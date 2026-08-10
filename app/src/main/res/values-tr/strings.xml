@@ -469,6 +469,9 @@
     <string name="no_relays">Yapılandırılmış röle yok</string>
     <string name="remove_relay">Röleyi kaldır</string>
     <string name="add_relay">Röle Ekle</string>
+    <string name="error_invalid_relay_url">wss:// ile başlayan geçerli ve güvenli bir röle URL\'si girin.</string>
+    <string name="error_external_relay_not_supported">Bu sürüm yalnızca White Noise tarafından yönetilen röleleri destekler.</string>
+    <string name="unsupported_relays_cleanup_notice">Başka bir uygulamadan içe aktarılan harici röleler bu sürümde desteklenmez. Bu liste düzenlendiğinde desteklenmeyen tüm röleler kaldırılır.</string>
     <string name="nip_65">Nerede paylaşırım</string>
     <string name="inbox">Nerede alırım</string>
     <string name="relay_posting_help">Başkaları sizi gruplara eklemek için anahtarınızı bu aktarma sunucularından alır.</string>

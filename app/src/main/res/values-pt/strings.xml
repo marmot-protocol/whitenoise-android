@@ -469,6 +469,9 @@
     <string name="no_relays">Nenhum relay configurado</string>
     <string name="remove_relay">Remover Relay?</string>
     <string name="add_relay">Adicionar Relay</string>
+    <string name="error_invalid_relay_url">Insira um URL de relay seguro e válido que comece por wss://.</string>
+    <string name="error_external_relay_not_supported">Esta versão suporta apenas relays geridos pelo White Noise.</string>
+    <string name="unsupported_relays_cleanup_notice">Os relays externos importados de outra aplicação não são suportados nesta versão. Editar esta lista remove todos os relays não suportados.</string>
     <string name="nip_65">Onde publico</string>
     <string name="inbox">Onde recebo</string>
     <string name="relay_posting_help">Outras pessoas obtêm a sua chave destes relays para adicionar você a grupos.</string>

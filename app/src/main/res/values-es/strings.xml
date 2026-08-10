@@ -469,6 +469,9 @@
     <string name="no_relays">No hay relés configurados</string>
     <string name="remove_relay">Eliminar relé</string>
     <string name="add_relay">Añadir un relé</string>
+    <string name="error_invalid_relay_url">Introduce una URL de relé segura y válida que comience por wss://.</string>
+    <string name="error_external_relay_not_supported">Esta versión solo admite relés administrados por White Noise.</string>
+    <string name="unsupported_relays_cleanup_notice">Los relés externos importados desde otra aplicación no son compatibles con esta versión. Al editar esta lista, se eliminarán todos los relés no compatibles.</string>
     <string name="nip_65">Dónde publico</string>
     <string name="inbox">Dónde recibo</string>
     <string name="relay_posting_help">Otras personas obtienen tu clave de estos relés para añadirte a grupos.</string>

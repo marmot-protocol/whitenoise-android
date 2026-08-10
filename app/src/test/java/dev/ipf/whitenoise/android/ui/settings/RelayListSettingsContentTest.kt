@@ -9,9 +9,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasProgressBarRangeInfo
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -94,7 +98,7 @@ class RelayListSettingsContentTest {
         render(
             lists = relayLists(nip65 = listOf("wss://post.example.com"), inbox = emptyList()),
             pendingUrl = pendingUrl,
-            onUpdateRelays = { _, _, _ -> updateRequested = true },
+            onAddRelay = { _, _, _ -> updateRequested = true },
         )
 
         composeRule.onNodeWithContentDescription(app.getString(R.string.add_relay)).performClick()
@@ -110,7 +114,7 @@ class RelayListSettingsContentTest {
         render(
             lists = relayLists(nip65 = listOf("wss://post.example.com"), inbox = emptyList()),
             pendingUrl = pendingUrl,
-            onUpdateRelays = { _, _, onSuccess -> onSuccess() },
+            onAddRelay = { _, _, onSuccess -> onSuccess() },
         )
 
         composeRule.onNodeWithContentDescription(app.getString(R.string.add_relay)).performClick()
@@ -137,11 +141,72 @@ class RelayListSettingsContentTest {
         composeRule.runOnIdle { assertEquals("", editorState.pendingUrl) }
     }
 
+    @Test
+    fun removingRelayShowsProgressAndBlocksOtherEdits() {
+        val removing = "wss://one.example.com"
+
+        render(
+            lists = relayLists(nip65 = listOf(removing, "wss://two.example.com"), inbox = emptyList()),
+            mutation = RelayMutation.Removing(RelayListKind.Nip65, removing),
+        )
+
+        composeRule
+            .onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate))
+            .assertIsDisplayed()
+        val removeActions = composeRule.onAllNodesWithContentDescription(app.getString(R.string.remove_relay))
+        removeActions.assertCountEquals(2)
+        removeActions[1].assertIsNotEnabled()
+    }
+
+    @Test
+    fun addingRelayShowsProgressAndDisablesInput() {
+        val pendingUrl = "wss://new.example.com"
+
+        render(
+            lists = relayLists(nip65 = listOf("wss://post.example.com"), inbox = emptyList()),
+            pendingUrl = pendingUrl,
+            mutation = RelayMutation.Adding(RelayListKind.Nip65, pendingUrl),
+        )
+
+        composeRule.onNodeWithContentDescription(app.getString(R.string.add_relay)).assertIsDisplayed()
+        composeRule.onAllNodes(hasSetTextAction()).assertCountEquals(0)
+    }
+
+    @Test
+    fun releaseExplainsWhyExternalRelayCannotBeAdded() {
+        val pendingUrl = "wss://external.example.com"
+
+        render(
+            lists = relayLists(nip65 = listOf("wss://relay.us.whitenoise.chat"), inbox = emptyList()),
+            pendingUrl = pendingUrl,
+            allowExternalRelayHosts = false,
+        )
+
+        composeRule.onNodeWithText(app.getString(R.string.error_external_relay_not_supported)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.add_relay)).assertIsNotEnabled()
+    }
+
+    @Test
+    fun releaseAllowsCleanupWhenOnlyImportedExternalRelayExists() {
+        val externalRelay = "wss://external.example.com"
+
+        render(
+            lists = relayLists(nip65 = listOf(externalRelay), inbox = emptyList()),
+            allowExternalRelayHosts = false,
+        )
+
+        composeRule.onNodeWithText(app.getString(R.string.unsupported_relays_cleanup_notice)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.remove_relay)).assertIsEnabled()
+    }
+
     private fun render(
         lists: AccountRelayListsFfi,
         canEdit: Boolean = true,
         pendingUrl: String = "",
-        onUpdateRelays: (RelayListKind, List<String>, () -> Unit) -> Unit = { _, _, _ -> },
+        mutation: RelayMutation? = null,
+        allowExternalRelayHosts: Boolean = true,
+        onAddRelay: (RelayListKind, String, () -> Unit) -> Unit = { _, _, _ -> },
+        onRemoveRelay: (RelayListKind, String) -> Unit = { _, _ -> },
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -155,9 +220,11 @@ class RelayListSettingsContentTest {
                             onSelectKind = { selectedKind = it },
                             pendingUrl = currentPendingUrl,
                             onPendingUrlChange = { currentPendingUrl = it },
-                            saving = false,
+                            mutation = mutation,
                             canEdit = canEdit,
-                            onUpdateRelays = onUpdateRelays,
+                            allowExternalRelayHosts = allowExternalRelayHosts,
+                            onAddRelay = onAddRelay,
+                            onRemoveRelay = onRemoveRelay,
                         )
                     }
                 }
