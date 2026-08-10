@@ -334,6 +334,7 @@ internal fun GroupDetailsScreen(
     }
     val noShareTargetText = stringResource(R.string.no_share_target_available)
     val groupTitleCopy = rememberGroupTitleCopy()
+    appState.profileRevisionForCompose
     val conversationTitle = controller.title(groupTitleCopy)
     val activeAccountIdHex = appState.activeAccount?.accountIdHex
     val dmPeerAccountIdHex =
@@ -849,7 +850,7 @@ internal fun GroupDetailsScreen(
         ) {
             val encryptedGroupAvatar = rememberEncryptedGroupAvatar(appState, controller.group)
             GroupDetailsHeader(
-                title = controller.title(groupTitleCopy),
+                title = conversationTitle,
                 subtitle =
                     if (isDm) {
                         ""
