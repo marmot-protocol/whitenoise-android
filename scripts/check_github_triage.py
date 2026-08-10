@@ -15,7 +15,19 @@ REPO = f"{OWNER}/whitenoise-android"
 PROJECT = "7"
 LEGACY_PROJECT = "5"
 RETIRED_LABELS = {"CRITICAL", "HIGH", "MEDIUM", "LOW", "tracking"}
-REQUIRED_ITEM_FIELDS = ("priority", "area", "triage health")
+REQUIRED_ITEM_FIELDS = ("priority", "area", "triage health", "status")
+ALLOWED_ISSUE_TYPES = {"Bug", "Feature", "Task", "Tracking"}
+ALLOWED_ITEM_FIELD_VALUES = {
+    "priority": {"P0", "P1", "P2", "P3"},
+    "triage health": {
+        "Needs triage",
+        "Ready",
+        "Blocked",
+        "Needs design",
+        "Needs upstream",
+    },
+    "status": {"Todo", "In Progress", "Done"},
+}
 
 
 def gh(*args: str) -> str:
@@ -68,17 +80,33 @@ def findings(current, legacy, issues, project, labels) -> list[str]:
     if duplicates:
         problems.append(f"open issues duplicated in project: {duplicates}")
 
-    untyped = sorted(
-        item["number"] for item in issues if not (item.get("issueType") or {}).get("name")
-    )
+    issue_types = {
+        item["number"]: (item.get("issueType") or {}).get("name") for item in issues
+    }
+    untyped = sorted(number for number, issue_type in issue_types.items() if not issue_type)
     if untyped:
         problems.append(f"open issues missing native type: {untyped}")
+    invalid_types = sorted(
+        number
+        for number, issue_type in issue_types.items()
+        if issue_type and issue_type not in ALLOWED_ISSUE_TYPES
+    )
+    if invalid_types:
+        problems.append(f"open issues with invalid native type: {invalid_types}")
 
     by_number = {item["content"]["number"]: item for item in project_open}
     for field in REQUIRED_ITEM_FIELDS:
         unset = sorted(number for number, item in by_number.items() if not item.get(field))
         if unset:
             problems.append(f"open issues missing {field}: {unset}")
+        allowed = ALLOWED_ITEM_FIELD_VALUES.get(field)
+        invalid = sorted(
+            number
+            for number, item in by_number.items()
+            if item.get(field) and allowed and item[field] not in allowed
+        )
+        if invalid:
+            problems.append(f"open issues with invalid {field}: {invalid}")
 
     retired_present = sorted(RETIRED_LABELS & labels)
     if retired_present:
