@@ -25,8 +25,7 @@ data class GroupTitleCopy(
 }
 
 data class TranscriptSenderDecoration(
-    val showName: Boolean,
-    val showAvatar: Boolean,
+    val showHeader: Boolean,
 )
 
 object GroupProjector {
@@ -144,12 +143,10 @@ object GroupProjector {
         isDm: Boolean,
         mine: Boolean,
         sameSenderAsOlderBubble: Boolean,
-        sameSenderAsNewerBubble: Boolean,
     ): TranscriptSenderDecoration {
         val showSenderIdentity = shouldShowTranscriptSenderAvatar(isDm = isDm, mine = mine)
         return TranscriptSenderDecoration(
-            showName = showSenderIdentity && !sameSenderAsOlderBubble,
-            showAvatar = showSenderIdentity && !sameSenderAsNewerBubble,
+            showHeader = showSenderIdentity && !sameSenderAsOlderBubble,
         )
     }
 

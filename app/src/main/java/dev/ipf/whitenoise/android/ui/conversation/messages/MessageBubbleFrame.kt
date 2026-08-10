@@ -1,10 +1,16 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -21,11 +27,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.Avatar
 
 /** Shared frame for caption and plain-text bubbles. */
 @Composable
@@ -95,6 +104,8 @@ internal fun MediaCaptionFrame(
     modifier: Modifier = Modifier,
     contentModifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(18.dp),
+    showIdentityHeader: Boolean = false,
+    identityHeader: @Composable ColumnScope.() -> Unit = {},
     media: @Composable ColumnScope.() -> Unit,
     caption: @Composable ColumnScope.() -> Unit,
 ) {
@@ -125,16 +136,28 @@ internal fun MediaCaptionFrame(
             ),
         tonalElevation = if (mine) 1.dp else 0.dp,
     ) {
-        MediaSupplementEnvelope(
-            alignEnd = alignEnd,
-            media = media,
-        ) {
-            Column(modifier = contentModifier.fillMaxWidth()) {
+        Column {
+            if (showIdentityHeader) {
                 Column(
-                    modifier = bubbleContentModifier(mentionModifier, Modifier),
-                    verticalArrangement = bubbleContentArrangement,
-                    content = caption,
-                )
+                    modifier =
+                        Modifier
+                            .padding(horizontal = 14.dp)
+                            .padding(top = 10.dp),
+                ) {
+                    identityHeader()
+                }
+            }
+            MediaSupplementEnvelope(
+                alignEnd = alignEnd,
+                media = media,
+            ) {
+                Column(modifier = contentModifier.fillMaxWidth()) {
+                    Column(
+                        modifier = bubbleContentModifier(mentionModifier, Modifier),
+                        verticalArrangement = bubbleContentArrangement,
+                        content = caption,
+                    )
+                }
             }
         }
     }
@@ -217,6 +240,50 @@ internal fun MessageBubbleInvalidationWarning(
         color = color,
         modifier = modifier,
     )
+}
+
+@Composable
+@Suppress("FunctionNaming")
+internal fun MessageBubbleSenderHeader(
+    name: String,
+    seed: String,
+    avatarUrl: String?,
+    profileLabel: String,
+    contentColor: Color,
+    onProfileClick: () -> Unit,
+    onLongPress: () -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .widthIn(min = 48.dp)
+                .heightIn(min = 48.dp)
+                .combinedClickable(
+                    enabled = enabled,
+                    onClickLabel = profileLabel,
+                    role = Role.Button,
+                    onClick = onProfileClick,
+                    onLongClick = onLongPress,
+                ).semantics { contentDescription = name },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Avatar(
+            title = name,
+            seed = seed,
+            size = 20.dp,
+            pictureUrl = avatarUrl,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = name,
+            style = MaterialTheme.typography.labelMedium,
+            color = contentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 internal fun shouldFrameMessageBubbleSupplement(

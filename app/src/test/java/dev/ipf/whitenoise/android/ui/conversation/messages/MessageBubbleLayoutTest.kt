@@ -12,20 +12,20 @@ class MessageBubbleLayoutTest {
 
     @Test
     fun bubbleColumnLeavesAFixedOppositeGutter() {
+        // Incoming group rows no longer reserve a standalone avatar lane; at 400dp
+        // width they recover 352dp max (48dp opposite gutter only).
         assertEquals(
             352.dp,
             messageBubbleColumnMaxWidth(
                 containerWidth = 400.dp,
                 selectionGutterWidth = 0.dp,
-                senderAvatarSlotWidth = 0.dp,
             ),
         )
         assertEquals(
             312.dp,
             messageBubbleColumnMaxWidth(
                 containerWidth = 400.dp,
-                selectionGutterWidth = 0.dp,
-                senderAvatarSlotWidth = 40.dp,
+                selectionGutterWidth = 40.dp,
             ),
         )
     }

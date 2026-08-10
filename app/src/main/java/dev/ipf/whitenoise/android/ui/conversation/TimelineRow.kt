@@ -27,7 +27,6 @@ import java.util.Locale
 internal fun TimelineRow(
     item: TimelineMessage,
     older: TimelineMessage?,
-    newer: TimelineMessage?,
     transcriptLocale: Locale,
     entryUnreadCount: Int,
     unreadIncomingCount: Int,
@@ -161,21 +160,11 @@ internal fun TimelineRow(
                         deletedMessageIds = controller.deletedMessageIds,
                     )
                 } == true
-            val sameSenderAsNewerBubble =
-                newer?.let { candidate ->
-                    conversationBubbleRowsShareSenderRun(
-                        first = item,
-                        second = candidate,
-                        streamingDebugEnabled = appState.streamingDebugEnabled,
-                        deletedMessageIds = controller.deletedMessageIds,
-                    )
-                } == true
             val senderDecoration =
                 GroupProjector.transcriptSenderDecoration(
                     isDm = controller.isDm,
                     mine = controller.isMessageMine(item.record),
                     sameSenderAsOlderBubble = sameSenderAsOlderBubble,
-                    sameSenderAsNewerBubble = sameSenderAsNewerBubble,
                 )
             DismissMessageActionMenuOnDispose(
                 messageId = item.record.messageIdHex,
@@ -220,8 +209,7 @@ internal fun TimelineRow(
                 },
                 mentionCandidates = mentionCandidates,
                 mentionPickerEnabled = mentionPickerEnabled,
-                showSenderName = senderDecoration.showName,
-                showSenderAvatar = senderDecoration.showAvatar,
+                showSenderHeader = senderDecoration.showHeader,
                 collapseLongMessages = collapseLongMessages,
                 readOnly = controller.group.pendingConfirmation,
             )

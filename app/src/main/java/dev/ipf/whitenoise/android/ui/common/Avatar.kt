@@ -91,15 +91,27 @@ internal fun Avatar(
             // taken in the same dp-constant space, so it also resists font
             // scale.
             val fontScale = LocalDensity.current.fontScale
-            val titleMediumSp = MaterialTheme.typography.titleMedium.fontSize
+            val titleMedium = MaterialTheme.typography.titleMedium
             val fittedFontSize =
-                minOf(size.value * 0.4f, titleMediumSp.value * fontScale).sp / fontScale
+                minOf(size.value * 0.4f, titleMedium.fontSize.value * fontScale).sp / fontScale
+            val inheritedLineHeightDp = titleMedium.lineHeight.value * fontScale
+            val fittedLineHeight =
+                if (inheritedLineHeightDp > size.value * 1.5f) {
+                    fittedFontSize * 1.25f
+                } else {
+                    titleMedium.lineHeight
+                }
             Text(
                 IdentityFormatter.initials(title),
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.titleMedium,
+                style = titleMedium,
                 fontSize = fittedFontSize,
+                // Preserve the theme line height at ordinary scales so existing
+                // avatars render identically. Cap only when scaled typography's
+                // line box is substantially taller than the compact avatar;
+                // otherwise the fallback glyphs can be clipped completely.
+                lineHeight = fittedLineHeight,
                 maxLines = 1,
             )
         }

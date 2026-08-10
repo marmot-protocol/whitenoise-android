@@ -3,8 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -25,11 +23,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -41,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -72,7 +67,6 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
-import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ReplySwipeGesture
@@ -90,7 +84,6 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
-import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
@@ -303,8 +296,7 @@ internal fun MessageBubble(
     onDeclineInvite: () -> Unit,
     mentionCandidates: List<MentionComposer.Candidate>,
     mentionPickerEnabled: Boolean,
-    showSenderName: Boolean = false,
-    showSenderAvatar: Boolean = false,
+    showSenderHeader: Boolean = false,
     collapseLongMessages: Boolean = true,
     readOnly: Boolean = false,
 ) {
@@ -536,11 +528,6 @@ internal fun MessageBubble(
                 )
             }
         }
-    val reserveSenderAvatarSlot =
-        GroupProjector.shouldShowTranscriptSenderAvatar(
-            isDm = controller.isDm,
-            mine = mine,
-        )
     // Match the timestamp to the bubble's visual cue. AMOLED uses the same
     // directional accent as the border; other themes keep their paired M3
     // on-color tokens.
@@ -705,12 +692,10 @@ internal fun MessageBubble(
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val selectionGutterWidth = if (selectionMode) messageBubbleSelectionGutterWidth else 0.dp
-        val senderAvatarSlotWidth = if (reserveSenderAvatarSlot) MessageBubbleSenderAvatarSlotWidth else 0.dp
         val bubbleColumnMaxWidth =
             messageBubbleColumnMaxWidth(
                 containerWidth = maxWidth,
                 selectionGutterWidth = selectionGutterWidth,
-                senderAvatarSlotWidth = senderAvatarSlotWidth,
             )
         val longPressBlockedBySelection = selectionMode && !rangeDragActive
         val replySwipeUnavailable = deleted || readOnly || textSelectionMode
@@ -718,11 +703,11 @@ internal fun MessageBubble(
         Row(
             // Both reply-swipe and long-press hitboxes cover the ENTIRE row,
             // not just the bubble: a swipe-right or long-press starting on the
-            // surrounding whitespace (avatar gutter, empty space next to the
-            // bubble) triggers the same action as one starting on the bubble.
+            // surrounding whitespace (empty space next to the bubble) triggers
+            // the same action as one starting on the bubble.
             // See #204. The visual slide stays on the Surface below via
             // `.offset`; only gesture detection lives on the row. Nested
-            // handlers (avatar, sender name, reaction chips) are children and
+            // handlers (sender header, reaction chips) are children and
             // still win for their own SHORT taps. Long-press is detected with a
             // raw pointerInput (below) rather than combinedClickable so it wins
             // over inner media `clickable` children for the long-press while
@@ -873,33 +858,6 @@ internal fun MessageBubble(
                 // to an outgoing bubble. Consume the middle space so the gutter
                 // stays at the row's leading edge for both message directions.
                 if (mine) Spacer(Modifier.weight(1f))
-            }
-            if (reserveSenderAvatarSlot) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(32.dp)
-                            .align(Alignment.Bottom),
-                ) {
-                    if (showSenderAvatar) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .clip(CircleShape)
-                                    .clickable(enabled = !textSelectionMode) {
-                                        appState.presentProfile(appState.npub(record.sender))
-                                    },
-                        ) {
-                            Avatar(
-                                title = appState.displayName(record.sender),
-                                seed = record.sender,
-                                size = 32.dp,
-                                pictureUrl = appState.avatarUrl(record.sender),
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.width(8.dp))
             }
             Column(
                 modifier = Modifier.widthIn(max = bubbleColumnMaxWidth),
@@ -1157,34 +1115,44 @@ internal fun MessageBubble(
                 // setting disabled never collapse (#325, #1180).
                 val collapsible =
                     collapseLongMessages && !deleted && !persistedFailure && !textSelectionMode
-                // The sender-name label (group chats only). Rendered above the
-                // shared media card when media is present, or as the first child
-                // of the text-only bubble otherwise.
-                val senderNameLabel: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
-                    if (showSenderName) {
-                        Text(
-                            appState.displayName(record.sender),
-                            style = MaterialTheme.typography.labelMedium,
-                            color =
-                                if (insideBubble && customBubbleColorActive) {
-                                    bubbleContentColor
-                                } else {
-                                    colorScheme.onSurfaceVariant
-                                },
-                            modifier =
-                                Modifier.combinedClickable(
-                                    enabled = !textSelectionMode,
-                                    onClick = { appState.presentProfile(appState.npub(record.sender)) },
-                                    onLongClick = {
-                                        if (!deleted && !selectionMode && !textSelectionMode) {
-                                            longPressWindowPosition = null
-                                            longPressWindowY = null
-                                            actionMenuAnchorBounds = messageBoundsInWindow[0]
-                                            onActionMenuOpenChange(true)
-                                        }
-                                    },
-                                ),
-                        )
+                // Compact sender identity at the start of an incoming group run.
+                val senderHeaderContent: @Composable () -> Unit = {
+                    val profileRevision = appState.profileRevisionForCompose
+                    val senderDisplayName =
+                        remember(record.sender, profileRevision) {
+                            appState.displayName(record.sender)
+                        }
+                    val senderAvatarUrl =
+                        remember(record.sender, profileRevision) {
+                            appState.avatarUrl(record.sender)
+                        }
+                    val senderHeaderColor =
+                        if (customBubbleColorActive) {
+                            bubbleContentColor
+                        } else {
+                            colorScheme.onSurfaceVariant
+                        }
+                    MessageBubbleSenderHeader(
+                        name = senderDisplayName,
+                        seed = record.sender,
+                        avatarUrl = senderAvatarUrl,
+                        profileLabel = stringResource(R.string.chat_list_search_open_profile),
+                        contentColor = senderHeaderColor,
+                        onProfileClick = { appState.presentProfile(appState.npub(record.sender)) },
+                        onLongPress = {
+                            if (!deleted && !selectionMode && !textSelectionMode) {
+                                longPressWindowPosition = null
+                                longPressWindowY = null
+                                actionMenuAnchorBounds = messageBoundsInWindow[0]
+                                onActionMenuOpenChange(true)
+                            }
+                        },
+                        enabled = !textSelectionMode,
+                    )
+                }
+                val senderHeader: @Composable () -> Unit = {
+                    if (showSenderHeader) {
+                        senderHeaderContent()
                     }
                 }
                 // The reply quote card. Self-contained (own translucent Surface),
@@ -1256,9 +1224,8 @@ internal fun MessageBubble(
                         horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        senderNameLabel(false)
                         replyPreviewCard(false)
-                        if (bodyOrWarningInsideBubble) {
+                        if (bodyOrWarningInsideBubble || showSenderHeader) {
                             MediaCaptionFrame(
                                 modifier = actionAnchorBoundsModifier,
                                 presentation = bubblePresentation,
@@ -1268,6 +1235,8 @@ internal fun MessageBubble(
                                 mentionedYouLabel = mentionedYouLabel,
                                 alignEnd = mine,
                                 contentModifier = textSelectionBoundsModifier,
+                                showIdentityHeader = showSenderHeader,
+                                identityHeader = { senderHeader() },
                                 media = {
                                     BubbleMediaBlocks(
                                         item = item,
@@ -1404,7 +1373,7 @@ internal fun MessageBubble(
                         // reply-bubble measurement changes.
                         contentModifier = if (replyPreview != null) Modifier.width(IntrinsicSize.Max) else Modifier,
                     ) {
-                        senderNameLabel(true)
+                        senderHeader()
                         replyPreviewCard(true)
                         BubbleBodyFooterAndRetry(
                             item = item,
@@ -1763,12 +1732,10 @@ internal fun MessageBubble(
 internal const val MESSAGE_COLLAPSE_LINE_LIMIT = 52
 
 private val MessageBubbleOppositeGutter = 48.dp
-private val MessageBubbleSenderAvatarSlotWidth = 40.dp
 
 internal fun messageBubbleColumnMaxWidth(
     containerWidth: Dp,
     selectionGutterWidth: Dp,
-    senderAvatarSlotWidth: Dp,
 ): Dp =
-    (containerWidth - MessageBubbleOppositeGutter - selectionGutterWidth - senderAvatarSlotWidth)
+    (containerWidth - MessageBubbleOppositeGutter - selectionGutterWidth)
         .coerceAtLeast(0.dp)

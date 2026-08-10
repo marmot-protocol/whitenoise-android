@@ -217,6 +217,7 @@ internal fun conversationBubbleRowsShareSenderRun(
 ): Boolean =
     timelineItemRendersAsConversationBubble(first, streamingDebugEnabled, deletedMessageIds) &&
         timelineItemRendersAsConversationBubble(second, streamingDebugEnabled, deletedMessageIds) &&
+        transcriptBubbleRowsShareMessageDirection(first.record, second.record) &&
         GroupProjector.messagesShareTranscriptSenderRun(
             firstSender = first.record.sender,
             firstRecordedAt = first.record.recordedAt,
@@ -224,6 +225,11 @@ internal fun conversationBubbleRowsShareSenderRun(
             secondRecordedAt = second.record.recordedAt,
             sameDay = !differentDay(first.record.recordedAt, second.record.recordedAt),
         )
+
+private fun transcriptBubbleRowsShareMessageDirection(
+    first: AppMessageRecordFfi,
+    second: AppMessageRecordFfi,
+): Boolean = first.direction.equals(second.direction, ignoreCase = true)
 
 private fun timelineItemRendersAsConversationBubble(
     item: TimelineMessage,
@@ -2672,7 +2678,6 @@ internal fun ConversationScreen(
                                 TimelineRow(
                                     item = item,
                                     older = renderedTimeline.getOrNull(index - 1),
-                                    newer = renderedTimeline.getOrNull(index + 1),
                                     transcriptLocale = transcriptLocale,
                                     entryUnreadCount = entryUnreadCount,
                                     unreadIncomingCount = unreadIncomingCount,

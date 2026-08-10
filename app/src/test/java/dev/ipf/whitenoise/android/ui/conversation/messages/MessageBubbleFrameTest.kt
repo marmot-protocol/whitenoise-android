@@ -245,6 +245,61 @@ class MessageBubbleFrameTest {
     }
 
     @Test
+    fun mediaCaptionIdentityHeaderInsideSurfacePreservesEnvelopeWidth() {
+        composeRule.setContent {
+            MaterialTheme {
+                Box(Modifier.width(300.dp)) {
+                    MediaCaptionFrame(
+                        presentation = messageBubblePresentation(deleted = false, mine = false),
+                        highlighted = false,
+                        mine = false,
+                        mentionedSelf = false,
+                        mentionedYouLabel = "Mentioned you",
+                        alignEnd = false,
+                        modifier = Modifier.testTag(MEDIA_IDENTITY_FRAME_TAG),
+                        contentModifier = Modifier.testTag(MEDIA_IDENTITY_CAPTION_TAG),
+                        showIdentityHeader = true,
+                        identityHeader = {
+                            Box(
+                                Modifier
+                                    .height(48.dp)
+                                    .testTag(MEDIA_IDENTITY_HEADER_TAG),
+                            )
+                        },
+                        media = {
+                            Box(Modifier.width(220.dp).height(100.dp).testTag(MEDIA_IDENTITY_MEDIA_TAG))
+                        },
+                    ) {
+                        Box(
+                            Modifier
+                                .width(58.dp)
+                                .height(12.dp)
+                                .testTag(MEDIA_IDENTITY_FOOTER_TAG),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.runOnIdle {
+            val frameBounds =
+                composeRule.onNodeWithTag(MEDIA_IDENTITY_FRAME_TAG).fetchSemanticsNode().boundsInRoot
+            val headerBounds =
+                composeRule.onNodeWithTag(MEDIA_IDENTITY_HEADER_TAG).fetchSemanticsNode().boundsInRoot
+            val mediaBounds =
+                composeRule.onNodeWithTag(MEDIA_IDENTITY_MEDIA_TAG).fetchSemanticsNode().boundsInRoot
+            val captionBounds =
+                composeRule.onNodeWithTag(MEDIA_IDENTITY_CAPTION_TAG).fetchSemanticsNode().boundsInRoot
+            assertTrue(frameBounds.left <= headerBounds.left)
+            assertTrue(frameBounds.top <= headerBounds.top)
+            assertTrue(frameBounds.right >= headerBounds.right)
+            assertTrue(frameBounds.bottom >= headerBounds.bottom)
+            assertTrue(headerBounds.bottom <= mediaBounds.top + 0.1f)
+            assertEquals(mediaBounds.width, captionBounds.width, 1f)
+        }
+    }
+
+    @Test
     fun mediaItemsKeepTheirSpacingAndCaptionHasNoExternalGap() {
         composeRule.setContent {
             MediaSupplementEnvelope(
@@ -308,6 +363,11 @@ class MessageBubbleFrameTest {
         const val MEDIA_REPLY_MEDIA_TAG = "media-reply-media"
         const val MEDIA_REPLY_CAPTION_TAG = "media-reply-caption"
         const val MEDIA_REPLY_FOOTER_TAG = "media-reply-footer"
+        const val MEDIA_IDENTITY_FRAME_TAG = "media-identity-frame"
+        const val MEDIA_IDENTITY_HEADER_TAG = "media-identity-header"
+        const val MEDIA_IDENTITY_MEDIA_TAG = "media-identity-media"
+        const val MEDIA_IDENTITY_CAPTION_TAG = "media-identity-caption"
+        const val MEDIA_IDENTITY_FOOTER_TAG = "media-identity-footer"
         const val NON_REPLY_COLUMN_TAG = "non-reply-column"
         const val NON_REPLY_BODY_TAG = "non-reply-body"
     }

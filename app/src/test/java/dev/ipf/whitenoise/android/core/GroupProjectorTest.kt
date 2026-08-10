@@ -704,32 +704,37 @@ class GroupProjectorTest {
     }
 
     @Test
-    fun transcriptSenderDecorationUsesOneIdentityAtEachEndOfAConsecutiveRun() {
+    fun transcriptSenderDecorationShowsOneHeaderAtRunStart() {
         assertEquals(
-            TranscriptSenderDecoration(showName = true, showAvatar = false),
+            TranscriptSenderDecoration(showHeader = true),
             GroupProjector.transcriptSenderDecoration(
                 isDm = false,
                 mine = false,
                 sameSenderAsOlderBubble = false,
-                sameSenderAsNewerBubble = true,
             ),
         )
         assertEquals(
-            TranscriptSenderDecoration(showName = false, showAvatar = true),
+            TranscriptSenderDecoration(showHeader = false),
             GroupProjector.transcriptSenderDecoration(
                 isDm = false,
                 mine = false,
                 sameSenderAsOlderBubble = true,
-                sameSenderAsNewerBubble = false,
             ),
         )
         assertEquals(
-            TranscriptSenderDecoration(showName = false, showAvatar = false),
+            TranscriptSenderDecoration(showHeader = false),
             GroupProjector.transcriptSenderDecoration(
                 isDm = false,
                 mine = true,
                 sameSenderAsOlderBubble = false,
-                sameSenderAsNewerBubble = false,
+            ),
+        )
+        assertEquals(
+            TranscriptSenderDecoration(showHeader = false),
+            GroupProjector.transcriptSenderDecoration(
+                isDm = true,
+                mine = false,
+                sameSenderAsOlderBubble = false,
             ),
         )
     }
