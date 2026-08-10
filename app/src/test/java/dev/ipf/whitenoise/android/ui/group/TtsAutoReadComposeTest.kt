@@ -16,6 +16,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -25,6 +26,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -295,6 +297,23 @@ class TtsAutoReadComposeTest {
         composeRule.onNodeWithText(string(R.string.tts_auto_read_use_default_off)).assert(isSelectable())
         composeRule.onNodeWithText(string(R.string.tts_auto_read_override_on)).assert(isSelectable())
         composeRule.onNodeWithText(string(R.string.tts_auto_read_override_off)).assert(isSelectable())
+    }
+
+    @Test
+    fun pickerContentShowsVisibleCheckOnlyOnSelectedOption() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                TtsAutoReadPickerContent(
+                    globalDefaultEnabled = false,
+                    selectedOverride = TtsAutoReadOverride.ON,
+                    onSelect = {},
+                )
+            }
+        }
+
+        val selectedLabel = string(R.string.selected)
+        composeRule.onAllNodesWithContentDescription(selectedLabel).assertCountEquals(1)
+        composeRule.onNodeWithText(string(R.string.tts_auto_read_override_on)).assertIsSelected()
     }
 
     @Test

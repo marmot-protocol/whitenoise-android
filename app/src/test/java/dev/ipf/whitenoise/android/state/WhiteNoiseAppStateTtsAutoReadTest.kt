@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -177,6 +178,60 @@ class WhiteNoiseAppStateTtsAutoReadTest {
         assertFalse(appState.ownsTtsAutoReadSession(groupA))
     }
 
+    @Test
+    fun switchedAccountDoesNotOwnPreviousAccountsAutoReadSession() {
+        val appState = testAppStateWithTwoAccounts(activeAccountRef = accountRef)
+        val engine = FakeSessionEngine()
+        appState.ttsController.attachEngine(engine)
+
+        appState.setConversationAutoReadOverride(groupA, TtsAutoReadOverride.ON)
+        assertTrue(
+            appState.speakAloudAutoRead(
+                groupA,
+                listOf(TtsSpeakableEntry("s", "Sender", "Owned on account A.")),
+                Locale.US,
+            ),
+        )
+        assertTrue(appState.ownsTtsAutoReadSession(groupA))
+
+        runBlocking { appState.setActiveAccount("account-b") }
+        assertFalse(appState.ownsTtsAutoReadSession(groupA))
+    }
+
+    @Test
+    fun speakAloudClearsAutoReadOwnershipWhileSpeakAloudAutoReadClaimsIt() {
+        val appState = testAppState()
+        val engine = FakeSessionEngine()
+        appState.ttsController.attachEngine(engine)
+
+        appState.setConversationAutoReadOverride(groupA, TtsAutoReadOverride.ON)
+        assertTrue(
+            appState.speakAloudAutoRead(
+                groupA,
+                listOf(TtsSpeakableEntry("auto", "Sender", "Auto-read.")),
+                Locale.US,
+            ),
+        )
+        assertTrue(appState.ownsTtsAutoReadSession(groupA))
+
+        assertTrue(
+            appState.speakAloud(
+                listOf(TtsSpeakableEntry("manual", "Sender", "Manual playback.")),
+                Locale.US,
+            ),
+        )
+        assertFalse(appState.ownsTtsAutoReadSession(groupA))
+
+        assertTrue(
+            appState.speakAloudAutoRead(
+                groupA,
+                listOf(TtsSpeakableEntry("auto-2", "Sender", "Auto-read again.")),
+                Locale.US,
+            ),
+        )
+        assertTrue(appState.ownsTtsAutoReadSession(groupA))
+    }
+
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
@@ -194,6 +249,33 @@ class WhiteNoiseAppStateTtsAutoReadTest {
                     ),
                 ),
             activeAccountRef = accountRef,
+        )
+
+    private fun testAppStateWithTwoAccounts(activeAccountRef: String): WhiteNoiseAppState =
+        WhiteNoiseAppState(
+            context = context,
+            draftStore = DraftStore(DiscardedDrafts),
+            accountIdHexResolver = { null },
+            accounts =
+                listOf(
+                    AccountSummaryFfi(
+                        label = accountRef,
+                        accountIdHex = "id-a",
+                        localSigning = true,
+                        externalSigning = false,
+                        signedOut = false,
+                        running = true,
+                    ),
+                    AccountSummaryFfi(
+                        label = "account-b",
+                        accountIdHex = "id-b",
+                        localSigning = true,
+                        externalSigning = false,
+                        signedOut = false,
+                        running = true,
+                    ),
+                ),
+            activeAccountRef = activeAccountRef,
         )
 
     private object DiscardedDrafts : DraftPersistence {

@@ -7,15 +7,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -32,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TtsAutoReadOverride
+import dev.ipf.whitenoise.android.ui.settings.SelectableSettingsRow
 import dev.ipf.whitenoise.android.ui.settings.settingsRowAmoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
@@ -127,37 +125,20 @@ internal fun TtsAutoReadPickerContent(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.selectableGroup()) {
-        TtsAutoReadPickerOption(
+        SelectableSettingsRow(
             title = stringResource(ttsAutoReadSettingLabelRes(null, globalDefaultEnabled)),
             selected = selectedOverride == null,
             onClick = { onSelect(null) },
         )
-        TtsAutoReadPickerOption(
+        SelectableSettingsRow(
             title = stringResource(R.string.tts_auto_read_override_on),
             selected = selectedOverride == TtsAutoReadOverride.ON,
             onClick = { onSelect(TtsAutoReadOverride.ON) },
         )
-        TtsAutoReadPickerOption(
+        SelectableSettingsRow(
             title = stringResource(R.string.tts_auto_read_override_off),
             selected = selectedOverride == TtsAutoReadOverride.OFF,
             onClick = { onSelect(TtsAutoReadOverride.OFF) },
         )
     }
-}
-
-@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
-@Composable
-private fun TtsAutoReadPickerOption(
-    title: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    ListItem(
-        modifier =
-            Modifier
-                .settingsRowAmoledSurfaceBorder()
-                .selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        headlineContent = { Text(title) },
-    )
 }
