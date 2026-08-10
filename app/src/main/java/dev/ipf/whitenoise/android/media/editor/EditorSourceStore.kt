@@ -187,19 +187,19 @@ internal class EditorSourceStore(
             true
         }
 
-    fun reconcile(liveLeaseIds: Set<String>): Int = reconcile(liveLeaseIds.associateWith { 1 })
+    fun reconcile(liveLeaseIds: Set<String>): Int? = reconcile(liveLeaseIds.associateWith { 1 })
 
     /** Reconciles both ownership and deduplicated reference counts after restart. */
-    fun reconcile(liveLeaseReferences: Map<String, Int>): Int =
+    fun reconcile(liveLeaseReferences: Map<String, Int>): Int? =
         synchronized(lock) {
-            if (!ensureLoadedLocked()) return 0
+            if (!ensureLoadedLocked()) return null
             val validReferences = liveLeaseReferences.filterValues { it > 0 }
             val stale = leases.keys - validReferences.keys
             val updated =
                 leases
                     .filterKeys { it in validReferences }
                     .mapValues { (id, lease) -> lease.copy(references = requireNotNull(validReferences[id])) }
-            if (!persistLocked(updated)) return 0
+            if (!persistLocked(updated)) return null
             stale.forEach {
                 payloads.remove(it)
             }

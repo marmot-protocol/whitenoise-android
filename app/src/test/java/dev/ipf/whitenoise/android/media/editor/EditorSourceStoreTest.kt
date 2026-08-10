@@ -96,7 +96,7 @@ class EditorSourceStoreTest {
         records.failReads = true
         val reloaded = store(payloads, records)
 
-        assertEquals(0, reloaded.reconcile(emptyMap()))
+        assertNull(reloaded.reconcile(emptyMap()))
         assertTrue(payloads.values.containsKey(lease.id))
         assertEquals(EditorSourceStageResult.Unavailable, reloaded.stageBytes(byteArrayOf(2)))
 
@@ -125,6 +125,19 @@ class EditorSourceStoreTest {
         store.reconcile(mapOf(lease.id to 3))
 
         assertEquals(3, store.lease(lease.id)?.references)
+    }
+
+    @Test
+    fun reconciliationMetadataWriteFailureReturnsUnavailableWithoutDeletingPayloads() {
+        val payloads = InMemoryPayloads()
+        val records = InMemoryStrings()
+        val store = store(payloads, records)
+        val lease = (store.stageBytes(byteArrayOf(1)) as EditorSourceStageResult.Success).lease
+        records.failWrites = true
+
+        assertNull(store.reconcile(emptyMap()))
+        assertTrue(payloads.values.containsKey(lease.id))
+        assertTrue(store.bytes(lease.id) != null)
     }
 
     @Test

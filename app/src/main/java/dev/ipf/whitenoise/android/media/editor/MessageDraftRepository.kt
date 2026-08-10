@@ -289,7 +289,10 @@ internal class MessageDraftRepository(
                 val sourceLeaseReferences =
                     editorSessions.sourceLeaseReferenceCounts()
                         ?: return@withContext Result.failure(editorSessionStoreUnavailable())
-                Result.success(sources.reconcile(sourceLeaseReferences))
+                val reconciledSources =
+                    sources.reconcile(sourceLeaseReferences)
+                        ?: return@withContext Result.failure(editorSourceStoreUnavailable())
+                Result.success(reconciledSources)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (cause: Exception) {
@@ -436,8 +439,13 @@ internal class MessageDraftRepository(
 
 private fun editorSessionStoreUnavailable() = IllegalStateException(EDITOR_SESSION_STORE_UNAVAILABLE_MESSAGE)
 
+private fun editorSourceStoreUnavailable() = IllegalStateException(EDITOR_SOURCE_STORE_UNAVAILABLE_MESSAGE)
+
 private const val EDITOR_SESSION_STORE_UNAVAILABLE_MESSAGE =
     "Encrypted editor sessions are temporarily unavailable"
+
+private const val EDITOR_SOURCE_STORE_UNAVAILABLE_MESSAGE =
+    "Encrypted editor sources are temporarily unavailable"
 
 internal fun MessageDraftAttachmentFfi.editorDigest(): String =
     editorAttachmentDigest(

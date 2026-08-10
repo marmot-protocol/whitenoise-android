@@ -288,6 +288,39 @@ class MessageDraftRepositoryTest {
         }
 
     @Test
+    fun startupReconciliationFailsWhenEncryptedSourcesCannotBeRead() =
+        runTest {
+            val payloads = RepositoryPayloads()
+            val sourceRecords = RepositorySessionStrings()
+            val initialSources =
+                EditorSourceStore(
+                    payloads = payloads,
+                    records = sourceRecords,
+                    newId = { "lease" },
+                )
+            val lease = (initialSources.stageBytes(byteArrayOf(1)) as EditorSourceStageResult.Success).lease
+            sourceRecords.failReads = true
+            val unavailableSources =
+                EditorSourceStore(
+                    payloads = payloads,
+                    records = sourceRecords,
+                )
+
+            val result =
+                repository(
+                    gateway = FakeDraftGateway(null),
+                    sessions = EditorSessionStore(RepositorySessionStrings()),
+                ).reconcileEditorState(unavailableSources)
+
+            assertTrue(result.isFailure)
+            assertEquals(
+                "Encrypted editor sources are temporarily unavailable",
+                result.exceptionOrNull()?.message,
+            )
+            assertTrue(payloads.values.containsKey(lease.id))
+        }
+
+    @Test
     fun draftReadRethrowsCancellation() =
         runTest {
             val gateway = FakeDraftGateway(null).apply { readFailure = CancellationException("cancelled") }
