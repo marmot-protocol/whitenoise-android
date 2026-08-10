@@ -114,7 +114,7 @@ internal fun RelaysScreen(
                                     editorState.mutation = mutation
                                     appState.launchMutation {
                                         try {
-                                            val updated = appState.addAccountRelay(kind, relay)
+                                            val updated = appState.addAccountRelay(accountAtStart, kind, relay)
                                             if (updated != null && appState.activeAccountRef == accountAtStart) {
                                                 lists = updated
                                                 onSuccess()
@@ -131,7 +131,7 @@ internal fun RelaysScreen(
                                     editorState.mutation = mutation
                                     appState.launchMutation {
                                         try {
-                                            val updated = appState.removeAccountRelay(kind, relay)
+                                            val updated = appState.removeAccountRelay(accountAtStart, kind, relay)
                                             if (updated != null && appState.activeAccountRef == accountAtStart) {
                                                 lists = updated
                                             }

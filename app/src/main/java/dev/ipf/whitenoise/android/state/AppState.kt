@@ -3991,6 +3991,7 @@ class WhiteNoiseAppState private constructor(
     suspend fun accountRelayLists(): AccountRelayListsFfi? = activeAccountRef?.let { loadAccountRelayLists(it) }
 
     suspend fun addAccountRelay(
+        account: String?,
         kind: RelayListKind,
         relay: String,
     ): AccountRelayListsFfi? {
@@ -4000,27 +4001,45 @@ class WhiteNoiseAppState private constructor(
                 RelayUrlValidationResult.UnsupportedHost -> R.string.error_external_relay_not_supported
                 RelayUrlValidationResult.Invalid -> R.string.error_invalid_relay_url
             }
-        return if (validationError != null) {
-            present(R.string.toast_relay_update_failed, validationError)
-            null
-        } else {
-            val account = activeAccountRef
-            val current = account?.let { loadAccountRelayLists(it) }
-            val plan = current?.let { relayListAfterAddition(it.relaysFor(kind), relay) }
-            if (account != null && plan != null) publishAccountRelays(account, kind, plan) else null
+        val current = account?.takeIf { validationError == null }?.let { loadAccountRelayLists(it) }
+        val plan = current?.let { relayListAfterAddition(it.relaysFor(kind), relay) }
+        return when {
+            validationError != null -> {
+                present(R.string.toast_relay_update_failed, validationError)
+                null
+            }
+            account == null -> {
+                present(R.string.toast_relay_update_failed, R.string.no_active_account_period)
+                null
+            }
+            current == null -> {
+                present(R.string.toast_relay_update_failed, R.string.no_relay_projection)
+                null
+            }
+            plan == null -> {
+                present(R.string.toast_relay_update_failed, R.string.error_invalid_relay_url)
+                null
+            }
+            else -> publishAccountRelays(account, kind, plan)
         }
     }
 
     suspend fun removeAccountRelay(
+        account: String?,
         kind: RelayListKind,
         relay: String,
     ): AccountRelayListsFfi? {
-        val account = activeAccountRef
         val current = account?.let { loadAccountRelayLists(it) }
-        return if (account != null && current != null) {
-            publishAccountRelays(account, kind, relayListAfterRemoval(current.relaysFor(kind), relay))
-        } else {
-            null
+        return when {
+            account == null -> {
+                present(R.string.toast_relay_update_failed, R.string.no_active_account_period)
+                null
+            }
+            current == null -> {
+                present(R.string.toast_relay_update_failed, R.string.no_relay_projection)
+                null
+            }
+            else -> publishAccountRelays(account, kind, relayListAfterRemoval(current.relaysFor(kind), relay))
         }
     }
 
