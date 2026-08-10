@@ -153,6 +153,63 @@ class ProfileEditSaveButtonTest {
         saveButton.assertIsEnabled()
     }
 
+    @Test
+    fun screenIgnoresStalePublishCompletionAfterAccountSwitch() {
+        val currentAppState = mutableStateOf(appState(ACCOUNT_A_REF, ACCOUNT_A_ID))
+        val loadCalls = LinkedBlockingQueue<LoadCall>()
+        val publishCalls = LinkedBlockingQueue<PublishCall>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileEditScreen(
+                    appState = currentAppState.value,
+                    onBack = {},
+                    loadProfile = { accountId ->
+                        val call = LoadCall(accountId)
+                        loadCalls.put(call)
+                        call.completion.await()
+                    },
+                    publishProfile = { submitted ->
+                        val call = PublishCall(submitted)
+                        publishCalls.put(call)
+                        call.completion.await()
+                    },
+                )
+            }
+        }
+        val saveButton = composeRule.onNodeWithText(context.getString(R.string.save))
+        val displayNameMatcher = hasSetTextAction() and hasText(context.getString(R.string.display_name))
+        val displayNameField = composeRule.onNode(displayNameMatcher)
+
+        val accountALoad = requireNotNull(loadCalls.poll(5, TimeUnit.SECONDS))
+        assertEquals(ACCOUNT_A_ID, accountALoad.accountId)
+        accountALoad.completion.complete(metadata(displayName = "Alice"))
+        composeRule.waitForIdle()
+        composeRule.onNode(hasScrollAction()).performScrollToNode(displayNameMatcher)
+        displayNameField.performTextReplacement("Alicia")
+        saveButton.assertIsEnabled().performClick()
+        val accountAPublish = requireNotNull(publishCalls.poll(5, TimeUnit.SECONDS))
+
+        composeRule.runOnIdle {
+            currentAppState.value = appState(ACCOUNT_B_REF, ACCOUNT_B_ID)
+        }
+        composeRule.waitForIdle()
+        val accountBLoad = requireNotNull(loadCalls.poll(5, TimeUnit.SECONDS))
+        assertEquals(ACCOUNT_B_ID, accountBLoad.accountId)
+        accountBLoad.completion.complete(metadata(displayName = "Bob"))
+        composeRule.waitForIdle()
+        saveButton.assertIsNotEnabled()
+
+        composeRule.onNode(hasScrollAction()).performScrollToNode(displayNameMatcher)
+        displayNameField.performTextReplacement("Bobby")
+        saveButton.assertIsEnabled()
+        accountAPublish.completion.complete(true)
+        composeRule.waitForIdle()
+
+        saveButton.assertIsEnabled()
+        displayNameField.performTextReplacement("Bob")
+        saveButton.assertIsNotEnabled()
+    }
+
     private fun metadata(displayName: String): UserProfileMetadataFfi =
         profileEditMetadata(
             displayName = displayName,
@@ -163,7 +220,10 @@ class ProfileEditSaveButtonTest {
             lud16 = "",
         )
 
-    private fun appState(): WhiteNoiseAppState =
+    private fun appState(
+        accountRef: String = ACCOUNT_A_REF,
+        accountId: String = ACCOUNT_A_ID,
+    ): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
             draftStore = DraftStore(ProfileEditDraftPersistence()),
@@ -171,16 +231,21 @@ class ProfileEditSaveButtonTest {
             accounts =
                 listOf(
                     AccountSummaryFfi(
-                        label = ACCOUNT_REF,
-                        accountIdHex = ACCOUNT_ID,
+                        label = accountRef,
+                        accountIdHex = accountId,
                         localSigning = true,
                         externalSigning = false,
                         signedOut = false,
                         running = true,
                     ),
                 ),
-            activeAccountRef = ACCOUNT_REF,
+            activeAccountRef = accountRef,
         )
+
+    private data class LoadCall(
+        val accountId: String,
+        val completion: CompletableDeferred<UserProfileMetadataFfi?> = CompletableDeferred(),
+    )
 
     private data class PublishCall(
         val metadata: UserProfileMetadataFfi,
@@ -189,8 +254,10 @@ class ProfileEditSaveButtonTest {
 
     private companion object {
         const val ACCOUNT_A = "account-a"
-        const val ACCOUNT_REF = "alice"
-        const val ACCOUNT_ID = "0101010101010101010101010101010101010101010101010101010101010101"
+        const val ACCOUNT_A_REF = "alice"
+        const val ACCOUNT_A_ID = "0101010101010101010101010101010101010101010101010101010101010101"
+        const val ACCOUNT_B_REF = "bob"
+        const val ACCOUNT_B_ID = "0202020202020202020202020202020202020202020202020202020202020202"
     }
 }
 

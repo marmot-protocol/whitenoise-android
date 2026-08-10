@@ -5,7 +5,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 class ProfileEditSaveStateTest {
     @Test
@@ -97,20 +96,6 @@ class ProfileEditSaveStateTest {
         assertTrue(state.canSave(ACCOUNT_B, accountBProfile.copy(about = "new")))
     }
 
-    @Test
-    fun profileEditorWiresBaselineToLoadEligibilityAndPublishOutcome() {
-        val source = profileEditSource().readText()
-
-        assertTrue("screen must own account-scoped save state", "ProfileEditSaveState()" in source)
-        assertTrue("save eligibility must include dirty-state comparison", "saveState.canSave(" in source)
-        assertTrue("loaded metadata must establish the baseline", "saveState.completeLoad(" in source)
-        assertTrue("publish outcome must control baseline advancement", "saveState.completeSave(" in source)
-        assertTrue(
-            "an account switch must supersede an in-flight save before publish starts",
-            "appState.activeAccount?.accountIdHex != accountId" in source,
-        )
-    }
-
     private fun metadata(displayName: String) =
         profileEditMetadata(
             displayName = displayName,
@@ -120,12 +105,6 @@ class ProfileEditSaveStateTest {
             nip05 = "",
             lud16 = "",
         )
-
-    private fun profileEditSource(): File =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt"),
-        ).firstOrNull(File::exists) ?: error("Missing ProfileEditScreen.kt")
 
     private companion object {
         const val ACCOUNT_A = "account-a"
