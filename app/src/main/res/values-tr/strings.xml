@@ -70,6 +70,11 @@
         <item quantity="one">%1$d sohbet seçildi</item>
         <item quantity="other">%1$d sohbet seçildi</item>
     </plurals>
+    <plurals name="message_selected_count">
+        <item quantity="one">%1$d mesaj seçildi</item>
+        <item quantity="other">%1$d mesaj seçildi</item>
+    </plurals>
+    <string name="message_selection_action_delete">Seçili mesajları sil</string>
     <plurals name="chat_list_bulk_delete_confirm">
         <item quantity="one">Bu cihazdan %1$d sohbet silinsin mi?</item>
         <item quantity="other">Bu cihazdan %1$d sohbet silinsin mi?</item>

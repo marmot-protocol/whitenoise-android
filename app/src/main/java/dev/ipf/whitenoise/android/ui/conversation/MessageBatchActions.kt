@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 
 /** UI-ready projection of one selected, user-visible message in timeline order. */
 internal data class BatchMessageActionItem(
@@ -10,6 +12,8 @@ internal data class BatchMessageActionItem(
     val senderDisplayName: String,
     val copyableText: String?,
     val forwardableText: String?,
+    /** True when the message has at least one attachment the single-message save path can persist. */
+    val hasSaveableMedia: Boolean = false,
     /**
      * Whether this message can be removed for the whole group — the authored
      * message, or another member's message the selecting user may moderate
@@ -36,6 +40,7 @@ internal enum class BatchDeleteScope {
 internal data class BatchMessageSelection(
     val action: BatchMessageActionItem,
     val record: AppMessageRecordFfi,
+    val status: MessageStatus,
     val timelineOrder: ULong,
 )
 
@@ -117,6 +122,97 @@ internal fun batchDeleteBreakdown(items: List<BatchMessageActionItem>): BatchDel
         deleteForEveryone = items.count(BatchMessageActionItem::canDeleteForEveryone),
         hideLocally = items.count { !it.canDeleteForEveryone },
     )
+
+internal data class BatchSelectionActionAvailability(
+    val canCopy: Boolean,
+    val canForward: Boolean,
+    val canSave: Boolean,
+    val canReply: Boolean,
+    val canInfo: Boolean,
+    val canDelete: Boolean,
+)
+
+internal fun batchSelectionActionAvailability(
+    items: List<BatchMessageActionItem>,
+    composerGate: ComposerGate,
+): BatchSelectionActionAvailability {
+    if (items.isEmpty()) {
+        return BatchSelectionActionAvailability(
+            canCopy = false,
+            canForward = false,
+            canSave = false,
+            canReply = false,
+            canInfo = false,
+            canDelete = false,
+        )
+    }
+    val forwardBodies = batchForwardBodies(items)
+    val single = items.size == 1
+    return BatchSelectionActionAvailability(
+        canCopy = items.all { !it.copyableText.isNullOrBlank() },
+        canForward = forwardBodies.isNotEmpty(),
+        canSave = items.all(BatchMessageActionItem::hasSaveableMedia),
+        canReply = single && composerGate == ComposerGate.COMPOSER,
+        canInfo = single,
+        canDelete = true,
+    )
+}
+
+internal enum class MessageSelectionBarAction {
+    Reply,
+    Info,
+    Copy,
+    Forward,
+    Save,
+}
+
+internal data class MessageSelectionBarRow(
+    val actions: List<MessageSelectionBarAction>,
+    val includesDelete: Boolean,
+)
+
+@Suppress("MaxLineLength")
+internal fun offeredMessageSelectionBarActions(availability: BatchSelectionActionAvailability): List<MessageSelectionBarAction> =
+    buildList {
+        add(MessageSelectionBarAction.Copy)
+        add(MessageSelectionBarAction.Forward)
+        if (availability.canReply) add(MessageSelectionBarAction.Reply)
+        if (availability.canInfo) add(MessageSelectionBarAction.Info)
+        add(MessageSelectionBarAction.Save)
+    }
+
+internal fun messageSelectionBarActionRows(
+    offered: List<MessageSelectionBarAction>,
+    maxActionsPerRow: Int,
+): List<MessageSelectionBarRow> {
+    val slotsPerRow = maxActionsPerRow.coerceAtLeast(1)
+    return buildList {
+        if (offered.isEmpty()) {
+            add(MessageSelectionBarRow(actions = emptyList(), includesDelete = true))
+            return@buildList
+        }
+        var index = 0
+        while (index < offered.size) {
+            val take = minOf(slotsPerRow, offered.size - index)
+            if (index + take >= offered.size) {
+                if (take < slotsPerRow) {
+                    add(
+                        MessageSelectionBarRow(
+                            actions = offered.subList(index, index + take),
+                            includesDelete = true,
+                        ),
+                    )
+                } else {
+                    add(MessageSelectionBarRow(actions = offered.subList(index, index + take), includesDelete = false))
+                    add(MessageSelectionBarRow(actions = emptyList(), includesDelete = true))
+                }
+                return@buildList
+            }
+            add(MessageSelectionBarRow(actions = offered.subList(index, index + take), includesDelete = false))
+            index += take
+        }
+    }
+}
 
 /**
  * Apply the chosen [scope] to every selection. In [BatchDeleteScope.EVERYONE]
