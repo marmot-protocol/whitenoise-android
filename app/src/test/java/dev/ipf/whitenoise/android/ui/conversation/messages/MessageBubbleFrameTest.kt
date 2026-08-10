@@ -300,6 +300,51 @@ class MessageBubbleFrameTest {
     }
 
     @Test
+    fun longIdentityHeaderDoesNotWidenNaturallyNarrowMedia() {
+        composeRule.setContent {
+            MaterialTheme {
+                Box(Modifier.width(300.dp)) {
+                    MediaCaptionFrame(
+                        presentation = messageBubblePresentation(deleted = false, mine = false),
+                        highlighted = false,
+                        mine = false,
+                        mentionedSelf = false,
+                        mentionedYouLabel = "Mentioned you",
+                        alignEnd = false,
+                        modifier = Modifier.testTag(MEDIA_IDENTITY_FRAME_TAG),
+                        showIdentityHeader = true,
+                        identityHeader = {
+                            MessageBubbleSenderHeader(
+                                name = "Very Long Sender Display Name That Must Ellipsize",
+                                seed = "alice",
+                                avatarUrl = null,
+                                profileLabel = "Open profile",
+                                contentColor = Color.Gray,
+                                onProfileClick = {},
+                                onLongPress = {},
+                                enabled = true,
+                            )
+                        },
+                        media = {
+                            Box(Modifier.width(120.dp).height(100.dp).testTag(MEDIA_IDENTITY_MEDIA_TAG))
+                        },
+                    ) {
+                        Box(Modifier.height(12.dp))
+                    }
+                }
+            }
+        }
+
+        composeRule.runOnIdle {
+            val frameBounds =
+                composeRule.onNodeWithTag(MEDIA_IDENTITY_FRAME_TAG).fetchSemanticsNode().boundsInRoot
+            val mediaBounds =
+                composeRule.onNodeWithTag(MEDIA_IDENTITY_MEDIA_TAG).fetchSemanticsNode().boundsInRoot
+            assertEquals(mediaBounds.width, frameBounds.width, 1f)
+        }
+    }
+
+    @Test
     fun mediaItemsKeepTheirSpacingAndCaptionHasNoExternalGap() {
         composeRule.setContent {
             MediaSupplementEnvelope(

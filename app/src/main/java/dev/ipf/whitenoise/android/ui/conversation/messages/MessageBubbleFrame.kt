@@ -136,35 +136,40 @@ internal fun MediaCaptionFrame(
             ),
         tonalElevation = if (mine) 1.dp else 0.dp,
     ) {
-        Column {
-            if (showIdentityHeader) {
+        MediaSupplementEnvelope(
+            alignEnd = alignEnd,
+            header =
+                if (showIdentityHeader) {
+                    {
+                        Column(
+                            modifier =
+                                Modifier
+                                    .padding(horizontal = 14.dp)
+                                    .padding(top = 10.dp),
+                        ) {
+                            identityHeader()
+                        }
+                    }
+                } else {
+                    null
+                },
+            media = media,
+        ) {
+            Column(modifier = contentModifier.fillMaxWidth()) {
                 Column(
-                    modifier =
-                        Modifier
-                            .padding(horizontal = 14.dp)
-                            .padding(top = 10.dp),
-                ) {
-                    identityHeader()
-                }
-            }
-            MediaSupplementEnvelope(
-                alignEnd = alignEnd,
-                media = media,
-            ) {
-                Column(modifier = contentModifier.fillMaxWidth()) {
-                    Column(
-                        modifier = bubbleContentModifier(mentionModifier, Modifier),
-                        verticalArrangement = bubbleContentArrangement,
-                        content = caption,
-                    )
-                }
+                    modifier = bubbleContentModifier(mentionModifier, Modifier),
+                    verticalArrangement = bubbleContentArrangement,
+                    content = caption,
+                )
             }
         }
     }
 }
 
 /**
- * Measures media first, then gives its supplement exactly the same width.
+ * Measures media first, then gives its optional header and supplement exactly
+ * the same width. A long sender name therefore ellipsizes instead of widening
+ * an otherwise narrow portrait image or file card.
  *
  * Media children intentionally retain their existing sizing policy: a
  * landscape image, grid, or voice note may consume the available width while
@@ -177,6 +182,7 @@ internal fun MediaCaptionFrame(
 internal fun MediaSupplementEnvelope(
     alignEnd: Boolean,
     modifier: Modifier = Modifier,
+    header: (@Composable ColumnScope.() -> Unit)? = null,
     media: @Composable ColumnScope.() -> Unit,
     supplement: @Composable ColumnScope.() -> Unit,
 ) {
@@ -193,6 +199,17 @@ internal fun MediaSupplementEnvelope(
             }.single().measure(relaxedConstraints)
         val envelopeWidth = constraints.constrainWidth(mediaPlaceable.width)
 
+        val headerPlaceable =
+            header?.let { headerContent ->
+                subcompose(MediaEnvelopeSlot.Header) {
+                    Column(content = headerContent)
+                }.single().measure(
+                    relaxedConstraints.copy(
+                        minWidth = envelopeWidth,
+                        maxWidth = envelopeWidth,
+                    ),
+                )
+            }
         val supplementPlaceable =
             subcompose(MediaEnvelopeSlot.Supplement) {
                 Column(content = supplement)
@@ -203,16 +220,19 @@ internal fun MediaSupplementEnvelope(
                 ),
             )
 
-        val measuredHeight = mediaPlaceable.height + supplementPlaceable.height
+        val headerHeight = headerPlaceable?.height ?: 0
+        val measuredHeight = headerHeight + mediaPlaceable.height + supplementPlaceable.height
         layout(envelopeWidth, constraints.constrainHeight(measuredHeight)) {
             val mediaX = if (alignEnd) envelopeWidth - mediaPlaceable.width else 0
-            mediaPlaceable.placeRelative(mediaX, 0)
-            supplementPlaceable.placeRelative(0, mediaPlaceable.height)
+            headerPlaceable?.placeRelative(0, 0)
+            mediaPlaceable.placeRelative(mediaX, headerHeight)
+            supplementPlaceable.placeRelative(0, headerHeight + mediaPlaceable.height)
         }
     }
 }
 
 private enum class MediaEnvelopeSlot {
+    Header,
     Media,
     Supplement,
 }
