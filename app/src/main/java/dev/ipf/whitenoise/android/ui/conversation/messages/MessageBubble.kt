@@ -377,6 +377,17 @@ internal fun MessageBubble(
     var actionMenuAnchorBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
     val rowCoordinates = remember(record.messageIdHex) { arrayOfNulls<LayoutCoordinates>(1) }
     val messageBoundsInWindow = remember(record.messageIdHex) { arrayOfNulls<IntRect>(1) }
+    val actionAnchorBoundsModifier =
+        Modifier.onGloballyPositioned { coordinates ->
+            val bounds = coordinates.boundsInWindow()
+            messageBoundsInWindow[0] =
+                IntRect(
+                    left = bounds.left.roundToInt(),
+                    top = bounds.top.roundToInt(),
+                    right = bounds.right.roundToInt(),
+                    bottom = bounds.bottom.roundToInt(),
+                )
+        }
     var swipeDrag by remember(record.messageIdHex) { mutableStateOf(0f) }
     val animatedSwipeOffset by animateFloatAsState(targetValue = swipeDrag, label = "replySwipeOffset")
     val clipboard = LocalClipboardManager.current
@@ -891,19 +902,7 @@ internal fun MessageBubble(
                 Spacer(Modifier.width(8.dp))
             }
             Column(
-                modifier =
-                    Modifier
-                        .widthIn(max = bubbleColumnMaxWidth)
-                        .onGloballyPositioned { coordinates ->
-                            val bounds = coordinates.boundsInWindow()
-                            messageBoundsInWindow[0] =
-                                IntRect(
-                                    left = bounds.left.roundToInt(),
-                                    top = bounds.top.roundToInt(),
-                                    right = bounds.right.roundToInt(),
-                                    bottom = bounds.bottom.roundToInt(),
-                                )
-                        },
+                modifier = Modifier.widthIn(max = bubbleColumnMaxWidth),
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
                 // Resolved before the content column so its presence can pick
@@ -1261,6 +1260,7 @@ internal fun MessageBubble(
                         replyPreviewCard(false)
                         if (bodyOrWarningInsideBubble) {
                             MediaCaptionFrame(
+                                modifier = actionAnchorBoundsModifier,
                                 presentation = bubblePresentation,
                                 highlighted = highlighted,
                                 mine = mine,
@@ -1322,6 +1322,7 @@ internal fun MessageBubble(
                             }
                         } else {
                             MediaSupplementEnvelope(
+                                modifier = actionAnchorBoundsModifier,
                                 alignEnd = mine,
                                 media = {
                                     BubbleMediaBlocks(
@@ -1388,7 +1389,8 @@ internal fun MessageBubble(
                         modifier =
                             Modifier
                                 .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) }
-                                .then(textSelectionBoundsModifier),
+                                .then(textSelectionBoundsModifier)
+                                .then(actionAnchorBoundsModifier),
                         presentation = bubblePresentation,
                         highlighted = highlighted,
                         mine = mine,
@@ -1443,6 +1445,7 @@ internal fun MessageBubble(
                     expanded = isActionMenuOpen && !deleted && !selectionMode && !textSelectionMode,
                     anchorBoundsInWindow = actionMenuAnchorBounds,
                     anchorWindowYPx = longPressWindowY,
+                    centerOverAnchor = hasMedia,
                     canReply = !readOnly,
                     canReact = !readOnly,
                     canDelete = deleteCapability.canDeleteAtAll,

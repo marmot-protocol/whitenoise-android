@@ -171,6 +171,7 @@ class MessageActionMenuLayoutTest {
             MessageActionMenuPositionProvider(
                 anchorBoundsInWindow = null,
                 anchorWindowYPx = 450f,
+                centerOverAnchor = false,
                 edgeInsetPx = 8,
                 anchorGapPx = 8,
                 estimatedOneColumnHeightPx = 200,
@@ -190,7 +191,7 @@ class MessageActionMenuLayoutTest {
     }
 
     @Test
-    fun reactionMenuCentersOnIncomingBubbleAndPrefersAboveIt() {
+    fun textMessageMenuCentersBelowIncomingBubble() {
         val provider =
             positionProvider(
                 touchY = 450,
@@ -201,7 +202,7 @@ class MessageActionMenuLayoutTest {
         val position = provider.position(window = IntSize(500, 780), popup = IntSize(328, 180))
 
         assertEquals(86, position.x)
-        assertEquals(163, position.y)
+        assertEquals(468, position.y)
     }
 
     @Test
@@ -210,13 +211,14 @@ class MessageActionMenuLayoutTest {
             positionProvider(
                 touchY = 520,
                 actionCount = 5,
+                centerOverAnchor = true,
                 anchorBounds = IntRect(240, 400, 480, 650),
             )
 
         val position = provider.position(window = IntSize(720, 900), popup = IntSize(328, 180))
 
         assertEquals(196, position.x)
-        assertEquals(163, position.y)
+        assertEquals(411, position.y)
     }
 
     @Test
@@ -245,18 +247,34 @@ class MessageActionMenuLayoutTest {
     }
 
     @Test
-    fun reactionMenuFallsBelowBubbleOnlyWhenAboveDoesNotFit() {
+    fun centeredMediaMenuOnlyClampsAtTheWindowEdge() {
         val provider =
             positionProvider(
-                touchY = 120,
+                touchY = 30,
                 actionCount = 3,
-                anchorBounds = IntRect(80, 20, 320, 220),
+                centerOverAnchor = true,
+                anchorBounds = IntRect(80, 0, 320, 60),
             )
 
         val position = provider.position(window = IntSize(400, 780), popup = IntSize(328, 180))
 
         assertEquals(36, position.x)
-        assertEquals(228, position.y)
+        assertEquals(8, position.y)
+    }
+
+    @Test
+    fun textMessageMenuMovesAboveOnlyWhenBelowDoesNotFit() {
+        val provider =
+            positionProvider(
+                touchY = 450,
+                actionCount = 5,
+                anchorBounds = IntRect(160, 400, 340, 460),
+            )
+
+        val position = provider.position(window = IntSize(500, 500), popup = IntSize(328, 180))
+
+        assertEquals(86, position.x)
+        assertEquals(163, position.y)
     }
 
     @Test
@@ -428,6 +446,7 @@ class MessageActionMenuLayoutTest {
     private fun positionProvider(
         touchY: Int,
         actionCount: Int,
+        centerOverAnchor: Boolean = false,
         anchorBounds: IntRect? = null,
         canReact: Boolean = true,
         canDelete: Boolean = false,
@@ -437,6 +456,7 @@ class MessageActionMenuLayoutTest {
     ) = MessageActionMenuPositionProvider(
         anchorBoundsInWindow = anchorBounds,
         anchorWindowYPx = touchY.toFloat(),
+        centerOverAnchor = centerOverAnchor,
         edgeInsetPx = 8,
         anchorGapPx = 8,
         estimatedOneColumnHeightPx =

@@ -113,6 +113,7 @@ internal fun MessageActionMenu(
     expanded: Boolean,
     anchorBoundsInWindow: IntRect?,
     anchorWindowYPx: Float?,
+    centerOverAnchor: Boolean = false,
     canReply: Boolean,
     canReact: Boolean,
     canDelete: Boolean,
@@ -179,8 +180,9 @@ internal fun MessageActionMenu(
     // Position from the frozen message bounds, not a screen corner. Centering
     // the reaction strip over the selected bubble gives images and text the
     // same stable visual anchor instead of pinning the surface to an outer
-    // screen edge. The provider prefers above the bubble, then falls below
-    // only when the top space is insufficient.
+    // screen edge. Media menus center over the visual card; text menus retain
+    // the familiar adjacent placement below the bubble (above only when the
+    // bottom space is insufficient).
     val edgeInsetPx = with(density) { 8.dp.roundToPx() }
     val anchorGapPx = with(density) { 8.dp.roundToPx() }
     // Compose runs calculatePosition on the FIRST layout pass with
@@ -227,6 +229,7 @@ internal fun MessageActionMenu(
         remember(
             anchorBoundsInWindow,
             anchorWindowYPx,
+            centerOverAnchor,
             edgeInsetPx,
             anchorGapPx,
             estimatedOneColumnHeightPx,
@@ -239,6 +242,7 @@ internal fun MessageActionMenu(
             MessageActionMenuPositionProvider(
                 anchorBoundsInWindow = anchorBoundsInWindow,
                 anchorWindowYPx = anchorWindowYPx,
+                centerOverAnchor = centerOverAnchor,
                 edgeInsetPx = edgeInsetPx,
                 anchorGapPx = anchorGapPx,
                 estimatedOneColumnHeightPx = estimatedOneColumnHeightPx,

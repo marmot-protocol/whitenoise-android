@@ -10,6 +10,7 @@ import kotlin.math.roundToInt
 internal class MessageActionMenuPositionProvider(
     private val anchorBoundsInWindow: IntRect?,
     private val anchorWindowYPx: Float?,
+    private val centerOverAnchor: Boolean,
     private val edgeInsetPx: Int,
     private val anchorGapPx: Int,
     private val estimatedOneColumnHeightPx: Int,
@@ -71,7 +72,11 @@ internal class MessageActionMenuPositionProvider(
         val bottomLimit = windowHeight - edgeInsetPx
         val preferredY =
             anchorBoundsInWindow?.let { bounds ->
-                bubbleRelativeY(bounds, popupHeight, touchY, bottomLimit)
+                if (centerOverAnchor) {
+                    bounds.center.y - popupHeight / 2
+                } else {
+                    adjacentToBubbleY(bounds, popupHeight, touchY, bottomLimit)
+                }
             } ?: touchRelativeY(popupHeight, touchY, bottomLimit)
         return preferredY.coerceIn(
             edgeInsetPx,
@@ -79,7 +84,7 @@ internal class MessageActionMenuPositionProvider(
         )
     }
 
-    private fun bubbleRelativeY(
+    private fun adjacentToBubbleY(
         bounds: IntRect,
         popupHeight: Int,
         touchY: Int,
@@ -88,8 +93,8 @@ internal class MessageActionMenuPositionProvider(
         val below = bounds.bottom + anchorGapPx
         val above = bounds.top - anchorGapPx - popupHeight
         return when {
-            above >= edgeInsetPx -> above
             below + popupHeight <= bottomLimit -> below
+            above >= edgeInsetPx -> above
             else -> touchY - popupHeight / 2
         }
     }
