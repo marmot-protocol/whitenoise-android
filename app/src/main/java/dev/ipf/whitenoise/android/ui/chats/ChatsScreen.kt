@@ -699,6 +699,7 @@ internal fun ChatsScreen(
             controller.items,
             controller.archivedItems,
             resolveFolderChatIds,
+            selectedFolderId,
         ) {
             chatFolderChipModels(
                 folders = accountFolders,
