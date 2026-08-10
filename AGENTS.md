@@ -35,6 +35,22 @@ If Android seems to need a cache for protocol data, stop and ask whether the dat
 - Prefer `rg` for searching.
 - Before editing files, check the dirty worktree and preserve changes you did not make.
 
+## Visual Change Evidence
+
+- Every pull request that changes rendered UI must add or update a deterministic
+  Roborazzi screenshot test and commit the generated PNG baseline under
+  `app/src/test/snapshots/`.
+- Cover the states materially affected by the change. Include relevant themes,
+  RTL, large font scale, loading/empty/error states, and loaded/fallback content
+  when those states can alter the result; do not create unrelated snapshot
+  variants merely to increase coverage.
+- After every commit that changes rendering, regenerate and commit the affected
+  baselines. Run the relevant Roborazzi verification task before pushing.
+- Verify that the pull request description's generated **Visual changes** section
+  points to the exact current head commit and shows every affected baseline.
+- Treat a missing-screenshot CI result as blocking. Do not dismiss it as an
+  informational warning or bypass it by changing unrelated snapshots.
+
 ## GitHub triage
 
 - The public White Noise Android project is
