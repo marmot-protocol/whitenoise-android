@@ -41,7 +41,6 @@ internal class WhiteNoiseJourneys {
      */
     fun MacrobenchmarkScope.launchForStartupMeasurement() {
         startActivityAndWait()
-        device.waitForIdle()
     }
 
     /**

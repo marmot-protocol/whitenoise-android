@@ -55,7 +55,23 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
       - name: Compile (Kotlin)
-        run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --no-daemon --stacktrace
+        run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin :app:assembleDevZapstoreBenchmarkRelease :benchmark:assembleDevZapstoreBenchmarkRelease --no-daemon --stacktrace
+
+      - name: Verify packaged Baseline Profile assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata=app/build/outputs/apk/devZapstore/benchmarkRelease/output-metadata.json
+          output_file=$(jq -er '
+            select(
+              .applicationId == "dev.ipf.whitenoise.android.dev" and
+              .variantName == "devZapstoreBenchmarkRelease"
+            )
+            | [.elements[] | select((.filters // []) | length == 0)]
+            | if length == 1 then .[0].outputFile else empty end
+          ' "$metadata")
+          app_apk="$(dirname "$metadata")/$output_file"
+          bash scripts/verify-baseline-profile.sh "$app_apk"
 
       # Release-mode Compose compiler output identifies unstable classes and
       # restartable/skippable composables using the same optimizations users
