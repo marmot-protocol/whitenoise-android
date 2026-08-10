@@ -9,7 +9,9 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -62,7 +64,7 @@ class StartChatErrorCardTest {
                 npub = "npub1alice",
                 progressHex = "deadbeef",
                 detail = AppText.Resource(R.string.invite_to_white_noise_description, listOf("Alice")),
-                copyable = false,
+                diagnosticReport = null,
                 recipientName = "Alice",
                 invitation = true,
                 title = AppText.Resource(R.string.invite_to_white_noise),
@@ -87,6 +89,34 @@ class StartChatErrorCardTest {
 
         assertEquals(1, inviteTaps)
         assertEquals(1, retryTaps)
+    }
+
+    @Test
+    fun technicalFailureCopiesSafeReportInsteadOfVisibleDetail() {
+        val secret = "relay failure for alice@example.test"
+        val error =
+            startChatErrorUiState(
+                npub = "npub1alice",
+                progressHex = "deadbeef",
+                error = IllegalStateException(secret),
+                recipientName = "Alice",
+                displayName = { "ignored" },
+            )
+        var copied: String? = null
+
+        assertTrue(error.copyable)
+        assertFalse(error.diagnosticReport.orEmpty().contains(secret))
+        composeRule.setContent {
+            StartChatErrorCard(
+                error = error,
+                onRetry = {},
+                onInvite = {},
+                onCopy = { copied = it },
+            )
+        }
+        composeRule.onNodeWithText(context.getString(R.string.copy)).performClick()
+
+        assertEquals(error.diagnosticReport, copied)
     }
 
     @Test

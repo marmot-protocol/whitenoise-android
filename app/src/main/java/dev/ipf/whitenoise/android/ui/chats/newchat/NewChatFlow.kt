@@ -52,6 +52,7 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.privacySafeErrorPresentation
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
@@ -76,12 +77,22 @@ internal data class StartChatErrorUiState(
     val npub: String,
     val progressHex: String,
     val detail: AppText,
-    val copyable: Boolean,
+    val diagnosticReport: String? = null,
     val recipientName: String? = null,
     val invitation: Boolean = false,
     val title: AppText = AppText.Resource(R.string.toast_couldnt_start_chat),
     val retryGroupIdHex: String? = null,
-)
+) {
+    val copyable: Boolean
+        get() = !diagnosticReport.isNullOrBlank()
+}
+
+private fun startChatFailureReport(error: Throwable): String? =
+    if (startProfileChatFailureCopyable(error)) {
+        privacySafeErrorPresentation("START_PROFILE_CHAT", error).report
+    } else {
+        null
+    }
 
 internal sealed interface StartChatAttemptResult {
     data class Open(
@@ -111,7 +122,7 @@ internal fun startChatErrorUiState(
             } else {
                 startProfileChatFailureDetail(error, displayName)
             },
-        copyable = startProfileChatFailureCopyable(error),
+        diagnosticReport = startChatFailureReport(error),
         recipientName = recipientName,
         invitation = invitation,
         title =
@@ -174,7 +185,7 @@ internal suspend fun attemptStartProfileChat(
                     npub = npub,
                     progressHex = progressHex,
                     detail = startProfileChatFailureDetail(error, displayName),
-                    copyable = startProfileChatFailureCopyable(error),
+                    diagnosticReport = startChatFailureReport(error),
                     recipientName = recipientName,
                     title = AppText.Resource(R.string.couldnt_load_chats),
                     retryGroupIdHex = groupIdHex,
@@ -220,7 +231,7 @@ internal suspend fun attemptOpenOrStartProfileChat(
                             npub = npub,
                             progressHex = progressHex,
                             detail = AppText.Resource(R.string.couldnt_load_chats),
-                            copyable = false,
+                            diagnosticReport = null,
                             recipientName = recipientName,
                         ),
                     )
@@ -697,7 +708,7 @@ internal fun StartChatErrorCard(
                 Text(stringResource(R.string.retry))
             }
             if (error.copyable) {
-                TextButton(onClick = { onCopy(detail) }) {
+                TextButton(onClick = { onCopy(requireNotNull(error.diagnosticReport)) }) {
                     Text(stringResource(R.string.copy))
                 }
             }

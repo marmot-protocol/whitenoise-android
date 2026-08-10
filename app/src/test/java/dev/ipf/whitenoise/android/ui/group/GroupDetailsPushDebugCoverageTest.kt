@@ -32,9 +32,9 @@ class GroupDetailsPushDebugCoverageTest {
             "runCatchingCancellable {" in controller.functionBody("groupPushDebugInfo"),
         )
         assertTrue(
-            "push debug load failures should surface a copyable diagnostic toast",
+            "push debug load failures should surface a privacy-safe diagnostic report",
             "R.string.toast_couldnt_load_push_debug_info" in controller.functionBody("groupPushDebugInfo") &&
-                "copyable = true" in controller.functionBody("groupPushDebugInfo"),
+                "presentFailure(" in controller.functionBody("groupPushDebugInfo"),
         )
     }
 

@@ -3,6 +3,9 @@
     <string name="app_name">White Noise</string>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise n’a pas pu démarrer</string>
+    <string name="error_try_again">Une erreur s’est produite. Réessayez ; si le problème persiste, copiez le rapport d’erreur.</string>
+    <string name="error_loaded_content_may_be_out_of_date">Votre contenu chargé reste disponible, mais il n’est peut-être plus à jour. Nouvelle tentative…</string>
+    <string name="error_loaded_content_kept">Impossible de charger davantage de contenu. Vos messages restent disponibles ; réessayez quand vous le souhaitez.</string>
     <string name="refresh">Actualiser l’export</string>
     <string name="retry">Réessayer</string>
     <string name="creating_identity">Créer une identité</string>
@@ -371,6 +374,9 @@
     <string name="app_lock_retry">Réessayer le déverrouillage</string>
     <string name="app_lock_auth_failed">Cela ne correspond pas. Réessayez.</string>
     <string name="app_lock_auth_cancelled">Le déverrouillage a été annulé. Vos discussions restent masquées.</string>
+    <string name="app_lock_auth_locked">Trop de tentatives. Déverrouillez votre appareil, puis réessayez.</string>
+    <string name="app_lock_auth_timed_out">Le délai de déverrouillage a expiré. Réessayez.</string>
+    <string name="app_lock_auth_unavailable">Le déverrouillage de l’appareil est indisponible pour le moment. Déverrouillez votre appareil, puis réessayez.</string>
     <string name="toast_app_lock_screen_lock_required">Configurez d’abord un verrouillage d’écran dans les paramètres Android.</string>
     <string name="force_incognito_keyboard">Clavier incognito</string>
     <string name="force_incognito_keyboard_subtitle">Demande au clavier de désactiver l\'apprentissage personnalisé</string>
@@ -895,6 +901,8 @@
     <string name="voice_message_release_to_send">Relâcher pour envoyer · glisser pour annuler</string>
     <string name="voice_message_too_short">Maintenir plus longtemps</string>
     <string name="voice_message_permission_denied">Autorisation du microphone requise</string>
+    <string name="voice_message_recording_failed">Impossible d’enregistrer le message vocal</string>
+    <string name="voice_message_microphone_busy">Le microphone est utilisé par une autre application. Fermez-la, puis réessayez.</string>
     <string name="voice_message_play">Lire le message vocal</string>
     <string name="voice_message_pause">Mettre en pause le message vocal</string>
     <string name="voice_message_failed">Le message vocal n\u0027a pas pu être chargé</string>
@@ -1211,6 +1219,7 @@
     <string name="app_updates">Mises à jour de l\'application</string>
     <string name="app_update_settings_title">Version Zapstore</string>
     <string name="app_update_settings_unknown">Installée : %1$s — Dernière : inconnue — appuyez pour vérifier</string>
+    <string name="app_update_settings_check_failed">Impossible de rechercher les mises à jour. Touchez pour réessayer.</string>
     <string name="app_update_settings_current">Installée : %1$s — À jour</string>
     <string name="app_update_settings_available">Installée : %1$s — Dernière : %2$s — mise à jour disponible</string>
     <string name="app_update_settings_available_with_count">Installée : %1$s — Dernière : %2$s — %3$d versions de retard</string>

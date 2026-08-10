@@ -1,10 +1,21 @@
 package dev.ipf.whitenoise.android.state
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ErrorPresentationTest {
+    @Test
+    fun identicalTransientCopyStillProducesDistinctNoticeKeys() {
+        val title = AppText.Plain("Saved")
+
+        assertNotEquals(
+            TransientNotice(id = 1L, title = title),
+            TransientNotice(id = 2L, title = title),
+        )
+    }
+
     @Test
     fun presentationSeparatesLocalizedCopyFromDiagnostics() {
         val secret = "nsec1" + "q".repeat(60)

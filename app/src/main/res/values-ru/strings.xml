@@ -3,6 +3,9 @@
     <string name="app_name">White Noise</string>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">Не удалось запустить White Noise</string>
+    <string name="error_try_again">Что-то пошло не так. Повторите попытку. Если проблема не исчезнет, скопируйте отчёт об ошибке.</string>
+    <string name="error_loaded_content_may_be_out_of_date">Загруженные данные по-прежнему доступны, но могли устареть. Повторная попытка…</string>
+    <string name="error_loaded_content_kept">Не удалось загрузить дополнительные данные. Ваши сообщения по-прежнему доступны; повторите попытку, когда будете готовы.</string>
     <string name="refresh">Обновить дамп</string>
     <string name="retry">Повторить</string>
     <string name="creating_identity">Создание индивидуальности</string>
@@ -395,6 +398,9 @@
     <string name="app_lock_retry">Повторить разблокировку</string>
     <string name="app_lock_auth_failed">Не совпало. Попробуйте снова.</string>
     <string name="app_lock_auth_cancelled">Разблокировка отменена. Ваши чаты всё еще скрыты.</string>
+    <string name="app_lock_auth_locked">Слишком много попыток. Разблокируйте устройство и повторите попытку.</string>
+    <string name="app_lock_auth_timed_out">Время ожидания разблокировки истекло. Повторите попытку.</string>
+    <string name="app_lock_auth_unavailable">Разблокировка устройства сейчас недоступна. Разблокируйте устройство и повторите попытку.</string>
     <string name="toast_app_lock_screen_lock_required">Сначала настройте блокировку экрана в настройках Android.</string>
     <string name="force_incognito_keyboard">Инкогнито-клавиатура</string>
     <string name="force_incognito_keyboard_subtitle">Просит клавиатуру отключить персонализированное обучение</string>
@@ -931,6 +937,8 @@
     <string name="voice_message_release_to_send">Отпустите для отправки · потяните для отмены</string>
     <string name="voice_message_too_short">Удерживайте дольше</string>
     <string name="voice_message_permission_denied">Требуется доступ к микрофону</string>
+    <string name="voice_message_recording_failed">Не удалось записать голосовое сообщение</string>
+    <string name="voice_message_microphone_busy">Микрофон используется другим приложением. Закройте его и повторите попытку.</string>
     <string name="voice_message_play">Воспроизвести голосовое</string>
     <string name="voice_message_pause">Пауза</string>
     <string name="voice_message_failed">Не удалось загрузить голосовое сообщение</string>
@@ -1263,6 +1271,7 @@
     <string name="app_updates">Обновления приложения</string>
     <string name="app_update_settings_title">Версия Zapstore</string>
     <string name="app_update_settings_unknown">Установлена: %1$s — Последняя: неизвестно — нажмите, чтобы проверить</string>
+    <string name="app_update_settings_check_failed">Не удалось проверить наличие обновлений. Нажмите, чтобы повторить попытку.</string>
     <string name="app_update_settings_current">Установлена: %1$s — Актуальна</string>
     <string name="app_update_settings_available">Установлена: %1$s — Последняя: %2$s — доступно обновление</string>
     <string name="app_update_settings_available_with_count">Установлена: %1$s — Последняя: %2$s — отстаёт на %3$d версий</string>

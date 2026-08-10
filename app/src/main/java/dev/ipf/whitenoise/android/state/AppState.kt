@@ -463,7 +463,7 @@ internal fun groupCreateFailureDetail(
         is MarmotKitException.MissingKeyPackage -> missingKeyPackageFailureDetail(throwable.account, displayName)
         is MarmotKitException.InvalidKeyPackageEvent -> AppText.Resource(R.string.error_missing_key_package)
         is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_invalid_identity_reference)
-        is MarmotKitException.Publish -> AppText.Resource(R.string.error_group_publish_failed, listOf(throwable.details))
+        is MarmotKitException.Publish -> AppText.Resource(R.string.error_group_create_failed_retry)
         is MarmotKitException -> AppText.Resource(R.string.error_group_create_failed_retry)
         else -> AppText.Resource(R.string.error_group_create_failed_retry)
     }
@@ -902,6 +902,7 @@ data class ToastMessage(
 )
 
 data class TransientNotice(
+    val id: Long,
     val title: AppText,
     val detail: AppText? = null,
 )
@@ -1962,6 +1963,7 @@ class WhiteNoiseAppState private constructor(
 
     var transientNotice by mutableStateOf<TransientNotice?>(null)
         private set
+    private var transientNoticeSequence = 0L
 
     var pendingProfileNpub by mutableStateOf<String?>(null)
         private set
@@ -6890,7 +6892,8 @@ class WhiteNoiseAppState private constructor(
         title: AppText,
         detail: AppText? = null,
     ) {
-        transientNotice = TransientNotice(title, detail)
+        transientNoticeSequence += 1L
+        transientNotice = TransientNotice(transientNoticeSequence, title, detail)
     }
 
     fun presentTransient(
