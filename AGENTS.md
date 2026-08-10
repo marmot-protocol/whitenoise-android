@@ -66,3 +66,84 @@ If Android seems to need a cache for protocol data, stop and ask whether the dat
   tool is absent.
 - Read `.agents/issue-triage.md` before creating or materially editing an issue.
   Run `python3 scripts/check_github_triage.py` after project changes.
+
+## Issues and project planning
+
+GitHub Issues are the product backlog. The public
+[White Noise Android project](https://github.com/orgs/marmot-protocol/projects/7)
+is the authoritative planning and triage view. Do not maintain a competing
+product backlog in documents, checklists, or an agent task system. Agent task
+systems may track durable execution, but should link back to the GitHub issue
+when product work already exists.
+
+### Required structure
+
+- Every open issue must appear exactly once in the White Noise Android project.
+- Give every issue one native GitHub type: `Bug`, `Feature`, `Task`, or
+  `Tracking`.
+- A tracker must use the organization-native `Tracking` type. A `tracking`
+  label, `Tracking:` title, or Markdown checklist is not a substitute.
+- Use native parent/sub-issue relationships for a tracker's hierarchy. Use
+  native dependencies only for genuine blockers, not preferred ordering.
+- Do not force unrelated standalone work into a tracker. Trackers should define
+  a coherent outcome, completion criteria, and a bounded set of sub-issues.
+- Close or archive shipped, obsolete, and duplicate work instead of retaining
+  it as an unofficial record.
+
+### Required project fields
+
+Every open issue must have these project fields set:
+
+- `Priority`: `P0` for an active critical incident or release-stopping
+  security, data-loss, or core-availability defect; `P1` for high-priority
+  committed work; `P2` for qualified next work; `P3` for valid, intentionally
+  deferred work.
+- `Area`: choose the single best owning product area.
+- `Triage health`: `Needs triage`, `Ready`, `Blocked`, `Needs design`, or
+  `Needs upstream`. `Ready` means the scope and acceptance criteria are
+  implementable; it does not mean implementation has started.
+- `Status`: `Todo`, `In Progress`, or `Done`, reflecting delivery state.
+- `Product rank`: set only when product leadership has established a relative
+  order. Lower numbers rank first; do not invent ranks merely to fill the field.
+
+The former `HIGH`, `MEDIUM`, `LOW`, and `tracking` labels are retired. Do not
+recreate or reapply them. Their migration equivalents are `P1`, `P2`, `P3`,
+and the native `Tracking` type. Labels may still express useful cross-cutting
+classifications, but must not duplicate native types or project fields.
+
+When priority and readiness are otherwise equal, current product order is:
+
+1. Text-to-speech
+2. Link previews
+3. Pinned messages
+4. Scheduled messages
+
+Represent this order through `Product rank`, not severity labels or issue
+numbers.
+
+### Creating or materially changing an issue
+
+1. Inspect the live default branch and identify the owning code, affected call
+   sites, and a named regression-test target.
+2. Search open and closed issues and pull requests by symptom, subsystem, and
+   root cause. Describe recurrences or remaining gaps as such.
+3. Draft the exact title, body, native type, project fields, labels, parent,
+   dependencies, and duplicate disposition.
+4. Pass the workspace source-grounded independent issue-review gate on that
+   exact draft. Any substantive correction invalidates the prior review.
+5. Publish from the reviewed body, add the issue to project 7, populate the
+   required fields, and read back both issue and project item to verify them.
+
+The `agent-ok` label is a separate autonomy decision, not a type, priority, or
+readiness marker. Apply it only when current repository policy permits
+autonomous implementation and the source-grounded scope is safe and complete.
+
+### Reconciliation
+
+Regular reconciliation must compare all open repository issues with project 7
+and flag missing or duplicate project items, missing native types, unset
+Priority/Area/Triage health fields, invalid tracker types, retired labels, and
+stale delivery status. Preserve user-authored content and native relationships.
+Surface ambiguous product priority, design, or upstream ownership for decision
+instead of guessing.
+
