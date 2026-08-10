@@ -51,7 +51,8 @@ import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
-import dev.ipf.whitenoise.android.ui.share.ShareChatPickerSheet
+import dev.ipf.whitenoise.android.ui.share.NullableShareRequestSaver
+import dev.ipf.whitenoise.android.ui.share.ShareChatPickerFullScreen
 
 internal data class ConversationOpenContext(
     val focusMessageId: String? = null,
@@ -255,7 +256,9 @@ internal fun MainShell(
     ) {
         mutableIntStateOf(0)
     }
-    var sharePickerRequest by remember { mutableStateOf<ShareRequest?>(null) }
+    var sharePickerRequest by rememberSaveable(stateSaver = NullableShareRequestSaver) {
+        mutableStateOf<ShareRequest?>(null)
+    }
     val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
@@ -860,8 +863,9 @@ internal fun MainShell(
         // handler wins over conversation/chat-list handlers (issue #1721).
         if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
             sharePickerRequest?.let { request ->
-                ShareChatPickerSheet(
+                ShareChatPickerFullScreen(
                     appState = appState,
+                    requestId = request.requestId,
                     payload = request.payload,
                     onDismiss = { sharePickerRequest = null },
                     onStage = { groupIds ->

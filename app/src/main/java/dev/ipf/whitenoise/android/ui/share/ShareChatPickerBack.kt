@@ -9,11 +9,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
-import androidx.compose.material3.SheetState
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -26,7 +22,6 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.util.lerp
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlin.coroutines.cancellation.CancellationException
 
 private const val PREDICTIVE_BACK_MIN_SCALE = 0.9f
@@ -39,12 +34,9 @@ internal fun interface ShareChatPickerOverlayBackRegistrar {
     ): () -> Unit
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ShareChatPickerBackAwareSheet(
-    sheetState: SheetState,
+internal fun ShareChatPickerBackAwareScreen(
     overlayBack: Boolean,
-    onDismissRequest: () -> Unit,
     onBackCommit: () -> Unit,
     overlayBackRegistrar: ShareChatPickerOverlayBackRegistrar? = null,
     content: @Composable () -> Unit,
@@ -57,11 +49,11 @@ internal fun ShareChatPickerBackAwareSheet(
     val onProgress: (Float) -> Unit = { predictiveBackProgress = it }
     val onCancel: () -> Unit = { predictiveBackProgress = 0f }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismissRequest,
-        sheetState = sheetState,
-        containerColor = amoledSheetContainerColor(),
-        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = false),
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .shareChatPickerPredictiveBackScale(animatedPredictiveBackProgress),
     ) {
         if (overlayBack) {
             ShareChatPickerOverlayBackHandler(
@@ -77,14 +69,7 @@ internal fun ShareChatPickerBackAwareSheet(
                 onCancel = onCancel,
             )
         }
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .shareChatPickerPredictiveBackScale(animatedPredictiveBackProgress),
-        ) {
-            content()
-        }
+        content()
     }
 }
 

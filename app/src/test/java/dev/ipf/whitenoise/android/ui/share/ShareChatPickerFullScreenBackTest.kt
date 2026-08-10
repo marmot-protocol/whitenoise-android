@@ -6,7 +6,6 @@ import android.window.OnBackAnimationCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
-import androidx.activity.ComponentDialog
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.getValue
@@ -17,8 +16,8 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotDisplayed
-import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -39,18 +38,17 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowDialog
 
 /**
- * Behavioral Back coverage for the inbound share recipient sheet (issue #1721).
- * Composes production [ShareChatPickerSheet] with [ModalBottomSheet], exercises
+ * Behavioral Back coverage for the inbound share recipient screen (issues #1721 and #1922).
+ * Composes production [ShareChatPickerFullScreen], exercises
  * committed and predictive Back through production callback seams,
  * and verifies request clearing plus route isolation.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
-class ShareChatPickerSheetBackTest {
+class ShareChatPickerFullScreenBackTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
@@ -65,7 +63,7 @@ class ShareChatPickerSheetBackTest {
         )
 
     @Test
-    fun backFromPartiallyExpandedIdleDismissesSheetAndClearsRequest() {
+    fun backFromIdleDismissesScreenAndClearsRequest() {
         val tracker = mountSharePicker()
 
         composeRule.onNodeWithText(shareToLabel).assertIsDisplayed()
@@ -78,29 +76,7 @@ class ShareChatPickerSheetBackTest {
     }
 
     @Test
-    fun backFromExpandedIdleDismissesSheetAndClearsRequest() {
-        val tracker = mountSharePicker()
-
-        composeRule.onNodeWithText(searchLabel).performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText(searchLabel).assertIsFocused()
-        ShadowDialog.getLatestDialog().currentFocus?.clearFocus()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText(searchLabel).assertIsNotFocused()
-
-        pressCommittedBack()
-
-        assertEquals(
-            "Expanded idle Back must fully cancel the share request, not partial-expand",
-            1,
-            tracker.dismissCount,
-        )
-        assertEquals(0, tracker.routeBackCount)
-        composeRule.onNodeWithText(shareToLabel).assertIsNotDisplayed()
-    }
-
-    @Test
-    fun backWithSearchFocusedDismissesSheetAndClearsRequest() {
+    fun backWithSearchFocusedDismissesScreenAndClearsRequest() {
         val tracker = mountSharePicker()
 
         composeRule.onNodeWithText(searchLabel).performClick()
@@ -133,14 +109,10 @@ class ShareChatPickerSheetBackTest {
     }
 
     @Test
-    fun repeatedBackWhileSheetIsSettlingDismissesRequestOnce() {
+    fun closeActionDismissesRequestOnce() {
         val tracker = mountSharePicker()
 
-        composeRule.mainClock.autoAdvance = false
-        Espresso.pressBack()
-        composeRule.mainClock.advanceTimeBy(100)
-        Espresso.pressBack()
-        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.onNodeWithContentDescription(app.getString(R.string.close)).performClick()
         composeRule.waitForIdle()
 
         assertEquals(1, tracker.dismissCount)
@@ -149,17 +121,17 @@ class ShareChatPickerSheetBackTest {
     }
 
     @Test
-    fun repeatedBackWithSearchFocusedWhileSheetIsSettlingDismissesRequestOnce() {
+    fun repeatedFocusedBackCallbackDismissesRequestOnce() {
         val tracker = mountSharePicker()
         composeRule.onNodeWithText(searchLabel).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText(searchLabel).assertIsFocused()
 
-        composeRule.mainClock.autoAdvance = false
-        Espresso.pressBack()
-        composeRule.mainClock.advanceTimeBy(100)
-        Espresso.pressBack()
-        composeRule.mainClock.advanceTimeBy(1_000)
+        val callback = checkNotNull(tracker.overlayBackCallback)
+        composeRule.runOnIdle {
+            callback.onBackInvoked()
+            callback.onBackInvoked()
+        }
         composeRule.waitForIdle()
 
         assertEquals(1, tracker.dismissCount)
@@ -168,14 +140,14 @@ class ShareChatPickerSheetBackTest {
     }
 
     @Test
-    fun dismissActionClearsFocusHidesKeyboardAndHidesSheet() {
+    fun dismissActionClearsFocusHidesKeyboardAndDismissesScreen() {
         var clearedFocus = false
         var hidKeyboard = false
         var hidSheet = false
         runShareChatPickerDismissal(
             clearFocus = { clearedFocus = true },
             hideKeyboard = { hidKeyboard = true },
-            hideSheet = { hidSheet = true },
+            dismiss = { hidSheet = true },
         )
         assertTrue(clearedFocus)
         assertTrue(hidKeyboard)
@@ -183,12 +155,12 @@ class ShareChatPickerSheetBackTest {
     }
 
     @Test
-    fun canceledPredictiveBackRestoresSheetAndKeepsRequest() {
+    fun canceledPredictiveBackRestoresScreenAndKeepsRequest() {
         val tracker = mountSharePicker()
 
         composeRule.onNodeWithText(shareToLabel).assertIsDisplayed()
-        val initialWidth = sheetTitleWidth()
-        val dispatcher = sheetOnBackPressedDispatcher()
+        val initialWidth = screenTitleWidth()
+        val dispatcher = screenOnBackPressedDispatcher()
 
         composeRule.runOnIdle {
             dispatcher.dispatchOnBackStarted(predictiveBackEvent(progress = 0f))
@@ -196,27 +168,27 @@ class ShareChatPickerSheetBackTest {
         }
         composeRule.waitForIdle()
 
-        val progressedWidth = sheetTitleWidth()
+        val progressedWidth = screenTitleWidth()
         assertTrue(
-            "Predictive progress should scale the sheet before cancel",
+            "Predictive progress should scale the screen before cancel",
             progressedWidth < initialWidth * 0.98f,
         )
 
         composeRule.runOnIdle { dispatcher.dispatchOnBackCancelled() }
         composeRule.waitForIdle()
 
-        assertEquals(initialWidth, sheetTitleWidth(), 1f)
+        assertEquals(initialWidth, screenTitleWidth(), 1f)
         assertEquals(0, tracker.dismissCount)
         assertEquals(0, tracker.routeBackCount)
         composeRule.onNodeWithText(shareToLabel).assertIsDisplayed()
     }
 
     @Test
-    fun committedPredictiveBackDismissesSheetOnceAndClearsRequest() {
+    fun committedPredictiveBackDismissesScreenOnceAndClearsRequest() {
         val tracker = mountSharePicker()
 
         composeRule.onNodeWithText(shareToLabel).assertIsDisplayed()
-        val dispatcher = sheetOnBackPressedDispatcher()
+        val dispatcher = screenOnBackPressedDispatcher()
 
         composeRule.runOnIdle {
             dispatcher.dispatchOnBackStarted(predictiveBackEvent(progress = 0f))
@@ -258,7 +230,7 @@ class ShareChatPickerSheetBackTest {
             WhiteNoiseTheme(darkTheme = true) {
                 BackHandler { tracker.routeBackCount++ }
                 if (tracker.showPicker) {
-                    ShareChatPickerSheet(
+                    ShareChatPickerFullScreen(
                         appState = appState,
                         payload = payload,
                         onDismiss = {
@@ -307,13 +279,9 @@ class ShareChatPickerSheetBackTest {
         composeRule.waitForIdle()
     }
 
-    private fun sheetOnBackPressedDispatcher(): OnBackPressedDispatcher {
-        val dialog = ShadowDialog.getLatestDialog()
-        assertTrue("Share picker must own a ComponentDialog", dialog is ComponentDialog)
-        return (dialog as ComponentDialog).onBackPressedDispatcher
-    }
+    private fun screenOnBackPressedDispatcher(): OnBackPressedDispatcher = composeRule.activity.onBackPressedDispatcher
 
-    private fun sheetTitleWidth(): Float =
+    private fun screenTitleWidth(): Float =
         composeRule
             .onNodeWithText(shareToLabel)
             .fetchSemanticsNode()

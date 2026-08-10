@@ -50,7 +50,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
-class ShareChatPickerSheetProfileTest {
+class ShareChatPickerFullScreenProfileTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
@@ -69,7 +69,7 @@ class ShareChatPickerSheetProfileTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerSheet(
+                ShareChatPickerFullScreen(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -97,7 +97,7 @@ class ShareChatPickerSheetProfileTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerSheet(
+                ShareChatPickerFullScreen(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -135,7 +135,7 @@ class ShareChatPickerSheetProfileTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerSheet(
+                ShareChatPickerFullScreen(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -175,7 +175,7 @@ class ShareChatPickerSheetProfileTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerSheet(
+                ShareChatPickerFullScreen(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -209,7 +209,7 @@ class ShareChatPickerSheetProfileTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerSheet(
+                ShareChatPickerFullScreen(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -235,7 +235,7 @@ class ShareChatPickerSheetProfileTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerSheet(
+                ShareChatPickerFullScreen(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -292,7 +292,7 @@ class ShareChatPickerSheetProfileTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerSheet(
+                ShareChatPickerFullScreen(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -342,7 +342,7 @@ class ShareChatPickerSheetProfileTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerSheet(
+                ShareChatPickerFullScreen(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -382,7 +382,7 @@ class ShareChatPickerSheetProfileTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerSheet(
+                ShareChatPickerFullScreen(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -409,7 +409,7 @@ class ShareChatPickerSheetProfileTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerSheet(
+                ShareChatPickerFullScreen(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -435,7 +435,7 @@ class ShareChatPickerSheetProfileTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerSheet(
+                ShareChatPickerFullScreen(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -471,7 +471,7 @@ class ShareChatPickerSheetProfileTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerSheet(
+                ShareChatPickerFullScreen(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -578,7 +578,6 @@ class ShareChatPickerSheetProfileTest {
             }
         }
     }
-
     private fun profile(
         displayName: String,
         name: String = displayName.lowercase(),
