@@ -7,6 +7,8 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -14,15 +16,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.editor.PhotoDraftStageResult
 import dev.ipf.whitenoise.android.media.editor.PhotoDraftStager
+import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorCommitResult
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorCommitter
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorRenderer
+import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceFailure
 import dev.ipf.whitenoise.android.media.editor.editorDigest
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -199,7 +204,7 @@ internal class ConversationMediaDraftState(
 
     fun saveEditor(
         editor: ActivePhotoEditor,
-        recipe: dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe,
+        recipe: PhotoEditRecipe,
         quality: MediaQuality,
     ) {
         scope.launch {
@@ -376,7 +381,7 @@ internal class ConversationMediaDraftState(
         result: PhotoDraftStageResult.NotEditable,
     ) {
         val description =
-            if (result.reason == dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceFailure.Animated) {
+            if (result.reason == PhotoEditorSourceFailure.Animated) {
                 messages.animationNotEditable
             } else {
                 messages.sourceNotEditable
@@ -430,7 +435,7 @@ internal fun rememberConversationMediaDraftState(
     chatId: String,
     mediaSlots: List<PendingMediaSlot>,
 ): ConversationMediaDraftState {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val messages =
         PhotoEditorMessages(
@@ -443,9 +448,11 @@ internal fun rememberConversationMediaDraftState(
         remember(appState, controller, chatId, context, scope, messages) {
             ConversationMediaDraftState(appState, controller, context, scope, messages)
         }
-    state.updateInputs(mediaSlots, controller.boundAccountRef)
+    SideEffect {
+        state.updateInputs(mediaSlots, controller.boundAccountRef)
+    }
 
-    androidx.compose.runtime.LaunchedEffect(state, mediaSlots, controller.boundAccountRef) {
+    LaunchedEffect(state, mediaSlots, controller.boundAccountRef) {
         state.prepareMissingPhotos()
     }
     DisposableEffect(state, chatId) {
@@ -465,7 +472,7 @@ internal fun ConversationMediaDraftContent(
     onDocumentUrisChange: (List<Uri>) -> Unit,
     mediaSender: ConversationMediaSender,
     chatTitle: String,
-    composerText: String,
+    composerText: () -> String,
     onCaptionAccepted: (seededCaption: String) -> Unit,
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
@@ -473,7 +480,15 @@ internal fun ConversationMediaDraftContent(
 ) {
     val previewStateHolder = rememberSaveableStateHolder()
     if ((mediaSlots.isNotEmpty() || documentUris.isNotEmpty()) && state.activeEditor == null) {
-        val seededCaption = composerText
+        val seededCaption = composerText()
+        val preparedPreviews =
+            remember(state.backedPhotos, state.preparedPhotos) {
+                state.preparedPreviews()
+            }
+        val preparedQualities =
+            remember(state.backedPhotos) {
+                state.preparedQualities()
+            }
         previewStateHolder.SaveableStateProvider(chatId) {
             MediaPreviewScreen(
                 mediaSlots = mediaSlots,
@@ -518,8 +533,8 @@ internal fun ConversationMediaDraftContent(
                 onSelectMediaQuality = { slotId, quality ->
                     mediaSlots.firstOrNull { it.id == slotId }?.let { state.selectQuality(it, quality) }
                 },
-                preparedPhotoPreviews = state.preparedPreviews(),
-                preparedPhotoQualities = state.preparedQualities(),
+                preparedPhotoPreviews = preparedPreviews,
+                preparedPhotoQualities = preparedQualities,
                 preparingPhotoSlotIds = state.preparingSlotIds,
                 nonEditableMediaSlotIds = state.nonEditableDescriptions.keys,
                 nonEditableMediaDescriptions = state.nonEditableDescriptions,

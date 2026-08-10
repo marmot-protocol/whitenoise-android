@@ -3001,7 +3001,7 @@ internal fun ConversationScreen(
         onDocumentUrisChange = { pendingDocumentUris = it },
         mediaSender = mediaSender,
         chatTitle = controller.title(groupTitleCopy),
-        composerText = composerTextState.valueState.value.text,
+        composerText = { composerTextState.valueState.value.text },
         onCaptionAccepted = { seededCaption ->
             if (composerTextState.valueState.value.text == seededCaption) {
                 composerTextState.valueState.value = TextFieldValue("")
