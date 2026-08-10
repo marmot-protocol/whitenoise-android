@@ -37,6 +37,13 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposer
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun ConversationBottomBar(
     selectionMode: Boolean,
+    selectionActionAvailability: BatchSelectionActionAvailability,
+    onCopySelection: () -> Unit,
+    onForwardSelection: () -> Unit,
+    onSaveSelection: () -> Unit,
+    onReplySelection: () -> Unit,
+    onInfoSelection: () -> Unit,
+    onDeleteSelection: () -> Unit,
     searchOpen: Boolean,
     searchMatchCount: Int,
     searchActiveIndex: Int,
@@ -87,7 +94,16 @@ internal fun ConversationBottomBar(
             },
     ) {
         when {
-            selectionMode -> Unit
+            selectionMode ->
+                MessageSelectionBottomBar(
+                    availability = selectionActionAvailability,
+                    onCopy = onCopySelection,
+                    onForward = onForwardSelection,
+                    onSave = onSaveSelection,
+                    onReply = onReplySelection,
+                    onInfo = onInfoSelection,
+                    onDelete = onDeleteSelection,
+                )
             searchOpen ->
                 ConversationSearchNavBar(
                     matchCount = searchMatchCount,

@@ -52,12 +52,7 @@ import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 internal fun ConversationTopBar(
     selectionMode: Boolean,
     selectedCount: Int,
-    canCopySelection: Boolean,
-    canForwardSelection: Boolean,
     onCloseSelection: () -> Unit,
-    onCopySelection: () -> Unit,
-    onForwardSelection: () -> Unit,
-    onDeleteSelection: () -> Unit,
     searchOpen: Boolean,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
@@ -82,12 +77,7 @@ internal fun ConversationTopBar(
         if (selectionMode) {
             MessageSelectionBar(
                 count = selectedCount,
-                canCopy = canCopySelection,
-                canForward = canForwardSelection,
                 onClose = onCloseSelection,
-                onCopy = onCopySelection,
-                onForward = onForwardSelection,
-                onDelete = onDeleteSelection,
             )
         } else if (searchOpen) {
             ConversationSearchTopBar(

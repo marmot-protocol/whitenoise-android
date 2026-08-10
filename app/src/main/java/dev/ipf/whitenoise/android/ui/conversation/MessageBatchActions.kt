@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.state.MessageStatus
 
 /** UI-ready projection of one selected, user-visible message in timeline order. */
 internal data class BatchMessageActionItem(
@@ -10,6 +11,8 @@ internal data class BatchMessageActionItem(
     val senderDisplayName: String,
     val copyableText: String?,
     val forwardableText: String?,
+    /** True when the message has at least one attachment the single-message save path can persist. */
+    val hasSaveableMedia: Boolean = false,
     /**
      * Whether this message can be removed for the whole group — the authored
      * message, or another member's message the selecting user may moderate
@@ -36,6 +39,7 @@ internal enum class BatchDeleteScope {
 internal data class BatchMessageSelection(
     val action: BatchMessageActionItem,
     val record: AppMessageRecordFfi,
+    val status: MessageStatus,
     val timelineOrder: ULong,
 )
 
@@ -117,6 +121,99 @@ internal fun batchDeleteBreakdown(items: List<BatchMessageActionItem>): BatchDel
         deleteForEveryone = items.count(BatchMessageActionItem::canDeleteForEveryone),
         hideLocally = items.count { !it.canDeleteForEveryone },
     )
+
+internal data class BatchSelectionActionAvailability(
+    val canCopy: Boolean,
+    val canForward: Boolean,
+    val canSave: Boolean,
+    val canReply: Boolean,
+    val canInfo: Boolean,
+    val canDelete: Boolean,
+)
+
+internal fun batchSelectionActionAvailability(
+    items: List<BatchMessageActionItem>,
+    readOnly: Boolean,
+): BatchSelectionActionAvailability {
+    if (items.isEmpty()) {
+        return BatchSelectionActionAvailability(
+            canCopy = false,
+            canForward = false,
+            canSave = false,
+            canReply = false,
+            canInfo = false,
+            canDelete = false,
+        )
+    }
+    val forwardBodies = batchForwardBodies(items)
+    val single = items.size == 1
+    return BatchSelectionActionAvailability(
+        canCopy = items.all { !it.copyableText.isNullOrBlank() },
+        canForward = forwardBodies.isNotEmpty(),
+        canSave = items.all(BatchMessageActionItem::hasSaveableMedia),
+        canReply = single && !readOnly,
+        canInfo = single,
+        canDelete = true,
+    )
+}
+
+internal enum class MessageSelectionBarAction {
+    Reply,
+    Info,
+    Copy,
+    Forward,
+    Save,
+}
+
+internal data class MessageSelectionBarActionLayout(
+    val inline: List<MessageSelectionBarAction>,
+    val overflow: List<MessageSelectionBarAction>,
+)
+
+@Suppress("MaxLineLength")
+internal fun offeredMessageSelectionBarActions(availability: BatchSelectionActionAvailability): List<MessageSelectionBarAction> =
+    buildList {
+        add(MessageSelectionBarAction.Copy)
+        add(MessageSelectionBarAction.Forward)
+        if (availability.canReply) add(MessageSelectionBarAction.Reply)
+        if (availability.canInfo) add(MessageSelectionBarAction.Info)
+        add(MessageSelectionBarAction.Save)
+    }
+
+internal fun partitionMessageSelectionBarActionsForWidth(
+    offered: List<MessageSelectionBarAction>,
+    barWidthPx: Int,
+    actionSlotWidthPx: Int,
+    deleteSlotWidthPx: Int,
+    overflowSlotWidthPx: Int,
+): MessageSelectionBarActionLayout {
+    if (offered.isEmpty()) {
+        return MessageSelectionBarActionLayout(inline = emptyList(), overflow = emptyList())
+    }
+
+    fun fits(
+        inlineCount: Int,
+        withOverflow: Boolean,
+    ): Boolean {
+        val overflow = if (withOverflow) overflowSlotWidthPx else 0
+        return inlineCount * actionSlotWidthPx + overflow + deleteSlotWidthPx <= barWidthPx
+    }
+
+    return when {
+        fits(offered.size, withOverflow = false) ->
+            MessageSelectionBarActionLayout(inline = offered, overflow = emptyList())
+        else -> {
+            var inlineCount = offered.size
+            while (inlineCount > 0 && !fits(inlineCount, withOverflow = true)) {
+                inlineCount -= 1
+            }
+            MessageSelectionBarActionLayout(
+                inline = offered.take(inlineCount),
+                overflow = offered.drop(inlineCount),
+            )
+        }
+    }
+}
 
 /**
  * Apply the chosen [scope] to every selection. In [BatchDeleteScope.EVERYONE]

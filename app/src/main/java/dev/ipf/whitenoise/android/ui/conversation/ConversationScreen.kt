@@ -170,11 +170,14 @@ import dev.ipf.whitenoise.android.ui.conversation.media.isLegacyRestore
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.photoApprovalOutputQuality
+import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
+import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.selectablePhotoQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInfoSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
@@ -287,6 +290,7 @@ private data class ConversationBatchSelectionUiState(
     val copyText: String,
     val forwardBodies: List<String>,
     val deleteBreakdown: BatchDeleteBreakdown,
+    val actionAvailability: BatchSelectionActionAvailability,
 )
 
 @Composable
@@ -295,13 +299,14 @@ private fun rememberConversationBatchSelectionUiState(
     chatId: String,
     activeAccountRef: String?,
     runtimeGeneration: Int,
+    readOnly: Boolean,
     appState: WhiteNoiseAppState,
 ): ConversationBatchSelectionUiState {
     val selections by
         remember(chatId, activeAccountRef, runtimeGeneration) {
             derivedStateOf { orderedBatchSelections(selectedMessages.values) }
         }
-    return remember(selections, appState.profileRevisionForCompose) {
+    return remember(selections, appState.profileRevisionForCompose, readOnly) {
         val actionItems =
             selections.map { selection ->
                 selection.action.copy(senderDisplayName = appState.displayName(selection.action.senderId))
@@ -312,6 +317,7 @@ private fun rememberConversationBatchSelectionUiState(
             copyText = batchCopyText(actionItems),
             forwardBodies = batchForwardBodies(actionItems),
             deleteBreakdown = batchDeleteBreakdown(actionItems),
+            actionAvailability = batchSelectionActionAvailability(actionItems, readOnly),
         )
     }
 }
@@ -533,6 +539,12 @@ internal fun ConversationScreen(
         }
     var batchForwardSheetOpen by
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+    var batchAttachmentSaveInFlight by
+        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+    var batchInfoSelection by
+        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateOf<BatchMessageSelection?>(null)
+        }
     var showBatchDeleteConfirm by
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var batchDeleteInFlight by
@@ -794,8 +806,10 @@ internal fun ConversationScreen(
                                 // surface and the mutation guard use, so bulk
                                 // routing never diverges from per-message policy.
                                 canDeleteForEveryone = controller.deleteCapabilityFor(record).canDeleteForEveryone,
+                                hasSaveableMedia = controller.mediaReferencesFor(item).isNotEmpty(),
                             ),
                         record = record,
+                        status = item.status,
                         timelineOrder = item.timelineOrder,
                     )
                 }.associateBy { it.action.messageId }
@@ -947,13 +961,16 @@ internal fun ConversationScreen(
     val selectionMode = selectedMessages.isNotEmpty()
     LaunchedEffect(selectionMode) {
         if (selectionMode) clearTextSelection()
+        if (!selectionMode) batchInfoSelection = null
     }
+    val selectionReadOnly = controller.group.pendingConfirmation
     val batchSelectionUi =
         rememberConversationBatchSelectionUiState(
             selectedMessages = selectedMessages,
             chatId = chat.id,
             activeAccountRef = appState.activeAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
+            readOnly = selectionReadOnly,
             appState = appState,
         )
     val renderedSize = renderedTimeline.size
@@ -2693,19 +2710,7 @@ internal fun ConversationScreen(
             ConversationTopBar(
                 selectionMode = selectionMode,
                 selectedCount = batchSelectionUi.actionItems.size,
-                canCopySelection = batchSelectionUi.copyText.isNotBlank(),
-                canForwardSelection = batchSelectionUi.forwardBodies.isNotEmpty(),
                 onCloseSelection = { selectedMessages.clear() },
-                onCopySelection = {
-                    if (batchSelectionUi.copyText.isNotBlank()) {
-                        clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
-                        selectedMessages.clear()
-                    }
-                },
-                onForwardSelection = {
-                    if (batchSelectionUi.forwardBodies.isNotEmpty()) batchForwardSheetOpen = true
-                },
-                onDeleteSelection = { showBatchDeleteConfirm = true },
                 searchOpen = searchOpen,
                 searchQuery = searchQuery,
                 onSearchQueryChange = {
@@ -2774,6 +2779,58 @@ internal fun ConversationScreen(
         bottomBar = {
             ConversationBottomBar(
                 selectionMode = selectionMode,
+                selectionActionAvailability =
+                    batchSelectionUi.actionAvailability.let { availability ->
+                        availability.copy(canSave = availability.canSave && !batchAttachmentSaveInFlight)
+                    },
+                onCopySelection = {
+                    if (batchSelectionUi.copyText.isNotBlank()) {
+                        clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
+                        selectedMessages.clear()
+                    }
+                },
+                onForwardSelection = {
+                    if (batchSelectionUi.forwardBodies.isNotEmpty()) batchForwardSheetOpen = true
+                },
+                onSaveSelection = {
+                    if (batchSelectionUi.actionAvailability.canSave && !batchAttachmentSaveInFlight) {
+                        batchAttachmentSaveInFlight = true
+                        val selections = batchSelectionUi.selections
+                        appState.launchMutation {
+                            try {
+                                var savedCount = 0
+                                var totalCount = 0
+                                selections.forEach { selection ->
+                                    val record = selection.record
+                                    val mediaReferences = controller.mediaReferencesFor(record)
+                                    totalCount += mediaReferences.size
+                                    savedCount +=
+                                        saveMessageMediaAttachments(
+                                            context = context,
+                                            controller = controller,
+                                            messageIdHex = record.messageIdHex,
+                                            mediaReferences = mediaReferences,
+                                            mine = controller.isMessageMine(record),
+                                        )
+                                }
+                                appState.presentAttachmentSaveOutcome(context, savedCount, totalCount)
+                                selectedMessages.clear()
+                            } finally {
+                                batchAttachmentSaveInFlight = false
+                            }
+                        }
+                    }
+                },
+                onReplySelection = {
+                    batchSelectionUi.selections.singleOrNull()?.let { selection ->
+                        controller.replyingTo = selection.record
+                        selectedMessages.clear()
+                    }
+                },
+                onInfoSelection = {
+                    batchInfoSelection = batchSelectionUi.selections.singleOrNull()
+                },
+                onDeleteSelection = { showBatchDeleteConfirm = true },
                 searchOpen = searchOpen,
                 searchMatchCount = effectiveSearchMatchIds.size,
                 searchActiveIndex = searchActiveIndex,
@@ -3145,6 +3202,19 @@ internal fun ConversationScreen(
                 appState.forwardTexts(targetGroupIds, batchSelectionUi.forwardBodies)
                 selectedMessages.clear()
             },
+        )
+    }
+
+    batchInfoSelection?.let { infoSelection ->
+        val infoRecord = infoSelection.record
+        MessageInfoSheet(
+            record = infoRecord,
+            status = infoSelection.status,
+            mine = controller.isMessageMine(infoRecord),
+            senderDisplayName = appState.displayName(infoRecord.sender),
+            senderNpub = appState.npub(infoRecord.sender),
+            onDismissRequest = { batchInfoSelection = null },
+            onCopy = { value -> clipboard.setText(AnnotatedString(value)) },
         )
     }
 

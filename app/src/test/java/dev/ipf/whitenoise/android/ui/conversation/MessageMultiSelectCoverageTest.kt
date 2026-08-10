@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -17,16 +18,17 @@ class MessageMultiSelectCoverageTest {
     }
 
     @Test
-    fun conversationOwnsSelectionActionsAndHidesBottomChrome() {
+    fun conversationOwnsSelectionActionsAndBottomSelectionBar() {
         val screenSource = source("ConversationScreen.kt")
         val topBarSource = source("ConversationTopBar.kt")
         val bottomBarSource = source("ConversationBottomBar.kt")
 
         assertTrue(screenSource.contains("selectedMessages"))
         assertTrue(topBarSource.contains("MessageSelectionBar("))
+        assertTrue(bottomBarSource.contains("MessageSelectionBottomBar("))
         assertTrue(screenSource.contains("batchCopyText(actionItems)"))
         assertTrue(screenSource.contains("batchForwardBodies(actionItems)"))
-        assertTrue(bottomBarSource.contains("selectionMode ->"))
+        assertTrue(screenSource.contains("batchSelectionActionAvailability("))
         assertTrue(screenSource.contains("if (initialTimelineAnchored && !selectionMode)"))
     }
 
@@ -50,7 +52,7 @@ class MessageMultiSelectCoverageTest {
 
         assertTrue(
             source.contains(
-                "return remember(selections, appState.profileRevisionForCompose) { " +
+                "return remember(selections, appState.profileRevisionForCompose, readOnly) { " +
                     "val actionItems = selections.map { selection -> " +
                     "selection.action.copy(senderDisplayName = appState.displayName(selection.action.senderId)) }",
             ),
@@ -67,9 +69,18 @@ class MessageMultiSelectCoverageTest {
         )
         assertTrue(
             source.contains(
-                "deleteBreakdown = batchDeleteBreakdown(actionItems)",
+                "actionAvailability = batchSelectionActionAvailability(actionItems, readOnly)",
             ),
         )
+    }
+
+    @Test
+    fun selectedMessageInfoUsesRetainedSnapshotOutsideTimelineWindow() {
+        val source = source("ConversationScreen.kt")
+
+        assertTrue(source.contains("batchInfoSelection"))
+        assertTrue(source.contains("batchInfoSelection = batchSelectionUi.selections.singleOrNull()"))
+        assertFalse(source.contains("renderedTimeline.firstOrNull { it.record.messageIdHex == infoMessageId }"))
     }
 
     @Test
