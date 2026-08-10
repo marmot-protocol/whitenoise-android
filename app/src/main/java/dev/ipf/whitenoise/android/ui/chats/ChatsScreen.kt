@@ -134,6 +134,9 @@ internal fun ChatsScreen(
     onPresentProfile: (npub: String, visibleActiveListHeadId: String?) -> Unit = { npub, _ ->
         appState.presentProfile(npub)
     },
+    // Shell-owned so the filter survives conversation navigation (issue #1897).
+    selectedFolderId: String? = null,
+    onSelectFolder: (String?) -> Unit = {},
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
@@ -166,9 +169,6 @@ internal fun ChatsScreen(
     // (loading → resolved/failed). Plain-text queries stay [None] and the list
     // filters exactly as before.
     var identifierResolution by remember { mutableStateOf<IdentifierResolution>(IdentifierResolution.None) }
-    // Folder-backed filtering: null = All. Every folder — seeded defaults
-    // included — filters by its effective membership (manual + rule matches).
-    var selectedFolderId by remember { mutableStateOf<String?>(null) }
     val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
     val accountFolders =
         remember(folderStoreState, appState.activeAccountRef) {
@@ -718,7 +718,7 @@ internal fun ChatsScreen(
     // folders emptying and stranded the list on an invisible filter.
     LaunchedEffect(folderChipModels, selectedFolderId) {
         if (selectedFolderId != null && folderChipModels.none { it.folderId == selectedFolderId }) {
-            selectedFolderId = null
+            onSelectFolder(null)
         }
     }
 
@@ -883,7 +883,7 @@ internal fun ChatsScreen(
                 ChatListFilterChips(
                     chips = folderChipModels,
                     selectedFolderId = selectedFolderId,
-                    onSelect = { selectedFolderId = it },
+                    onSelect = onSelectFolder,
                     onEditFolder = { folderHandoff.editingFolderId = it },
                 )
             }

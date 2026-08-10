@@ -211,7 +211,6 @@ class ChatsScreenSelectionActionsCoverageTest {
         listOf(
             "var searchOpen by remember",
             "var searchQuery by remember",
-            "var selectedFolderId by remember",
             "val chatListState = key(showArchived) { rememberLazyListState() }",
         ).forEach { declaration ->
             assertTrue(
@@ -219,6 +218,10 @@ class ChatsScreenSelectionActionsCoverageTest {
                 source.indexOf(declaration) in 0 until handoffStart,
             )
         }
+        assertTrue(
+            "folder filter must be parent-owned so the editor swap does not reset it",
+            "selectedFolderId:" in source.substring(0, handoffStart),
+        )
         assertTrue(
             "the rendered chat list must use the state preserved across the editor swap",
             "state = chatListState" in source,
