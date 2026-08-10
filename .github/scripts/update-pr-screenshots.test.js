@@ -78,6 +78,7 @@ test('updates the description before failing a UI change with no baseline', asyn
     rest: {
       pulls: {
         listFiles: () => {},
+        get: async () => ({ data: { ...pr, number: 42, body: 'Summary' } }),
         update: async request => updates.push(request),
       },
       issues: {},
@@ -114,6 +115,7 @@ test('comment fallback remains blocking when the description cannot be edited', 
     rest: {
       pulls: {
         listFiles: function listFiles() {},
+        get: async () => ({ data: { ...pr, number: 42, body: 'Summary' } }),
         update: async () => { throw new Error('description edits disabled') },
       },
       issues: {

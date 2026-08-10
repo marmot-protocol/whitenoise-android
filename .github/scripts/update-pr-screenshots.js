@@ -75,7 +75,11 @@ function replaceSection(body, section) {
 }
 
 async function run({ github, context, core }) {
-  const pr = context.payload.pull_request
+  const { data: pr } = await github.rest.pulls.get({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    pull_number: context.payload.pull_request.number,
+  })
   const files = await github.paginate(github.rest.pulls.listFiles, {
     owner: context.repo.owner,
     repo: context.repo.repo,

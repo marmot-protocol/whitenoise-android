@@ -45,7 +45,10 @@ If Android seems to need a cache for protocol data, stop and ask whether the dat
   when those states can alter the result; do not create unrelated snapshot
   variants merely to increase coverage.
 - After every commit that changes rendering, regenerate and commit the affected
-  baselines. Run the relevant Roborazzi verification task before pushing.
+  baselines with `./gradlew :app:recordRoborazziDevZapstoreDebug` or
+  `:app:recordRoborazziDevPlayDebug`. Before pushing, run
+  `./gradlew :app:verifyRoborazziDevZapstoreDebug
+  :app:verifyRoborazziDevPlayDebug`.
 - Verify that the pull request description's generated **Visual changes** section
   points to the exact current head commit and shows every affected baseline.
 - Treat a missing-screenshot CI result as blocking. Do not dismiss it as an
