@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -54,10 +55,12 @@ internal fun TextToSpeechScreen(
     val ttsResolution = appState.ttsResolution
     val reportNoEngine = shouldReportNoTtsEngine(ttsResolution)
     val lifecycleOwner = LocalLifecycleOwner.current
+    val locale = LocalConfiguration.current.locales[0]
     var refreshToken by remember { mutableIntStateOf(0) }
     var pendingEnginePackage by remember { mutableStateOf<String?>(null) }
     var trustWarningOpen by remember { mutableStateOf(false) }
     var rateSheetOpen by remember { mutableStateOf(false) }
+    var customRateOpen by remember { mutableStateOf(false) }
     var engineSheetOpen by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
@@ -119,7 +122,9 @@ internal fun TextToSpeechScreen(
                     item {
                         SettingsRow(
                             title = stringResource(R.string.tts_settings_rate_title),
-                            subtitle = rateOverride?.let(::ttsRateLabel) ?: stringResource(R.string.tts_settings_rate_system),
+                            subtitle =
+                                rateOverride?.let { ttsRateLabel(it, locale) }
+                                    ?: stringResource(R.string.tts_settings_rate_system),
                             icon = Icons.Filled.Speed,
                             onClick = { rateSheetOpen = true },
                         )
@@ -157,7 +162,7 @@ internal fun TextToSpeechScreen(
                 )
                 TtsRatePreferences.PRESET_RATES.forEach { rate ->
                     SelectableSettingsRow(
-                        title = ttsRateLabel(rate),
+                        title = ttsRateLabel(rate, locale),
                         selected = rateOverride == rate,
                         onClick = {
                             appState.setTtsRateOverride(rate)
@@ -165,8 +170,26 @@ internal fun TextToSpeechScreen(
                         },
                     )
                 }
+                SelectableSettingsRow(
+                    title = stringResource(R.string.tts_rate_custom),
+                    selected = isTtsCustomRate(rateOverride),
+                    onClick = {
+                        rateSheetOpen = false
+                        customRateOpen = true
+                    },
+                )
             }
         }
+    }
+    if (customRateOpen) {
+        TtsCustomRateDialog(
+            initialRate = rateOverride ?: appState.ttsRatePreferences.resolvedRate(),
+            onDismiss = { customRateOpen = false },
+            onRateSelected = { rate ->
+                appState.setTtsRateOverride(rate)
+                customRateOpen = false
+            },
+        )
     }
     if (engineSheetOpen) {
         ModalBottomSheet(onDismissRequest = { engineSheetOpen = false }) {
@@ -223,14 +246,17 @@ internal fun TextToSpeechScreen(
  * Non-integer rates format with the active locale's decimal separator
  * (0,75\u00d7 in de/fr), integers stay bare (1\u00d7).
  */
-internal fun ttsRateLabel(rate: Float): String {
+internal fun ttsRateLabel(
+    rate: Float,
+    locale: java.util.Locale,
+): String {
     val whole = rate.toInt()
     val number =
         if (rate == whole.toFloat()) {
             whole.toString()
         } else {
             java.text.NumberFormat
-                .getNumberInstance()
+                .getNumberInstance(locale)
                 .format(rate.toDouble())
         }
     return "$number\u00d7"

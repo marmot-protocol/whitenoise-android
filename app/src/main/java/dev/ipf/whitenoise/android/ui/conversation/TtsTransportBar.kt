@@ -21,7 +21,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,9 +36,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsHistoryEdgeState
 import dev.ipf.whitenoise.android.audio.tts.TtsState
-import dev.ipf.whitenoise.android.state.TtsRatePreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.settings.ttsRateLabel
 
 /**
  * Read-aloud transport strip rendered beneath the conversation's top bar in
@@ -60,10 +57,12 @@ internal fun TtsTransportBar(
     if (current is TtsState.Idle) return
     val rateOverride by appState.ttsRatePreferences.rateOverride.collectAsState()
     val historyEdge by appState.ttsHistorySession.edgeState.collectAsState()
+    val activeRate = rateOverride ?: appState.ttsRatePreferences.resolvedRate()
 
     TtsTransportBarContent(
         state = current,
-        rateLabel = ttsRateLabel(rateOverride ?: appState.ttsRatePreferences.resolvedRate()),
+        rateOverride = rateOverride,
+        activeRate = activeRate,
         onPause = { appState.ttsController.pause() },
         onResume = { appState.ttsController.resume() },
         // Navigation routes through the history session so an edge tap pages
@@ -72,7 +71,7 @@ internal fun TtsTransportBar(
         onNextSentence = { appState.ttsHistorySession.nextSentence() },
         onPreviousMessage = { appState.ttsHistorySession.previousMessage() },
         onNextMessage = { appState.ttsHistorySession.nextMessage() },
-        onCycleRate = { appState.setTtsRateOverride(nextTtsPresetRate(rateOverride)) },
+        onRateSelected = appState::setTtsRateOverride,
         onStop = { appState.stopSpeaking() },
         modifier = modifier,
         historyEdge = historyEdge,
@@ -83,14 +82,15 @@ internal fun TtsTransportBar(
 @Composable
 internal fun TtsTransportBarContent(
     state: TtsState,
-    rateLabel: String,
+    rateOverride: Float?,
+    activeRate: Float,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onPreviousSentence: () -> Unit,
     onNextSentence: () -> Unit,
     onPreviousMessage: () -> Unit,
     onNextMessage: () -> Unit,
-    onCycleRate: () -> Unit,
+    onRateSelected: (Float?) -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
     historyEdge: TtsHistoryEdgeState? = null,
@@ -155,7 +155,11 @@ internal fun TtsTransportBarContent(
                     HistoryEdgeStatus(historyEdge)
                 }
                 if (!isError) {
-                    TextButton(onClick = onCycleRate) { Text(rateLabel) }
+                    TtsTransportRatePicker(
+                        rateOverride = rateOverride,
+                        activeRate = activeRate,
+                        onRateSelected = onRateSelected,
+                    )
                 }
                 IconButton(onClick = onStop) {
                     Icon(Icons.Default.Close, contentDescription = stringResource(R.string.tts_bar_stop))
@@ -255,15 +259,4 @@ private fun HistoryEdgeStatus(historyEdge: TtsHistoryEdgeState?) {
                 .padding(top = 2.dp)
                 .semantics { liveRegion = LiveRegionMode.Polite },
     )
-}
-
-/** Cycles the preset list; from the System default it starts at 1×. */
-internal fun nextTtsPresetRate(currentOverride: Float?): Float {
-    val presets = TtsRatePreferences.PRESET_RATES
-    val currentIndex = presets.indexOfFirst { it == currentOverride }
-    return if (currentIndex < 0) {
-        TtsRatePreferences.DEFAULT_RATE
-    } else {
-        presets[(currentIndex + 1) % presets.size]
-    }
 }
