@@ -428,32 +428,58 @@ internal fun ProfileHeroHeader(
     }
 }
 
+@Suppress("FunctionNaming")
+@Composable
+internal fun ProfileSaveButton(
+    enabled: Boolean,
+    busy: Boolean,
+    onSave: () -> Unit,
+) {
+    Button(
+        onClick = onSave,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        if (busy) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.width(8.dp))
+        }
+        // Profile edit's primary action is conceptually "save" to the
+        // user; the relay-publish mechanics are an implementation detail
+        // that only the failure surface needs to name (#834).
+        Text(stringResource(R.string.save))
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProfileEditScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
+    loadProfile: suspend (String) -> UserProfileMetadataFfi? = appState::loadUserProfile,
+    publishProfile: suspend (UserProfileMetadataFfi) -> Boolean = appState::publishProfile,
 ) {
     val active = appState.activeAccount
-    var displayName by remember(active?.accountIdHex) { mutableStateOf("") }
-    var about by remember(active?.accountIdHex) { mutableStateOf("") }
-    var imageDrafts by remember(active?.accountIdHex) { mutableStateOf(ProfileImageDrafts()) }
-    var profileLoaded by remember(active?.accountIdHex) { mutableStateOf(false) }
+    val activeAccountId = active?.accountIdHex
+    val saveState = remember { ProfileEditSaveState() }
+    var displayName by remember(activeAccountId) { mutableStateOf("") }
+    var about by remember(activeAccountId) { mutableStateOf("") }
+    var imageDrafts by remember(activeAccountId) { mutableStateOf(ProfileImageDrafts()) }
     val picture = imageDrafts.picture
     val banner = imageDrafts.banner
-    var nip05 by remember(active?.accountIdHex) { mutableStateOf("") }
-    var lud16 by remember(active?.accountIdHex) { mutableStateOf("") }
+    var nip05 by remember(activeAccountId) { mutableStateOf("") }
+    var lud16 by remember(activeAccountId) { mutableStateOf("") }
     // In-flight / failed LNURL-pay resolution of the lud16 field (#795). The
     // error is a string resource id so the inline message can distinguish
     // "doesn't resolve" from "no network"; it clears on every edit.
-    var lud16Checking by remember { mutableStateOf(false) }
-    var lud16ResolveError by remember(active?.accountIdHex) { mutableStateOf<Int?>(null) }
+    var lud16Checking by remember(activeAccountId) { mutableStateOf(false) }
+    var lud16ResolveError by remember(activeAccountId) { mutableStateOf<Int?>(null) }
     val lud16FocusRequester = remember { FocusRequester() }
-    var busy by remember { mutableStateOf(false) }
-    var pictureUploading by remember(active?.accountIdHex) { mutableStateOf(false) }
-    var pictureUploadJob by remember(active?.accountIdHex) { mutableStateOf<Job?>(null) }
-    var bannerUploading by remember(active?.accountIdHex) { mutableStateOf(false) }
-    var bannerUploadJob by remember(active?.accountIdHex) { mutableStateOf<Job?>(null) }
+    var busy by remember(activeAccountId) { mutableStateOf(false) }
+    var pictureUploading by remember(activeAccountId) { mutableStateOf(false) }
+    var pictureUploadJob by remember(activeAccountId) { mutableStateOf<Job?>(null) }
+    var bannerUploading by remember(activeAccountId) { mutableStateOf(false) }
+    var bannerUploadJob by remember(activeAccountId) { mutableStateOf<Job?>(null) }
     // Drives the avatar bottom sheet (pick-from-photos / paste-link / remove).
     // The picture URL no longer lives as a standalone editor row; it's edited
     // exclusively through this control so the editor reads like an app screen,
@@ -471,6 +497,8 @@ internal fun ProfileEditScreen(
     val bannerValid = ProfileFieldValidation.isAcceptablePictureUrl(banner)
     val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)
     val lud16Valid = ProfileFieldValidation.isAcceptableLud16(lud16)
+    val currentMetadata = profileEditMetadata(displayName, about, picture, banner, nip05, lud16)
+    val profileLoaded = saveState.isLoadedFor(activeAccountId)
     val saveEnabled =
         !busy &&
             !pictureUploading &&
@@ -479,7 +507,8 @@ internal fun ProfileEditScreen(
             pictureValid &&
             bannerValid &&
             nip05Valid &&
-            lud16Valid
+            lud16Valid &&
+            saveState.canSave(activeAccountId, currentMetadata)
 
     DisposableEffect(active?.accountIdHex) {
         onDispose {
@@ -490,21 +519,13 @@ internal fun ProfileEditScreen(
 
     fun saveProfile() {
         if (!saveEnabled) return
+        val accountId = activeAccountId ?: return
         busy = true
         lud16ResolveError = null
         // Snapshot the field values now: the mutation outlives this composition,
         // so reading them inside the lambda would publish whatever is on screen
         // when it runs.
-        val metadata =
-            UserProfileMetadataFfi(
-                name = displayName.trim().ifBlank { null },
-                displayName = displayName.trim().ifBlank { null },
-                about = about.trim().ifBlank { null },
-                picture = picture.trim().ifBlank { null },
-                banner = banner.trim().ifBlank { null },
-                nip05 = nip05.trim().ifBlank { null },
-                lud16 = lud16.trim().ifBlank { null },
-            )
+        val metadata = currentMetadata
         scope.launch {
             // A non-blank Lightning address must resolve to a live LNURL-pay
             // endpoint before it is published (#795); a blank field means "no
@@ -533,7 +554,9 @@ internal fun ProfileEditScreen(
             }
             appState.launchMutation {
                 try {
-                    appState.publishProfile(metadata)
+                    if (appState.activeAccount?.accountIdHex != accountId) return@launchMutation
+                    val succeeded = publishProfile(metadata)
+                    saveState.completeSave(accountId, metadata, succeeded)
                 } finally {
                     busy = false
                 }
@@ -622,27 +645,39 @@ internal fun ProfileEditScreen(
         }
     }
 
-    LaunchedEffect(active?.accountIdHex) {
-        profileLoaded = false
+    LaunchedEffect(activeAccountId) {
+        saveState.beginLoad(activeAccountId)
+        val accountId = activeAccountId ?: return@LaunchedEffect
         try {
-            val profile = active?.accountIdHex?.let { appState.loadUserProfile(it) }
-            if (profile != null) {
-                displayName = profile.displayName ?: profile.name ?: ""
-                about = profile.about ?: ""
-                imageDrafts =
-                    ProfileImageDrafts(
-                        picture = profile.picture ?: "",
-                        banner = profile.banner ?: "",
-                    )
-                nip05 = profile.nip05 ?: ""
-                lud16 = profile.lud16 ?: ""
-            }
+            val profile = loadProfile(accountId)
+            val loadedDisplayName = profile?.displayName ?: profile?.name ?: ""
+            val loadedAbout = profile?.about ?: ""
+            val loadedPicture = profile?.picture ?: ""
+            val loadedBanner = profile?.banner ?: ""
+            val loadedNip05 = profile?.nip05 ?: ""
+            val loadedLud16 = profile?.lud16 ?: ""
+            val loadedMetadata =
+                profileEditMetadata(
+                    loadedDisplayName,
+                    loadedAbout,
+                    loadedPicture,
+                    loadedBanner,
+                    loadedNip05,
+                    loadedLud16,
+                )
+            if (!saveState.completeLoad(accountId, loadedMetadata)) return@LaunchedEffect
+            displayName = loadedDisplayName
+            about = loadedAbout
+            imageDrafts = ProfileImageDrafts(picture = loadedPicture, banner = loadedBanner)
+            nip05 = loadedNip05
+            lud16 = loadedLud16
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
-            appState.present(R.string.toast_couldnt_load_profile, copyable = true)
-        } finally {
-            profileLoaded = true
+            val emptyMetadata = profileEditMetadata("", "", "", "", "", "")
+            if (saveState.completeLoad(accountId, emptyMetadata)) {
+                appState.present(R.string.toast_couldnt_load_profile, copyable = true)
+            }
         }
     }
 
@@ -660,20 +695,11 @@ internal fun ProfileEditScreen(
         bottomBar = {
             if (active != null) {
                 StickyFormActionBar {
-                    Button(
-                        onClick = { saveProfile() },
+                    ProfileSaveButton(
                         enabled = saveEnabled,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (busy) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(8.dp))
-                        }
-                        // Profile edit's primary action is conceptually "save" to the
-                        // user; the relay-publish mechanics are an implementation detail
-                        // that only the failure surface needs to name (#834).
-                        Text(stringResource(R.string.save))
-                    }
+                        busy = busy,
+                        onSave = { saveProfile() },
+                    )
                 }
             }
         },

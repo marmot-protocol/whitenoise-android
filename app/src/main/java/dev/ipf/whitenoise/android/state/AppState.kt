@@ -6528,28 +6528,31 @@ class WhiteNoiseAppState private constructor(
         return chatListItemFromAuthoritativeGroupDetails(details, activeAccountIdHex)
     }
 
-    suspend fun publishProfile(profile: UserProfileMetadataFfi) {
-        val account = activeAccountRef ?: return
-        runCatchingCancellable {
-            val profileRelayCount =
-                marmotIo {
-                    val relayLists = accountRelayLists(account)
-                    val profileRelays =
-                        accountNip65Relays(account).ifEmpty {
-                            relayLists.defaultRelays.ifEmpty { MarmotClient.bootstrapRelays }
-                        }
-                    val bootstrapRelays = relayLists.bootstrapRelays.ifEmpty { MarmotClient.bootstrapRelays }
-                    publishUserProfile(account, profile, profileRelays, bootstrapRelays)
-                    profileRelays.size
-                }
-            notifyProfilesChanged()
-            presentText(
-                AppText.Resource(R.string.toast_profile_published),
-                AppText.Resource(R.string.toast_profile_published_detail, listOf(profileRelayCount)),
-            )
-        }.onFailure {
+    suspend fun publishProfile(profile: UserProfileMetadataFfi): Boolean {
+        val account = activeAccountRef ?: return false
+        val result =
+            runCatchingCancellable {
+                val profileRelayCount =
+                    marmotIo {
+                        val relayLists = accountRelayLists(account)
+                        val profileRelays =
+                            accountNip65Relays(account).ifEmpty {
+                                relayLists.defaultRelays.ifEmpty { MarmotClient.bootstrapRelays }
+                            }
+                        val bootstrapRelays = relayLists.bootstrapRelays.ifEmpty { MarmotClient.bootstrapRelays }
+                        publishUserProfile(account, profile, profileRelays, bootstrapRelays)
+                        profileRelays.size
+                    }
+                notifyProfilesChanged()
+                presentText(
+                    AppText.Resource(R.string.toast_profile_published),
+                    AppText.Resource(R.string.toast_profile_published_detail, listOf(profileRelayCount)),
+                )
+            }
+        result.onFailure {
             present(R.string.toast_couldnt_publish_profile, AppText.Plain(it.readableMessage()), copyable = true)
         }
+        return result.isSuccess
     }
 
     fun present(
