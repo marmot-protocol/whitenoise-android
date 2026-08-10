@@ -49,9 +49,22 @@ test('requires a committed baseline for UI-affecting changes', () => {
     status: 'modified',
   }]), false)
   assert.equal(isMissingVisualCoverage([{
+    filename: 'app/src/test/snapshots/obsolete.png',
+    status: 'removed',
+  }]), true)
+  assert.equal(isMissingVisualCoverage([{
     filename: 'app/src/main/java/dev/ipf/whitenoise/android/core/Model.kt',
     status: 'modified',
   }]), false)
+})
+
+test('renders the exact head provenance with snapshot evidence', () => {
+  const section = renderSection(pr, [{
+    filename: 'app/src/test/snapshots/screen.png',
+    status: 'added',
+  }])
+  assert.match(section, /baselines at head `head-sha`/)
+  assert.match(section, /\| Current \|/)
 })
 
 test('updates the description before failing a UI change with no baseline', async () => {
@@ -86,6 +99,45 @@ test('updates the description before failing a UI change with no baseline', asyn
   assert.match(updates[0].body, /UI-affecting files changed/)
   assert.equal(failures.length, 1)
   assert.match(failures[0], /committed Roborazzi screenshot baseline/)
+})
+
+test('comment fallback remains blocking when the description cannot be edited', async () => {
+  const comments = []
+  const failures = []
+  const github = {
+    paginate: async method => method.name === 'listFiles'
+      ? [{
+          filename: 'app/src/main/java/dev/ipf/whitenoise/android/ui/Screen.kt',
+          status: 'modified',
+        }]
+      : [],
+    rest: {
+      pulls: {
+        listFiles: function listFiles() {},
+        update: async () => { throw new Error('description edits disabled') },
+      },
+      issues: {
+        listComments: function listComments() {},
+        createComment: async request => comments.push(request),
+        updateComment: async () => {},
+      },
+    },
+  }
+  const context = {
+    payload: { pull_request: { ...pr, number: 42, body: 'Summary' } },
+    repo: { owner: 'marmot', repo: 'base' },
+  }
+  const core = {
+    info: () => {},
+    warning: () => {},
+    setFailed: message => failures.push(message),
+  }
+
+  await run({ github, context, core })
+
+  assert.equal(comments.length, 1)
+  assert.match(comments[0].body, /UI-affecting files changed/)
+  assert.equal(failures.length, 1)
 })
 
 test('replaces the generated section without changing surrounding text', () => {
