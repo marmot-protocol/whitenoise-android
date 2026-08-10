@@ -6,6 +6,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -59,11 +60,11 @@ class MessageActionMenuLayoutTest {
     }
 
     @Test
-    fun columnAndHeightEstimatesTrackGridRowsAndDeleteSection() {
+    fun columnAndHeightEstimatesTrackGridRowsWithIntegratedDelete() {
         assertEquals(2, messageActionColumnCount(312.dp, 136.dp))
         assertEquals(1, messageActionColumnCount(260.dp, 136.dp))
-        assertEquals(394.dp, estimatedMessageActionMenuHeight(9, 2, canReact = true, canDelete = true))
-        assertEquals(594.dp, estimatedMessageActionMenuHeight(9, 1, canReact = true, canDelete = true))
+        assertEquals(329.dp, estimatedMessageActionMenuHeight(9, 2, canReact = true, canDelete = true))
+        assertEquals(579.dp, estimatedMessageActionMenuHeight(9, 1, canReact = true, canDelete = true))
     }
 
     @Test
@@ -190,7 +191,7 @@ class MessageActionMenuLayoutTest {
     }
 
     @Test
-    fun maximumMenuUsesRowMajorTwoColumnGridAndFullWidthDelete() {
+    fun maximumMenuUsesRowMajorTwoColumnGridWithDeleteLast() {
         renderMenu(fontScale = 1f)
 
         val reply = bounds("Reply")
@@ -203,8 +204,10 @@ class MessageActionMenuLayoutTest {
         assertTrue(reply.left < edit.left)
         assertEquals(select.top, selectText.top, 0.5f)
         assertTrue(select.top > reply.top)
-        assertTrue(delete.width > reply.width * 1.8f)
-        assertTrue(delete.top > bounds("Message info").bottom)
+        val info = bounds("Message info")
+        assertEquals(info.top, delete.top, 0.5f)
+        assertTrue(info.left < delete.left)
+        assertEquals(reply.width, delete.width, 0.5f)
     }
 
     @Test
@@ -261,11 +264,49 @@ class MessageActionMenuLayoutTest {
         assertTrue(bounds.height >= 48f)
     }
 
+    @Test
+    fun quickReactionButtonsStayCompactWhenOnlyOneIsAvailable() {
+        renderMenu(fontScale = 1f, canReact = true)
+
+        val bounds =
+            composeRule
+                .onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍")
+                .fetchSemanticsNode()
+                .boundsInRoot
+
+        assertEquals(48f, bounds.width, 0.5f)
+        assertEquals(48f, bounds.height, 0.5f)
+    }
+
+    @Test
+    fun emojiPickerStaysVisibleWithMaximumQuickReactions() {
+        renderMenu(
+            fontScale = 1f,
+            canReact = true,
+            quickReactionEmojis = listOf("❤️", "👍", "👎", "😂", "😮", "😢"),
+        )
+
+        val menu =
+            composeRule
+                .onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val picker =
+            composeRule
+                .onNodeWithContentDescription("Open emoji picker")
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
+
+        assertTrue(picker.right <= menu.right)
+    }
+
     private fun renderMenu(
         fontScale: Float,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         callbacks: MutableList<String> = mutableListOf(),
         canReact: Boolean = false,
+        quickReactionEmojis: List<String> = if (canReact) listOf("👍") else emptyList(),
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -288,7 +329,7 @@ class MessageActionMenuLayoutTest {
                         canSpeak = true,
                         canSelectText = true,
                         canSave = true,
-                        quickReactionEmojis = if (canReact) listOf("👍") else emptyList(),
+                        quickReactionEmojis = quickReactionEmojis,
                         onDismissRequest = {},
                         onReact = {},
                         onOpenEmojiPicker = {},

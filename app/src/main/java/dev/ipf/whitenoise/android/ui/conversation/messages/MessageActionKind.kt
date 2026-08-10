@@ -19,6 +19,7 @@ internal enum class MessageActionKind {
 }
 
 internal const val MESSAGE_ACTION_MENU_TEST_TAG = "message-action-menu"
+internal const val MESSAGE_ACTION_REACTION_TEST_TAG = "message-action-reaction"
 private val actionSectionSpacing = 8.dp
 
 internal fun messageActionKinds(
@@ -56,13 +57,13 @@ internal fun estimatedMessageActionMenuHeight(
     actionRowHeight: Dp = 48.dp,
     reactionRowHeight: Dp = 48.dp,
 ): Dp {
-    val rows = (actionCount + columns - 1) / columns
+    val gridActionCount = actionCount + if (canDelete) 1 else 0
+    val rows = (gridActionCount + columns - 1) / columns
     val actionHeight = actionRowHeight * rows + ((rows - 1).coerceAtLeast(0) * 2).dp
     val sectionHeights =
         buildList {
             if (canReact) add(reactionRowHeight + 9.dp) // row + internal gap + divider
             add(actionHeight)
-            if (canDelete) add(actionRowHeight + 9.dp) // divider + internal gap + destructive row
         }
     return 16.dp + sectionHeights.fold(0.dp) { total, height -> total + height } +
         actionSectionSpacing * (sectionHeights.size - 1)

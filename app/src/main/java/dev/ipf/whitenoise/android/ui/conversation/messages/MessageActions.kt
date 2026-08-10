@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -153,7 +154,11 @@ internal fun MessageActionMenu(
                 canSave = canSave,
             )
         }
-    val labeledActions = actionKinds.map { kind -> kind to messageActionLabel(kind) }
+    val labeledActions: List<Pair<MessageActionKind?, String>> =
+        buildList {
+            actionKinds.forEach { kind -> add(kind to messageActionLabel(kind)) }
+            if (canDelete) add(null to stringResource(R.string.delete))
+        }
     val textMeasurer = rememberTextMeasurer()
     val actionTextStyle = MaterialTheme.typography.titleMedium
     val minimumActionCellWidth =
@@ -170,14 +175,7 @@ internal fun MessageActionMenu(
         with(density) {
             maxOf(48.dp, actionTextStyle.lineHeight.toDp() + 16.dp)
         }
-    val reactionRowHeight =
-        with(density) {
-            maxOf(
-                48.dp,
-                MaterialTheme.typography.titleMedium.lineHeight
-                    .toDp() + 8.dp,
-            )
-        }
+    val reactionRowHeight = 48.dp
     // Position the popup purely from the captured window touch y, independent of
     // any anchor's layout position. DropdownMenu derived flip-above from the
     // anchor's bounds, so a bubble taller than the viewport (anchor off-screen)
@@ -294,22 +292,36 @@ internal fun MessageActionMenu(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                quickReactionEmojis.forEach { emoji ->
-                                    EmojiActionButton(
-                                        emoji = emoji,
-                                        onClick = { onReact(emoji) },
-                                        modifier = Modifier.weight(1f),
-                                        height = reactionRowHeight,
-                                    )
+                                Row(
+                                    modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    quickReactionEmojis.forEach { emoji ->
+                                        EmojiActionButton(
+                                            emoji = emoji,
+                                            onClick = { onReact(emoji) },
+                                            modifier = Modifier.testTag("$MESSAGE_ACTION_REACTION_TEST_TAG:$emoji"),
+                                        )
+                                    }
                                 }
                                 IconButton(
                                     onClick = onOpenEmojiPicker,
-                                    modifier = Modifier.size(reactionRowHeight),
+                                    modifier = Modifier.size(48.dp),
                                 ) {
-                                    Icon(
-                                        Icons.Default.EmojiEmotions,
-                                        contentDescription = stringResource(R.string.open_emoji_picker),
-                                    )
+                                    Surface(
+                                        modifier = Modifier.size(40.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        shape = CircleShape,
+                                        border = amoledSurfaceBorderStroke(),
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                Icons.Default.EmojiEmotions,
+                                                contentDescription = stringResource(R.string.open_emoji_picker),
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                        }
+                                    }
                                 }
                             }
                             AppDivider()
@@ -326,7 +338,17 @@ internal fun MessageActionMenu(
                                     rowActions.forEach { (kind, label) ->
                                         MessageActionButton(
                                             label = label,
-                                            icon = { messageActionIcon(kind) },
+                                            icon = {
+                                                if (kind == null) {
+                                                    Icon(
+                                                        Icons.Default.Delete,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(20.dp),
+                                                    )
+                                                } else {
+                                                    messageActionIcon(kind)
+                                                }
+                                            },
                                             onClick = {
                                                 when (kind) {
                                                     MessageActionKind.Reply -> onReply()
@@ -338,9 +360,11 @@ internal fun MessageActionMenu(
                                                     MessageActionKind.Forward -> onForward()
                                                     MessageActionKind.Save -> onSave()
                                                     MessageActionKind.Info -> onInfo()
+                                                    null -> onDelete()
                                                 }
                                             },
                                             modifier = Modifier.weight(1f),
+                                            isDestructive = kind == null,
                                             minimumHeight = actionRowHeight,
                                         )
                                     }
@@ -349,21 +373,6 @@ internal fun MessageActionMenu(
                                     }
                                 }
                             }
-                        }
-                    }
-                    if (canDelete) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AppDivider()
-                            // One Delete entry regardless of role or ownership;
-                            // the delete surface it opens offers only the scopes
-                            // the capability model permits.
-                            MessageActionButton(
-                                label = stringResource(R.string.delete),
-                                icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                                onClick = onDelete,
-                                isDestructive = true,
-                                minimumHeight = actionRowHeight,
-                            )
                         }
                     }
                 }
@@ -694,16 +703,20 @@ private fun EmojiActionButton(
     emoji: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    height: Dp = 36.dp,
 ) {
-    Surface(
-        modifier = modifier.height(height).clip(CircleShape).clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = CircleShape,
-        border = amoledSurfaceBorderStroke(),
+    Box(
+        modifier = modifier.size(48.dp).clip(CircleShape).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(emoji, style = MaterialTheme.typography.titleMedium)
+        Surface(
+            modifier = Modifier.size(40.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = CircleShape,
+            border = amoledSurfaceBorderStroke(),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(emoji, style = MaterialTheme.typography.titleMedium)
+            }
         }
     }
 }
