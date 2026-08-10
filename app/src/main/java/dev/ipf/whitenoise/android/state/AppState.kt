@@ -1291,7 +1291,24 @@ internal fun networkDisplayNameFallback(
     accountLabel: String?,
     accountIdHex: String,
     shortNpub: (String) -> String,
-): String = accountLabel?.takeIf { it.isNotBlank() } ?: shortNpub(accountIdHex)
+): String {
+    val label = accountLabel?.takeIf { it.isNotBlank() }
+    if (label != null && !IdentityFormatter.isNostrIdentityFallback(label)) {
+        return label
+    }
+    return shortNpub(accountIdHex)
+}
+
+internal fun npubPresentation(
+    accountIdHex: String,
+    cachedNpub: String?,
+    encode: (String) -> String?,
+): String {
+    val candidate = cachedNpub ?: runCatching { encode(accountIdHex) }.getOrNull()
+    return candidate
+        ?.takeIf { it.startsWith("npub1") && !it.equals(accountIdHex, ignoreCase = true) }
+        .orEmpty()
+}
 
 private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
 
@@ -6241,14 +6258,20 @@ class WhiteNoiseAppState private constructor(
     }
 
     fun npub(accountIdHex: String): String {
-        npubs.get(accountIdHex)?.let { return it }
-        // npub is a pure hex→bech32 encoding of the pubkey — no storage read, so
-        // no DB-lock contention, and safe to resolve inline (unlike displayName /
-        // userProfile, which this change moves off the composition thread).
-        // Resolving here also keeps it independent of whether a published profile
-        // exists — an account with no profile metadata still gets a real npub.
-        val resolved = runCatching { marmot().npub(accountIdHex) }.getOrNull() ?: return accountIdHex
-        npubs.put(accountIdHex, resolved)
+        val cached = npubs.get(accountIdHex)
+        val resolved =
+            npubPresentation(accountIdHex, cached) {
+                // npub is a pure hex→bech32 encoding of the pubkey — no storage read, so
+                // no DB-lock contention, and safe to resolve inline (unlike displayName /
+                // userProfile, which this change moves off the composition thread).
+                // Resolving here also keeps it independent of whether a published profile
+                // exists — an account with no profile metadata still gets a real npub.
+                marmot().npub(accountIdHex)
+            }
+        if (resolved.isEmpty()) return ""
+        if (cached == null) {
+            npubs.put(accountIdHex, resolved)
+        }
         return resolved
     }
 

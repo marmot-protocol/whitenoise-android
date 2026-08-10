@@ -60,7 +60,7 @@ class GroupDetailsPushDebugCoverageTest {
     }
 
     @Test
-    fun pushDebugSectionSurfacesTokenHealthAndCopyableIdentifiers() {
+    fun pushDebugSectionSurfacesTokenHealthAndCopyableNpubIdentifiers() {
         val screen = groupDetailsSource().readText()
         val sectionBody = screen.functionBody("PushDeliveryDebugSection")
         val tokenRowsBody = screen.functionBody("PushTokenDebugRows")
@@ -72,10 +72,12 @@ class GroupDetailsPushDebugCoverageTest {
                 "R.string.push_debug_last_token_list_update" in sectionBody,
         )
         assertTrue(
-            "token rows should expose copyable member, token fingerprint, and push-server identifiers",
-            "copyValue = token.memberIdHex" in tokenRowsBody &&
+            "token rows should expose copyable npub identities and preserve the token fingerprint",
+            "val memberNpub = appState.npub(token.memberIdHex)" in tokenRowsBody &&
+                "copyValue = memberNpub" in tokenRowsBody &&
                 "copyValue = token.tokenFingerprint" in tokenRowsBody &&
-                "copyValue = token.serverPubkeyHex" in tokenRowsBody,
+                "val serverNpub = appState.npub(token.serverPubkeyHex)" in tokenRowsBody &&
+                "copyValue = serverNpub" in tokenRowsBody,
         )
         assertTrue(
             "token rows should show local registration and per-token delivery state",

@@ -2048,11 +2048,14 @@ private fun PushTokenDebugRows(
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.fillMaxWidth(),
     )
-    DiagnosticRow(
-        stringResource(R.string.push_debug_member),
-        IdentityFormatter.short(token.memberIdHex),
-        copyValue = token.memberIdHex,
-    )
+    val memberNpub = appState.npub(token.memberIdHex)
+    if (memberNpub.isNotBlank()) {
+        DiagnosticRow(
+            stringResource(R.string.push_debug_member),
+            IdentityFormatter.short(memberNpub),
+            copyValue = memberNpub,
+        )
+    }
     DiagnosticRow(stringResource(R.string.push_debug_leaf_index), token.leafIndex.toString())
     DiagnosticRow(stringResource(R.string.push_debug_platform), token.platform.name)
     DiagnosticRow(
@@ -2060,11 +2063,14 @@ private fun PushTokenDebugRows(
         IdentityFormatter.short(token.tokenFingerprint),
         copyValue = token.tokenFingerprint,
     )
-    DiagnosticRow(
-        stringResource(R.string.push_debug_push_server_pubkey),
-        IdentityFormatter.short(token.serverPubkeyHex),
-        copyValue = token.serverPubkeyHex,
-    )
+    val serverNpub = appState.npub(token.serverPubkeyHex)
+    if (serverNpub.isNotBlank()) {
+        DiagnosticRow(
+            stringResource(R.string.push_debug_push_server_pubkey),
+            IdentityFormatter.short(serverNpub),
+            copyValue = serverNpub,
+        )
+    }
     DiagnosticRow(stringResource(R.string.push_debug_relay_hint), yesNo(token.hasRelayHint))
     DiagnosticRow(stringResource(R.string.push_debug_active_leaf), yesNo(token.activeLeaf))
     DiagnosticRow(stringResource(R.string.push_debug_member_matches_active_leaf), yesNo(token.memberMatchesActiveLeaf))

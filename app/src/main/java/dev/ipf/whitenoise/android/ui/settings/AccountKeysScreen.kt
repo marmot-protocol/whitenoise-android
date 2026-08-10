@@ -94,6 +94,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ENCRYPTED_BACKUP_MIN_PASSPHRASE_LENGTH
 import dev.ipf.whitenoise.android.core.EncryptedBackupPassphraseStrength
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.encryptedBackupPassphraseInputsValid
 import dev.ipf.whitenoise.android.core.encryptedBackupPassphraseStrength
 import dev.ipf.whitenoise.android.core.groupedEncryptedBackup
@@ -242,16 +243,15 @@ internal fun AccountKeysScreen(
                         Text(stringResource(R.string.no_active_account_period), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         DiagnosticRow(stringResource(R.string.display_name), appState.displayName(active.accountIdHex))
-                        CopyableValueRow(
-                            label = stringResource(R.string.public_key),
-                            value = active.accountIdHex,
-                            clipboard = clipboard,
-                        )
-                        CopyableValueRow(
-                            label = "npub",
-                            value = appState.npub(active.accountIdHex),
-                            clipboard = clipboard,
-                        )
+                        val npub = appState.npub(active.accountIdHex)
+                        if (npub.isNotBlank()) {
+                            CopyableValueRow(
+                                label = stringResource(R.string.public_key),
+                                value = npub,
+                                displayValue = IdentityFormatter.short(npub, prefix = 10, suffix = 8),
+                                clipboard = clipboard,
+                            )
+                        }
                         DiagnosticRow(stringResource(R.string.local_signing), stringResource(if (active.localSigning) R.string.yes else R.string.no))
                         DiagnosticRow(stringResource(R.string.status), stringResource(if (active.running) R.string.online else R.string.idle))
                     }
