@@ -77,7 +77,7 @@ class MessageBatchSelectionActionsTest {
     }
 
     @Test
-    fun partitionMovesLowerPriorityActionsToOverflowWhenBarIsTooNarrow() {
+    fun actionRowsWrapAndKeepDeleteOnItsOwnRowWhenNeeded() {
         val offered =
             listOf(
                 MessageSelectionBarAction.Copy,
@@ -86,49 +86,29 @@ class MessageBatchSelectionActionsTest {
                 MessageSelectionBarAction.Info,
                 MessageSelectionBarAction.Save,
             )
-        val slotPx = 48
-        val layout =
-            partitionMessageSelectionBarActionsForWidth(
-                offered = offered,
-                barWidthPx = slotPx * 4,
-                actionSlotWidthPx = slotPx,
-                deleteSlotWidthPx = slotPx,
-                overflowSlotWidthPx = slotPx,
-            )
 
-        assertEquals(
-            listOf(MessageSelectionBarAction.Copy, MessageSelectionBarAction.Forward),
-            layout.inline,
-        )
-        assertEquals(
-            listOf(
-                MessageSelectionBarAction.Reply,
-                MessageSelectionBarAction.Info,
-                MessageSelectionBarAction.Save,
-            ),
-            layout.overflow,
-        )
+        val rows = messageSelectionBarActionRows(offered = offered, maxActionsPerRow = 4)
+
+        assertEquals(2, rows.size)
+        assertEquals(offered.take(4), rows[0].actions)
+        assertFalse(rows[0].includesDelete)
+        assertEquals(listOf(MessageSelectionBarAction.Save), rows[1].actions)
+        assertTrue(rows[1].includesDelete)
     }
 
     @Test
-    fun partitionKeepsAllInlineWhenEverythingFits() {
+    fun actionRowsKeepDeleteOnSameRowWhenThereIsRoom() {
         val offered =
             listOf(
                 MessageSelectionBarAction.Copy,
                 MessageSelectionBarAction.Forward,
             )
-        val slotPx = 48
-        val layout =
-            partitionMessageSelectionBarActionsForWidth(
-                offered = offered,
-                barWidthPx = slotPx * 3,
-                actionSlotWidthPx = slotPx,
-                deleteSlotWidthPx = slotPx,
-                overflowSlotWidthPx = slotPx,
-            )
 
-        assertEquals(offered, layout.inline)
-        assertTrue(layout.overflow.isEmpty())
+        val rows = messageSelectionBarActionRows(offered = offered, maxActionsPerRow = 3)
+
+        assertEquals(1, rows.size)
+        assertEquals(offered, rows[0].actions)
+        assertTrue(rows[0].includesDelete)
     }
 
     private fun item(

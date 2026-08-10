@@ -166,9 +166,9 @@ internal enum class MessageSelectionBarAction {
     Save,
 }
 
-internal data class MessageSelectionBarActionLayout(
-    val inline: List<MessageSelectionBarAction>,
-    val overflow: List<MessageSelectionBarAction>,
+internal data class MessageSelectionBarRow(
+    val actions: List<MessageSelectionBarAction>,
+    val includesDelete: Boolean,
 )
 
 @Suppress("MaxLineLength")
@@ -181,37 +181,35 @@ internal fun offeredMessageSelectionBarActions(availability: BatchSelectionActio
         add(MessageSelectionBarAction.Save)
     }
 
-internal fun partitionMessageSelectionBarActionsForWidth(
+internal fun messageSelectionBarActionRows(
     offered: List<MessageSelectionBarAction>,
-    barWidthPx: Int,
-    actionSlotWidthPx: Int,
-    deleteSlotWidthPx: Int,
-    overflowSlotWidthPx: Int,
-): MessageSelectionBarActionLayout {
-    if (offered.isEmpty()) {
-        return MessageSelectionBarActionLayout(inline = emptyList(), overflow = emptyList())
-    }
-
-    fun fits(
-        inlineCount: Int,
-        withOverflow: Boolean,
-    ): Boolean {
-        val overflow = if (withOverflow) overflowSlotWidthPx else 0
-        return inlineCount * actionSlotWidthPx + overflow + deleteSlotWidthPx <= barWidthPx
-    }
-
-    return when {
-        fits(offered.size, withOverflow = false) ->
-            MessageSelectionBarActionLayout(inline = offered, overflow = emptyList())
-        else -> {
-            var inlineCount = offered.size
-            while (inlineCount > 0 && !fits(inlineCount, withOverflow = true)) {
-                inlineCount -= 1
+    maxActionsPerRow: Int,
+): List<MessageSelectionBarRow> {
+    val slotsPerRow = maxActionsPerRow.coerceAtLeast(1)
+    return buildList {
+        if (offered.isEmpty()) {
+            add(MessageSelectionBarRow(actions = emptyList(), includesDelete = true))
+            return@buildList
+        }
+        var index = 0
+        while (index < offered.size) {
+            val take = minOf(slotsPerRow, offered.size - index)
+            if (index + take >= offered.size) {
+                if (take < slotsPerRow) {
+                    add(
+                        MessageSelectionBarRow(
+                            actions = offered.subList(index, index + take),
+                            includesDelete = true,
+                        ),
+                    )
+                } else {
+                    add(MessageSelectionBarRow(actions = offered.subList(index, index + take), includesDelete = false))
+                    add(MessageSelectionBarRow(actions = emptyList(), includesDelete = true))
+                }
+                return@buildList
             }
-            MessageSelectionBarActionLayout(
-                inline = offered.take(inlineCount),
-                overflow = offered.drop(inlineCount),
-            )
+            add(MessageSelectionBarRow(actions = offered.subList(index, index + take), includesDelete = false))
+            index += take
         }
     }
 }
