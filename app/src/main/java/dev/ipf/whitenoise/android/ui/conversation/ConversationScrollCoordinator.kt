@@ -303,6 +303,17 @@ internal class ConversationScrollCoordinator(
         foregroundRestoreInProgress = false
     }
 
+    /**
+     * Opens the draw gate after the bounded settle deadline while keeping the
+     * captured snapshot, so the next settled geometry can still apply the one
+     * deferred correction. User intent, navigation, and disposal discard the
+     * retained snapshot through the existing cancellation paths.
+     */
+    fun releaseForegroundRestoreGate(token: ConversationForegroundRestoreToken) {
+        if (token.revision != foregroundRestoreRevision) return
+        foregroundRestoreInProgress = false
+    }
+
     private fun clearForegroundRestore(token: ConversationForegroundRestoreToken) {
         if (token.revision != foregroundRestoreRevision) return
         foregroundSnapshot = null

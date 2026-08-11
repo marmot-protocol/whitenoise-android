@@ -30,17 +30,18 @@ internal data class ConversationForegroundSettleState(
 /**
  * Waits for the requested IME state, then relaxes only that request after the
  * liveness timeout. Transient inset or unmeasured chrome geometry never passes.
- * The relaxed geometry wait is bounded by the same timeout, so the caller is
- * never blocked longer than twice the liveness window — a null return means
- * geometry never settled and the foreground transaction must be released with
- * the correction deferred until valid geometry arrives.
+ * The relaxed geometry wait is bounded by the same timeout, so the draw gate is
+ * never held longer than twice the liveness window — when that deadline expires
+ * [onSettleDeadlineExpired] must open the gate, and the wait keeps the captured
+ * snapshot armed until settled geometry arrives to apply the one correction.
  */
 internal suspend fun awaitConversationForegroundPresentation(
     preDrawSignals: ReceiveChannel<Unit>,
     currentState: () -> ConversationForegroundSettleState,
     expectedImeVisible: Boolean,
     expectedVisibilityTimeoutMillis: Long,
-): ConversationForegroundSettleState? {
+    onSettleDeadlineExpired: () -> Unit = {},
+): ConversationForegroundSettleState {
     suspend fun awaitState(predicate: ForegroundSettlePredicate): ConversationForegroundSettleState {
         while (true) {
             preDrawSignals.receive()
@@ -55,17 +56,25 @@ internal suspend fun awaitConversationForegroundPresentation(
         ?: withTimeoutOrNull(expectedVisibilityTimeoutMillis) {
             awaitState { it.isGeometrySettled() }
         }
+        ?: run {
+            onSettleDeadlineExpired()
+            awaitState { it.isGeometrySettled() }
+        }
 }
 
-/** Keeps Android on its task snapshot while the foreground transaction owns presentation. */
+/**
+ * Keeps Android on its task snapshot while the foreground transaction owns
+ * presentation. Every pre-draw pumps [onPreDraw] — the settle wait re-checks on
+ * each signal, including after the deadline opens the gate, when blocked
+ * pre-draws no longer occur but a deferred correction may still be armed.
+ */
 internal class ConversationForegroundDrawGate(
     private val isBlocked: () -> Boolean,
-    private val onBlockedPreDraw: () -> Unit = {},
+    private val onPreDrawSignal: () -> Unit = {},
 ) : ViewTreeObserver.OnPreDrawListener {
     override fun onPreDraw(): Boolean {
-        val blocked = isBlocked()
-        if (blocked) onBlockedPreDraw()
-        return !blocked
+        onPreDrawSignal()
+        return !isBlocked()
     }
 }
 
@@ -74,18 +83,18 @@ internal class ConversationForegroundDrawGate(
 @Composable
 internal fun ConversationForegroundDrawGateEffect(
     isBlocked: () -> Boolean,
-    onBlockedPreDraw: () -> Unit,
+    onPreDraw: () -> Unit,
 ) {
     val view = LocalView.current
     val currentIsBlocked by rememberUpdatedState(isBlocked)
-    val currentOnBlockedPreDraw by rememberUpdatedState(onBlockedPreDraw)
+    val currentOnPreDraw by rememberUpdatedState(onPreDraw)
 
     DisposableEffect(view) {
         val observer = view.viewTreeObserver
         val gate =
             ConversationForegroundDrawGate(
                 isBlocked = { currentIsBlocked() },
-                onBlockedPreDraw = { currentOnBlockedPreDraw() },
+                onPreDrawSignal = { currentOnPreDraw() },
             )
         observer.addOnPreDrawListener(gate)
         onDispose {

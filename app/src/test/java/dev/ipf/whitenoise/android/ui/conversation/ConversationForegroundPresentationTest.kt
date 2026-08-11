@@ -1,9 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
@@ -11,25 +14,26 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ConversationForegroundPresentationTest {
     @Test
     fun drawGateBlocksOnlyWhileTheForegroundTransactionOwnsPresentation() {
         var blocked = false
-        var blockedPreDraws = 0
+        var preDrawSignals = 0
         val gate =
             ConversationForegroundDrawGate(
                 isBlocked = { blocked },
-                onBlockedPreDraw = { blockedPreDraws++ },
+                onPreDrawSignal = { preDrawSignals++ },
             )
 
         assertTrue(gate.onPreDraw())
-        assertTrue(blockedPreDraws == 0)
+        assertTrue(preDrawSignals == 1)
         blocked = true
         assertFalse(gate.onPreDraw())
-        assertTrue(blockedPreDraws == 1)
+        assertTrue(preDrawSignals == 2)
         blocked = false
         assertTrue(gate.onPreDraw())
-        assertTrue(blockedPreDraws == 1)
+        assertTrue(preDrawSignals == 3)
     }
 
     @Test
@@ -177,25 +181,44 @@ class ConversationForegroundPresentationTest {
         }
 
     @Test
-    fun unsettledGeometryReleasesTheWaitAfterTheBoundedFallback() =
+    fun settleDeadlineOpensTheGateAndKeepsTheCorrectionArmed() =
         runTest {
             val signals = Channel<Unit>(capacity = Channel.CONFLATED)
-            val animating =
+            var deadlineExpirations = 0
+            var current =
                 ConversationForegroundSettleState(
                     geometry = ConversationForegroundGeometry(520, 200, 296),
                     imeTargetBottomPx = 300,
                     bottomChromeMeasured = true,
                 )
-
-            val result =
-                awaitConversationForegroundPresentation(
-                    preDrawSignals = signals,
-                    currentState = { animating },
-                    expectedImeVisible = true,
-                    expectedVisibilityTimeoutMillis = 1_000,
+            val settled =
+                ConversationForegroundSettleState(
+                    geometry = ConversationForegroundGeometry(420, 300, 396),
+                    imeTargetBottomPx = 300,
+                    bottomChromeMeasured = true,
                 )
 
-            assertEquals(null, result)
+            val result =
+                async {
+                    awaitConversationForegroundPresentation(
+                        preDrawSignals = signals,
+                        currentState = { current },
+                        expectedImeVisible = true,
+                        expectedVisibilityTimeoutMillis = 1_000,
+                        onSettleDeadlineExpired = { deadlineExpirations++ },
+                    )
+                }
+            advanceTimeBy(2_001)
+            runCurrent()
+
+            assertEquals(1, deadlineExpirations)
+            assertFalse(result.isCompleted)
+
+            current = settled
+            signals.trySend(Unit)
+
+            assertEquals(settled, result.await())
+            assertEquals(1, deadlineExpirations)
         }
 
     @Test

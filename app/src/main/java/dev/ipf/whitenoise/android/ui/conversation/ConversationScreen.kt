@@ -2040,7 +2040,7 @@ internal fun ConversationScreen(
         )
     ConversationForegroundDrawGateEffect(
         isBlocked = { scrollCoordinator.foregroundRestoreInProgress },
-        onBlockedPreDraw = { foregroundPreDrawSignals.trySend(Unit) },
+        onPreDraw = { foregroundPreDrawSignals.trySend(Unit) },
     )
     ConversationComposerLifecycleEffect(
         observerKey = controller,
@@ -2088,22 +2088,22 @@ internal fun ConversationScreen(
                             currentState = currentForegroundSettleStateProvider,
                             expectedImeVisible = restoreToken.expectedImeVisible || restoreFocus,
                             expectedVisibilityTimeoutMillis = FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS,
+                            // Past the deadline the snapshot stays armed, so the
+                            // wait below still applies one correction when
+                            // geometry finally settles — only user intent,
+                            // navigation, or disposal discards it.
+                            onSettleDeadlineExpired = {
+                                scrollCoordinator.releaseForegroundRestoreGate(restoreToken)
+                            },
                         )
-                    if (resumedPresentation == null) {
-                        // Geometry never settled inside both bounded waits, so
-                        // release the draw gate instead of holding the snapshot
-                        // forever, deferring correction until layout recovers.
-                        scrollCoordinator.cancelForegroundRestore()
-                    } else {
-                        scrollCoordinator.completeForegroundRestore(
-                            token = restoreToken,
-                            resumedGeometry = resumedPresentation.geometry,
-                            resumedTimelineStructure = currentTimelineStructureProvider(),
-                            resumedScrollAnchor = currentScrollAnchorProvider(),
-                            resolveAnchorIndex = currentScrollAnchorResolver,
-                            resolveTailIndex = { currentTailIndex },
-                        )
-                    }
+                    scrollCoordinator.completeForegroundRestore(
+                        token = restoreToken,
+                        resumedGeometry = resumedPresentation.geometry,
+                        resumedTimelineStructure = currentTimelineStructureProvider(),
+                        resumedScrollAnchor = currentScrollAnchorProvider(),
+                        resolveAnchorIndex = currentScrollAnchorResolver,
+                        resolveTailIndex = { currentTailIndex },
+                    )
                 } else {
                     scrollCoordinator.cancelForegroundRestore()
                 }

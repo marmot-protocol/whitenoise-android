@@ -129,6 +129,67 @@ class ConversationScrollCoordinatorTest {
         }
 
     @Test
+    fun releasedGateKeepsTheDeferredCorrectionArmed() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val pausedGeometry = ConversationForegroundGeometry(420, 300, 396)
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = coordinator.bookmark(anchor(messageId = "last", listIndex = 40)),
+                        geometry = pausedGeometry,
+                        timelineStructure = timelineStructure("last"),
+                    ),
+                )
+
+            coordinator.releaseForegroundRestoreGate(token)
+
+            assertFalse(coordinator.foregroundRestoreInProgress)
+            val restored =
+                coordinator.completeForegroundRestore(
+                    token = token,
+                    resumedGeometry = pausedGeometry.copy(viewportHeightPx = 720, imeBottomPx = 0),
+                    resumedTimelineStructure = timelineStructure("last"),
+                    resolveAnchorIndex = { 40 },
+                    resolveTailIndex = { 42 },
+                )
+
+            assertTrue(restored)
+            assertEquals(listOf(ScrollWrite.Snap(42, 0)), writer.writes)
+        }
+
+    @Test
+    fun userGestureDiscardsAReleasedDeferredCorrection() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val geometry = ConversationForegroundGeometry(720, 0, 96)
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = coordinator.bookmark(anchor(messageId = "paused", listIndex = 18)),
+                        geometry = geometry,
+                        timelineStructure = timelineStructure("paused"),
+                    ),
+                )
+
+            coordinator.releaseForegroundRestoreGate(token)
+            coordinator.onUserGestureStarted(anchor(messageId = "gesture", listIndex = 12, pixelOffset = 24))
+            val restored =
+                coordinator.completeForegroundRestore(
+                    token = token,
+                    resumedGeometry = geometry.copy(viewportHeightPx = 700),
+                    resumedTimelineStructure = timelineStructure("paused"),
+                    resolveAnchorIndex = { 18 },
+                    resolveTailIndex = { 99 },
+                )
+
+            assertFalse(restored)
+            assertTrue(writer.writes.isEmpty())
+        }
+
+    @Test
     fun userGestureCancelsPendingForegroundRestore() =
         runTest {
             val writer = RecordingScrollWriter()
