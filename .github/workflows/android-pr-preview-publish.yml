@@ -9,8 +9,10 @@ on:
     types: [completed]
 
 concurrency:
-  group: android-pr-preview-publish-${{ github.event.workflow_run.id }}
-  cancel-in-progress: false
+  # One publisher per PR: a new push cancels a superseded signer/publisher so
+  # an older build cannot finish after the latest build and replace its link.
+  group: android-pr-preview-publish-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
+  cancel-in-progress: true
 
 permissions:
   actions: read
@@ -124,6 +126,22 @@ jobs:
             url=$(APK_PATH="$apk" .github/scripts/upload-pr-apk-to-blossom.sh)
             printf '%s_url=%s\n' "$channel" "$url" >> "$GITHUB_OUTPUT"
           done
+
+      # A push can land while validation/signing/upload runs. Do not let a
+      # superseded run overwrite the sticky comment with stale APK links.
+      - name: Recheck PR head before comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+            --jq '[.state, .head.sha] | @tsv')
+          expected=$(printf 'open\t%s' "$HEAD_SHA")
+          [[ "$current" == "$expected" ]] || {
+            printf 'PR changed while publishing; refusing to post stale links.\n' >&2
+            exit 1
+          }
 
       - name: Upsert concise PR comment
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v8

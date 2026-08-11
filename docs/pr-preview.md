@@ -22,6 +22,8 @@ Configure a dedicated preview-only PKCS#12 key through these Actions secrets:
 
 Never reuse a production, staging, or developer debug key. Back up the preview key securely: replacement requires uninstalling the persistent preview and loses its local data.
 
+The persistent package deliberately lets code from one internal PR replace code from another while retaining the preview app's accounts, history, and Android Keystore entries. Treat it as an untrusted test environment: never use production identities or sensitive conversations there. Use the isolated lane for authentication, storage, migration, or destructive changes.
+
 ## Physical-device acceptance
 
 CI cannot prove Android installer behavior. Before relying on the persistent lane, use the ordinary downloaded-APK installer on a physical phone:
@@ -30,4 +32,3 @@ CI cannot prove Android installer behavior. Before relying on the persistent lan
 2. Install preview B over A and confirm the account, Android Keystore identity, group, history, permissions, and current PR/SHA remain correct.
 3. Install A over B and confirm the equal-version update is accepted.
 4. Confirm production and staging are untouched, and confirm an isolated preview installs alongside all three.
-
