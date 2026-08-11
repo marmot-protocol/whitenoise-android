@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasScrollAction
@@ -289,6 +290,7 @@ class ShareChatPickerFullScreenTest {
             }
         }
 
+        composeRule.onNodeWithText(app.getString(R.string.share_search_chats)).performClick()
         composeRule.onNodeWithText("Alice").performClick()
         composeRule.onNodeWithText("Bob").performClick()
         composeRule
@@ -299,6 +301,7 @@ class ShareChatPickerFullScreenTest {
             assertEquals(listOf(GROUP_A, GROUP_B), staged)
             assertEquals(1, dismissCount)
         }
+        composeRule.onNodeWithText(app.getString(R.string.share_search_chats)).assertIsNotFocused()
     }
 
     @Test

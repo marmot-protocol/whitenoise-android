@@ -123,8 +123,7 @@ internal fun ShareChatPickerFullScreenContent(
                     selectedCount = pickerState.selected.size,
                     onStage = {
                         if (!finishing && pickerState.stage(onStage)) {
-                            finishing = true
-                            onDismiss()
+                            dismissPicker()
                         }
                     },
                 )

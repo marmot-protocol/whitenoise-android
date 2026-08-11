@@ -608,6 +608,7 @@ internal fun MainShell(
         val activeGroupIds = allChats.mapTo(mutableSetOf()) { it.group.groupIdHex }
         val directGroupId = resolveShareDirectGroupId(request, accountRef, activeGroupIds)
         if (directGroupId != null) {
+            clearSharePickerRequest()
             onShareRequestHandled(request)
             stageShareToChats(request, listOf(directGroupId), allChats)
         } else {
@@ -925,7 +926,6 @@ internal fun MainShell(
                 onStage = { groupIds ->
                     val allChats = chatsController.items + chatsController.archivedItems
                     stageShareToChats(request, groupIds, allChats)
-                    clearSharePickerRequest()
                 },
             )
         }
