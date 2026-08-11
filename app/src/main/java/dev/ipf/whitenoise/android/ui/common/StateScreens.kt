@@ -1,37 +1,63 @@
+@file:Suppress(
+    "FunctionNaming",
+    "MatchingDeclarationName",
+) // Compose recovery primitives intentionally share this file.
+
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import kotlinx.coroutines.launch
+import dev.ipf.whitenoise.android.state.ErrorPresentation
+import dev.ipf.whitenoise.android.state.TransientNotice
+
+internal enum class LoadFailurePlacement {
+    None,
+    FullScreen,
+    Inline,
+}
+
+internal fun loadFailurePlacement(
+    hasFailure: Boolean,
+    hasLoadedContent: Boolean,
+): LoadFailurePlacement =
+    when {
+        !hasFailure -> LoadFailurePlacement.None
+        hasLoadedContent -> LoadFailurePlacement.Inline
+        else -> LoadFailurePlacement.FullScreen
+    }
 
 @Composable
 fun LoadingScreen() {
@@ -41,28 +67,31 @@ fun LoadingScreen() {
 }
 
 @Composable
-internal fun FailureScreen(
-    message: String,
-    onRetry: () -> Unit,
-    onRetryAction: suspend () -> Unit,
+internal fun InlineConfirmationNotice(
+    notice: TransientNotice,
+    modifier: Modifier = Modifier,
 ) {
-    val scope = rememberCoroutineScope()
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(44.dp))
-            Text(stringResource(R.string.white_noise_couldnt_start), style = MaterialTheme.typography.titleLarge)
-            SelectionContainer {
-                Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Button(
-                onClick = {
-                    onRetry()
-                    scope.launch { onRetryAction() }
-                },
-            ) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.retry))
+    val context = LocalContext.current
+    Surface(
+        modifier = modifier.fillMaxWidth().statusBarsPadding(),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(notice.title.resolve(context), style = MaterialTheme.typography.bodyMedium)
+                notice.detail?.let {
+                    Text(
+                        it.resolve(context),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                    )
+                }
             }
         }
     }
@@ -71,12 +100,12 @@ internal fun FailureScreen(
 @Composable
 internal fun ErrorContent(
     title: String,
-    message: String,
+    error: ErrorPresentation,
+    onRetry: () -> Unit,
 ) {
-    // Failed-load errors often carry engine/relay identifiers users need to
-    // paste into a bug report. Make the message selectable (long-press copy)
-    // and surface a discoverable Copy button. See #543.
     val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    val message = error.message.resolve(context)
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(40.dp))
@@ -84,7 +113,12 @@ internal fun ErrorContent(
             SelectionContainer {
                 Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            TextButton(onClick = { clipboard.setText(AnnotatedString(message)) }) {
+            Button(onClick = onRetry) {
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.retry))
+            }
+            TextButton(onClick = { clipboard.setText(AnnotatedString(error.report)) }) {
                 Icon(
                     Icons.Default.ContentCopy,
                     contentDescription = null,
@@ -93,6 +127,39 @@ internal fun ErrorContent(
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.copy))
             }
+        }
+    }
+}
+
+@Composable
+internal fun InlineErrorBanner(
+    error: ErrorPresentation,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    Surface(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 2.dp,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                error.message.resolve(context),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            IconButton(onClick = { clipboard.setText(AnnotatedString(error.report)) }) {
+                Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy))
+            }
+            TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
         }
     }
 }

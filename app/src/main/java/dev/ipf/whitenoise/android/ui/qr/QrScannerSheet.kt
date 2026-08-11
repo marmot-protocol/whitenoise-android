@@ -308,7 +308,7 @@ private fun bindQrScannerCamera(
                         if (raw != null && didScan.compareAndSet(false, true)) onScan(raw)
                     }.addOnFailureListener {
                         if (disposedRef.get()) return@addOnFailureListener
-                        onError(it.message ?: it.javaClass.simpleName)
+                        onError(cameraUnavailable)
                     }.addOnCompleteListener {
                         analyzerBusy.set(false)
                         imageProxy.close()
@@ -325,7 +325,7 @@ private fun bindQrScannerCamera(
                 // sheet dismisses.
                 runCatching { scannerRef.getAndSet(null)?.close() }
                 runCatching { providerRef.getAndSet(null)?.unbindAll() }
-                onError(it.message ?: it.javaClass.simpleName)
+                onError(cameraUnavailable)
             }
         },
         executor,

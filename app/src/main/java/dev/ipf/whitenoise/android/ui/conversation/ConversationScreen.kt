@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -108,6 +109,8 @@ import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingEvent
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingState
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
+import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -116,6 +119,7 @@ import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
+import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.shouldFocusComposerOnDraftRestore
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
@@ -127,13 +131,17 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
+import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
+import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
+import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
+import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -212,6 +220,60 @@ private const val RESUME_IME_SETTLE_MAX_FRAMES = 24
 // background-arrival listener bounded so a later, genuinely foreground
 // message does not unexpectedly start an otherwise idle auto-reader.
 private const val TTS_AUTO_READ_RESUME_SYNC_TIMEOUT_MS = 10_000L
+
+private fun presentVoiceRecordingFailure(
+    appState: WhiteNoiseAppState,
+    throwable: Throwable,
+    voiceTooShortMessage: String,
+) {
+    when {
+        throwable is IllegalStateException && throwable.message == "voice recording too short" ->
+            appState.present(voiceTooShortMessage)
+        throwable.message?.contains("audio is in use", ignoreCase = true) == true ->
+            appState.presentFailure(
+                R.string.voice_message_recording_failed,
+                "VOICE_RECORDING_START",
+                throwable,
+                AppText.Resource(R.string.voice_message_microphone_busy),
+            )
+        else ->
+            appState.presentFailure(
+                R.string.voice_message_recording_failed,
+                "VOICE_RECORDING",
+                throwable,
+            )
+    }
+}
+
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+@Composable
+private fun ConversationLoadErrorContent(
+    error: ErrorPresentation,
+    onRetry: () -> Unit,
+) {
+    ErrorContent(
+        title = stringResource(R.string.couldnt_load_conversation),
+        error = error,
+        onRetry = onRetry,
+    )
+}
+
+private fun LazyListScope.conversationLoadErrorItem(
+    key: String,
+    error: ErrorPresentation?,
+    placement: LoadFailurePlacement,
+    errorEdge: ConversationLoadFailureEdge,
+    targetEdge: ConversationLoadFailureEdge,
+    onRetry: () -> Unit,
+) {
+    if (error == null || placement != LoadFailurePlacement.Inline || errorEdge != targetEdge) return
+    item(key = key) {
+        InlineErrorBanner(
+            error = error,
+            onRetry = onRetry,
+        )
+    }
+}
 
 /** Whether adjacent timeline items participate in one visible message-bubble sender run. */
 internal fun conversationBubbleRowsShareSenderRun(
@@ -373,6 +435,7 @@ internal fun ConversationScreen(
     // overlap and intercept touches on the message input. Resets to
     // zero on dispose so other surfaces aren't affected. Issue #122.
     val snackbarBottomInset = LocalSnackbarBottomInset.current
+    val snackbarContentInset = LocalSnackbarContentInset.current
     // Keyed on chat.id so that a back-to-back conversation push (Compose
     // reusing the same node across nav) re-runs the effect: the
     // previous chat's onDispose may not have fired before the next
@@ -1334,9 +1397,7 @@ internal fun ConversationScreen(
                 },
                 onRecordingComplete = { file, durationMs -> mediaSender.sendVoiceAttachment(file, durationMs) },
                 onError = { throwable ->
-                    if (throwable is IllegalStateException && throwable.message == "voice recording too short") {
-                        appState.present(voiceTooShortMsg)
-                    }
+                    presentVoiceRecordingFailure(appState, throwable, voiceTooShortMsg)
                 },
                 // Honor the user's media-quality ceiling for voice notes.
                 // Read at record-start (the controller is not re-keyed on the
@@ -1617,6 +1678,7 @@ internal fun ConversationScreen(
         }
     }
     val latestTimelineItemId = renderedTimeline.lastOrNull()?.id
+    val loadFailurePlacement = loadFailurePlacement(controller.error != null, controller.timeline.isNotEmpty())
     val transcriptLocale = LocalConfiguration.current.locales[0]
     val olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
     val bottomTimelineIndex = renderedTimeline.size + 1 + olderHeaderCount
@@ -2564,7 +2626,7 @@ internal fun ConversationScreen(
                 hasSearchQuery = searchQuery.isNotBlank(),
                 onPreviousSearchMatch = { navigateToSearchMatch(forward = false) },
                 onNextSearchMatch = { navigateToSearchMatch(forward = true) },
-                hasError = controller.error != null,
+                hasError = loadFailurePlacement == LoadFailurePlacement.FullScreen,
                 composerGate = composerGate,
                 controller = controller,
                 appState = appState,
@@ -2665,7 +2727,11 @@ internal fun ConversationScreen(
                 .consumeWindowInsets(WindowInsets.ime),
         ) {
             when {
-                controller.error != null -> ErrorContent(stringResource(R.string.couldnt_load_conversation), controller.error.orEmpty())
+                loadFailurePlacement == LoadFailurePlacement.FullScreen ->
+                    ConversationLoadErrorContent(
+                        error = requireNotNull(controller.error),
+                        onRetry = { scope.launch { controller.retryLoadFailure() } },
+                    )
                 controller.group.pendingConfirmation && renderedTimeline.isEmpty() && !controller.isLoading && initialTimelineLoadStarted ->
                     InvitePreviewPlaceholder(
                         inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
@@ -2713,9 +2779,17 @@ internal fun ConversationScreen(
                                         transcriptHeightPx = coordinates.size.height.toFloat()
                                     },
                             verticalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(bottom = 8.dp),
+                            contentPadding = PaddingValues(bottom = 8.dp + snackbarContentInset.value),
                         ) {
                             item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
+                            conversationLoadErrorItem(
+                                key = "conversation-load-error-top",
+                                error = controller.error,
+                                placement = loadFailurePlacement,
+                                errorEdge = controller.errorEdge,
+                                targetEdge = ConversationLoadFailureEdge.TOP,
+                                onRetry = { scope.launch { controller.retryLoadFailure() } },
+                            )
                             if (controller.hasMoreBefore || controller.isLoadingOlder) {
                                 item(key = "older-messages-loading") {
                                     Box(
@@ -2821,6 +2895,14 @@ internal fun ConversationScreen(
                                     collapseLongMessages = collapseLongMessages,
                                 )
                             }
+                            conversationLoadErrorItem(
+                                key = "conversation-load-error-bottom",
+                                error = controller.error,
+                                placement = loadFailurePlacement,
+                                errorEdge = controller.errorEdge,
+                                targetEdge = ConversationLoadFailureEdge.BOTTOM,
+                                onRetry = { scope.launch { controller.retryLoadFailure() } },
+                            )
                             // Kept minimal (matches the top-spacer) so the last
                             // bubble sits a tight breathing-room above the
                             // composer rather than orphaned in mid-screen; the
@@ -2969,7 +3051,7 @@ internal fun ConversationScreen(
                                 },
                             )
                         when (result.succeeded) {
-                            result.attempted -> appState.present(R.string.batch_delete_complete)
+                            result.attempted -> appState.presentTransient(R.string.batch_delete_complete)
                             0 -> appState.present(R.string.batch_delete_failed, copyable = true)
                             else -> appState.present(R.string.batch_delete_partial, copyable = true)
                         }

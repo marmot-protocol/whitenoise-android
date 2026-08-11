@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.updates
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.util.Log
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -18,24 +19,32 @@ class AppUpdateWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
+    private val repository = AppUpdateRepository(appContext)
+
     override suspend fun doWork(): Result {
         if (shouldSkipForMeteredDataSaver(applicationContext)) return Result.success()
         return try {
-            val repository = AppUpdateRepository(applicationContext)
             val info = repository.refresh()
             if (info.shouldShowBanner && AppUpdateForegroundState.shouldPostBackgroundNotification()) {
                 AppUpdateNotifier(applicationContext).show(info)
             }
             Result.success()
         } catch (error: IOException) {
+            logRefreshFailure()
             resultForRefreshFailure(error)
         } catch (error: RuntimeException) {
+            logRefreshFailure()
             resultForRefreshFailure(error)
         }
     }
 
+    private fun logRefreshFailure() {
+        Log.w(TAG, repository.loadInfo().lastAttemptErrorReport ?: "Update check failed without a report")
+    }
+
     companion object {
         private const val UNIQUE_WORK_NAME = "darkmatter-zapstore-update-check"
+        private const val TAG = "AppUpdateWorker"
 
         internal fun resultForRefreshFailure(error: Throwable): Result =
             when (error) {

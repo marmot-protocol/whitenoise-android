@@ -21,6 +21,7 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -29,13 +30,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.NoticeTier
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
 /**
@@ -60,6 +64,12 @@ internal val LocalSnackbarBottomInset =
         mutableStateOf(0.dp)
     }
 
+/** Space occupied by the currently visible app-level notice. Conversation and
+ * chat-list content consume this value so the last row remains reachable above
+ * the notice instead of being painted underneath it. */
+internal val LocalSnackbarContentInset =
+    staticCompositionLocalOf<MutableState<Dp>> { mutableStateOf(0.dp) }
+
 @Composable
 fun WhiteNoiseSnackbarHost(
     hostState: SnackbarHostState,
@@ -81,27 +91,34 @@ fun WhiteNoiseSnackbarHost(
 
 /**
  * Visuals for toasts pushed through `WhiteNoiseAppState.present`. Carries the
- * emit site's explicit [copyable] flag so [SwipeDismissibleSnackbar] can gate
- * its Copy affordance on the toast's kind (error/diagnostic vs. success or
- * transient confirmation) instead of guessing from the message body (#796).
+ * emit site's explicit [copyable] flag and privacy-safe [copyText] payload so
+ * [SwipeDismissibleSnackbar] never falls back to copying user-facing text.
  */
 internal data class ToastSnackbarVisuals(
     override val message: String,
     val copyable: Boolean = false,
+    val tier: NoticeTier = if (copyable) NoticeTier.ActionableError else NoticeTier.Confirmation,
+    val copyText: String? = null,
 ) : SnackbarVisuals {
     override val actionLabel: String? = null
-    override val withDismissAction: Boolean = false
-    override val duration: SnackbarDuration = SnackbarDuration.Short
+    override val withDismissAction: Boolean = tier == NoticeTier.ActionableError
+    override val duration: SnackbarDuration =
+        if (tier == NoticeTier.ActionableError) {
+            SnackbarDuration.Indefinite
+        } else {
+            SnackbarDuration.Short
+        }
 }
 
 /**
  * Whether a snackbar should render the Copy affordance (#543, #796). Only
- * non-actionable toasts explicitly flagged copyable at their emit site — error
- * and diagnostic strings — qualify; plain `showSnackbar(message)` calls and
- * actionable snackbars never do.
+ * diagnostic toasts explicitly carrying a privacy-safe report qualify; plain
+ * `showSnackbar(message)` calls and legacy copyable flags without a report do
+ * not.
  */
 internal fun snackbarShowsCopyAffordance(visuals: SnackbarVisuals): Boolean =
-    visuals.actionLabel == null && (visuals as? ToastSnackbarVisuals)?.copyable == true
+    visuals.actionLabel == null &&
+        (visuals as? ToastSnackbarVisuals)?.let { it.copyable && !it.copyText.isNullOrBlank() } == true
 
 /**
  * The one snackbar surface treatment: AMOLED resolves `inverseSurface` to pure
@@ -128,6 +145,15 @@ internal fun Modifier.snackbarSurfaceBoundary(): Modifier = amoledSurfaceBorder(
  */
 @Composable
 fun SwipeDismissibleSnackbar(data: SnackbarData) {
+    val density = LocalDensity.current
+    val contentInset = LocalSnackbarContentInset.current
+    DisposableEffect(data) {
+        onDispose { contentInset.value = 0.dp }
+    }
+    val reserveNoticeSpace =
+        Modifier.onSizeChanged { size ->
+            contentInset.value = with(density) { size.height.toDp() + 16.dp }
+        }
     val dismissState =
         key(data) {
             rememberSwipeToDismissBoxState(
@@ -151,11 +177,11 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
             // a discoverable Copy affordance in the free action slot, plus a
             // SelectionContainer for long-press copy (issues #543, #796).
             val clipboard = LocalClipboardManager.current
-            val message = data.visuals.message
+            val copyText = requireNotNull((data.visuals as ToastSnackbarVisuals).copyText)
             Snackbar(
-                modifier = Modifier.snackbarSurfaceBoundary(),
+                modifier = reserveNoticeSpace.snackbarSurfaceBoundary(),
                 action = {
-                    IconButton(onClick = { clipboard.setText(AnnotatedString(message)) }) {
+                    IconButton(onClick = { clipboard.setText(AnnotatedString(copyText)) }) {
                         Icon(
                             Icons.Default.ContentCopy,
                             contentDescription = stringResource(R.string.copy),
@@ -164,7 +190,7 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
                 },
             ) {
                 SelectionContainer {
-                    Text(message)
+                    Text(data.visuals.message)
                 }
             }
         } else {
@@ -173,7 +199,7 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
             // untouched) and non-copyable toasts like success confirmations —
             // renders plain, with the message text still selectable.
             SelectionContainer {
-                Snackbar(snackbarData = data, modifier = Modifier.snackbarSurfaceBoundary())
+                Snackbar(snackbarData = data, modifier = reserveNoticeSpace.snackbarSurfaceBoundary())
             }
         }
     }

@@ -12,6 +12,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.io.IOException
 
 private typealias FetchLatestRelease = suspend (String, String?) -> ZapstoreLatestRelease?
 
@@ -91,6 +92,25 @@ class AppUpdateRepositoryTest {
 
             val reloaded = repository().loadInfo(installed)
             assertEquals("2026.2.0", reloaded.dismissedVersion)
+        }
+
+    @Test
+    fun failedAttemptPersistsBoundedPrivacySafeOutcomeUntilSuccess() =
+        runBlocking {
+            val credentialUrl = "https://user:pass@example.test"
+            val failing = repository { _, _ -> throw IOException("failed $credentialUrl") }
+
+            runCatching { failing.refresh("2026.1.0") }
+            val failed = repository().loadInfo("2026.1.0")
+
+            assertEquals(nowMillis, failed.lastAttemptAtMillis)
+            assertTrue(failed.lastAttemptErrorReport.orEmpty().contains("operation=BACKGROUND_UPDATE_CHECK"))
+            assertFalse(failed.lastAttemptErrorReport.orEmpty().contains("user:pass"))
+            assertTrue(failed.lastAttemptErrorReport.orEmpty().length <= 600)
+
+            nowMillis += 1_000L
+            repository { _, _ -> null }.refresh("2026.1.0")
+            assertNull(repository().loadInfo("2026.1.0").lastAttemptErrorReport)
         }
 
     private fun repository(): AppUpdateRepository = repository { _, _ -> null }

@@ -4,8 +4,10 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
@@ -15,9 +17,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
@@ -25,9 +29,11 @@ import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
-import dev.ipf.whitenoise.android.ui.common.FailureScreen
+import dev.ipf.whitenoise.android.ui.common.ErrorContent
+import dev.ipf.whitenoise.android.ui.common.InlineConfirmationNotice
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
+import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
@@ -37,8 +43,11 @@ import dev.ipf.whitenoise.android.ui.onboarding.OnboardingScreen
 import dev.ipf.whitenoise.android.ui.settings.WipeOutcomeSheet
 import dev.ipf.whitenoise.android.ui.settings.WipeProgressSheet
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private const val TRANSIENT_NOTICE_DURATION_MILLIS = 2_000L
 
 @Composable
 fun WhiteNoiseApp(
@@ -60,8 +69,11 @@ fun WhiteNoiseApp(
     // composer. Owned here so the host — which lives at this level —
     // can read it; child screens mutate via [LocalSnackbarBottomInset].
     val snackbarBottomInset = remember { mutableStateOf(0.dp) }
+    val snackbarContentInset = remember { mutableStateOf(0.dp) }
     val toast = appState.toast
+    val transientNotice = appState.transientNotice
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             appState.refreshLocalNotificationPermission()
@@ -107,10 +119,17 @@ fun WhiteNoiseApp(
                 ToastSnackbarVisuals(
                     message = listOfNotNull(toast.title.resolve(context), toast.detail?.resolve(context)).joinToString("\n"),
                     copyable = toast.copyable,
+                    tier = toast.tier,
+                    copyText = toast.diagnosticReport,
                 ),
             )
             appState.clearToast()
         }
+    }
+    LaunchedEffect(transientNotice) {
+        transientNotice ?: return@LaunchedEffect
+        delay(TRANSIENT_NOTICE_DURATION_MILLIS)
+        appState.clearTransientNotice(transientNotice)
     }
     LaunchedEffect(inboundProfilePayload, appState.phase) {
         val payload = inboundProfilePayload ?: return@LaunchedEffect
@@ -132,7 +151,10 @@ fun WhiteNoiseApp(
     // whole app UI so every descendant text field requests incognito mode from
     // the IME (no learning / suggestion history / cloud sync of typed content).
     IncognitoKeyboardScope(enabled = appState.forceIncognitoKeyboard) {
-        CompositionLocalProvider(LocalSnackbarBottomInset provides snackbarBottomInset) {
+        CompositionLocalProvider(
+            LocalSnackbarBottomInset provides snackbarBottomInset,
+            LocalSnackbarContentInset provides snackbarContentInset,
+        ) {
             Scaffold(
                 contentWindowInsets = WindowInsets(0.dp),
                 snackbarHost = { WhiteNoiseSnackbarHost(snackbarHostState) },
@@ -143,26 +165,31 @@ fun WhiteNoiseApp(
                     if (!appState.appLockScreenVisible) {
                         AppSelfUpdateDialog(appState = appState)
                     }
-                    when (val phase = appState.phase) {
-                        AppPhase.Bootstrapping -> LoadingScreen()
-                        AppPhase.Onboarding -> OnboardingScreen(appState)
-                        AppPhase.Ready ->
-                            MainShell(
-                                appState = appState,
-                                inboundNotificationTarget = inboundNotificationTarget,
-                                inboundNotificationRequestId = inboundNotificationRequestId,
-                                onNotificationTargetHandled = onNotificationTargetHandled,
-                                inboundShareRequest = inboundShareRequest,
-                                onShareRequestHandled = onShareRequestHandled,
-                                inboundAppUpdateTap = inboundAppUpdateTap,
-                                onAppUpdateTapHandled = onAppUpdateTapHandled,
-                            )
-                        is AppPhase.Failed ->
-                            FailureScreen(
-                                message = phase.message,
-                                onRetry = { appState.present(R.string.toast_restarting) },
-                                onRetryAction = { appState.bootstrap() },
-                            )
+                    Column(Modifier.fillMaxSize()) {
+                        transientNotice?.let { InlineConfirmationNotice(it) }
+                        Box(Modifier.fillMaxWidth().weight(1f)) {
+                            when (val phase = appState.phase) {
+                                AppPhase.Bootstrapping -> LoadingScreen()
+                                AppPhase.Onboarding -> OnboardingScreen(appState)
+                                AppPhase.Ready ->
+                                    MainShell(
+                                        appState = appState,
+                                        inboundNotificationTarget = inboundNotificationTarget,
+                                        inboundNotificationRequestId = inboundNotificationRequestId,
+                                        onNotificationTargetHandled = onNotificationTargetHandled,
+                                        inboundShareRequest = inboundShareRequest,
+                                        onShareRequestHandled = onShareRequestHandled,
+                                        inboundAppUpdateTap = inboundAppUpdateTap,
+                                        onAppUpdateTapHandled = onAppUpdateTapHandled,
+                                    )
+                                is AppPhase.Failed ->
+                                    ErrorContent(
+                                        title = stringResource(R.string.white_noise_couldnt_start),
+                                        error = phase.error,
+                                        onRetry = { scope.launch { appState.bootstrap() } },
+                                    )
+                            }
+                        }
                     }
                     if (appState.appLockScreenVisible) {
                         AppLockScreen(

@@ -15,6 +15,8 @@ data class AppUpdateInfo(
     val checkedAtMillis: Long?,
     val dismissedVersion: String?,
     val releasesBehind: Int?,
+    val lastAttemptAtMillis: Long? = null,
+    val lastAttemptErrorReport: String? = null,
 ) {
     val isUpdateAvailable: Boolean
         get() = latestVersion?.let { CalVer.compare(it, installedVersion) > 0 } ?: false

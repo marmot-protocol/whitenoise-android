@@ -220,12 +220,14 @@ class GroupMemberAdministrationGateTest {
         controller: ConversationController,
         title: Int,
     ) {
-        assertEquals(ConversationControllerCopy().groupRosterChanged, controller.lastMutationError)
+        assertEquals(
+            AppText.Plain(ConversationControllerCopy().groupRosterChanged),
+            controller.lastMutationError?.message,
+        )
         assertEquals(
             ToastMessage(
                 title = AppText.Resource(title),
                 detail = AppText.Resource(R.string.toast_group_roster_changed),
-                copyable = true,
             ),
             appState.toast,
         )
@@ -289,7 +291,8 @@ class GroupMemberAdministrationGateTest {
     ) {
         val field = ConversationController::class.java.getDeclaredField("lastMutationError\$delegate")
         field.isAccessible = true
-        (field.get(controller) as MutableState<String?>).value = error
+        (field.get(controller) as MutableState<ErrorPresentation?>).value =
+            ErrorPresentation(AppText.Plain(error), "operation=TEST\nerror=TEST")
     }
 
     private fun appState(runtimeAccess: RuntimeAccessRecorder? = null) =

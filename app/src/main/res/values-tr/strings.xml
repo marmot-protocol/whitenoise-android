@@ -3,6 +3,9 @@
     <string name="app_name">White Noise</string>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise başlatılamadı</string>
+    <string name="error_try_again">Bir sorun oluştu. Tekrar deneyin; sorun devam ederse hata raporunu kopyalayın.</string>
+    <string name="error_loaded_content_may_be_out_of_date">Yüklenen içerikleriniz hâlâ kullanılabilir, ancak güncel olmayabilir. Yeniden deneniyor…</string>
+    <string name="error_loaded_content_kept">Daha fazla içerik yüklenemedi. Mesajlarınız hâlâ kullanılabilir; hazır olduğunuzda tekrar deneyin.</string>
     <string name="refresh">Dökümü yenile</string>
     <string name="retry">Tekrar dene</string>
     <string name="creating_identity">Kimlik oluşturma</string>
@@ -371,6 +374,9 @@
     <string name="app_lock_retry">Kilidi açmayı tekrar dene</string>
     <string name="app_lock_auth_failed">Eşleşmedi. Tekrar deneyin.</string>
     <string name="app_lock_auth_cancelled">Kilit açma iptal edildi. Sohbetleriniz hâlâ gizli.</string>
+    <string name="app_lock_auth_locked">Çok fazla deneme yapıldı. Cihazınızın kilidini açıp tekrar deneyin.</string>
+    <string name="app_lock_auth_timed_out">Kilit açma işlemi zaman aşımına uğradı. Tekrar deneyin.</string>
+    <string name="app_lock_auth_unavailable">Cihaz kilidini açma şu anda kullanılamıyor. Cihazınızın kilidini açıp tekrar deneyin.</string>
     <string name="toast_app_lock_screen_lock_required">Önce Android Ayarları’nda bir ekran kilidi ayarlayın.</string>
     <string name="force_incognito_keyboard">Gizli klavye</string>
     <string name="force_incognito_keyboard_subtitle">Klavyeden kişiselleştirilmiş öğrenmeyi kapatmasını ister</string>
@@ -893,6 +899,8 @@
     <string name="voice_message_release_to_send">Göndermek için bırakın · iptal için kaydırın</string>
     <string name="voice_message_too_short">Daha uzun süre basılı tutun</string>
     <string name="voice_message_permission_denied">Kayıt için mikrofon izni gerekli</string>
+    <string name="voice_message_recording_failed">Sesli mesaj kaydedilemedi</string>
+    <string name="voice_message_microphone_busy">Mikrofon başka bir uygulama tarafından kullanılıyor. O uygulamayı kapatıp tekrar deneyin.</string>
     <string name="voice_message_play">Sesli mesajı oynat</string>
     <string name="voice_message_pause">Sesli mesajı duraklat</string>
     <string name="voice_message_failed">Sesli mesaj yüklenemedi</string>
@@ -1209,6 +1217,7 @@
     <string name="app_updates">Uygulama güncellemeleri</string>
     <string name="app_update_settings_title">Zapstore sürümü</string>
     <string name="app_update_settings_unknown">Yüklü: %1$s — En son: bilinmiyor — kontrol etmek için dokunun</string>
+    <string name="app_update_settings_check_failed">Güncellemeler denetlenemedi. Tekrar denemek için dokunun.</string>
     <string name="app_update_settings_current">Yüklü: %1$s — Güncel</string>
     <string name="app_update_settings_available">Yüklü: %1$s — En son: %2$s — güncelleme mevcut</string>
     <string name="app_update_settings_available_with_count">Yüklü: %1$s — En son: %2$s — %3$d sürüm geride</string>
