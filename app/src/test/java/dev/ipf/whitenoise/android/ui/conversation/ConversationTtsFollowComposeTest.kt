@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
@@ -31,6 +32,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertTrue
@@ -100,6 +102,44 @@ class ConversationTtsFollowComposeTest {
     }
 
     @Test
+    fun directDragWhilePagingIsSuspendedPreventsDeferredFollowScroll() {
+        val pagingStarted = CompletableDeferred<Unit>()
+        val releasePaging = CompletableDeferred<Unit>()
+        lateinit var visibleKeys: () -> List<Any>
+        val messages = (0 until 100).map { "message-$it" }
+        val targetMessageId = "message-5"
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                DeferredFollowHarness(
+                    messages = messages,
+                    targetMessageId = targetMessageId,
+                    pagingStarted = pagingStarted,
+                    releasePaging = releasePaging,
+                    onVisibleKeys = { visibleKeys = it },
+                )
+            }
+        }
+        composeRule.waitUntil { pagingStarted.isCompleted }
+
+        composeRule.onNodeWithTag(TRANSCRIPT_TAG).performTouchInput { swipeUp() }
+        val resumeLabel =
+            ApplicationProvider
+                .getApplicationContext<android.content.Context>()
+                .getString(R.string.tts_resume_follow)
+        composeRule.onNodeWithText(resumeLabel).assertIsDisplayed()
+        composeRule.runOnIdle { releasePaging.complete(Unit) }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            assertTrue(
+                "a deferred follow command must not defeat the direct drag",
+                targetMessageId !in visibleKeys(),
+            )
+        }
+    }
+
+    @Test
     fun recycledTargetRowIsRemountedByStableKey() {
         var request by mutableStateOf(0)
         lateinit var visibleKeys: () -> List<Any>
@@ -152,6 +192,47 @@ class ConversationTtsFollowComposeTest {
         }
     }
 
+    @Test
+    fun targetEvictedBetweenBoundedScrollPhasesNeverScrollsReplacementRow() {
+        var messages by mutableStateOf((0 until 100).map { "message-$it" })
+        var request by mutableStateOf(0)
+        var resolveCalls = 0
+        lateinit var visibleKeys: () -> List<Any>
+        val targetMessageId = "message-5"
+        val replacementMessageId = "message-6"
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                FollowViewportHarness(
+                    messages = messages,
+                    initialFirstVisibleItemIndex = 90,
+                    targetMessageId = targetMessageId,
+                    request = request,
+                    onVisibleKeys = { visibleKeys = it },
+                    targetIndexResolver = {
+                        resolveCalls++
+                        if (resolveCalls == 1) {
+                            messages.indexOf(targetMessageId).takeIf { it >= 0 }
+                        } else {
+                            messages = messages.filterNot { it == targetMessageId }
+                            null
+                        }
+                    },
+                )
+            }
+        }
+        composeRule.runOnIdle { request++ }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            assertTrue("the target must be re-resolved after pre-positioning", resolveCalls >= 2)
+            assertTrue(
+                "the row that replaced the removed target index must not be scrolled into view",
+                replacementMessageId !in visibleKeys(),
+            )
+        }
+    }
+
     @Composable
     private fun FollowViewportHarness(
         messages: List<String>,
@@ -159,6 +240,7 @@ class ConversationTtsFollowComposeTest {
         targetMessageId: String,
         request: Int,
         onVisibleKeys: (() -> List<Any>) -> Unit,
+        targetIndexResolver: (() -> Int?)? = null,
     ) {
         val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialFirstVisibleItemIndex)
         val coordinator =
@@ -169,7 +251,7 @@ class ConversationTtsFollowComposeTest {
                 )
             }
         onVisibleKeys { listState.layoutInfo.visibleItemsInfo.map { it.key } }
-        LaunchedEffect(request, messages, targetMessageId) {
+        LaunchedEffect(request, targetMessageId) {
             if (request == 0) return@LaunchedEffect
             val targetIndex = messages.indexOf(targetMessageId)
             if (targetIndex < 0) return@LaunchedEffect
@@ -180,7 +262,9 @@ class ConversationTtsFollowComposeTest {
                 estimatedItemHeightPx = null,
                 listState = listState,
                 scrollCoordinator = coordinator,
-                resolveTargetIndex = { messages.indexOf(targetMessageId).takeIf { it >= 0 } },
+                resolveTargetIndex =
+                    targetIndexResolver
+                        ?: { messages.indexOf(targetMessageId).takeIf { it >= 0 } },
                 isCurrentTarget = { true },
                 currentScrollAnchor = {
                     ConversationScrollAnchor(
@@ -210,8 +294,83 @@ class ConversationTtsFollowComposeTest {
         }
     }
 
-    private fun speakingState(): TtsState.Speaking {
-        val target = followTarget("message-1")
+    @Composable
+    private fun DeferredFollowHarness(
+        messages: List<String>,
+        targetMessageId: String,
+        pagingStarted: CompletableDeferred<Unit>,
+        releasePaging: CompletableDeferred<Unit>,
+        onVisibleKeys: (() -> List<Any>) -> Unit,
+    ) {
+        val listState = rememberLazyListState(initialFirstVisibleItemIndex = 90)
+        val coordinator =
+            remember(listState) {
+                ConversationScrollCoordinator(
+                    writer = LazyListConversationScrollWriter(listState),
+                    initialMode = ConversationScrollMode.ReadingHistory(null, 0),
+                )
+            }
+        val policy =
+            remember {
+                ConversationTtsFollowPolicy().apply {
+                    observe(speakingState(targetMessageId), ownsSession = true)
+                }
+            }
+        onVisibleKeys { listState.layoutInfo.visibleItemsInfo.map { it.key } }
+        LaunchedEffect(listState, policy) {
+            listState.interactionSource.interactions.collectConversationDragInteractions(
+                onStarted = {
+                    policy.onUserDrag()
+                    coordinator.onUserGestureStarted(listState.followAnchor())
+                },
+                awaitScrollSettled = {
+                    snapshotFlow { listState.isScrollInProgress }.filter { !it }.first()
+                },
+                onSettled = {},
+            )
+        }
+        LaunchedEffect(policy, targetMessageId) {
+            val target = policy.claimPendingTarget() ?: return@LaunchedEffect
+            pagingStarted.complete(Unit)
+            releasePaging.await()
+            if (!policy.isCurrentTarget(target)) return@LaunchedEffect
+            followTtsTargetInViewport(
+                target = target,
+                itemKey = targetMessageId,
+                targetIndex = messages.indexOf(targetMessageId),
+                estimatedItemHeightPx = null,
+                listState = listState,
+                scrollCoordinator = coordinator,
+                resolveTargetIndex = { messages.indexOf(targetMessageId).takeIf { it >= 0 } },
+                isCurrentTarget = { policy.isCurrentTarget(target) },
+                currentScrollAnchor = { listState.followAnchor() },
+            )
+        }
+        Box {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxWidth().height(320.dp).testTag(TRANSCRIPT_TAG),
+            ) {
+                items(messages, key = { it }) { messageId ->
+                    Text(messageId, Modifier.fillMaxWidth().height(80.dp))
+                }
+            }
+            if (policy.showResumeAction) {
+                TtsResumeFollowButton(onClick = policy::resumeFollow)
+            }
+        }
+    }
+
+    private fun LazyListState.followAnchor() =
+        ConversationScrollAnchor(
+            listIndex = firstVisibleItemIndex,
+            pixelOffset = firstVisibleItemScrollOffset,
+            itemId = null,
+            messageId = null,
+        )
+
+    private fun speakingState(messageId: String = "message-1"): TtsState.Speaking {
+        val target = followTarget(messageId)
         return TtsState.Speaking(
             chunkIndex = 0,
             chunkCount = 1,

@@ -1515,7 +1515,8 @@ internal fun ConversationScreen(
     }
 
     fun isCurrentTtsFollowTarget(target: ConversationTtsFollowTarget): Boolean =
-        appState.ownsTtsAutoReadSession(controller.group.groupIdHex) &&
+        ttsFollowPolicy.isCurrentTarget(target) &&
+            appState.ownsTtsAutoReadSession(controller.group.groupIdHex) &&
             appState.ttsController.state.value is TtsState.Speaking &&
             appState.ttsController.state.value
                 .conversationFollowTargetOrNull() == target
@@ -1546,10 +1547,12 @@ internal fun ConversationScreen(
             ) {
                 return@LaunchedEffect
             }
+            if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
             // Give the LazyColumn one bounded remount opportunity after paging.
             // The follow effect deliberately does not key itself on timeline
             // mutations, because its own page load would otherwise cancel it.
             withFrameNanos { }
+            if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
             row =
                 controller.timeline
                     .filterNot { MessageProjector.isEdit(it.record) }
@@ -1564,10 +1567,10 @@ internal fun ConversationScreen(
             return@LaunchedEffect
         }
         val currentProjection = ttsEntry(row.record) ?: return@LaunchedEffect
+        if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
         if (target.projectionId.isBlank() || currentProjection.projectionId != target.projectionId) {
             return@LaunchedEffect
         }
-        if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
 
         val targetIndex = currentTimelineListIndex(target.messageIdHex) ?: return@LaunchedEffect
         val layoutInfo = listState.layoutInfo

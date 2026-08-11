@@ -86,6 +86,11 @@ internal class ConversationTtsFollowPolicy {
         return target
     }
 
+    fun isCurrentTarget(target: ConversationTtsFollowTarget): Boolean {
+        val followsCurrentTarget = activeTarget == target
+        return isFollowEnabled && isSpeaking && followsCurrentTarget
+    }
+
     fun onUserDrag() {
         if (activeTarget == null) return
         isFollowEnabled = false
@@ -206,16 +211,16 @@ internal suspend fun followTtsTargetInViewport(
         true
     } else {
         val scrollOffset = (decision as TtsFollowViewportDecision.ScrollToItemOffset).offset
-        val completed =
+        var targetResolved = false
+        val commandCompleted =
             scrollCoordinator.programmaticJump(
                 targetMessageId = target.messageIdHex,
                 reason = ConversationScrollReason.ReadAloudFollow,
             ) {
                 if (!isCurrentTarget()) return@programmaticJump
-                animateScrollToItem(targetIndex, scrollOffset) {
-                    resolveTargetIndex() ?: targetIndex
-                }
+                targetResolved = animateScrollToItem(targetIndex, scrollOffset, resolveTargetIndex)
             }
+        val completed = commandCompleted && targetResolved
         if (completed) scrollCoordinator.settleReadingAt(currentScrollAnchor())
         completed
     }

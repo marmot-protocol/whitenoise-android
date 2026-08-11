@@ -508,24 +508,27 @@ internal class ConversationScrollCoordinator(
         suspend fun animateScrollToItem(
             index: Int,
             scrollOffset: Int = 0,
-            resolveIndex: () -> Int = { index },
-        ) {
+            resolveIndex: () -> Int? = { index },
+        ): Boolean {
             ensureCurrent()
-            var targetIndex = resolveIndex().coerceAtLeast(0)
+            var targetIndex = resolveIndex()?.coerceAtLeast(0)
             var repositionAttempts = 0
             while (
+                targetIndex != null &&
                 repositionAttempts < MAX_TARGET_REPOSITION_ATTEMPTS &&
                 prePositionIfFar(targetIndex)
             ) {
                 repositionAttempts++
                 ensureCurrent()
-                targetIndex = resolveIndex().coerceAtLeast(0)
+                targetIndex = resolveIndex()?.coerceAtLeast(0)
             }
-            if (isFar(targetIndex)) {
-                writer.scrollToItem(targetIndex, scrollOffset)
+            val resolvedTargetIndex = targetIndex ?: return false
+            if (isFar(resolvedTargetIndex)) {
+                writer.scrollToItem(resolvedTargetIndex, scrollOffset)
             } else {
-                writer.animateScrollToItem(targetIndex, scrollOffset)
+                writer.animateScrollToItem(resolvedTargetIndex, scrollOffset)
             }
+            return true
         }
 
         private suspend fun prePositionIfFar(targetIndex: Int): Boolean {
