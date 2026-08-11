@@ -40,9 +40,11 @@ them as performance numbers.
 
 The journeys never clear package data. They use real UI actions and the real MDK
 store; no Android-side protocol cache or fake performance data is introduced.
-Use a dedicated test identity: AGP removes the temporary dev target after
-`generateBaselineProfile`, so the app must be reinstalled and signed in again
-before running measurements. The synced group remains available to the account.
+On a physical device, every connected-test command must pass
+`-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true`; otherwise AGP
+may uninstall the target during teardown and erase the local identity and message
+history. After profile collection, restore the normal dev APK in place without
+uninstalling or clearing data.
 
 ## Run Macrobenchmarks
 
@@ -57,8 +59,9 @@ ANDROID_SERIAL=<device-serial> \
 The script builds the normal dev and release-like APKs, replaces the dev app in
 place, invokes only the startup and group-open before/after methods, and pulls
 JSON plus Perfetto output into `benchmark/build/outputs/manual/`. Its exit trap
-restores the normal dev debug APK and uninstalls the self-instrumenting benchmark
-package even when a benchmark fails; the authenticated app data remains intact.
+restores the normal dev debug APK even when a benchmark fails. Both target and
+benchmark APKs are installed or updated in place; the runner never uninstalls a
+package, so authenticated app data remains intact on a personal physical device.
 
 For a focused rerun, set AndroidJUnitRunner's comma-separated class filter via
 `BENCHMARK_CLASS_FILTER`; the script still uses the same state-preserving path.
@@ -68,6 +71,7 @@ mutation argument:
 
 ```bash
 ./gradlew :benchmark:connectedDevZapstoreBenchmarkReleaseAndroidTest \
+  -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
   -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark#createGroupConversationOpen \
   -Pandroid.testInstrumentationRunnerArguments.createdGroupPrefix="Benchmark group"
 ```
@@ -81,6 +85,7 @@ Run the one-shot invite journey by filtering to its test method:
 
 ```bash
 ./gradlew :benchmark:connectedDevZapstoreBenchmarkReleaseAndroidTest \
+  -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
   -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark#acceptInviteConversationReady \
   -Pandroid.testInstrumentationRunnerArguments.inviteName="$INVITE_NAME"
 ```
@@ -97,12 +102,13 @@ The state-preserving script copies results and `.perfetto-trace` files under:
 benchmark/build/outputs/manual/<UTC timestamp>/
 ```
 
-`./gradlew :benchmark:connectedCheck` remains available for an ephemeral fixture
-or CI device. Supplying `groupName` is required for authenticated group tests;
-group creation and invite acceptance also require their explicit arguments.
-Tests whose fixture or mutation argument is missing are reported as skipped.
-The connected task may uninstall the target package during teardown, so prefer
-the script for a local stateful fixture.
+`./gradlew :benchmark:connectedCheck` remains available for an emulator or CI
+device. Supplying `groupName` is required for authenticated group tests; group
+creation and invite acceptance also require their explicit arguments. Tests
+whose fixture or mutation argument is missing are reported as skipped. On a
+physical device, pass the leave-APKs-installed property shown above; prefer the
+state-preserving script for a local fixture because it also restores the debug
+APK in place.
 
 ## Generate and package the Baseline Profile
 
@@ -113,15 +119,20 @@ startup code out of the primary DEX:
 
 ```bash
 ./gradlew :app:generateBaselineProfile \
+  -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
   -Pandroid.testInstrumentationRunnerArguments.groupName="$GROUP_NAME"
 ```
 
 The generated profile is merged into and committed from
 `app/src/main/generated/baselineProfiles/`. It is consumed by every supported
 release variant; generation does not run implicitly during ordinary release
-assembly. AGP removes the temporary dev app after collection; reinstall the
-normal dev APK and sign the fixture back in before running the measurement
-script.
+assembly. The leave-APKs-installed property prevents AGP teardown from removing
+the authenticated target. After collection, replace the profileable variant
+with the normal dev build in place—never uninstall first:
+
+```bash
+./gradlew :app:installDevZapstoreDebug
+```
 
 Build a release-like APK and verify both compiled profile assets:
 

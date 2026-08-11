@@ -128,7 +128,6 @@ local_output="benchmark/build/outputs/manual/$run_id"
 cleanup() {
   local status=$?
   trap - EXIT
-  adb_cmd uninstall "$test_package" >/dev/null 2>&1 || true
   if ! adb_cmd install -r -d -t "$dev_app_apk"; then
     echo "Failed to restore the normal dev app: $dev_app_apk" >&2
     if ((status == 0)); then status=1; fi
@@ -140,8 +139,9 @@ trap cleanup EXIT
 
 # Replacing the target APK with the same application ID and debug certificate
 # preserves its authenticated data. The exit trap restores the normal dev debug
-# APK and uninstalls the self-instrumenting package even when the run fails.
-adb_cmd uninstall "$test_package" >/dev/null 2>&1 || true
+# APK even when the run fails. The benchmark package is also updated in place
+# and left installed so this workflow never performs an uninstall on a personal
+# physical device.
 adb_cmd install -r -d -t "$app_apk"
 adb_cmd install -r -d -t "$test_apk"
 
