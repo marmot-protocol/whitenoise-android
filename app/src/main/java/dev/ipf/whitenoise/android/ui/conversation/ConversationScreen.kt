@@ -245,6 +245,7 @@ private fun presentVoiceRecordingFailure(
     }
 }
 
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 @Composable
 private fun ConversationLoadErrorContent(
     error: ErrorPresentation,
