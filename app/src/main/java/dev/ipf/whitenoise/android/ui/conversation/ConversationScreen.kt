@@ -667,6 +667,7 @@ internal fun ConversationScreen(
     var lastFollowedLatestId by remember(controller) { mutableStateOf<String?>(null) }
     var initialTimelineLoadStarted by remember(controller) { mutableStateOf(false) }
     var highlightedMessageId by remember(controller) { mutableStateOf<String?>(null) }
+    var transientHighlightOwner by remember(controller) { mutableStateOf<Any?>(null) }
     var navigateReplyJob by remember(controller) { mutableStateOf<Job?>(null) }
     // UI-only row-height cache for exact centered scrolls. LazyColumn can only
     // measure a target after it has been composed; keeping the measured height
@@ -1450,7 +1451,7 @@ internal fun ConversationScreen(
         targetMessageId: String,
         fallbackTargetIndex: Int,
         reason: ConversationScrollReason,
-    ) {
+    ): Boolean {
         val completed =
             scrollCoordinator.programmaticJump(
                 targetMessageId = targetMessageId,
@@ -1462,7 +1463,9 @@ internal fun ConversationScreen(
                 if (viewportHeight <= 0) {
                     // Layout not measured yet (rare on a fresh open): fall back to the
                     // plain top-aligned jump rather than guessing an offset.
-                    animateScrollToItem(targetIndex)
+                    animateScrollToItem(targetIndex) {
+                        currentTimelineListIndex(targetMessageId) ?: targetIndex
+                    }
                     return@programmaticJump
                 }
                 val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
@@ -1485,7 +1488,9 @@ internal fun ConversationScreen(
                         visibleTimelineItemHeightsPx = visibleTimelineHeights,
                     )
                 val animatedOffset = ReplyNavigation.centeredScrollOffset(viewportHeight, itemHeight)
-                animateScrollToItem(targetIndex, animatedOffset)
+                animateScrollToItem(targetIndex, animatedOffset) {
+                    currentTimelineListIndex(targetMessageId) ?: targetIndex
+                }
 
                 // Keep the measured correction in the same coordinator command. A
                 // newer drag/jump cancels this whole block before it can snap back.
@@ -1505,6 +1510,21 @@ internal fun ConversationScreen(
                 }
             }
         if (completed) scrollCoordinator.settleReadingAt(currentScrollAnchor())
+        return completed
+    }
+
+    suspend fun showTransientMessageHighlight(messageId: String) {
+        val owner = Any()
+        transientHighlightOwner = owner
+        highlightedMessageId = messageId
+        try {
+            delay(1_500L)
+        } finally {
+            if (transientHighlightOwner === owner) {
+                transientHighlightOwner = null
+                highlightedMessageId = null
+            }
+        }
     }
 
     fun saveQuickReactionEmojis(choices: List<String>) {
@@ -1522,6 +1542,7 @@ internal fun ConversationScreen(
     }
 
     fun navigateToReplyTarget(item: TimelineMessage) {
+        highlightedMessageId = null
         navigateReplyJob?.cancel()
         navigateReplyJob =
             scope.launch {
@@ -1541,21 +1562,20 @@ internal fun ConversationScreen(
                     return@launch
                 }
                 val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-                centerTimelineItemAt(
-                    targetMessageId,
-                    1 + olderMessagesHeaderCount + timelineIndex,
-                    ConversationScrollReason.Reply,
-                )
-                highlightedMessageId = targetMessageId
-                delay(1_500L)
-                if (highlightedMessageId == targetMessageId) {
-                    highlightedMessageId = null
-                }
+                val centered =
+                    centerTimelineItemAt(
+                        targetMessageId,
+                        1 + olderMessagesHeaderCount + timelineIndex,
+                        ConversationScrollReason.Reply,
+                    )
+                if (!centered) return@launch
+                showTransientMessageHighlight(targetMessageId)
             }
     }
 
     fun jumpToNextUnreadMention() {
         val targetMessageId = unreadMentionMessageIds.firstOrNull() ?: return
+        highlightedMessageId = null
         navigateReplyJob?.cancel()
         navigateReplyJob =
             scope.launch {
@@ -1572,21 +1592,19 @@ internal fun ConversationScreen(
                     return@launch
                 }
                 val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-                centerTimelineItemAt(
-                    targetMessageId,
-                    1 + olderMessagesHeaderCount + timelineIndex,
-                    ConversationScrollReason.Mention,
-                )
-                highlightedMessageId = targetMessageId
+                val centered =
+                    centerTimelineItemAt(
+                        targetMessageId,
+                        1 + olderMessagesHeaderCount + timelineIndex,
+                        ConversationScrollReason.Mention,
+                    )
+                if (!centered) return@launch
                 // Mark read up to the visited mention so the count — and the
                 // chat-list @-badge — decrement in step; advance the local read
                 // anchor so the chip's derived count updates immediately.
                 readAnchorMessageId = targetMessageId
                 controller.markReadUpTo(targetMessageId)
-                delay(1_500L)
-                if (highlightedMessageId == targetMessageId) {
-                    highlightedMessageId = null
-                }
+                showTransientMessageHighlight(targetMessageId)
             }
     }
 
@@ -1715,16 +1733,14 @@ internal fun ConversationScreen(
                 .indexOfFirst { it.record.messageIdHex == messageIdHex }
         if (timelineIndex < 0) return
         val liveOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-        centerTimelineItemAt(
-            messageIdHex,
-            1 + liveOlderHeaderCount + timelineIndex,
-            ConversationScrollReason.Search,
-        )
-        highlightedMessageId = messageIdHex
-        delay(1_500L)
-        if (highlightedMessageId == messageIdHex) {
-            highlightedMessageId = null
-        }
+        val centered =
+            centerTimelineItemAt(
+                messageIdHex,
+                1 + liveOlderHeaderCount + timelineIndex,
+                ConversationScrollReason.Search,
+            )
+        if (!centered) return
+        showTransientMessageHighlight(messageIdHex)
     }
 
     fun scrollToSearchMatch(match: ConversationSearchMatch) {
@@ -2257,16 +2273,14 @@ internal fun ConversationScreen(
         }
         val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
         // Center the match so prior + subsequent context is visible (#595).
-        centerTimelineItemAt(
-            target,
-            1 + olderMessagesHeaderCount + timelineIndex,
-            ConversationScrollReason.FocusMessage,
-        )
-        highlightedMessageId = target
-        delay(1_500L)
-        if (highlightedMessageId == target) {
-            highlightedMessageId = null
-        }
+        val centered =
+            centerTimelineItemAt(
+                target,
+                1 + olderMessagesHeaderCount + timelineIndex,
+                ConversationScrollReason.FocusMessage,
+            )
+        if (!centered) return@LaunchedEffect
+        showTransientMessageHighlight(target)
     }
 
     // Scroll-driven read pointer advance. Watches the shared read anchor
