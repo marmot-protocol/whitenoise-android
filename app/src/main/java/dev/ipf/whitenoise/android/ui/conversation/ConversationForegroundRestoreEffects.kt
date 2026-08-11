@@ -6,12 +6,15 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -20,10 +23,65 @@ import androidx.lifecycle.LifecycleOwner
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
 import kotlinx.coroutines.channels.Channel
+import java.util.concurrent.atomic.AtomicBoolean
 
 // Liveness fallback only. Correctness waits for the IME target/inset settle signal,
 // never a guessed number of rendered frames.
 private const val FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS = 1_500L
+
+/**
+ * IME open/close re-anchoring, hoisted out of [ConversationScreen]'s body for
+ * the same bytecode-verifier reason as [ConversationForegroundRestoreEffects].
+ *
+ * Re-anchoring is authorized by the coordinator snapshot taken at the
+ * pre-inset focus edge, never by transient live list geometry — and never
+ * mid-gesture: the wait settles only when the live inset reaches the IME
+ * animation target, so a swipe-up drag that pauses cannot trigger the scroll
+ * write under the user's finger.
+ */
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ConversationImeReanchorEffect(
+    controller: ConversationController,
+    scrollCoordinator: ConversationScrollCoordinator,
+    imeIsOpen: Boolean,
+    initialTimelineAnchored: Boolean,
+    imeTransitionBookmark: MutableState<ConversationScrollBookmark?>,
+    suppressNextImeOpenReanchor: AtomicBoolean,
+    currentScrollAnchor: () -> ConversationScrollAnchor,
+    resolveScrollAnchorIndex: (ConversationScrollAnchor) -> Int?,
+    currentTailIndex: () -> Int,
+) {
+    val density = LocalDensity.current
+    val imeInsets = WindowInsets.ime
+    val imeAnimationTargetInsets = WindowInsets.imeAnimationTarget
+    LaunchedEffect(controller, imeIsOpen, initialTimelineAnchored) {
+        if (!imeIsOpen) {
+            imeTransitionBookmark.value = null
+            return@LaunchedEffect
+        }
+        if (scrollCoordinator.foregroundRestoreInProgress) return@LaunchedEffect
+        val suppressForCustomInputSwap = suppressNextImeOpenReanchor.getAndSet(false)
+        if (!initialTimelineAnchored || suppressForCustomInputSwap) return@LaunchedEffect
+        awaitImeInsetAtTarget(
+            readInset = { imeInsets.getBottom(density) },
+            readTargetInset = { imeAnimationTargetInsets.getBottom(density) },
+            awaitFrame = { withFrameNanos { } },
+        )
+        val snapshot = imeTransitionBookmark.value ?: scrollCoordinator.bookmark(currentScrollAnchor())
+        when (snapshot.settledMode) {
+            ConversationScrollMode.FollowingTail ->
+                scrollCoordinator.followTailIfAllowed(
+                    resolveTailIndex = { currentTailIndex() },
+                    reason = ConversationScrollReason.ImeTransition,
+                )
+            is ConversationScrollMode.ReadingHistory ->
+                scrollCoordinator.restoreBookmark(snapshot, resolveAnchorIndex = resolveScrollAnchorIndex)
+            else -> Unit
+        }
+    }
+}
 
 /**
  * App-switch pause/resume handling for the conversation viewport, hoisted out
