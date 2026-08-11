@@ -36,7 +36,7 @@ function declaresNoVisualChanges(body) {
   // first so hidden text cannot disable enforcement, and require the marker to
   // sit on one line.
   const visible = (body || '')
-    .replace(/```[\s\S]*?(?:```|$)/g, '')
+    .replace(/(```|~~~)[\s\S]*?(?:\1|$)/g, '')
     .replace(/<!--[\s\S]*?(?:-->|$)/g, '')
   return NO_VISUAL_CHANGES_MARKER.test(visible)
 }

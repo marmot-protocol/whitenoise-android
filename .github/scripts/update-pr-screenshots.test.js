@@ -112,6 +112,8 @@ test('recognizes the declared behavioral opt-out', () => {
   assert.equal(declaresNoVisualChanges(null), false)
   assert.equal(declaresNoVisualChanges('<!-- Visual changes: none -->'), false)
   assert.equal(declaresNoVisualChanges('```\nVisual changes: none\n```'), false)
+  assert.equal(declaresNoVisualChanges('~~~\nVisual changes: none\n~~~'), false)
+  assert.equal(declaresNoVisualChanges('~~~\nVisual changes: none'), false)
   assert.equal(declaresNoVisualChanges('Visual changes:\nnone'), false)
   assert.equal(declaresNoVisualChanges('<!-- hidden -->\nVisual changes: none'), true)
   assert.equal(declaresNoVisualChanges('```js\ncode\n```\n\nVisual changes: none (behavioral)'), true)
