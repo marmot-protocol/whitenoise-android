@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.NotificationUpdateFfi
 internal const val MAX_NOTIFICATION_MESSAGE_HISTORY = 25
 internal const val CARRIED_NOTIFICATION_MESSAGE_HISTORY_CAP = MAX_NOTIFICATION_MESSAGE_HISTORY - 1
 internal const val MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS = 1_000
+internal const val MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS = 160
 internal const val CONVERSATION_SHORTCUT_PREFIX = "conversation-"
 
 internal data class NotificationPostDecision(
@@ -76,6 +77,20 @@ internal fun boundedNotificationMessageText(text: CharSequence): String {
     if (value.codePointCount(0, value.length) <= MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS) return value
     val endIndex = value.offsetByCodePoints(0, MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS)
     return value.substring(0, endIndex)
+}
+
+internal fun shouldUseExpandedSingleMessageStyle(
+    body: CharSequence,
+    carriedMessageCount: Int,
+    redactContent: Boolean,
+): Boolean =
+    !redactContent &&
+        carriedMessageCount == 0 &&
+        body.codePointCount() >= MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS
+
+private fun CharSequence.codePointCount(): Int {
+    val value = toString()
+    return value.codePointCount(0, value.length)
 }
 
 internal fun conversationShortcutRemovalOrder(

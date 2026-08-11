@@ -588,6 +588,21 @@ internal suspend fun runNotificationReconnectOnNetworkRestore(
 }
 
 /**
+ * Starts the local runtime, confirms the passive no-replay notification
+ * receiver, and only then permits startup work that may trigger catch-up.
+ */
+internal suspend fun runNotificationStartupReceiverBoundary(
+    startRuntime: suspend () -> Unit,
+    awaitReceiverActive: suspend () -> Boolean,
+    continueStartup: suspend () -> Unit,
+): Boolean {
+    startRuntime()
+    if (!awaitReceiverActive()) return false
+    continueStartup()
+    return true
+}
+
+/**
  * Prefer the battery-efficient native-push wake path when this build/device
  * supports it. If enabling push fails, retain the persistent relay connection
  * so first-run setup never silently leaves the account without background
@@ -3137,15 +3152,27 @@ class WhiteNoiseAppState private constructor(
                     client ?: MarmotClient(appContext).also { client = it }
                 }
             appStateDebug { "bootstrap root=${opened.rootPath}" }
-            withContext(Dispatchers.IO) {
-                opened.marmot.configurePrivacyRuntime()
-                opened.marmot.start()
-            }
-            appStateDebug { "marmot started" }
+            // NotificationManager state must be ready before the passive MDK
+            // receiver can deliver its first event. Once start() returns, attach
+            // that receiver before any account/catch-up work can emit an update
+            // into the no-replay gap (#1982).
             localNotificationPresenter.ensureChannels()
             refreshLocalNotificationPermission()
-            startNotificationListener()
-            refreshSecurityPrivacySettings()
+            val receiverReady =
+                runNotificationStartupReceiverBoundary(
+                    startRuntime = {
+                        withContext(Dispatchers.IO) {
+                            opened.marmot.configurePrivacyRuntime()
+                            opened.marmot.start()
+                        }
+                    },
+                    awaitReceiverActive = ::ensureNotificationReceiverForStartup,
+                    continueStartup = ::refreshSecurityPrivacySettings,
+                )
+            if (!receiverReady) {
+                throw IllegalStateException("notification receiver unavailable during startup")
+            }
+            appStateDebug { "marmot started" }
             refreshAccountsForBootstrap()
             // Resolve interrupted editor commits against MDK before any draft
             // is reopened, and reclaim encrypted sources with no live session.
@@ -3238,6 +3265,21 @@ class WhiteNoiseAppState private constructor(
             !networkNotificationRecoverySuppressed &&
             notificationReceiverActive.value &&
             listenerJob?.isActive == true
+    }
+
+    private suspend fun ensureNotificationReceiverForStartup(): Boolean {
+        if (networkNotificationRecoverySuppressed) return false
+        val listenerJob = notificationJob.currentOrStart { launchNotificationListenerLoop() } ?: return false
+        if (!notificationReceiverActive.value) {
+            notificationReceiverRetryWake.update { it + 1L }
+        }
+        return withTimeoutOrNull(NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS) {
+            awaitActiveNotificationReceiver(
+                isReceiverActive = { notificationReceiverActive.value },
+                listenerJob = listenerJob,
+                awaitReceiverActive = { notificationReceiverActive.first { it } },
+            )
+        } == true
     }
 
     suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMs: Long = NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS): Boolean =
@@ -6865,9 +6907,29 @@ class WhiteNoiseAppState private constructor(
     suspend fun loadCreatedChatListItem(groupIdHex: String): ChatListItem {
         val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
         markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_START)
-        val details = marmotIo { groupDetails(account, groupIdHex) }
+        val item = loadAuthoritativeChatListItem(account, groupIdHex)
         markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_RETURN)
-        val activeAccountIdHex = accounts.firstOrNull { it.label == account }?.accountIdHex
+        return item
+    }
+
+    /**
+     * Targeted local read for a message-notification tap. This avoids waiting
+     * for the target account's broad chat-list projection to bind (#586).
+     */
+    suspend fun loadNotificationChatListItem(
+        accountRef: String,
+        groupIdHex: String,
+    ): ChatListItem {
+        check(activeAccountRef == accountRef) { "notification target account is not active" }
+        return loadAuthoritativeChatListItem(accountRef, groupIdHex)
+    }
+
+    private suspend fun loadAuthoritativeChatListItem(
+        accountRef: String,
+        groupIdHex: String,
+    ): ChatListItem {
+        val details = marmotIo { groupDetails(accountRef, groupIdHex) }
+        val activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
         return chatListItemFromAuthoritativeGroupDetails(details, activeAccountIdHex)
     }
 
@@ -7919,6 +7981,7 @@ class WhiteNoiseAppState private constructor(
         private const val MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES = 4096
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
         private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
+        private const val NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS = 5_000L
 
         private const val NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS = 10_000L
         private const val MAX_RETAINED_CONVERSATION_STATES = 32

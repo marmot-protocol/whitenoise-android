@@ -116,6 +116,16 @@ class LocalNotificationPresenterDecisionTest {
     }
 
     @Test
+    fun expandedSingleMessageStyleRequiresALongVisibleFirstMessage() {
+        val longBody = "a".repeat(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS)
+
+        assertTrue(shouldUseExpandedSingleMessageStyle(longBody, carriedMessageCount = 0, redactContent = false))
+        assertFalse(shouldUseExpandedSingleMessageStyle(longBody.dropLast(1), carriedMessageCount = 0, redactContent = false))
+        assertFalse(shouldUseExpandedSingleMessageStyle(longBody, carriedMessageCount = 1, redactContent = false))
+        assertFalse(shouldUseExpandedSingleMessageStyle(longBody, carriedMessageCount = 0, redactContent = true))
+    }
+
+    @Test
     fun conversationShortcutRemovalOrderRemovesLeastRecentlyUsedFirst() {
         val existing =
             setOf(

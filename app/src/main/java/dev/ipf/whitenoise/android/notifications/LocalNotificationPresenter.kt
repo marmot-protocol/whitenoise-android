@@ -45,6 +45,13 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
 
+private const val EXTRA_EXPANDED_SINGLE_MESSAGE_BODY =
+    "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_BODY"
+private const val EXTRA_EXPANDED_SINGLE_MESSAGE_TIMESTAMP =
+    "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_TIMESTAMP"
+private const val EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER =
+    "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_SENDER"
+
 @SuppressLint("MissingPermission")
 private fun postLocalNotification(
     manager: NotificationManagerCompat,
@@ -495,10 +502,10 @@ class LocalNotificationPresenter(
                                 if (redactContent) {
                                     null
                                 } else {
-                                    existingMessagingStyle(
+                                    existingConversationMessages(
                                         notificationContent.notificationTag,
                                         notificationContent.notificationId,
-                                    )?.messages
+                                    )
                                 }
                             ConversationCardPostSynchronizer.awaitTestBarrier(
                                 ConversationCardOp.SHOW_NOTIFY,
@@ -508,16 +515,36 @@ class LocalNotificationPresenter(
                             )
                             val presentationTimestampMs = nowMillis()
                             stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
-                            builder.setStyle(
-                                messagingStyle(
-                                    notificationContent,
-                                    messaging.conversationTitleOverride,
-                                    decision.historyCap,
-                                    carried,
-                                    messaging.sender,
-                                    presentationTimestampMs,
-                                ),
-                            )
+                            if (
+                                shouldUseExpandedSingleMessageStyle(
+                                    body = notificationContent.body,
+                                    carriedMessageCount = carried.orEmpty().size,
+                                    redactContent = redactContent,
+                                )
+                            ) {
+                                builder
+                                    .setContentTitle(notificationContent.title)
+                                    .setContentText(notificationContent.body)
+                                    .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
+                                    .addExtras(
+                                        Bundle().apply {
+                                            putCharSequence(EXTRA_EXPANDED_SINGLE_MESSAGE_BODY, notificationContent.body)
+                                            putLong(EXTRA_EXPANDED_SINGLE_MESSAGE_TIMESTAMP, presentationTimestampMs)
+                                            putBundle(EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER, messaging.sender.toBundle())
+                                        },
+                                    )
+                            } else {
+                                builder.setStyle(
+                                    messagingStyle(
+                                        notificationContent,
+                                        messaging.conversationTitleOverride,
+                                        decision.historyCap,
+                                        carried,
+                                        messaging.sender,
+                                        presentationTimestampMs,
+                                    ),
+                                )
+                            }
                             val notification = builder.build()
                             ConversationCardPostSynchronizer.awaitTestBarrier(
                                 ConversationCardOp.SHOW_NOTIFY,
@@ -906,13 +933,28 @@ class LocalNotificationPresenter(
                 ?.notification
         }.getOrNull()
 
-    private fun existingMessagingStyle(
+    private fun existingConversationMessages(
         tag: String,
         id: Int,
-    ): NotificationCompat.MessagingStyle? {
+    ): List<NotificationCompat.MessagingStyle.Message>? {
         val existing = activeConversationCard(tag, id) ?: return null
         if (existing.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) return null
-        return NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(existing)
+        NotificationCompat.MessagingStyle
+            .extractMessagingStyleFromNotification(existing)
+            ?.messages
+            ?.let { return it }
+        val extras = existing.extras ?: return null
+        val body = extras.getCharSequence(EXTRA_EXPANDED_SINGLE_MESSAGE_BODY) ?: return null
+        val senderBundle = extras.getBundle(EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER) ?: return null
+        val timestamp = extras.getLong(EXTRA_EXPANDED_SINGLE_MESSAGE_TIMESTAMP, Long.MIN_VALUE)
+        if (timestamp == Long.MIN_VALUE) return null
+        return listOf(
+            NotificationCompat.MessagingStyle.Message(
+                boundedNotificationMessageText(body),
+                timestamp,
+                Person.fromBundle(senderBundle),
+            ),
+        )
     }
 
     private fun publishConversationShortcut(
