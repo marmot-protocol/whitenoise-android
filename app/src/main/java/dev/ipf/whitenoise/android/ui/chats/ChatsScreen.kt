@@ -147,6 +147,11 @@ internal fun ChatsScreen(
     // Shell-owned so the filter survives conversation navigation (issue #1897).
     selectedFolderId: String? = null,
     onSelectFolder: (String?) -> Unit = {},
+    onGroupCreateSubmitted: () -> Long = { 0L },
+    onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ ->
+        onOpenGroup(item, null, false, null)
+    },
+    onGroupCreateFlowSuperseded: () -> Unit = {},
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
@@ -770,7 +775,15 @@ internal fun ChatsScreen(
                 showNewChatFlow = false
                 openGroupFromVisibleList(item, null, justCreated)
             },
-            onClose = { showNewChatFlow = false },
+            onClose = {
+                showNewChatFlow = false
+                onGroupCreateFlowSuperseded()
+            },
+            onGroupCreateSubmitted = onGroupCreateSubmitted,
+            onGroupCreateCompletedOpen = { item, requestToken ->
+                showNewChatFlow = false
+                onGroupCreateCompletedOpen(item, requestToken)
+            },
         )
         return
     }

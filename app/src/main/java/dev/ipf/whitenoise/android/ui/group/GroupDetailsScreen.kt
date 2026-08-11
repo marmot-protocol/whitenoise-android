@@ -256,6 +256,9 @@ internal fun GroupDetailsScreen(
     // Shared-group rows and a newly-created group replace the currently open
     // conversation in the shell without bouncing through the chat list.
     onOpenConversation: (ChatListItem, Boolean) -> Unit = { _, _ -> },
+    onGroupCreateSubmitted: () -> Long = { 0L },
+    onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ -> onOpenConversation(item, false) },
+    onGroupCreateFlowSuperseded: () -> Unit = {},
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var showEditGroup by remember { mutableStateOf(false) }
@@ -733,8 +736,13 @@ internal fun GroupDetailsScreen(
         NewGroupFlow(
             appState = appState,
             initialMembers = listOf(dmPeerCandidate),
-            onOpenConversation = onOpenConversation,
-            onClose = { showStartGroupWithContact = false },
+            onCreateCompletedOpen = onGroupCreateCompletedOpen,
+            onCreateSubmitted = onGroupCreateSubmitted,
+            onCreateFlowSuperseded = onGroupCreateFlowSuperseded,
+            onClose = {
+                showStartGroupWithContact = false
+                onGroupCreateFlowSuperseded()
+            },
         )
         return
     }

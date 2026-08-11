@@ -428,6 +428,9 @@ internal fun ConversationScreen(
     restoredScrollSnapshot: ConversationScrollSnapshot? = null,
     onSaveScrollSnapshot: (ConversationScrollSnapshot?) -> Unit = {},
     onOpenConversation: (ChatListItem, Boolean) -> Unit = { _, _ -> },
+    onGroupCreateSubmitted: () -> Long = { 0L },
+    onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ -> onOpenConversation(item, false) },
+    onGroupCreateFlowSuperseded: () -> Unit = {},
 ) {
     WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
     // Push the global snackbar host above the conversation composer so
@@ -2492,6 +2495,9 @@ internal fun ConversationScreen(
                 showDetails = false
                 onOpenConversation(item, created)
             },
+            onGroupCreateSubmitted = onGroupCreateSubmitted,
+            onGroupCreateCompletedOpen = onGroupCreateCompletedOpen,
+            onGroupCreateFlowSuperseded = onGroupCreateFlowSuperseded,
         )
         return
     }

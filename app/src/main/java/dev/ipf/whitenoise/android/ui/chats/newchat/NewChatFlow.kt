@@ -270,6 +270,9 @@ internal fun NewChatFlowHost(
     appState: WhiteNoiseAppState,
     onOpenConversation: (ChatListItem, Boolean) -> Unit,
     onClose: () -> Unit,
+    onGroupCreateSubmitted: () -> Long = { 0L },
+    onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ -> onOpenConversation(item, false) },
+    onGroupCreateFlowSuperseded: () -> Unit = {},
 ) {
     var stepName by rememberSaveable { mutableStateOf(NewChatStep.NewMessage.name) }
     val step = runCatching { NewChatStep.valueOf(stepName) }.getOrDefault(NewChatStep.NewMessage)
@@ -284,8 +287,13 @@ internal fun NewChatFlowHost(
         NewChatStep.NewGroup ->
             NewGroupFlow(
                 appState = appState,
-                onOpenConversation = onOpenConversation,
-                onClose = { stepName = NewChatStep.NewMessage.name },
+                onCreateCompletedOpen = onGroupCreateCompletedOpen,
+                onCreateSubmitted = onGroupCreateSubmitted,
+                onCreateFlowSuperseded = onGroupCreateFlowSuperseded,
+                onClose = {
+                    onGroupCreateFlowSuperseded()
+                    stepName = NewChatStep.NewMessage.name
+                },
             )
     }
 }
@@ -297,8 +305,10 @@ internal fun NewChatFlowHost(
 @Composable
 internal fun NewGroupFlow(
     appState: WhiteNoiseAppState,
-    onOpenConversation: (ChatListItem, Boolean) -> Unit,
+    onCreateCompletedOpen: (ChatListItem, Long) -> Unit,
     onClose: () -> Unit,
+    onCreateSubmitted: () -> Long = { 0L },
+    onCreateFlowSuperseded: () -> Unit = {},
     initialMembers: List<RecipientSearch.Candidate> = emptyList(),
 ) {
     val selected = remember { mutableStateListOf<RecipientSearch.Candidate>().apply { addAll(initialMembers) } }
@@ -307,8 +317,12 @@ internal fun NewGroupFlow(
         NewGroupSetupScreen(
             appState = appState,
             members = selected,
-            onBack = { setupOpen = false },
-            onOpenConversation = onOpenConversation,
+            onBack = {
+                setupOpen = false
+                onCreateFlowSuperseded()
+            },
+            onCreateCompletedOpen = onCreateCompletedOpen,
+            onCreateSubmitted = onCreateSubmitted,
         )
     } else {
         ContactPickerScreen(
