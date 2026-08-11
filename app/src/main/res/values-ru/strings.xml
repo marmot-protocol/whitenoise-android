@@ -1473,7 +1473,7 @@
     <string name="attachment_type_file">Файл</string>
 
     <string name="global_search_date_filter_title">Дата</string>
-    <string name="global_search_date_any_time">Любая дата</string>
+    <string name="global_search_date_any_time">В любое время</string>
     <string name="global_search_date_today">Сегодня</string>
     <string name="global_search_date_last_7_days">Последние 7 дней</string>
     <string name="global_search_date_last_30_days">Последние 30 дней</string>

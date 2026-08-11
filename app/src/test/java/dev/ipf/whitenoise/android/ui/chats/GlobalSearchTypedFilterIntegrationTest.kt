@@ -5,8 +5,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
@@ -117,12 +121,17 @@ class GlobalSearchTypedFilterIntegrationTest {
             )
         }
 
+        assertOnlyTypedFilterSectionHeaders()
+
+        composeRule
+            .onNodeWithTag(CHAT_LIST_SEARCH_FILTER_SHEET_TAG)
+            .performTouchInput { swipeUp() }
         composeRule
             .onNodeWithTag(GLOBAL_SEARCH_CONTENT_FILTER_TAG)
-            .performScrollTo()
             .assertIsDisplayed()
         composeRule
             .onNodeWithTag(globalSearchContentChipTag(GlobalSearchContentKind.VOICE_AUDIO))
+            .performScrollTo()
             .performClick()
         composeRule.runOnIdle {
             assertEquals(
@@ -224,6 +233,21 @@ class GlobalSearchTypedFilterIntegrationTest {
                 .single()
                 .chipId,
         )
+    }
+
+    private fun assertOnlyTypedFilterSectionHeaders() {
+        composeRule
+            .onNodeWithText(composeRule.activity.getString(R.string.chat_list_search_filter_chat))
+            .assertDoesNotExist()
+        composeRule
+            .onNodeWithText(composeRule.activity.getString(R.string.chat_list_search_filter_sender))
+            .assertDoesNotExist()
+        composeRule
+            .onNodeWithText(composeRule.activity.getString(R.string.chat_list_search_filter_date))
+            .assertExists()
+        composeRule
+            .onNodeWithText(composeRule.activity.getString(R.string.chat_list_search_filter_content))
+            .assertExists()
     }
 
     private companion object {

@@ -356,32 +356,31 @@ internal fun ChatsScreen(
     // by the query and stable group-id membership, not the live row list object:
     // unrelated chat-list republishes or row reordering must not restart a
     // full-corpus body search while the user is typing (#1201).
-    val normalizedSearchQuery = searchQuery.trim()
-    val searchProjection =
-        remember(
-            normalizedSearchQuery,
-            globalSearchState.dateFilterSelection,
-            globalSearchState.contentFilterSelection,
-        ) {
+    val trimmedQuery = searchQuery.trim()
+    val ciSearchNeedle = remember(trimmedQuery) { trimmedQuery.lowercase(Locale.ROOT) }
+    val bodySearchGroupIds = remember(sourceList) { sourceList.map { it.id }.sorted() }
+    LaunchedEffect(
+        trimmedQuery,
+        showArchived,
+        bodySearchGroupIds,
+        globalSearchState.dateFilterSelection,
+        globalSearchState.contentFilterSelection,
+    ) {
+        val searchProjection =
             globalSearchState.projectSearchRequest(
                 zoneId = ZoneId.systemDefault(),
                 nowMillis = System.currentTimeMillis(),
             )
-        }
-    val trimmedQuery = searchProjection.query
-    val ciSearchNeedle = remember(trimmedQuery) { trimmedQuery.lowercase(Locale.ROOT) }
-    val bodySearchGroupIds = remember(sourceList) { sourceList.map { it.id }.sorted() }
-    LaunchedEffect(trimmedQuery, showArchived, bodySearchGroupIds, searchProjection.requiresTypedMdkContract) {
         if (searchProjection.requiresTypedMdkContract) {
             bodyMatches = emptyMap()
             return@LaunchedEffect
         }
-        if (trimmedQuery.isEmpty()) {
+        if (searchProjection.query.isEmpty()) {
             bodyMatches = emptyMap()
             return@LaunchedEffect
         }
         delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
-        bodyMatches = controller.searchMessageBodies(sourceList, trimmedQuery)
+        bodyMatches = controller.searchMessageBodies(sourceList, searchProjection.query)
     }
     // Resolve a pasted Nostr identifier in the search field (#344). An npub is
     // validated (and normalized) via the FFI key parser — no network. A NIP-05

@@ -9,11 +9,21 @@ class ChatListBodySearchKeyTest {
     fun bodySearchEffectKeysOnStableGroupIdsNotLiveSourceListIdentity() {
         val source = chatsScreenSource().readText()
         val stableEffectKey =
-            "LaunchedEffect(trimmedQuery, showArchived, bodySearchGroupIds, " +
-                "searchProjection.requiresTypedMdkContract)"
+            listOf(
+                "LaunchedEffect(",
+                "        trimmedQuery,",
+                "        showArchived,",
+                "        bodySearchGroupIds,",
+                "        globalSearchState.dateFilterSelection,",
+                "        globalSearchState.contentFilterSelection,",
+                "    )",
+            ).joinToString("\n")
+        val bodySearchEffectIndex = source.indexOf(stableEffectKey)
+        val projectionIndex = source.indexOf("globalSearchState.projectSearchRequest(")
         val typedGuardIndex = source.indexOf("if (searchProjection.requiresTypedMdkContract)")
         val clearMatchesIndex = source.indexOf("bodyMatches = emptyMap()", startIndex = typedGuardIndex)
-        val legacySearchIndex = source.indexOf("controller.searchMessageBodies(sourceList, trimmedQuery)")
+        val legacySearchIndex =
+            source.indexOf("controller.searchMessageBodies(sourceList, searchProjection.query)")
 
         assertTrue(
             "body-search must derive a stable sorted id snapshot",
@@ -26,7 +36,13 @@ class ChatListBodySearchKeyTest {
         )
         assertTrue(
             "the expensive search still runs against the current source list snapshot",
-            "controller.searchMessageBodies(sourceList, trimmedQuery)" in source,
+            legacySearchIndex >= 0,
+        )
+        assertTrue(
+            "time-sensitive date bounds must be projected when the body-search request runs",
+            bodySearchEffectIndex >= 0 &&
+                projectionIndex > bodySearchEffectIndex &&
+                projectionIndex < legacySearchIndex,
         )
         assertTrue(
             "typed filters must clear matches before the legacy body-search call",
