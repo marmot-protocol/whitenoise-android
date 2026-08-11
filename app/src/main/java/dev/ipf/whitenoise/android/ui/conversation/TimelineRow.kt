@@ -169,8 +169,8 @@ internal fun TimelineRow(
                             appState = appState,
                             readOnly = controller.group.pendingConfirmation,
                         )
-                        return@Column
                     }
+                    return@Column
                 }
                 TimelineRowKind.DebugRow -> {
                     MessageDebugRow(
