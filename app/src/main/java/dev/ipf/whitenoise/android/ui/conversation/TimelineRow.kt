@@ -154,9 +154,10 @@ internal fun TimelineRow(
                         )
                     val invalidated = item.projected?.invalidationStatus != null
                     if (!projectedDeleted && !optimisticallyDeleted && !invalidated) {
-                        val fallbackText = androidx.compose.ui.res.stringResource(
-                            dev.ipf.whitenoise.android.R.string.notification_channel_agent_activity,
-                        )
+                        val fallbackText =
+                            androidx.compose.ui.res.stringResource(
+                                dev.ipf.whitenoise.android.R.string.notification_channel_agent_activity,
+                            )
                         val activity =
                             remember(item.record, fallbackText) {
                                 AgentActivityProjector.project(item.record, fallbackText)
