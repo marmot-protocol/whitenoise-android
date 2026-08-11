@@ -93,15 +93,18 @@ internal class WhiteNoiseJourneys {
 
     fun returnToChatList() {
         repeat(4) {
-            if (findTag(PerformanceTags.NEW_MESSAGE) != null) return
-            device.pressBack()
+            if (findTag(PerformanceTags.NEW_MESSAGE, NAVIGATION_SETTLE_TIMEOUT_MS) != null) return
+            check(device.pressBack()) { "Failed to navigate back toward the chat list." }
             device.waitForIdle()
         }
         waitForTag(PerformanceTags.NEW_MESSAGE)
     }
 
-    private fun findTag(tag: String): UiObject2? =
-        device.onElementOrNull(timeoutMs = 0) {
+    private fun findTag(
+        tag: String,
+        timeoutMs: Long = 0,
+    ): UiObject2? =
+        device.onElementOrNull(timeoutMs = timeoutMs) {
             matchesPerformanceTag(tag)
         }
 
@@ -220,6 +223,7 @@ internal class WhiteNoiseJourneys {
         const val DEFAULT_TIMEOUT_MS = 15_000L
         const val STARTUP_TIMEOUT_MS = 30_000L
         const val NETWORK_STATE_TIMEOUT_MS = 45_000L
+        const val NAVIGATION_SETTLE_TIMEOUT_MS = 2_000L
         const val INPUT_METHOD_POLL_INTERVAL_MS = 100L
     }
 }
