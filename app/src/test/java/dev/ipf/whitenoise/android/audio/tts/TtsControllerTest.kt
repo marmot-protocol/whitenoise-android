@@ -49,6 +49,43 @@ class TtsControllerTest {
     }
 
     @Test
+    fun projectedMappingsWithLeadingWhitespacePublishExactVisibleWord() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+        val entry =
+            TtsSpeakableEntry(
+                senderKey = "alice",
+                senderDisplayName = "Alice",
+                text = "  Hello world.  ",
+                messageIdHex = "m1",
+                spokenTextSpans =
+                    listOf(
+                        TtsSpokenTextSpan(
+                            TtsTextRange(2, 13),
+                            TtsVisibleTextSpan("b0/n0", 0, 11),
+                        ),
+                    ),
+                projectionId = "projection-m1",
+            )
+
+        assertTrue(controller.speak(listOf(entry), Locale.US))
+        assertEquals("Alice: Hello world.", engine.spoken.single().text)
+
+        engine.range(index = 0, start = 13, end = 18)
+
+        assertEquals(
+            TtsPassage(
+                messageIdHex = "m1",
+                sentenceIndex = 0,
+                projectionId = "projection-m1",
+                visibleWord = listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
+            ),
+            controller.state.value.passage,
+        )
+    }
+
+    @Test
     fun speakChunksTextAndAdvancesFromEngineCallbacks() {
         val engine = FakeTtsSpeechEngine()
         val focus = FakeTtsAudioFocus()
