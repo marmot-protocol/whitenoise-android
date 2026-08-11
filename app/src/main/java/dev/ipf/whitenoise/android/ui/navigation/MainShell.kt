@@ -12,6 +12,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -111,6 +112,7 @@ internal fun profileForegroundRoute(
 internal fun ProfileGroupForegroundCoordinator(
     appState: WhiteNoiseAppState,
     conversationController: ConversationController?,
+    profileGroupForegroundState: ProfileGroupForegroundState,
     secureWindowEnabled: Boolean?,
     profileSecurePolicy: SecureFlagPolicy,
     onOpenConversation: (ChatListItem, Boolean) -> Unit,
@@ -121,7 +123,7 @@ internal fun ProfileGroupForegroundCoordinator(
     onClosePicker: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    val foregroundState = remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
+    val foregroundState = profileGroupForegroundState
     val route =
         profileForegroundRoute(
             pendingProfileNpub = appState.pendingProfileNpub,
@@ -263,6 +265,10 @@ internal fun MainShell(
     // conversation. Explicit shell navigation advances [navigationGeneration]
     // and invalidates a captured pending generation (issue #1953).
     var shellNavState by remember { mutableStateOf(ShellNavigationState()) }
+    val profileGroupForegroundState =
+        remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
+    var armedNotificationRequestId by remember { mutableLongStateOf(0L) }
+    var previousPendingProfileNpub by remember { mutableStateOf<String?>(null) }
     val supersedePendingGroupCreateOpen: () -> Unit = {
         shellNavState =
             reduceShellNavigation(shellNavState, ShellNavigationEvent.CreateFlowSuperseded).state
@@ -394,6 +400,14 @@ internal fun MainShell(
     // list with a toast for a stale/removed target. Pure logic in
     // [resolveNotificationNav]; this effect just acts on each step and re-fires
     // as account/chat-list state changes.
+    LaunchedEffect(appState.pendingProfileNpub) {
+        val current = appState.pendingProfileNpub
+        if (current != null && current != previousPendingProfileNpub) {
+            shellNavState = armShellProfileForeground(shellNavState, profileGroupForegroundState)
+        }
+        previousPendingProfileNpub = current
+    }
+
     LaunchedEffect(
         inboundNotificationTarget,
         inboundNotificationRequestId,
@@ -419,6 +433,10 @@ internal fun MainShell(
                 routingNotification = false
                 return@LaunchedEffect
             }
+        if (routingRequestId != armedNotificationRequestId) {
+            armedNotificationRequestId = routingRequestId
+            shellNavState = armShellNotificationRequest(shellNavState, profileGroupForegroundState)
+        }
         if (appState.accounts.isEmpty()) {
             // Accounts are not loaded yet; release any routing overlay so we do
             // not stick on NotificationLoading. Do not touch chat-list await
@@ -876,6 +894,7 @@ internal fun MainShell(
     ProfileGroupForegroundCoordinator(
         appState = appState,
         conversationController = conversationController,
+        profileGroupForegroundState = profileGroupForegroundState,
         secureWindowEnabled =
             if (selectedChat != null || section == MainSection.Chats) {
                 !appState.allowChatScreenshotsInChats
@@ -991,6 +1010,9 @@ internal fun MainShell(
                             onPresentProfile = { npub, visibleHeadId ->
                                 chatListReturnHeadSnap =
                                     presentProfileFromChatList(chatListReturnHeadSnap, visibleHeadId)
+                                shellNavState =
+                                    armShellProfileForeground(shellNavState, profileGroupForegroundState)
+                                previousPendingProfileNpub = npub
                                 appState.presentProfile(npub)
                             },
                         )

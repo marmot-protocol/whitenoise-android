@@ -16,6 +16,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundCoordinator
+import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -79,6 +80,7 @@ class ProfileSheetEntryPointTest {
                 ProfileGroupForegroundCoordinator(
                     appState = appState,
                     conversationController = null,
+                    profileGroupForegroundState = ProfileGroupForegroundState(),
                     secureWindowEnabled = null,
                     profileSecurePolicy = SecureFlagPolicy.Inherit,
                     onOpenConversation = { _, _ -> },

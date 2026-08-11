@@ -59,13 +59,13 @@ class ShellNavigationTest {
         var selectedChat: String? = null
         val submitA = reduceShellNavigation(state, ShellNavigationEvent.CreateSubmitted)
         state = submitA.state
-        val (_, afterOpen) =
+        val (afterOpenState, afterOpen) =
             reduceAndApply(
                 state,
                 selectedChat,
                 ShellNavigationEvent.ExplicitConversationOpened(groupB),
             )
-        state = reduceShellNavigation(state, ShellNavigationEvent.ExplicitConversationOpened(groupB)).state
+        state = afterOpenState
         selectedChat = afterOpen
         val (_, _, completeA) =
             completeCreate(
@@ -130,9 +130,9 @@ class ShellNavigationTest {
         var selectedChat: String? = null
         val submit = reduceShellNavigation(state, ShellNavigationEvent.CreateSubmitted)
         state = submit.state
-        val (_, afterSwitch) =
+        val (afterSwitchState, afterSwitch) =
             reduceAndApply(state, selectedChat, ShellNavigationEvent.AccountSwitched)
-        state = reduceShellNavigation(state, ShellNavigationEvent.AccountSwitched).state
+        state = afterSwitchState
         selectedChat = afterSwitch
         val (_, afterComplete, complete) =
             completeCreate(
@@ -156,17 +156,17 @@ class ShellNavigationTest {
         var selectedChat: String? = null
         val submit = reduceShellNavigation(state, ShellNavigationEvent.CreateSubmitted)
         state = submit.state
-        val (_, afterOpen) =
+        val (afterOpenState, afterOpen) =
             reduceAndApply(
                 state,
                 selectedChat,
                 ShellNavigationEvent.ExplicitConversationOpened(groupB),
             )
-        state = reduceShellNavigation(state, ShellNavigationEvent.ExplicitConversationOpened(groupB)).state
+        state = afterOpenState
         selectedChat = afterOpen
-        val (_, afterBack) =
+        val (afterBackState, afterBack) =
             reduceAndApply(state, selectedChat, ShellNavigationEvent.ConversationBackedOut)
-        state = reduceShellNavigation(state, ShellNavigationEvent.ConversationBackedOut).state
+        state = afterBackState
         selectedChat = afterBack
         val (_, afterComplete, complete) =
             completeCreate(
@@ -191,21 +191,21 @@ class ShellNavigationTest {
         var selectedChat: String? = null
         val submit = reduceShellNavigation(state, ShellNavigationEvent.CreateSubmitted)
         state = submit.state
-        val (_, afterB) =
+        val (afterBState, afterB) =
             reduceAndApply(
                 state,
                 selectedChat,
                 ShellNavigationEvent.ExplicitConversationOpened(groupB),
             )
-        state = reduceShellNavigation(state, ShellNavigationEvent.ExplicitConversationOpened(groupB)).state
+        state = afterBState
         selectedChat = afterB
-        val (_, afterC) =
+        val (afterCState, afterC) =
             reduceAndApply(
                 state,
                 selectedChat,
                 ShellNavigationEvent.ExplicitConversationOpened(groupC),
             )
-        state = reduceShellNavigation(state, ShellNavigationEvent.ExplicitConversationOpened(groupC)).state
+        state = afterCState
         selectedChat = afterC
         val (_, afterComplete, complete) =
             completeCreate(
@@ -252,18 +252,18 @@ class ShellNavigationTest {
         var selectedChat: String? = null
         val submitA = reduceShellNavigation(state, ShellNavigationEvent.CreateSubmitted)
         state = submitA.state
-        val (_, afterOpen) =
+        val (afterOpenState, afterOpen) =
             reduceAndApply(
                 state,
                 selectedChat,
                 ShellNavigationEvent.ExplicitConversationOpened(groupB),
             )
-        state = reduceShellNavigation(state, ShellNavigationEvent.ExplicitConversationOpened(groupB)).state
+        state = afterOpenState
         selectedChat = afterOpen
         val submitC = reduceShellNavigation(state, ShellNavigationEvent.CreateSubmitted)
         state = submitC.state
 
-        val (_, afterStale, staleComplete) =
+        val (afterStaleState, afterStale, staleComplete) =
             completeCreate(
                 state,
                 selectedChat,
@@ -276,7 +276,7 @@ class ShellNavigationTest {
 
         val (_, afterCurrent, currentComplete) =
             completeCreate(
-                staleComplete.state,
+                afterStaleState,
                 afterStale,
                 groupC,
                 submitC.createRequestTokenMinted!!,
@@ -294,13 +294,13 @@ class ShellNavigationTest {
         var selectedChat: String? = null
         val submit = reduceShellNavigation(state, ShellNavigationEvent.CreateSubmitted)
         state = submit.state
-        val (_, afterOpen) =
+        val (afterOpenState, afterOpen) =
             reduceAndApply(
                 state,
                 selectedChat,
                 ShellNavigationEvent.ExplicitConversationOpened(groupA),
             )
-        state = reduceShellNavigation(state, ShellNavigationEvent.ExplicitConversationOpened(groupA)).state
+        state = afterOpenState
         selectedChat = afterOpen
         val (_, afterComplete, complete) =
             completeCreate(
@@ -339,13 +339,13 @@ class ShellNavigationTest {
         val submitAfterFail = reduceShellNavigation(state, ShellNavigationEvent.CreateSubmitted)
         state = submitAfterFail.state
         val retryToken = submitAfterFail.createRequestTokenMinted!!
-        val (_, afterOpen) =
+        val (afterOpenState, afterOpen) =
             reduceAndApply(
                 state,
                 selectedChat,
                 ShellNavigationEvent.ExplicitConversationOpened(groupB),
             )
-        state = reduceShellNavigation(state, ShellNavigationEvent.ExplicitConversationOpened(groupB)).state
+        state = afterOpenState
         selectedChat = afterOpen
         val (_, afterLateRetry, lateRetry) =
             completeCreate(state, selectedChat, groupA, retryToken)

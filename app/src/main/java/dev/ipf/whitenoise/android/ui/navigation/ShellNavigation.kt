@@ -34,6 +34,12 @@ internal sealed interface ShellNavigationEvent {
     /** Create flow was dismissed or superseded without opening the new group. */
     data object CreateFlowSuperseded : ShellNavigationEvent
 
+    /** A profile sheet or deep link became the foreground destination. */
+    data object ProfileForegroundOpened : ShellNavigationEvent
+
+    /** A notification tap was received and routing has begun. */
+    data object NotificationRequestReceived : ShellNavigationEvent
+
     /** User backed out of the open conversation to the chat list. */
     data object ConversationBackedOut : ShellNavigationEvent
 
@@ -47,11 +53,14 @@ internal fun reduceShellNavigation(
 ): ShellNavigationTransition =
     when (event) {
         ShellNavigationEvent.CreateSubmitted -> reduceCreateSubmitted(state)
-        is ShellNavigationEvent.ExplicitConversationOpened -> reduceExplicitConversationOpened(state, event)
+        is ShellNavigationEvent.ExplicitConversationOpened -> revokePendingCreate(state)
         is ShellNavigationEvent.CreateCompleted -> reduceCreateCompleted(state, event)
-        ShellNavigationEvent.CreateFlowSuperseded -> reduceCreateFlowSuperseded(state)
-        ShellNavigationEvent.ConversationBackedOut -> reduceConversationBackedOut(state)
-        ShellNavigationEvent.AccountSwitched -> reduceAccountSwitched(state)
+        ShellNavigationEvent.CreateFlowSuperseded,
+        ShellNavigationEvent.ProfileForegroundOpened,
+        ShellNavigationEvent.NotificationRequestReceived,
+        ShellNavigationEvent.ConversationBackedOut,
+        ShellNavigationEvent.AccountSwitched,
+        -> revokePendingCreate(state)
     }
 
 private fun reduceCreateSubmitted(state: ShellNavigationState): ShellNavigationTransition {
@@ -66,10 +75,7 @@ private fun reduceCreateSubmitted(state: ShellNavigationState): ShellNavigationT
     )
 }
 
-private fun reduceExplicitConversationOpened(
-    state: ShellNavigationState,
-    @Suppress("UnusedParameter") event: ShellNavigationEvent.ExplicitConversationOpened,
-): ShellNavigationTransition =
+private fun revokePendingCreate(state: ShellNavigationState): ShellNavigationTransition =
     ShellNavigationTransition(
         state =
             state.copy(
@@ -97,29 +103,20 @@ private fun reduceCreateCompleted(
     }
 }
 
-private fun reduceCreateFlowSuperseded(state: ShellNavigationState): ShellNavigationTransition =
-    ShellNavigationTransition(
-        state =
-            state.copy(
-                navigationGeneration = state.navigationGeneration + 1,
-                pendingCreateRequestToken = null,
-            ),
-    )
+/** Revoke create ownership when a notification request is first observed. */
+internal fun armShellNotificationRequest(
+    shellNavState: ShellNavigationState,
+    profileForeground: ProfileGroupForegroundState,
+): ShellNavigationState {
+    profileForeground.close()
+    return reduceShellNavigation(shellNavState, ShellNavigationEvent.NotificationRequestReceived).state
+}
 
-private fun reduceConversationBackedOut(state: ShellNavigationState): ShellNavigationTransition =
-    ShellNavigationTransition(
-        state =
-            state.copy(
-                navigationGeneration = state.navigationGeneration + 1,
-                pendingCreateRequestToken = null,
-            ),
-    )
-
-private fun reduceAccountSwitched(state: ShellNavigationState): ShellNavigationTransition =
-    ShellNavigationTransition(
-        state =
-            state.copy(
-                navigationGeneration = state.navigationGeneration + 1,
-                pendingCreateRequestToken = null,
-            ),
-    )
+/** Revoke create ownership when a profile becomes the foreground destination. */
+internal fun armShellProfileForeground(
+    shellNavState: ShellNavigationState,
+    profileForeground: ProfileGroupForegroundState,
+): ShellNavigationState {
+    profileForeground.close()
+    return reduceShellNavigation(shellNavState, ShellNavigationEvent.ProfileForegroundOpened).state
+}
