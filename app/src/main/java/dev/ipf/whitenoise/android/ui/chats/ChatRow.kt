@@ -232,8 +232,12 @@ internal fun ChatRow(
                                 .longPressOrVerticalDrag(
                                     onLongPressStart = {
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onLongClick()
                                     },
-                                    onLongPressRelease = { onLongClick() },
+                                    // The sheet is already visible at the platform
+                                    // long-press threshold. Keep owning the pointer
+                                    // through up, but never open it a second time.
+                                    onLongPressRelease = {},
                                     onDragStart = { position ->
                                         pointerWindowY(position)?.let { onDragSelectionStart?.invoke(it) }
                                     },
