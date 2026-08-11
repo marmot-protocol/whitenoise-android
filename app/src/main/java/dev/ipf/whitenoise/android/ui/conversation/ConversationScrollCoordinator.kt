@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.supervisorScope
 import java.util.concurrent.CancellationException
+import kotlin.math.abs
+
+private const val MAX_ANIMATED_SCROLL_ITEMS = 10
+private const val MAX_TARGET_REPOSITION_ATTEMPTS = 3
 
 /** The durable reading intent behind the conversation's transient list geometry. */
 internal sealed interface ConversationScrollMode {
@@ -358,12 +362,50 @@ internal class ConversationScrollCoordinator(
             writer.scrollToItem(index.coerceAtLeast(0), scrollOffset)
         }
 
+        /**
+         * Keeps distance-independent navigation responsive: snap near a far target, then animate only
+         * the final few rows. Message-backed callers can re-resolve after each snap because paging may
+         * insert or remove list headers while the command is suspended.
+         */
         suspend fun animateScrollToItem(
             index: Int,
             scrollOffset: Int = 0,
+            resolveIndex: () -> Int = { index },
         ) {
             ensureCurrent()
-            writer.animateScrollToItem(index.coerceAtLeast(0), scrollOffset)
+            var targetIndex = resolveIndex().coerceAtLeast(0)
+            var repositionAttempts = 0
+            while (
+                repositionAttempts < MAX_TARGET_REPOSITION_ATTEMPTS &&
+                prePositionIfFar(targetIndex)
+            ) {
+                repositionAttempts++
+                ensureCurrent()
+                targetIndex = resolveIndex().coerceAtLeast(0)
+            }
+            if (isFar(targetIndex)) {
+                writer.scrollToItem(targetIndex, scrollOffset)
+            } else {
+                writer.animateScrollToItem(targetIndex, scrollOffset)
+            }
+        }
+
+        private suspend fun prePositionIfFar(targetIndex: Int): Boolean {
+            val currentIndex = writer.firstVisibleItemIndex
+            if (!isFar(targetIndex)) return false
+            val approachIndex =
+                if (targetIndex > currentIndex) {
+                    targetIndex - MAX_ANIMATED_SCROLL_ITEMS
+                } else {
+                    targetIndex + MAX_ANIMATED_SCROLL_ITEMS
+                }
+            writer.scrollToItem(approachIndex, 0)
+            return true
+        }
+
+        private fun isFar(targetIndex: Int): Boolean {
+            val indexDistance = abs(targetIndex - writer.firstVisibleItemIndex)
+            return indexDistance > MAX_ANIMATED_SCROLL_ITEMS
         }
 
         private suspend fun ensureCurrent() {
@@ -488,6 +530,8 @@ internal suspend fun ConversationScrollCoordinator.restoreViewport(
     }
 
 internal interface ConversationScrollWriter {
+    val firstVisibleItemIndex: Int
+
     suspend fun scrollToItem(
         index: Int,
         scrollOffset: Int = 0,
@@ -503,6 +547,9 @@ internal interface ConversationScrollWriter {
 internal class LazyListConversationScrollWriter(
     private val listState: LazyListState,
 ) : ConversationScrollWriter {
+    override val firstVisibleItemIndex: Int
+        get() = listState.firstVisibleItemIndex
+
     override suspend fun scrollToItem(
         index: Int,
         scrollOffset: Int,
