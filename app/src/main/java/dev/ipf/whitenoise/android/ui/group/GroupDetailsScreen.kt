@@ -30,7 +30,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.automirrored.filled.WrapText
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Call
@@ -546,11 +545,21 @@ internal fun GroupDetailsScreen(
     val sharedMediaTiles = rememberSharedMediaTiles(controller, appState)
     var showMediaLibrary by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showBubbleColors by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    val autoReadKeys by appState.ttsAutoReadPreferences.enabledKeys.collectAsState()
-    val autoReadEnabled =
-        remember(autoReadKeys, appState.activeAccountRef, controller.group.groupIdHex) {
-            appState.isConversationAutoRead(controller.group.groupIdHex)
+    val ttsAutoReadPrefs by appState.ttsAutoReadPreferences.state.collectAsState()
+    val autoReadOverride =
+        remember(ttsAutoReadPrefs, appState.activeAccountRef, controller.group.groupIdHex) {
+            appState.activeAccountRef?.let { accountRef ->
+                appState.ttsAutoReadPreferences.overrideFor(accountRef, controller.group.groupIdHex)
+            }
         }
+    val autoReadSettingLabel =
+        stringResource(
+            ttsAutoReadSettingLabelRes(
+                override = autoReadOverride,
+                globalDefaultEnabled = ttsAutoReadPrefs.globalDefaultEnabled,
+            ),
+        )
+    var showAutoReadPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var pendingDisappearingSecs by remember(controller.group.groupIdHex) { mutableStateOf<Long?>(null) }
     var showFolderPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
@@ -1038,14 +1047,10 @@ internal fun GroupDetailsScreen(
                     },
                 )
                 if (appState.ttsHasUsableEngine) {
-                    GroupSwitchActionRow(
-                        icon = Icons.AutoMirrored.Filled.VolumeUp,
+                    TtsAutoReadGroupActionRow(
                         title = stringResource(R.string.tts_auto_read_title),
-                        subtitle = stringResource(R.string.tts_auto_read_subtitle),
-                        checked = autoReadEnabled,
-                        onCheckedChange = {
-                            appState.setConversationAutoRead(controller.group.groupIdHex, it)
-                        },
+                        provenanceLabel = autoReadSettingLabel,
+                        onClick = { showAutoReadPicker = true },
                     )
                 }
                 SettingsActionRow(
@@ -1053,6 +1058,17 @@ internal fun GroupDetailsScreen(
                     title = stringResource(R.string.sounds_and_notifications),
                     value = notificationModeLabel(conversationNotifyMode),
                     onClick = { showNotificationSettings = true },
+                )
+            }
+
+            if (showAutoReadPicker) {
+                TtsAutoReadPickerSheet(
+                    globalDefaultEnabled = ttsAutoReadPrefs.globalDefaultEnabled,
+                    selectedOverride = autoReadOverride,
+                    onDismiss = { showAutoReadPicker = false },
+                    onSelect = { override ->
+                        appState.setConversationAutoReadOverride(controller.group.groupIdHex, override)
+                    },
                 )
             }
 

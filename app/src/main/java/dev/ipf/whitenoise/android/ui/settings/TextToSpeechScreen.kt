@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.audio.tts.shouldReportNoTtsEngine
 import dev.ipf.whitenoise.android.state.TtsRatePreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SettingsGroup
+import dev.ipf.whitenoise.android.ui.group.TtsAutoReadGlobalDefaultRow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,6 +52,7 @@ internal fun TextToSpeechScreen(
 ) {
     val selectedOverride by appState.ttsEnginePreferences.selectedEnginePackage.collectAsState()
     val rateOverride by appState.ttsRatePreferences.rateOverride.collectAsState()
+    val ttsAutoReadPrefs by appState.ttsAutoReadPreferences.state.collectAsState()
     val engineChoice = appState.ttsEngineChoice()
     val ttsResolution = appState.ttsResolution
     val reportNoEngine = shouldReportNoTtsEngine(ttsResolution)
@@ -116,7 +118,7 @@ internal fun TextToSpeechScreen(
                 )
             }
             item {
-                // The whole page is one segmented list: two picker rows whose
+                // Keep all speech preferences in one segmented list. Picker
                 // options live in sheets, matching the Language pattern.
                 SettingsGroup {
                     item {
@@ -140,6 +142,12 @@ internal fun TextToSpeechScreen(
                                 onClick = { engineSheetOpen = true },
                             )
                         }
+                    }
+                    item {
+                        TtsAutoReadGlobalDefaultRow(
+                            checked = ttsAutoReadPrefs.globalDefaultEnabled,
+                            onCheckedChange = { appState.setTtsAutoReadGlobalDefault(it) },
+                        )
                     }
                 }
             }
