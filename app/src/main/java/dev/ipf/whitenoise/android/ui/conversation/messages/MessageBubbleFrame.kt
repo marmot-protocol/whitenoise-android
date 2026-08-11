@@ -41,11 +41,16 @@ internal fun MessageBubbleFrame(
     shape: Shape = RoundedCornerShape(18.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val highlightColor =
+        messageTargetHighlightColor(
+            customBorderArgb = presentation.borderOverrideArgb,
+            fallback = MaterialTheme.colorScheme.tertiary,
+        )
     val highlightModifier =
         messageTargetHighlightModifier(
             highlighted = highlighted,
             customBorderArgb = presentation.borderOverrideArgb,
-            color = MaterialTheme.colorScheme.tertiary,
+            color = highlightColor,
         )
     val mentionModifier =
         messageMentionRailModifier(
@@ -98,11 +103,16 @@ internal fun MediaCaptionFrame(
     media: @Composable ColumnScope.() -> Unit,
     caption: @Composable ColumnScope.() -> Unit,
 ) {
+    val highlightColor =
+        messageTargetHighlightColor(
+            customBorderArgb = presentation.borderOverrideArgb,
+            fallback = MaterialTheme.colorScheme.tertiary,
+        )
     val highlightModifier =
         messageTargetHighlightModifier(
             highlighted = highlighted,
             customBorderArgb = presentation.borderOverrideArgb,
-            color = MaterialTheme.colorScheme.tertiary,
+            color = highlightColor,
         )
     val mentionModifier =
         messageMentionRailModifier(
@@ -223,6 +233,11 @@ internal fun shouldFrameMessageBubbleSupplement(
     bodyText: String?,
     invalidationWarning: String?,
 ): Boolean = bodyText != null || invalidationWarning != null
+
+internal fun messageTargetHighlightColor(
+    customBorderArgb: Long?,
+    fallback: Color,
+): Color = customBorderArgb?.let(::colorFromArgb) ?: fallback
 
 private fun messageTargetHighlightModifier(
     highlighted: Boolean,
