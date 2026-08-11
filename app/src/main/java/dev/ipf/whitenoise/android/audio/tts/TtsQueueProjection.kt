@@ -3,8 +3,8 @@ package dev.ipf.whitenoise.android.audio.tts
 /** Immutable flattened queue indexes rebuilt whenever the message window changes. */
 internal data class TtsQueueProjection(
     val chunks: List<TtsChunk>,
-    val messageFirstChunkIndex: IntArray,
-    val messageSentenceCount: IntArray,
+    val messageFirstChunkIndex: List<Int>,
+    val messageSentenceCount: List<Int>,
 ) {
     fun messageIndexForChunk(chunkIndex: Int): Int {
         // Binary search over sorted first-chunk offsets avoids quadratic
@@ -46,7 +46,7 @@ internal data class TtsQueueProjection(
             chunks[first].sentenceIndex == chunks[second].sentenceIndex
 
     companion object {
-        val EMPTY = TtsQueueProjection(emptyList(), intArrayOf(), intArrayOf())
+        val EMPTY = TtsQueueProjection(emptyList(), emptyList(), emptyList())
 
         fun from(messages: List<TtsQueuedMessage>): TtsQueueProjection {
             val firstIndices = mutableListOf<Int>()
@@ -68,7 +68,7 @@ internal data class TtsQueueProjection(
                     nextIndex += 1
                 }
             }
-            return TtsQueueProjection(flat, firstIndices.toIntArray(), sentenceCounts.toIntArray())
+            return TtsQueueProjection(flat, firstIndices.toList(), sentenceCounts.toList())
         }
     }
 }

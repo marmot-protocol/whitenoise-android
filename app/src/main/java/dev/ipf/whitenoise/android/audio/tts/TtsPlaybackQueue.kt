@@ -132,7 +132,7 @@ internal class TtsPlaybackQueue(
     private var projection = TtsQueueProjection.EMPTY
     private val chunks: List<TtsChunk>
         get() = projection.chunks
-    private val messageSentenceCount: IntArray
+    private val messageSentenceCount: List<Int>
         get() = projection.messageSentenceCount
     private var currentIndex = 0
     private var generation = 0L

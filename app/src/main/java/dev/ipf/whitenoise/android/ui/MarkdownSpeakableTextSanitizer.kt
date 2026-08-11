@@ -18,32 +18,6 @@ internal data class SpeakableUrlOmission(
 /** URL-safe last-resort projection when legacy content has no usable Markdown AST. */
 internal fun legacyTextToSpeakableText(text: String): String = legacyTextToSpeakableProjection(text).text
 
-internal fun markdownSpeakableLeafText(
-    content: String,
-    maxChars: Int,
-): String {
-    if (maxChars <= 0) return ""
-    val visible = markdownSafeDisplayText(content, maxChars)
-    return visible.withoutSpeakableUrls().safeUtf16Prefix(maxChars)
-}
-
-private fun String.withoutSpeakableUrls(): String {
-    val omissions = speakableUrlOmissions(this)
-    if (omissions.isEmpty()) return this
-    val withoutUrls =
-        buildString {
-            var sourceStart = 0
-            omissions.forEach { omission ->
-                append(this@withoutSpeakableUrls, sourceStart, omission.start)
-                append(' ')
-                append(this@withoutSpeakableUrls, omission.preservedSuffixStart, omission.end)
-                sourceStart = omission.end
-            }
-            append(this@withoutSpeakableUrls, sourceStart, this@withoutSpeakableUrls.length)
-        }
-    return withoutUrls.trimEnd().trimEnd(':', ';', ',')
-}
-
 internal fun speakableUrlOmissions(text: String): List<SpeakableUrlOmission> =
     speakableUrl
         .findAll(text)

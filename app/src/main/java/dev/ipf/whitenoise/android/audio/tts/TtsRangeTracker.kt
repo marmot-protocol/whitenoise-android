@@ -147,20 +147,14 @@ private fun String.isCompleteWord(
     locale: Locale,
 ): Boolean {
     val iterator = BreakIterator.getWordInstance(locale).apply { setText(this@isCompleteWord) }
-    var boundaryStart = iterator.first()
-    var boundaryEnd = iterator.next()
+    if (!iterator.isBoundary(start) || iterator.following(start) != end) return false
+
+    var offset = start
     var completeWord = false
-    while (boundaryEnd != BreakIterator.DONE && !completeWord) {
-        if (boundaryStart == start && boundaryEnd == end) {
-            var offset = start
-            while (offset < end && !completeWord) {
-                val codePoint = codePointAt(offset)
-                completeWord = Character.isLetterOrDigit(codePoint)
-                offset += Character.charCount(codePoint)
-            }
-        }
-        boundaryStart = boundaryEnd
-        boundaryEnd = iterator.next()
+    while (offset < end && !completeWord) {
+        val codePoint = codePointAt(offset)
+        completeWord = Character.isLetterOrDigit(codePoint)
+        offset += Character.charCount(codePoint)
     }
     return completeWord
 }
