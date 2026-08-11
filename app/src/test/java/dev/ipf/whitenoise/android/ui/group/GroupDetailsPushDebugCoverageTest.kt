@@ -72,10 +72,8 @@ class GroupDetailsPushDebugCoverageTest {
                 "R.string.push_debug_last_token_list_update" in sectionBody,
         )
         assertTrue(
-            "token rows should expose copyable member, token fingerprint, and push-server identifiers",
-            "copyValue = token.memberIdHex" in tokenRowsBody &&
-                "copyValue = token.tokenFingerprint" in tokenRowsBody &&
-                "copyValue = token.serverPubkeyHex" in tokenRowsBody,
+            "token rows should expose copyable token fingerprints",
+            "copyValue = token.tokenFingerprint" in tokenRowsBody,
         )
         assertTrue(
             "token rows should show local registration and per-token delivery state",

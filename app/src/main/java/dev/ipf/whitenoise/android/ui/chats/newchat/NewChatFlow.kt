@@ -46,7 +46,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.AppText
@@ -510,7 +509,7 @@ private fun NewMessageScreen(
                     item {
                         ContactRow(
                             title = appState.displayName(resolvedHex),
-                            subtitle = IdentityFormatter.short(appState.npub(resolvedHex)),
+                            subtitle = appState.shortNpub(resolvedHex).takeIf { it.isNotBlank() },
                             avatarSeed = resolvedHex,
                             avatarUrl = appState.avatarUrl(resolvedHex),
                             enabled = creatingHex == null,
@@ -569,7 +568,7 @@ private fun NewMessageScreen(
                                 when {
                                     candidate.isFollowing -> stringResource(R.string.user_search_following)
                                     candidate.searchProfile != null -> stringResource(R.string.user_search_network)
-                                    else -> IdentityFormatter.short(candidate.npub)
+                                    else -> appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
                                 },
                             avatarSeed = candidate.accountIdHex,
                             avatarUrl =

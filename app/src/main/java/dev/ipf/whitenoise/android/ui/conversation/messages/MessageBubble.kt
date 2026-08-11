@@ -1599,7 +1599,7 @@ internal fun MessageBubble(
                         status = item.status,
                         mine = mine,
                         senderDisplayName = appState.displayName(record.sender),
-                        senderNpub = appState.npub(record.sender),
+                        senderNpub = appState.npubForDisplay(record.sender),
                         onDismissRequest = { infoSheetOpen = false },
                         onCopy = { value ->
                             clipboard.setText(AnnotatedString(value))

@@ -2,13 +2,35 @@ package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.MarmotEventFfi
 
+data class DiagnosticIdentityPresentation(
+    val accountLabel: (accountLabel: String, accountIdHex: String) -> String,
+    val publicIdentity: (pubkeyHex: String) -> String,
+) {
+    companion object {
+        fun accountLabel(
+            accountLabel: String,
+            accountIdHex: String,
+            presentPublicIdentity: (String) -> String,
+        ): String {
+            val label = accountLabel.takeIf { it.isNotBlank() }
+            if (label != null && !IdentityFormatter.isNostrIdentityFallback(label)) {
+                return label
+            }
+            return presentPublicIdentity(accountIdHex)
+        }
+    }
+}
+
 object DiagnosticFormatter {
-    fun describe(event: MarmotEventFfi): String =
+    fun describe(
+        event: MarmotEventFfi,
+        identity: DiagnosticIdentityPresentation,
+    ): String =
         when (event) {
             is MarmotEventFfi.GroupJoined ->
-                "[${event.accountLabel}] joined group ${IdentityFormatter.short(event.groupIdHex)}"
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] joined group ${IdentityFormatter.short(event.groupIdHex)}"
             is MarmotEventFfi.GroupStateUpdated ->
-                "[${event.accountLabel}] group state ${IdentityFormatter.short(event.groupIdHex)}"
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] group state ${IdentityFormatter.short(event.groupIdHex)}"
             is MarmotEventFfi.MessageReceived -> {
                 // Diagnostic entries render live on the Diagnostics screen and
                 // are captured by screen recorders, screenshots, and logcat.
@@ -16,32 +38,36 @@ object DiagnosticFormatter {
                 // is enough to debug delivery without breaking the e2e
                 // confidentiality contract.
                 val msg = event.received.message
-                "[${event.received.accountLabel}] msg from ${IdentityFormatter.short(msg.sender)} " +
+                val account =
+                    identity.accountLabel(
+                        event.received.accountLabel,
+                        event.received.accountIdHex,
+                    )
+                "[$account] msg from ${identity.publicIdentity(msg.sender)} " +
                     "kind=${msg.kind} len=${msg.plaintext.length}"
             }
             is MarmotEventFfi.ProjectionUpdated ->
-                "[${event.update.accountLabel}] projection ${IdentityFormatter.short(
+                "[${identity.accountLabel(event.update.accountLabel, event.update.accountIdHex)}] projection ${IdentityFormatter.short(
                     event.update.update.groupIdHex,
                 )} (${event.update.update.messages.size} messages)"
             is MarmotEventFfi.GroupEvent ->
-                "[${event.accountLabel}] group event"
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] group event"
             is MarmotEventFfi.AccountError ->
                 // The FFI error string is not guaranteed content-free; scrub
                 // common secret shapes before truncating so a path that ever
                 // interpolates a relay URL, token, key, or decrypted content
                 // can't leak it in full through this screen-capturable surface.
-                "[${event.accountLabel}] error: ${redactError(event.message)}"
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] error: ${redactError(event.message)}"
             is MarmotEventFfi.AgentStreamActivity ->
-                "[${event.accountLabel}] agent stream activity"
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] agent stream activity"
             is MarmotEventFfi.EpochStallEscalated ->
                 // hex group id only — epoch and arm count carry no content.
-                "[${event.accountLabel}] epoch stall escalated in ${IdentityFormatter.short(
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] epoch stall escalated in ${IdentityFormatter.short(
                     event.groupIdHex,
                 )} epoch=${event.stalledEpoch} arms=${event.arms}"
             is MarmotEventFfi.WelcomeDeliveryPending ->
-                // hex ids only (recipient pubkey + group id) — no secret content;
-                // shortened like the other arms so this stays capture-safe.
-                "[${event.accountLabel}] welcome pending for ${IdentityFormatter.short(
+                // Recipient is a public identity; group id stays shortened hex.
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] welcome pending for ${identity.publicIdentity(
                     event.recipientHex,
                 )} in group ${IdentityFormatter.short(event.groupIdHex)}"
         }

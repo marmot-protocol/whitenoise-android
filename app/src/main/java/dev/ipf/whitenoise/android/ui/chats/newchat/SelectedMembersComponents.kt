@@ -42,7 +42,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -220,7 +219,7 @@ internal fun SelectedMembersReviewScreen(
                 val memberName = selectedMemberDisplayName(member, appState)
                 ContactRow(
                     title = memberName,
-                    subtitle = IdentityFormatter.short(member.npub),
+                    subtitle = appState.shortNpub(member.accountIdHex).takeIf { it.isNotBlank() },
                     avatarSeed = member.accountIdHex,
                     avatarUrl = selectedMemberAvatarUrl(member, appState.avatarUrl(member.accountIdHex)),
                     trailing = {

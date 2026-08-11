@@ -61,7 +61,7 @@ internal fun ProfileQrSheet(
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    val npub = appState.npub(accountIdHex)
+    val npub = appState.npubForDisplay(accountIdHex)
     val link = remember(npub) { ProfileLink.parse(npub) }
     var copied by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
@@ -93,15 +93,17 @@ internal fun ProfileQrSheet(
                 pictureUrl = appState.avatarUrl(accountIdHex),
             )
             Text(appState.displayName(accountIdHex), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-            Button(
-                onClick = {
-                    clipboard.setText(AnnotatedString(npub))
-                    copied = true
-                },
-            ) {
-                Icon(Icons.Default.Check, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(if (copied) stringResource(R.string.copied) else IdentityFormatter.short(npub, prefix = 16, suffix = 14))
+            if (npub.isNotBlank()) {
+                Button(
+                    onClick = {
+                        clipboard.setText(AnnotatedString(npub))
+                        copied = true
+                    },
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (copied) stringResource(R.string.copied) else IdentityFormatter.short(npub, prefix = 16, suffix = 14))
+                }
             }
             link?.let { QrCodeImage(content = it.qrUri) }
             scanError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -114,6 +116,7 @@ internal fun ProfileQrSheet(
                                 .putExtra(Intent.EXTRA_TEXT, link?.uri ?: npub)
                         context.startActivity(Intent.createChooser(sendIntent, shareProfileTitle))
                     },
+                    enabled = npub.isNotBlank(),
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(Icons.Default.QrCode, contentDescription = null)
