@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -109,6 +110,7 @@ import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingState
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
+import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -218,6 +220,59 @@ private const val RESUME_IME_SETTLE_MAX_FRAMES = 24
 // background-arrival listener bounded so a later, genuinely foreground
 // message does not unexpectedly start an otherwise idle auto-reader.
 private const val TTS_AUTO_READ_RESUME_SYNC_TIMEOUT_MS = 10_000L
+
+private fun presentVoiceRecordingFailure(
+    appState: WhiteNoiseAppState,
+    throwable: Throwable,
+    voiceTooShortMessage: String,
+) {
+    when {
+        throwable is IllegalStateException && throwable.message == "voice recording too short" ->
+            appState.present(voiceTooShortMessage)
+        throwable.message?.contains("audio is in use", ignoreCase = true) == true ->
+            appState.presentFailure(
+                R.string.voice_message_recording_failed,
+                "VOICE_RECORDING_START",
+                throwable,
+                AppText.Resource(R.string.voice_message_microphone_busy),
+            )
+        else ->
+            appState.presentFailure(
+                R.string.voice_message_recording_failed,
+                "VOICE_RECORDING",
+                throwable,
+            )
+    }
+}
+
+@Composable
+private fun ConversationLoadErrorContent(
+    error: ErrorPresentation,
+    onRetry: () -> Unit,
+) {
+    ErrorContent(
+        title = stringResource(R.string.couldnt_load_conversation),
+        error = error,
+        onRetry = onRetry,
+    )
+}
+
+private fun LazyListScope.conversationLoadErrorItem(
+    key: String,
+    error: ErrorPresentation?,
+    placement: LoadFailurePlacement,
+    errorEdge: ConversationLoadFailureEdge,
+    targetEdge: ConversationLoadFailureEdge,
+    onRetry: () -> Unit,
+) {
+    if (error == null || placement != LoadFailurePlacement.Inline || errorEdge != targetEdge) return
+    item(key = key) {
+        InlineErrorBanner(
+            error = error,
+            onRetry = onRetry,
+        )
+    }
+}
 
 /** Whether adjacent timeline items participate in one visible message-bubble sender run. */
 internal fun conversationBubbleRowsShareSenderRun(
@@ -1340,23 +1395,7 @@ internal fun ConversationScreen(
                 },
                 onRecordingComplete = { file, durationMs -> mediaSender.sendVoiceAttachment(file, durationMs) },
                 onError = { throwable ->
-                    when {
-                        throwable is IllegalStateException && throwable.message == "voice recording too short" ->
-                            appState.present(voiceTooShortMsg)
-                        throwable.message?.contains("audio is in use", ignoreCase = true) == true ->
-                            appState.presentFailure(
-                                R.string.voice_message_recording_failed,
-                                "VOICE_RECORDING_START",
-                                throwable,
-                                AppText.Resource(R.string.voice_message_microphone_busy),
-                            )
-                        else ->
-                            appState.presentFailure(
-                                R.string.voice_message_recording_failed,
-                                "VOICE_RECORDING",
-                                throwable,
-                            )
-                    }
+                    presentVoiceRecordingFailure(appState, throwable, voiceTooShortMsg)
                 },
                 // Honor the user's media-quality ceiling for voice notes.
                 // Read at record-start (the controller is not re-keyed on the
@@ -2674,8 +2713,7 @@ internal fun ConversationScreen(
         ) {
             when {
                 loadFailurePlacement == LoadFailurePlacement.FullScreen ->
-                    ErrorContent(
-                        title = stringResource(R.string.couldnt_load_conversation),
+                    ConversationLoadErrorContent(
                         error = requireNotNull(controller.error),
                         onRetry = { scope.launch { controller.retryLoadFailure() } },
                     )
@@ -2729,18 +2767,14 @@ internal fun ConversationScreen(
                             contentPadding = PaddingValues(bottom = 8.dp + snackbarContentInset.value),
                         ) {
                             item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
-                            controller.error
-                                ?.takeIf {
-                                    loadFailurePlacement == LoadFailurePlacement.Inline &&
-                                        controller.errorEdge == ConversationLoadFailureEdge.TOP
-                                }?.let { failure ->
-                                    item(key = "conversation-load-error-top") {
-                                        InlineErrorBanner(
-                                            error = failure,
-                                            onRetry = { scope.launch { controller.retryLoadFailure() } },
-                                        )
-                                    }
-                                }
+                            conversationLoadErrorItem(
+                                key = "conversation-load-error-top",
+                                error = controller.error,
+                                placement = loadFailurePlacement,
+                                errorEdge = controller.errorEdge,
+                                targetEdge = ConversationLoadFailureEdge.TOP,
+                                onRetry = { scope.launch { controller.retryLoadFailure() } },
+                            )
                             if (controller.hasMoreBefore || controller.isLoadingOlder) {
                                 item(key = "older-messages-loading") {
                                     Box(
@@ -2846,18 +2880,14 @@ internal fun ConversationScreen(
                                     collapseLongMessages = collapseLongMessages,
                                 )
                             }
-                            controller.error
-                                ?.takeIf {
-                                    loadFailurePlacement == LoadFailurePlacement.Inline &&
-                                        controller.errorEdge == ConversationLoadFailureEdge.BOTTOM
-                                }?.let { failure ->
-                                    item(key = "conversation-load-error-bottom") {
-                                        InlineErrorBanner(
-                                            error = failure,
-                                            onRetry = { scope.launch { controller.retryLoadFailure() } },
-                                        )
-                                    }
-                                }
+                            conversationLoadErrorItem(
+                                key = "conversation-load-error-bottom",
+                                error = controller.error,
+                                placement = loadFailurePlacement,
+                                errorEdge = controller.errorEdge,
+                                targetEdge = ConversationLoadFailureEdge.BOTTOM,
+                                onRetry = { scope.launch { controller.retryLoadFailure() } },
+                            )
                             // Kept minimal (matches the top-spacer) so the last
                             // bubble sits a tight breathing-room above the
                             // composer rather than orphaned in mid-screen; the
