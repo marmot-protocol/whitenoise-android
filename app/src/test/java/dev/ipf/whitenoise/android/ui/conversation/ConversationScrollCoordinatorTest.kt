@@ -14,7 +14,385 @@ import org.junit.Test
 import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("LargeClass") // Scroll state-machine invariants share one command/writer harness.
 class ConversationScrollCoordinatorTest {
+    @Test
+    fun unchangedForegroundGeometryPerformsNoScrollWrite() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val anchor = anchor(messageId = "reader", listIndex = 18, pixelOffset = 72)
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 72),
+                )
+            val geometry =
+                ConversationForegroundGeometry(
+                    viewportHeightPx = 720,
+                    imeBottomPx = 0,
+                    bottomChromeHeightPx = 96,
+                )
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = coordinator.bookmark(anchor),
+                        geometry = geometry,
+                        timelineStructure = timelineStructure("reader"),
+                    ),
+                )
+
+            val restored =
+                coordinator.completeForegroundRestore(
+                    token = token,
+                    resumedGeometry = geometry,
+                    resumedTimelineStructure = timelineStructure("reader"),
+                    resolveAnchorIndex = { 31 },
+                    resolveTailIndex = { 99 },
+                )
+
+            assertTrue(restored)
+            assertTrue(writer.writes.isEmpty())
+            assertFalse(coordinator.foregroundRestoreInProgress)
+            assertEquals(ConversationScrollMode.ReadingHistory("reader", 72), coordinator.mode)
+        }
+
+    @Test
+    fun changedForegroundGeometryPerformsOneTailCorrection() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val pausedGeometry =
+                ConversationForegroundGeometry(
+                    viewportHeightPx = 420,
+                    imeBottomPx = 300,
+                    bottomChromeHeightPx = 396,
+                )
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = coordinator.bookmark(anchor(messageId = "last", listIndex = 40)),
+                        geometry = pausedGeometry,
+                        timelineStructure = timelineStructure("last"),
+                    ),
+                )
+
+            val restored =
+                coordinator.completeForegroundRestore(
+                    token = token,
+                    resumedGeometry = pausedGeometry.copy(viewportHeightPx = 720, imeBottomPx = 0),
+                    resumedTimelineStructure = timelineStructure("last"),
+                    resolveAnchorIndex = { 40 },
+                    resolveTailIndex = { 42 },
+                )
+
+            assertTrue(restored)
+            assertEquals(listOf(ScrollWrite.Snap(42, 0)), writer.writes)
+            assertTrue(coordinator.isFollowingTail)
+            assertFalse(coordinator.foregroundRestoreInProgress)
+        }
+
+    @Test
+    fun changedForegroundGeometryKeepsThePresentationBlockedUntilCorrectionCompletes() =
+        runTest {
+            val writer = BlockingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val pausedGeometry = ConversationForegroundGeometry(720, 0, 96)
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = coordinator.bookmark(anchor(messageId = "last", listIndex = 40)),
+                        geometry = pausedGeometry,
+                        timelineStructure = timelineStructure("last"),
+                    ),
+                )
+
+            val completion =
+                launch {
+                    coordinator.completeForegroundRestore(
+                        token = token,
+                        resumedGeometry = pausedGeometry.copy(imeBottomPx = 280),
+                        resumedTimelineStructure = timelineStructure("last"),
+                        resolveAnchorIndex = { 40 },
+                        resolveTailIndex = { 42 },
+                    )
+                }
+            writer.writeStarted.await()
+
+            assertTrue(
+                "the root draw gate must remain closed while the one correction is suspended",
+                coordinator.foregroundRestoreInProgress,
+            )
+
+            writer.releaseWrite.complete(Unit)
+            completion.join()
+            assertFalse(coordinator.foregroundRestoreInProgress)
+        }
+
+    @Test
+    fun releasedGateKeepsTheDeferredCorrectionArmed() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val pausedGeometry = ConversationForegroundGeometry(420, 300, 396)
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = coordinator.bookmark(anchor(messageId = "last", listIndex = 40)),
+                        geometry = pausedGeometry,
+                        timelineStructure = timelineStructure("last"),
+                    ),
+                )
+
+            coordinator.releaseForegroundRestoreGate(token)
+
+            assertFalse(coordinator.foregroundRestoreInProgress)
+            val restored =
+                coordinator.completeForegroundRestore(
+                    token = token,
+                    resumedGeometry = pausedGeometry.copy(viewportHeightPx = 720, imeBottomPx = 0),
+                    resumedTimelineStructure = timelineStructure("last"),
+                    resolveAnchorIndex = { 40 },
+                    resolveTailIndex = { 42 },
+                )
+
+            assertTrue(restored)
+            assertEquals(listOf(ScrollWrite.Snap(42, 0)), writer.writes)
+        }
+
+    @Test
+    fun userGestureDiscardsAReleasedDeferredCorrection() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val geometry = ConversationForegroundGeometry(720, 0, 96)
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = coordinator.bookmark(anchor(messageId = "paused", listIndex = 18)),
+                        geometry = geometry,
+                        timelineStructure = timelineStructure("paused"),
+                    ),
+                )
+
+            coordinator.releaseForegroundRestoreGate(token)
+            coordinator.onUserGestureStarted(anchor(messageId = "gesture", listIndex = 12, pixelOffset = 24))
+            val restored =
+                coordinator.completeForegroundRestore(
+                    token = token,
+                    resumedGeometry = geometry.copy(viewportHeightPx = 700),
+                    resumedTimelineStructure = timelineStructure("paused"),
+                    resolveAnchorIndex = { 18 },
+                    resolveTailIndex = { 99 },
+                )
+
+            assertFalse(restored)
+            assertTrue(writer.writes.isEmpty())
+        }
+
+    @Test
+    fun userGestureCancelsPendingForegroundRestore() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val geometry =
+                ConversationForegroundGeometry(
+                    viewportHeightPx = 720,
+                    imeBottomPx = 0,
+                    bottomChromeHeightPx = 96,
+                )
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = coordinator.bookmark(anchor(messageId = "paused", listIndex = 18)),
+                        geometry = geometry,
+                    ),
+                )
+
+            val gestureAnchor = anchor(messageId = "gesture", listIndex = 12, pixelOffset = 24)
+            coordinator.onUserGestureStarted(gestureAnchor)
+            val restored =
+                coordinator.completeForegroundRestore(
+                    token = token,
+                    resumedGeometry = geometry.copy(viewportHeightPx = 700),
+                    resolveAnchorIndex = { 31 },
+                    resolveTailIndex = { 99 },
+                )
+
+            assertFalse(restored)
+            assertTrue(writer.writes.isEmpty())
+            assertFalse(coordinator.foregroundRestoreInProgress)
+            assertEquals(ConversationScrollMode.ReadingHistory("gesture", 24), coordinator.mode)
+        }
+
+    @Test
+    fun newerProgrammaticNavigationCancelsPendingForegroundRestore() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val geometry =
+                ConversationForegroundGeometry(
+                    viewportHeightPx = 720,
+                    imeBottomPx = 0,
+                    bottomChromeHeightPx = 96,
+                )
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = coordinator.bookmark(anchor(messageId = "paused", listIndex = 18)),
+                        geometry = geometry,
+                    ),
+                )
+
+            coordinator.programmaticJump(
+                targetMessageId = "newer",
+                reason = ConversationScrollReason.Reply,
+                resultingMode = ConversationScrollMode.ReadingHistory("newer", 12),
+            ) {
+                scrollToItem(44, 12)
+            }
+            val restored =
+                coordinator.completeForegroundRestore(
+                    token = token,
+                    resumedGeometry = geometry.copy(viewportHeightPx = 700),
+                    resolveAnchorIndex = { 31 },
+                    resolveTailIndex = { 99 },
+                )
+
+            assertFalse(restored)
+            assertEquals(listOf(ScrollWrite.Snap(44, 12)), writer.writes)
+            assertFalse(coordinator.foregroundRestoreInProgress)
+            assertEquals(ConversationScrollMode.ReadingHistory("newer", 12), coordinator.mode)
+        }
+
+    @Test
+    fun backgroundAppendDefersPassiveTailWriteAndCommitsOnceOnResume() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val geometry =
+                ConversationForegroundGeometry(
+                    viewportHeightPx = 720,
+                    imeBottomPx = 0,
+                    bottomChromeHeightPx = 96,
+                )
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = coordinator.bookmark(anchor(messageId = "last", listIndex = 40)),
+                        geometry = geometry,
+                        timelineStructure = timelineStructure("last"),
+                    ),
+                )
+
+            val followedWhilePaused =
+                coordinator.followTailIfAllowed(
+                    resolveTailIndex = { 41 },
+                    reason = ConversationScrollReason.NewMessage,
+                    awaitFrame = {},
+                )
+
+            assertFalse(followedWhilePaused)
+            assertTrue(writer.writes.isEmpty())
+            assertTrue(coordinator.foregroundRestoreInProgress)
+
+            val restored =
+                coordinator.completeForegroundRestore(
+                    token = token,
+                    resumedGeometry = geometry,
+                    resumedTimelineStructure = timelineStructure("last", "new"),
+                    resolveAnchorIndex = { 40 },
+                    resolveTailIndex = { 41 },
+                )
+
+            assertTrue(restored)
+            assertEquals(listOf(ScrollWrite.Snap(41, 0)), writer.writes)
+            assertFalse(coordinator.foregroundRestoreInProgress)
+        }
+
+    @Test
+    fun backgroundStructureChangeDefersHistoryReanchorUntilForegroundCommit() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val anchor = anchor(messageId = "reader", listIndex = 18, pixelOffset = 72)
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 72),
+                )
+            coordinator.settleReadingAt(anchor)
+            val geometry =
+                ConversationForegroundGeometry(
+                    viewportHeightPx = 720,
+                    imeBottomPx = 0,
+                    bottomChromeHeightPx = 96,
+                )
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = coordinator.bookmark(anchor),
+                        geometry = geometry,
+                        timelineStructure = timelineStructure("reader"),
+                    ),
+                )
+
+            val reanchoredWhilePaused = coordinator.reanchorReadingHistory { 31 }
+
+            assertFalse(reanchoredWhilePaused)
+            assertTrue(writer.writes.isEmpty())
+            assertTrue(coordinator.foregroundRestoreInProgress)
+
+            val restored =
+                coordinator.completeForegroundRestore(
+                    token = token,
+                    resumedGeometry = geometry,
+                    resumedTimelineStructure = timelineStructure("older", "reader"),
+                    resolveAnchorIndex = { 31 },
+                    resolveTailIndex = { 99 },
+                )
+
+            assertTrue(restored)
+            assertEquals(listOf(ScrollWrite.Snap(31, 72)), writer.writes)
+            assertFalse(coordinator.foregroundRestoreInProgress)
+        }
+
+    @Test
+    fun pausingCancelsAnInFlightPassiveScrollBeforeItCanWrite() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val frameRequested = CompletableDeferred<Unit>()
+            val releaseFrame = CompletableDeferred<Unit>()
+            var passiveResult = true
+            val passiveScroll =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    passiveResult =
+                        coordinator.followTailIfAllowed(
+                            resolveTailIndex = { 41 },
+                            reason = ConversationScrollReason.NewMessage,
+                            awaitFrame = {
+                                frameRequested.complete(Unit)
+                                releaseFrame.await()
+                            },
+                        )
+                }
+            frameRequested.await()
+
+            coordinator.beginForegroundRestore(
+                ConversationForegroundSnapshot(
+                    scrollBookmark = coordinator.bookmark(anchor(messageId = "last", listIndex = 40)),
+                    geometry = ConversationForegroundGeometry(720, 0, 96),
+                    timelineStructure = timelineStructure("last"),
+                ),
+            )
+            releaseFrame.complete(Unit)
+            passiveScroll.join()
+
+            assertFalse(passiveResult)
+            assertTrue(writer.writes.isEmpty())
+            assertTrue(coordinator.foregroundRestoreInProgress)
+            assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+        }
+
     @Test
     fun readingHistoryResumeRestoresLogicalAnchorInsteadOfFollowingTransientBottomGeometry() =
         runTest {
@@ -25,14 +403,22 @@ class ConversationScrollCoordinatorTest {
                     writer = writer,
                     initialMode = ConversationScrollMode.ReadingHistory("reader", 72),
                 )
-            val paused = coordinator.bookmark(anchor)
+            val pausedGeometry = ConversationForegroundGeometry(720, 0, 96)
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = coordinator.bookmark(anchor),
+                        geometry = pausedGeometry,
+                        timelineStructure = timelineStructure("reader"),
+                    ),
+                )
 
-            coordinator.restoreViewport(
-                snapshot = paused,
+            coordinator.completeForegroundRestore(
+                token = token,
+                resumedGeometry = pausedGeometry.copy(viewportHeightPx = 540),
+                resumedTimelineStructure = timelineStructure("reader"),
                 resolveAnchorIndex = { 31 },
                 resolveTailIndex = { 99 },
-                frameCount = 1,
-                awaitFrame = {},
             )
 
             assertEquals(listOf(ScrollWrite.Snap(31, 72)), writer.writes)
@@ -61,28 +447,29 @@ class ConversationScrollCoordinatorTest {
     }
 
     @Test
-    fun followingTailResumeKeepsTailAnchoredAcrossViewportFrames() =
+    fun followingTailResumeAppliesOneCorrectionForChangedGeometry() =
         runTest {
             val writer = RecordingScrollWriter()
             val coordinator = ConversationScrollCoordinator(writer)
-            val paused = coordinator.bookmark(anchor(messageId = "last", listIndex = 40))
+            val pausedGeometry = ConversationForegroundGeometry(720, 0, 96)
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = coordinator.bookmark(anchor(messageId = "last", listIndex = 40)),
+                        geometry = pausedGeometry,
+                        timelineStructure = timelineStructure("last"),
+                    ),
+                )
 
-            coordinator.restoreViewport(
-                snapshot = paused,
+            coordinator.completeForegroundRestore(
+                token = token,
+                resumedGeometry = pausedGeometry.copy(imeBottomPx = 280),
+                resumedTimelineStructure = timelineStructure("last"),
                 resolveAnchorIndex = { 40 },
                 resolveTailIndex = { 42 },
-                frameCount = 3,
-                awaitFrame = {},
             )
 
-            assertEquals(
-                listOf(
-                    ScrollWrite.Snap(42, 0),
-                    ScrollWrite.Snap(42, 0),
-                    ScrollWrite.Snap(42, 0),
-                ),
-                writer.writes,
-            )
+            assertEquals(listOf(ScrollWrite.Snap(42, 0)), writer.writes)
             assertTrue(coordinator.isFollowingTail)
         }
 
@@ -526,6 +913,25 @@ class ConversationScrollCoordinatorTest {
     }
 
     @Test
+    fun conversationScreenUsesOneForegroundTransactionWithoutFrameDelayedRestore() {
+        val screen = sourceFile("ConversationScreen.kt").readText()
+        val presentation = sourceFile("ConversationForegroundPresentation.kt").readText()
+
+        assertTrue(screen.contains("scrollCoordinator.beginForegroundRestore("))
+        assertTrue(screen.contains("scrollCoordinator.completeForegroundRestore("))
+        assertTrue(screen.contains("scrollCoordinator.foregroundRestoreInProgress"))
+        assertTrue(screen.contains("ConversationForegroundDrawGateEffect"))
+        assertTrue(screen.contains("foregroundPreDrawSignals"))
+        assertTrue(screen.contains("awaitConversationForegroundPresentation("))
+        assertTrue(screen.contains("WindowInsets.imeAnimationTarget"))
+        assertTrue(screen.contains("expectedImeVisible = restoreToken.expectedImeVisible || restoreFocus"))
+        assertTrue(presentation.contains("it.isSettled(expectedImeVisible)"))
+        assertTrue(presentation.contains("it.isGeometrySettled()"))
+        assertFalse(screen.contains("RESUME_IME_SETTLE_MAX_FRAMES"))
+        assertFalse(screen.contains("scrollCoordinator.restoreViewport("))
+    }
+
+    @Test
     fun conversationScreenRoutesEveryLazyListWriteThroughTheCoordinator() {
         val screen = sourceFile("ConversationScreen.kt").readText()
         val coordinator = sourceFile("ConversationScrollCoordinator.kt").readText()
@@ -557,6 +963,12 @@ class ConversationScrollCoordinatorTest {
         messageId = messageId,
     )
 
+    private fun timelineStructure(vararg messageIds: String) =
+        ConversationTimelineStructure(
+            rowKeys = messageIds.map { messageId -> "msg:$messageId" to messageId },
+            olderHeaderCount = 0,
+        )
+
     private sealed interface ScrollWrite {
         data class Snap(
             val index: Int,
@@ -587,6 +999,28 @@ class ConversationScrollCoordinatorTest {
         ) {
             writes += ScrollWrite.Animate(index, scrollOffset)
             firstVisibleItemIndex = index
+        }
+    }
+
+    private class BlockingScrollWriter : ConversationScrollWriter {
+        val writeStarted = CompletableDeferred<Unit>()
+        val releaseWrite = CompletableDeferred<Unit>()
+        override var firstVisibleItemIndex = 0
+
+        override suspend fun scrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) {
+            writeStarted.complete(Unit)
+            releaseWrite.await()
+        }
+
+        override suspend fun animateScrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) {
+            writeStarted.complete(Unit)
+            releaseWrite.await()
         }
     }
 }
