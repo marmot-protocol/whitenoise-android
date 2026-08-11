@@ -64,6 +64,7 @@ internal data class TtsQueueProjection(
                             index = nextIndex,
                             messageIdHex = message.messageIdHex,
                             projectionId = message.projectionId,
+                            timelineAt = message.timelineAt,
                         )
                     nextIndex += 1
                 }

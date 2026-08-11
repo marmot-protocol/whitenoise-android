@@ -24,6 +24,7 @@ data class TtsChunk(
     val sourceText: String = text,
     val messageIdHex: String = "",
     val projectionId: String = "",
+    val timelineAt: ULong = 0uL,
     // Offsets are relative to the exact [text] submitted to the engine.
     val visibleSpans: List<TtsSpokenTextSpan> = emptyList(),
     val senderPrefix: TtsTextRange? = null,

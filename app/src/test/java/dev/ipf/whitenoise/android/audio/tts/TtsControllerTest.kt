@@ -398,7 +398,7 @@ class TtsControllerTest {
                 sentenceIndex = 0,
                 sentenceCount = 2,
                 messageProgressGeneration = 2L,
-            ),
+            ).copy(sessionId = 1L),
             controller.state.value,
         )
         assertEquals(listOf("New one.", "New two."), secondEngine.spoken.map { it.text })

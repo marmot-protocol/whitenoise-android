@@ -55,6 +55,7 @@ internal enum class ConversationScrollReason {
     Mention,
     Search,
     FocusMessage,
+    ReadAloudFollow,
     JumpToNewest,
     Send,
 }

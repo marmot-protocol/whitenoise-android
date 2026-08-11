@@ -2,11 +2,26 @@ package dev.ipf.whitenoise.android.audio.tts
 
 import android.speech.tts.TextToSpeech
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TtsPlaybackQueueTest {
+    @Test
+    fun restartingTheSamePassagePublishesANewSessionAndRetainsItsTimelinePosition() {
+        val harness = TtsQueueHarness()
+        val message = mappedMessage("m1", "Alice", "Hello.", timelineAt = 42uL)
+
+        harness.queue.start(listOf(message))
+        val first = harness.queue.state.value
+        harness.queue.start(listOf(message))
+        val restarted = harness.queue.state.value
+
+        assertNotEquals(first.sessionId, restarted.sessionId)
+        assertEquals(42uL, restarted.passage?.timelineAt)
+    }
+
     @Test
     fun activeRangePublishesAStableVisibleWordAfterSenderPrefixNormalization() {
         val harness = TtsQueueHarness()
@@ -464,6 +479,7 @@ class TtsPlaybackQueueTest {
         text: String,
         maxChunkLength: Int = 4_000,
         projectionId: String = "",
+        timelineAt: ULong = 0uL,
     ): TtsQueuedMessage {
         val chunks = TtsChunker.chunk(text, java.util.Locale.US, maxChunkLength = maxChunkLength)
         return TtsQueuedMessage(
@@ -472,11 +488,13 @@ class TtsPlaybackQueueTest {
             preview = text,
             messageIdHex = id,
             projectionId = projectionId,
+            timelineAt = timelineAt,
             chunks =
                 chunks.map { chunk ->
                     chunk.copy(
                         messageIdHex = id,
                         projectionId = projectionId,
+                        timelineAt = timelineAt,
                         visibleSpans =
                             listOf(
                                 TtsSpokenTextSpan(
