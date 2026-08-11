@@ -943,6 +943,7 @@ internal fun GroupDetailsScreen(
 
             Column {
                 AppDivider()
+                Spacer(Modifier.height(Dimens.spaceMd))
                 SettingsActionRow(
                     icon = Icons.Default.Schedule,
                     title = stringResource(R.string.disappearing_messages),
@@ -1055,6 +1056,18 @@ internal fun GroupDetailsScreen(
                     value = notificationModeLabel(conversationNotifyMode),
                     onClick = { showNotificationSettings = true },
                 )
+                if (isDm && dmPeerCandidate != null) {
+                    DirectDetailsContactEditorRow(
+                        appState = appState,
+                        groupIdHex = controller.group.groupIdHex,
+                        peerAccountIdHex = dmPeerAccountIdHex,
+                        isDm = isDm,
+                        readOnlyInvite = readOnlyInvite,
+                        dmPeerNpub = dmPeerNpub,
+                        activeAccountRef = appState.activeAccountRef,
+                        accounts = appState.accounts,
+                    )
+                }
             }
 
             if (showDisappearingPicker) {
@@ -1107,16 +1120,6 @@ internal fun GroupDetailsScreen(
                 Column {
                     AppDivider()
                     Spacer(Modifier.height(Dimens.spaceSm))
-                    DirectDetailsContactEditorRow(
-                        appState = appState,
-                        groupIdHex = controller.group.groupIdHex,
-                        peerAccountIdHex = dmPeerAccountIdHex,
-                        isDm = isDm,
-                        readOnlyInvite = readOnlyInvite,
-                        dmPeerNpub = dmPeerNpub,
-                        activeAccountRef = appState.activeAccountRef,
-                        accounts = appState.accounts,
-                    )
                     FlowQuickActionRow(
                         icon = Icons.Default.Group,
                         title = stringResource(R.string.contact_create_group_with, conversationTitle),
