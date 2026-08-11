@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.MarmotEventFfi
+import dev.ipf.marmotkit.MarmotKitException
+import java.util.Locale
 
 data class DiagnosticIdentityPresentation(
     val accountLabel: (accountLabel: String, accountIdHex: String) -> String,
@@ -22,6 +24,12 @@ data class DiagnosticIdentityPresentation(
 }
 
 object DiagnosticFormatter {
+    data class ErrorReportContext(
+        val appVersion: String,
+        val androidVersion: String,
+        val occurredAtUtc: String,
+    )
+
     fun describe(
         event: MarmotEventFfi,
         identity: DiagnosticIdentityPresentation,
@@ -77,6 +85,7 @@ object DiagnosticFormatter {
     private val NSEC_SECRET = Regex("(?i)nsec1[0-9a-z]+\\b")
     private val HEX_SECRET = Regex("\\b[0-9a-fA-F]{64,}\\b")
     private val SEPARATED_HEX_SECRET = Regex("(?i)\\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){15,}\\b")
+    private val UUID_IDENTIFIER = Regex("(?i)\\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b")
 
     // No trailing \b after the padding: `=` is a non-word char, so a \b there
     // only matched when another word char followed, letting the engine backtrack
@@ -101,6 +110,7 @@ object DiagnosticFormatter {
                 .replace(NSEC_SECRET, REDACTED)
                 .replace(HEX_SECRET, REDACTED)
                 .replace(SEPARATED_HEX_SECRET, REDACTED)
+                .replace(UUID_IDENTIFIER, REDACTED)
                 .replace(BASE64_SECRET, REDACTED)
                 .replace(TOKEN_ASSIGNMENT) { "${it.groupValues[1]}=$REDACTED" }
                 .replace(BEARER_HEADER, "Authorization: Bearer $REDACTED")
@@ -109,4 +119,92 @@ object DiagnosticFormatter {
         val end = if (Character.isHighSurrogate(scrubbed[MAX_ERROR_LEN - 1])) MAX_ERROR_LEN - 1 else MAX_ERROR_LEN
         return scrubbed.take(end) + "…"
     }
+
+    /**
+     * A bounded, privacy-safe support payload kept separate from user-facing
+     * copy. Operation and category are stable identifiers; exception messages
+     * and class names never become UI text or support payloads. Callers may add
+     * an explicitly selected, non-user-authored [technicalDetail], which is
+     * still scrubbed and bounded before it is included.
+     */
+    fun errorReport(
+        operationCode: String,
+        throwable: Throwable,
+        context: ErrorReportContext,
+        technicalDetail: String? = null,
+    ): String =
+        buildString {
+            appendLine("White Noise error report")
+            appendLine("operation=${stableCode(operationCode)}")
+            appendLine("error=${errorCode(throwable)}")
+            technicalDetail
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+                ?.let { appendLine("detail=${redactError(it)}") }
+            appendLine("app=${redactError(context.appVersion)}")
+            appendLine("android=${redactError(context.androidVersion)}")
+            append("utc=${redactError(context.occurredAtUtc)}")
+        }.take(MAX_REPORT_LEN)
+
+    internal fun errorCode(throwable: Throwable): String {
+        val chain = causeChain(throwable)
+        val names = chain.map { it.javaClass.simpleName.lowercase(Locale.ROOT) }
+        val marmotError = chain.filterIsInstance<MarmotKitException>().firstOrNull()
+        return when {
+            chain.any { it is java.util.concurrent.CancellationException } -> "CANCELLED"
+            marmotError is MarmotKitException.ExternalSignerRejected -> "CANCELLED"
+            marmotError is MarmotKitException.InvalidChatPin ||
+                marmotError is MarmotKitException.InvalidMessageDraft ||
+                marmotError is MarmotKitException.InvalidMediaReference ||
+                marmotError is MarmotKitException.InvalidHex ||
+                marmotError is MarmotKitException.InvalidIdentity ||
+                marmotError is MarmotKitException.InvalidKeyPackageEvent ||
+                marmotError is MarmotKitException.EmptyPassphrase -> "INVALID_INPUT"
+            marmotError is MarmotKitException.UnknownAccount ||
+                marmotError is MarmotKitException.UnknownGroup ||
+                marmotError is MarmotKitException.MissingKeyPackage ||
+                marmotError is MarmotKitException.MemberNotInGroup ||
+                marmotError is MarmotKitException.SecretNotFound -> "NOT_FOUND"
+            marmotError is MarmotKitException.RuntimeBusy ||
+                marmotError is MarmotKitException.AccountSessionBusy ||
+                marmotError is MarmotKitException.StorageBusy ||
+                marmotError is MarmotKitException.GroupSendQueueFull -> "RESOURCE_BUSY"
+            marmotError is MarmotKitException.NotGroupAdmin ||
+                marmotError is MarmotKitException.AdminCannotSelfRemove ||
+                marmotError is MarmotKitException.WouldRemoveLastAdmin -> "PERMISSION_DENIED"
+            marmotError is MarmotKitException.Publish ||
+                marmotError is MarmotKitException.TransportClosed ||
+                marmotError is MarmotKitException.AccountCatchUp ||
+                marmotError is MarmotKitException.FollowListUnavailable -> "CONNECTIVITY"
+            marmotError is MarmotKitException.KeystoreUnavailable ||
+                marmotError is MarmotKitException.ExternalSignerUnavailable -> "PLATFORM_UNAVAILABLE"
+            marmotError is MarmotKitException.EncryptionFailed ||
+                marmotError is MarmotKitException.ExternalSignerMismatch -> "CRYPTO_FAILURE"
+            marmotError is MarmotKitException.Io -> "IO"
+            chain.any { it is SecurityException } || names.any { "permission" in it || "security" in it } -> "PERMISSION_DENIED"
+            names.any { "timeout" in it } -> "TIMEOUT"
+            chain.any { it is java.io.IOException } || names.any { "network" in it || "connect" in it || "relay" in it } -> "CONNECTIVITY"
+            chain.any { it is IllegalArgumentException } || names.any { "invalid" in it || "parse" in it } -> "INVALID_INPUT"
+            names.any { "notfound" in it || "missing" in it } -> "NOT_FOUND"
+            names.any { "busy" in it || "conflict" in it || "locked" in it } -> "RESOURCE_BUSY"
+            else -> "UNEXPECTED"
+        }
+    }
+
+    private fun causeChain(throwable: Throwable): List<Throwable> =
+        generateSequence(throwable) { current -> current.cause?.takeUnless { it === current } }
+            .take(MAX_CAUSE_DEPTH)
+            .toList()
+
+    private fun stableCode(value: String): String =
+        value
+            .uppercase(Locale.ROOT)
+            .replace(Regex("[^A-Z0-9_]+"), "_")
+            .trim('_')
+            .take(MAX_CODE_LEN)
+            .ifBlank { "UNKNOWN_OPERATION" }
+
+    private const val MAX_REPORT_LEN = 600
+    private const val MAX_CODE_LEN = 64
+    private const val MAX_CAUSE_DEPTH = 8
 }

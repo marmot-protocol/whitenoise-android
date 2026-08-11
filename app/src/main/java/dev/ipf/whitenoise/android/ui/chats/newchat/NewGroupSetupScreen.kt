@@ -171,7 +171,7 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
     onRetryGroupIdCleared: () -> Unit,
     onAuthoritativeReadFailed: (Throwable) -> Unit,
 ) {
-    groupCreateSuccessToastResId(showCreatedToast, retentionOutcome)?.let { appState.present(it) }
+    groupCreateSuccessToastResId(showCreatedToast, retentionOutcome)?.let { appState.presentTransient(it) }
     runCatchingCancellable {
         val item = appState.loadCreatedChatListItem(groupIdHex)
         onRetryGroupIdCleared()

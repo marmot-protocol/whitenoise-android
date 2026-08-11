@@ -9,6 +9,9 @@
     <string name="white_noise_couldnt_start">White Noise couldn\'t start</string>
     <string name="refresh">Refresh</string>
     <string name="retry">Retry</string>
+    <string name="error_try_again">Something went wrong. Try again; if it keeps happening, copy the error report.</string>
+    <string name="error_loaded_content_may_be_out_of_date">Your loaded content is still available, but it may be out of date. Retrying…</string>
+    <string name="error_loaded_content_kept">Couldn\'t load more. Your messages are still available; retry when you\'re ready.</string>
     <string name="creating_identity">Creating identity</string>
     <string name="creating_identity_title">Creating Identity</string>
     <string name="create_new_identity">Create New Identity</string>
@@ -480,6 +483,9 @@
     <string name="app_lock_retry">Retry unlock</string>
     <string name="app_lock_auth_failed">That did not match. Try again.</string>
     <string name="app_lock_auth_cancelled">Unlock was cancelled. Your chats are still hidden.</string>
+    <string name="app_lock_auth_locked">Too many attempts. Unlock your device, then try again.</string>
+    <string name="app_lock_auth_timed_out">Unlock timed out. Try again.</string>
+    <string name="app_lock_auth_unavailable">Device unlock is unavailable right now. Try again after unlocking your device.</string>
     <string name="toast_app_lock_screen_lock_required">Set a screen lock in Android Settings first.</string>
     <string name="force_incognito_keyboard">Incognito keyboard</string>
     <string name="force_incognito_keyboard_subtitle">Asks your keyboard to turn off personalized learning</string>
@@ -1129,6 +1135,8 @@
     <string name="voice_message_release_to_send">Release to send · slide off to cancel</string>
     <string name="voice_message_too_short">Hold longer to record</string>
     <string name="voice_message_permission_denied">Microphone permission needed to record</string>
+    <string name="voice_message_recording_failed">Couldn\'t record voice message</string>
+    <string name="voice_message_microphone_busy">The microphone is in use by another app. Close it there and try again.</string>
     <string name="voice_message_play">Play voice message</string>
     <string name="voice_message_pause">Pause voice message</string>
     <string name="voice_message_failed">Voice message couldn\'t load</string>
@@ -1301,6 +1309,7 @@
     <string name="app_updates">App updates</string>
     <string name="app_update_settings_title">Zapstore release</string>
     <string name="app_update_settings_unknown">Installed: %1$s — Latest: unknown — tap to check</string>
+    <string name="app_update_settings_check_failed">Couldn\'t check for updates. Tap to retry.</string>
     <string name="app_update_settings_current">Installed: %1$s — Up to date</string>
     <string name="app_update_settings_available">Installed: %1$s — Latest: %2$s — update available</string>
     <string name="app_update_settings_available_with_count">Installed: %1$s — Latest: %2$s — %3$d releases behind</string>

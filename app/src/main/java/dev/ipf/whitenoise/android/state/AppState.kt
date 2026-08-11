@@ -192,7 +192,7 @@ sealed interface AppPhase {
     data object Ready : AppPhase
 
     data class Failed(
-        val message: String,
+        val error: ErrorPresentation,
     ) : AppPhase
 }
 
@@ -465,7 +465,7 @@ internal fun groupCreateFailureDetail(
         is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_invalid_identity_reference)
         is MarmotKitException.Publish -> AppText.Resource(R.string.error_group_publish_failed, listOf(throwable.details))
         is MarmotKitException -> AppText.Resource(R.string.error_group_create_failed_retry)
-        else -> AppText.Plain(throwable.readableMessage())
+        else -> AppText.Resource(R.string.error_group_create_failed_retry)
     }
 
 /**
@@ -897,6 +897,13 @@ data class ToastMessage(
     // transient state changes leave this false (the default) so the emit
     // site — not a message-body heuristic — decides.
     val copyable: Boolean = false,
+    val tier: NoticeTier = NoticeTier.ActionableError,
+    val diagnosticReport: String? = null,
+)
+
+data class TransientNotice(
+    val title: AppText,
+    val detail: AppText? = null,
 )
 
 private data class ProfilePresentation(
@@ -1953,6 +1960,9 @@ class WhiteNoiseAppState private constructor(
     var toast by mutableStateOf<ToastMessage?>(null)
         private set
 
+    var transientNotice by mutableStateOf<TransientNotice?>(null)
+        private set
+
     var pendingProfileNpub by mutableStateOf<String?>(null)
         private set
 
@@ -2730,28 +2740,37 @@ class WhiteNoiseAppState private constructor(
         val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return
         launchMutation {
             var failures = 0
+            var firstFailure: Throwable? = null
             for (groupIdHex in targets) {
-                val ok =
+                val result =
                     runCatchingCancellable {
                         withGroupCommitLock(account, groupIdHex) {
                             marmotIo { sendText(account, groupIdHex, trimmed) }
                         }
-                    }.isSuccess
-                if (!ok) failures += 1
+                    }
+                result.onFailure {
+                    failures += 1
+                    if (firstFailure == null) firstFailure = it
+                }
             }
             val delivered = targets.size - failures
             when {
                 failures == 0 ->
-                    presentText(AppText.Resource(R.string.toast_forwarded_to_chats, listOf(delivered)))
+                    presentTransient(AppText.Resource(R.string.toast_forwarded_to_chats, listOf(delivered)))
                 delivered == 0 ->
-                    present(R.string.toast_forward_failed, copyable = true)
-                else ->
-                    presentText(
+                    presentFailure(R.string.toast_forward_failed, "MESSAGE_FORWARD", requireNotNull(firstFailure))
+                else -> {
+                    val partialTitle =
                         AppText.Resource(
                             R.string.toast_forwarded_partial,
                             listOf("$delivered/${targets.size}"),
-                        ),
+                        )
+                    presentFailure(
+                        title = partialTitle,
+                        operationCode = "MESSAGE_FORWARD_PARTIAL",
+                        throwable = requireNotNull(firstFailure),
                     )
+                }
             }
         }
     }
@@ -2772,6 +2791,7 @@ class WhiteNoiseAppState private constructor(
         launchMutation {
             var completeTargets = 0
             var successfulSends = 0
+            var firstFailure: Throwable? = null
             for (groupIdHex in targets) {
                 var targetComplete = true
                 try {
@@ -2782,23 +2802,29 @@ class WhiteNoiseAppState private constructor(
                                 successfulSends += 1
                             } catch (throwable: Throwable) {
                                 if (throwable is CancellationException) throw throwable
+                                if (firstFailure == null) firstFailure = throwable
                                 targetComplete = false
                             }
                         }
                     }
                 } catch (throwable: Throwable) {
                     if (throwable is CancellationException) throw throwable
+                    if (firstFailure == null) firstFailure = throwable
                     targetComplete = false
                 }
                 if (targetComplete) completeTargets += 1
             }
             when {
                 completeTargets == targets.size ->
-                    presentText(AppText.Resource(R.string.toast_forwarded_to_chats, listOf(completeTargets)))
+                    presentTransient(AppText.Resource(R.string.toast_forwarded_to_chats, listOf(completeTargets)))
                 successfulSends == 0 ->
-                    present(R.string.toast_forward_batch_failed, copyable = true)
+                    presentFailure(R.string.toast_forward_batch_failed, "MESSAGE_FORWARD_BATCH", requireNotNull(firstFailure))
                 else ->
-                    present(R.string.toast_forwarded_batch_partial, copyable = true)
+                    presentFailure(
+                        R.string.toast_forwarded_batch_partial,
+                        "MESSAGE_FORWARD_BATCH_PARTIAL",
+                        requireNotNull(firstFailure),
+                    )
             }
         }
     }
@@ -2841,10 +2867,10 @@ class WhiteNoiseAppState private constructor(
                 val result = marmotIo { promoteAdminDetailed(account, groupId, target) }
                 chatsController?.applyProfileGroupDetails(account, result.details)
             }
-            present(R.string.toast_admin_added)
+            presentTransient(R.string.toast_admin_added)
             true
         }.onFailure { error ->
-            present(R.string.toast_couldnt_update_admin, AppText.Plain(error.readableMessage()), copyable = true)
+            presentFailure(R.string.toast_couldnt_update_admin, "PROFILE_GROUP_ADMIN_UPDATE", error)
         }.getOrDefault(false)
     }
 
@@ -2870,6 +2896,7 @@ class WhiteNoiseAppState private constructor(
         val account = activeAccountRef ?: return false
         var failures = 0
         var firstFailure: AppText? = null
+        var firstFailureThrowable: Throwable? = null
         for (groupIdHex in targets) {
             runCatchingCancellable {
                 withGroupCommitLock(account, groupIdHex) {
@@ -2882,6 +2909,7 @@ class WhiteNoiseAppState private constructor(
             }.onFailure { error ->
                 failures += 1
                 if (firstFailure == null) {
+                    firstFailureThrowable = error
                     val message = error.readableMessage()
                     firstFailure =
                         if (isDuplicateSignatureKeyError(message)) {
@@ -2890,7 +2918,7 @@ class WhiteNoiseAppState private constructor(
                                 listOf(displayName(ref)),
                             )
                         } else {
-                            AppText.Plain(message)
+                            AppText.Resource(R.string.error_try_again)
                         }
                 }
             }
@@ -2902,7 +2930,17 @@ class WhiteNoiseAppState private constructor(
                 firstFailure = firstFailure,
             )
         profileGroupInviteToast(outcome)?.let { toast ->
-            if (toast.detail == null) {
+            val failure = firstFailureThrowable
+            if (toast.copyable && failure != null) {
+                presentFailure(
+                    titleRes = toast.messageRes,
+                    operationCode = "PROFILE_GROUP_INVITE",
+                    throwable = failure,
+                    detail = toast.detail ?: AppText.Resource(R.string.error_try_again),
+                )
+            } else if (!toast.copyable) {
+                presentTransient(toast.messageRes, toast.detail)
+            } else if (toast.detail == null) {
                 present(toast.messageRes, copyable = toast.copyable)
             } else {
                 present(toast.messageRes, toast.detail, copyable = toast.copyable)
@@ -3130,7 +3168,7 @@ class WhiteNoiseAppState private constructor(
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
             appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
-            phase = AppPhase.Failed(error.readableMessage())
+            phase = AppPhase.Failed(privacySafeErrorPresentation("APP_BOOTSTRAP", error))
         }
     }
 
@@ -3229,12 +3267,12 @@ class WhiteNoiseAppState private constructor(
             val summary = marmotIo { createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
             activateCreatedIdentity(summary)
             phase = AppPhase.Ready
-            present(R.string.toast_identity_created)
+            presentTransient(R.string.toast_identity_created)
             appStateDebug { "identity engine setup returned in ${SystemClock.elapsedRealtime() - startedAt}ms" }
             launchIdentityPostCreateWarmup(summary)
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
-            present(R.string.toast_couldnt_create_identity, AppText.Plain(error.readableMessage()), copyable = true)
+            presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", error)
         }
     }
 
@@ -3350,7 +3388,7 @@ class WhiteNoiseAppState private constructor(
         setActiveAccount(summary.label)
         refreshLocalNotificationSettings()
         phase = AppPhase.Ready
-        present(R.string.toast_identity_imported)
+        presentTransient(R.string.toast_identity_imported)
         warmProfile(summary.accountIdHex)
     }
 
@@ -3417,15 +3455,15 @@ class WhiteNoiseAppState private constructor(
             setActiveAccount(summary.label)
             refreshLocalNotificationSettings()
             phase = AppPhase.Ready
-            present(R.string.toast_identity_imported)
+            presentTransient(R.string.toast_identity_imported)
             warmProfile(summary.accountIdHex)
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
             if (error is MarmotKitException.ExternalSignerRejected) {
-                present(R.string.toast_amber_sign_in_cancelled)
+                presentTransient(R.string.toast_amber_sign_in_cancelled)
             } else {
                 appStateDebug(error) { "amber login failed: ${error.readableMessage()}" }
-                present(R.string.toast_couldnt_login_amber, AppText.Plain(error.readableMessage()), copyable = true)
+                presentFailure(R.string.toast_couldnt_login_amber, "AMBER_SIGN_IN", error)
             }
         } finally {
             amberSignInStage = null
@@ -3685,7 +3723,7 @@ class WhiteNoiseAppState private constructor(
             runCatchingCancellable {
                 marmotIo { signInAccount(label) }
             }.onFailure {
-                present(R.string.toast_couldnt_sign_in_account, AppText.Plain(it.readableMessage()), copyable = true)
+                presentFailure(R.string.toast_couldnt_sign_in_account, "ACCOUNT_SIGN_IN", it)
                 return
             }
             refreshAccounts()
@@ -3966,7 +4004,7 @@ class WhiteNoiseAppState private constructor(
         }.onFailure {
             // Secret-key export holds the nsec in hand and the toast is not
             // behind FLAG_SECURE — scrub the FFI message before showing it (#846).
-            present(R.string.toast_couldnt_export_nsec, AppText.Plain(DiagnosticFormatter.redactError(it.readableMessage())), copyable = true)
+            presentFailure(R.string.toast_couldnt_export_nsec, "SECRET_KEY_EXPORT", it)
         }.getOrNull()
     }
 
@@ -4056,10 +4094,10 @@ class WhiteNoiseAppState private constructor(
         return runCatchingCancellable {
             marmotIo { exportEncryptedSecretKey(account, passphrase) }
         }.onSuccess {
-            present(R.string.toast_encrypted_backup_created)
+            presentTransient(R.string.toast_encrypted_backup_created)
         }.onFailure {
             appStateDebug { "encrypted backup failed: ${it.javaClass.simpleName}" }
-            present(R.string.toast_couldnt_create_encrypted_backup, copyable = true)
+            presentFailure(R.string.toast_couldnt_create_encrypted_backup, "ENCRYPTED_BACKUP_EXPORT", it)
         }.getOrNull()
     }
 
@@ -4128,18 +4166,16 @@ class WhiteNoiseAppState private constructor(
         return if (validationError != null) {
             when (validationError) {
                 RelayPublishValidationError.Invalid ->
-                    present(R.string.toast_relay_update_failed, R.string.error_invalid_relay_url, copyable = true)
+                    present(R.string.toast_relay_update_failed, R.string.error_invalid_relay_url)
                 RelayPublishValidationError.Blocked ->
                     present(
                         R.string.toast_relay_update_failed,
                         R.string.error_remove_invalid_relay_urls_first,
-                        copyable = true,
                     )
                 RelayPublishValidationError.Unavailable ->
                     present(
                         R.string.toast_relay_update_failed,
                         AppText.Plain(RELAY_HOSTS_UNAVAILABLE_MESSAGE),
-                        copyable = true,
                     )
             }
             null
@@ -4152,9 +4188,9 @@ class WhiteNoiseAppState private constructor(
                     }
                 }
             }.onSuccess {
-                present(R.string.toast_relay_list_updated)
+                presentTransient(R.string.toast_relay_list_updated)
             }.onFailure {
-                present(R.string.toast_relay_update_failed, AppText.Plain(it.readableMessage()), copyable = true)
+                presentFailure(R.string.toast_relay_update_failed, "RELAY_LIST_UPDATE", it)
             }.getOrNull()
         }
     }
@@ -4188,7 +4224,7 @@ class WhiteNoiseAppState private constructor(
             marmotIo { accountKeyPackages(account, bootstrapRelays) }
         }.getOrElse {
             if (it is CancellationException) throw it
-            present(R.string.toast_couldnt_load_key_packages, AppText.Plain(it.readableMessage()), copyable = true)
+            presentFailure(R.string.toast_couldnt_load_key_packages, "KEY_PACKAGE_LOAD", it)
             emptyList()
         }
     }
@@ -4228,11 +4264,11 @@ class WhiteNoiseAppState private constructor(
         }
         return runCatching {
             marmotIo { deleteAccountKeyPackage(account, eventIdHex, relays) }
-            present(R.string.toast_key_package_deleted)
+            presentTransient(R.string.toast_key_package_deleted)
             true
         }.getOrElse {
             if (it is CancellationException) throw it
-            present(R.string.toast_couldnt_delete_key_package, AppText.Plain(it.readableMessage()), copyable = true)
+            presentFailure(R.string.toast_couldnt_delete_key_package, "KEY_PACKAGE_DELETE", it)
             false
         }
     }
@@ -4241,11 +4277,11 @@ class WhiteNoiseAppState private constructor(
         val account = activeAccountRef ?: return false
         return runCatching {
             marmotIo { publishNewKeyPackage(account) }
-            present(R.string.toast_new_key_package_published)
+            presentTransient(R.string.toast_new_key_package_published)
             true
         }.getOrElse {
             if (it is CancellationException) throw it
-            present(R.string.toast_couldnt_publish_key_package, AppText.Plain(it.readableMessage()), copyable = true)
+            presentFailure(R.string.toast_couldnt_publish_key_package, "KEY_PACKAGE_PUBLISH", it)
             false
         }
     }
@@ -4254,11 +4290,11 @@ class WhiteNoiseAppState private constructor(
         val account = activeAccountRef ?: return false
         return runCatching {
             marmotIo { republishKeyPackage(account) }
-            present(R.string.toast_key_package_republished)
+            presentTransient(R.string.toast_key_package_republished)
             true
         }.getOrElse {
             if (it is CancellationException) throw it
-            present(R.string.toast_couldnt_republish_key_package, AppText.Plain(it.readableMessage()), copyable = true)
+            presentFailure(R.string.toast_couldnt_republish_key_package, "KEY_PACKAGE_REPUBLISH", it)
             false
         }
     }
@@ -4456,11 +4492,11 @@ class WhiteNoiseAppState private constructor(
                     )
                 }
             relayTelemetrySettings = updated
-            present(R.string.toast_security_privacy_updated)
+            presentTransient(R.string.toast_security_privacy_updated)
             true
         }.getOrElse {
             if (it is CancellationException) throw it
-            present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()), copyable = true)
+            presentFailure(R.string.toast_couldnt_update_security_privacy, "SECURITY_PRIVACY_UPDATE", it)
             false
         }
 
@@ -4480,11 +4516,11 @@ class WhiteNoiseAppState private constructor(
                 transform = { AuditLogSettingsPolicy.settingsWithEnabled(it, enabled) },
                 persistToEngine = { settings -> marmotIo { setAuditLogSettings(settings) } },
             )
-            present(R.string.toast_security_privacy_updated)
+            presentTransient(R.string.toast_security_privacy_updated)
             true
         }.getOrElse {
             if (it is CancellationException) throw it
-            present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()), copyable = true)
+            presentFailure(R.string.toast_couldnt_update_security_privacy, "SECURITY_PRIVACY_UPDATE", it)
             false
         }
 
@@ -4498,11 +4534,11 @@ class WhiteNoiseAppState private constructor(
                 transform = { AuditLogSettingsPolicy.settingsWithRedaction(it, redact) },
                 persistToEngine = { settings -> marmotIo { setAuditLogSettings(settings) } },
             )
-            present(R.string.toast_security_privacy_updated)
+            presentTransient(R.string.toast_security_privacy_updated)
             true
         }.getOrElse {
             if (it is CancellationException) throw it
-            present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()), copyable = true)
+            presentFailure(R.string.toast_couldnt_update_security_privacy, "SECURITY_PRIVACY_UPDATE", it)
             false
         }
 
@@ -4517,27 +4553,32 @@ class WhiteNoiseAppState private constructor(
             runCatching { marmotIo { auditLogFiles() } }
                 .getOrElse {
                     if (it is CancellationException) throw it
-                    present(R.string.toast_couldnt_delete_audit_logs, AppText.Plain(it.readableMessage()), copyable = true)
+                    presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
                     return false
                 }
         if (files.isEmpty()) {
-            present(R.string.toast_no_audit_logs_to_delete)
+            presentTransient(R.string.toast_no_audit_logs_to_delete)
             return false
         }
         var anyDeleted = false
+        var firstFailure: Throwable? = null
         for (file in files) {
             val outcome =
                 runCatchingCancellable { marmotIo { deleteAuditLogFile(file.path) } }
                     .onFailure {
+                        if (firstFailure == null) firstFailure = it
                         appStateDebug { "deleteAuditLogFile failed: ${it.readableMessage()}" }
                     }.getOrNull() ?: continue
             anyDeleted = true
             appStateDebug { "audit log deleted still_recording=${outcome.stillRecording}" }
         }
-        present(
-            if (anyDeleted) R.string.toast_audit_logs_deleted else R.string.toast_couldnt_delete_audit_logs,
-            copyable = !anyDeleted,
-        )
+        if (anyDeleted) {
+            presentTransient(R.string.toast_audit_logs_deleted)
+        } else {
+            firstFailure?.let {
+                presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
+            } ?: present(R.string.toast_couldnt_delete_audit_logs)
+        }
         return anyDeleted
     }
 
@@ -5783,11 +5824,11 @@ class WhiteNoiseAppState private constructor(
             appStateDebug {
                 "local notifications account=${account.take(8)} enabled=${settings.localNotificationsEnabled} permission=$localNotificationPermissionGranted"
             }
-            present(if (enabled) R.string.toast_local_notifications_enabled else R.string.toast_local_notifications_disabled)
+            presentTransient(if (enabled) R.string.toast_local_notifications_enabled else R.string.toast_local_notifications_disabled)
             true
         }.getOrElse {
             rethrowIfCancellation(it)
-            present(R.string.toast_couldnt_update_notifications, AppText.Plain(it.readableMessage()), copyable = true)
+            presentFailure(R.string.toast_couldnt_update_notifications, "NOTIFICATION_SETTINGS_UPDATE", it)
             false
         }
     }
@@ -5809,7 +5850,7 @@ class WhiteNoiseAppState private constructor(
                     marmotIo { setLocalNotificationsEnabled(account, true) }
                 }.getOrElse {
                     rethrowIfCancellation(it)
-                    present(R.string.toast_couldnt_enable_notifications, AppText.Plain(it.readableMessage()), copyable = true)
+                    presentFailure(R.string.toast_couldnt_enable_notifications, "NOTIFICATION_ENABLE", it)
                     return false
                 }
             localNotificationSettings = settings
@@ -5827,7 +5868,7 @@ class WhiteNoiseAppState private constructor(
             present(R.string.toast_couldnt_keep_connected, R.string.toast_android_blocked_foreground_service, copyable = true)
             return false
         }
-        present(if (enabled) R.string.toast_background_connection_enabled else R.string.toast_background_connection_disabled)
+        presentTransient(if (enabled) R.string.toast_background_connection_enabled else R.string.toast_background_connection_disabled)
         return true
     }
 
@@ -6082,7 +6123,7 @@ class WhiteNoiseAppState private constructor(
             }
         }.getOrElse {
             rethrowIfCancellation(it)
-            present(R.string.toast_couldnt_update_notifications, AppText.Plain(it.readableMessage()), copyable = true)
+            presentFailure(R.string.toast_couldnt_update_notifications, "NOTIFICATION_SETTINGS_UPDATE", it)
             false
         }
     }
@@ -6775,13 +6816,13 @@ class WhiteNoiseAppState private constructor(
                         profileRelays.size
                     }
                 notifyProfilesChanged()
-                presentText(
+                presentTransient(
                     AppText.Resource(R.string.toast_profile_published),
                     AppText.Resource(R.string.toast_profile_published_detail, listOf(profileRelayCount)),
                 )
             }
         result.onFailure {
-            present(R.string.toast_couldnt_publish_profile, AppText.Plain(it.readableMessage()), copyable = true)
+            presentFailure(R.string.toast_couldnt_publish_profile, "PROFILE_PUBLISH", it)
         }
         return result.isSuccess
     }
@@ -6821,12 +6862,50 @@ class WhiteNoiseAppState private constructor(
         title: AppText,
         detail: AppText? = null,
         copyable: Boolean = false,
+        diagnosticReport: String? = null,
+        tier: NoticeTier = NoticeTier.ActionableError,
     ) {
-        toast = ToastMessage(title, detail, copyable)
+        val safeReport = diagnosticReport?.trim()?.takeIf(String::isNotEmpty)
+        toast =
+            ToastMessage(
+                title = title,
+                detail = detail,
+                // A Copy affordance is valid only when there is a deliberately
+                // constructed privacy-safe report. Legacy callers that merely
+                // set copyable=true must never copy visible UI text.
+                copyable = copyable && safeReport != null,
+                tier = tier,
+                diagnosticReport = safeReport,
+            )
+    }
+
+    fun presentTransient(
+        @StringRes titleRes: Int,
+        detail: AppText? = null,
+    ) {
+        presentTransient(AppText.Resource(titleRes), detail)
+    }
+
+    fun presentTransient(
+        title: AppText,
+        detail: AppText? = null,
+    ) {
+        transientNotice = TransientNotice(title, detail)
+    }
+
+    fun presentTransient(
+        title: String,
+        detail: String? = null,
+    ) {
+        presentTransient(AppText.Plain(title), detail?.let(AppText::Plain))
     }
 
     fun clearToast() {
         toast = null
+    }
+
+    fun clearTransientNotice(notice: TransientNotice? = transientNotice) {
+        if (transientNotice === notice) transientNotice = null
     }
 
     private suspend fun configurePrivacyRuntime() {

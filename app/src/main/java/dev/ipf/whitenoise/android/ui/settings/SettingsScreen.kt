@@ -710,6 +710,7 @@ private fun AppUpdateSettingsRow(
     val latest = info.latestVersion
     val subtitle =
         when {
+            info.lastAttemptErrorReport != null -> stringResource(R.string.app_update_settings_check_failed)
             latest == null -> stringResource(R.string.app_update_settings_unknown, info.installedVersion)
             !info.isUpdateAvailable -> stringResource(R.string.app_update_settings_current, info.installedVersion)
             info.releasesBehind != null ->

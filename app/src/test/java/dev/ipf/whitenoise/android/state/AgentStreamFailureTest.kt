@@ -29,6 +29,6 @@ class AgentStreamFailureTest {
                 ConversationControllerCopy(),
             )
 
-        assertEquals("Stream failed: boom", text)
+        assertEquals("Stream failed: Try again.", text)
     }
 }

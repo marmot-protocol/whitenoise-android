@@ -16,6 +16,7 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -94,12 +95,16 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
+import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
+import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
+import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
+import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -254,6 +259,7 @@ internal fun ChatsScreen(
     // zero on dispose so other surfaces aren't affected, mirroring
     // ConversationScreen's composer lift (#122).
     val snackbarBottomInset = LocalSnackbarBottomInset.current
+    val snackbarContentInset = LocalSnackbarContentInset.current
     DisposableEffect(Unit) {
         snackbarBottomInset.value = FAB_SNACKBAR_INSET
         onDispose { snackbarBottomInset.value = 0.dp }
@@ -302,6 +308,7 @@ internal fun ChatsScreen(
         }
 
     val sourceList = if (showArchived) controller.archivedItems else controller.items
+    val loadFailurePlacement = loadFailurePlacement(controller.error != null, sourceList.isNotEmpty())
     // Subscribing read of the profile-cache revision so the filter
     // re-runs when a DM peer's display name resolves — the title
     // projection inside `applyChatListSearchAndFilter` reads
@@ -470,7 +477,7 @@ internal fun ChatsScreen(
                     } else {
                         R.plurals.toast_chat_list_chats_restored
                     }
-                appState.present(context.resources.getQuantityString(pluralRes, succeeded, succeeded))
+                appState.presentTransient(context.resources.getQuantityString(pluralRes, succeeded, succeeded))
             }
         }
     }
@@ -910,10 +917,11 @@ internal fun ChatsScreen(
             Box(Modifier.fillMaxSize()) {
                 when {
                     controller.isLoading && sourceList.isEmpty() -> LoadingScreen()
-                    controller.error != null ->
+                    loadFailurePlacement == LoadFailurePlacement.FullScreen ->
                         ErrorContent(
                             stringResource(R.string.couldnt_load_chats),
-                            controller.error.orEmpty(),
+                            requireNotNull(controller.error),
+                            onRetry = controller::retryLoad,
                         )
                     sourceList.isEmpty() && showArchived ->
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -924,12 +932,29 @@ internal fun ChatsScreen(
                         }
                     sourceList.isEmpty() ->
                         EmptyChats(onCreate = { showNewChatFlow = true })
-                    visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None -> Unit
+                    visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
+                        controller.error?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }?.let { failure ->
+                            InlineErrorBanner(
+                                error = failure,
+                                onRetry = controller::retryLoad,
+                                modifier = Modifier.align(Alignment.TopCenter),
+                            )
+                        }
                     visibleItems.isEmpty() ->
-                        ChatListNoResults(
-                            query = searchQuery.trim(),
-                            unreadFolderSelected = selectedFolderRule?.unreadOnly == true,
-                        )
+                        Column(Modifier.fillMaxSize()) {
+                            controller.error?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }?.let { failure ->
+                                InlineErrorBanner(
+                                    error = failure,
+                                    onRetry = controller::retryLoad,
+                                )
+                            }
+                            Box(Modifier.fillMaxWidth().weight(1f)) {
+                                ChatListNoResults(
+                                    query = searchQuery.trim(),
+                                    unreadFolderSelected = selectedFolderRule?.unreadOnly == true,
+                                )
+                            }
+                        }
                     else ->
                         LazyColumn(
                             modifier =
@@ -941,7 +966,16 @@ internal fun ChatsScreen(
                                         chatListHeightPx = coordinates.size.height.toFloat()
                                     },
                             state = chatListState,
+                            contentPadding = PaddingValues(bottom = snackbarContentInset.value),
                         ) {
+                            controller.error?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }?.let { failure ->
+                                item(key = "chat-list-load-error") {
+                                    InlineErrorBanner(
+                                        error = failure,
+                                        onRetry = controller::retryLoad,
+                                    )
+                                }
+                            }
                             visibleItems.forEachIndexed { targetIndex, item ->
                                 if (targetIndex == pinnedBoundary) {
                                     this.item(
@@ -1145,7 +1179,7 @@ internal fun ChatsScreen(
                         }
                     }
                     if (succeeded > 0) {
-                        appState.present(
+                        appState.presentTransient(
                             context.resources.getQuantityString(
                                 R.plurals.toast_chat_list_chats_deleted,
                                 succeeded,

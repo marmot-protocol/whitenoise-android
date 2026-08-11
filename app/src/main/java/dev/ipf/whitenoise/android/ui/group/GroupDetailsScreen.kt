@@ -100,7 +100,6 @@ import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupPushTokenDebugEntryFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
@@ -113,9 +112,11 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
@@ -512,11 +513,7 @@ internal fun GroupDetailsScreen(
                 }
                 pendingTranscriptShareFile?.delete()
                 pendingTranscriptShareFile = null
-                appState.present(
-                    R.string.toast_couldnt_export_transcript,
-                    AppText.Plain(DiagnosticFormatter.redactError(error.message ?: error.javaClass.simpleName)),
-                    copyable = true,
-                )
+                appState.presentFailure(R.string.toast_couldnt_export_transcript, "CONVERSATION_TRANSCRIPT_SHARE", error)
             } finally {
                 transcriptExportInFlight = false
             }
@@ -930,10 +927,10 @@ internal fun GroupDetailsScreen(
                 }
             }
 
-            controller.lastMutationError?.let { message ->
+            controller.lastMutationError?.let { error ->
                 Box(Modifier.padding(horizontal = Dimens.spaceLg)) {
                     GroupMutationErrorBanner(
-                        message = message,
+                        error = error,
                         onDismiss = { controller.clearLastMutationError() },
                     )
                 }
@@ -1834,10 +1831,12 @@ internal fun GroupDetailsHeader(
 
 @Composable
 private fun GroupMutationErrorBanner(
-    message: String,
+    error: ErrorPresentation,
     onDismiss: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    val message = error.message.resolve(context)
     Surface(
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -1850,15 +1849,13 @@ private fun GroupMutationErrorBanner(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(Icons.Default.ErrorOutline, contentDescription = null)
-            // Mutation errors carry engine/relay strings users want to copy
-            // into a bug report: selectable text + a Copy affordance (#543).
             SelectionContainer(modifier = Modifier.weight(1f)) {
                 Text(
                     stringResource(R.string.latest_group_error, message),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            IconButton(onClick = { clipboard.setText(AnnotatedString(message)) }) {
+            IconButton(onClick = { clipboard.setText(AnnotatedString(error.report)) }) {
                 Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy))
             }
             IconButton(onClick = onDismiss) {

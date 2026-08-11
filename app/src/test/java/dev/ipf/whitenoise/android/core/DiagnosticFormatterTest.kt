@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.core
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotEventFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.ReceivedMessageFfi
 import dev.ipf.marmotkit.RuntimeMessageReceivedFfi
 import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
@@ -152,5 +153,82 @@ class DiagnosticFormatterTest {
         // Followed by whitespace, then punctuation.
         assertEquals("a [redacted] b", DiagnosticFormatter.redactError("a $doublePadded b"))
         assertEquals("[redacted].", DiagnosticFormatter.redactError("$padded."))
+    }
+
+    @Test
+    fun errorReportUsesStableCodesWithoutExceptionMessages() {
+        val secret = "a".repeat(64)
+        val failure = IllegalStateException("wrapper", java.io.IOException("https://user:pass@example.test token=abc $secret"))
+
+        val report =
+            DiagnosticFormatter.errorReport(
+                operationCode = "message send",
+                throwable = failure,
+                context =
+                    DiagnosticFormatter.ErrorReportContext(
+                        appVersion = "1.2.3 (45)",
+                        androidVersion = "16 (API 36)",
+                        occurredAtUtc = "2026-08-10T12:00:00Z",
+                    ),
+            )
+
+        assertTrue(report.contains("operation=MESSAGE_SEND"))
+        assertTrue(report.contains("error=CONNECTIVITY"))
+        assertFalse(report.contains("IllegalStateException"))
+        assertFalse(report.contains("wrapper"))
+        assertFalse(report.contains("user:pass"))
+        assertFalse(report.contains(secret))
+        assertFalse(report.contains("detail="))
+        assertTrue(report.length <= 600)
+    }
+
+    @Test
+    fun errorReportRedactsExplicitTechnicalDetail() {
+        val identifier = "123e4567-e89b-42d3-a456-426614174000"
+        val report =
+            DiagnosticFormatter.errorReport(
+                operationCode = "attachment open",
+                throwable = IllegalStateException("failed for message $identifier"),
+                context = DiagnosticFormatter.ErrorReportContext("dev", "test", "now"),
+                technicalDetail = "message $identifier from https://user:pass@example.test token=abc",
+            )
+
+        assertFalse(report.contains(identifier))
+        assertTrue(report.contains("message [redacted]"))
+        assertFalse(report.contains("user:pass"))
+        assertTrue(report.contains("token=[redacted]"))
+    }
+
+    @Test
+    fun errorReportTruncatesUnboundedDetails() {
+        val report =
+            DiagnosticFormatter.errorReport(
+                operationCode = "very long operation ${"x".repeat(200)}",
+                throwable = RuntimeException("failure ${"y".repeat(2_000)}"),
+                context = DiagnosticFormatter.ErrorReportContext("dev", "test", "now"),
+                technicalDetail = "bounded ${"z".repeat(2_000)}",
+            )
+
+        assertTrue(report.length <= 600)
+        assertTrue(report.contains("operation=VERY_LONG_OPERATION_"))
+    }
+
+    @Test
+    fun typedMarmotFailuresUseStableCategories() {
+        val cases =
+            listOf(
+                MarmotKitException.Publish("relay") to "CONNECTIVITY",
+                MarmotKitException.StorageBusy("locked") to "RESOURCE_BUSY",
+                MarmotKitException.InvalidIdentity("bad") to "INVALID_INPUT",
+                MarmotKitException.UnknownGroup("a".repeat(64)) to "NOT_FOUND",
+                MarmotKitException.ExternalSignerRejected() to "CANCELLED",
+                MarmotKitException.KeystoreUnavailable("locked") to "PLATFORM_UNAVAILABLE",
+                MarmotKitException.Io("disk") to "IO",
+                MarmotKitException.EncryptionFailed("cipher") to "CRYPTO_FAILURE",
+            )
+
+        cases.forEach { (failure, expected) ->
+            assertEquals(expected, DiagnosticFormatter.errorCode(failure))
+        }
     }
 }

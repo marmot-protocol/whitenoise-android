@@ -268,8 +268,11 @@ internal fun MainShell(
         }
     }
 
-    LaunchedEffect(chatsController, appState.activeAccountRef, appState.runtimeGeneration) {
-        chatsController.bind(appState.activeAccountRef)
+    LaunchedEffect(chatsController, appState.activeAccountRef, appState.runtimeGeneration, chatsController.retryGeneration) {
+        chatsController.bind(
+            accountRef = appState.activeAccountRef,
+            preserveLoadedContent = chatsController.retryGeneration > 0L,
+        )
     }
 
     // Freshness model for #6: the chat-list subscription stays bound while a
@@ -517,7 +520,7 @@ internal fun MainShell(
             openChatForShare(allChats, groupIds.first())
             val otherCount = groupIds.size - 1
             if (otherCount > 0) {
-                appState.presentText(AppText.Resource(R.string.toast_share_staged_other_chats, listOf(otherCount)))
+                appState.presentTransient(AppText.Resource(R.string.toast_share_staged_other_chats, listOf(otherCount)))
             }
         }
 
@@ -711,7 +714,7 @@ internal fun MainShell(
             }
         }
     }
-    LaunchedEffect(conversationController) {
+    LaunchedEffect(conversationController, conversationController?.retryGeneration) {
         conversationController?.start()
     }
     ProfileGroupForegroundCoordinator(

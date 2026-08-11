@@ -54,7 +54,6 @@ import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
-import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
@@ -2160,7 +2159,11 @@ internal fun presentSendFailure(
         "DMSend",
         "send failed type=${throwable.javaClass.simpleName} detail=${throwable.message}",
     )
-    appState.present(sendFailureMessageRes(throwable))
+    if (throwable is MarmotKitException.GroupSendQueueFull) {
+        appState.present(R.string.toast_send_queue_full)
+    } else {
+        appState.presentFailure(R.string.toast_send_failed, "MESSAGE_SEND", throwable)
+    }
 }
 
 /**
@@ -2313,11 +2316,12 @@ internal fun firstMessageOrder(messageIds: Iterable<String>): Map<String, Int> =
 data class ConversationControllerCopy(
     val waitingForStream: String = "Waiting for stream...",
     val streamFailedFormat: String = "Stream failed: %1\$s",
+    val tryAgain: String = "Try again.",
     val couldntAddMemberDuplicateFormat: String =
         "Couldn't add %1\$s. They're already a member, or their signing key conflicts with an existing member.",
     val groupRosterChanged: String = "Group membership changed. Review the group and try again.",
 ) {
-    fun streamFailed(message: String): String = String.format(streamFailedFormat, message)
+    fun streamFailed(): String = String.format(streamFailedFormat, tryAgain)
 
     fun couldntAddMemberDuplicate(name: String): String = String.format(couldntAddMemberDuplicateFormat, name)
 }
@@ -2742,7 +2746,7 @@ internal fun agentStreamFailureText(
     copy: ConversationControllerCopy,
 ): String {
     if (throwable is CancellationException) throw throwable
-    return copy.streamFailed(throwable.message ?: throwable.javaClass.simpleName)
+    return copy.streamFailed()
 }
 
 internal suspend fun runBestEffortPostCommitSteps(
@@ -2981,8 +2985,22 @@ class ChatsController private constructor(
 
     var isLoading by mutableStateOf(true)
         private set
-    var error by mutableStateOf<String?>(null)
+    var error by mutableStateOf<ErrorPresentation?>(null)
         private set
+
+    private val retryLoadSignal = Channel<Unit>(Channel.CONFLATED)
+    var retryGeneration by mutableStateOf(0L)
+        private set
+    private var terminalLoadFailure = false
+
+    fun retryLoad() {
+        if (terminalLoadFailure) {
+            terminalLoadFailure = false
+            retryGeneration += 1L
+        } else {
+            retryLoadSignal.trySend(Unit)
+        }
+    }
 
     /** The account this controller is currently bound to (observable so
      *  notification routing can tell when the right account's list is ready). */
@@ -3351,18 +3369,23 @@ class ChatsController private constructor(
         }
     }
 
-    suspend fun bind(accountRef: String?) {
+    suspend fun bind(
+        accountRef: String?,
+        preserveLoadedContent: Boolean = false,
+    ) {
         if (isCleared) return
         val currentBindJob = coroutineContext[Job]
         synchronized(liveSubscriptionLock) { bindJob = currentBindJob }
         chatsDebug { "bind account=${accountRef?.take(8)}" }
         this.accountRef = accountRef
         this.boundAccountRef = accountRef
-        isLoading = accountRef != null
-        resetBackingState()
+        val keepLoadedContent = preserveLoadedContent && chatRows.isNotEmpty()
+        isLoading = accountRef != null && !keepLoadedContent
+        if (!keepLoadedContent) resetBackingState()
         bindEpoch += 1L
         recompute()
         error = null
+        terminalLoadFailure = false
 
         if (accountRef == null) {
             synchronized(liveSubscriptionLock) {
@@ -3374,7 +3397,7 @@ class ChatsController private constructor(
         }
         try {
             var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
-            var catchUpStarted = false
+            var catchUpStarted = keepLoadedContent
             while (coroutineContext.isActive && shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
                 var chatListSubscription: ChatListSubscription? = null
                 var chatsSubscription: ChatsSubscription? = null
@@ -3484,10 +3507,21 @@ class ChatsController private constructor(
                         "live chat subscription failed account=${accountRef.take(8)}: " +
                             "${throwable.message ?: throwable.javaClass.simpleName}"
                     }
-                    if (chatRows.isEmpty()) {
-                        isLoading = false
-                        error = throwable.message ?: throwable.javaClass.simpleName
-                    }
+                    isLoading = false
+                    val hasLoadedContent = chatRows.isNotEmpty()
+                    error =
+                        privacySafeErrorPresentation(
+                            operationCode = if (hasLoadedContent) "CHAT_LIST_REFRESH" else "CHAT_LIST_LOAD",
+                            throwable = throwable,
+                            message =
+                                AppText.Resource(
+                                    if (hasLoadedContent) {
+                                        R.string.error_loaded_content_may_be_out_of_date
+                                    } else {
+                                        R.string.error_try_again
+                                    },
+                                ),
+                        )
                 } finally {
                     // NonCancellable: a cancelled bind must still close subscriptions
                     // so a retry loop or account switch cannot leak account-wide
@@ -3515,8 +3549,13 @@ class ChatsController private constructor(
                         receivedUpdate = receivedLiveUpdate,
                     )
                 chatsDebug { "chat subscriptions ended; retrying in ${retryDelayMs}ms account=${accountRef.take(8)}" }
-                delay(retryDelayMs)
-                retryDelayMs = nextLiveSubscriptionRetryDelayMillis(retryDelayMs)
+                val userRequestedRetry = withTimeoutOrNull(retryDelayMs) { retryLoadSignal.receive() } != null
+                retryDelayMs =
+                    if (userRequestedRetry) {
+                        LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
+                    } else {
+                        nextLiveSubscriptionRetryDelayMillis(retryDelayMs)
+                    }
             }
         } catch (cancel: CancellationException) {
             // Expected when LaunchedEffect re-keys (account switch, navigate
@@ -3526,7 +3565,8 @@ class ChatsController private constructor(
         } catch (throwable: Throwable) {
             chatsDebug(throwable) { "bind failed account=${accountRef.take(8)}: ${throwable.message ?: throwable.javaClass.simpleName}" }
             isLoading = false
-            error = throwable.message ?: throwable.javaClass.simpleName
+            error = privacySafeErrorPresentation("CHAT_LIST_LOAD", throwable)
+            terminalLoadFailure = true
         } finally {
             synchronized(liveSubscriptionLock) {
                 if (bindJob === currentBindJob) {
@@ -4341,11 +4381,7 @@ class ChatsController private constructor(
                         }
                     }.onFailure { error ->
                         if (isActiveBindEpoch(epoch)) {
-                            appState.present(
-                                R.string.toast_couldnt_update_chat,
-                                AppText.Plain(error.message ?: error.javaClass.simpleName),
-                                copyable = true,
-                            )
+                            appState.presentFailure(R.string.toast_couldnt_update_chat, "CHAT_ARCHIVE_UPDATE", error)
                         }
                     }.getOrDefault(false)
 
@@ -4358,7 +4394,7 @@ class ChatsController private constructor(
             intents.forEach { (groupIdHex, intent) -> finishOptimisticArchive(groupIdHex, intent) }
         }
         if (notify && succeeded > 0 && isActiveBindEpoch(epoch)) {
-            appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
+            appState.presentTransient(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
         }
         return succeeded
     }
@@ -4479,18 +4515,17 @@ class ChatsController private constructor(
                 removedGroupIds = removedGroupIds + groupIdHex
                 recompute()
             }
-            appState.present(R.string.toast_left_chat)
+            appState.presentTransient(R.string.toast_left_chat)
             true
         }.onFailure {
-            val errorText = AppText.Plain(it.message ?: it.javaClass.simpleName)
             if (demotedBeforeLeave) {
                 // User was demoted but we couldn't complete the leave.
                 // Tell them so they know to ask another admin to restore
                 // their role (or retry); the generic "couldn't leave"
                 // toast misses that they're now mid-state.
-                appState.present(R.string.toast_demoted_but_couldnt_leave, errorText, copyable = true)
+                appState.presentFailure(R.string.toast_demoted_but_couldnt_leave, "CHAT_LEAVE_AFTER_DEMOTE", it)
             } else {
-                appState.present(R.string.toast_couldnt_leave_chat, errorText, copyable = true)
+                appState.presentFailure(R.string.toast_couldnt_leave_chat, "CHAT_LEAVE", it)
             }
         }.getOrDefault(false)
     }
@@ -4511,11 +4546,11 @@ class ChatsController private constructor(
         wipe.exceptionOrNull()?.let {
             if (it is CancellationException) throw it
             removedSnapshot?.let(::restoreRemovedChatRow)
-            appState.present(R.string.toast_couldnt_delete_chat, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
+            appState.presentFailure(R.string.toast_couldnt_delete_chat, "CHAT_LOCAL_DELETE", it)
             return false
         }
         if (notify) {
-            appState.present(R.string.toast_chat_deleted_local)
+            appState.presentTransient(R.string.toast_chat_deleted_local)
         }
         return true
     }
@@ -4563,12 +4598,12 @@ class ChatsController private constructor(
         wipe.exceptionOrNull()?.let {
             if (it is CancellationException) throw it
             removedSnapshot?.let(::restoreRemovedChatRow)
-            appState.present(R.string.toast_couldnt_delete_chat, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
+            appState.presentFailure(R.string.toast_couldnt_delete_chat, "CHAT_LEAVE_AND_DELETE", it)
             return false
         }
         // Wipe succeeded (or found nothing to remove) — the row was already
         // hidden optimistically on entry, so just confirm.
-        appState.present(R.string.toast_chat_deleted_local)
+        appState.presentTransient(R.string.toast_chat_deleted_local)
         return true
     }
 
@@ -4635,10 +4670,10 @@ class ChatsController private constructor(
                 true
             }.getOrElse {
                 if (it is CancellationException) throw it
-                appState.present(
+                appState.presentFailure(
                     if (grantedBeforeLeave) R.string.toast_granted_but_couldnt_step_down else R.string.toast_couldnt_update_admin,
-                    AppText.Plain(it.message ?: it.javaClass.simpleName),
-                    copyable = true,
+                    if (grantedBeforeLeave) "CHAT_DELETE_AFTER_ADMIN_GRANT" else "CHAT_DELETE_ADMIN_TRANSFER",
+                    it,
                 )
                 removedSnapshot?.let(::restoreRemovedChatRow)
                 false
@@ -4649,7 +4684,7 @@ class ChatsController private constructor(
         runCatching { appState.deleteGroupLocalWithClientCleanup(account, groupIdHex) }
             .exceptionOrNull()
             ?.let { if (it is CancellationException) throw it }
-        appState.present(R.string.toast_chat_deleted_local)
+        appState.presentTransient(R.string.toast_chat_deleted_local)
         return true
     }
 
@@ -5423,6 +5458,18 @@ internal fun compareConversationTimelinePosition(
 
 internal enum class ConversationSearchPageDirection { OLDER, NEWER }
 
+internal enum class ConversationLoadFailureEdge { TOP, BOTTOM }
+
+internal fun conversationLoadFailureEdge(
+    hasPageFailure: Boolean,
+    failedPageDirection: ConversationSearchPageDirection?,
+): ConversationLoadFailureEdge =
+    if (hasPageFailure && failedPageDirection == ConversationSearchPageDirection.NEWER) {
+        ConversationLoadFailureEdge.BOTTOM
+    } else {
+        ConversationLoadFailureEdge.TOP
+    }
+
 internal fun conversationSearchPageDirection(
     match: ConversationSearchMatch,
     oldestTimelineAt: ULong,
@@ -5825,10 +5872,19 @@ class ConversationController(
     // disable buttons while one is in flight and prevent double-submits.
     var mutationInFlight by mutableStateOf(false)
         private set
-    var lastMutationError by mutableStateOf<String?>(null)
+    var lastMutationError by mutableStateOf<ErrorPresentation?>(null)
         private set
-    var error by mutableStateOf<String?>(null)
+    private var subscriptionError by mutableStateOf<ErrorPresentation?>(null)
+    private var pageError by mutableStateOf<ErrorPresentation?>(null)
+    val error: ErrorPresentation?
+        get() = pageError ?: subscriptionError
+    internal val errorEdge: ConversationLoadFailureEdge
+        get() = conversationLoadFailureEdge(pageError != null, failedPageDirection)
+    private val retryLoadSignal = Channel<Unit>(Channel.CONFLATED)
+    var retryGeneration by mutableStateOf(0L)
         private set
+    private var terminalLoadFailure = false
+    private var failedPageDirection: ConversationSearchPageDirection? = null
 
     // Drops re-entrant calls so a rapid double-tap can't enqueue duplicate
     // FFI work even before Compose re-evaluates `enabled = !mutationInFlight`.
@@ -5849,7 +5905,15 @@ class ConversationController(
         lastMutationError = null
     }
 
-    private fun mutationError(throwable: Throwable): String = throwable.message ?: throwable.javaClass.simpleName
+    private fun recordMutationFailure(
+        @StringRes title: Int,
+        operationCode: String,
+        throwable: Throwable,
+        detail: AppText = AppText.Resource(R.string.error_try_again),
+    ) {
+        lastMutationError = privacySafeErrorPresentation(operationCode, throwable, detail)
+        appState.presentFailure(title, operationCode, throwable, detail)
+    }
 
     private fun Throwable.rethrowIfCancellation() {
         if (this is CancellationException) throw this
@@ -6151,7 +6215,9 @@ class ConversationController(
             }
         if (!shouldStart) return
         isLoading = true
-        error = null
+        subscriptionError = null
+        pageError = null
+        terminalLoadFailure = false
         try {
             coroutineScope {
                 conversationScope = this
@@ -6183,11 +6249,13 @@ class ConversationController(
             if (throwable.isUseAfterEviction()) {
                 markActiveAccountRemovedFromMembers(account)
                 isLoading = false
-                error = null
+                subscriptionError = null
+                pageError = null
                 return
             }
             isLoading = false
-            error = throwable.message ?: throwable.javaClass.simpleName
+            subscriptionError = privacySafeErrorPresentation("CONVERSATION_LOAD", throwable)
+            terminalLoadFailure = true
         } finally {
             conversationScope = null
             cleanupConversationSubscriptions()
@@ -6326,8 +6394,13 @@ class ConversationController(
             if (shouldExit) return
             if (connected) retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
             if (!coroutineContext.isActive || isAccountTeardownRequested()) break
-            delay(retryDelayMs)
-            retryDelayMs = nextLiveSubscriptionRetryDelayMillis(retryDelayMs)
+            val userRequestedRetry = withTimeoutOrNull(retryDelayMs) { retryLoadSignal.receive() } != null
+            retryDelayMs =
+                if (userRequestedRetry) {
+                    LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
+                } else {
+                    nextLiveSubscriptionRetryDelayMillis(retryDelayMs)
+                }
         }
     }
 
@@ -6396,7 +6469,7 @@ class ConversationController(
             groupSnapshot?.let(::applyGroupState)
             refreshMembers()
             isLoading = false
-            error = null
+            subscriptionError = null
             var connected = false
 
             coroutineScope {
@@ -6428,13 +6501,21 @@ class ConversationController(
             if (throwable.isUseAfterEviction()) {
                 markActiveAccountRemovedFromMembers(account)
                 isLoading = false
-                error = null
+                subscriptionError = null
                 return true to false
             }
-            if (timelineRecords.isEmpty()) {
-                isLoading = false
-                error = throwable.message ?: throwable.javaClass.simpleName
-            }
+            isLoading = false
+            subscriptionError =
+                privacySafeErrorPresentation(
+                    operationCode = if (timelineRecords.isEmpty()) "CONVERSATION_LOAD" else "CONVERSATION_REFRESH",
+                    throwable = throwable,
+                    message =
+                        if (timelineRecords.isEmpty()) {
+                            AppText.Resource(R.string.error_try_again)
+                        } else {
+                            AppText.Resource(R.string.error_loaded_content_may_be_out_of_date)
+                        },
+                )
         } finally {
             closeConversationSubscriptionHandles(groupSubscription, timelineStream)
         }
@@ -7504,11 +7585,7 @@ class ConversationController(
                 },
             )
         mutation.onFailure { throwable ->
-            appState.present(
-                R.string.toast_reaction_failed,
-                AppText.Plain(throwable.message ?: throwable.javaClass.simpleName),
-                copyable = true,
-            )
+            appState.presentFailure(R.string.toast_reaction_failed, "MESSAGE_REACTION", throwable)
         }
         val reactionCommitted = mutation.getOrDefault(false)
         if (reactionCommitted) {
@@ -7547,11 +7624,7 @@ class ConversationController(
             deletedMessageIds = deletedMessageIds - target
             throwable.rethrowIfCancellation()
             if (presentFailure) {
-                appState.present(
-                    R.string.toast_couldnt_delete_message,
-                    AppText.Plain(throwable.message ?: throwable.javaClass.simpleName),
-                    copyable = true,
-                )
+                appState.presentFailure(R.string.toast_couldnt_delete_message, "MESSAGE_DELETE", throwable)
             }
             false
         }
@@ -7620,7 +7693,7 @@ class ConversationController(
                 ?.takeIf { it.status == MessageStatus.Pending && it.text == trimmed }
                 ?.let { optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Failed) }
             publishTimelineFromIndexes()
-            appState.present(R.string.toast_couldnt_edit_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
+            appState.presentFailure(R.string.toast_couldnt_edit_message, "MESSAGE_EDIT", throwable)
         }
     }
 
@@ -8298,20 +8371,18 @@ class ConversationController(
                 appState.markGroupLeftOnChatList(account, group.groupIdHex)
                 val name = displayName?.takeIf { it.isNotBlank() }
                 if (name != null) {
-                    appState.presentText(AppText.Resource(R.string.toast_left_named, listOf(name)))
+                    appState.presentTransient(AppText.Resource(R.string.toast_left_named, listOf(name)))
                 } else {
-                    appState.present(R.string.toast_left_chat)
+                    appState.presentTransient(R.string.toast_left_chat)
                 }
                 true
             }.getOrElse {
                 if (it is CancellationException) throw it
-                val message = mutationError(it)
-                lastMutationError = message
-                if (demotedBeforeLeave) {
-                    appState.present(R.string.toast_demoted_but_couldnt_leave, AppText.Plain(message), copyable = true)
-                } else {
-                    appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(message), copyable = true)
-                }
+                recordMutationFailure(
+                    if (demotedBeforeLeave) R.string.toast_demoted_but_couldnt_leave else R.string.toast_couldnt_leave_chat,
+                    if (demotedBeforeLeave) "GROUP_LEAVE_AFTER_DEMOTE" else "GROUP_LEAVE",
+                    it,
+                )
                 false
             }
         }
@@ -8329,11 +8400,7 @@ class ConversationController(
                 runCatching { appState.marmotIo { acceptGroupInvite(account, group.groupIdHex) } }
                     .getOrElse {
                         it.rethrowIfCancellation()
-                        appState.present(
-                            R.string.toast_couldnt_accept_invite,
-                            AppText.Plain(it.message ?: it.javaClass.simpleName),
-                            copyable = true,
-                        )
+                        appState.presentFailure(R.string.toast_couldnt_accept_invite, "GROUP_INVITE_ACCEPT", it)
                         return@withMutationLockResult false
                     }
             acceptedInvitePeerAccount = invitePeerAccount
@@ -8344,7 +8411,7 @@ class ConversationController(
             // local self-left latch before refreshMembers() so applyGroupDetails
             // is allowed to add self back to the roster (issue #787).
             selfMembership.clearSelfLeft()
-            if (notify) appState.present(R.string.toast_invite_accepted)
+            if (notify) appState.presentTransient(R.string.toast_invite_accepted)
             inviteStreamScope.launch {
                 runBestEffortPostCommitSteps(
                     steps =
@@ -8379,11 +8446,11 @@ class ConversationController(
                 appState.dismissConversationNotifications(account, group.groupIdHex)
                 group = group.copy(pendingConfirmation = false, archived = true)
                 appState.applyLocalGroupUpdate(group)
-                appState.present(R.string.toast_invite_declined)
+                appState.presentTransient(R.string.toast_invite_declined)
                 true
             }.getOrElse {
                 it.rethrowIfCancellation()
-                appState.present(R.string.toast_couldnt_decline_invite, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
+                appState.presentFailure(R.string.toast_couldnt_decline_invite, "GROUP_INVITE_DECLINE", it)
                 false
             }
         }
@@ -8398,12 +8465,10 @@ class ConversationController(
                     group = updated
                     appState.applyLocalGroupUpdate(updated)
                 }
-                appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
+                appState.presentTransient(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
                 true
             }.onFailure {
-                val message = mutationError(it)
-                lastMutationError = message
-                appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(message), copyable = true)
+                recordMutationFailure(R.string.toast_couldnt_update_chat, "GROUP_ARCHIVE_UPDATE", it)
             }.getOrDefault(false)
         }
 
@@ -8413,12 +8478,10 @@ class ConversationController(
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatchingCancellable {
                 appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
-                appState.present(R.string.toast_chat_deleted_local)
+                appState.presentTransient(R.string.toast_chat_deleted_local)
                 true
             }.onFailure {
-                val message = mutationError(it)
-                lastMutationError = message
-                appState.present(R.string.toast_couldnt_delete_chat, AppText.Plain(message), copyable = true)
+                recordMutationFailure(R.string.toast_couldnt_delete_chat, "GROUP_LOCAL_DELETE", it)
             }.getOrDefault(false)
         }
 
@@ -8442,12 +8505,10 @@ class ConversationController(
                         )
                     }
                 }
-                appState.present(R.string.toast_group_updated)
+                appState.presentTransient(R.string.toast_group_updated)
                 true
             }.onFailure {
-                val message = mutationError(it)
-                lastMutationError = message
-                appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message), copyable = true)
+                recordMutationFailure(R.string.toast_couldnt_update_group, "GROUP_PROFILE_UPDATE", it)
             }.getOrDefault(false)
         }
 
@@ -8487,12 +8548,10 @@ class ConversationController(
                 // Reflect the change locally so the avatar updates immediately,
                 // without waiting for the group-state subscription to converge.
                 group = groupWithPublicAvatar(group, normalized, encryptedImageCleared)
-                appState.present(R.string.toast_group_updated)
+                appState.presentTransient(R.string.toast_group_updated)
                 true
             }.onFailure {
-                val message = mutationError(it)
-                lastMutationError = message
-                appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message), copyable = true)
+                recordMutationFailure(R.string.toast_couldnt_update_group, "GROUP_AVATAR_URL_UPDATE", it)
             }.getOrDefault(false)
         }
 
@@ -8542,7 +8601,7 @@ class ConversationController(
                     }
                 }
                 refreshMembers(probeEviction = false)
-                appState.present(R.string.toast_group_updated)
+                appState.presentTransient(R.string.toast_group_updated)
                 true
             }.onFailure {
                 presentGroupImageMutationFailure(it, requestedMutationKey, attemptedLegacyClear)
@@ -8555,8 +8614,6 @@ class ConversationController(
         requestedMutationKey: String,
         attemptedLegacyClear: Boolean,
     ) {
-        val message = mutationError(throwable)
-        lastMutationError = message
         val failure =
             classifyGroupImageMutationFailure(
                 requestedMutationKey = requestedMutationKey,
@@ -8569,7 +8626,7 @@ class ConversationController(
             } else {
                 R.string.toast_couldnt_update_group
             }
-        appState.present(title, AppText.Plain(message), copyable = true)
+        recordMutationFailure(title, "GROUP_IMAGE_UPDATE", throwable)
     }
 
     private fun canAdministerMembersFromAuthoritativeRoster(): Boolean =
@@ -8591,8 +8648,12 @@ class ConversationController(
     private fun presentRosterChanged(
         @StringRes title: Int,
     ) {
-        lastMutationError = copy.groupRosterChanged
-        appState.present(title, R.string.toast_group_roster_changed, copyable = true)
+        lastMutationError =
+            ErrorPresentation(
+                message = AppText.Plain(copy.groupRosterChanged),
+                report = "White Noise error report\noperation=GROUP_ROSTER_UPDATE\nerror=STALE_STATE",
+            )
+        appState.present(title, R.string.toast_group_roster_changed)
     }
 
     private suspend fun resolveCanonicalInviteRefs(memberRefs: List<String>): List<String>? =
@@ -8600,9 +8661,7 @@ class ConversationController(
             canonicalGroupInviteRefs(memberRefs, appState::resolveAccountIdHex)
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
-            val message = mutationError(throwable)
-            lastMutationError = message
-            appState.present(R.string.toast_couldnt_add_members, AppText.Plain(message), copyable = true)
+            recordMutationFailure(R.string.toast_couldnt_add_members, "GROUP_INVITE_RESOLVE", throwable)
             null
         }
 
@@ -8612,7 +8671,7 @@ class ConversationController(
     ): Boolean =
         when (outcome) {
             GroupAdministrationCommitOutcome.COMMITTED -> {
-                appState.present(if (adminAdded) R.string.toast_admin_added else R.string.toast_admin_removed)
+                appState.presentTransient(if (adminAdded) R.string.toast_admin_added else R.string.toast_admin_removed)
                 true
             }
             GroupAdministrationCommitOutcome.ROSTER_CHANGED -> {
@@ -8663,23 +8722,22 @@ class ConversationController(
                         presentRosterChanged(R.string.toast_couldnt_add_members)
                         return@track false
                     }
-                    appState.present(R.string.toast_invite_sent)
+                    appState.presentTransient(R.string.toast_invite_sent)
                     true
                 } catch (throwable: Throwable) {
                     throwable.rethrowIfCancellation()
-                    val message = mutationError(throwable)
+                    val rawMessage = throwable.message.orEmpty()
                     if (inviteSent && addAsAdmin) {
                         // The invite is already out; keep the UI honest about the
                         // partial success and leave the row-level Admin switch as the
                         // retry path once the member appears in details.
-                        lastMutationError = "Invite sent, but admin promotion failed: $message"
-                        appState.present(
+                        recordMutationFailure(
                             R.string.toast_invite_sent_but_couldnt_add_admin,
-                            AppText.Plain(message),
-                            copyable = true,
+                            "GROUP_INVITE_ADMIN_PROMOTION",
+                            throwable,
                         )
                         true
-                    } else if (isDuplicateSignatureKeyError(message)) {
+                    } else if (isDuplicateSignatureKeyError(rawMessage)) {
                         // MLS rejected the add commit because the proposed member
                         // already holds a seat (or their signing key collides with
                         // an existing member's). The UI pre-checks membership, but a
@@ -8688,12 +8746,15 @@ class ConversationController(
                         // CreateCommitError(ProposalValidationError(...)) enum (#899).
                         val name = duplicateSignatureKeyDisplayName(refs, appState::displayName)
                         val friendly = copy.couldntAddMemberDuplicate(name)
-                        lastMutationError = friendly
-                        appState.present(R.string.toast_couldnt_add_members, AppText.Plain(friendly), copyable = true)
+                        recordMutationFailure(
+                            R.string.toast_couldnt_add_members,
+                            "GROUP_INVITE_DUPLICATE_MEMBER",
+                            throwable,
+                            AppText.Plain(friendly),
+                        )
                         false
                     } else {
-                        lastMutationError = message
-                        appState.present(R.string.toast_couldnt_add_members, AppText.Plain(message), copyable = true)
+                        recordMutationFailure(R.string.toast_couldnt_add_members, "GROUP_INVITE_MEMBER", throwable)
                         false
                     }
                 }
@@ -8723,7 +8784,7 @@ class ConversationController(
                         presentRosterChanged(R.string.toast_couldnt_remove_member)
                         return@track false
                     }
-                    appState.present(R.string.toast_member_removed)
+                    appState.presentTransient(R.string.toast_member_removed)
                     true
                 } catch (throwable: Throwable) {
                     throwable.rethrowIfCancellation()
@@ -8733,12 +8794,10 @@ class ConversationController(
                     // whether this specific target remains in the local roster.
                     refreshMembers(probeEviction = false)
                     if (members.none { it.memberIdHex.equals(target, ignoreCase = true) }) {
-                        appState.present(R.string.toast_member_removed)
+                        appState.presentTransient(R.string.toast_member_removed)
                         true
                     } else {
-                        val message = mutationError(throwable)
-                        lastMutationError = message
-                        appState.present(R.string.toast_couldnt_remove_member, AppText.Plain(message), copyable = true)
+                        recordMutationFailure(R.string.toast_couldnt_remove_member, "GROUP_REMOVE_MEMBER", throwable)
                         false
                     }
                 }
@@ -8786,9 +8845,7 @@ class ConversationController(
                         }
                     presentAdminCommitOutcome(outcome, adminAdded = admin)
                 }.onFailure {
-                    val message = mutationError(it)
-                    lastMutationError = message
-                    appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message), copyable = true)
+                    recordMutationFailure(R.string.toast_couldnt_update_admin, "GROUP_MEMBER_ADMIN_UPDATE", it)
                 }.getOrDefault(false)
             }
         }
@@ -8823,12 +8880,10 @@ class ConversationController(
                         Log.w("DMConversation", "refresh after retention update failed for ${group.groupIdHex.take(8)}", refreshError)
                         publishTimelineFromIndexes()
                     }
-                appState.present(R.string.toast_disappearing_messages_updated)
+                appState.presentTransient(R.string.toast_disappearing_messages_updated)
                 true
             }.onFailure {
-                val message = mutationError(it)
-                lastMutationError = message
-                appState.present(R.string.toast_couldnt_update_disappearing, AppText.Plain(message), copyable = true)
+                recordMutationFailure(R.string.toast_couldnt_update_disappearing, "GROUP_RETENTION_UPDATE", it)
             }.getOrDefault(false)
         }
 
@@ -8863,9 +8918,7 @@ class ConversationController(
                 refreshManagementState()
                 true
             }.onFailure {
-                val message = mutationError(it)
-                lastMutationError = message
-                appState.present(R.string.toast_couldnt_enable_disbanding, AppText.Plain(message), copyable = true)
+                recordMutationFailure(R.string.toast_couldnt_enable_disbanding, "GROUP_DISBAND_ENABLE", it)
             }.getOrDefault(false)
         }
 
@@ -8884,9 +8937,7 @@ class ConversationController(
                 refreshManagementState()
                 true
             }.onFailure {
-                val message = mutationError(it)
-                lastMutationError = message
-                appState.present(R.string.toast_couldnt_disband, AppText.Plain(message), copyable = true)
+                recordMutationFailure(R.string.toast_couldnt_disband, "GROUP_DISBAND", it)
             }.getOrDefault(false)
         }
 
@@ -8928,9 +8979,7 @@ class ConversationController(
                     }
                 presentAdminCommitOutcome(outcome, adminAdded = false)
             }.onFailure {
-                val message = mutationError(it)
-                lastMutationError = message
-                appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message), copyable = true)
+                recordMutationFailure(R.string.toast_couldnt_update_admin, "GROUP_SELF_DEMOTE", it)
             }.getOrDefault(false)
         }
 
@@ -8992,17 +9041,15 @@ class ConversationController(
                     appState.present(R.string.toast_couldnt_update_admin, R.string.toast_cant_transfer_admin, copyable = true)
                     return@runCatchingCancellable false
                 }
-                appState.present(R.string.toast_admin_transferred)
+                appState.presentTransient(R.string.toast_admin_transferred)
                 true
             }.onFailure {
-                val message = mutationError(it)
-                lastMutationError = message
                 if (grantedBeforeDemote) {
                     // Target is now an admin but we couldn't step down. Tell the user
                     // so they can retry the step-down (or revoke the grant).
-                    appState.present(R.string.toast_granted_but_couldnt_step_down, AppText.Plain(message), copyable = true)
+                    recordMutationFailure(R.string.toast_granted_but_couldnt_step_down, "GROUP_ADMIN_TRANSFER_STEP_DOWN", it)
                 } else {
-                    appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message), copyable = true)
+                    recordMutationFailure(R.string.toast_couldnt_update_admin, "GROUP_ADMIN_TRANSFER", it)
                 }
             }.getOrDefault(false)
         }
@@ -9027,7 +9074,7 @@ class ConversationController(
         return runCatchingCancellable {
             appState.marmotIo { groupMlsState(account, group.groupIdHex) }
         }.onFailure {
-            appState.present(R.string.toast_couldnt_load_mls_state, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
+            appState.presentFailure(R.string.toast_couldnt_load_mls_state, "GROUP_MLS_STATE_LOAD", it)
         }.getOrNull()
     }
 
@@ -9036,11 +9083,7 @@ class ConversationController(
         return runCatchingCancellable {
             appState.marmotIo { groupPushDebugInfo(account, group.groupIdHex) }
         }.onFailure {
-            appState.present(
-                R.string.toast_couldnt_load_push_debug_info,
-                AppText.Plain(it.message ?: it.javaClass.simpleName),
-                copyable = true,
-            )
+            appState.presentFailure(R.string.toast_couldnt_load_push_debug_info, "GROUP_PUSH_DEBUG_LOAD", it)
         }.getOrNull()
     }
 
@@ -9078,11 +9121,7 @@ class ConversationController(
                 )
             }
         }.onFailure {
-            appState.present(
-                R.string.toast_couldnt_export_transcript,
-                AppText.Plain(DiagnosticFormatter.redactError(it.message ?: it.javaClass.simpleName)),
-                copyable = true,
-            )
+            appState.presentFailure(R.string.toast_couldnt_export_transcript, "CONVERSATION_TRANSCRIPT_EXPORT", it)
         }.getOrNull()
     }
 
@@ -9224,7 +9263,7 @@ class ConversationController(
         // that we're actually retrying, otherwise the stale banner sits over
         // a successful retry and a developer can't distinguish "still broken"
         // from "we forgot to clear it".
-        error = null
+        pageError = null
         isLoadingOlder = true
         return try {
             // The subscription's paginate_backwards extends the runtime's
@@ -9233,6 +9272,7 @@ class ConversationController(
             // and cap-trimmed. We render it directly via replaceWindow=true.
             val page = paginateOlderIfSubscriptionActive(subscription) ?: return false
             hasLoadedOlderPages = true
+            failedPageDirection = null
             applyTimelinePage(page, replaceWindow = true, updatePagination = true)
             protectedTimelineMessageIds.clear()
             protectedTimelineMessageIds.addAll(timelineRecords.keys)
@@ -9244,7 +9284,13 @@ class ConversationController(
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
-            error = throwable.message ?: throwable.javaClass.simpleName
+            failedPageDirection = ConversationSearchPageDirection.OLDER
+            pageError =
+                privacySafeErrorPresentation(
+                    "CONVERSATION_PAGE_OLDER",
+                    throwable,
+                    AppText.Resource(R.string.error_loaded_content_kept),
+                )
             false
         } finally {
             isLoadingOlder = false
@@ -9255,7 +9301,7 @@ class ConversationController(
         val subscription = timelineSubscription
         if (!hasMoreAfter || isLoadingOlder || subscription == null) return false
         val priorMessageIds = timelineRecords.keys.toSet()
-        error = null
+        pageError = null
         isLoadingOlder = true
         return try {
             val page = paginateNewerIfSubscriptionActive(subscription)
@@ -9263,6 +9309,7 @@ class ConversationController(
                 false
             } else {
                 applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+                failedPageDirection = null
                 protectedTimelineMessageIds.clear()
                 if (hasLoadedOlderPages) {
                     protectedTimelineMessageIds.addAll(timelineRecords.keys)
@@ -9273,10 +9320,30 @@ class ConversationController(
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
-            error = throwable.message ?: throwable.javaClass.simpleName
+            failedPageDirection = ConversationSearchPageDirection.NEWER
+            pageError =
+                privacySafeErrorPresentation(
+                    "CONVERSATION_PAGE_NEWER",
+                    throwable,
+                    AppText.Resource(R.string.error_loaded_content_kept),
+                )
             false
         } finally {
             isLoadingOlder = false
+        }
+    }
+
+    suspend fun retryLoadFailure() {
+        when (failedPageDirection?.takeIf { pageError != null }) {
+            ConversationSearchPageDirection.OLDER -> loadOlderPage()
+            ConversationSearchPageDirection.NEWER -> loadNewerPage()
+            null ->
+                if (terminalLoadFailure) {
+                    terminalLoadFailure = false
+                    retryGeneration += 1L
+                } else {
+                    retryLoadSignal.trySend(Unit)
+                }
         }
     }
 
@@ -10735,7 +10802,7 @@ class ConversationController(
                             )
                         }
                         is AgentStreamUpdateFfi.Failed -> {
-                            updateStreamPreview(streamId, copy.streamFailed(update.message), MessageStatus.Failed)
+                            updateStreamPreview(streamId, copy.streamFailed(), MessageStatus.Failed)
                         }
                         // Typed Hermes-agent variants (Progress / Record / Status)
                         // are surfaced only through the streaming-debug rows above;

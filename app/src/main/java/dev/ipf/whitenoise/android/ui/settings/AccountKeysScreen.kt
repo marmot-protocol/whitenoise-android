@@ -448,7 +448,7 @@ internal fun AccountKeysScreen(
                 appState.launchMutation {
                     try {
                         when (appState.signOutActiveAccount(deleteKeyPackages)) {
-                            SignOutCompletion.Complete -> appState.present(R.string.toast_signed_out)
+                            SignOutCompletion.Complete -> appState.presentTransient(R.string.toast_signed_out)
                             // Local sign-out completed but the engine call
                             // failed or reported relay cleanup failures. This
                             // is informational and not copyable (#966); MDK
@@ -560,7 +560,7 @@ internal fun AccountKeysScreen(
                                 } else {
                                     val report = wipeReport(outcome)
                                     if (report.clean) {
-                                        appState.present(R.string.toast_signed_out_and_wiped)
+                                        appState.presentTransient(R.string.toast_signed_out_and_wiped)
                                     } else {
                                         // Local wipe completed regardless; the
                                         // app-root sheet lists the best-effort
