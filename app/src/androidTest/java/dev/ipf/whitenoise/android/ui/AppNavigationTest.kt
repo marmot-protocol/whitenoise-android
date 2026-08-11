@@ -126,18 +126,16 @@ class AppNavigationTest {
     }
 
     @Test
-    fun loadingScreenHasNoBrandingText() {
-        // LoadingScreen is a bare centered spinner — no branding text. Its visual
-        // rendering is covered by the Roborazzi screenshot pilot; this just guards
-        // that stray branding copy doesn't creep back onto it.
+    fun loadingScreenShowsBrandedProgress() {
         composeRule.setContent {
             WhiteNoiseTheme {
                 LoadingScreen()
             }
         }
 
-        composeRule.onNodeWithText("Loading White Noise").assertDoesNotExist()
-        composeRule.onNodeWithText("Starting Marmot").assertDoesNotExist()
+        composeRule.onNodeWithText("White Noise").assertIsDisplayed()
+        composeRule.onNodeWithText("Starting securely…").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("White Noise logo").assertIsDisplayed()
     }
 
     @Test

@@ -6,6 +6,7 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
@@ -62,6 +63,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
+        val splashInstalledAtMs = SystemClock.elapsedRealtime()
         val initialSystemDarkTheme = resources.configuration.isNightModeActive
         // Apply the pre-Compose theme here, not in attachBaseContext: the window
         // doesn't exist that early, so Activity.setTheme() NPEs on getWindow().
@@ -69,7 +71,7 @@ class MainActivity : FragmentActivity() {
         setTheme(preComposeThemeFor(readPersistedThemeMode(), initialSystemDarkTheme))
         super.onCreate(savedInstanceState)
         appState = (application as WhiteNoiseApplication).appState
-        holdSplashThroughBootstrap(splashScreen)
+        holdSplashThroughBootstrap(splashScreen, splashInstalledAtMs)
         appState.onAllowChatScreenshotsChanged = allowChatScreenshotsCallback
         applyRecentsPreferenceSecureFlag(
             allowChatScreenshots = ChatScreenshotPreferences.readAllowChatScreenshots(this),
@@ -159,8 +161,16 @@ class MainActivity : FragmentActivity() {
     // Keep the system splash (icon on the themed window background) up until
     // engine bootstrap flips the phase, instead of a bare spinner mid-boot.
     // Installed before super.onCreate, held from here once appState exists.
-    private fun holdSplashThroughBootstrap(splashScreen: androidx.core.splashscreen.SplashScreen) {
-        splashScreen.setKeepOnScreenCondition { appState.phase == AppPhase.Bootstrapping }
+    private fun holdSplashThroughBootstrap(
+        splashScreen: androidx.core.splashscreen.SplashScreen,
+        installedAtMs: Long,
+    ) {
+        splashScreen.setKeepOnScreenCondition {
+            shouldRetainSystemSplash(
+                phase = appState.phase,
+                elapsedMs = SystemClock.elapsedRealtime() - installedAtMs,
+            )
+        }
     }
 
     /**
@@ -361,6 +371,18 @@ class MainActivity : FragmentActivity() {
         window.setBackgroundDrawable(ColorDrawable(preComposeWindowBackgroundFor(themeMode, systemDarkTheme)))
     }
 }
+
+internal const val MAX_RETAINED_SYSTEM_SPLASH_MILLIS = 1_500L
+
+/**
+ * The platform splash is deliberately brief. A slow engine handoff continues
+ * on the branded Compose startup surface instead of looking like a frozen,
+ * featureless window (#1921).
+ */
+internal fun shouldRetainSystemSplash(
+    phase: AppPhase,
+    elapsedMs: Long,
+): Boolean = phase == AppPhase.Bootstrapping && elapsedMs < MAX_RETAINED_SYSTEM_SPLASH_MILLIS
 
 internal fun preComposeThemeFor(
     themeMode: AppThemeMode,

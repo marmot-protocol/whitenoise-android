@@ -3,6 +3,8 @@
     <string name="app_name">White Noise</string>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise konnte nicht gestartet werden</string>
+    <string name="starting_securely">Sicherer Start…</string>
+    <string name="startup_taking_too_long">Der Start dauert länger als erwartet. Bitte versuche es erneut.</string>
     <string name="error_try_again">Etwas ist schiefgelaufen. Versuche es erneut. Wenn das Problem weiterhin besteht, kopiere den Fehlerbericht.</string>
     <string name="error_loaded_content_may_be_out_of_date">Ihre geladenen Inhalte sind weiterhin verfügbar, könnten aber veraltet sein. Wird erneut versucht…</string>
     <string name="error_loaded_content_kept">Weitere Inhalte konnten nicht geladen werden. Deine Nachrichten sind weiterhin verfügbar; versuche es erneut, wenn du bereit bist.</string>

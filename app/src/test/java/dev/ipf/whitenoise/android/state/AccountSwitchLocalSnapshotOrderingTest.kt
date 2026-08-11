@@ -35,7 +35,10 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
         assertTrue("a blocked catch-up must run outside the controller bind job", "notificationScope.launch" in body)
         assertTrue("rapid account rebinds must share an active catch-up", "accountCatchUpJob?.isActive == true" in body)
-        assertTrue("the background job must run the best-effort catch-up", "catchUpAccounts()" in body)
+        assertTrue(
+            "the background job must run the result-bearing best-effort catch-up",
+            "catchUpAccountsBestEffort()" in body,
+        )
     }
 
     @Test
@@ -100,6 +103,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue(
             "trace must reject a controller that is no longer active",
             "activeAccountRef != accountRef" in recorder,
+        )
+        assertTrue(
+            "a stale controller must be rejected before publishing startup readiness",
+            recorder.indexOf("activeAccountRef != accountRef") <
+                recorder.indexOf("recordStartupLocalSnapshotRendered()"),
         )
         assertTrue(
             "trace must use a monotonic elapsed clock",

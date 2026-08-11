@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.TransientNotice
+import dev.ipf.whitenoise.android.ui.onboarding.WhiteNoiseLogoLockup
 
 internal enum class LoadFailurePlacement {
     None,
@@ -60,8 +61,26 @@ internal fun loadFailurePlacement(
 
 @Composable
 fun LoadingScreen() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            WhiteNoiseLogoLockup(size = 72.dp)
+            Text(
+                text = stringResource(R.string.white_noise),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            CircularProgressIndicator(
+                modifier = Modifier.size(32.dp),
+                strokeWidth = 3.dp,
+            )
+            Text(
+                text = stringResource(R.string.starting_securely),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
     }
 }
 

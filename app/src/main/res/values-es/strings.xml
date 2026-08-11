@@ -3,6 +3,8 @@
     <string name="app_name">White Noise</string>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">No se pudo iniciar White Noise</string>
+    <string name="starting_securely">Iniciando de forma segura…</string>
+    <string name="startup_taking_too_long">El inicio está tardando más de lo esperado. Inténtalo de nuevo.</string>
     <string name="error_try_again">Algo salió mal. Inténtalo de nuevo; si el problema continúa, copia el informe de error.</string>
     <string name="error_loaded_content_may_be_out_of_date">El contenido cargado sigue disponible, pero puede estar desactualizado. Reintentando…</string>
     <string name="error_loaded_content_kept">No se pudo cargar más contenido. Tus mensajes siguen disponibles; vuelve a intentarlo cuando quieras.</string>
