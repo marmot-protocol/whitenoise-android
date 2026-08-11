@@ -7,6 +7,7 @@ root=${1:?candidate root is required}
 : "${BUILD_RUN_NUMBER:?BUILD_RUN_NUMBER is required}"
 
 expected_version=2000000000
+expected_sha=${HEAD_SHA:0:7}
 
 for channel in stable isolated; do
   dir="$root/$channel"
@@ -25,6 +26,9 @@ for channel in stable isolated; do
     printf 'Expected exactly one %s candidate, found %d\n' "$channel" "${#apks[@]}" >&2
     exit 1
   fi
+  [[ $(stat -c '%s' "${apks[0]}") -le 157286400 ]]
+  zipinfo -t "${apks[0]}" >/dev/null
+  [[ $(zipinfo -1 "${apks[0]}" | wc -l) -le 50000 ]]
 
   if [[ "$channel" == stable ]]; then
     expected_package=dev.ipf.whitenoise.android.preview
@@ -34,6 +38,11 @@ for channel in stable isolated; do
 
   actual_package=$(apkanalyzer manifest application-id "${apks[0]}")
   actual_version=$(apkanalyzer manifest version-code "${apks[0]}")
+  actual_version_name=$(apkanalyzer manifest version-name "${apks[0]}")
   [[ "$actual_package" == "$expected_package" ]]
   [[ "$actual_version" == "$expected_version" ]]
+  [[ "$actual_version_name" == *"preview-pr${PR_NUMBER}-${expected_sha}"* ]]
+  mapfile -t native_abis < <(zipinfo -1 "${apks[0]}" | sed -nE 's#^lib/([^/]+)/.+#\1#p' | sort -u)
+  (( ${#native_abis[@]} == 1 ))
+  [[ "${native_abis[0]}" == "arm64-v8a" ]]
 done

@@ -7,6 +7,7 @@ keystore=${3:?keystore path is required}
 : "${PR_PREVIEW_KEYSTORE_PASSWORD:?PR_PREVIEW_KEYSTORE_PASSWORD is required}"
 : "${PR_PREVIEW_KEY_ALIAS:?PR_PREVIEW_KEY_ALIAS is required}"
 : "${PR_PREVIEW_KEY_PASSWORD:?PR_PREVIEW_KEY_PASSWORD is required}"
+: "${PR_PREVIEW_CERT_SHA256:?PR_PREVIEW_CERT_SHA256 is required}"
 
 apksigner=$(find "${ANDROID_HOME:?ANDROID_HOME is required}/build-tools" -type f -name apksigner -print | sort -V | tail -1)
 test -x "$apksigner"
@@ -22,6 +23,10 @@ for channel in stable isolated; do
     --key-pass env:PR_PREVIEW_KEY_PASSWORD \
     --out "$output" \
     "$input"
-  "$apksigner" verify --verbose --print-certs "$output"
+  cert_digest=$(
+    "$apksigner" verify --verbose --print-certs "$output" |
+      sed -n 's/^Signer #1 certificate SHA-256 digest: //p'
+  )
+  expected_digest=$(printf '%s' "$PR_PREVIEW_CERT_SHA256" | tr -d ':' | tr '[:upper:]' '[:lower:]')
+  [[ "${cert_digest,,}" == "$expected_digest" ]]
 done
-

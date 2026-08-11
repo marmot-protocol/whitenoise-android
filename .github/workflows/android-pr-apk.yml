@@ -29,7 +29,9 @@ jobs:
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
       PR_PREVIEW_CHANNEL: ${{ matrix.channel }}
+      PREVIEW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       GITHUB_RUN_NUMBER: ${{ github.run_number }}
+      WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
 
     steps:
       - name: Checkout PR commit without credentials
@@ -52,8 +54,10 @@ jobs:
       - name: Test preview workflow contract
         run: .github/scripts/test-pr-preview-contract.sh
 
+      # The Play distribution deliberately omits Zapstore's production-style
+      # self-updater. Preview APKs are replaced only from the PR install link.
       - name: Assemble preview candidate
-        run: ./gradlew :app:assembleDevZapstoreDebug --no-daemon --stacktrace
+        run: ./gradlew :app:assemblePreviewPlayRelease --no-daemon --stacktrace
 
       - name: Stage candidate and provenance
         shell: bash
@@ -63,7 +67,7 @@ jobs:
           test -n "$apk"
           mkdir -p preview-candidate
           cp "$apk" "preview-candidate/whitenoise-pr-${PR_NUMBER}-${PR_PREVIEW_CHANNEL}-unsigned.apk"
-          sha256sum preview-candidate/*.apk > preview-candidate/SHA256SUMS
+          (cd preview-candidate && sha256sum *.apk > SHA256SUMS)
           printf '%s\n' \
             "pr_number=$PR_NUMBER" \
             "channel=$PR_PREVIEW_CHANNEL" \

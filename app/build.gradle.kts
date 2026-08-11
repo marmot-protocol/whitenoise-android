@@ -148,7 +148,8 @@ val prPreviewChannel: String? = System.getenv("PR_PREVIEW_CHANNEL")?.takeIf { it
 val prPreviewVersionCode = 2_000_000_000
 val defaultAppName = "White Noise"
 val buildShortSha =
-    System.getenv("GITHUB_SHA")?.take(7)
+    System.getenv("PREVIEW_HEAD_SHA")?.take(7)
+        ?: System.getenv("GITHUB_SHA")?.take(7)
         ?: System.getenv("GIT_COMMIT")?.take(7)
         ?: "local"
 
@@ -201,30 +202,9 @@ android {
     productFlavors {
         create("dev") {
             dimension = "environment"
-            // PR_PREVIEW_CHANNEL is accepted only with PR_NUMBER. Keeping this
-            // branch explicit makes package identity a reviewable contract.
-            if (prNumber != null) {
-                manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher_preview"
-                manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_preview"
-                when (prPreviewChannel) {
-                    "stable" -> {
-                        applicationIdSuffix = ".preview"
-                        versionNameSuffix = "-preview-pr$prNumber"
-                        manifestPlaceholders["appName"] = "Preview $defaultAppName"
-                    }
-                    "isolated" -> {
-                        applicationIdSuffix = ".preview.pr$prNumber"
-                        versionNameSuffix = "-preview-pr$prNumber-isolated"
-                        manifestPlaceholders["appName"] = "PR $prNumber $defaultAppName"
-                    }
-                    else -> error("PR_PREVIEW_CHANNEL must be 'stable' or 'isolated' when PR_NUMBER is set")
-                }
-                versionCode = prPreviewVersionCode
-            } else {
-                applicationIdSuffix = ".dev"
-                versionNameSuffix = "-dev"
-                manifestPlaceholders["appName"] = defaultAppName
-            }
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            manifestPlaceholders["appName"] = defaultAppName
             manifestPlaceholders["deepLinkScheme"] = "whitenoise-dev"
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-dev".asBuildConfigString())
             buildConfigField(
@@ -271,6 +251,38 @@ android {
                 "WHITENOISE_PUSH_RELAY_HINT",
                 environmentRuntimeConfigProperty("dev", "PUSH_RELAY_HINT").asBuildConfigString(),
             )
+        }
+
+        create("preview") {
+            dimension = "environment"
+            val previewIdentity = prNumber ?: "local"
+            val previewChannel = prPreviewChannel ?: "stable"
+            manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher_preview"
+            manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_preview"
+            manifestPlaceholders["deepLinkScheme"] = "whitenoise-preview"
+            buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-preview".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_OTLP_ENDPOINT", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_OTLP_AUTH_TOKEN", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_AUDIT_LOG_ENDPOINT", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_AUDIT_LOG_AUTH_TOKEN", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "preview".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_TELEMETRY_TENANT", "whitenoise-android-preview".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_PUSH_SERVER_PUBKEY_HEX", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_PUSH_RELAY_HINT", "".asBuildConfigString())
+            versionCode = prPreviewVersionCode
+            when (previewChannel) {
+                "stable" -> {
+                    applicationIdSuffix = ".preview"
+                    versionNameSuffix = "-preview-pr$previewIdentity-$buildShortSha"
+                    manifestPlaceholders["appName"] = "PR $previewIdentity Preview"
+                }
+                "isolated" -> {
+                    applicationIdSuffix = ".preview.pr$previewIdentity"
+                    versionNameSuffix = "-preview-pr$previewIdentity-$buildShortSha-isolated"
+                    manifestPlaceholders["appName"] = "PR $previewIdentity Isolated"
+                }
+                else -> error("PR_PREVIEW_CHANNEL must be 'stable' or 'isolated'")
+            }
         }
 
         create("production") {
@@ -433,16 +445,6 @@ android {
         }
     }
 
-    // PR preview builds reuse the staging flavor's blueprint launcher icon so
-    // the app on a tester's home screen is visually distinct from the
-    // production/local-dev icon. Layered on top of the dev flavor's own
-    // resources so anything else in src/dev/res still wins over src/staging/res.
-    if (prNumber != null) {
-        sourceSets.getByName("dev") {
-            res.srcDirs("src/staging/res")
-        }
-    }
-
     buildTypes {
         debug {
             // Debug builds keep each flavor's applicationId so the local
@@ -527,6 +529,7 @@ androidComponents {
                             "benchmarkRelease",
                             "nonMinifiedRelease",
                         )
+                "preview" -> variantBuilder.buildType == "release"
                 "production", "staging" -> variantBuilder.buildType == "release"
                 else -> true
             }

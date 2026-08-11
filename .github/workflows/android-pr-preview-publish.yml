@@ -92,6 +92,7 @@ jobs:
           PR_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.PR_PREVIEW_KEYSTORE_PASSWORD }}
           PR_PREVIEW_KEY_ALIAS: ${{ secrets.PR_PREVIEW_KEY_ALIAS }}
           PR_PREVIEW_KEY_PASSWORD: ${{ secrets.PR_PREVIEW_KEY_PASSWORD }}
+          PR_PREVIEW_CERT_SHA256: ${{ secrets.PR_PREVIEW_CERT_SHA256 }}
         shell: bash
         run: .github/scripts/sign-pr-preview-candidates.sh candidates signed "$RUNNER_TEMP/pr-preview.p12"
 
@@ -138,7 +139,9 @@ jobs:
               '',
               `**[Install/update Preview White Noise](${process.env.STABLE_URL})** — keeps app data when switching PRs.`,
               '',
-              `[Isolated PR #${pr} build](${process.env.ISOLATED_URL}) — separate app/data for side-by-side or storage-sensitive testing.`,
+              `This replaces the current PR Preview and retains its accounts and history.`,
+              '',
+              `[Isolated PR #${pr}](${process.env.ISOLATED_URL}) — use for storage/auth changes or side-by-side testing.`,
             ].join('\n');
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner, repo: context.repo.repo, issue_number: pr, per_page: 100,
