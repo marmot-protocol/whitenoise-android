@@ -12,7 +12,6 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imeNestedScroll
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -216,8 +214,6 @@ private val COMPOSER_SNACKBAR_INSET = 72.dp
 
 private const val MEDIA_PICKER_MAX_ITEMS = 10
 
-private const val IME_SETTLE_MAX_FRAMES = 24
-
 // Foreground catch-up normally materializes almost immediately. Keep the
 // background-arrival listener bounded so a later, genuinely foreground
 // message does not unexpectedly start an otherwise idle auto-reader.
@@ -276,9 +272,6 @@ private fun LazyListScope.conversationLoadErrorItem(
         )
     }
 }
-
-@OptIn(ExperimentalLayoutApi::class)
-private fun Modifier.conversationImeNestedScroll(): Modifier = imeNestedScroll()
 
 /** Whether adjacent timeline items participate in one visible message-bubble sender run. */
 internal fun conversationBubbleRowsShareSenderRun(
@@ -1143,7 +1136,8 @@ internal fun ConversationScreen(
     val composerFocus = remember(chat.id) { FocusRequester() }
     var composerFocused by remember(chat.id) { mutableStateOf(false) }
     var composerDismissInProgress by remember(chat.id) { mutableStateOf(false) }
-    var imeTransitionBookmark by remember(chat.id) { mutableStateOf<ConversationScrollBookmark?>(null) }
+    val imeTransitionBookmarkState = remember(chat.id) { mutableStateOf<ConversationScrollBookmark?>(null) }
+    var imeTransitionBookmark by imeTransitionBookmarkState
     val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -1962,33 +1956,17 @@ internal fun ConversationScreen(
         }
         unreadDivergenceLogged = true
     }
-    // IME re-anchoring is authorized by the coordinator snapshot taken at
-    // the pre-inset focus edge, never by transient live list geometry.
-    LaunchedEffect(controller, imeIsOpen, initialTimelineAnchored) {
-        if (!imeIsOpen) {
-            imeTransitionBookmark = null
-            return@LaunchedEffect
-        }
-        if (scrollCoordinator.foregroundRestoreInProgress) return@LaunchedEffect
-        val suppressForCustomInputSwap = suppressNextImeOpenReanchor.getAndSet(false)
-        if (!initialTimelineAnchored || suppressForCustomInputSwap) return@LaunchedEffect
-        awaitStableImeInset(
-            maxFrames = IME_SETTLE_MAX_FRAMES,
-            readInset = { imeInsets.getBottom(density) },
-            awaitFrame = { withFrameNanos { } },
-        )
-        val snapshot = imeTransitionBookmark ?: scrollCoordinator.bookmark(currentScrollAnchor())
-        when (snapshot.settledMode) {
-            ConversationScrollMode.FollowingTail ->
-                scrollCoordinator.followTailIfAllowed(
-                    resolveTailIndex = { currentTailIndex },
-                    reason = ConversationScrollReason.ImeTransition,
-                )
-            is ConversationScrollMode.ReadingHistory ->
-                scrollCoordinator.restoreBookmark(snapshot, resolveAnchorIndex = ::resolveScrollAnchorIndex)
-            else -> Unit
-        }
-    }
+    ConversationImeReanchorEffect(
+        controller = controller,
+        scrollCoordinator = scrollCoordinator,
+        imeIsOpen = imeIsOpen,
+        initialTimelineAnchored = initialTimelineAnchored,
+        imeTransitionBookmark = imeTransitionBookmarkState,
+        suppressNextImeOpenReanchor = suppressNextImeOpenReanchor,
+        currentScrollAnchor = { currentScrollAnchor() },
+        resolveScrollAnchorIndex = ::resolveScrollAnchorIndex,
+        currentTailIndex = { currentTailIndex },
+    )
     // #589/#1888: app-switch resume handling. Android/Compose can restore the
     //   BasicTextField focus and IME visibility on its own, popping a keyboard
     //   the user never asked for. We snapshot the composer focus on ON_PAUSE
@@ -2457,7 +2435,6 @@ internal fun ConversationScreen(
         modifier =
             Modifier
                 .fillMaxSize()
-                .conversationImeNestedScroll()
                 .dismissTextSelectionOnOutsideTap(
                     active = textSelectionMessageId != null,
                     selectedBoundsInWindow = textSelectionBubbleBounds,
