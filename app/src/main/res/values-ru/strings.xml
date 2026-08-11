@@ -626,6 +626,7 @@
     <string name="toast_couldnt_publish_profile">Не удалось опубликовать профиль</string>
     <string name="toast_send_failed">Отправить не удалось</string>
     <string name="toast_send_queue_full">В этом чате слишком много сообщений ожидает отправки, поэтому ваше не отправлено. Повторите попытку, когда очередь разберётся.</string>
+    <string name="toast_chat_still_loading">Этот чат ещё загружается. Повторите попытку чуть позже.</string>
     <string name="toast_send_membership_verifying">Проверяем ваше участие в группе — сообщение не отправлено. Оно сохранено в поле ввода; повторите попытку через мгновение.</string>
     <string name="toast_reaction_failed">Реакция не удалась</string>
     <string name="toast_couldnt_delete_message">Не удалось удалить сообщение. Попробуйте снова.</string>
