@@ -305,6 +305,47 @@ class TtsPlaybackQueueProgressTest {
     }
 
     @Test
+    fun oneChunkNoRangeCompletionPublishesTerminalIdleProgress() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        queue.start(ttsMessages(ttsMessage("", "", "Hello.")))
+
+        queue.onDone(harness.utteranceId(0))
+
+        val idle = queue.state.value as TtsState.Idle
+        assertEquals(1f, idle.messageProgressFraction, 0.001f)
+        assertEquals(1, idle.messageCount)
+    }
+
+    @Test
+    fun sameSlotSamePreviewReplacementIncrementsProgressGeneration() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        val sharedPreview = "A".repeat(120)
+        queue.start(
+            ttsMessages(
+                ttsMessageWithId("same", "", "", "Original tail.").copy(preview = sharedPreview),
+            ),
+        )
+        val before = (queue.state.value as TtsState.Speaking).messageProgressGeneration
+        queue.onRangeStart(harness.utteranceId(0), 4, harness.spokenTextLength())
+        assertTrue((queue.state.value as TtsState.Speaking).messageProgressFraction > 0f)
+
+        queue.replaceWindow(
+            window =
+                ttsMessages(
+                    ttsMessageWithId("same", "", "", "Replacement tail.").copy(preview = sharedPreview),
+                ),
+            targetMessageIdHex = "same",
+            targetSentence = TtsWindowSentenceTarget.First,
+        )
+
+        val after = (queue.state.value as TtsState.Speaking).messageProgressGeneration
+        assertTrue(after > before)
+        assertEquals(0f, (queue.state.value as TtsState.Speaking).messageProgressFraction, 0.001f)
+    }
+
+    @Test
     fun requeueInvalidatesRangeCallbacksFromThePreviousGeneration() {
         val harness = TtsQueueHarness()
         val queue = harness.queue

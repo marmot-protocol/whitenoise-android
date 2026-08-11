@@ -14,6 +14,7 @@ sealed interface TtsState {
     val sentenceCountWithinMessage: Int
     val messagePreview: String
     val messageProgressFraction: Float
+    val messageProgressGeneration: Long
 
     data class Idle(
         override val chunkIndex: Int = 0,
@@ -24,6 +25,7 @@ sealed interface TtsState {
         override val sentenceCountWithinMessage: Int = 0,
         override val messagePreview: String = "",
         override val messageProgressFraction: Float = 0f,
+        override val messageProgressGeneration: Long = 0L,
     ) : TtsState
 
     data class Speaking(
@@ -35,6 +37,7 @@ sealed interface TtsState {
         override val sentenceCountWithinMessage: Int,
         override val messagePreview: String,
         override val messageProgressFraction: Float = 0f,
+        override val messageProgressGeneration: Long = 0L,
     ) : TtsState
 
     data class Paused(
@@ -46,6 +49,7 @@ sealed interface TtsState {
         override val sentenceCountWithinMessage: Int,
         override val messagePreview: String,
         override val messageProgressFraction: Float = 0f,
+        override val messageProgressGeneration: Long = 0L,
     ) : TtsState
 
     data class Error(
@@ -58,6 +62,7 @@ sealed interface TtsState {
         override val sentenceCountWithinMessage: Int,
         override val messagePreview: String,
         override val messageProgressFraction: Float = 0f,
+        override val messageProgressGeneration: Long = 0L,
     ) : TtsState
 }
 
@@ -124,6 +129,7 @@ internal class TtsPlaybackQueue(
     private var messageSentenceCount: IntArray = intArrayOf()
     private var currentIndex = 0
     private var generation = 0L
+    private var messageProgressGeneration = 0L
     private var refreshAtNextBoundary = false
     private var announceSenderForCurrentMessage = false
     private var senderAnnouncedAtMessageIndex: Int? = null
@@ -164,6 +170,7 @@ internal class TtsPlaybackQueue(
     fun start(messages: List<TtsQueuedMessage>) {
         stopEngine()
         generation += 1
+        messageProgressGeneration += 1
         refreshAtNextBoundary = false
         replaceMessages(messages)
         currentIndex = 0
@@ -391,6 +398,7 @@ internal class TtsPlaybackQueue(
         val active = current is TtsState.Speaking || current is TtsState.Paused
         val targetMessage = window.indexOfFirst { it.messageIdHex == targetMessageIdHex }
         if (!active || targetMessage < 0) return false
+        messageProgressGeneration += 1
         val currentMessageId = messageIdAt(messageIndexForChunk(currentIndex))
         val announcedId = senderAnnouncedAtMessageIndex?.let(::messageIdAt)
         val pausedId = messageIndexAtPause?.let(::messageIdAt)
@@ -623,6 +631,7 @@ internal class TtsPlaybackQueue(
                 sentenceCountWithinMessage = lastSentenceCount,
                 messagePreview = lastPreview,
                 messageProgressFraction = 1f,
+                messageProgressGeneration = messageProgressGeneration,
             )
         onTerminal()
     }
@@ -660,6 +669,7 @@ internal class TtsPlaybackQueue(
                 sentenceCountWithinMessage = sentenceCount,
                 messagePreview = messagePreview,
                 messageProgressFraction = messageProgressFraction,
+                messageProgressGeneration = messageProgressGeneration,
             )
         onTerminal()
     }
@@ -872,6 +882,7 @@ internal class TtsPlaybackQueue(
                 sentenceCountWithinMessage = messageSentenceCount[messageIndex],
                 messagePreview = messages[messageIndex].preview,
                 messageProgressFraction = progress.fraction,
+                messageProgressGeneration = messageProgressGeneration,
             )
     }
 
@@ -893,6 +904,7 @@ internal class TtsPlaybackQueue(
                 sentenceCountWithinMessage = messageSentenceCount[messageIndex],
                 messagePreview = messages[messageIndex].preview,
                 messageProgressFraction = progress.fraction,
+                messageProgressGeneration = messageProgressGeneration,
             )
     }
 

@@ -56,14 +56,13 @@ internal fun TtsTransportBar(
     modifier: Modifier = Modifier,
 ) {
     val state by appState.ttsController.state.collectAsState()
-    val current = state
-    if (current is TtsState.Idle) return
+    val displayState = rememberTtsTransportDisplayState(state) ?: return
     val rateOverride by appState.ttsRatePreferences.rateOverride.collectAsState()
     val historyEdge by appState.ttsHistorySession.edgeState.collectAsState()
     val activeRate = rateOverride ?: appState.ttsRatePreferences.resolvedRate()
 
     TtsTransportBarContent(
-        state = current,
+        state = displayState,
         rateOverride = rateOverride,
         activeRate = activeRate,
         onPause = { appState.ttsController.pause() },
@@ -228,27 +227,6 @@ internal fun TtsTransportBarContent(
         }
     }
 }
-
-internal fun ttsMessageIndex(state: TtsState): Int = state.messageIndex
-
-internal fun ttsMessageCount(state: TtsState): Int = state.messageCount
-
-internal fun ttsSentenceIndex(state: TtsState): Int = state.sentenceIndexWithinMessage
-
-internal fun ttsSentenceCount(state: TtsState): Int = state.sentenceCountWithinMessage
-
-internal fun ttsMessageProgressFraction(state: TtsState): Float = state.messageProgressFraction.coerceIn(0f, 1f)
-
-internal fun ttsProgressAnimationKey(state: TtsState): Pair<Int, String> = state.messageIndex to state.messagePreview
-
-internal fun ttsNavigationEnabled(state: TtsState): Boolean = state !is TtsState.Error && state !is TtsState.Idle
-
-// A pending edge load owns the cursor: every navigation action disables so
-// duplicate or conflicting requests can't queue up behind it.
-internal fun ttsNavigationEnabled(
-    state: TtsState,
-    historyEdge: TtsHistoryEdgeState?,
-): Boolean = ttsNavigationEnabled(state) && historyEdge !is TtsHistoryEdgeState.Loading
 
 // Compact status line for a pending or failed history edge load, announced
 // politely so TalkBack narrates the state change without stealing focus.

@@ -9,6 +9,7 @@ internal fun speakingTts(
     sentenceIndex: Int = 0,
     sentenceCount: Int = 1,
     messageProgressFraction: Float? = null,
+    messageProgressGeneration: Long = 1L,
 ): TtsState.Speaking =
     TtsState.Speaking(
         chunkIndex = chunkIndex,
@@ -19,6 +20,7 @@ internal fun speakingTts(
         sentenceCountWithinMessage = sentenceCount,
         messagePreview = messagePreview,
         messageProgressFraction = messageProgressFraction ?: sentenceProgressFallback(sentenceIndex, sentenceCount),
+        messageProgressGeneration = messageProgressGeneration,
     )
 
 internal fun pausedTts(
@@ -30,6 +32,7 @@ internal fun pausedTts(
     sentenceIndex: Int = 0,
     sentenceCount: Int = 1,
     messageProgressFraction: Float? = null,
+    messageProgressGeneration: Long = 1L,
 ): TtsState.Paused =
     TtsState.Paused(
         chunkIndex = chunkIndex,
@@ -40,6 +43,7 @@ internal fun pausedTts(
         sentenceCountWithinMessage = sentenceCount,
         messagePreview = messagePreview,
         messageProgressFraction = messageProgressFraction ?: sentenceProgressFallback(sentenceIndex, sentenceCount),
+        messageProgressGeneration = messageProgressGeneration,
     )
 
 internal fun idleTts(
@@ -51,6 +55,7 @@ internal fun idleTts(
     sentenceIndex: Int = 0,
     sentenceCount: Int = 0,
     messageProgressFraction: Float? = null,
+    messageProgressGeneration: Long = 1L,
 ): TtsState.Idle =
     TtsState.Idle(
         chunkIndex = chunkIndex,
@@ -61,6 +66,7 @@ internal fun idleTts(
         sentenceCountWithinMessage = sentenceCount,
         messagePreview = messagePreview,
         messageProgressFraction = messageProgressFraction ?: sentenceProgressFallback(sentenceIndex, sentenceCount),
+        messageProgressGeneration = messageProgressGeneration,
     )
 
 internal fun errorTts(
@@ -73,6 +79,7 @@ internal fun errorTts(
     sentenceIndex: Int = 0,
     sentenceCount: Int = 0,
     messageProgressFraction: Float? = null,
+    messageProgressGeneration: Long = 1L,
 ): TtsState.Error =
     TtsState.Error(
         error = error,
@@ -84,6 +91,7 @@ internal fun errorTts(
         sentenceCountWithinMessage = sentenceCount,
         messagePreview = messagePreview,
         messageProgressFraction = messageProgressFraction ?: sentenceProgressFallback(sentenceIndex, sentenceCount),
+        messageProgressGeneration = messageProgressGeneration,
     )
 
 private fun sentenceProgressFallback(

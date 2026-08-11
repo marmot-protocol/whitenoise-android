@@ -28,6 +28,7 @@ class TtsPlaybackQueueNavigationTest {
                 sentenceCountWithinMessage = 3,
                 messagePreview = "Beta one. Beta two. Beta three.",
                 messageProgressFraction = 2f / 3f,
+                messageProgressGeneration = 1L,
             ),
             queue.state.value,
         )

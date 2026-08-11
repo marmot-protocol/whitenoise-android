@@ -100,11 +100,22 @@ class TtsTransportBarLogicTest {
 
     @Test
     fun progressAnimationRestartsOnlyWhenTheMessageChanges() {
-        val firstUpdate = speakingTts(0, 2, 0, 3, messageProgressFraction = 0.2f)
-        val sameMessage = speakingTts(0, 2, 0, 4, messageProgressFraction = 0.4f)
-        val nextMessage = speakingTts(1, 2, 1, 4, messageProgressFraction = 0f)
+        val firstUpdate =
+            speakingTts(0, 2, 0, 3, messageProgressFraction = 0.2f, messageProgressGeneration = 1L)
+        val sameMessage =
+            speakingTts(0, 2, 0, 4, messageProgressFraction = 0.4f, messageProgressGeneration = 1L)
+        val nextMessage =
+            speakingTts(1, 2, 1, 4, messageProgressFraction = 0f, messageProgressGeneration = 1L)
         val editedMessage =
-            speakingTts(0, 2, 0, 3, messagePreview = "Edited", messageProgressFraction = 0f)
+            speakingTts(
+                0,
+                2,
+                0,
+                3,
+                messagePreview = "Edited",
+                messageProgressFraction = 0f,
+                messageProgressGeneration = 2L,
+            )
 
         assertEquals(ttsProgressAnimationKey(firstUpdate), ttsProgressAnimationKey(sameMessage))
         assertEquals(false, ttsProgressAnimationKey(firstUpdate) == ttsProgressAnimationKey(nextMessage))
@@ -112,5 +123,32 @@ class TtsTransportBarLogicTest {
             false,
             ttsProgressAnimationKey(firstUpdate) == ttsProgressAnimationKey(editedMessage),
         )
+    }
+
+    @Test
+    fun sameSlotSamePreviewReplacementChangesProgressAnimationKey() {
+        val sharedPreview = "A".repeat(120)
+        val before =
+            speakingTts(
+                0,
+                2,
+                0,
+                3,
+                messagePreview = sharedPreview,
+                messageProgressFraction = 0.6f,
+                messageProgressGeneration = 4L,
+            )
+        val after =
+            speakingTts(
+                0,
+                2,
+                0,
+                3,
+                messagePreview = sharedPreview,
+                messageProgressFraction = 0f,
+                messageProgressGeneration = 5L,
+            )
+
+        assertEquals(false, ttsProgressAnimationKey(before) == ttsProgressAnimationKey(after))
     }
 }

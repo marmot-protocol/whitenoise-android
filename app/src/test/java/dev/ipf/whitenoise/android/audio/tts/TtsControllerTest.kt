@@ -284,7 +284,7 @@ class TtsControllerTest {
 
         assertTrue(engine.spoken.isEmpty())
         assertEquals(
-            errorTts(TtsError.Synthesis, 0, 1, 0, 1, "One."),
+            errorTts(TtsError.Synthesis, 0, 1, 0, 1, "One.", messageProgressGeneration = 0L),
             controller.state.value,
         )
         assertEquals(1, focus.acquireCalls)
@@ -306,7 +306,16 @@ class TtsControllerTest {
         staleCompletion?.invoke(staleId)
 
         assertEquals(
-            speakingTts(0, 2, 0, 1, "New one. New two.", sentenceIndex = 0, sentenceCount = 2),
+            speakingTts(
+                0,
+                2,
+                0,
+                1,
+                "New one. New two.",
+                sentenceIndex = 0,
+                sentenceCount = 2,
+                messageProgressGeneration = 2L,
+            ),
             controller.state.value,
         )
         assertEquals(listOf("New one.", "New two."), secondEngine.spoken.map { it.text })

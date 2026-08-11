@@ -38,6 +38,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsHistoryDirection
 import dev.ipf.whitenoise.android.audio.tts.TtsHistoryEdgeState
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.errorTts
+import dev.ipf.whitenoise.android.audio.tts.idleTts
 import dev.ipf.whitenoise.android.audio.tts.pausedTts
 import dev.ipf.whitenoise.android.audio.tts.speakingTts
 import dev.ipf.whitenoise.android.state.TtsRatePreferences
@@ -295,6 +296,79 @@ class TtsTransportBarTest {
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_pause)).assertIsEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_stop)).assertIsEnabled()
     }
+
+    @Test
+    fun oneChunkNoRangeCompletionAnimatesProgressBeforeDismissal() {
+        composeRule.mainClock.autoAdvance = false
+        var state: TtsState by mutableStateOf(singleSentenceSpeakingState())
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                val displayState = rememberTtsTransportDisplayState(state) ?: return@WhiteNoiseTheme
+                TtsTransportBarContent(
+                    state = displayState,
+                    rateOverride = 1.0f,
+                    activeRate = 1.0f,
+                    onPause = {},
+                    onResume = {},
+                    onPreviousSentence = {},
+                    onNextSentence = {},
+                    onPreviousMessage = {},
+                    onNextMessage = {},
+                    onRateSelected = {},
+                    onStop = {},
+                    modifier = Modifier.width(360.dp).testTag(BAR_TAG),
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(BAR_TAG).assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            state = singleSentenceTerminalState()
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BAR_TAG).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_pause)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_play)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
+
+        composeRule.mainClock.advanceTimeBy(201)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BAR_TAG).assertIsDisplayed()
+
+        composeRule.mainClock.advanceTimeBy(50)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BAR_TAG).assertDoesNotExist()
+    }
+
+    private fun singleSentenceSpeakingState() =
+        speakingTts(
+            chunkIndex = 0,
+            chunkCount = 1,
+            messageIndex = 0,
+            messageCount = 1,
+            messagePreview = "Hello.",
+            sentenceIndex = 0,
+            sentenceCount = 1,
+            messageProgressFraction = 0f,
+            messageProgressGeneration = 1L,
+        )
+
+    private fun singleSentenceTerminalState() =
+        idleTts(
+            chunkIndex = 1,
+            chunkCount = 1,
+            messageIndex = 1,
+            messageCount = 1,
+            messagePreview = "Hello.",
+            sentenceIndex = 1,
+            sentenceCount = 1,
+            messageProgressFraction = 1f,
+            messageProgressGeneration = 1L,
+        )
 
     @Test
     fun failedEdgeLoadKeepsNavigationEnabledForRetryAndShowsTheError() {
