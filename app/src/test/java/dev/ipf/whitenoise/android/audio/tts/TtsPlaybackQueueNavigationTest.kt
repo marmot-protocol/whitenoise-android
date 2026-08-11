@@ -4,6 +4,7 @@ import android.speech.tts.TextToSpeech
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
+@Suppress("LargeClass") // This class intentionally keeps the queue's navigation matrix together.
 class TtsPlaybackQueueNavigationTest {
     @Test
     fun skipPreviousMessageFromLaterSentenceStartsPreviousMessage() {
@@ -26,6 +27,8 @@ class TtsPlaybackQueueNavigationTest {
                 sentenceIndexWithinMessage = 2,
                 sentenceCountWithinMessage = 3,
                 messagePreview = "Beta one. Beta two. Beta three.",
+                messageProgressFraction = 2f / 3f,
+                messageProgressGeneration = 1L,
             ),
             queue.state.value,
         )
@@ -185,7 +188,16 @@ class TtsPlaybackQueueNavigationTest {
         queue.skipPreviousSentence()
 
         assertEquals(
-            speakingTts(1, 3, 1, 2, "Beta one. Beta two.", sentenceIndex = 0, sentenceCount = 2),
+            speakingTts(
+                1,
+                3,
+                1,
+                2,
+                "Beta one. Beta two.",
+                sentenceIndex = 0,
+                sentenceCount = 2,
+                messageProgressFraction = 0.5f,
+            ),
             queue.state.value,
         )
         assertEquals("Beta one.", harness.lastSpokenTexts(2).first())
@@ -210,7 +222,16 @@ class TtsPlaybackQueueNavigationTest {
         queue.onDone(harness.utteranceId(1))
         // Mid split sentence: both chunks report the same logical sentence.
         assertEquals(
-            speakingTts(2, 4, 1, 2, "Long sentence. Short.", sentenceIndex = 0, sentenceCount = 2),
+            speakingTts(
+                2,
+                4,
+                1,
+                2,
+                "Long sentence. Short.",
+                sentenceIndex = 0,
+                sentenceCount = 2,
+                messageProgressFraction = 13f / 32f,
+            ),
             queue.state.value,
         )
 
@@ -228,7 +249,16 @@ class TtsPlaybackQueueNavigationTest {
 
         queue.skipPreviousSentence()
         assertEquals(
-            speakingTts(1, 4, 1, 2, "Long sentence. Short.", sentenceIndex = 0, sentenceCount = 2),
+            speakingTts(
+                1,
+                4,
+                1,
+                2,
+                "Long sentence. Short.",
+                sentenceIndex = 0,
+                sentenceCount = 2,
+                messageProgressFraction = 0.5f,
+            ),
             queue.state.value,
         )
         assertEquals("Long part one", harness.lastSpokenTexts(3).first())
@@ -388,7 +418,16 @@ class TtsPlaybackQueueNavigationTest {
         queue.skipPreviousSentence()
 
         assertEquals(
-            pausedTts(0, 3, 0, 1, "One. Two. Three.", sentenceIndex = 0, sentenceCount = 3),
+            pausedTts(
+                0,
+                3,
+                0,
+                1,
+                "One. Two. Three.",
+                sentenceIndex = 0,
+                sentenceCount = 3,
+                messageProgressFraction = 1f / 3f,
+            ),
             queue.state.value,
         )
         assertEquals(enqueuedBeforeNavigation, harness.enqueued.size)
@@ -396,7 +435,16 @@ class TtsPlaybackQueueNavigationTest {
         queue.resume()
 
         assertEquals(
-            speakingTts(0, 3, 0, 1, "One. Two. Three.", sentenceIndex = 0, sentenceCount = 3),
+            speakingTts(
+                0,
+                3,
+                0,
+                1,
+                "One. Two. Three.",
+                sentenceIndex = 0,
+                sentenceCount = 3,
+                messageProgressFraction = 1f / 3f,
+            ),
             queue.state.value,
         )
         assertEquals("One.", harness.lastSpokenTexts(3).first())
@@ -591,7 +639,16 @@ class TtsPlaybackQueueNavigationTest {
         queue.pause()
         queue.skipPreviousSentence()
         assertEquals(
-            pausedTts(0, 2, 0, 1, "One. Two.", sentenceIndex = 0, sentenceCount = 2),
+            pausedTts(
+                0,
+                2,
+                0,
+                1,
+                "One. Two.",
+                sentenceIndex = 0,
+                sentenceCount = 2,
+                messageProgressFraction = 0.5f,
+            ),
             queue.state.value,
         )
 
@@ -600,7 +657,16 @@ class TtsPlaybackQueueNavigationTest {
         queue.skipPreviousSentence()
 
         assertEquals(
-            pausedTts(0, 2, 0, 1, "One. Two.", sentenceIndex = 0, sentenceCount = 2),
+            pausedTts(
+                0,
+                2,
+                0,
+                1,
+                "One. Two.",
+                sentenceIndex = 0,
+                sentenceCount = 2,
+                messageProgressFraction = 0.5f,
+            ),
             queue.state.value,
         )
 

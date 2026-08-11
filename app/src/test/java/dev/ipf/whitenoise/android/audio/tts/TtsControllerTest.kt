@@ -141,7 +141,16 @@ class TtsControllerTest {
         controller.skipPreviousSentence()
 
         assertEquals(
-            speakingTts(0, 3, 0, 1, "First. Second. Third.", sentenceIndex = 0, sentenceCount = 3),
+            speakingTts(
+                0,
+                3,
+                0,
+                1,
+                "First. Second. Third.",
+                sentenceIndex = 0,
+                sentenceCount = 3,
+                messageProgressFraction = 1f / 3f,
+            ),
             controller.state.value,
         )
         assertEquals(listOf("First.", "Second.", "Third."), engine.spoken.takeLast(3).map { it.text })
@@ -275,7 +284,7 @@ class TtsControllerTest {
 
         assertTrue(engine.spoken.isEmpty())
         assertEquals(
-            errorTts(TtsError.Synthesis, 0, 1, 0, 1, "One."),
+            errorTts(TtsError.Synthesis, 0, 1, 0, 1, "One.", messageProgressGeneration = 0L),
             controller.state.value,
         )
         assertEquals(1, focus.acquireCalls)
@@ -297,7 +306,16 @@ class TtsControllerTest {
         staleCompletion?.invoke(staleId)
 
         assertEquals(
-            speakingTts(0, 2, 0, 1, "New one. New two.", sentenceIndex = 0, sentenceCount = 2),
+            speakingTts(
+                0,
+                2,
+                0,
+                1,
+                "New one. New two.",
+                sentenceIndex = 0,
+                sentenceCount = 2,
+                messageProgressGeneration = 2L,
+            ),
             controller.state.value,
         )
         assertEquals(listOf("New one.", "New two."), secondEngine.spoken.map { it.text })
@@ -597,6 +615,7 @@ class TtsControllerTest {
         override fun setCallbacks(
             onDone: (String?) -> Unit,
             onError: (String?, Int) -> Unit,
+            onRangeStart: (String?, Int, Int) -> Unit,
         ) {
             completionCallback = onDone
             errorCallback = onError

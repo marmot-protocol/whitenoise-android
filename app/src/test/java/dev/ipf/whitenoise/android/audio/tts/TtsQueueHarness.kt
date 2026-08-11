@@ -24,6 +24,10 @@ internal class TtsQueueHarness(
 
     fun utteranceId(position: Int): String = enqueued[position].second
 
+    fun spokenText(position: Int = 0): String = enqueued[position].first.text
+
+    fun spokenTextLength(position: Int = 0): Int = spokenText(position).length
+
     fun lastSpokenTexts(count: Int): List<String> = enqueued.takeLast(count).map { it.first.text }
 }
 
