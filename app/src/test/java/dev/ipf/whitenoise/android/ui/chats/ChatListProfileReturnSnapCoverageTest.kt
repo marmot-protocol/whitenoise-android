@@ -205,7 +205,7 @@ class ChatListProfileReturnSnapCoverageTest {
 
         assertTrue(
             "account reset must dismiss the picker holding the previous account's group ids",
-            "sharePickerRequest = null" in accountResetBlock,
+            "clearSharePickerRequest()" in accountResetBlock,
         )
     }
 

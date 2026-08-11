@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.share
 import android.content.Intent
 import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import java.util.UUID
 
 /**
  * One inbound share awaiting UI consumption. [shortcutId] is resolved against
@@ -11,6 +12,7 @@ import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 data class ShareRequest(
     val payload: SharePayload,
     val shortcutId: String?,
+    val requestId: String = "",
 )
 
 fun parseShareRequest(intent: Intent?): ShareRequest? {
@@ -18,6 +20,7 @@ fun parseShareRequest(intent: Intent?): ShareRequest? {
     return ShareRequest(
         payload = payload,
         shortcutId = intent?.getStringExtra(ShortcutManagerCompat.EXTRA_SHORTCUT_ID)?.takeIf { it.isNotBlank() },
+        requestId = UUID.randomUUID().toString(),
     )
 }
 

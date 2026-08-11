@@ -6,42 +6,47 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.ChatConversationKindFfi
@@ -58,6 +63,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
+import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetAvatarAccount
@@ -65,73 +71,79 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetMembersP
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
-import kotlinx.coroutines.launch
 
-internal fun runShareChatPickerDismissal(
-    clearFocus: () -> Unit,
-    hideKeyboard: () -> Unit,
-    hideSheet: () -> Unit,
-) {
-    clearFocus()
-    hideKeyboard()
-    hideSheet()
-}
+internal const val SHARE_CHAT_PICKER_SCREEN_TEST_TAG = "share_chat_picker_full_screen"
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Visible production surface, split from its modal window for deterministic screenshot capture. */
 @Composable
-internal fun ShareChatPickerSheet(
+internal fun ShareChatPickerFullScreenContent(
     appState: WhiteNoiseAppState,
+    requestId: String = "",
     payload: SharePayload,
     onDismiss: () -> Unit,
     onStage: (List<String>) -> Unit,
     overlayBackRegistrar: ShareChatPickerOverlayBackRegistrar? = null,
 ) {
-    val pickerState = rememberShareChatPickerState(appState, payload)
+    val pickerState = rememberShareChatPickerState(appState, requestId, payload)
     val presentedTargets = rememberShareChatPickerPresentations(appState, pickerState)
-    val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val currentOnDismiss by rememberUpdatedState(onDismiss)
-    var dismissing by remember { mutableStateOf(false) }
-    val dismissSheet: () -> Unit = {
-        if (!dismissing) {
-            dismissing = true
+    val shareToTitle = stringResource(R.string.share_to)
+    var finishing by remember(requestId) { mutableStateOf(false) }
+    val dismissPicker: () -> Unit = {
+        if (!finishing) {
+            finishing = true
             runShareChatPickerDismissal(
                 clearFocus = { focusManager.clearFocus(force = true) },
                 hideKeyboard = { keyboardController?.hide() },
-                hideSheet = {
-                    scope.launch {
-                        try {
-                            sheetState.hide()
-                            if (!sheetState.isVisible) currentOnDismiss()
-                        } finally {
-                            if (sheetState.isVisible) dismissing = false
-                        }
-                    }
-                },
+                dismiss = onDismiss,
             )
         }
     }
-    LaunchedEffect(pickerState.searchFocused) {
-        if (pickerState.searchFocused) sheetState.expand()
-    }
-    ShareChatPickerBackAwareSheet(
-        sheetState = sheetState,
+    ShareChatPickerBackAwareScreen(
         overlayBack = pickerState.searchFocused,
-        onDismissRequest = onDismiss,
-        onBackCommit = dismissSheet,
+        onBackCommit = dismissPicker,
         overlayBackRegistrar = overlayBackRegistrar,
     ) {
-        ShareChatPickerContent(
-            pickerState = pickerState,
-            presentedTargets = presentedTargets,
-            sheetExpanded =
-                sheetState.currentValue == SheetValue.Expanded ||
-                    sheetState.targetValue == SheetValue.Expanded,
-            onDismiss = onDismiss,
-            onStage = onStage,
-        )
+        Scaffold(
+            modifier =
+                Modifier.fillMaxSize().testTag(SHARE_CHAT_PICKER_SCREEN_TEST_TAG).semantics {
+                    isTraversalGroup = true
+                    paneTitle = shareToTitle
+                },
+            containerColor = amoledSheetContainerColor(),
+            topBar = {
+                TopAppBar(
+                    title = { Text(shareToTitle) },
+                    navigationIcon = { ShareChatPickerCloseButton(dismissPicker) },
+                )
+            },
+            bottomBar = {
+                ShareChatPickerFooter(
+                    selectedCount = pickerState.selected.size,
+                    onStage = {
+                        if (!finishing && pickerState.stage(onStage)) {
+                            dismissPicker()
+                        }
+                    },
+                )
+            },
+        ) { padding ->
+            key(requestId) {
+                ShareChatPickerContent(
+                    pickerState = pickerState,
+                    presentedTargets = presentedTargets,
+                    modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShareChatPickerCloseButton(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
     }
 }
 
@@ -192,20 +204,13 @@ private fun rememberShareChatPickerPresentations(
 private fun ShareChatPickerContent(
     pickerState: ShareChatPickerState,
     presentedTargets: List<ShareChatPickerTargetPresentation>,
-    sheetExpanded: Boolean,
-    onDismiss: () -> Unit,
-    onStage: (List<String>) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    val listState = rememberLazyListState()
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            stringResource(R.string.share_to),
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
         ShareChatPickerPreview(
             previewText = pickerState.previewText,
             attachmentCount = pickerState.attachmentCount,
@@ -222,13 +227,8 @@ private fun ShareChatPickerContent(
         ShareChatPickerTargetList(
             pickerState = pickerState,
             filteredTargets = pickerState.filtered(presentedTargets),
-            sheetExpanded = sheetExpanded,
-        )
-        ShareChatPickerFooter(
-            selectedCount = pickerState.selected.size,
-            onStage = {
-                if (pickerState.stage(onStage)) onDismiss()
-            },
+            modifier = Modifier.weight(1f),
+            listState = listState,
         )
     }
 }
@@ -269,14 +269,12 @@ private fun ShareChatPickerPreview(
 private fun ShareChatPickerTargetList(
     pickerState: ShareChatPickerState,
     filteredTargets: List<ShareChatPickerTargetPresentation>,
-    sheetExpanded: Boolean,
+    modifier: Modifier,
+    listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    val targetListMaxHeight = if (sheetExpanded) 420.dp else 152.dp
     LazyColumn(
-        modifier =
-            Modifier
-                .heightIn(max = targetListMaxHeight)
-                .fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
+        state = listState,
         contentPadding = PaddingValues(bottom = Dimens.spaceLg),
     ) {
         if (pickerState.targets.isEmpty() || filteredTargets.isEmpty()) {
@@ -311,18 +309,11 @@ private fun ShareChatPickerFooter(
     selectedCount: Int,
     onStage: () -> Unit,
 ) {
-    Surface(
-        color = amoledSheetContainerColor(),
-        shadowElevation = 6.dp,
-        modifier = Modifier.fillMaxWidth().imePadding(),
-    ) {
+    StickyFormActionBar {
         Button(
             onClick = onStage,
             enabled = selectedCount > 0,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Dimens.spaceLg, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.Send,
@@ -353,10 +344,17 @@ private class ShareChatPickerState(
     val activeAccountIdHex: String?,
     val previewText: String,
     val attachmentCount: Int,
+    private val queryState: MutableState<String>,
+    private val selectedState: MutableState<ArrayList<String>>,
 ) {
-    var query by mutableStateOf("")
+    var query: String
+        get() = queryState.value
+        set(value) {
+            queryState.value = value
+        }
     var searchFocused by mutableStateOf(false)
-    val selected = mutableStateListOf<String>()
+    val selected: List<String>
+        get() = selectedState.value
 
     fun filtered(presentedTargets: List<ShareChatPickerTargetPresentation>): List<ShareChatPickerTargetPresentation> {
         val needle = query.trim()
@@ -376,7 +374,10 @@ private class ShareChatPickerState(
     }
 
     fun toggleSelection(groupId: String) {
-        if (selected.contains(groupId)) selected.remove(groupId) else selected.add(groupId)
+        selectedState.value =
+            ArrayList(selected).apply {
+                if (contains(groupId)) remove(groupId) else add(groupId)
+            }
     }
 
     fun stage(onStage: (List<String>) -> Unit): Boolean {
@@ -459,18 +460,27 @@ private fun shareTargetAccountIds(
 @Composable
 private fun rememberShareChatPickerState(
     appState: WhiteNoiseAppState,
+    requestId: String,
     payload: SharePayload,
 ): ShareChatPickerState {
     val targets = remember(appState) { appState.forwardTargets() }
-    return remember(appState, payload, targets) {
+    val activeAccountRef = appState.activeAccountRef
+    val queryState = rememberSaveable(requestId, activeAccountRef, payload) { mutableStateOf("") }
+    val selectedState =
+        rememberSaveable(requestId, activeAccountRef, payload) {
+            mutableStateOf(arrayListOf<String>())
+        }
+    return remember(appState, requestId, payload, targets, queryState, selectedState) {
         ShareChatPickerState(
             appState = appState,
             payload = payload,
             targets = targets,
-            activeAccountRef = appState.activeAccountRef,
+            activeAccountRef = activeAccountRef,
             activeAccountIdHex = appState.activeAccount?.accountIdHex,
             previewText = payload.text?.trim().orEmpty(),
             attachmentCount = payload.streamUris.size,
+            queryState = queryState,
+            selectedState = selectedState,
         )
     }
 }
@@ -508,6 +518,7 @@ private fun ShareTargetRow(
         avatarSeed = avatarAccount ?: item.group.groupIdHex,
         avatarUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
         avatarImage = rememberEncryptedGroupAvatar(appState, item.group),
+        modifier = Modifier.semantics { this.selected = selected },
         onClick = { onToggle(groupId) },
         trailing = { SelectionIndicator(selected = selected) },
     )

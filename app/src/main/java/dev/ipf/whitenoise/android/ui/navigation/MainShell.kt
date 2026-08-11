@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
@@ -27,6 +28,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.notifications.inviteAuthoritativeGroupAvailable
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
 import dev.ipf.whitenoise.android.notifications.retryInviteAuthoritativeLoad
+import dev.ipf.whitenoise.android.share.EncryptedPendingShareRequestStore
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.resolveShareDirectGroupId
 import dev.ipf.whitenoise.android.share.shouldPresentInboundShare
@@ -51,7 +53,9 @@ import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
-import dev.ipf.whitenoise.android.ui.share.ShareChatPickerSheet
+import dev.ipf.whitenoise.android.ui.share.ShareChatPickerFullScreen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal data class ConversationOpenContext(
     val focusMessageId: String? = null,
@@ -255,7 +259,20 @@ internal fun MainShell(
     ) {
         mutableIntStateOf(0)
     }
+    val context = LocalContext.current
+    val pendingShareRequestStore = remember(context) { EncryptedPendingShareRequestStore.create(context) }
     var sharePickerRequest by remember { mutableStateOf<ShareRequest?>(null) }
+    var savedSharePickerRequestId by rememberSaveable { mutableStateOf<String?>(null) }
+    val clearSharePickerRequest: () -> Unit = {
+        val requestId = savedSharePickerRequestId ?: sharePickerRequest?.requestId
+        sharePickerRequest = null
+        savedSharePickerRequestId = null
+        requestId?.let { pendingRequestId ->
+            appState.launchMutation {
+                withContext(Dispatchers.IO) { pendingShareRequestStore.remove(pendingRequestId) }
+            }
+        }
+    }
     val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
@@ -270,6 +287,33 @@ internal fun MainShell(
 
     LaunchedEffect(chatsController, appState.activeAccountRef, appState.runtimeGeneration) {
         chatsController.bind(appState.activeAccountRef)
+    }
+
+    LaunchedEffect(pendingShareRequestStore, savedSharePickerRequestId) {
+        val requestId = savedSharePickerRequestId ?: return@LaunchedEffect
+        if (sharePickerRequest?.requestId == requestId) return@LaunchedEffect
+        val restored = withContext(Dispatchers.IO) { pendingShareRequestStore.load(requestId) }
+        if (savedSharePickerRequestId != requestId) return@LaunchedEffect
+        if (restored == null) {
+            savedSharePickerRequestId = null
+        } else {
+            sharePickerRequest = restored
+        }
+    }
+
+    LaunchedEffect(
+        pendingShareRequestStore,
+        savedSharePickerRequestId,
+        inboundShareRequest,
+        sharePickerRequest,
+    ) {
+        if (
+            savedSharePickerRequestId == null &&
+            inboundShareRequest == null &&
+            sharePickerRequest == null
+        ) {
+            withContext(Dispatchers.IO) { pendingShareRequestStore.clear() }
+        }
     }
 
     // Freshness model for #6: the chat-list subscription stays bound while a
@@ -537,7 +581,7 @@ internal fun MainShell(
 
     LaunchedEffect(appState.appLockScreenVisible) {
         if (appState.appLockScreenVisible) {
-            sharePickerRequest = null
+            clearSharePickerRequest()
         }
     }
 
@@ -563,11 +607,15 @@ internal fun MainShell(
         val allChats = chatsController.items + chatsController.archivedItems
         val activeGroupIds = allChats.mapTo(mutableSetOf()) { it.group.groupIdHex }
         val directGroupId = resolveShareDirectGroupId(request, accountRef, activeGroupIds)
-        onShareRequestHandled(request)
         if (directGroupId != null) {
+            clearSharePickerRequest()
+            onShareRequestHandled(request)
             stageShareToChats(request, listOf(directGroupId), allChats)
         } else {
+            val persisted = withContext(Dispatchers.IO) { pendingShareRequestStore.save(request) }
+            onShareRequestHandled(request)
             sharePickerRequest = request
+            savedSharePickerRequestId = request.requestId.takeIf { persisted }
         }
     }
 
@@ -654,7 +702,7 @@ internal fun MainShell(
     LaunchedEffect(appState.activeAccountRef) {
         val current = appState.activeAccountRef
         if (shouldResetNavOnAccountChange(previousActiveAccountRef, current)) {
-            sharePickerRequest = null
+            clearSharePickerRequest()
             selectedChat = null
             selectedChatOpenContext = ConversationOpenContext()
             selectedChatJustCreated = false
@@ -713,6 +761,14 @@ internal fun MainShell(
     }
     LaunchedEffect(conversationController) {
         conversationController?.start()
+    }
+    if (
+        shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible) &&
+        savedSharePickerRequestId != null &&
+        sharePickerRequest == null
+    ) {
+        LoadingScreen()
+        return
     }
     ProfileGroupForegroundCoordinator(
         appState = appState,
@@ -855,22 +911,23 @@ internal fun MainShell(
                         )
                 }
         }
+    }
 
-        // Compose the inbound share picker after the foreground route so its Back
-        // handler wins over conversation/chat-list handlers (issue #1721).
-        if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
-            sharePickerRequest?.let { request ->
-                ShareChatPickerSheet(
-                    appState = appState,
-                    payload = request.payload,
-                    onDismiss = { sharePickerRequest = null },
-                    onStage = { groupIds ->
-                        val allChats = chatsController.items + chatsController.archivedItems
-                        stageShareToChats(request, groupIds, allChats)
-                        sharePickerRequest = null
-                    },
-                )
-            }
+    // Compose after every shell/profile/new-group surface. The full-screen
+    // Dialog owns pointer and accessibility focus while preserving the route
+    // underneath for an exact return after cancellation (issue #1721).
+    if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
+        sharePickerRequest?.let { request ->
+            ShareChatPickerFullScreen(
+                appState = appState,
+                requestId = request.requestId,
+                payload = request.payload,
+                onDismiss = clearSharePickerRequest,
+                onStage = { groupIds ->
+                    val allChats = chatsController.items + chatsController.archivedItems
+                    stageShareToChats(request, groupIds, allChats)
+                },
+            )
         }
     }
 }
