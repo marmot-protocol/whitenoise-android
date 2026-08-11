@@ -175,7 +175,10 @@ class TtsHistoryEdgeDeferralTest {
             // navigation: playback picks the target up on resume.
             assertNull(harness.session.edgeState.value)
             assertEquals(listOf("m1", "m2"), harness.controller.queuedMessageIds())
-            assertEquals(pausedTts(1, 2, 1, 2, "Text m2."), harness.controller.state.value)
+            assertEquals(
+                pausedTts(1, 2, 1, 2, "Text m2.", messageProgressGeneration = 2L),
+                harness.controller.state.value,
+            )
 
             harness.controller.resume()
 
@@ -379,7 +382,16 @@ class TtsHistoryEdgeDeferralTest {
             // A previous-sentence tap lands on the loaded message's LAST
             // sentence, not its first.
             assertEquals(
-                speakingTts(1, 4, 0, 2, "Text m1. More m1 2.", sentenceIndex = 1, sentenceCount = 2),
+                speakingTts(
+                    1,
+                    4,
+                    0,
+                    2,
+                    "Text m1. More m1 2.",
+                    sentenceIndex = 1,
+                    sentenceCount = 2,
+                    messageProgressGeneration = 2L,
+                ),
                 harness.controller.state.value,
             )
             assertEquals("Nm1: More m1 2.", harness.engine.spoken[2].text)

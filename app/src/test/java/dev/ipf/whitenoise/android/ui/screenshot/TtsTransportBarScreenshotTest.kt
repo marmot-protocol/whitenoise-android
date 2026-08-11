@@ -12,9 +12,11 @@ import dev.ipf.whitenoise.android.audio.tts.TtsHistoryDirection
 import dev.ipf.whitenoise.android.audio.tts.TtsHistoryEdgeState
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.errorTts
+import dev.ipf.whitenoise.android.audio.tts.idleTts
 import dev.ipf.whitenoise.android.audio.tts.pausedTts
 import dev.ipf.whitenoise.android.audio.tts.speakingTts
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBarContent
+import dev.ipf.whitenoise.android.ui.conversation.ttsTerminalCompletionDisplayState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -124,11 +126,49 @@ class TtsTransportBarScreenshotTest {
         capture("tts_transport_bar_history_error_amoled")
     }
 
+    @Test
+    fun ttsTransportBarTerminalCompletionLight() {
+        render(terminalCompletion(), darkTheme = false, amoled = false)
+        capture("tts_transport_bar_terminal_completion_light")
+    }
+
+    @Test
+    fun ttsTransportBarTerminalCompletionDark() {
+        render(terminalCompletion(), darkTheme = true, amoled = false)
+        capture("tts_transport_bar_terminal_completion_dark")
+    }
+
+    @Test
+    fun ttsTransportBarTerminalCompletionAmoled() {
+        render(terminalCompletion(), darkTheme = true, amoled = true)
+        capture("tts_transport_bar_terminal_completion_amoled")
+    }
+
     private val preview = "Alice: The quick brown fox jumps over it"
 
-    private fun speaking(): TtsState = speakingTts(4, 20, 1, 12, preview, sentenceIndex = 2, sentenceCount = 8)
+    private fun speaking(): TtsState =
+        speakingTts(
+            chunkIndex = 4,
+            chunkCount = 20,
+            messageIndex = 1,
+            messageCount = 12,
+            messagePreview = preview,
+            sentenceIndex = 2,
+            sentenceCount = 8,
+            messageProgressFraction = 0.35f,
+        )
 
-    private fun paused(): TtsState = pausedTts(4, 20, 1, 12, preview, sentenceIndex = 2, sentenceCount = 8)
+    private fun paused(): TtsState =
+        pausedTts(
+            chunkIndex = 4,
+            chunkCount = 20,
+            messageIndex = 1,
+            messageCount = 12,
+            messagePreview = preview,
+            sentenceIndex = 2,
+            sentenceCount = 8,
+            messageProgressFraction = 0.35f,
+        )
 
     private fun error(): TtsState =
         errorTts(
@@ -141,6 +181,34 @@ class TtsTransportBarScreenshotTest {
             sentenceIndex = 2,
             sentenceCount = 8,
         )
+
+    private fun terminalCompletion(): TtsState {
+        val lastActive =
+            speakingTts(
+                chunkIndex = 0,
+                chunkCount = 1,
+                messageIndex = 0,
+                messageCount = 1,
+                messagePreview = "Hello.",
+                sentenceIndex = 0,
+                sentenceCount = 1,
+                messageProgressFraction = 0f,
+                messageProgressGeneration = 1L,
+            )
+        val terminalIdle =
+            idleTts(
+                chunkIndex = 1,
+                chunkCount = 1,
+                messageIndex = 1,
+                messageCount = 1,
+                messagePreview = "Hello.",
+                sentenceIndex = 1,
+                sentenceCount = 1,
+                messageProgressFraction = 1f,
+                messageProgressGeneration = 1L,
+            )
+        return ttsTerminalCompletionDisplayState(lastActive, terminalIdle)
+    }
 
     private fun loadingEdge(): TtsHistoryEdgeState = TtsHistoryEdgeState.Loading(TtsHistoryDirection.Older)
 

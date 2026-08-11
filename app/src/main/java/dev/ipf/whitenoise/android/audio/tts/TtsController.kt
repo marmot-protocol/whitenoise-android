@@ -12,6 +12,7 @@ internal interface TtsSpeechEngine {
     fun setCallbacks(
         onDone: (String?) -> Unit,
         onError: (String?, Int) -> Unit,
+        onRangeStart: (String?, Int, Int) -> Unit = { _, _, _ -> },
     )
 
     fun clearCallbacks()
@@ -71,7 +72,7 @@ class TtsController internal constructor(
             this.engine?.clearCallbacks()
         }
         this.engine = engine
-        engine.setCallbacks(::onDone, ::onError)
+        engine.setCallbacks(::onDone, ::onError, ::onRangeStart)
     }
 
     @Synchronized
@@ -255,6 +256,15 @@ class TtsController internal constructor(
         if (state.value is TtsState.Speaking || state.value is TtsState.Paused) {
             queue.stop()
         }
+    }
+
+    @Synchronized
+    private fun onRangeStart(
+        utteranceId: String?,
+        start: Int,
+        end: Int,
+    ) {
+        queue.onRangeStart(utteranceId, start, end)
     }
 
     @Synchronized

@@ -192,7 +192,7 @@ class TtsPlaybackQueueWindowTest {
             )
 
         assertEquals(true, replaced)
-        assertEquals(speakingTts(0, 3, 0, 3, "Alpha."), queue.state.value)
+        assertEquals(speakingTts(0, 3, 0, 3, "Alpha.", messageProgressGeneration = 2L), queue.state.value)
         // Same contract as message navigation: the engine restarts at the
         // target and each sender change announces afresh.
         assertEquals(listOf("Alice: Alpha.", "Bob: Beta.", "Carol: Gamma."), harness.lastSpokenTexts(3))
@@ -224,12 +224,12 @@ class TtsPlaybackQueueWindowTest {
             )
 
         assertEquals(true, replaced)
-        assertEquals(pausedTts(0, 3, 0, 3, "Alpha."), queue.state.value)
+        assertEquals(pausedTts(0, 3, 0, 3, "Alpha.", messageProgressGeneration = 2L), queue.state.value)
         assertEquals(enqueuedBefore, harness.enqueued.size)
 
         queue.resume()
 
-        assertEquals(speakingTts(0, 3, 0, 3, "Alpha."), queue.state.value)
+        assertEquals(speakingTts(0, 3, 0, 3, "Alpha.", messageProgressGeneration = 2L), queue.state.value)
         assertEquals("Alice: Alpha.", harness.lastSpokenTexts(3).first())
     }
 
@@ -253,7 +253,16 @@ class TtsPlaybackQueueWindowTest {
 
         assertEquals(true, replaced)
         assertEquals(
-            speakingTts(2, 3, 1, 2, "Beta one. Beta two.", sentenceIndex = 1, sentenceCount = 2),
+            speakingTts(
+                2,
+                3,
+                1,
+                2,
+                "Beta one. Beta two.",
+                sentenceIndex = 1,
+                sentenceCount = 2,
+                messageProgressGeneration = 2L,
+            ),
             queue.state.value,
         )
         assertEquals("Bob: Beta two.", harness.lastSpokenTexts(1).first())

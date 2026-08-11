@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -53,14 +56,13 @@ internal fun TtsTransportBar(
     modifier: Modifier = Modifier,
 ) {
     val state by appState.ttsController.state.collectAsState()
-    val current = state
-    if (current is TtsState.Idle) return
+    val displayState = rememberTtsTransportDisplayState(state) ?: return
     val rateOverride by appState.ttsRatePreferences.rateOverride.collectAsState()
     val historyEdge by appState.ttsHistorySession.edgeState.collectAsState()
     val activeRate = rateOverride ?: appState.ttsRatePreferences.resolvedRate()
 
     TtsTransportBarContent(
-        state = current,
+        state = displayState,
         rateOverride = rateOverride,
         activeRate = activeRate,
         onPause = { appState.ttsController.pause() },
@@ -142,9 +144,19 @@ internal fun TtsTransportBarContent(
                         )
                     }
                     if (!isError && ttsMessageCount(state) > 0) {
+                        val targetProgress = ttsMessageProgressFraction(state)
+                        val animatedProgress =
+                            key(ttsProgressAnimationKey(state)) {
+                                val progress by animateFloatAsState(
+                                    targetValue = targetProgress,
+                                    animationSpec = tween(durationMillis = 200),
+                                    label = "ttsMessageProgress",
+                                )
+                                progress
+                            }
                         // The progress text above already narrates the position.
                         LinearProgressIndicator(
-                            progress = { (ttsMessageIndex(state) + 1).toFloat() / ttsMessageCount(state) },
+                            progress = { animatedProgress },
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
@@ -215,23 +227,6 @@ internal fun TtsTransportBarContent(
         }
     }
 }
-
-internal fun ttsMessageIndex(state: TtsState): Int = state.messageIndex
-
-internal fun ttsMessageCount(state: TtsState): Int = state.messageCount
-
-internal fun ttsSentenceIndex(state: TtsState): Int = state.sentenceIndexWithinMessage
-
-internal fun ttsSentenceCount(state: TtsState): Int = state.sentenceCountWithinMessage
-
-internal fun ttsNavigationEnabled(state: TtsState): Boolean = state !is TtsState.Error && state !is TtsState.Idle
-
-// A pending edge load owns the cursor: every navigation action disables so
-// duplicate or conflicting requests can't queue up behind it.
-internal fun ttsNavigationEnabled(
-    state: TtsState,
-    historyEdge: TtsHistoryEdgeState?,
-): Boolean = ttsNavigationEnabled(state) && historyEdge !is TtsHistoryEdgeState.Loading
 
 // Compact status line for a pending or failed history edge load, announced
 // politely so TalkBack narrates the state change without stealing focus.

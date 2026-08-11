@@ -17,10 +17,20 @@ internal class AndroidTtsSpeechEngine(
     override fun setCallbacks(
         onDone: (String?) -> Unit,
         onError: (String?, Int) -> Unit,
+        onRangeStart: (String?, Int, Int) -> Unit,
     ) {
         textToSpeech.setOnUtteranceProgressListener(
             object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) = Unit
+
+                override fun onRangeStart(
+                    utteranceId: String?,
+                    start: Int,
+                    end: Int,
+                    frame: Int,
+                ) {
+                    onRangeStart(utteranceId, start, end)
+                }
 
                 override fun onDone(utteranceId: String?) {
                     onDone(utteranceId)
