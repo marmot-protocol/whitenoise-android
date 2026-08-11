@@ -757,6 +757,7 @@ dependencies {
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.profileinstaller)
+    implementation(libs.androidx.tracing)
     implementation(libs.okhttp)
     // One profile is generated from the authenticated dev/zapstore fixture and
     // merged into main for every release consumer. Select that producer

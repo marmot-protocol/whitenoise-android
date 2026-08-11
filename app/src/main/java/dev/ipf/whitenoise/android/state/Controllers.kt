@@ -4504,7 +4504,10 @@ class ChatsController private constructor(
                 } else {
                     if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
                         withContext(NonCancellable) {
-                            val demoteResult = appState.marmotIo { selfDemoteAdminDetailed(account, groupIdHex) }
+                            val demoteResult =
+                                appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                                    selfDemoteAdminDetailed(account, groupIdHex)
+                                }
                             demotedBeforeLeave = true
                             appState.applyLocalGroupUpdate(demoteResult.details.group)
                             appState.marmotIo { leaveGroup(account, groupIdHex) }
@@ -4674,14 +4677,20 @@ class ChatsController private constructor(
         val left =
             runCatching {
                 appState.withGroupCommitLock(account, groupIdHex) {
-                    val promote = appState.marmotIo { promoteAdminDetailed(account, groupIdHex, newAdmin.memberIdHex) }
+                    val promote =
+                        appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
+                            promoteAdminDetailed(account, groupIdHex, newAdmin.memberIdHex)
+                        }
                     grantedBeforeLeave = true
                     appState.applyLocalGroupUpdate(promote.details.group)
                     // Grant has landed on the MLS group; finish demote + leave even
                     // if the scope is cancelled so we never strand two admins or a
                     // half-completed leave.
                     withContext(NonCancellable) {
-                        val demote = appState.marmotIo { selfDemoteAdminDetailed(account, groupIdHex) }
+                        val demote =
+                            appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                                selfDemoteAdminDetailed(account, groupIdHex)
+                            }
                         appState.applyLocalGroupUpdate(demote.details.group)
                         appState.marmotIo { leaveGroup(account, groupIdHex) }
                     }
@@ -8358,7 +8367,9 @@ class ConversationController(
                         if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, liveMemberCount)) {
                             withContext(NonCancellable) {
                                 val demoteResult =
-                                    appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
+                                    appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                                        selfDemoteAdminDetailed(account, group.groupIdHex)
+                                    }
                                 demotedBeforeLeave = true
                                 applyMutationDetails(account, demoteResult.details)
                                 appState.marmotIo { leaveGroup(account, group.groupIdHex) }
@@ -8425,14 +8436,17 @@ class ConversationController(
             group = optimisticGroup
             appState.applyLocalGroupUpdate(optimisticGroup)
             val acceptedGroup =
-                runCatching { appState.marmotIo { acceptGroupInvite(account, group.groupIdHex) } }
-                    .getOrElse {
-                        group = rollbackOptimisticAcceptedInvite(group, optimisticGroup, previousGroup)
-                        appState.applyLocalGroupUpdate(group)
-                        it.rethrowIfCancellation()
-                        appState.presentFailure(R.string.toast_couldnt_accept_invite, "GROUP_INVITE_ACCEPT", it)
-                        return@withMutationLockResult false
+                runCatching {
+                    appState.marmotIo(MarmotTraceSection.ACCEPT_GROUP_INVITE) {
+                        acceptGroupInvite(account, group.groupIdHex)
                     }
+                }.getOrElse {
+                    group = rollbackOptimisticAcceptedInvite(group, optimisticGroup, previousGroup)
+                    appState.applyLocalGroupUpdate(group)
+                    it.rethrowIfCancellation()
+                    appState.presentFailure(R.string.toast_couldnt_accept_invite, "GROUP_INVITE_ACCEPT", it)
+                    return@withMutationLockResult false
+                }
             acceptedInvitePeerAccount = invitePeerAccount
             group = acceptedGroup
             appState.applyLocalGroupUpdate(group)
@@ -8739,12 +8753,16 @@ class ConversationController(
                                 return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
                             }
                             val inviteResult =
-                                appState.marmotIo { inviteMembersDetailed(account, group.groupIdHex, refs) }
+                                appState.marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
+                                    inviteMembersDetailed(account, group.groupIdHex, refs)
+                                }
                             applyMutationDetails(account, inviteResult.details)
                             inviteSent = true
                             adminTargets.forEach { target ->
                                 val promoteResult =
-                                    appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
+                                    appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
+                                        promoteAdminDetailed(account, group.groupIdHex, target)
+                                    }
                                 applyMutationDetails(account, promoteResult.details)
                             }
                             GroupAdministrationCommitOutcome.COMMITTED
@@ -8807,7 +8825,9 @@ class ConversationController(
                             authoritativeAdministrationTarget(target)
                                 ?: return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
                             val result =
-                                appState.marmotIo { removeMembersDetailed(account, group.groupIdHex, listOf(target)) }
+                                appState.marmotIo(MarmotTraceSection.REMOVE_MEMBERS) {
+                                    removeMembersDetailed(account, group.groupIdHex, listOf(target))
+                                }
                             applyMutationDetails(account, result.details)
                             GroupAdministrationCommitOutcome.COMMITTED
                         }
@@ -8865,11 +8885,15 @@ class ConversationController(
                             }
                             if (admin) {
                                 val result =
-                                    appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
+                                    appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
+                                        promoteAdminDetailed(account, group.groupIdHex, target)
+                                    }
                                 applyMutationDetails(account, result.details)
                             } else {
                                 val result =
-                                    appState.marmotIo { demoteAdminDetailed(account, group.groupIdHex, target) }
+                                    appState.marmotIo(MarmotTraceSection.DEMOTE_ADMIN) {
+                                        demoteAdminDetailed(account, group.groupIdHex, target)
+                                    }
                                 applyMutationDetails(account, result.details)
                             }
                             GroupAdministrationCommitOutcome.COMMITTED
@@ -9004,7 +9028,10 @@ class ConversationController(
                         if (group.admins.distinctBy { it.lowercase() }.size <= 1) {
                             return@withGroupCommitLock GroupAdministrationCommitOutcome.KEEP_ONE_ADMIN
                         }
-                        val result = appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
+                        val result =
+                            appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                                selfDemoteAdminDetailed(account, group.groupIdHex)
+                            }
                         applyMutationDetails(account, result.details)
                         GroupAdministrationCommitOutcome.COMMITTED
                     }
@@ -9054,7 +9081,9 @@ class ConversationController(
                             return@withGroupCommitLock false
                         }
                         val promoteResult =
-                            appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
+                            appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
+                                promoteAdminDetailed(account, group.groupIdHex, target)
+                            }
                         grantedBeforeDemote = true
                         applyMutationDetails(account, promoteResult.details)
                         // The grant has already landed on the MLS group. If the scope is
@@ -9063,7 +9092,9 @@ class ConversationController(
                         // cancellation past the partial-state branch). Run it to completion.
                         withContext(NonCancellable) {
                             val demoteResult =
-                                appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
+                                appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                                    selfDemoteAdminDetailed(account, group.groupIdHex)
+                                }
                             applyMutationDetails(account, demoteResult.details)
                         }
                         true
@@ -10616,12 +10647,17 @@ class ConversationController(
                     // UI. Display-only group-record updates skip this replay but
                     // still read details below so non-admin roster changes are not
                     // hidden behind AppGroupRecordFfi's coarse shape.
-                    appState.marmotIo { groupMlsState(account, group.groupIdHex) }
+                    appState.marmotIo(MarmotTraceSection.REFRESH_GROUP_MLS_STATE) {
+                        groupMlsState(account, group.groupIdHex)
+                    }
                 }
                 if (!memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
                     return@runCatchingCancellable
                 }
-                val details = appState.marmotIo { groupDetails(account, group.groupIdHex) }
+                val details =
+                    appState.marmotIo(MarmotTraceSection.REFRESH_GROUP_DETAILS) {
+                        groupDetails(account, group.groupIdHex)
+                    }
                 if (!memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
                     return@runCatchingCancellable
                 }

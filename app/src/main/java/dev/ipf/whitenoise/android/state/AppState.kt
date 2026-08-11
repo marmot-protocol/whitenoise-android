@@ -2874,7 +2874,10 @@ class WhiteNoiseAppState private constructor(
         if (target.isEmpty() || groupId.isEmpty() || account == null) return false
         return runCatchingCancellable {
             withGroupCommitLock(account, groupId) {
-                val result = marmotIo { promoteAdminDetailed(account, groupId, target) }
+                val result =
+                    marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
+                        promoteAdminDetailed(account, groupId, target)
+                    }
                 chatsController?.applyProfileGroupDetails(account, result.details)
             }
             presentTransient(R.string.toast_admin_added)
@@ -2912,7 +2915,7 @@ class WhiteNoiseAppState private constructor(
             runCatchingCancellable {
                 withGroupCommitLock(account, groupIdHex) {
                     val result =
-                        marmotIo {
+                        marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
                             inviteMembersDetailed(account, groupIdHex, listOf(ref))
                         }
                     chatsController?.applyProfileGroupDetails(account, result.details)
@@ -3005,9 +3008,19 @@ class WhiteNoiseAppState private constructor(
         activeConversationAccountRef == accountRef &&
             activeConversationGroupIdHex?.equals(groupIdHex, ignoreCase = true) == true
 
+    private val marmotBridgeTracer = MarmotBridgeTracer()
+
     suspend fun <T> marmotIo(block: suspend Marmot.() -> T): T =
         withContext(Dispatchers.IO) {
             marmot().block()
+        }
+
+    suspend fun <T> marmotIo(
+        traceSection: String,
+        block: suspend Marmot.() -> T,
+    ): T =
+        withContext(Dispatchers.IO) {
+            marmotBridgeTracer.trace(traceSection) { marmot().block() }
         }
 
     /**
@@ -6830,7 +6843,7 @@ class WhiteNoiseAppState private constructor(
      */
     suspend fun createProfileChatGroup(npub: String): String {
         val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
-        return marmotIo { createGroup(account, "", listOf(npub), null) }
+        return marmotIo(MarmotTraceSection.CREATE_GROUP) { createGroup(account, "", listOf(npub), null) }
     }
 
     private var chatCreateOpenTiming: ChatCreateOpenTiming? = null
