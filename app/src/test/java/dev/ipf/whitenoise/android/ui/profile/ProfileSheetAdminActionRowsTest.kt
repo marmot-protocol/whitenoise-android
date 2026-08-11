@@ -11,7 +11,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -23,6 +25,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -151,6 +154,54 @@ class ProfileSheetAdminActionRowsTest {
     }
 
     @Test
+    fun moderationBlockKeepsBottomAnchoredBoundsStableAcrossRoleChangesAtAllFontScales() {
+        val actions =
+            mutableStateOf(
+                listOf(GroupMemberMenuAction.RevokeAdmin, GroupMemberMenuAction.RemoveMember),
+            )
+        val pendingAction = mutableStateOf<GroupMemberMenuAction?>(null)
+        val fontScale = mutableStateOf(1f)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale.value)) {
+                    Box(Modifier.width(320.dp).height(360.dp)) {
+                        Box(Modifier.align(Alignment.BottomCenter)) {
+                            ProfileSheetAdminActionRows(
+                                actions = actions.value,
+                                pendingAction = pendingAction.value,
+                                busy = pendingAction.value != null,
+                                onGrantAdmin = {},
+                                onRevokeAdmin = {},
+                                onRemoveMember = {},
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        assertStableRoleTransitions(
+            baseline = moderationBlockBounds(),
+            actions = actions,
+            pendingAction = pendingAction,
+        )
+
+        composeRule.runOnIdle {
+            actions.value = listOf(GroupMemberMenuAction.RevokeAdmin, GroupMemberMenuAction.RemoveMember)
+            pendingAction.value = null
+            fontScale.value = 2f
+        }
+        composeRule.waitForIdle()
+
+        assertStableRoleTransitions(
+            baseline = moderationBlockBounds(),
+            actions = actions,
+            pendingAction = pendingAction,
+        )
+    }
+
+    @Test
     fun failedMutationClearsPendingActionAndAllowsRetry() =
         runTest {
             var pendingAction: GroupMemberMenuAction? = null
@@ -251,6 +302,45 @@ class ProfileSheetAdminActionRowsTest {
                 progressMatcher and hasAnyAncestor(hasTestTag(adminActionRowTag(action))),
                 useUnmergedTree = true,
             ).assertIsDisplayed()
+    }
+
+    private fun assertStableRoleTransitions(
+        baseline: Rect,
+        actions: MutableState<List<GroupMemberMenuAction>>,
+        pendingAction: MutableState<GroupMemberMenuAction?>,
+    ) {
+        composeRule.runOnIdle {
+            pendingAction.value = GroupMemberMenuAction.RevokeAdmin
+        }
+        composeRule.waitForIdle()
+        assertModerationBoundsEqual(baseline, moderationBlockBounds())
+
+        composeRule.runOnIdle {
+            actions.value = listOf(GroupMemberMenuAction.GrantAdmin, GroupMemberMenuAction.RemoveMember)
+            pendingAction.value = null
+        }
+        composeRule.waitForIdle()
+        assertModerationBoundsEqual(baseline, moderationBlockBounds())
+
+        composeRule.runOnIdle {
+            pendingAction.value = GroupMemberMenuAction.GrantAdmin
+        }
+        composeRule.waitForIdle()
+        assertModerationBoundsEqual(baseline, moderationBlockBounds())
+    }
+
+    private fun moderationBlockBounds(): Rect =
+        composeRule
+            .onNodeWithTag(PROFILE_SHEET_ADMIN_ACTIONS_TAG, useUnmergedTree = true)
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+    private fun assertModerationBoundsEqual(
+        expected: Rect,
+        actual: Rect,
+    ) {
+        assertEquals(expected.top, actual.top, 0.5f)
+        assertEquals(expected.height, actual.height, 0.5f)
     }
 
     private fun string(resId: Int): String = ApplicationProvider.getApplicationContext<Context>().getString(resId)

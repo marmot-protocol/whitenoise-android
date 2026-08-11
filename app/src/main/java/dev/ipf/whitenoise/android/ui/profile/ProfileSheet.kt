@@ -179,6 +179,8 @@ internal fun profileSheetAdminActions(
 
 internal fun adminActionRowTag(action: GroupMemberMenuAction): String = "profile-admin-action-${action.name}"
 
+internal const val PROFILE_SHEET_ADMIN_ACTIONS_TAG = "profile-sheet-admin-actions"
+
 internal fun runProfileSheetAdminMutation(
     action: GroupMemberMenuAction,
     isBusy: () -> Boolean,
@@ -322,7 +324,8 @@ internal fun ProfileSheetAdminActionRows(
     onRevokeAdmin: () -> Unit,
     onRemoveMember: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().testTag(PROFILE_SHEET_ADMIN_ACTIONS_TAG)) {
+        AppDivider()
         actions.forEach { action ->
             when (action) {
                 GroupMemberMenuAction.GrantAdmin ->
@@ -1504,7 +1507,6 @@ private fun ProfileSheetAdminActions(
         remember(controller.presentedMembers, targetHex) {
             controller.presentedMembers.firstOrNull { it.memberIdHex.equals(targetHex, ignoreCase = true) }
         }
-    val targetIsAdmin = targetMember?.let { controller.isAdmin(it) } == true
     // Keep the action label stable while the optimistic badge changes. The row
     // remains disabled until MDK reconciles, then switches to the inverse action.
     val targetWasAuthoritativelyAdmin = targetMember?.let { controller.isAuthoritativeAdmin(it) } == true
@@ -1542,36 +1544,22 @@ private fun ProfileSheetAdminActions(
         )
     }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        AppDivider()
-        // Reuses the same "Admin" badge the members list shows so the action
-        // labels (Grant/Revoke admin) read naturally. Uses an existing string
-        // (R.string.admin) only — no new copy to translate.
-        if (targetIsAdmin) {
-            Text(
-                stringResource(R.string.admin),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
-            )
-        }
-        ProfileSheetAdminActionRows(
-            actions = actions,
-            pendingAction = pendingAction,
-            busy = busy,
-            onGrantAdmin = {
-                runMutation(GroupMemberMenuAction.GrantAdmin) {
-                    controller.setMemberAdmin(targetMember, admin = true)
-                }
-            },
-            onRevokeAdmin = {
-                runMutation(GroupMemberMenuAction.RevokeAdmin) {
-                    controller.setMemberAdmin(targetMember, admin = false)
-                }
-            },
-            onRemoveMember = { confirmRemove = true },
-        )
-    }
+    ProfileSheetAdminActionRows(
+        actions = actions,
+        pendingAction = pendingAction,
+        busy = busy,
+        onGrantAdmin = {
+            runMutation(GroupMemberMenuAction.GrantAdmin) {
+                controller.setMemberAdmin(targetMember, admin = true)
+            }
+        },
+        onRevokeAdmin = {
+            runMutation(GroupMemberMenuAction.RevokeAdmin) {
+                controller.setMemberAdmin(targetMember, admin = false)
+            }
+        },
+        onRemoveMember = { confirmRemove = true },
+    )
 
     if (confirmRemove) {
         ConfirmDialog(
