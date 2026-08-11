@@ -32,4 +32,22 @@ internal fun reconcileChatListSelection(
 internal fun chatListBackHandlerEnabled(
     selectionMode: Boolean,
     searchOpen: Boolean,
-): Boolean = selectionMode || searchOpen
+    filterSheetOpen: Boolean = false,
+): Boolean = selectionMode || searchOpen || filterSheetOpen
+
+internal enum class ChatListBackDismissal {
+    ClearSelection,
+    DismissFilterSheet,
+    CloseSearch,
+}
+
+internal fun chatListBackDismissal(
+    selectionMode: Boolean,
+    searchState: GlobalSearchState,
+): ChatListBackDismissal? =
+    when {
+        selectionMode -> ChatListBackDismissal.ClearSelection
+        searchState.filterSheetOpen -> ChatListBackDismissal.DismissFilterSheet
+        searchState.isOpen -> ChatListBackDismissal.CloseSearch
+        else -> null
+    }

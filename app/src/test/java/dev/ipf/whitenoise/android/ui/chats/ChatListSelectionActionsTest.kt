@@ -37,5 +37,21 @@ class ChatListSelectionActionsTest {
         assertTrue(chatListBackHandlerEnabled(selectionMode = true, searchOpen = false))
         assertTrue(chatListBackHandlerEnabled(selectionMode = false, searchOpen = true))
         assertTrue(chatListBackHandlerEnabled(selectionMode = true, searchOpen = true))
+        assertTrue(chatListBackHandlerEnabled(selectionMode = false, searchOpen = false, filterSheetOpen = true))
+    }
+
+    @Test
+    fun backDismissalPrioritizesSelectionThenFilterSheetThenSearch() {
+        val searchOpen = GlobalSearchState(isOpen = true, filterSheetOpen = true)
+        assertEquals(ChatListBackDismissal.ClearSelection, chatListBackDismissal(selectionMode = true, searchOpen))
+        assertEquals(
+            ChatListBackDismissal.DismissFilterSheet,
+            chatListBackDismissal(selectionMode = false, searchOpen),
+        )
+        assertEquals(
+            ChatListBackDismissal.CloseSearch,
+            chatListBackDismissal(selectionMode = false, GlobalSearchState(isOpen = true)),
+        )
+        assertEquals(null, chatListBackDismissal(selectionMode = false, GlobalSearchState()))
     }
 }

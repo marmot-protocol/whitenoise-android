@@ -45,6 +45,10 @@ import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchAccountScope
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchStateSaver
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
@@ -240,6 +244,22 @@ internal fun MainShell(
     // conversation does not dispose the selection when ChatsScreen leaves
     // composition (issue #1897).
     var selectedChatListFolderId by remember { mutableStateOf<String?>(null) }
+    // Global chat-list search survives conversation navigation and rotation
+    // (issue #1941). Saveable codec only — no protocol or preference storage.
+    var globalSearchState by rememberSaveable(stateSaver = GlobalSearchStateSaver) {
+        mutableStateOf(GlobalSearchState())
+    }
+    val globalSearchAccountScope =
+        remember(appState.activeAccountRef, appState.runtimeGeneration) {
+            GlobalSearchAccountScope.from(appState.activeAccountRef, appState.runtimeGeneration)
+        }
+    val scopedGlobalSearchState =
+        GlobalSearchTransitions.reconcileAccountScope(globalSearchState, globalSearchAccountScope)
+    LaunchedEffect(globalSearchAccountScope) {
+        if (globalSearchState != scopedGlobalSearchState) {
+            globalSearchState = scopedGlobalSearchState
+        }
+    }
     // True while a tapped notification for a non-active account is mid-resolution
     // (switching account / awaiting its chat list). Holds a single stable loading
     // state over the multi-step route so the chat list never paints as an
@@ -883,6 +903,15 @@ internal fun MainShell(
                         ChatsScreen(
                             appState = appState,
                             controller = chatsController,
+                            globalSearchState = scopedGlobalSearchState,
+                            onGlobalSearchStateChange = { update ->
+                                val currentState =
+                                    GlobalSearchTransitions.reconcileAccountScope(
+                                        globalSearchState,
+                                        globalSearchAccountScope,
+                                    )
+                                globalSearchState = update(currentState)
+                            },
                             selectedFolderId = selectedChatListFolderId,
                             onSelectFolder = { selectedChatListFolderId = it },
                             conversationReturnHeadId = publishedConversationReturnHead(chatListReturnHeadSnap),
