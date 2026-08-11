@@ -2202,6 +2202,8 @@ class WhiteNoiseAppState private constructor(
     private val notificationScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private var accountCatchUpJob: Job? = null
+    private var startupUnreadReconciliationPending = false
+    private var startupUnreadReconciliationJob: Job? = null
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
 
     // Bumped whenever cross-account caches are cleared (switch / sign-out). An
@@ -3144,7 +3146,7 @@ class WhiteNoiseAppState private constructor(
             refreshLocalNotificationPermission()
             startNotificationListener()
             refreshSecurityPrivacySettings()
-            refreshAccounts()
+            refreshAccountsForBootstrap()
             // Resolve interrupted editor commits against MDK before any draft
             // is reopened, and reclaim encrypted sources with no live session.
             messageDraftRepository.reconcileEditorState(editorSourceStore).onFailure {
@@ -3162,17 +3164,21 @@ class WhiteNoiseAppState private constructor(
                 localNotificationSettings = null
                 phase = AppPhase.Onboarding
             } else {
-                if (activeAccountRef == null || accounts.none { it.label == activeAccountRef }) {
-                    setActiveAccount(accounts.first().label)
-                } else {
-                    // Reconcile the persisted active ref with the engine — e.g.
-                    // sign in if the account was non-destructively signed out, and
-                    // re-key the media matrix that was seeded before accounts loaded.
-                    setActiveAccount(activeAccountRef!!)
+                val targetAccountRef =
+                    activeAccountRef
+                        ?.takeIf { persisted -> accounts.any { it.label == persisted } }
+                        ?: accounts.first().label
+                // Reconcile the persisted active ref with the engine — e.g. sign
+                // in if it was non-destructively signed out. The callback is the
+                // existing local-ready boundary: rendering the local chat snapshot
+                // must not wait for profile, privacy, notification, push, or MDK's
+                // deferred group hydration work below it.
+                setActiveAccount(targetAccountRef) {
+                    phase = AppPhase.Ready
                 }
-                refreshLocalNotificationSettings()
-                phase = AppPhase.Ready
-                activeAccount?.accountIdHex?.let { warmProfile(it) }
+                // Preserve the old behavior when an attempted sign-in returns
+                // before reaching setActiveAccount's activation callback.
+                if (phase == AppPhase.Bootstrapping) phase = AppPhase.Ready
             }
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
@@ -3498,6 +3504,15 @@ class WhiteNoiseAppState private constructor(
     }
 
     suspend fun refreshAccounts() {
+        refreshAccounts(loadMemberRosters = true)
+    }
+
+    private suspend fun refreshAccountsForBootstrap() {
+        refreshAccounts(loadMemberRosters = false)
+        startupUnreadReconciliationPending = accounts.any { it.isSignedInSigningAccount() }
+    }
+
+    private suspend fun refreshAccounts(loadMemberRosters: Boolean) {
         val refreshedAccounts = marmotIo { listAccounts() }
         val bubbleColorMigrationSucceeded =
             withContext(Dispatchers.IO) {
@@ -3514,7 +3529,7 @@ class WhiteNoiseAppState private constructor(
         }
         accounts = refreshedAccounts
         releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
-        refreshAccountUnreadCounts(refreshedAccounts)
+        refreshAccountUnreadCounts(refreshedAccounts, loadMemberRosters)
     }
 
     fun unreadCountForAccount(accountRef: String): ULong = accountUnreadCounts[accountRef] ?: 0uL
@@ -3576,7 +3591,10 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private suspend fun refreshAccountUnreadCounts(accountSummaries: List<AccountSummaryFfi> = accounts) {
+    private suspend fun refreshAccountUnreadCounts(
+        accountSummaries: List<AccountSummaryFfi> = accounts,
+        loadMemberRosters: Boolean = true,
+    ) {
         val signingAccounts = accountSummaries.filter { it.isSignedInSigningAccount() }
         if (signingAccounts.isEmpty()) {
             accountUnreadCounts = emptyMap()
@@ -3587,10 +3605,15 @@ class WhiteNoiseAppState private constructor(
         val previous = accountUnreadCounts
         val rawCountsByHex =
             runCatchingCancellable {
-                marmotIo { accountUnreadSummary().associateBy { it.accountIdHex } }
+                marmotIo { accountUnreadSummary().associate { it.accountIdHex to it.unreadCount } }
             }.onFailure {
                 appStateDebug(it) { "account unread summary refresh failed: ${it.readableMessage()}" }
             }.getOrNull()
+        if (!loadMemberRosters) {
+            accountUnreadCounts = rawAccountUnreadCounts(signingAccounts, rawCountsByHex, previous)
+            retainManualUnreadRefs(signingAccounts.mapTo(mutableSetOf(), AccountSummaryFfi::label))
+            return
+        }
         val accountGate = Semaphore(ACCOUNT_UNREAD_ACCOUNT_FANOUT)
         // Share one roster gate across the whole bulk refresh so member FFI
         // fan-out stays bounded across all signed-in accounts, not per account.
@@ -3601,7 +3624,7 @@ class WhiteNoiseAppState private constructor(
                     .map { summary ->
                         async {
                             accountGate.withPermit {
-                                val rawCount = rawCountsByHex?.get(summary.accountIdHex)?.unreadCount
+                                val rawCount = rawCountsByHex?.get(summary.accountIdHex)
                                 val cheapZero =
                                     rawCount == 0uL &&
                                         manualUnreadFolded(summary.label) &&
@@ -3758,11 +3781,28 @@ class WhiteNoiseAppState private constructor(
         accountRef: String,
         rowCount: Int,
     ) {
+        launchPendingStartupUnreadReconciliation()
         val trace = pendingAccountSwitchTrace ?: return
         if (trace.accountRef != accountRef || activeAccountRef != accountRef) return
         pendingAccountSwitchTrace = null
         val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
         appStateDebug { "account-switch first-local-frame +${elapsedMs}ms rows=$rowCount" }
+    }
+
+    /**
+     * Restore exact removed-group suppression only after MainShell has rendered
+     * its first local chat-list snapshot. Until then the cheap Marmot aggregate
+     * keeps badges useful without competing with MDK's deferred group hydration.
+     */
+    private fun launchPendingStartupUnreadReconciliation() {
+        if (!startupUnreadReconciliationPending || startupUnreadReconciliationJob?.isActive == true) return
+        startupUnreadReconciliationPending = false
+        startupUnreadReconciliationJob =
+            notificationScope.launch {
+                runCatchingCancellable { refreshAccountUnreadCounts() }.onFailure {
+                    appStateDebug(it) { "post-startup unread reconciliation failed: ${it.readableMessage()}" }
+                }
+            }
     }
 
     /**
