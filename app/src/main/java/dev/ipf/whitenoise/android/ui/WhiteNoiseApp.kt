@@ -21,6 +21,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
@@ -183,7 +184,7 @@ fun WhiteNoiseApp(
                                     )
                                 is AppPhase.Failed ->
                                     ErrorContent(
-                                        title = context.getString(R.string.white_noise_couldnt_start),
+                                        title = stringResource(R.string.white_noise_couldnt_start),
                                         error = phase.error,
                                         onRetry = { scope.launch { appState.bootstrap() } },
                                     )
