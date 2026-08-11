@@ -2570,6 +2570,20 @@ internal fun cacheAppliedGroupMembers(
     appState.requestProfiles(members.map { it.memberIdHex })
 }
 
+/** Immediate invite-bar projection while the local MDK confirmation is pending. */
+internal fun optimisticAcceptedInvite(group: AppGroupRecordFfi): AppGroupRecordFfi =
+    group.copy(
+        archived = false,
+        pendingConfirmation = false,
+    )
+
+/** Roll back only if no newer authoritative group projection replaced our optimistic value. */
+internal fun rollbackOptimisticAcceptedInvite(
+    current: AppGroupRecordFfi,
+    optimistic: AppGroupRecordFfi,
+    previous: AppGroupRecordFfi,
+): AppGroupRecordFfi = if (current == optimistic) previous else current
+
 internal data class AuthoritativeChatListMembers(
     val memberCacheByGroup: Map<String, List<AppGroupMemberRecordFfi>>,
     val removedGroupIds: Set<String>,
@@ -8400,9 +8414,15 @@ class ConversationController(
         withMutationLockResult(false) {
             val account = conversationAccountRef ?: return@withMutationLockResult false
             val invitePeerAccount = inviteAccount
+            val previousGroup = group
+            val optimisticGroup = optimisticAcceptedInvite(previousGroup)
+            group = optimisticGroup
+            appState.applyLocalGroupUpdate(optimisticGroup)
             val acceptedGroup =
                 runCatching { appState.marmotIo { acceptGroupInvite(account, group.groupIdHex) } }
                     .getOrElse {
+                        group = rollbackOptimisticAcceptedInvite(group, optimisticGroup, previousGroup)
+                        appState.applyLocalGroupUpdate(group)
                         it.rethrowIfCancellation()
                         appState.presentFailure(R.string.toast_couldnt_accept_invite, "GROUP_INVITE_ACCEPT", it)
                         return@withMutationLockResult false

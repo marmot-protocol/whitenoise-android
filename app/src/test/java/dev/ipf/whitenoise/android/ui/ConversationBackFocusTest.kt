@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.ConversationBackAction
+import dev.ipf.whitenoise.android.ui.conversation.awaitStableImeInset
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.conversationBackAction
 import org.junit.Assert.assertEquals
@@ -91,6 +92,12 @@ class ConversationBackFocusTest {
                     imeIsOpen = true,
                     expected = ConversationBackAction.DISMISS_COMPOSER,
                 ),
+                BackCase(
+                    composerFocused = false,
+                    imeIsOpen = true,
+                    composerDismissInProgress = true,
+                    expected = ConversationBackAction.NAVIGATE_UP,
+                ),
                 BackCase(expected = ConversationBackAction.NAVIGATE_UP),
             )
 
@@ -103,10 +110,32 @@ class ConversationBackFocusTest {
                     searchOpen = case.searchOpen,
                     composerFocused = case.composerFocused,
                     imeIsOpen = case.imeIsOpen,
+                    composerDismissInProgress = case.composerDismissInProgress,
                 ),
             )
         }
     }
+
+    @Test
+    fun imeSettleWaitsWithoutWritingAndStopsAfterStableGeometry() =
+        kotlinx.coroutines.test.runTest {
+            val insets = ArrayDeque(listOf(100, 180, 240, 240, 240))
+            var current = 40
+            var frames = 0
+
+            val settled =
+                awaitStableImeInset(
+                    maxFrames = 24,
+                    readInset = { current },
+                    awaitFrame = {
+                        frames++
+                        current = insets.removeFirst()
+                    },
+                )
+
+            assertEquals(true, settled)
+            assertEquals(5, frames)
+        }
 }
 
 private data class BackCase(
@@ -115,5 +144,6 @@ private data class BackCase(
     val searchOpen: Boolean = false,
     val composerFocused: Boolean = false,
     val imeIsOpen: Boolean = false,
+    val composerDismissInProgress: Boolean = false,
     val expected: ConversationBackAction,
 )

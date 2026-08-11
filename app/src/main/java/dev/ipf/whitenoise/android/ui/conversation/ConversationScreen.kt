@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imeAnimationTarget
+import androidx.compose.foundation.layout.imeNestedScroll
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -217,6 +218,8 @@ private val COMPOSER_SNACKBAR_INSET = 72.dp
 
 private const val MEDIA_PICKER_MAX_ITEMS = 10
 
+private const val IME_SETTLE_MAX_FRAMES = 24
+
 // Foreground catch-up normally materializes almost immediately. Keep the
 // background-arrival listener bounded so a later, genuinely foreground
 // message does not unexpectedly start an otherwise idle auto-reader.
@@ -279,6 +282,9 @@ private fun LazyListScope.conversationLoadErrorItem(
 // Liveness fallback only. Correctness waits for the IME target/inset settle signal,
 // never a guessed number of rendered frames.
 private const val FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS = 1_500L
+
+@OptIn(ExperimentalLayoutApi::class)
+private fun Modifier.conversationImeNestedScroll(): Modifier = imeNestedScroll()
 
 /** Whether adjacent timeline items participate in one visible message-bubble sender run. */
 internal fun conversationBubbleRowsShareSenderRun(
@@ -1146,6 +1152,7 @@ internal fun ConversationScreen(
     // installed rather than to chat.id.
     val composerFocus = remember(chat.id) { FocusRequester() }
     var composerFocused by remember(chat.id) { mutableStateOf(false) }
+    var composerDismissInProgress by remember(chat.id) { mutableStateOf(false) }
     var imeTransitionBookmark by remember(chat.id) { mutableStateOf<ConversationScrollBookmark?>(null) }
     var foregroundRestoreToken by remember(controller) { mutableStateOf<ConversationForegroundRestoreToken?>(null) }
     val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
@@ -1896,6 +1903,7 @@ internal fun ConversationScreen(
                 searchOpen = searchOpen,
                 composerFocused = composerFocused,
                 imeIsOpen = imeIsOpen,
+                composerDismissInProgress = composerDismissInProgress,
             )
         ) {
             ConversationBackAction.CLEAR_TEXT_SELECTION -> clearTextSelection()
@@ -1905,11 +1913,16 @@ internal fun ConversationScreen(
             }
             ConversationBackAction.CLOSE_SEARCH -> closeSearch()
             ConversationBackAction.DISMISS_COMPOSER -> {
+                composerDismissInProgress = true
                 focusManager.clearFocus(force = true)
                 keyboardController?.hide()
             }
             ConversationBackAction.NAVIGATE_UP -> onBack()
         }
+    }
+
+    LaunchedEffect(imeIsOpen) {
+        if (!imeIsOpen) composerDismissInProgress = false
     }
 
     // Auto-focus the field on open; clear transient highlight on close.
@@ -1974,13 +1987,17 @@ internal fun ConversationScreen(
         if (scrollCoordinator.foregroundRestoreInProgress) return@LaunchedEffect
         val suppressForCustomInputSwap = suppressNextImeOpenReanchor.getAndSet(false)
         if (!initialTimelineAnchored || suppressForCustomInputSwap) return@LaunchedEffect
+        awaitStableImeInset(
+            maxFrames = IME_SETTLE_MAX_FRAMES,
+            readInset = { imeInsets.getBottom(density) },
+            awaitFrame = { withFrameNanos { } },
+        )
         val snapshot = imeTransitionBookmark ?: scrollCoordinator.bookmark(currentScrollAnchor())
         when (snapshot.settledMode) {
             ConversationScrollMode.FollowingTail ->
                 scrollCoordinator.followTailIfAllowed(
                     resolveTailIndex = { currentTailIndex },
                     reason = ConversationScrollReason.ImeTransition,
-                    frameCount = 24,
                 )
             is ConversationScrollMode.ReadingHistory ->
                 scrollCoordinator.restoreBookmark(snapshot, resolveAnchorIndex = ::resolveScrollAnchorIndex)
@@ -2546,6 +2563,7 @@ internal fun ConversationScreen(
         modifier =
             Modifier
                 .fillMaxSize()
+                .conversationImeNestedScroll()
                 .dismissTextSelectionOnOutsideTap(
                     active = textSelectionMessageId != null,
                     selectedBoundsInWindow = textSelectionBubbleBounds,
@@ -2759,12 +2777,22 @@ internal fun ConversationScreen(
                 autoFocusConsumedState = composerAutoFocusConsumed,
                 composerFocus = composerFocus,
                 onComposerFocusChanged = { focused ->
+                    if (focused) composerDismissInProgress = false
                     if (focused && !composerFocused && !imeIsOpen) {
                         imeTransitionBookmark = scrollCoordinator.bookmark(currentScrollAnchor())
                     } else if (!focused && !imeIsOpen) {
                         imeTransitionBookmark = null
                     }
                     composerFocused = focused
+                },
+                onComposerPreImeBack = {
+                    if (composerDismissInProgress) {
+                        onBack()
+                    } else {
+                        composerDismissInProgress = true
+                        focusManager.clearFocus(force = true)
+                        keyboardController?.hide()
+                    }
                 },
                 onBottomInputChanged = { reanchorNewestAfterBottomInputChange() },
                 onKeyboardRestoreFromCustomInput = { suppressNextImeOpenReanchor.set(true) },

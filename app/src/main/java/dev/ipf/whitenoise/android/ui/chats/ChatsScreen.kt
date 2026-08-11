@@ -1046,7 +1046,10 @@ internal fun ChatsScreen(
                                                 updateChatDragSelection(pointerWindowY)
                                             },
                                             onDragSelectionEnd = { finishChatDrag(clearSelection = false) },
-                                            onDragSelectionCancel = { finishChatDrag(clearSelection = true) },
+                                            onDragSelectionCancel = {
+                                                actionSheetChatId = null
+                                                finishChatDrag(clearSelection = true)
+                                            },
                                             rangeDragActive = dragAnchorChatId == item.id,
                                             onToggleSelection = {
                                                 val updated = toggleChatListSelection(selectedChatIds, item.id)

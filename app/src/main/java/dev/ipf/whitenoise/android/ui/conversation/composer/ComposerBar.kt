@@ -345,6 +345,7 @@ internal fun ComposerBar(
     // #589: surfaces the live focus state up to the conversation screen so the
     // resume observer can tell whether the keyboard was up when we were paused.
     onComposerFocusChanged: (Boolean) -> Unit = {},
+    onComposerPreImeBack: (() -> Unit)? = null,
     onBottomInputChanged: () -> Unit = {},
     onKeyboardRestoreFromCustomInput: () -> Unit = {},
     onKeyboardRestoreFromCustomInputFailed: () -> Unit = {},
@@ -917,8 +918,12 @@ internal fun ComposerBar(
                         attachmentSheetOpen = attachmentSheetState.isOpen,
                         preImeBackEnabled = !composerEmojiPickerOpen && !attachmentSheetState.isOpen,
                         onPreImeBack = {
-                            focusManager.clearFocus(force = true)
-                            keyboardController?.hide()
+                            if (onComposerPreImeBack != null) {
+                                onComposerPreImeBack()
+                            } else {
+                                focusManager.clearFocus(force = true)
+                                keyboardController?.hide()
+                            }
                         },
                         hasCameraCapture = onCaptureFromCamera != null,
                         hasLocationShare = onShareLocation != null,
