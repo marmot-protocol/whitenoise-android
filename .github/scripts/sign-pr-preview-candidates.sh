@@ -23,10 +23,13 @@ for channel in stable isolated; do
     --key-pass env:PR_PREVIEW_KEY_PASSWORD \
     --out "$output" \
     "$input"
-  cert_digest=$(
-    "$apksigner" verify --verbose --print-certs "$output" |
-      sed -n 's/^Signer #1 certificate SHA-256 digest: //p'
+  verification=$("$apksigner" verify --verbose --print-certs --min-sdk-version 34 "$output")
+  mapfile -t cert_digests < <(
+    printf '%s\n' "$verification" |
+      sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest: //p'
   )
+  (( ${#cert_digests[@]} == 1 ))
+  cert_digest=${cert_digests[0]}
   expected_digest=$(printf '%s' "$PR_PREVIEW_CERT_SHA256" | tr -d ':' | tr '[:upper:]' '[:lower:]')
   [[ "${cert_digest,,}" == "$expected_digest" ]]
 done

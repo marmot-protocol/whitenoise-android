@@ -110,6 +110,9 @@ case "$1" in
     ;;
   verify)
     printf 'Signer #1 certificate SHA-256 digest: %s\n' "${FAKE_CERT_DIGEST:-aabbccdd}"
+    if [[ "${FAKE_SECOND_SIGNER:-false}" == true ]]; then
+      printf 'Signer #2 certificate SHA-256 digest: aabbccdd\n'
+    fi
     ;;
   *) exit 64 ;;
 esac
@@ -125,5 +128,7 @@ export PR_PREVIEW_CERT_SHA256=aabbccdd
 "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
 rm -rf "$tmp/signed"
 expect_rejection 'wrong signing certificate' env FAKE_CERT_DIGEST=deadbeef "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
+rm -rf "$tmp/signed"
+expect_rejection 'multiple signing certificates' env FAKE_SECOND_SIGNER=true "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
 
 printf 'preview validation fixtures: passed\n'

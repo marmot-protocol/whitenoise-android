@@ -11,7 +11,9 @@ on:
 concurrency:
   # One publisher per PR: a new push cancels a superseded signer/publisher so
   # an older build cannot finish after the latest build and replace its link.
-  group: android-pr-preview-publish-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
+  # Internal PR branch names are stable across pushes, including when GitHub's
+  # optional workflow_run.pull_requests association is empty.
+  group: android-pr-preview-publish-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 permissions:
@@ -24,13 +26,10 @@ jobs:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.head_repository.full_name == github.repository &&
-      github.event.workflow_run.pull_requests[0] != null &&
-      github.event.workflow_run.pull_requests[1] == null
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
       HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       BUILD_RUN_ID: ${{ github.event.workflow_run.id }}
       BUILD_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
@@ -59,6 +58,27 @@ jobs:
           mkdir -p candidates/stable candidates/isolated
           gh run download "$BUILD_RUN_ID" --name pr-preview-stable --dir candidates/stable
           gh run download "$BUILD_RUN_ID" --name pr-preview-isolated --dir candidates/isolated
+
+      # workflow_run.pull_requests is optional and can be empty. Resolve the PR
+      # from the immutable head SHA through GitHub, fail closed on ambiguity,
+      # then use that trusted number for provenance and publication checks.
+      - name: Resolve the single current PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          default_branch='${{ github.event.workflow_run.repository.default_branch }}'
+          mapfile -t matches < <(
+            gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/pulls" --paginate \
+              --jq ".[] | select(.state == \"open\" and .head.sha == \"${HEAD_SHA}\" and .head.repo.full_name == \"${GITHUB_REPOSITORY}\" and .base.ref == \"${default_branch}\") | .number"
+          )
+          if (( ${#matches[@]} != 1 )); then
+            printf 'Expected exactly one open internal PR for %s, found %d.\n' \
+              "$HEAD_SHA" "${#matches[@]}" >&2
+            exit 1
+          fi
+          printf 'PR_NUMBER=%s\n' "${matches[0]}" >> "$GITHUB_ENV"
 
       - name: Verify current PR head
         env:
@@ -146,6 +166,12 @@ jobs:
           for channel in stable isolated; do
             apk=$(find "signed/$channel" -type f -name '*.apk' -print -quit)
             url=$(APK_PATH="$apk" .github/scripts/upload-pr-apk-to-blossom.sh)
+            remote_sha=$(curl --fail --location --retry 3 --retry-all-errors --max-time 240 "$url" | sha256sum | awk '{print $1}')
+            local_sha=$(sha256sum "$apk" | awk '{print $1}')
+            [[ "$remote_sha" == "$local_sha" ]] || {
+              printf 'Published %s APK digest does not match the signed file.\n' "$channel" >&2
+              exit 1
+            }
             printf '%s_url=%s\n' "$channel" "$url" >> "$GITHUB_OUTPUT"
           done
 
