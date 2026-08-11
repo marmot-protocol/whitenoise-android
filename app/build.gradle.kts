@@ -1,9 +1,11 @@
+import com.android.build.api.attributes.ProductFlavorAttr
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.androidx.baselineprofile)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.detekt)
@@ -161,6 +163,7 @@ android {
         versionName = "2026.8.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "false")
         buildConfigField(
             "String",
             "MDK_SHORT_SHA",
@@ -447,6 +450,19 @@ android {
             // When signing is absent, the release packaging tasks fail (see the
             // guard below) instead of producing an unsigned artifact.
         }
+        // Created by the Baseline Profile plugin from `release`. Keep both
+        // performance-only variants installable without weakening the signing
+        // contract of a production or staging release APK. They intentionally
+        // reuse the dev package so an authenticated dev fixture survives swaps
+        // between the debug and release-like benchmark APKs.
+        create("benchmarkRelease") {
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "true")
+        }
+        create("nonMinifiedRelease") {
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "true")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -492,7 +508,13 @@ androidComponents {
                 ?.second
         val enabled =
             when (environment) {
-                "dev" -> variantBuilder.buildType == "debug"
+                "dev" ->
+                    variantBuilder.buildType in
+                        setOf(
+                            "debug",
+                            "benchmarkRelease",
+                            "nonMinifiedRelease",
+                        )
                 "production", "staging" -> variantBuilder.buildType == "release"
                 else -> true
             }
@@ -529,6 +551,50 @@ androidComponents {
     }
 }
 
+// Compose compiler reports are opt-in because they add work and generate a
+// large number of files. CI enables the property for an optimized staging
+// compilation and publishes both the metrics and stability reports.
+val enableComposeCompilerReports =
+    providers
+        .gradleProperty("whitenoise.enableComposeCompilerReports")
+        .map(String::toBooleanStrict)
+        .getOrElse(false)
+
+composeCompiler {
+    if (enableComposeCompilerReports) {
+        metricsDestination = layout.buildDirectory.dir("compose-metrics")
+        reportsDestination = layout.buildDirectory.dir("compose-reports")
+    }
+}
+
+baselineProfile {
+    automaticGenerationDuringBuild = false
+    dexLayoutOptimization = true
+    mergeIntoMain = true
+    saveInSrc = true
+    warnings {
+        // Other environments intentionally expose only their supported release
+        // variant; performance tooling is scoped to the safe dev package.
+        disabledVariants = false
+    }
+}
+
+// The producer intentionally has one safe dev/zapstore fixture variant. Point
+// every release consumer's profile-only configuration at that artifact without
+// adding broad flavor fallbacks to the app's runtime dependency graph.
+val baselineProfileEnvironment = objects.named(ProductFlavorAttr::class.java, "dev")
+val baselineProfileDistribution = objects.named(ProductFlavorAttr::class.java, "zapstore")
+afterEvaluate {
+    configurations
+        .matching { it.name.endsWith("ReleaseBaselineProfile") }
+        .configureEach {
+            attributes {
+                attribute(ProductFlavorAttr.of("environment"), baselineProfileEnvironment)
+                attribute(ProductFlavorAttr.of("distribution"), baselineProfileDistribution)
+            }
+        }
+}
+
 // Task names carry the distribution flavor between the environment and the build
 // type (e.g. packageStagingZapstoreRelease…), so match on the environment alone.
 // This runs only on release package tasks, so the build type is already implied.
@@ -556,17 +622,23 @@ fun releaseSigningHintForPackageTask(taskName: String): String =
 // unsigned release APK is uninstallable, so a build that "succeeds" while
 // emitting one hides a release-blocking failure. Override with
 // WHITENOISE_ALLOW_UNSIGNED_RELEASE=true.
-tasks.matching { it.name.startsWith("package") && it.name.contains("Release") }.configureEach {
-    doFirst {
-        if (!releaseSigningConfiguredForPackageTask(name) && !allowUnsignedRelease) {
-            throw GradleException(
-                "Release signing is not configured for $name (set ${releaseSigningHintForPackageTask(name)}). " +
-                    "Refusing to produce an unsigned release artifact; " +
-                    "set WHITENOISE_ALLOW_UNSIGNED_RELEASE=true to override.",
-            )
+tasks
+    .matching {
+        it.name.startsWith("package") &&
+            it.name.endsWith("Release") &&
+            !it.name.contains("BenchmarkRelease") &&
+            !it.name.contains("NonMinifiedRelease")
+    }.configureEach {
+        doFirst {
+            if (!releaseSigningConfiguredForPackageTask(name) && !allowUnsignedRelease) {
+                throw GradleException(
+                    "Release signing is not configured for $name (set ${releaseSigningHintForPackageTask(name)}). " +
+                        "Refusing to produce an unsigned release artifact; " +
+                        "set WHITENOISE_ALLOW_UNSIGNED_RELEASE=true to override.",
+                )
+            }
         }
     }
-}
 
 kover {
     reports {
@@ -662,7 +734,18 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.okhttp)
+    // One profile is generated from the authenticated dev/zapstore fixture and
+    // merged into main for every release consumer. Select that producer
+    // configuration explicitly so staging/play/production consumers do not
+    // demand unsafe benchmark variants with their own package identities.
+    baselineProfile(
+        project(
+            path = ":benchmark",
+            configuration = "devZapstoreReleaseBaselineProfile",
+        ),
+    )
     testImplementation(libs.junit)
     testImplementation(libs.okhttp)
     testImplementation(libs.okhttp.mockwebserver)

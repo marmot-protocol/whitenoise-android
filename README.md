@@ -36,6 +36,13 @@ Direct Gradle equivalents (Zapstore debug is the default local dev flavor):
 ./gradlew :app:installDevZapstoreDebug
 ```
 
+Release-like startup and group-flow measurements, Baseline Profile generation,
+profile packaging verification, and Compose compiler report commands are
+documented in [docs/performance.md](docs/performance.md). Run them on a dedicated
+physical device with an authenticated dev test account. The state-preserving
+runner replaces the dev package in place with the same debug key and avoids the
+connected-test teardown that otherwise removes local fixture data.
+
 The app also has a `distribution` flavor dimension, orthogonal to the
 environment above: **`zapstore`** enables verified direct-APK self-updates (the
 Zapstore manifest permissions and the installer implementation in the `zapstore`

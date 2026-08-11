@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingScreen
 import dev.ipf.whitenoise.android.ui.settings.WipeOutcomeSheet
 import dev.ipf.whitenoise.android.ui.settings.WipeProgressSheet
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -156,6 +157,7 @@ fun WhiteNoiseApp(
             LocalSnackbarContentInset provides snackbarContentInset,
         ) {
             Scaffold(
+                modifier = Modifier.exposePerformanceTestTags(),
                 contentWindowInsets = WindowInsets(0.dp),
                 snackbarHost = { WhiteNoiseSnackbarHost(snackbarHostState) },
             ) { padding ->

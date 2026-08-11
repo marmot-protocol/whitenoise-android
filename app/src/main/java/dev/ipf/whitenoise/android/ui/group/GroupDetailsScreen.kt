@@ -146,6 +146,8 @@ import dev.ipf.whitenoise.android.ui.settings.ChatBubbleColorsScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
 import dev.ipf.whitenoise.android.ui.settings.chatFolderDisplayName
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
@@ -1208,7 +1210,10 @@ internal fun GroupDetailsScreen(
                         )
                     } else {
                         Row(
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 56.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
@@ -1312,7 +1317,7 @@ internal fun GroupDetailsScreen(
                         // Row taps route into the profile sheet, which carries the same
                         // admin actions (grant/revoke admin, remove) the old per-row menu
                         // exposed (#444/#635 scope rules).
-                        GroupMemberIdentityRows(visibleMembers) { _, member ->
+                        GroupMemberIdentityRows(visibleMembers) { index, member ->
                             val isSelfRow = GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
                             val rowMutationPending =
                                 controller.isMemberMutationPending(member.memberIdHex) ||
@@ -1328,6 +1333,12 @@ internal fun GroupDetailsScreen(
                                     },
                                 avatarSeed = member.memberIdHex,
                                 avatarUrl = controller.memberAvatarUrl(member),
+                                modifier =
+                                    if (index == 0) {
+                                        Modifier.performanceTestTag(PerformanceTestTags.MEMBER_LIST)
+                                    } else {
+                                        Modifier
+                                    },
                                 onSubtitleClick =
                                     if (isSelfRow || memberNpub.isBlank()) {
                                         null

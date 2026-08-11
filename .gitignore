@@ -9,6 +9,8 @@
 /.idea/assetWizardSettings.xml
 .DS_Store
 /build
+/benchmark/build
+/trace_processor
 /captures
 .externalNativeBuild
 .cxx
