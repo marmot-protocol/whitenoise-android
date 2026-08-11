@@ -25,23 +25,33 @@ internal fun conversationBackAction(
         else -> ConversationBackAction.NAVIGATE_UP
     }
 
-/** Wait for inset geometry to settle without issuing per-frame scroll writes. */
-internal suspend fun awaitStableImeInset(
-    maxFrames: Int,
+/**
+ * Wait until the IME inset reaches its animation target and holds there,
+ * without issuing per-frame scroll writes.
+ *
+ * Frame-stability alone cannot tell a finished keyboard animation from a
+ * gesture-driven drag whose finger merely paused — two equal frames read as
+ * "settled" mid-gesture, and the scroll write that follows yanks the list
+ * while the user still owns the inset. The animation target only matches the
+ * live inset once the IME genuinely stops, so waiting for that equality can
+ * never authorize a write inside an active drag. No frame cap: a drag may
+ * hold indefinitely, and releasing or cancelling it always converges the
+ * inset onto a target, so the wait ends with the gesture. Callers scope this
+ * to the IME-open edge, which cancels the wait if the keyboard closes.
+ */
+internal suspend fun awaitImeInsetAtTarget(
     stableFramesRequired: Int = 2,
     readInset: () -> Int,
+    readTargetInset: () -> Int,
     awaitFrame: suspend () -> Unit,
-): Boolean {
-    var previousInset = readInset()
+) {
     var stableFrames = 0
-    repeat(maxFrames.coerceAtLeast(1)) {
+    while (true) {
         awaitFrame()
-        val inset = readInset()
-        stableFrames = if (inset == previousInset) stableFrames + 1 else 0
-        if (stableFrames >= stableFramesRequired.coerceAtLeast(1)) return true
-        previousInset = inset
+        stableFrames =
+            if (readInset() == readTargetInset()) stableFrames + 1 else 0
+        if (stableFrames >= stableFramesRequired.coerceAtLeast(1)) return
     }
-    return false
 }
 
 internal enum class ComposerPreImeBackAction {
