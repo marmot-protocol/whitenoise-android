@@ -1471,4 +1471,21 @@
     <string name="attachment_type_video">Видео</string>
     <string name="attachment_type_image">Изображение</string>
     <string name="attachment_type_file">Файл</string>
+
+    <string name="global_search_date_filter_title">Дата</string>
+    <string name="global_search_date_any_time">Любая дата</string>
+    <string name="global_search_date_today">Сегодня</string>
+    <string name="global_search_date_last_7_days">Последние 7 дней</string>
+    <string name="global_search_date_last_30_days">Последние 30 дней</string>
+    <string name="global_search_date_custom">Свой диапазон…</string>
+    <string name="global_search_date_custom_from">Дата начала</string>
+    <string name="global_search_date_custom_to">Дата окончания</string>
+    <string name="global_search_date_custom_summary">%1$s — %2$s</string>
+    <string name="global_search_date_custom_reversed_error">Дата окончания должна быть не раньше даты начала.</string>
+    <string name="global_search_content_text">Текст</string>
+    <string name="global_search_content_links">Ссылки</string>
+    <string name="global_search_content_images_video">Изображения и видео</string>
+    <string name="global_search_content_voice_audio">Голос и аудио</string>
+    <string name="global_search_content_files_documents">Файлы и документы</string>
+    <string name="global_search_content_any_attachment">Любое вложение</string>
 </resources>
