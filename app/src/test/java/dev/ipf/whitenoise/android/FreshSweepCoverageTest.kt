@@ -114,8 +114,11 @@ class FreshSweepCoverageTest {
     @Test
     fun acceptInviteAcknowledgesSuccessBeforeLifecycleScopedWarmup() {
         val body = source("state/Controllers.kt").kotlinFunctionBody("acceptInvite")
+        val optimisticProjection = body.indexOf("group = optimisticGroup")
+        val optimisticLocalUpdate = body.indexOf("applyLocalGroupUpdate(optimisticGroup)")
         val accept = body.indexOf("acceptGroupInvite")
-        val localUpdate = body.indexOf("applyLocalGroupUpdate")
+        val confirmedProjection = body.indexOf("group = acceptedGroup")
+        val confirmedLocalUpdate = body.indexOf("applyLocalGroupUpdate(group)", confirmedProjection)
         val dismiss = body.indexOf("dismissConversationNotifications")
         val clearSelfLeft = body.indexOf("clearSelfLeft()")
         val toast = body.indexOf("toast_invite_accepted")
@@ -126,8 +129,14 @@ class FreshSweepCoverageTest {
         val watcher = body.indexOf("watchAgentTextStream(account, streamId)")
         val readState = body.indexOf("\"read-state\" to { initializeReadState(account) }")
 
-        assertTrue("accept must precede the local group snapshot", accept in 0 until localUpdate)
-        assertTrue("local snapshot must precede notification dismissal", localUpdate < dismiss)
+        assertTrue(
+            "optimistic projection must precede its local snapshot",
+            optimisticProjection in 0 until optimisticLocalUpdate,
+        )
+        assertTrue("optimistic snapshot must precede the engine accept", optimisticLocalUpdate < accept)
+        assertTrue("engine accept must precede the confirmed projection", accept < confirmedProjection)
+        assertTrue("confirmed projection must precede its local snapshot", confirmedProjection < confirmedLocalUpdate)
+        assertTrue("confirmed snapshot must precede notification dismissal", confirmedLocalUpdate < dismiss)
         assertTrue("notification dismissal must precede clearing the self-left latch", dismiss < clearSelfLeft)
         assertTrue("self-left latch must clear before durable success is shown", clearSelfLeft < toast)
         assertTrue("success must precede the post-accept warm-up launch", toast < warmupLaunch)

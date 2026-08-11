@@ -9,11 +9,13 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -22,9 +24,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 class ChatActionSheetTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -217,5 +221,45 @@ class ChatActionSheetTest {
             .onNodeWithText(string(R.string.delete))
             .performScrollTo()
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun actionSheetLightScreenshot() {
+        renderScreenshotSheet(darkTheme = false)
+        composeRule.onRoot(useUnmergedTree = true).captureRoboImage("src/test/snapshots/chat_action_sheet_light.png")
+    }
+
+    @Test
+    fun actionSheetDarkScreenshot() {
+        renderScreenshotSheet(darkTheme = true)
+        composeRule.onRoot(useUnmergedTree = true).captureRoboImage("src/test/snapshots/chat_action_sheet_dark.png")
+    }
+
+    private fun renderScreenshotSheet(darkTheme: Boolean) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = darkTheme) {
+                ChatActionSheet(
+                    hasUnread = false,
+                    canMarkUnread = true,
+                    archived = false,
+                    muted = false,
+                    pinned = false,
+                    showPinToggle = true,
+                    showMovePinnedUp = false,
+                    showMovePinnedDown = false,
+                    onMarkRead = {},
+                    onMarkUnread = {},
+                    onAddToFolder = {},
+                    onArchiveToggle = {},
+                    onMuteToggle = {},
+                    onPinToggle = {},
+                    onMovePinned = {},
+                    onSelect = {},
+                    onDelete = {},
+                    onDismiss = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
     }
 }

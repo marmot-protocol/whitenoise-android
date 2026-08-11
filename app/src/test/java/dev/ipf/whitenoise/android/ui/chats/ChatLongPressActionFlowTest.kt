@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
@@ -107,8 +108,86 @@ class ChatLongPressActionFlowTest {
     }
 
     @Test
-    fun longPressDragEntersRangeWithoutOpeningActions() {
+    @Suppress("LongMethod") // Full pointer lifecycle and visible sheet belong in one regression test.
+    fun actionSheetOpensAtLongPressThresholdBeforePointerUp() {
+        var sheetOpen by mutableStateOf(false)
+        var actionOpens = 0
+        var chatOpens = 0
+        val item = chatItem()
+        val state = appState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.testTag(CHAT_HOLD_HOST_TAG)) {
+                    ChatListRow(
+                        item = item,
+                        appState = state,
+                        isMuted = false,
+                        selectionMode = false,
+                        selected = false,
+                        onOpen = { chatOpens++ },
+                        onOpenProfile = {},
+                        onOpenActions = {
+                            actionOpens++
+                            sheetOpen = true
+                        },
+                        onDragSelectionStart = {},
+                        onDragSelection = { false },
+                        onDragSelectionEnd = {},
+                        onDragSelectionCancel = {},
+                        rangeDragActive = false,
+                        onToggleSelection = {},
+                    )
+                }
+                if (sheetOpen) {
+                    ChatActionSheet(
+                        hasUnread = false,
+                        canMarkUnread = true,
+                        archived = false,
+                        muted = false,
+                        pinned = false,
+                        showPinToggle = true,
+                        showMovePinnedUp = false,
+                        showMovePinnedDown = false,
+                        onMarkRead = {},
+                        onMarkUnread = {},
+                        onAddToFolder = {},
+                        onArchiveToggle = {},
+                        onMuteToggle = {},
+                        onPinToggle = {},
+                        onMovePinned = {},
+                        onSelect = {},
+                        onDelete = {},
+                        onDismiss = { sheetOpen = false },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(CHAT_HOLD_HOST_TAG).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveTo(center)
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(string(R.string.select)).assertIsDisplayed()
+        composeRule.runOnIdle {
+            assertEquals(1, actionOpens)
+            assertEquals(0, chatOpens)
+        }
+
+        composeRule.onAllNodes(isRoot())[0].performTouchInput { up() }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertEquals(1, actionOpens)
+            assertEquals(0, chatOpens)
+        }
+    }
+
+    @Test
+    fun longPressDragDismissesThresholdActionAndEntersRange() {
         var rangeActive by mutableStateOf(false)
+        var sheetOpen by mutableStateOf(false)
         var actionOpens = 0
         var dragStarts = 0
         var dragMoves = 0
@@ -126,8 +205,12 @@ class ChatLongPressActionFlowTest {
                         selected = rangeActive,
                         onOpen = {},
                         onOpenProfile = {},
-                        onOpenActions = { actionOpens++ },
+                        onOpenActions = {
+                            actionOpens++
+                            sheetOpen = true
+                        },
                         onDragSelectionStart = {
+                            sheetOpen = false
                             rangeActive = true
                             dragStarts++
                         },
@@ -157,7 +240,8 @@ class ChatLongPressActionFlowTest {
         }
         composeRule.waitForIdle()
 
-        assertEquals(0, actionOpens)
+        assertEquals(1, actionOpens)
+        assertEquals(false, sheetOpen)
         assertEquals(1, dragStarts)
         assertTrue(dragMoves >= 2)
         assertEquals(1, dragEnds)
@@ -309,5 +393,6 @@ class ChatLongPressActionFlowTest {
     private companion object {
         const val GROUP_NAME = "Gesture test group"
         const val CHAT_DRAG_HOST_TAG = "chat-drag-host"
+        const val CHAT_HOLD_HOST_TAG = "chat-hold-host"
     }
 }
