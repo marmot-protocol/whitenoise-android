@@ -2992,7 +2992,11 @@ class WhiteNoiseAppState private constructor(
                     }
                 chatsController?.applyProfileGroupDetails(account, result.details)
             }
-            presentTransient(R.string.toast_admin_added)
+            presentConversationTransient(
+                accountRef = account,
+                groupIdHex = groupId,
+                titleRes = R.string.toast_admin_added,
+            )
             true
         }.onFailure { error ->
             presentFailure(R.string.toast_couldnt_update_admin, "PROFILE_GROUP_ADMIN_UPDATE", error)

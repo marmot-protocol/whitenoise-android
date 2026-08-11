@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class ErrorPresentationTest {
     @Test
@@ -38,6 +40,22 @@ class ErrorPresentationTest {
     }
 
     @Test
+    fun profileAdminPromotionScopesItsConfirmationToTheMutatedGroup() {
+        val body = appStateSource().readText().functionBody("promoteProfileInGroup")
+
+        assertTrue(
+            "profile-sheet admin success must use the originating account and group",
+            "presentConversationTransient(" in body &&
+                "accountRef = account" in body &&
+                "groupIdHex = groupId" in body,
+        )
+        assertFalse(
+            "profile-sheet admin success must not escape through the app-global confirmation host",
+            "presentTransient(R.string.toast_admin_added)" in body,
+        )
+    }
+
+    @Test
     fun presentationSeparatesLocalizedCopyFromDiagnostics() {
         val secret = "nsec1" + "q".repeat(60)
         val presentation =
@@ -56,4 +74,11 @@ class ErrorPresentationTest {
         assertFalse(presentation.report.contains("failed with"))
         assertFalse((presentation.message as AppText.Plain).value.contains("IllegalStateException"))
     }
+
+    private fun appStateSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+        ).firstOrNull(File::exists)
+            ?: error("Missing AppState.kt source file")
 }
