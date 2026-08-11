@@ -14,7 +14,10 @@ class StartupUnreadHydrationCoverageTest {
         val bootstrap = source.functionBody("bootstrapLocked")
         val startupRefresh = source.functionBody("refreshAccountsForBootstrap")
 
-        assertTrue("bootstrap must use the startup-scoped account refresh", "refreshAccountsForBootstrap()" in bootstrap)
+        assertTrue(
+            "bootstrap must use the startup-scoped account refresh",
+            "refreshAccountsForBootstrap()" in bootstrap,
+        )
         assertFalse("bootstrap must not run the suppression-aware bulk refresh", "refreshAccounts()" in bootstrap)
         assertTrue(
             "startup account refresh must skip membership-aware roster reads",
@@ -42,9 +45,18 @@ class StartupUnreadHydrationCoverageTest {
         val recorder = source.functionBody("recordAccountSwitchLocalSnapshotRendered")
         val launcher = source.functionBody("launchPendingStartupUnreadReconciliation")
 
-        assertTrue("the first-frame hook must release the deferred unread pass", "launchPendingStartupUnreadReconciliation()" in recorder)
-        assertTrue("the deferred pass must run on a process-lifetime scope", "notificationScope.launch" in launcher)
-        assertTrue("the deferred pass must restore suppression-aware counts", "refreshAccountUnreadCounts()" in launcher)
+        assertTrue(
+            "the first-frame hook must release the deferred unread pass",
+            "launchPendingStartupUnreadReconciliation()" in recorder,
+        )
+        assertTrue(
+            "the deferred pass must run on a process-lifetime scope",
+            "notificationScope.launch" in launcher,
+        )
+        assertTrue(
+            "the deferred pass must restore suppression-aware counts",
+            "refreshAccountUnreadCounts()" in launcher,
+        )
     }
 
     private fun appStateSource(): File =
