@@ -1318,9 +1318,15 @@
     <string name="mute">Silenciar</string>
     <string name="mute_dialog_title">Silenciar notificaciones</string>
     <string name="mute_dialog_description">Los demás no verán que silenciaste este chat.</string>
+    <string name="mute_duration_1_hour">1 hora</string>
     <string name="mute_duration_8_hours">8 horas</string>
-    <string name="mute_duration_1_week">1 semana</string>
+    <string name="mute_duration_1_day">1 día</string>
+    <string name="mute_duration_7_days">7 días</string>
+    <string name="mute_duration_custom">Hora personalizada…</string>
     <string name="mute_duration_always">Siempre</string>
+    <string name="mute_custom_time_title">Elige una hora</string>
+    <string name="mute_custom_future_error">Elige una hora futura.</string>
+    <string name="mute_custom_selected">Silenciado hasta %1$s</string>
     <string name="notify_for">Notificar</string>
     <string name="ok">OK</string>
     <string name="device_privacy">Privacidad del dispositivo</string>

@@ -614,9 +614,25 @@ internal fun GroupDetailsScreen(
         if (showMuteDurationDialog) {
             MuteDurationDialog(
                 onDismiss = { showMuteDurationDialog = false },
-                onConfirm = { duration ->
+                onConfirm = { target ->
                     showMuteDurationDialog = false
-                    appState.muteConversationFor(controller.group.groupIdHex, duration)
+                    when (target) {
+                        is MuteTarget.After ->
+                            appState.muteConversationFor(
+                                controller.group.groupIdHex,
+                                target.durationMillis,
+                            )
+                        is MuteTarget.At ->
+                            appState.muteConversationUntil(
+                                controller.group.groupIdHex,
+                                target.expiryMillis,
+                            )
+                        MuteTarget.Always ->
+                            appState.muteConversationFor(
+                                controller.group.groupIdHex,
+                                durationMillis = 0L,
+                            )
+                    }
                 },
             )
         }

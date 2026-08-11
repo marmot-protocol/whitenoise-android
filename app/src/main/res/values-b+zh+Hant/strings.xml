@@ -1292,9 +1292,15 @@
     <string name="mute">靜音</string>
     <string name="mute_dialog_title">靜音訊息通知</string>
     <string name="mute_dialog_description">其他人不會看到你靜音了此聊天。</string>
+    <string name="mute_duration_1_hour">1 小時</string>
     <string name="mute_duration_8_hours">8 小時</string>
-    <string name="mute_duration_1_week">1 週</string>
+    <string name="mute_duration_1_day">1 天</string>
+    <string name="mute_duration_7_days">7 天</string>
+    <string name="mute_duration_custom">自訂時間…</string>
     <string name="mute_duration_always">永遠</string>
+    <string name="mute_custom_time_title">選擇時間</string>
+    <string name="mute_custom_future_error">請選擇未來的時間。</string>
+    <string name="mute_custom_selected">靜音至 %1$s</string>
     <string name="notify_for">通知</string>
     <string name="ok">確定</string>
     <string name="device_privacy">裝置隱私</string>
