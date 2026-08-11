@@ -1,9 +1,12 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.conversation.messages.MediaCaptionFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
@@ -76,6 +80,7 @@ class MessageBubbleChromeScreenshotTest {
                         }
                         CustomAmoledReplyBubble(highlighted = false)
                         CustomAmoledReplyBubble(highlighted = true)
+                        CustomAmoledMediaCaptionBubble(highlighted = true)
                     }
                 }
             }
@@ -137,6 +142,32 @@ class MessageBubbleChromeScreenshotTest {
 }
 
 @Composable
+private fun CustomAmoledMediaCaptionBubble(highlighted: Boolean) {
+    val presentation =
+        messageBubblePresentation(
+            deleted = false,
+            mine = true,
+            customArgb = OUTGOING_CUSTOM_AMOLED_ARGB,
+        )
+    MediaCaptionFrame(
+        presentation = presentation,
+        highlighted = highlighted,
+        mine = true,
+        mentionedSelf = false,
+        mentionedYouLabel = "Mentioned you",
+        alignEnd = true,
+        media = { Box(Modifier.width(180.dp).height(80.dp).background(Color(0xFF303030))) },
+    ) {
+        Text("Highlighted media caption")
+        Text(
+            text = "12:36",
+            style = MaterialTheme.typography.labelSmall,
+            color = messageBubbleTimestampColor(mine = true, deleted = false),
+        )
+    }
+}
+
+@Composable
 private fun CustomAmoledReplyBubble(highlighted: Boolean) {
     val presentation =
         messageBubblePresentation(
@@ -194,3 +225,4 @@ private fun DirectionalBubble(
 }
 
 private const val CUSTOM_AMOLED_ARGB = 0xFFFFC107L
+private const val OUTGOING_CUSTOM_AMOLED_ARGB = 0xFF9C27B0L
