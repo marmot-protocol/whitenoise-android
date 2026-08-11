@@ -280,6 +280,13 @@ android {
                     applicationIdSuffix = ".preview.pr$previewIdentity"
                     versionNameSuffix = "-preview-pr$previewIdentity-$buildShortSha-isolated"
                     manifestPlaceholders["appName"] = "PR $previewIdentity Isolated"
+                    val isolatedDeepLinkScheme = "whitenoise-preview-pr$previewIdentity"
+                    manifestPlaceholders["deepLinkScheme"] = isolatedDeepLinkScheme
+                    buildConfigField(
+                        "String",
+                        "WHITENOISE_DEEP_LINK_SCHEME",
+                        isolatedDeepLinkScheme.asBuildConfigString(),
+                    )
                 }
                 else -> error("PR_PREVIEW_CHANNEL must be 'stable' or 'isolated'")
             }

@@ -40,6 +40,11 @@ case "${1:-}" in
   -1)
     printf 'AndroidManifest.xml\nlib/%s/libmarmot.so\n' "${FAKE_ABI:-arm64-v8a}"
     ;;
+  -l)
+    printf '%s\n' \
+      "-rw-r--r--  2.0 unx ${FAKE_EXPANDED_BYTES:-1024} b- 512 defN 80-Jan-01 00:00 AndroidManifest.xml" \
+      "-rw-r--r--  2.0 unx 1024 b- 512 defN 80-Jan-01 00:00 lib/arm64-v8a/libmarmot.so"
+    ;;
   *) exit 64 ;;
 esac
 FAKE_ZIPINFO
@@ -89,9 +94,11 @@ make_candidates "$candidates"
 cp "$candidates/stable/preview.apk" "$candidates/stable/extra.apk"
 expect_rejection 'multiple APKs' env PATH="$fake_bin:$PATH" "$verifier" "$candidates"
 make_candidates "$candidates"
-truncate -s 157286401 "$candidates/stable/preview.apk"
+truncate -s 67108849 "$candidates/stable/preview.apk"
 (cd "$candidates/stable" && sha256sum preview.apk > SHA256SUMS)
 expect_rejection 'oversized APK' env PATH="$fake_bin:$PATH" "$verifier" "$candidates"
+make_candidates "$candidates"
+expect_rejection 'oversized expanded APK' env PATH="$fake_bin:$PATH" FAKE_EXPANDED_BYTES=536870913 "$verifier" "$candidates"
 
 android_home="$tmp/android"
 mkdir -p "$android_home/build-tools/1"

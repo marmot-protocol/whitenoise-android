@@ -8,6 +8,8 @@ root=${1:?candidate root is required}
 
 expected_version=2000000000
 expected_sha=${HEAD_SHA:0:7}
+max_apk_bytes=67108848
+max_expanded_bytes=536870912
 
 for channel in stable isolated; do
   dir="$root/$channel"
@@ -27,9 +29,11 @@ for channel in stable isolated; do
     printf 'Expected exactly one %s candidate, found %d\n' "$channel" "${#apks[@]}" >&2
     exit 1
   fi
-  [[ $(stat -c '%s' "${apks[0]}") -le 157286400 ]]
+  [[ $(stat -c '%s' "${apks[0]}") -le "$max_apk_bytes" ]]
   zipinfo -t "${apks[0]}" >/dev/null
   [[ $(zipinfo -1 "${apks[0]}" | wc -l) -le 50000 ]]
+  expanded_bytes=$(zipinfo -l "${apks[0]}" | awk '$1 ~ /^[-dl]/ { total += $4 } END { print total + 0 }')
+  [[ "$expanded_bytes" -le "$max_expanded_bytes" ]]
 
   if [[ "$channel" == stable ]]; then
     expected_package=dev.ipf.whitenoise.android.preview

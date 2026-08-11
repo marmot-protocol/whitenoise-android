@@ -9,7 +9,7 @@ Both use the `preview` environment and `play` distribution. Preview builds there
 
 ## Security boundary
 
-`android-pr-apk.yml` runs PR-controlled Gradle code without repository secrets and uploads unsigned, one-day candidate artifacts. `android-pr-preview-publish.yml` runs only the copy stored on the default branch after that workflow succeeds. It confirms the PR is still open at the same internal-repository head SHA, validates checksums, provenance, ZIP shape, size, package ID, version, PR/SHA version name, and ARM64 contents, then signs the APK as untrusted data without executing it. It verifies the dedicated certificate fingerprint before publishing to Blossom and updating the PR comment.
+`android-pr-apk.yml` runs PR-controlled Gradle code without repository secrets and uploads unsigned, one-day candidate artifacts. `android-pr-preview-publish.yml` runs only the copy stored on the default branch after that workflow succeeds. It confirms the PR is still open at the same internal-repository head SHA, validates checksums, provenance, ZIP shape, a 67,108,848-byte raw APK ceiling, a 512 MiB expanded-size ceiling, package ID, version, PR/SHA version name, and ARM64 contents, then signs the APK as untrusted data without executing it. It verifies the dedicated certificate fingerprint before publishing to Blossom and updating the PR comment.
 
 Configure a dedicated preview-only PKCS#12 key through these Actions secrets:
 
