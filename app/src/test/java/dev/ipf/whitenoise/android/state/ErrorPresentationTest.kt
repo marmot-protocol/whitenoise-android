@@ -17,6 +17,27 @@ class ErrorPresentationTest {
     }
 
     @Test
+    fun conversationNoticeMatchesOnlyItsOriginatingAccountAndGroup() {
+        val notice =
+            TransientNotice(
+                id = 1L,
+                title = AppText.Plain("Admin removed"),
+                conversation = ConversationNoticeDestination("account-a", "group-a"),
+            )
+
+        assertTrue(notice.isForConversation("account-a", "group-a"))
+        assertFalse(notice.isForConversation("account-a", "group-b"))
+        assertFalse(notice.isForConversation("account-b", "group-a"))
+    }
+
+    @Test
+    fun globalNoticeNeverMatchesAConversation() {
+        val notice = TransientNotice(id = 1L, title = AppText.Plain("Saved"))
+
+        assertFalse(notice.isForConversation("account-a", "group-a"))
+    }
+
+    @Test
     fun presentationSeparatesLocalizedCopyFromDiagnostics() {
         val secret = "nsec1" + "q".repeat(60)
         val presentation =

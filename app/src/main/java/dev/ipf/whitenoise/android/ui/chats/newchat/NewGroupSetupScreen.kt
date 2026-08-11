@@ -167,6 +167,7 @@ private suspend fun runNewGroupCreateMutation(
             )
         openCreatedGroupAfterCanonicalCreate(
             appState = appState,
+            accountRef = account,
             groupIdHex = groupIdHex,
             showCreatedToast = !isRetryLoad,
             retentionOutcome = retentionOutcome,
@@ -183,6 +184,7 @@ private suspend fun runNewGroupCreateMutation(
 
 private suspend fun openCreatedGroupAfterCanonicalCreate(
     appState: WhiteNoiseAppState,
+    accountRef: String,
     groupIdHex: String,
     showCreatedToast: Boolean,
     retentionOutcome: GroupRetentionApplyOutcome,
@@ -191,11 +193,14 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
     onRetryGroupIdCleared: () -> Unit,
     onAuthoritativeReadFailed: (Throwable) -> Unit,
 ) {
-    groupCreateSuccessToastResId(showCreatedToast, retentionOutcome)?.let { appState.presentTransient(it) }
+    val successToastResId = groupCreateSuccessToastResId(showCreatedToast, retentionOutcome)
     runCatchingCancellable {
         val item = appState.loadCreatedChatListItem(groupIdHex)
         onRetryGroupIdCleared()
         onCreateCompletedOpen(item, createRequestToken)
+        successToastResId?.let {
+            appState.presentConversationTransient(accountRef, groupIdHex, it)
+        }
     }.onFailure {
         appState.abandonGroupCreateTiming(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_FAILED)
         onAuthoritativeReadFailed(it)

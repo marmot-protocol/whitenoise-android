@@ -4,13 +4,13 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -19,14 +19,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AppPhase
+import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
@@ -48,7 +51,39 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val TRANSIENT_NOTICE_DURATION_MILLIS = 2_000L
+internal const val TRANSIENT_NOTICE_DURATION_MILLIS = 2_000L
+internal const val GLOBAL_TRANSIENT_NOTICE_TAG = "global-transient-notice"
+
+@Composable
+@Suppress("FunctionNaming")
+internal fun TransientNoticeTimeoutEffect(
+    notice: TransientNotice?,
+    onClear: (TransientNotice) -> Unit,
+) {
+    LaunchedEffect(notice) {
+        notice ?: return@LaunchedEffect
+        delay(TRANSIENT_NOTICE_DURATION_MILLIS)
+        onClear(notice)
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+internal fun GlobalTransientNotice(
+    notice: TransientNotice?,
+    modifier: Modifier = Modifier,
+) {
+    notice?.takeIf { it.conversation == null }?.let {
+        InlineConfirmationNotice(
+            notice = it,
+            modifier =
+                modifier
+                    .statusBarsPadding()
+                    .padding(top = TopAppBarDefaults.TopAppBarExpandedHeight)
+                    .testTag(GLOBAL_TRANSIENT_NOTICE_TAG),
+        )
+    }
+}
 
 @Composable
 fun WhiteNoiseApp(
@@ -127,11 +162,7 @@ fun WhiteNoiseApp(
             appState.clearToast()
         }
     }
-    LaunchedEffect(transientNotice) {
-        transientNotice ?: return@LaunchedEffect
-        delay(TRANSIENT_NOTICE_DURATION_MILLIS)
-        appState.clearTransientNotice(transientNotice)
-    }
+    TransientNoticeTimeoutEffect(transientNotice, appState::clearTransientNotice)
     LaunchedEffect(inboundProfilePayload, appState.phase) {
         val payload = inboundProfilePayload ?: return@LaunchedEffect
         if (appState.phase == AppPhase.Ready && appState.presentProfilePayload(payload)) {
@@ -167,32 +198,31 @@ fun WhiteNoiseApp(
                     if (!appState.appLockScreenVisible) {
                         AppSelfUpdateDialog(appState = appState)
                     }
-                    Column(Modifier.fillMaxSize()) {
-                        transientNotice?.let { InlineConfirmationNotice(it) }
-                        Box(Modifier.fillMaxWidth().weight(1f)) {
-                            when (val phase = appState.phase) {
-                                AppPhase.Bootstrapping -> LoadingScreen()
-                                AppPhase.Onboarding -> OnboardingScreen(appState)
-                                AppPhase.Ready ->
-                                    MainShell(
-                                        appState = appState,
-                                        inboundNotificationTarget = inboundNotificationTarget,
-                                        inboundNotificationRequestId = inboundNotificationRequestId,
-                                        onNotificationTargetHandled = onNotificationTargetHandled,
-                                        inboundShareRequest = inboundShareRequest,
-                                        onShareRequestHandled = onShareRequestHandled,
-                                        inboundAppUpdateTap = inboundAppUpdateTap,
-                                        onAppUpdateTapHandled = onAppUpdateTapHandled,
-                                    )
-                                is AppPhase.Failed ->
-                                    ErrorContent(
-                                        title = stringResource(R.string.white_noise_couldnt_start),
-                                        error = phase.error,
-                                        onRetry = { scope.launch { appState.bootstrap() } },
-                                    )
-                            }
-                        }
+                    when (val phase = appState.phase) {
+                        AppPhase.Bootstrapping -> LoadingScreen()
+                        AppPhase.Onboarding -> OnboardingScreen(appState)
+                        AppPhase.Ready ->
+                            MainShell(
+                                appState = appState,
+                                inboundNotificationTarget = inboundNotificationTarget,
+                                inboundNotificationRequestId = inboundNotificationRequestId,
+                                onNotificationTargetHandled = onNotificationTargetHandled,
+                                inboundShareRequest = inboundShareRequest,
+                                onShareRequestHandled = onShareRequestHandled,
+                                inboundAppUpdateTap = inboundAppUpdateTap,
+                                onAppUpdateTapHandled = onAppUpdateTapHandled,
+                            )
+                        is AppPhase.Failed ->
+                            ErrorContent(
+                                title = stringResource(R.string.white_noise_couldnt_start),
+                                error = phase.error,
+                                onRetry = { scope.launch { appState.bootstrap() } },
+                            )
                     }
+                    GlobalTransientNotice(
+                        notice = transientNotice,
+                        modifier = Modifier.align(Alignment.TopCenter),
+                    )
                     if (appState.appLockScreenVisible) {
                         AppLockScreen(
                             error = appState.appUnlockError,
