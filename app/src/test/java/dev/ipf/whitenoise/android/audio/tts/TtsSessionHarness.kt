@@ -248,6 +248,7 @@ internal class FakeSessionEngine : TtsSpeechEngine {
     override fun setCallbacks(
         onDone: (String?) -> Unit,
         onError: (String?, Int) -> Unit,
+        onRangeStart: (String?, Int, Int) -> Unit,
     ) {
         this.onDone = onDone
     }

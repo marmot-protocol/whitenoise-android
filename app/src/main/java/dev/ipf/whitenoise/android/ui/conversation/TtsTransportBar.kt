@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -142,9 +145,19 @@ internal fun TtsTransportBarContent(
                         )
                     }
                     if (!isError && ttsMessageCount(state) > 0) {
+                        val targetProgress = ttsMessageProgressFraction(state)
+                        val animatedProgress =
+                            key(ttsProgressAnimationKey(state)) {
+                                val progress by animateFloatAsState(
+                                    targetValue = targetProgress,
+                                    animationSpec = tween(durationMillis = 200),
+                                    label = "ttsMessageProgress",
+                                )
+                                progress
+                            }
                         // The progress text above already narrates the position.
                         LinearProgressIndicator(
-                            progress = { (ttsMessageIndex(state) + 1).toFloat() / ttsMessageCount(state) },
+                            progress = { animatedProgress },
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
@@ -223,6 +236,10 @@ internal fun ttsMessageCount(state: TtsState): Int = state.messageCount
 internal fun ttsSentenceIndex(state: TtsState): Int = state.sentenceIndexWithinMessage
 
 internal fun ttsSentenceCount(state: TtsState): Int = state.sentenceCountWithinMessage
+
+internal fun ttsMessageProgressFraction(state: TtsState): Float = state.messageProgressFraction.coerceIn(0f, 1f)
+
+internal fun ttsProgressAnimationKey(state: TtsState): Pair<Int, String> = state.messageIndex to state.messagePreview
 
 internal fun ttsNavigationEnabled(state: TtsState): Boolean = state !is TtsState.Error && state !is TtsState.Idle
 

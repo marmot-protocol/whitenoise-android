@@ -74,4 +74,43 @@ class TtsTransportBarLogicTest {
         assertEquals(false, ttsNavigationEnabled(errorTts(TtsError.Network, 0, 2)))
         assertEquals(false, ttsNavigationEnabled(idleTts(0, 0)))
     }
+
+    @Test
+    fun messageProgressFractionReadsEveryStateVariant() {
+        val speaking =
+            speakingTts(3, 8, 2, 5, "Preview", messageProgressFraction = 0.35f)
+        assertEquals(0.35f, ttsMessageProgressFraction(speaking))
+        val paused =
+            pausedTts(3, 8, 2, 5, "Preview", messageProgressFraction = 0.35f)
+        assertEquals(0.35f, ttsMessageProgressFraction(paused))
+        assertEquals(
+            0.5f,
+            ttsMessageProgressFraction(
+                errorTts(TtsError.Synthesis, 4, 8, 3, 5, "Preview", messageProgressFraction = 0.5f),
+            ),
+        )
+        assertEquals(1f, ttsMessageProgressFraction(idleTts(8, 8, 4, 5, "Preview", messageProgressFraction = 1f)))
+    }
+
+    @Test
+    fun messageProgressFractionIsClampedToTheUnitInterval() {
+        assertEquals(1f, ttsMessageProgressFraction(speakingTts(0, 2, messageProgressFraction = 1.5f)))
+        assertEquals(0f, ttsMessageProgressFraction(speakingTts(0, 2, messageProgressFraction = -0.2f)))
+    }
+
+    @Test
+    fun progressAnimationRestartsOnlyWhenTheMessageChanges() {
+        val firstUpdate = speakingTts(0, 2, 0, 3, messageProgressFraction = 0.2f)
+        val sameMessage = speakingTts(0, 2, 0, 4, messageProgressFraction = 0.4f)
+        val nextMessage = speakingTts(1, 2, 1, 4, messageProgressFraction = 0f)
+        val editedMessage =
+            speakingTts(0, 2, 0, 3, messagePreview = "Edited", messageProgressFraction = 0f)
+
+        assertEquals(ttsProgressAnimationKey(firstUpdate), ttsProgressAnimationKey(sameMessage))
+        assertEquals(false, ttsProgressAnimationKey(firstUpdate) == ttsProgressAnimationKey(nextMessage))
+        assertEquals(
+            false,
+            ttsProgressAnimationKey(firstUpdate) == ttsProgressAnimationKey(editedMessage),
+        )
+    }
 }

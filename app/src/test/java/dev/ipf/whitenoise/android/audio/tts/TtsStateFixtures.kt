@@ -8,6 +8,7 @@ internal fun speakingTts(
     messagePreview: String = "",
     sentenceIndex: Int = 0,
     sentenceCount: Int = 1,
+    messageProgressFraction: Float? = null,
 ): TtsState.Speaking =
     TtsState.Speaking(
         chunkIndex = chunkIndex,
@@ -17,6 +18,7 @@ internal fun speakingTts(
         sentenceIndexWithinMessage = sentenceIndex,
         sentenceCountWithinMessage = sentenceCount,
         messagePreview = messagePreview,
+        messageProgressFraction = messageProgressFraction ?: sentenceProgressFallback(sentenceIndex, sentenceCount),
     )
 
 internal fun pausedTts(
@@ -27,6 +29,7 @@ internal fun pausedTts(
     messagePreview: String = "",
     sentenceIndex: Int = 0,
     sentenceCount: Int = 1,
+    messageProgressFraction: Float? = null,
 ): TtsState.Paused =
     TtsState.Paused(
         chunkIndex = chunkIndex,
@@ -36,6 +39,7 @@ internal fun pausedTts(
         sentenceIndexWithinMessage = sentenceIndex,
         sentenceCountWithinMessage = sentenceCount,
         messagePreview = messagePreview,
+        messageProgressFraction = messageProgressFraction ?: sentenceProgressFallback(sentenceIndex, sentenceCount),
     )
 
 internal fun idleTts(
@@ -46,6 +50,7 @@ internal fun idleTts(
     messagePreview: String = "",
     sentenceIndex: Int = 0,
     sentenceCount: Int = 0,
+    messageProgressFraction: Float? = null,
 ): TtsState.Idle =
     TtsState.Idle(
         chunkIndex = chunkIndex,
@@ -55,6 +60,7 @@ internal fun idleTts(
         sentenceIndexWithinMessage = sentenceIndex,
         sentenceCountWithinMessage = sentenceCount,
         messagePreview = messagePreview,
+        messageProgressFraction = messageProgressFraction ?: sentenceProgressFallback(sentenceIndex, sentenceCount),
     )
 
 internal fun errorTts(
@@ -66,6 +72,7 @@ internal fun errorTts(
     messagePreview: String = "",
     sentenceIndex: Int = 0,
     sentenceCount: Int = 0,
+    messageProgressFraction: Float? = null,
 ): TtsState.Error =
     TtsState.Error(
         error = error,
@@ -76,4 +83,10 @@ internal fun errorTts(
         sentenceIndexWithinMessage = sentenceIndex,
         sentenceCountWithinMessage = sentenceCount,
         messagePreview = messagePreview,
+        messageProgressFraction = messageProgressFraction ?: sentenceProgressFallback(sentenceIndex, sentenceCount),
     )
+
+private fun sentenceProgressFallback(
+    sentenceIndex: Int,
+    sentenceCount: Int,
+): Float = TtsMessageProgress.sentenceFallback(sentenceIndex, sentenceCount)

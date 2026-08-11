@@ -141,7 +141,16 @@ class TtsControllerTest {
         controller.skipPreviousSentence()
 
         assertEquals(
-            speakingTts(0, 3, 0, 1, "First. Second. Third.", sentenceIndex = 0, sentenceCount = 3),
+            speakingTts(
+                0,
+                3,
+                0,
+                1,
+                "First. Second. Third.",
+                sentenceIndex = 0,
+                sentenceCount = 3,
+                messageProgressFraction = 1f / 3f,
+            ),
             controller.state.value,
         )
         assertEquals(listOf("First.", "Second.", "Third."), engine.spoken.takeLast(3).map { it.text })
@@ -597,6 +606,7 @@ class TtsControllerTest {
         override fun setCallbacks(
             onDone: (String?) -> Unit,
             onError: (String?, Int) -> Unit,
+            onRangeStart: (String?, Int, Int) -> Unit,
         ) {
             completionCallback = onDone
             errorCallback = onError

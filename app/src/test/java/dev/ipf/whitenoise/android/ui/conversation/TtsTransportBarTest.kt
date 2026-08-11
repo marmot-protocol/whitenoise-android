@@ -15,6 +15,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -89,6 +90,30 @@ class TtsTransportBarTest {
     fun progressIdentifiesBothTheSentenceAndTheMessage() {
         renderBar(state = speakingTts(4, 20, 1, 12, "Preview", sentenceIndex = 2, sentenceCount = 8))
 
+        composeRule
+            .onNodeWithText(app.getString(R.string.tts_bar_progress, 3, 8, 2, 12))
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun progressAnimationFramesAreHiddenFromAccessibility() {
+        renderBar(
+            state =
+                speakingTts(
+                    4,
+                    20,
+                    1,
+                    12,
+                    "Preview",
+                    sentenceIndex = 2,
+                    sentenceCount = 8,
+                    messageProgressFraction = 0.35f,
+                ),
+        )
+
+        composeRule
+            .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+            .assertCountEquals(0)
         composeRule
             .onNodeWithText(app.getString(R.string.tts_bar_progress, 3, 8, 2, 12))
             .assertIsDisplayed()

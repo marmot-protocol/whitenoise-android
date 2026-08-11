@@ -126,9 +126,29 @@ class TtsTransportBarScreenshotTest {
 
     private val preview = "Alice: The quick brown fox jumps over it"
 
-    private fun speaking(): TtsState = speakingTts(4, 20, 1, 12, preview, sentenceIndex = 2, sentenceCount = 8)
+    private fun speaking(): TtsState =
+        speakingTts(
+            chunkIndex = 4,
+            chunkCount = 20,
+            messageIndex = 1,
+            messageCount = 12,
+            messagePreview = preview,
+            sentenceIndex = 2,
+            sentenceCount = 8,
+            messageProgressFraction = 0.35f,
+        )
 
-    private fun paused(): TtsState = pausedTts(4, 20, 1, 12, preview, sentenceIndex = 2, sentenceCount = 8)
+    private fun paused(): TtsState =
+        pausedTts(
+            chunkIndex = 4,
+            chunkCount = 20,
+            messageIndex = 1,
+            messageCount = 12,
+            messagePreview = preview,
+            sentenceIndex = 2,
+            sentenceCount = 8,
+            messageProgressFraction = 0.35f,
+        )
 
     private fun error(): TtsState =
         errorTts(
