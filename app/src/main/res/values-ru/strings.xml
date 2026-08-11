@@ -1372,9 +1372,15 @@
     <string name="mute">Без звука</string>
     <string name="mute_dialog_title">Отключить уведомления</string>
     <string name="mute_dialog_description">Другие не увидят, что вы отключили уведомления в этом чате.</string>
+    <string name="mute_duration_1_hour">1 час</string>
     <string name="mute_duration_8_hours">8 часов</string>
-    <string name="mute_duration_1_week">1 неделя</string>
+    <string name="mute_duration_1_day">1 день</string>
+    <string name="mute_duration_7_days">7 дней</string>
+    <string name="mute_duration_custom">Другое время…</string>
     <string name="mute_duration_always">Всегда</string>
+    <string name="mute_custom_time_title">Выберите время</string>
+    <string name="mute_custom_future_error">Выберите время в будущем.</string>
+    <string name="mute_custom_selected">Отключено до %1$s</string>
     <string name="notify_for">Уведомлять</string>
     <string name="ok">OK</string>
     <string name="device_privacy">Конфиденциальность устройства</string>

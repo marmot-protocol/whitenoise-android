@@ -215,23 +215,45 @@ class ChatMutePreferences(
         val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return
         synchronized(mutationLock) {
             resolveExpiredLockedInternal()
-            // Re-muting an already-timed-muted chat keeps its original restore
-            // mode, so extending a mute never loses the pre-mute state. A timed
-            // mute never restores to NONE — muting a permanently-muted chat for
-            // an hour must unmute it after, not re-mute it — so coerce to ALL.
-            val priorRestore =
-                muteExpiries[key]?.restoreMode ?: (_state.value.notificationModes[key] ?: ChatNotifyMode.ALL)
-            val restoreMode = if (priorRestore == ChatNotifyMode.NONE) ChatNotifyMode.ALL else priorRestore
-            val modes =
-                _state.value.notificationModes
-                    .toMutableMap()
-                    .apply { put(key, ChatNotifyMode.NONE) }
-            // A non-positive duration is a permanent mute: keep a record with a
-            // null expiry so it still remembers [restoreMode] for when unmuted.
             val expiry = if (durationMillis <= 0) null else now() + durationMillis
-            val nextExpiries = muteExpiries + (key to MuteExpiry(expiry, restoreMode))
-            publishLocked(modes.toMap(), nextExpiries)
+            muteUntilLocked(key, expiry)
         }
+    }
+
+    /** Mute until the exact future Unix epoch-millisecond [expiryMillis]. */
+    fun muteUntil(
+        accountRef: String,
+        groupIdHex: String,
+        expiryMillis: Long,
+    ) {
+        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return
+        synchronized(mutationLock) {
+            resolveExpiredLockedInternal()
+            if (expiryMillis <= now()) return
+            muteUntilLocked(key, expiryMillis)
+        }
+    }
+
+    // Caller must hold [mutationLock].
+    private fun muteUntilLocked(
+        key: String,
+        expiryMillis: Long?,
+    ) {
+        // Re-muting an already-timed-muted chat keeps its original restore
+        // mode, so extending a mute never loses the pre-mute state. A timed
+        // mute never restores to NONE — muting a permanently-muted chat for
+        // an hour must unmute it after, not re-mute it — so coerce to ALL.
+        val priorRestore =
+            muteExpiries[key]?.restoreMode ?: (_state.value.notificationModes[key] ?: ChatNotifyMode.ALL)
+        val restoreMode = if (priorRestore == ChatNotifyMode.NONE) ChatNotifyMode.ALL else priorRestore
+        val modes =
+            _state.value.notificationModes
+                .toMutableMap()
+                .apply { put(key, ChatNotifyMode.NONE) }
+        // A null expiry is a permanent mute: keep a record so it still
+        // remembers [restoreMode] for when the user unmutes it.
+        val nextExpiries = muteExpiries + (key to MuteExpiry(expiryMillis, restoreMode))
+        publishLocked(modes.toMap(), nextExpiries)
     }
 
     /**
