@@ -94,7 +94,10 @@ internal class WhiteNoiseJourneys {
     fun returnToChatList() {
         repeat(4) {
             if (findTag(PerformanceTags.NEW_MESSAGE, NAVIGATION_SETTLE_TIMEOUT_MS) != null) return
-            check(device.pressBack()) { "Failed to navigate back toward the chat list." }
+            // UiDevice returns false when no matching accessibility event is
+            // observed, even when Android's predictive Back handled the key.
+            // The bounded selector wait is the authoritative navigation check.
+            device.pressBack()
             device.waitForIdle()
         }
         waitForTag(PerformanceTags.NEW_MESSAGE)
