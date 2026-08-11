@@ -1,23 +1,8 @@
 name: Android PR APK
 
-# Builds an unsigned dev-debug APK for every pull request and, for PRs raised
-# from the base repository, uploads it as a workflow artifact and posts a sticky
-# comment on the PR with a download link. Fork PRs still get the build (so CI
-# validates the change), but the artifact upload and comment are gated so they
-# only run for internal-branch PRs — this keeps secrets, tokens, and any
-# artifact-URL trust surface out of fork context. See android-ci.yml for the
-# credential-free validation matrix; this workflow is purely an installable
-# preview build on top of that.
-#
-# PR-specific behavior (see app/build.gradle.kts):
-#   - applicationId gets ".dev.pr<N>" appended so the APK installs side-by-side
-#     with the production and staging apps (and other PR previews).
-#   - versionCode = 100000 + GITHUB_RUN_NUMBER (monotonic across all PR builds).
-#   - Launcher label becomes "<N> White Noise" so testers can tell which PR is
-#     which on the home screen.
-#   - arm64-v8a only, to keep build time short. Testers on 32-bit devices are
-#     out of scope for preview builds.
-
+# This pull_request workflow is intentionally unprivileged. It compiles the PR
+# code and hands unsigned preview candidates to android-pr-preview-publish.yml;
+# it never receives signing or upload credentials.
 on:
   pull_request:
     branches: [master]
@@ -26,179 +11,69 @@ on:
       - 'docs/**'
       - '.github/ISSUE_TEMPLATE/**'
 
-# Superseded pushes to the same PR cancel the prior build so a long incremental
-# push chain does not queue redundant work.
 concurrency:
-  group: android-pr-apk-${{ github.workflow }}-${{ github.ref }}
+  group: android-pr-apk-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
-# Default token permissions are read-only; the comment job below opts in to
-# pull-requests: write locally so nothing else can accidentally mutate PR state.
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build unsigned PR APK
+    name: Build untrusted preview candidates
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    outputs:
-      # Direct Blossom install URL (#1172). Empty when the upload step is skipped
-      # (fork PR, or no BLOSSOM_UPLOAD_NSEC secret); the comment job checks that.
-      blossom_url: ${{ steps.blossom.outputs.url }}
+    strategy:
+      matrix:
+        channel: [stable, isolated]
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_PREVIEW_CHANNEL: ${{ matrix.channel }}
       GITHUB_RUN_NUMBER: ${{ github.run_number }}
-      # #1172: only a non-secret boolean at job scope — whether the preview
-      # upload key is configured — so the step `if` can gate on it WITHOUT
-      # exposing the secret to the PR-controlled Gradle build. The nsec itself is
-      # injected only into the upload step below. False on fork PRs / until the
-      # maintainer adds the secret, so the Blossom step stays a safe no-op.
-      HAS_BLOSSOM_UPLOAD_NSEC: ${{ secrets.BLOSSOM_UPLOAD_NSEC != '' }}
 
     steps:
-      - name: Checkout
+      - name: Checkout PR commit without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
-      - name: Test Blossom upload retry logic
-        run: .github/scripts/test-upload-pr-apk-to-blossom.sh
-
-      # AGP 9.x / Gradle 9.4.1 require JDK 17 (matches the other workflows).
       - name: Set up JDK 17
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
+      - name: Set up Gradle read-only cache
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          # PR builds share the cache read-only so a compromised PR cannot
-          # poison the cache for downstream master builds.
           cache-read-only: true
 
-      # The dev flavor already declares `splits.abi { include("arm64-v8a", ...) }`
-      # so `assembleDevZapstoreDebug` produces one APK per ABI plus a universal
-      # APK; no `-Pandroid.injected.build.abi` flag is needed. Selecting the
-      # arm64-v8a split happens in the locate step below. Zapstore is the default
-      # dev distribution; previews are sideloaded, so the self-update-capable
-      # flavor is the right one to hand testers.
-      - name: Assemble dev zapstore debug APK
+      - name: Test preview workflow contract
+        run: .github/scripts/test-pr-preview-contract.sh
+
+      - name: Assemble preview candidate
         run: ./gradlew :app:assembleDevZapstoreDebug --no-daemon --stacktrace
 
-      - name: Locate built APK
-        id: locate
+      - name: Stage candidate and provenance
         shell: bash
         run: |
           set -euo pipefail
-          # Search recursively — AGP output path conventions can shift between
-          # major versions, and this workflow needs to survive that.
-          apk_path=$(find app/build/outputs/apk -type f -name '*arm64-v8a*.apk' -print -quit)
-          if [[ -z "$apk_path" ]]; then
-            # Fallback: universal APK if the ABI split was not produced.
-            apk_path=$(find app/build/outputs/apk -type f -name '*universal*.apk' -print -quit)
-          fi
-          if [[ -z "$apk_path" ]]; then
-            printf 'No APK produced under app/build/outputs/apk. Tree:\n' >&2
-            find app/build/outputs -type f -name '*.apk' >&2 || true
-            exit 1
-          fi
-          printf 'apk_path=%s\n' "$apk_path" >> "$GITHUB_OUTPUT"
-          printf 'Selected APK: %s\n' "$apk_path"
+          apk=$(find app/build/outputs/apk -type f -name '*arm64-v8a*.apk' -print -quit)
+          test -n "$apk"
+          mkdir -p preview-candidate
+          cp "$apk" "preview-candidate/whitenoise-pr-${PR_NUMBER}-${PR_PREVIEW_CHANNEL}-unsigned.apk"
+          sha256sum preview-candidate/*.apk > preview-candidate/SHA256SUMS
+          printf '%s\n' \
+            "pr_number=$PR_NUMBER" \
+            "channel=$PR_PREVIEW_CHANNEL" \
+            "head_sha=${{ github.event.pull_request.head.sha }}" \
+            "run_number=$GITHUB_RUN_NUMBER" > preview-candidate/provenance.env
 
-      # Preview distribution (#1172): upload the arm64 APK to a public Blossom
-      # server so testers get a one-tap, content-addressed install URL with no
-      # GitHub sign-in. This is the sole channel — the GitHub artifact was
-      # dropped to avoid storage cost, so preview links are ephemeral (the blob
-      # expires; each push re-uploads a fresh one). Internal PRs only (needs the
-      # upload key); fork PRs still build above for CI validation but don't
-      # upload. The comment job surfaces this URL.
-      - name: Upload PR APK to Blossom
-        id: blossom
-        if: >-
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          env.HAS_BLOSSOM_UPLOAD_NSEC == 'true'
-        env:
-          # nostr.download: permissionless, non-Cloudflare Blossom that accepts
-          # ~50 MB APK blobs with anonymous GET and native blob expiry — verified
-          # against a real upload (#1172). Cloudflare-fronted servers (blossom.band)
-          # cap request bodies at 100 MB and WAF-block programmatic uploads.
-          BLOSSOM_SERVER: https://nostr.download
-          APK_PATH: ${{ steps.locate.outputs.apk_path }}
-          # Secret injected ONLY into this step (not job scope), so the
-          # PR-controlled Gradle build step never sees it (#1172 CR).
-          BLOSSOM_UPLOAD_NSEC: ${{ secrets.BLOSSOM_UPLOAD_NSEC }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          # nak performs the Blossom kind-24242 signed PUT. Pinned to an
-          # immutable commit (v0.20.0) so an upstream release can't change the
-          # uploader while it holds the secret (#1172 CR). ubuntu-latest ships Go.
-          go install github.com/fiatjaf/nak@62fa610a063b708743456e49f9befaef4a441a37
-          # The helper feeds the APK via stdin, verifies the returned SHA-256,
-          # and retries only transport/5xx failures. Three four-minute attempts
-          # plus bounded exponential backoff keep a stalled server inside the job cap.
-          url=$(.github/scripts/upload-pr-apk-to-blossom.sh)
-          printf 'url=%s\n' "$url" >> "$GITHUB_OUTPUT"
-          printf '::notice::Blossom install URL: %s\n' "$url"
-
-  comment:
-    name: Post PR comment with download link
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    if: github.event.pull_request.head.repo.full_name == github.repository
-    permissions:
-      pull-requests: write
-    steps:
-      - name: Upsert sticky comment
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v8
-        env:
-          # #1172: set when the build job uploaded to Blossom; empty otherwise.
-          BLOSSOM_URL: ${{ needs.build.outputs.blossom_url }}
+      - name: Upload untrusted candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          script: |
-            const prNumber = context.payload.pull_request.number;
-            const runId = context.runId;
-            const blossomUrl = process.env.BLOSSOM_URL;
-            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
-            const marker = '<!-- pr-apk-preview -->';
-            const download = blossomUrl
-              ? `**[Install directly](${blossomUrl})** — one tap, no GitHub sign-in (public, content-addressed \`.apk\`).`
-              : `The preview upload didn't run for this [build](${runUrl}) — re-run the workflow to refresh this link.`;
-            const body = [
-              marker,
-              `### Preview APK for PR #${prNumber}`,
-              '',
-              `Home-screen label: **${prNumber} White Noise** with the blueprint launcher icon — installs side-by-side with the production and staging apps.`,
-              '',
-              `${download} ARM64 only.`,
-              '',
-              'Every push to this PR rebuilds and updates this comment.',
-            ].join('\n');
-
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              per_page: 100,
-            });
-            const existing = comments.find(c => c.body && c.body.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body,
-              });
-            }
+          name: pr-preview-${{ matrix.channel }}
+          path: preview-candidate/
+          if-no-files-found: error
+          retention-days: 1

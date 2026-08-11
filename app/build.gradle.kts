@@ -135,14 +135,17 @@ val allowUnsignedRelease =
     runtimeConfigProperty("WHITENOISE_ALLOW_UNSIGNED_RELEASE", "false")
         .equals("true", ignoreCase = true)
 
-// Per-PR preview build inputs. When CI sets PR_NUMBER on a pull-request build,
-// the dev flavor branches to a distinct applicationId, versionCode, versionName,
-// and launcher label so the resulting APK installs side-by-side with the
-// production/staging apps and is visually distinguishable on the home screen
-// (see .github/workflows/android-pr-apk.yml).
+// PR preview inputs. The default "stable" channel deliberately keeps one
+// applicationId so every PR preview updates the same app and retains its data.
+// The "isolated" channel remains available when a reviewer needs side-by-side
+// installs or a clean data directory. Both are signed later by a privileged,
+// base-branch-only workflow; Gradle never receives the preview signing key.
 val prNumber: String? = System.getenv("PR_NUMBER")?.takeIf { it.isNotBlank() }
-val prRunNumber: Int? = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
-val basePrVersionCode = 100_000
+val prPreviewChannel: String? = System.getenv("PR_PREVIEW_CHANNEL")?.takeIf { it.isNotBlank() }
+// Android accepts an update whose versionCode equals the installed version.
+// A fixed preview-only code therefore lets a tester move between any two PR
+// builds without uninstalling and losing the preview app's data.
+val prPreviewVersionCode = 2_000_000_000
 val defaultAppName = "White Noise"
 val buildShortSha =
     System.getenv("GITHUB_SHA")?.take(7)
@@ -161,6 +164,8 @@ android {
         targetSdk = 36
         versionCode = 8
         versionName = "2026.8.6"
+        manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
+        manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_round"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "false")
@@ -196,18 +201,25 @@ android {
     productFlavors {
         create("dev") {
             dimension = "environment"
-            // On CI pull-request builds, PR_NUMBER isolates the APK to its own
-            // applicationId (side-by-side install), monotonic versionCode, and a
-            // launcher label prefixed by the PR number so the icon on a tester's
-            // home screen is unambiguous. Local dev builds fall through to the
-            // plain .dev suffix and default label.
+            // PR_PREVIEW_CHANNEL is accepted only with PR_NUMBER. Keeping this
+            // branch explicit makes package identity a reviewable contract.
             if (prNumber != null) {
-                applicationIdSuffix = ".dev.pr$prNumber"
-                versionNameSuffix = "-dev-pr$prNumber"
-                manifestPlaceholders["appName"] = "$prNumber $defaultAppName"
-                if (prRunNumber != null) {
-                    versionCode = basePrVersionCode + prRunNumber
+                manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher_preview"
+                manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_preview"
+                when (prPreviewChannel) {
+                    "stable" -> {
+                        applicationIdSuffix = ".preview"
+                        versionNameSuffix = "-preview-pr$prNumber"
+                        manifestPlaceholders["appName"] = "Preview $defaultAppName"
+                    }
+                    "isolated" -> {
+                        applicationIdSuffix = ".preview.pr$prNumber"
+                        versionNameSuffix = "-preview-pr$prNumber-isolated"
+                        manifestPlaceholders["appName"] = "PR $prNumber $defaultAppName"
+                    }
+                    else -> error("PR_PREVIEW_CHANNEL must be 'stable' or 'isolated' when PR_NUMBER is set")
                 }
+                versionCode = prPreviewVersionCode
             } else {
                 applicationIdSuffix = ".dev"
                 versionNameSuffix = "-dev"
