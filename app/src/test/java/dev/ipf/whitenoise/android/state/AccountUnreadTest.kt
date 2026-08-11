@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
@@ -19,6 +20,25 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class AccountUnreadTest {
+    @Test
+    fun rawAccountUnreadCounts_mapsEngineIdsToUiAccountRefsWithFallbacks() {
+        val accounts =
+            listOf(
+                account(label = "personal", accountIdHex = "aa"),
+                account(label = "work", accountIdHex = "bb"),
+                account(label = "new", accountIdHex = "cc"),
+            )
+
+        assertEquals(
+            mapOf("personal" to 3uL, "work" to 2uL, "new" to 0uL),
+            rawAccountUnreadCounts(
+                accounts = accounts,
+                rawCountsByAccountId = mapOf("aa" to 3uL),
+                previous = mapOf("work" to 2uL),
+            ),
+        )
+    }
+
     @Test
     fun accountUnreadCount_sumsDurableChatListRows() {
         val rows =
@@ -244,4 +264,16 @@ class AccountUnreadTest {
             account = accountIdHex,
             local = false,
         )
+
+    private fun account(
+        label: String,
+        accountIdHex: String,
+    ) = AccountSummaryFfi(
+        label = label,
+        accountIdHex = accountIdHex,
+        localSigning = true,
+        externalSigning = false,
+        signedOut = false,
+        running = true,
+    )
 }
