@@ -26,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -42,8 +41,6 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 
 internal const val GLOBAL_SEARCH_DATE_DIALOG_TAG = "global-search-date-dialog"
 internal const val GLOBAL_SEARCH_DATE_APPLY_TAG = "global-search-date-apply"
@@ -224,13 +221,6 @@ private fun GlobalSearchCustomRangeReviewDialog(
             zoneId = stage.snapshottedZoneId,
         )
     val validation = customSelection.validateCustomRange()
-    val locale = LocalConfiguration.current.locales[0]
-    val dateFormatter =
-        remember(locale) {
-            DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
-        }
-    val fromLabel = remember(stage.from, locale) { stage.from.format(dateFormatter) }
-    val toLabel = remember(stage.to, locale) { stage.to.format(dateFormatter) }
     AlertDialog(
         modifier = Modifier.testTag(GLOBAL_SEARCH_DATE_DIALOG_TAG),
         onDismissRequest = onDismiss,
@@ -238,12 +228,7 @@ private fun GlobalSearchCustomRangeReviewDialog(
         text = {
             Column {
                 Text(
-                    text =
-                        stringResource(
-                            R.string.global_search_date_custom_summary,
-                            fromLabel,
-                            toLabel,
-                        ),
+                    text = globalSearchCustomDateRangeLabel(stage.from, stage.to),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 if (validation == GlobalSearchCustomRangeValidation.Reversed) {

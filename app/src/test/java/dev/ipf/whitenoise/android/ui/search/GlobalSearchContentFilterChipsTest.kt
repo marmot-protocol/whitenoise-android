@@ -19,6 +19,7 @@ import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
@@ -54,7 +55,10 @@ class GlobalSearchContentFilterChipsTest {
         }
 
         GlobalSearchContentKind.entries.forEach { kind ->
-            composeRule.onNodeWithTag(globalSearchContentChipTag(kind)).assertIsDisplayed()
+            composeRule
+                .onNodeWithTag(globalSearchContentChipTag(kind))
+                .performScrollTo()
+                .assertIsDisplayed()
         }
 
         composeRule

@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.search
 
+import androidx.annotation.StringRes
+import dev.ipf.whitenoise.android.R
+
 enum class GlobalSearchContentKind {
     TEXT,
     LINKS,
@@ -34,3 +37,14 @@ class GlobalSearchContentFilterSelection(
         val EMPTY = GlobalSearchContentFilterSelection()
     }
 }
+
+@StringRes
+internal fun GlobalSearchContentKind.labelRes(): Int =
+    when (this) {
+        GlobalSearchContentKind.TEXT -> R.string.global_search_content_text
+        GlobalSearchContentKind.LINKS -> R.string.global_search_content_links
+        GlobalSearchContentKind.IMAGES_VIDEO -> R.string.global_search_content_images_video
+        GlobalSearchContentKind.VOICE_AUDIO -> R.string.global_search_content_voice_audio
+        GlobalSearchContentKind.FILES_DOCUMENTS -> R.string.global_search_content_files_documents
+        GlobalSearchContentKind.ANY_ATTACHMENT -> R.string.global_search_content_any_attachment
+    }

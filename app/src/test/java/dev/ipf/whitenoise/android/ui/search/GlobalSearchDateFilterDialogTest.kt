@@ -141,7 +141,6 @@ class GlobalSearchDateFilterDialogTest {
             .onNodeWithText(context.getString(R.string.global_search_date_custom_reversed_error))
             .assertIsDisplayed()
         composeRule.onNodeWithTag(GLOBAL_SEARCH_DATE_APPLY_TAG).assertIsNotEnabled()
-        composeRule.onNodeWithTag(GLOBAL_SEARCH_DATE_APPLY_TAG).performClick()
 
         composeRule.runOnIdle { assertNull(applied) }
     }

@@ -1,11 +1,21 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.runtime.saveable.Saver
+import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
+import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
+import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
+import dev.ipf.whitenoise.android.search.GlobalSearchRequestProjection
+import dev.ipf.whitenoise.android.search.decodeGlobalSearchContentFilter
+import dev.ipf.whitenoise.android.search.decodeGlobalSearchDateFilter
+import dev.ipf.whitenoise.android.search.encodeGlobalSearchContentFilter
+import dev.ipf.whitenoise.android.search.encodeGlobalSearchDateFilter
+import dev.ipf.whitenoise.android.search.projectGlobalSearchRequest
+import java.time.ZoneId
 import java.util.Base64
 
 /**
  * In-session global chat-list search state owned by [dev.ipf.whitenoise.android.ui.navigation.MainShell].
- * Structured filters are modeled here for UI only; they do not drive query execution yet.
+ * Structured filters are modeled here for UI; typed date/content projection is explicit until mdk#1363.
  */
 internal data class GlobalSearchState(
     val isOpen: Boolean = false,
@@ -14,8 +24,8 @@ internal data class GlobalSearchState(
     val accountScopeToken: String = "",
     val chatFilters: Set<GlobalSearchChatFilter> = emptySet(),
     val senderFilters: Set<GlobalSearchSenderFilter> = emptySet(),
-    val dateFilters: Set<GlobalSearchDateFilter> = emptySet(),
-    val contentFilters: Set<GlobalSearchContentFilter> = emptySet(),
+    val dateFilterSelection: GlobalSearchDateFilterSelection = GlobalSearchDateFilterSelection.AnyTime,
+    val contentFilterSelection: GlobalSearchContentFilterSelection = GlobalSearchContentFilterSelection.EMPTY,
 )
 
 internal data class GlobalSearchChatFilter(
@@ -30,20 +40,6 @@ internal data class GlobalSearchSenderFilter(
     val displayLabel: String,
 ) {
     val chipId: String = "sender:$stableId"
-}
-
-internal data class GlobalSearchDateFilter(
-    val stableId: String,
-    val displayLabel: String,
-) {
-    val chipId: String = "date:$stableId"
-}
-
-internal data class GlobalSearchContentFilter(
-    val stableId: String,
-    val displayLabel: String,
-) {
-    val chipId: String = "content:$stableId"
 }
 
 internal data class GlobalSearchAccountScope(
@@ -91,22 +87,54 @@ internal object GlobalSearchActiveChips {
                 state.senderFilters.map {
                     GlobalSearchActiveChip(it.chipId, it.displayLabel, GlobalSearchFilterCategory.Sender)
                 } +
-                state.dateFilters.map {
-                    GlobalSearchActiveChip(it.chipId, it.displayLabel, GlobalSearchFilterCategory.Date)
-                } +
-                state.contentFilters.map {
-                    GlobalSearchActiveChip(it.chipId, it.displayLabel, GlobalSearchFilterCategory.Content)
-                }
+                globalSearchDateChip(state.dateFilterSelection) +
+                globalSearchContentChips(state.contentFilterSelection)
         return GlobalSearchActiveChipList(chips.sortedBy(GlobalSearchActiveChip::chipId))
     }
+
+    private fun globalSearchDateChip(selection: GlobalSearchDateFilterSelection): List<GlobalSearchActiveChip> =
+        when (selection) {
+            GlobalSearchDateFilterSelection.AnyTime -> emptyList()
+            else ->
+                listOf(
+                    GlobalSearchActiveChip(
+                        chipId = GLOBAL_SEARCH_DATE_CHIP_PREFIX + globalSearchDateCodecKey(selection),
+                        displayLabel = "",
+                        category = GlobalSearchFilterCategory.Date,
+                    ),
+                )
+        }
+
+    private fun globalSearchContentChips(selection: GlobalSearchContentFilterSelection): List<GlobalSearchActiveChip> =
+        GlobalSearchContentKind.entries
+            .filter { it in selection.selectedKinds }
+            .map { kind ->
+                GlobalSearchActiveChip(
+                    chipId = GLOBAL_SEARCH_CONTENT_CHIP_PREFIX + kind.name,
+                    displayLabel = "",
+                    category = GlobalSearchFilterCategory.Content,
+                )
+            }
 }
+
+private const val GLOBAL_SEARCH_DATE_CHIP_PREFIX = "date:"
+private const val GLOBAL_SEARCH_CONTENT_CHIP_PREFIX = "content:"
+
+private fun globalSearchDateCodecKey(selection: GlobalSearchDateFilterSelection): String =
+    when (selection) {
+        GlobalSearchDateFilterSelection.AnyTime -> "any"
+        GlobalSearchDateFilterSelection.Today -> "today"
+        GlobalSearchDateFilterSelection.Last7Days -> "last7"
+        GlobalSearchDateFilterSelection.Last30Days -> "last30"
+        is GlobalSearchDateFilterSelection.Custom -> "custom"
+    }
 
 internal data class GlobalSearchCandidate(
     val textMatches: Boolean = false,
     val chatId: String? = null,
     val senderId: String? = null,
-    val dateId: String? = null,
-    val contentIds: Set<String> = emptySet(),
+    val dateCodecKey: String? = null,
+    val contentKinds: Set<GlobalSearchContentKind> = emptySet(),
 )
 
 /**
@@ -118,8 +146,8 @@ internal data class GlobalSearchQueryAlgebra(
     private val queryText: String,
     private val chatIds: Set<String>,
     private val senderIds: Set<String>,
-    private val dateIds: Set<String>,
-    private val contentIds: Set<String>,
+    private val dateCodecKey: String?,
+    private val contentKinds: Set<GlobalSearchContentKind>,
 ) {
     fun matchesCategory(
         category: GlobalSearchFilterCategory,
@@ -128,37 +156,57 @@ internal data class GlobalSearchQueryAlgebra(
         when (category) {
             GlobalSearchFilterCategory.Chat -> value in chatIds
             GlobalSearchFilterCategory.Sender -> value in senderIds
-            GlobalSearchFilterCategory.Date -> value in dateIds
-            GlobalSearchFilterCategory.Content -> value in contentIds
+            GlobalSearchFilterCategory.Date -> dateCodecKey == value
+            GlobalSearchFilterCategory.Content ->
+                runCatching { GlobalSearchContentKind.valueOf(value) }.getOrNull() in contentKinds
         }
 
     fun matches(candidate: GlobalSearchCandidate): Boolean =
         (queryText.isBlank() || candidate.textMatches) &&
             (chatIds.isEmpty() || candidate.chatId in chatIds) &&
             (senderIds.isEmpty() || candidate.senderId in senderIds) &&
-            (dateIds.isEmpty() || candidate.dateId in dateIds) &&
-            (contentIds.isEmpty() || contentIds.intersect(candidate.contentIds).isNotEmpty())
+            (dateCodecKey == null || candidate.dateCodecKey == dateCodecKey) &&
+            (contentKinds.isEmpty() || contentKinds.intersect(candidate.contentKinds).isNotEmpty())
 
     companion object {
         fun from(state: GlobalSearchState): GlobalSearchQueryAlgebra {
+            val dateActive = state.dateFilterSelection !is GlobalSearchDateFilterSelection.AnyTime
             val categories =
                 listOf(
                     state.chatFilters.isNotEmpty(),
                     state.senderFilters.isNotEmpty(),
-                    state.dateFilters.isNotEmpty(),
-                    state.contentFilters.isNotEmpty(),
+                    dateActive,
+                    state.contentFilterSelection.isActive,
                 ).count { it }
+            val dateCodecKey =
+                if (dateActive) {
+                    globalSearchDateCodecKey(state.dateFilterSelection)
+                } else {
+                    null
+                }
             return GlobalSearchQueryAlgebra(
                 activeCategoryCount = categories,
                 queryText = state.query,
                 chatIds = state.chatFilters.map { it.stableId }.toSet(),
                 senderIds = state.senderFilters.map { it.stableId }.toSet(),
-                dateIds = state.dateFilters.map { it.stableId }.toSet(),
-                contentIds = state.contentFilters.map { it.stableId }.toSet(),
+                dateCodecKey = dateCodecKey,
+                contentKinds = state.contentFilterSelection.selectedKinds,
             )
         }
     }
 }
+
+internal fun GlobalSearchState.projectSearchRequest(
+    zoneId: ZoneId,
+    nowMillis: Long,
+): GlobalSearchRequestProjection =
+    projectGlobalSearchRequest(
+        query = query,
+        dateFilter = dateFilterSelection,
+        contentFilter = contentFilterSelection,
+        zoneId = zoneId,
+        nowMillis = nowMillis,
+    )
 
 /**
  * Closing search resets the transient search UI (query, filters, sheet) so the next
@@ -201,19 +249,13 @@ internal object GlobalSearchTransitions {
 
     fun applyDateFilter(
         state: GlobalSearchState,
-        filter: GlobalSearchDateFilter,
-    ): GlobalSearchState =
-        state.copy(
-            dateFilters = state.dateFilters.filterNot { it.stableId == filter.stableId }.toSet() + filter,
-        )
+        selection: GlobalSearchDateFilterSelection,
+    ): GlobalSearchState = state.copy(dateFilterSelection = selection)
 
-    fun applyContentFilter(
+    fun setContentFilterSelection(
         state: GlobalSearchState,
-        filter: GlobalSearchContentFilter,
-    ): GlobalSearchState =
-        state.copy(
-            contentFilters = state.contentFilters.filterNot { it.stableId == filter.stableId }.toSet() + filter,
-        )
+        selection: GlobalSearchContentFilterSelection,
+    ): GlobalSearchState = state.copy(contentFilterSelection = selection)
 
     fun removeFilter(
         state: GlobalSearchState,
@@ -225,13 +267,21 @@ internal object GlobalSearchTransitions {
             chipId.startsWith("sender:") ->
                 state.copy(senderFilters = state.senderFilters.filterNot { it.chipId == chipId }.toSet())
             chipId.startsWith("date:") ->
-                state.copy(
-                    dateFilters = state.dateFilters.filterNot { it.chipId == chipId }.toSet(),
-                )
-            chipId.startsWith("content:") ->
-                state.copy(
-                    contentFilters = state.contentFilters.filterNot { it.chipId == chipId }.toSet(),
-                )
+                state.copy(dateFilterSelection = GlobalSearchDateFilterSelection.AnyTime)
+            chipId.startsWith("content:") -> {
+                val kindName = chipId.removePrefix("content:")
+                val kind = runCatching { GlobalSearchContentKind.valueOf(kindName) }.getOrNull()
+                if (kind == null) {
+                    state
+                } else {
+                    state.copy(
+                        contentFilterSelection =
+                            GlobalSearchContentFilterSelection(
+                                state.contentFilterSelection.selectedKinds - kind,
+                            ),
+                    )
+                }
+            }
             else -> state
         }
 
@@ -239,8 +289,8 @@ internal object GlobalSearchTransitions {
         state.copy(
             chatFilters = emptySet(),
             senderFilters = emptySet(),
-            dateFilters = emptySet(),
-            contentFilters = emptySet(),
+            dateFilterSelection = GlobalSearchDateFilterSelection.AnyTime,
+            contentFilterSelection = GlobalSearchContentFilterSelection.EMPTY,
         )
 
     /**
@@ -264,7 +314,7 @@ internal object GlobalSearchTransitions {
     }
 }
 
-private const val GLOBAL_SEARCH_CODEC_VERSION = 2
+private const val GLOBAL_SEARCH_CODEC_VERSION = 3
 private const val GLOBAL_SEARCH_CODEC_FIELD_COUNT = 9
 private const val GLOBAL_SEARCH_FIELD_SEPARATOR = "\u001f"
 private const val GLOBAL_SEARCH_LIST_SEPARATOR = "\u001e"
@@ -306,10 +356,8 @@ internal fun encodeGlobalSearchState(state: GlobalSearchState): String {
         encodeLabeledFilters(state.chatFilters.map { it.stableId to it.displayLabel })
     val senderTokens =
         encodeLabeledFilters(state.senderFilters.map { it.stableId to it.displayLabel })
-    val dateTokens =
-        encodeLabeledFilters(state.dateFilters.map { it.stableId to it.displayLabel })
-    val contentTokens =
-        encodeLabeledFilters(state.contentFilters.map { it.stableId to it.displayLabel })
+    val dateToken = encodeGlobalSearchCodecString(encodeGlobalSearchDateFilter(state.dateFilterSelection))
+    val contentToken = encodeGlobalSearchCodecString(encodeGlobalSearchContentFilter(state.contentFilterSelection))
     return listOf(
         GLOBAL_SEARCH_CODEC_VERSION.toString(),
         state.isOpen.toString(),
@@ -318,8 +366,8 @@ internal fun encodeGlobalSearchState(state: GlobalSearchState): String {
         encodeGlobalSearchCodecString(state.accountScopeToken),
         chatTokens,
         senderTokens,
-        dateTokens,
-        contentTokens,
+        dateToken,
+        contentToken,
     ).joinToString(GLOBAL_SEARCH_FIELD_SEPARATOR)
 }
 
@@ -352,18 +400,8 @@ private fun decodeGlobalSearchStateFields(fields: List<String>): GlobalSearchSta
                 GlobalSearchSenderFilter(stableId, displayLabel)
             }?.toSet()
             ?: return null
-    val dateFilters =
-        decodeLabeledFilters(fields[7])
-            ?.map { (stableId, displayLabel) ->
-                GlobalSearchDateFilter(stableId, displayLabel)
-            }?.toSet()
-            ?: return null
-    val contentFilters =
-        decodeLabeledFilters(fields[8])
-            ?.map { (stableId, displayLabel) ->
-                GlobalSearchContentFilter(stableId, displayLabel)
-            }?.toSet()
-            ?: return null
+    val dateEncoded = decodeGlobalSearchCodecString(fields[7]) ?: return null
+    val contentEncoded = decodeGlobalSearchCodecString(fields[8]) ?: return null
     return GlobalSearchState(
         isOpen = fields[1].toBooleanStrictOrNull() ?: return null,
         query = query,
@@ -371,8 +409,8 @@ private fun decodeGlobalSearchStateFields(fields: List<String>): GlobalSearchSta
         accountScopeToken = accountScopeToken,
         chatFilters = chatFilters,
         senderFilters = senderFilters,
-        dateFilters = dateFilters,
-        contentFilters = contentFilters,
+        dateFilterSelection = decodeGlobalSearchDateFilter(dateEncoded),
+        contentFilterSelection = decodeGlobalSearchContentFilter(contentEncoded),
     )
 }
 

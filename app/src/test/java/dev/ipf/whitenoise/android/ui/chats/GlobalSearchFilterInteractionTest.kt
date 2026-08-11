@@ -12,6 +12,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
+import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
+import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -22,6 +26,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -57,7 +66,7 @@ class GlobalSearchFilterInteractionTest {
                     state =
                         GlobalSearchState(
                             isOpen = true,
-                            dateFilters = setOf(GlobalSearchDateFilter("today", "Today")),
+                            dateFilterSelection = GlobalSearchDateFilterSelection.Today,
                         ),
                     onOpenFilters = {},
                     onRemoveFilter = {},
@@ -159,7 +168,8 @@ class GlobalSearchFilterInteractionTest {
                 GlobalSearchState(
                     isOpen = true,
                     chatFilters = setOf(chat),
-                    contentFilters = setOf(GlobalSearchContentFilter("links", "Links")),
+                    contentFilterSelection =
+                        GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.LINKS)),
                 ),
             )
         composeRule.setContent {
@@ -179,7 +189,10 @@ class GlobalSearchFilterInteractionTest {
         composeRule.onNodeWithTag(globalSearchFilterChipTag(chat.chipId)).performClick()
         composeRule.runOnIdle {
             assertTrue(stateHolder.value.chatFilters.isEmpty())
-            assertEquals(setOf(GlobalSearchContentFilter("links", "Links")), stateHolder.value.contentFilters)
+            assertEquals(
+                setOf(GlobalSearchContentKind.LINKS),
+                stateHolder.value.contentFilterSelection.selectedKinds,
+            )
         }
     }
 
@@ -211,7 +224,7 @@ class GlobalSearchFilterInteractionTest {
                 GlobalSearchState(
                     isOpen = true,
                     chatFilters = setOf(GlobalSearchChatFilter("g1", "Alice")),
-                    dateFilters = setOf(GlobalSearchDateFilter("today", "Today")),
+                    dateFilterSelection = GlobalSearchDateFilterSelection.Today,
                 ),
             )
         composeRule.setContent {
@@ -231,8 +244,46 @@ class GlobalSearchFilterInteractionTest {
         composeRule.onNodeWithTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG).performClick()
         composeRule.runOnIdle {
             assertTrue(stateHolder.value.chatFilters.isEmpty())
-            assertTrue(stateHolder.value.dateFilters.isEmpty())
+            assertEquals(GlobalSearchDateFilterSelection.AnyTime, stateHolder.value.dateFilterSelection)
         }
+    }
+
+    @Test
+    fun customDateActiveChipShowsInclusiveRangeLabel() {
+        val from = LocalDate.of(2026, 7, 1)
+        val to = LocalDate.of(2026, 7, 3)
+        val custom =
+            GlobalSearchDateFilterSelection.Custom(
+                from = from,
+                to = to,
+                zoneId = ZoneId.of("UTC"),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    GlobalSearchFilterControlsRow(
+                        state = GlobalSearchState(isOpen = true, dateFilterSelection = custom),
+                        onOpenFilters = {},
+                        onRemoveFilter = {},
+                        onClearAll = {},
+                    )
+                }
+            }
+        }
+
+        val formatter =
+            DateTimeFormatter
+                .ofLocalizedDate(FormatStyle.MEDIUM)
+                .withLocale(Locale.US)
+        val expectedLabel =
+            context.getString(
+                R.string.global_search_date_custom_summary,
+                from.format(formatter),
+                to.format(formatter),
+            )
+        composeRule
+            .onNodeWithTag(globalSearchFilterChipTag("date:custom"))
+            .assertTextEquals(expectedLabel)
     }
 
     @Test
@@ -243,11 +294,9 @@ class GlobalSearchFilterInteractionTest {
                     state =
                         GlobalSearchState(
                             isOpen = true,
-                            dateFilters =
-                                setOf(
-                                    GlobalSearchDateFilter("today", "Today"),
-                                    GlobalSearchDateFilter("last-7-days", "Last 7 days"),
-                                ),
+                            dateFilterSelection = GlobalSearchDateFilterSelection.Today,
+                            contentFilterSelection =
+                                GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.TEXT)),
                         ),
                     onOpenFilters = {},
                     onRemoveFilter = {},

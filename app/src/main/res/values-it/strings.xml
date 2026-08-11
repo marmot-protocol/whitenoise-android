@@ -1417,7 +1417,7 @@
     <string name="attachment_type_file">File</string>
 
     <string name="global_search_date_filter_title">Data</string>
-    <string name="global_search_date_any_time">Qualsiasi data</string>
+    <string name="global_search_date_any_time">In qualsiasi momento</string>
     <string name="global_search_date_today">Oggi</string>
     <string name="global_search_date_last_7_days">Ultimi 7 giorni</string>
     <string name="global_search_date_last_30_days">Ultimi 30 giorni</string>

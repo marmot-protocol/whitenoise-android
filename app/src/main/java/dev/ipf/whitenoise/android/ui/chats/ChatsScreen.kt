@@ -116,6 +116,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.ZoneId
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -158,10 +159,9 @@ internal fun ChatsScreen(
     val folderHandoff = rememberFolderHandoff(appState.activeAccountRef)
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     val selectionMode = selectedChatIds.isNotEmpty()
-    // The filter state and reusable UI are introduced here, while interactive
-    // filter sections arrive in the follow-up typed-filter change. Do not expose
-    // an action that can only open an empty sheet in this intermediate commit.
-    val interactiveGlobalSearchFilterSectionsAvailable = false
+    // This stacked change supplies the typed Date and Content sections that the
+    // base search-state shell intentionally leaves unavailable.
+    val interactiveGlobalSearchFilterSectionsAvailable = true
     val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
     val mutedConversations = chatNotificationState.mutedConversations
     val searchOpen = globalSearchState.isOpen
@@ -356,10 +356,26 @@ internal fun ChatsScreen(
     // by the query and stable group-id membership, not the live row list object:
     // unrelated chat-list republishes or row reordering must not restart a
     // full-corpus body search while the user is typing (#1201).
-    val trimmedQuery = searchQuery.trim()
+    val normalizedSearchQuery = searchQuery.trim()
+    val searchProjection =
+        remember(
+            normalizedSearchQuery,
+            globalSearchState.dateFilterSelection,
+            globalSearchState.contentFilterSelection,
+        ) {
+            globalSearchState.projectSearchRequest(
+                zoneId = ZoneId.systemDefault(),
+                nowMillis = System.currentTimeMillis(),
+            )
+        }
+    val trimmedQuery = searchProjection.query
     val ciSearchNeedle = remember(trimmedQuery) { trimmedQuery.lowercase(Locale.ROOT) }
     val bodySearchGroupIds = remember(sourceList) { sourceList.map { it.id }.sorted() }
-    LaunchedEffect(trimmedQuery, showArchived, bodySearchGroupIds) {
+    LaunchedEffect(trimmedQuery, showArchived, bodySearchGroupIds, searchProjection.requiresTypedMdkContract) {
+        if (searchProjection.requiresTypedMdkContract) {
+            bodyMatches = emptyMap()
+            return@LaunchedEffect
+        }
         if (trimmedQuery.isEmpty()) {
             bodyMatches = emptyMap()
             return@LaunchedEffect
@@ -918,16 +934,9 @@ internal fun ChatsScreen(
             }
         },
     ) { padding ->
-        GlobalSearchFilterSheet(
-            visible =
-                shouldPresentGlobalSearchFilterSheet(
-                    searchState = globalSearchState,
-                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
-                    selectionMode = selectionMode,
-                ),
-            onDismiss = {
-                onGlobalSearchStateChange(GlobalSearchTransitions::dismissFilterSheet)
-            },
+        GlobalSearchTypedFilterSheet(
+            state = globalSearchPresentationState,
+            onStateChange = onGlobalSearchStateChange,
         )
         Column(Modifier.fillMaxSize().padding(padding)) {
             if (appState.appUpdateInfo.shouldShowBanner) {

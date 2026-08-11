@@ -1,21 +1,16 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
+import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
+import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneId
 
 class GlobalSearchStateTest {
-    private fun dateFilter(
-        stableId: String,
-        label: String,
-    ) = GlobalSearchDateFilter(stableId, label)
-
-    private fun contentFilter(
-        stableId: String,
-        label: String,
-    ) = GlobalSearchContentFilter(stableId, label)
-
     private fun accountScope(
         accountRef: String?,
         runtimeGeneration: Int,
@@ -38,8 +33,9 @@ class GlobalSearchStateTest {
                 accountScopeToken = scopeToken,
                 chatFilters = setOf(GlobalSearchChatFilter("abc", "Chat A")),
                 senderFilters = setOf(GlobalSearchSenderFilter("npub1", "Sender B")),
-                dateFilters = setOf(dateFilter("today", "Today")),
-                contentFilters = setOf(contentFilter("images", "Images")),
+                dateFilterSelection = GlobalSearchDateFilterSelection.Today,
+                contentFilterSelection =
+                    GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.IMAGES_VIDEO)),
             )
         val closed = GlobalSearchTransitions.closeSearch(state)
         assertFalse(closed.isOpen)
@@ -48,8 +44,8 @@ class GlobalSearchStateTest {
         assertEquals(scopeToken, closed.accountScopeToken)
         assertTrue(closed.chatFilters.isEmpty())
         assertTrue(closed.senderFilters.isEmpty())
-        assertTrue(closed.dateFilters.isEmpty())
-        assertTrue(closed.contentFilters.isEmpty())
+        assertEquals(GlobalSearchDateFilterSelection.AnyTime, closed.dateFilterSelection)
+        assertTrue(closed.contentFilterSelection.selectedKinds.isEmpty())
     }
 
     @Test
@@ -70,17 +66,19 @@ class GlobalSearchStateTest {
     fun applyAndRemoveFilters() {
         val chat = GlobalSearchChatFilter("group1", "Chat A")
         val sender = GlobalSearchSenderFilter("npub1", "Sender B")
-        val date = dateFilter("last-7-days", "Last 7 days")
-        val content = contentFilter("links", "Links")
         var state = GlobalSearchState(isOpen = true)
         state = GlobalSearchTransitions.applyChatFilter(state, chat)
         state = GlobalSearchTransitions.applySenderFilter(state, sender)
-        state = GlobalSearchTransitions.applyDateFilter(state, date)
-        state = GlobalSearchTransitions.applyContentFilter(state, content)
+        state = GlobalSearchTransitions.applyDateFilter(state, GlobalSearchDateFilterSelection.Last7Days)
+        state =
+            GlobalSearchTransitions.setContentFilterSelection(
+                state,
+                GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.LINKS)),
+            )
         assertEquals(setOf(chat), state.chatFilters)
         assertEquals(setOf(sender), state.senderFilters)
-        assertEquals(setOf(date), state.dateFilters)
-        assertEquals(setOf(content), state.contentFilters)
+        assertEquals(GlobalSearchDateFilterSelection.Last7Days, state.dateFilterSelection)
+        assertEquals(setOf(GlobalSearchContentKind.LINKS), state.contentFilterSelection.selectedKinds)
         state = GlobalSearchTransitions.removeFilter(state, chat.chipId)
         state = GlobalSearchTransitions.removeFilter(state, sender.chipId)
         assertTrue(state.chatFilters.isEmpty())
@@ -108,13 +106,13 @@ class GlobalSearchStateTest {
                 isOpen = true,
                 query = "needle",
                 chatFilters = setOf(GlobalSearchChatFilter("g1", "A")),
-                dateFilters = setOf(dateFilter("today", "Today")),
+                dateFilterSelection = GlobalSearchDateFilterSelection.Today,
             )
         val cleared = GlobalSearchTransitions.clearAllFilters(state)
         assertTrue(cleared.isOpen)
         assertEquals("needle", cleared.query)
         assertTrue(cleared.chatFilters.isEmpty())
-        assertTrue(cleared.dateFilters.isEmpty())
+        assertEquals(GlobalSearchDateFilterSelection.AnyTime, cleared.dateFilterSelection)
     }
 
     @Test
@@ -129,8 +127,9 @@ class GlobalSearchStateTest {
                         GlobalSearchChatFilter("g2", "B"),
                     ),
                 senderFilters = setOf(GlobalSearchSenderFilter("npub1", "Bob")),
-                dateFilters = setOf(dateFilter("today", "Today"), dateFilter("last-7-days", "Last 7 days")),
-                contentFilters = setOf(contentFilter("text", "Text")),
+                dateFilterSelection = GlobalSearchDateFilterSelection.Today,
+                contentFilterSelection =
+                    GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.TEXT)),
             )
         val algebra = GlobalSearchQueryAlgebra.from(state)
         assertEquals(4, algebra.activeCategoryCount)
@@ -149,8 +148,9 @@ class GlobalSearchStateTest {
                 query = "needle",
                 chatFilters = setOf(GlobalSearchChatFilter("g1", "A")),
                 senderFilters = setOf(GlobalSearchSenderFilter("npub1", "Bob")),
-                dateFilters = setOf(dateFilter("today", "Today")),
-                contentFilters = setOf(contentFilter("text", "Text")),
+                dateFilterSelection = GlobalSearchDateFilterSelection.Today,
+                contentFilterSelection =
+                    GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.TEXT)),
             )
         val algebra = GlobalSearchQueryAlgebra.from(state)
         val fullMatch =
@@ -158,24 +158,24 @@ class GlobalSearchStateTest {
                 textMatches = true,
                 chatId = "g1",
                 senderId = "npub1",
-                dateId = "today",
-                contentIds = setOf("text", "link"),
+                dateCodecKey = "today",
+                contentKinds = setOf(GlobalSearchContentKind.TEXT, GlobalSearchContentKind.LINKS),
             )
         val missingCategory =
             GlobalSearchCandidate(
                 textMatches = true,
                 chatId = "g1",
                 senderId = "npub1",
-                dateId = "today",
-                contentIds = emptySet(),
+                dateCodecKey = "today",
+                contentKinds = emptySet(),
             )
         val textMismatch =
             GlobalSearchCandidate(
                 textMatches = false,
                 chatId = "g1",
                 senderId = "npub1",
-                dateId = "today",
-                contentIds = setOf("text"),
+                dateCodecKey = "today",
+                contentKinds = setOf(GlobalSearchContentKind.TEXT),
             )
         assertTrue(algebra.matches(fullMatch))
         assertFalse(algebra.matches(missingCategory))
@@ -212,26 +212,47 @@ class GlobalSearchStateTest {
             GlobalSearchState(
                 isOpen = true,
                 chatFilters = setOf(GlobalSearchChatFilter("g1", "Alice")),
-                contentFilters =
-                    setOf(
-                        contentFilter("files", "Files"),
-                        contentFilter("links", "Links"),
+                contentFilterSelection =
+                    GlobalSearchContentFilterSelection(
+                        selectedKinds =
+                            setOf(
+                                GlobalSearchContentKind.FILES_DOCUMENTS,
+                                GlobalSearchContentKind.LINKS,
+                            ),
                     ),
             )
         val chips = GlobalSearchActiveChips.from(state)
         assertEquals(3, chips.count)
         assertEquals(
-            listOf("chat:g1", "content:files", "content:links"),
+            listOf("chat:g1", "content:FILES_DOCUMENTS", "content:LINKS"),
             chips.items.map { it.chipId },
         )
     }
 
     @Test
     fun activeChipOrderIsStableAcrossSelectionInsertionOrder() {
-        val first = GlobalSearchContentFilter("a", "First")
-        val second = GlobalSearchContentFilter("b", "Second")
-        val forward = GlobalSearchState(contentFilters = linkedSetOf(first, second))
-        val reverse = GlobalSearchState(contentFilters = linkedSetOf(second, first))
+        val forward =
+            GlobalSearchState(
+                contentFilterSelection =
+                    GlobalSearchContentFilterSelection(
+                        selectedKinds =
+                            setOf(
+                                GlobalSearchContentKind.TEXT,
+                                GlobalSearchContentKind.LINKS,
+                            ),
+                    ),
+            )
+        val reverse =
+            GlobalSearchState(
+                contentFilterSelection =
+                    GlobalSearchContentFilterSelection(
+                        selectedKinds =
+                            setOf(
+                                GlobalSearchContentKind.LINKS,
+                                GlobalSearchContentKind.TEXT,
+                            ),
+                    ),
+            )
 
         assertEquals(GlobalSearchActiveChips.from(forward), GlobalSearchActiveChips.from(reverse))
     }
@@ -246,8 +267,9 @@ class GlobalSearchStateTest {
                 accountScopeToken = scope.encodeToken(),
                 chatFilters = setOf(GlobalSearchChatFilter("g1", "Alice")),
                 senderFilters = setOf(GlobalSearchSenderFilter("npub1", "Bob")),
-                dateFilters = setOf(dateFilter("today", "Today")),
-                contentFilters = setOf(contentFilter("text", "Text")),
+                dateFilterSelection = GlobalSearchDateFilterSelection.Today,
+                contentFilterSelection =
+                    GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.TEXT)),
             )
         val reconciled = GlobalSearchTransitions.reconcileAccountScope(state, scope)
         assertEquals(state, reconciled)
@@ -264,8 +286,9 @@ class GlobalSearchStateTest {
                 accountScopeToken = previousScope.encodeToken(),
                 chatFilters = setOf(GlobalSearchChatFilter("g1", "Alice")),
                 senderFilters = setOf(GlobalSearchSenderFilter("npub1", "Bob")),
-                dateFilters = setOf(dateFilter("today", "Today")),
-                contentFilters = setOf(contentFilter("text", "Text")),
+                dateFilterSelection = GlobalSearchDateFilterSelection.Today,
+                contentFilterSelection =
+                    GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.TEXT)),
             )
         val reconciled = GlobalSearchTransitions.reconcileAccountScope(state, nextScope)
         assertEquals(nextScope.encodeToken(), reconciled.accountScopeToken)
@@ -273,13 +296,19 @@ class GlobalSearchStateTest {
         assertTrue(reconciled.isOpen)
         assertTrue(reconciled.chatFilters.isEmpty())
         assertTrue(reconciled.senderFilters.isEmpty())
-        assertEquals(setOf(dateFilter("today", "Today")), reconciled.dateFilters)
-        assertEquals(setOf(contentFilter("text", "Text")), reconciled.contentFilters)
+        assertEquals(GlobalSearchDateFilterSelection.Today, reconciled.dateFilterSelection)
+        assertEquals(setOf(GlobalSearchContentKind.TEXT), reconciled.contentFilterSelection.selectedKinds)
     }
 
     @Test
     fun encodeDecodeRoundTrip() {
         val scopeToken = accountScope("personal", 3).encodeToken()
+        val customDate =
+            GlobalSearchDateFilterSelection.Custom(
+                from = LocalDate.of(2026, 1, 2),
+                to = LocalDate.of(2026, 3, 4),
+                zoneId = ZoneId.of("America/Los_Angeles"),
+            )
         val state =
             GlobalSearchState(
                 isOpen = true,
@@ -288,8 +317,9 @@ class GlobalSearchStateTest {
                 accountScopeToken = scopeToken,
                 chatFilters = setOf(GlobalSearchChatFilter("group\u001e1\u001dpart", "Alice\u001f\u001dlabel")),
                 senderFilters = setOf(GlobalSearchSenderFilter("npub1", "Bob")),
-                dateFilters = setOf(dateFilter("last-30-days", "Last 30 days")),
-                contentFilters = setOf(contentFilter("videos", "Videos")),
+                dateFilterSelection = customDate,
+                contentFilterSelection =
+                    GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.IMAGES_VIDEO)),
             )
         val encoded = encodeGlobalSearchState(state)
         val decoded = decodeGlobalSearchState(encoded)
@@ -300,19 +330,33 @@ class GlobalSearchStateTest {
     fun encodeIsDeterministicAcrossInsertionOrder() {
         val chatA = GlobalSearchChatFilter("g1", "A")
         val chatB = GlobalSearchChatFilter("g2", "B")
-        val dateA = dateFilter("today", "Today")
-        val dateB = dateFilter("last-7-days", "Last 7 days")
         val forward =
             GlobalSearchState(
                 isOpen = true,
                 chatFilters = linkedSetOf(chatA, chatB),
-                dateFilters = linkedSetOf(dateA, dateB),
+                dateFilterSelection = GlobalSearchDateFilterSelection.Today,
+                contentFilterSelection =
+                    GlobalSearchContentFilterSelection(
+                        selectedKinds =
+                            setOf(
+                                GlobalSearchContentKind.TEXT,
+                                GlobalSearchContentKind.LINKS,
+                            ),
+                    ),
             )
         val reverse =
             GlobalSearchState(
                 isOpen = true,
                 chatFilters = linkedSetOf(chatB, chatA),
-                dateFilters = linkedSetOf(dateB, dateA),
+                dateFilterSelection = GlobalSearchDateFilterSelection.Today,
+                contentFilterSelection =
+                    GlobalSearchContentFilterSelection(
+                        selectedKinds =
+                            setOf(
+                                GlobalSearchContentKind.LINKS,
+                                GlobalSearchContentKind.TEXT,
+                            ),
+                    ),
             )
         assertEquals(encodeGlobalSearchState(forward), encodeGlobalSearchState(reverse))
     }

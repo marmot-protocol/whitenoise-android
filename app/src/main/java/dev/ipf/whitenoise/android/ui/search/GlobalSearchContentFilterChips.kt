@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.search
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -19,9 +18,9 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
+import dev.ipf.whitenoise.android.search.labelRes
 
 internal const val GLOBAL_SEARCH_CONTENT_FILTER_TAG = "global-search-content-filter"
 
@@ -76,14 +75,3 @@ private fun GlobalSearchContentChip(
             },
     )
 }
-
-@StringRes
-private fun GlobalSearchContentKind.labelRes(): Int =
-    when (this) {
-        GlobalSearchContentKind.TEXT -> R.string.global_search_content_text
-        GlobalSearchContentKind.LINKS -> R.string.global_search_content_links
-        GlobalSearchContentKind.IMAGES_VIDEO -> R.string.global_search_content_images_video
-        GlobalSearchContentKind.VOICE_AUDIO -> R.string.global_search_content_voice_audio
-        GlobalSearchContentKind.FILES_DOCUMENTS -> R.string.global_search_content_files_documents
-        GlobalSearchContentKind.ANY_ATTACHMENT -> R.string.global_search_content_any_attachment
-    }
