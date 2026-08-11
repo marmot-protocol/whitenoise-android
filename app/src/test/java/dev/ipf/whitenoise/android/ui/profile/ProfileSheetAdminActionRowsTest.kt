@@ -12,6 +12,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -60,7 +61,17 @@ class ProfileSheetAdminActionRowsTest {
         val grantLabel = string(R.string.make_admin)
         val grantTag = adminActionRowTag(GroupMemberMenuAction.GrantAdmin)
 
-        composeRule.onNodeWithText(grantLabel).performScrollTo().performClick()
+        composeRule.onNodeWithText(grantLabel).performScrollTo()
+        val idleBounds =
+            composeRule.runOnIdle {
+                val labelBounds =
+                    composeRule.onNodeWithText(grantLabel, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val rowBounds =
+                    composeRule.onNode(hasTestTag(grantTag), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                labelBounds to rowBounds
+            }
+
+        composeRule.onNodeWithText(grantLabel).performClick()
 
         val progress =
             composeRule.onNode(
@@ -75,8 +86,10 @@ class ProfileSheetAdminActionRowsTest {
             val labelBounds =
                 composeRule.onNodeWithText(grantLabel, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
             val progressBounds = progress.fetchSemanticsNode().boundsInRoot
-            assertTrue(progressBounds.left >= labelBounds.right)
-            assertTrue(progressBounds.right <= rowBounds.right)
+            assertTrue(progressBounds.right <= labelBounds.left)
+            assertTrue(progressBounds.left >= rowBounds.left)
+            assertEquals(idleBounds.first, labelBounds)
+            assertEquals(idleBounds.second, rowBounds)
         }
     }
 
