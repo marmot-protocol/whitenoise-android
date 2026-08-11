@@ -484,7 +484,13 @@ internal fun MainShell(
         fun commitNotificationConversationOpen(chatItem: ChatListItem) {
             sectionName = MainSection.Chats.name
             settingsDetailName = null
-            commitExplicitConversationOpen(chatItem.group.groupIdHex)
+            shellNavState =
+                reduceShellNavigation(
+                    shellNavState,
+                    ShellNavigationEvent.NotificationRoutedConversationOpened(
+                        chatItem.group.groupIdHex,
+                    ),
+                ).state
             selectedChatOpenContext =
                 nextNotificationConversationOpenContext(selectedChatOpenContext)
             selectedChatJustCreated = false

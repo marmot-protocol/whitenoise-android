@@ -8,6 +8,8 @@ package dev.ipf.whitenoise.android.ui.navigation
 internal data class ShellNavigationState(
     val navigationGeneration: Long = 0L,
     val pendingCreateRequestToken: Long? = null,
+    /** Generation captured when [ShellNavigationEvent.NotificationRequestReceived] arms routing. */
+    val notificationArmedGeneration: Long? = null,
 )
 
 internal data class ShellNavigationTransition(
@@ -20,8 +22,13 @@ internal sealed interface ShellNavigationEvent {
     /** Group create was submitted and may open its conversation on completion. */
     data object CreateSubmitted : ShellNavigationEvent
 
-    /** User opened a conversation explicitly (notification, chat list, profile, …). */
+    /** User opened a conversation explicitly (chat list, profile, share, …). */
     data class ExplicitConversationOpened(
+        val chatId: String,
+    ) : ShellNavigationEvent
+
+    /** Delayed notification routing opened a conversation after arming. */
+    data class NotificationRoutedConversationOpened(
         val chatId: String,
     ) : ShellNavigationEvent
 
@@ -54,13 +61,15 @@ internal fun reduceShellNavigation(
     when (event) {
         ShellNavigationEvent.CreateSubmitted -> reduceCreateSubmitted(state)
         is ShellNavigationEvent.ExplicitConversationOpened -> revokePendingCreate(state)
+        is ShellNavigationEvent.NotificationRoutedConversationOpened ->
+            reduceNotificationRoutedConversationOpened(state)
         is ShellNavigationEvent.CreateCompleted -> reduceCreateCompleted(state, event)
         ShellNavigationEvent.CreateFlowSuperseded,
         ShellNavigationEvent.ProfileForegroundOpened,
-        ShellNavigationEvent.NotificationRequestReceived,
         ShellNavigationEvent.ConversationBackedOut,
         ShellNavigationEvent.AccountSwitched,
         -> revokePendingCreate(state)
+        ShellNavigationEvent.NotificationRequestReceived -> armNotificationRequest(state)
     }
 
 private fun reduceCreateSubmitted(state: ShellNavigationState): ShellNavigationTransition {
@@ -81,8 +90,37 @@ private fun revokePendingCreate(state: ShellNavigationState): ShellNavigationTra
             state.copy(
                 navigationGeneration = state.navigationGeneration + 1,
                 pendingCreateRequestToken = null,
+                notificationArmedGeneration = null,
             ),
     )
+
+private fun armNotificationRequest(state: ShellNavigationState): ShellNavigationTransition {
+    val armedGeneration = state.navigationGeneration + 1
+    return ShellNavigationTransition(
+        state =
+            state.copy(
+                navigationGeneration = armedGeneration,
+                pendingCreateRequestToken = null,
+                notificationArmedGeneration = armedGeneration,
+            ),
+    )
+}
+
+/**
+ * Delayed notification commit revokes stale create ownership only when no newer
+ * [ShellNavigationEvent.CreateSubmitted] advanced [ShellNavigationState.navigationGeneration]
+ * after the request was armed (issue #1953).
+ */
+private fun reduceNotificationRoutedConversationOpened(state: ShellNavigationState): ShellNavigationTransition {
+    val armedGeneration = state.notificationArmedGeneration
+    return if (armedGeneration != null && state.navigationGeneration == armedGeneration) {
+        revokePendingCreate(state)
+    } else {
+        ShellNavigationTransition(
+            state = state.copy(notificationArmedGeneration = null),
+        )
+    }
+}
 
 private fun reduceCreateCompleted(
     state: ShellNavigationState,

@@ -17,6 +17,7 @@ class ShellNavigationInterleavingTest {
     ): String? =
         when (event) {
             is ShellNavigationEvent.ExplicitConversationOpened -> event.chatId
+            is ShellNavigationEvent.NotificationRoutedConversationOpened -> event.chatId
             is ShellNavigationEvent.CreateCompleted ->
                 if (transition.createOpenAccepted) event.chatId else selectedChat
             ShellNavigationEvent.ConversationBackedOut,
@@ -164,6 +165,58 @@ class ShellNavigationInterleavingTest {
 
         assertFalse(completeTransition.createOpenAccepted)
         assertEquals(groupB, selectedChat)
+    }
+
+    @Test
+    fun notificationArmedThenNewerCreateSubmittedThenDelayedNotificationOpen_preservesCreateOwnership() {
+        val notificationChat = "group-notification"
+        val newerCreateChat = "group-newer-create"
+
+        var state = ShellNavigationState()
+        var selectedChat: String? = null
+        state = armShellNotificationRequest(state, ProfileGroupForegroundState())
+        val submit = reduceShellNavigation(state, ShellNavigationEvent.CreateSubmitted)
+        state = submit.state
+        val newerToken = submit.createRequestTokenMinted!!
+        val routedEvent =
+            ShellNavigationEvent.NotificationRoutedConversationOpened(notificationChat)
+        val routedTransition = reduceShellNavigation(state, routedEvent)
+        state = routedTransition.state
+        selectedChat = applyShellSelection(selectedChat, routedEvent, routedTransition)
+
+        assertEquals(notificationChat, selectedChat)
+        assertEquals(newerToken, state.pendingCreateRequestToken)
+
+        val completeEvent = ShellNavigationEvent.CreateCompleted(newerCreateChat, newerToken)
+        val completeTransition = reduceShellNavigation(state, completeEvent)
+        selectedChat = applyShellSelection(selectedChat, completeEvent, completeTransition)
+
+        assertTrue(completeTransition.createOpenAccepted)
+        assertEquals(newerCreateChat, selectedChat)
+    }
+
+    @Test
+    fun notificationArmedThenDelayedOpenWithoutNewerCreate_rejectsStaleCreateCompletion() {
+        val groupA = "group-a"
+        val notificationChat = "group-notification"
+
+        var state = ShellNavigationState()
+        var selectedChat: String? = null
+        val submit = reduceShellNavigation(state, ShellNavigationEvent.CreateSubmitted)
+        state = submit.state
+        val staleToken = submit.createRequestTokenMinted!!
+        state = armShellNotificationRequest(state, ProfileGroupForegroundState())
+        val routedEvent =
+            ShellNavigationEvent.NotificationRoutedConversationOpened(notificationChat)
+        val routedTransition = reduceShellNavigation(state, routedEvent)
+        state = routedTransition.state
+        selectedChat = applyShellSelection(selectedChat, routedEvent, routedTransition)
+        val completeEvent = ShellNavigationEvent.CreateCompleted(groupA, staleToken)
+        val completeTransition = reduceShellNavigation(state, completeEvent)
+        selectedChat = applyShellSelection(selectedChat, completeEvent, completeTransition)
+
+        assertFalse(completeTransition.createOpenAccepted)
+        assertEquals(notificationChat, selectedChat)
     }
 
     @Test

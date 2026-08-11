@@ -18,6 +18,7 @@ class ShellNavigationTest {
     ): String? =
         when (event) {
             is ShellNavigationEvent.ExplicitConversationOpened -> event.chatId
+            is ShellNavigationEvent.NotificationRoutedConversationOpened -> event.chatId
             is ShellNavigationEvent.CreateCompleted ->
                 if (transition.createOpenAccepted) event.chatId else selectedChat
             ShellNavigationEvent.ConversationBackedOut,
