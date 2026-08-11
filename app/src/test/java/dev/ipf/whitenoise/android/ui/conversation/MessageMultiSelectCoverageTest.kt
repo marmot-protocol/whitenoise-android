@@ -104,19 +104,26 @@ class MessageMultiSelectCoverageTest {
         val source = source("messages/MessageBubble.kt").replace(Regex("\\s+"), " ")
 
         assertTrue(source.contains("expanded = isActionMenuOpen && !deleted && !selectionMode && !textSelectionMode"))
-        assertTrue(source.contains("remember(textSelectionMode, selectionMode, onActionMenuOpenChange)"))
+        assertTrue(
+            source.contains(
+                "remember( textSelectionMode, selectionMode, displayedBody, " +
+                    "record.contentTokens.truncated, onActionMenuOpenChange, )",
+            ),
+        )
         assertTrue(
             source.contains(
                 "if (!selectionMode && !textSelectionMode) { " +
                     "longPressWindowPosition = null longPressWindowY = null " +
-                    "actionMenuAnchorBounds = messageBoundsInWindow[0] onActionMenuOpenChange(true)",
+                    "actionMenuAnchorBounds = messageBoundsInWindow[0] " +
+                    "captureActionMenuVisibleStart(null) onActionMenuOpenChange(true)",
             ),
         )
         assertTrue(
             source.contains(
                 "if (!deleted && !selectionMode && !textSelectionMode) { " +
                     "longPressWindowPosition = null longPressWindowY = null " +
-                    "actionMenuAnchorBounds = messageBoundsInWindow[0] onActionMenuOpenChange(true)",
+                    "actionMenuAnchorBounds = messageBoundsInWindow[0] " +
+                    "captureActionMenuVisibleStart(null) onActionMenuOpenChange(true)",
             ),
         )
     }

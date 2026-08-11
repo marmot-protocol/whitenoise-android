@@ -1709,8 +1709,9 @@ class WhiteNoiseAppState private constructor(
     fun speakAloud(
         entries: List<TtsSpeakableEntry>,
         locale: java.util.Locale,
+        startSentenceIndex: Int = 0,
     ): Boolean {
-        val started = ttsController.speak(entries, locale)
+        val started = ttsController.speak(entries, locale, startSentenceIndex)
         if (started) {
             // Only a speak that actually replaced the queue may end the
             // previous auto-read session: a failed start (blank text, no
@@ -1726,9 +1727,10 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         entries: List<TtsSpeakableEntry>,
         locale: java.util.Locale,
+        startSentenceIndex: Int = 0,
     ): Boolean {
         val owner = ttsAutoReadSessionKeyFor(activeAccountRef, groupIdHex) ?: return false
-        val started = speakAloud(entries, locale)
+        val started = speakAloud(entries, locale, startSentenceIndex)
         if (started) {
             ttsAutoReadSessionKey = owner
             ttsHistorySession.onConversationSessionStarted(activeAccountRef, groupIdHex)

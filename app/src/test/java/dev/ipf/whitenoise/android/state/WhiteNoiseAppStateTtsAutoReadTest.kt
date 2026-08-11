@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -69,6 +70,25 @@ class WhiteNoiseAppStateTtsAutoReadTest {
         appState.setConversationAutoReadOverride(groupA, TtsAutoReadOverride.OFF)
         assertFalse(appState.ownsTtsAutoReadSession(groupA))
         assertTrue(appState.ttsController.state.value is TtsState.Idle)
+    }
+
+    @Test
+    fun speakAloudAutoReadStartsAtRequestedSentenceAndKeepsSessionOwnership() {
+        val appState = testAppState()
+        val engine = FakeSessionEngine()
+        appState.ttsController.attachEngine(engine)
+
+        assertTrue(
+            appState.speakAloudAutoRead(
+                groupIdHex = groupA,
+                entries = listOf(TtsSpeakableEntry("s", "Sender", "First. Second. Third.")),
+                locale = Locale.US,
+                startSentenceIndex = 1,
+            ),
+        )
+
+        assertEquals(listOf("Sender: Second.", "Third."), engine.spoken.map { it.text })
+        assertTrue(appState.ownsTtsAutoReadSession(groupA))
     }
 
     @Test
