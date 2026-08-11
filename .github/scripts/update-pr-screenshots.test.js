@@ -3,6 +3,7 @@ const test = require('node:test')
 const {
   isUiFile,
   isMissingVisualCoverage,
+  declaresNoVisualChanges,
   renderSection,
   replaceSection,
   run,
@@ -100,6 +101,57 @@ test('updates the description before failing a UI change with no baseline', asyn
   assert.match(updates[0].body, /UI-affecting files changed/)
   assert.equal(failures.length, 1)
   assert.match(failures[0], /committed Roborazzi screenshot baseline/)
+})
+
+test('recognizes the declared behavioral opt-out', () => {
+  assert.equal(declaresNoVisualChanges('Summary\n\nVisual changes: none (behavioral timing fix)'), true)
+  assert.equal(declaresNoVisualChanges('visual changes: NONE'), true)
+  assert.equal(declaresNoVisualChanges('Summary with visual changes: none inline'), false)
+  assert.equal(declaresNoVisualChanges('Visual changes: two screenshots'), false)
+  assert.equal(declaresNoVisualChanges(''), false)
+  assert.equal(declaresNoVisualChanges(null), false)
+  assert.equal(declaresNoVisualChanges('<!-- Visual changes: none -->'), false)
+  assert.equal(declaresNoVisualChanges('```\nVisual changes: none\n```'), false)
+  assert.equal(declaresNoVisualChanges('~~~\nVisual changes: none\n~~~'), false)
+  assert.equal(declaresNoVisualChanges('~~~\nVisual changes: none'), false)
+  assert.equal(declaresNoVisualChanges('Visual changes:\nnone'), false)
+  assert.equal(declaresNoVisualChanges('<!-- hidden -->\nVisual changes: none'), true)
+  assert.equal(declaresNoVisualChanges('```js\ncode\n```\n\nVisual changes: none (behavioral)'), true)
+})
+
+test('accepts a UI change with no baseline when the description declares no visual changes', async () => {
+  const updates = []
+  const failures = []
+  const body = 'Summary\n\nVisual changes: none'
+  const github = {
+    paginate: async () => [{
+      filename: 'app/src/main/java/dev/ipf/whitenoise/android/ui/Screen.kt',
+      status: 'modified',
+    }],
+    rest: {
+      pulls: {
+        listFiles: () => {},
+        get: async () => ({ data: { ...pr, number: 42, body } }),
+        update: async request => updates.push(request),
+      },
+      issues: {},
+    },
+  }
+  const context = {
+    payload: { pull_request: { ...pr, number: 42, body } },
+    repo: { owner: 'marmot', repo: 'base' },
+  }
+  const core = {
+    info: () => {},
+    warning: () => {},
+    setFailed: message => failures.push(message),
+  }
+
+  await run({ github, context, core })
+
+  assert.equal(updates.length, 1)
+  assert.match(updates[0].body, /declares "Visual changes: none"/)
+  assert.equal(failures.length, 0)
 })
 
 test('comment fallback remains blocking when the description cannot be edited', async () => {
