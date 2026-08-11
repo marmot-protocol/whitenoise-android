@@ -147,17 +147,42 @@ capture_device_state() {
   } >"$destination"
 }
 
+restore_heads_up_notifications() {
+  local attempt restored_value
+  for attempt in 1 2 3; do
+    if [[ -z "$original_heads_up_notifications_enabled" ||
+      "$original_heads_up_notifications_enabled" == "null" ]]; then
+      adb_cmd shell settings delete global heads_up_notifications_enabled >/dev/null 2>&1 || true
+      restored_value="$(
+        adb_cmd shell settings get global heads_up_notifications_enabled 2>/dev/null | tr -d '\r'
+      )" || restored_value=""
+      if [[ "$restored_value" == "null" ]]; then
+        return 0
+      fi
+    else
+      adb_cmd shell settings put global heads_up_notifications_enabled \
+        "$original_heads_up_notifications_enabled" >/dev/null 2>&1 || true
+      restored_value="$(
+        adb_cmd shell settings get global heads_up_notifications_enabled 2>/dev/null | tr -d '\r'
+      )" || restored_value=""
+      if [[ "$restored_value" == "$original_heads_up_notifications_enabled" ]]; then
+        return 0
+      fi
+    fi
+
+    if ((attempt < 3)); then sleep 1; fi
+  done
+
+  echo "Failed to restore global heads_up_notifications_enabled to its original value." >&2
+  echo "Reconnect the device and restore it manually before relying on notification behavior." >&2
+  return 1
+}
+
 cleanup() {
   local status=$?
   trap - EXIT
-  if [[ "$heads_up_setting_captured" == true ]]; then
-    if [[ -z "$original_heads_up_notifications_enabled" ||
-      "$original_heads_up_notifications_enabled" == "null" ]]; then
-      adb_cmd shell settings delete global heads_up_notifications_enabled >/dev/null || true
-    else
-      adb_cmd shell settings put global heads_up_notifications_enabled \
-        "$original_heads_up_notifications_enabled" || true
-    fi
+  if [[ "$heads_up_setting_captured" == true ]] && ! restore_heads_up_notifications; then
+    if ((status == 0)); then status=1; fi
   fi
   if [[ "$device_output_pulled" == true ]]; then
     adb_cmd shell rm -rf "$device_output" || true
