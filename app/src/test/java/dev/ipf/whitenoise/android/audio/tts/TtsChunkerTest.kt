@@ -147,6 +147,20 @@ class TtsChunkerTest {
         assertTrue(chunks.all { chunk -> chunk.text.hasOnlyPairedSurrogates() })
     }
 
+    @Test
+    fun chunksRetainTheirExactSourceRangesAfterSentenceAndWhitespaceSplits() {
+        val text = "  First sentence.   alpha beta gamma  "
+
+        val chunks = TtsChunker.chunk(text, Locale.US, maxChunkLength = 12)
+
+        assertEquals(listOf("First", "sentence.", "alpha beta", "gamma"), chunks.map(TtsChunk::text))
+        assertEquals(
+            chunks.map(TtsChunk::text),
+            chunks.map { text.substring(it.sourceStart, it.sourceEnd) },
+        )
+        assertEquals(listOf(0, 0, 1, 1), chunks.map(TtsChunk::sentenceIndex))
+    }
+
     private fun String.hasOnlyPairedSurrogates(): Boolean {
         var index = 0
         while (index < length) {
