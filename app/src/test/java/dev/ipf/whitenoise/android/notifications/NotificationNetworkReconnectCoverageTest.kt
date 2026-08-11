@@ -113,9 +113,7 @@ class NotificationNetworkReconnectCoverageTest {
         )
         assertTrue(
             "notification reconnect must reuse the current listener and await its shared receiver state",
-            "notificationJob.currentOrStart" in receiver &&
-                "awaitActiveNotificationReceiver(" in receiver &&
-                "notificationReceiverActive.first { it }" in receiver &&
+            "awaitNotificationReceiverForStartup(" in receiver &&
                 "notificationJob.cancelAndJoin()" !in receiver,
         )
         assertTrue(
@@ -134,8 +132,8 @@ class NotificationNetworkReconnectCoverageTest {
         )
         assertTrue(
             "bootstrap failure must not imply a receiver is ready for reconnect catch-up",
-            "if (client == null) bootstrap()" in receiver &&
-                "if (client != null)" in receiver,
+            "if (!bootstrapCompleted) bootstrap()" in receiver &&
+                "if (!bootstrapCompleted || networkNotificationRecoverySuppressed) return false" in receiver,
         )
         assertTrue(
             "reconnect requests must be coalesced while in flight",
