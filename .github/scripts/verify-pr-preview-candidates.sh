@@ -20,6 +20,7 @@ for channel in stable isolated; do
   grep -Fx "channel=$channel" "$dir/provenance.env"
   grep -Fx "head_sha=$HEAD_SHA" "$dir/provenance.env"
   grep -Fx "run_number=$BUILD_RUN_NUMBER" "$dir/provenance.env"
+  [[ $(wc -l < "$dir/provenance.env") -eq 4 ]]
 
   mapfile -t apks < <(find "$dir" -maxdepth 1 -type f -name '*.apk' -print)
   if (( ${#apks[@]} != 1 )); then
