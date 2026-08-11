@@ -2171,11 +2171,16 @@ internal fun presentSendFailure(
  * message was never accepted, and the backlog clears on the group's own schedule
  * rather than on any timer this app could pick. That earns its own wording, since
  * the generic failure invites a retry the engine has already ruled out.
+ *
+ * A hydration-pending group is the opposite case — transient by design, the
+ * runtime promotes it shortly after account readiness — so that one gets
+ * wording that invites the retry instead of announcing a failure.
  */
 @StringRes
 internal fun sendFailureMessageRes(throwable: Throwable): Int =
     when (throwable) {
         is MarmotKitException.GroupSendQueueFull -> R.string.toast_send_queue_full
+        is MarmotKitException.GroupHydrationPending -> R.string.toast_chat_still_loading
         else -> R.string.toast_send_failed
     }
 
@@ -5519,6 +5524,7 @@ private const val LIVE_TIMELINE_WINDOW_CAP = 200
 // One frame: long enough to collapse a chat-list sync burst into a single
 // recompute, short enough to stay imperceptible.
 private const val CHAT_LIST_RECOMPUTE_DEBOUNCE_MS = 16L
+private const val GROUP_HYDRATION_RETRY_DELAY_MS = 750L
 private const val MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY = 64
 private const val NOTIFICATION_AVATAR_PREWARM_CONVERSATIONS = 24
 
@@ -10594,7 +10600,10 @@ class ConversationController(
         refreshMembers()
     }
 
-    private suspend fun refreshMembers(probeEviction: Boolean = true) {
+    private suspend fun refreshMembers(
+        probeEviction: Boolean = true,
+        retryOnHydrationPending: Boolean = true,
+    ) {
         val account = conversationAccountRef ?: return
         val refreshGeneration = memberRosterRefreshGeneration.begin()
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
@@ -10622,12 +10631,27 @@ class ConversationController(
                 if (!memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
                     return@onFailure
                 }
-                if (throwable.isUseAfterEviction()) {
-                    markActiveAccountRemovedFromMembers(account)
-                    return
+                when {
+                    throwable.isUseAfterEviction() -> markActiveAccountRemovedFromMembers(account)
+                    retryOnHydrationPending && throwable is MarmotKitException.GroupHydrationPending -> {
+                        // Deferred hydration answers early reads with a retryable
+                        // pending state — the runtime promotes the group shortly
+                        // after account readiness, so wait once instead of showing
+                        // a failed roster.
+                        delay(GROUP_HYDRATION_RETRY_DELAY_MS)
+                        if (memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
+                            refreshMembers(probeEviction, retryOnHydrationPending = false)
+                        }
+                    }
+                    else -> {
+                        memberRosterLoadTracker.transition(GroupRosterRefreshEvent.FAILED)
+                        Log.w(
+                            "DMConversation",
+                            "refresh members failed for ${group.groupIdHex.take(8)}",
+                            throwable,
+                        )
+                    }
                 }
-                memberRosterLoadTracker.transition(GroupRosterRefreshEvent.FAILED)
-                Log.w("DMConversation", "refresh members failed for ${group.groupIdHex.take(8)}", throwable)
             }
         } catch (cancel: CancellationException) {
             if (memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {

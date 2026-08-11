@@ -464,6 +464,7 @@ internal fun groupCreateFailureDetail(
         is MarmotKitException.InvalidKeyPackageEvent -> AppText.Resource(R.string.error_missing_key_package)
         is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_invalid_identity_reference)
         is MarmotKitException.Publish -> AppText.Resource(R.string.error_group_create_failed_retry)
+        is MarmotKitException.GroupHydrationPending -> AppText.Resource(R.string.toast_chat_still_loading)
         is MarmotKitException -> AppText.Resource(R.string.error_group_create_failed_retry)
         else -> AppText.Resource(R.string.error_group_create_failed_retry)
     }
