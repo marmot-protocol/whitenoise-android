@@ -56,20 +56,6 @@ internal data class GlobalSearchAccountScope(
             runtimeGeneration.toString()
 
     companion object {
-        @Suppress("ReturnCount")
-        fun decodeToken(token: String): GlobalSearchAccountScope? {
-            val separatorIndex = token.lastIndexOf(GLOBAL_SEARCH_SCOPE_SEPARATOR)
-            if (separatorIndex < 0) return null
-            val accountRef =
-                decodeGlobalSearchCodecString(token.substring(0, separatorIndex)) ?: return null
-            val runtimeGeneration =
-                token.substring(separatorIndex + 1).toIntOrNull() ?: return null
-            return GlobalSearchAccountScope(
-                accountRef = accountRef.ifEmpty { null },
-                runtimeGeneration = runtimeGeneration,
-            )
-        }
-
         fun from(
             accountRef: String?,
             runtimeGeneration: Int,
