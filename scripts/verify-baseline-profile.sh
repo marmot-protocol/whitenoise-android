@@ -18,7 +18,6 @@ fi
 
 bash "$script_dir/verify-generated-profiles.sh" "$script_dir/../app/src/main/generated/baselineProfiles"
 
-require_command rg
 if command -v apkanalyzer >/dev/null 2>&1; then
   profile_entries="$(apkanalyzer files list "$apk_path")"
 else
@@ -27,7 +26,7 @@ else
 fi
 
 for required_entry in assets/dexopt/baseline.prof assets/dexopt/baseline.profm; do
-  if ! rg -Fxq "$required_entry" <<<"$profile_entries"; then
+  if ! grep -Fxq "$required_entry" <<<"$profile_entries"; then
     echo "Missing compiled Baseline Profile asset: $required_entry" >&2
     exit 1
   fi
