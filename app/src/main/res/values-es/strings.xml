@@ -3,6 +3,9 @@
     <string name="app_name">White Noise</string>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">No se pudo iniciar White Noise</string>
+    <string name="error_try_again">Algo salió mal. Inténtalo de nuevo; si el problema continúa, copia el informe de error.</string>
+    <string name="error_loaded_content_may_be_out_of_date">El contenido cargado sigue disponible, pero puede estar desactualizado. Reintentando…</string>
+    <string name="error_loaded_content_kept">No se pudo cargar más contenido. Tus mensajes siguen disponibles; vuelve a intentarlo cuando quieras.</string>
     <string name="refresh">Actualizar volcado</string>
     <string name="retry">Reintentar</string>
     <string name="creating_identity">Creando identidad</string>
@@ -371,6 +374,9 @@
     <string name="app_lock_retry">Reintentar desbloqueo</string>
     <string name="app_lock_auth_failed">No coincidió. Inténtalo de nuevo.</string>
     <string name="app_lock_auth_cancelled">Se canceló el desbloqueo. Tus chats siguen ocultos.</string>
+    <string name="app_lock_auth_locked">Demasiados intentos. Desbloquea el dispositivo y vuelve a intentarlo.</string>
+    <string name="app_lock_auth_timed_out">El tiempo para desbloquear se agotó. Inténtalo de nuevo.</string>
+    <string name="app_lock_auth_unavailable">El desbloqueo del dispositivo no está disponible en este momento. Desbloquea el dispositivo y vuelve a intentarlo.</string>
     <string name="toast_app_lock_screen_lock_required">Configura primero un bloqueo de pantalla en los ajustes de Android.</string>
     <string name="force_incognito_keyboard">Teclado de incógnito</string>
     <string name="force_incognito_keyboard_subtitle">Pide al teclado desactivar el aprendizaje personalizado</string>
@@ -895,6 +901,8 @@
     <string name="voice_message_release_to_send">Suelta para enviar · desliza para cancelar</string>
     <string name="voice_message_too_short">Mantén más tiempo para grabar</string>
     <string name="voice_message_permission_denied">Se necesita permiso del micrófono</string>
+    <string name="voice_message_recording_failed">No se pudo grabar el mensaje de voz</string>
+    <string name="voice_message_microphone_busy">Otra aplicación está usando el micrófono. Ciérrala y vuelve a intentarlo.</string>
     <string name="voice_message_play">Reproducir mensaje de voz</string>
     <string name="voice_message_pause">Pausar mensaje de voz</string>
     <string name="voice_message_failed">No se pudo cargar el mensaje de voz</string>
@@ -1211,6 +1219,7 @@
     <string name="app_updates">Actualizaciones de la aplicación</string>
     <string name="app_update_settings_title">Versión de Zapstore</string>
     <string name="app_update_settings_unknown">Instalada: %1$s — Última: desconocida — toca para comprobar</string>
+    <string name="app_update_settings_check_failed">No se pudieron buscar actualizaciones. Toca para volver a intentarlo.</string>
     <string name="app_update_settings_current">Instalada: %1$s — Actualizada</string>
     <string name="app_update_settings_available">Instalada: %1$s — Última: %2$s — actualización disponible</string>
     <string name="app_update_settings_available_with_count">Instalada: %1$s — Última: %2$s — %3$d versiones de retraso</string>

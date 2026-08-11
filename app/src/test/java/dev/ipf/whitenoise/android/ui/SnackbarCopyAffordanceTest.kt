@@ -2,23 +2,38 @@ package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarVisuals
+import dev.ipf.whitenoise.android.state.NoticeTier
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.snackbarShowsCopyAffordance
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * Issue #796: the snackbar Copy affordance must be gated by the explicit
- * `copyable` flag set at the toast's emit site — not by a heuristic over the
- * message body, and never as a default for every non-actionable snackbar.
+ * explicit privacy-safe report set at the toast's emit site — not by a
+ * heuristic over the message body or a legacy `copyable` flag alone.
  */
 class SnackbarCopyAffordanceTest {
     @Test
     fun copyableErrorToastShowsCopyAffordance() {
         assertTrue(
             snackbarShowsCopyAffordance(
-                ToastSnackbarVisuals(message = "Couldn't send message\nRelayError: timed out", copyable = true),
+                ToastSnackbarVisuals(
+                    message = "Couldn't send message\nTry again",
+                    copyable = true,
+                    copyText = "operation=MESSAGE_SEND\nerror=CONNECTIVITY",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun copyableFlagWithoutSafeReportDoesNotCopyVisibleText() {
+        assertFalse(
+            snackbarShowsCopyAffordance(
+                ToastSnackbarVisuals(message = "Validation failed for alice@example.test", copyable = true),
             ),
         )
     }
@@ -46,6 +61,23 @@ class SnackbarCopyAffordanceTest {
     fun actionableSnackbarsNeverShowCopyAffordance() {
         // The action slot (e.g. the chat-list "Undo") must stay untouched.
         assertFalse(snackbarShowsCopyAffordance(fakeVisuals(actionLabel = "Undo")))
+    }
+
+    @Test
+    fun appNoticesUseTierAppropriateLifetimeAndCopyPayload() {
+        val confirmation = ToastSnackbarVisuals(message = "Saved")
+        val error =
+            ToastSnackbarVisuals(
+                message = "Couldn\'t save\nTry again",
+                copyable = true,
+                tier = NoticeTier.ActionableError,
+                copyText = "operation=SAVE\nerror=CONNECTIVITY",
+            )
+
+        assertEquals(SnackbarDuration.Short, confirmation.duration)
+        assertEquals(SnackbarDuration.Indefinite, error.duration)
+        assertEquals("operation=SAVE\nerror=CONNECTIVITY", error.copyText)
+        assertTrue(error.withDismissAction)
     }
 
     private fun fakeVisuals(actionLabel: String?): SnackbarVisuals =

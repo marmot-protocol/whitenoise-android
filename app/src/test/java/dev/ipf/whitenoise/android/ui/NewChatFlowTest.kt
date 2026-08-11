@@ -260,7 +260,7 @@ class NewChatFlowTest {
     fun startProfileChatFailureDistinguishesTechnicalFailures() {
         val publishFailure = MarmotKitException.Publish("relay unreachable")
         assertEquals(
-            AppText.Resource(R.string.error_group_publish_failed, listOf("relay unreachable")),
+            AppText.Resource(R.string.error_group_create_failed_retry),
             startProfileChatFailureDetail(publishFailure) { "ignored" },
         )
         assertTrue(startProfileChatFailureCopyable(publishFailure))
@@ -271,7 +271,10 @@ class NewChatFlowTest {
         )
         assertFalse(startProfileChatFailureCopyable(runtimeFailure))
         val unexpectedFailure = RuntimeException("relay unreachable")
-        assertEquals(AppText.Plain("relay unreachable"), startProfileChatFailureDetail(unexpectedFailure) { "ignored" })
+        assertEquals(
+            AppText.Resource(R.string.error_group_create_failed_retry),
+            startProfileChatFailureDetail(unexpectedFailure) { "ignored" },
+        )
         assertTrue(startProfileChatFailureCopyable(unexpectedFailure))
     }
 

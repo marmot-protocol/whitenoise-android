@@ -291,26 +291,29 @@ class MainActivity : FragmentActivity() {
             prompt.authenticate(promptInfo)
         }.onFailure {
             appUnlockPromptActive = false
-            appState.markAppUnlockFailed(AppText.Resource(R.string.app_lock_auth_cancelled))
+            appState.markAppUnlockFailed(AppText.Resource(R.string.app_lock_auth_unavailable))
         }
     }
 
     private fun appLockAuthErrorMessage(
         errorCode: Int,
-        errString: CharSequence,
+        @Suppress("UNUSED_PARAMETER") errString: CharSequence,
     ): AppText =
         when (errorCode) {
             BiometricPrompt.ERROR_CANCELED,
             BiometricPrompt.ERROR_USER_CANCELED,
             BiometricPrompt.ERROR_NEGATIVE_BUTTON,
             -> AppText.Resource(R.string.app_lock_auth_cancelled)
-            else ->
-                errString
-                    .toString()
-                    .trim()
-                    .takeIf { it.isNotEmpty() }
-                    ?.let(AppText::Plain)
-                    ?: AppText.Resource(R.string.app_lock_auth_cancelled)
+            BiometricPrompt.ERROR_LOCKOUT,
+            BiometricPrompt.ERROR_LOCKOUT_PERMANENT,
+            -> AppText.Resource(R.string.app_lock_auth_locked)
+            BiometricPrompt.ERROR_TIMEOUT -> AppText.Resource(R.string.app_lock_auth_timed_out)
+            BiometricPrompt.ERROR_HW_NOT_PRESENT,
+            BiometricPrompt.ERROR_HW_UNAVAILABLE,
+            BiometricPrompt.ERROR_NO_BIOMETRICS,
+            BiometricPrompt.ERROR_NO_DEVICE_CREDENTIAL,
+            -> AppText.Resource(R.string.app_lock_auth_unavailable)
+            else -> AppText.Resource(R.string.app_lock_auth_failed)
         }
 
     private fun retainAppLockBackgroundSecureFlagIfNeeded() {
