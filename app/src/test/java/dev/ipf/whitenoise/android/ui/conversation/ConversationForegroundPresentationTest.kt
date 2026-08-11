@@ -164,7 +164,7 @@ class ConversationForegroundPresentationTest {
                         preDrawSignals = signals,
                         currentState = { current },
                         expectedImeVisible = false,
-                        expectedVisibilityTimeoutMillis = 0,
+                        expectedVisibilityTimeoutMillis = 1_000,
                     )
                 }
             yield()
@@ -174,6 +174,28 @@ class ConversationForegroundPresentationTest {
             signals.trySend(Unit)
 
             assertEquals(settled, result.await())
+        }
+
+    @Test
+    fun unsettledGeometryReleasesTheWaitAfterTheBoundedFallback() =
+        runTest {
+            val signals = Channel<Unit>(capacity = Channel.CONFLATED)
+            val animating =
+                ConversationForegroundSettleState(
+                    geometry = ConversationForegroundGeometry(520, 200, 296),
+                    imeTargetBottomPx = 300,
+                    bottomChromeMeasured = true,
+                )
+
+            val result =
+                awaitConversationForegroundPresentation(
+                    preDrawSignals = signals,
+                    currentState = { animating },
+                    expectedImeVisible = true,
+                    expectedVisibilityTimeoutMillis = 1_000,
+                )
+
+            assertEquals(null, result)
         }
 
     @Test

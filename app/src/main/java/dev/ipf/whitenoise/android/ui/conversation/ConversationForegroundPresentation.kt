@@ -30,13 +30,17 @@ internal data class ConversationForegroundSettleState(
 /**
  * Waits for the requested IME state, then relaxes only that request after the
  * liveness timeout. Transient inset or unmeasured chrome geometry never passes.
+ * The relaxed geometry wait is bounded by the same timeout, so the caller is
+ * never blocked longer than twice the liveness window — a null return means
+ * geometry never settled and the foreground transaction must be released with
+ * the correction deferred until valid geometry arrives.
  */
 internal suspend fun awaitConversationForegroundPresentation(
     preDrawSignals: ReceiveChannel<Unit>,
     currentState: () -> ConversationForegroundSettleState,
     expectedImeVisible: Boolean,
     expectedVisibilityTimeoutMillis: Long,
-): ConversationForegroundSettleState {
+): ConversationForegroundSettleState? {
     suspend fun awaitState(predicate: ForegroundSettlePredicate): ConversationForegroundSettleState {
         while (true) {
             preDrawSignals.receive()
@@ -48,7 +52,9 @@ internal suspend fun awaitConversationForegroundPresentation(
     return withTimeoutOrNull(expectedVisibilityTimeoutMillis) {
         awaitState { it.isSettled(expectedImeVisible) }
     } ?: currentState().takeIf { it.isGeometrySettled() }
-        ?: awaitState { it.isGeometrySettled() }
+        ?: withTimeoutOrNull(expectedVisibilityTimeoutMillis) {
+            awaitState { it.isGeometrySettled() }
+        }
 }
 
 /** Keeps Android on its task snapshot while the foreground transaction owns presentation. */

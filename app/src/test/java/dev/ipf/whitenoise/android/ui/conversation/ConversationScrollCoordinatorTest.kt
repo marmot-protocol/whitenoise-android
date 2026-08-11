@@ -944,6 +944,7 @@ class ConversationScrollCoordinatorTest {
     private class BlockingScrollWriter : ConversationScrollWriter {
         val writeStarted = CompletableDeferred<Unit>()
         val releaseWrite = CompletableDeferred<Unit>()
+        override var firstVisibleItemIndex = 0
 
         override suspend fun scrollToItem(
             index: Int,

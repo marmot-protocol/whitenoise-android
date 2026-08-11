@@ -2089,14 +2089,21 @@ internal fun ConversationScreen(
                             expectedImeVisible = restoreToken.expectedImeVisible || restoreFocus,
                             expectedVisibilityTimeoutMillis = FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS,
                         )
-                    scrollCoordinator.completeForegroundRestore(
-                        token = restoreToken,
-                        resumedGeometry = resumedPresentation.geometry,
-                        resumedTimelineStructure = currentTimelineStructureProvider(),
-                        resumedScrollAnchor = currentScrollAnchorProvider(),
-                        resolveAnchorIndex = currentScrollAnchorResolver,
-                        resolveTailIndex = { currentTailIndex },
-                    )
+                    if (resumedPresentation == null) {
+                        // Geometry never settled inside both bounded waits, so
+                        // release the draw gate instead of holding the snapshot
+                        // forever, deferring correction until layout recovers.
+                        scrollCoordinator.cancelForegroundRestore()
+                    } else {
+                        scrollCoordinator.completeForegroundRestore(
+                            token = restoreToken,
+                            resumedGeometry = resumedPresentation.geometry,
+                            resumedTimelineStructure = currentTimelineStructureProvider(),
+                            resumedScrollAnchor = currentScrollAnchorProvider(),
+                            resolveAnchorIndex = currentScrollAnchorResolver,
+                            resolveTailIndex = { currentTailIndex },
+                        )
+                    }
                 } else {
                     scrollCoordinator.cancelForegroundRestore()
                 }

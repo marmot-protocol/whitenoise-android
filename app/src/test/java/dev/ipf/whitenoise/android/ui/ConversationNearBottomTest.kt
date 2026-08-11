@@ -692,6 +692,8 @@ class ConversationNearBottomTest {
     ) : ConversationScrollWriter {
         var writeCount = 0
             private set
+        override val firstVisibleItemIndex: Int
+            get() = state.firstVisibleItemIndex
 
         override suspend fun scrollToItem(
             index: Int,
