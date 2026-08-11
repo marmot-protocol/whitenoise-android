@@ -48,4 +48,10 @@ write_profile not-narrower baseline $'Lexample/App;\nSPLexample/App;->launch()V'
 write_profile not-narrower startup $'Lexample/App;\nPLexample/App;->launch()V'
 expect_failure not-narrower
 
+# Extra flag variants must not make an identity-equivalent Baseline Profile
+# appear broader merely because it contains more physical rules.
+write_profile duplicate-flags-only baseline $'Lexample/App;\nHLexample/App;->launch()V\nSPLexample/App;->launch()V'
+write_profile duplicate-flags-only startup $'Lexample/App;\nPLexample/App;->launch()V'
+expect_failure duplicate-flags-only
+
 echo "Generated profile verifier tests passed"

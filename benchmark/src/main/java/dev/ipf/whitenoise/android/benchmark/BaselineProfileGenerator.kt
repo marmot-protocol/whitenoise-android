@@ -25,7 +25,7 @@ class BaselineProfileGenerator {
 
     @Test
     fun generateCriticalUserJourneys() {
-        val groupName = BenchmarkConfig.requireFixture(BenchmarkConfig.groupName, "groupName")
+        val groupName = BenchmarkConfig.requireGeneratorFixture(BenchmarkConfig.groupName, "groupName")
         val journeys = WhiteNoiseJourneys()
         journeys.prepareAuthenticatedChatList()
         baselineProfileRule.collect(

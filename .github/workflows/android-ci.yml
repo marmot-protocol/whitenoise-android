@@ -55,7 +55,12 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
       - name: Compile (Kotlin)
-        run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin :app:assembleDevZapstoreBenchmarkRelease :benchmark:assembleDevZapstoreBenchmarkRelease --no-daemon --stacktrace
+        run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --no-daemon --stacktrace
+
+      # Keep this release compilation in its own Gradle process. Compiling it
+      # concurrently with the debug matrix can exhaust the hosted runner heap.
+      - name: Assemble app for Baseline Profile verification
+        run: ./gradlew :app:assembleDevZapstoreBenchmarkRelease --no-daemon --stacktrace
 
       - name: Verify packaged Baseline Profile assets
         shell: bash

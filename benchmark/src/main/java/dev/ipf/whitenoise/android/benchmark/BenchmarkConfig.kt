@@ -29,4 +29,14 @@ internal object BenchmarkConfig {
         )
         return checkNotNull(value)
     }
+
+    fun requireGeneratorFixture(
+        value: String?,
+        argumentName: String,
+    ): String =
+        requireNotNull(value) {
+            "Missing required baseline-profile fixture. Pass " +
+                "-Pandroid.testInstrumentationRunnerArguments.$argumentName=<value> " +
+                "after preparing the authenticated dev fixture."
+        }
 }

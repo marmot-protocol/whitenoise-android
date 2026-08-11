@@ -51,12 +51,7 @@ class ConversationTopBarSemanticsTest {
                     ConversationTopBar(
                         selectionMode = false,
                         selectedCount = 0,
-                        canCopySelection = false,
-                        canForwardSelection = false,
                         onCloseSelection = {},
-                        onCopySelection = {},
-                        onForwardSelection = {},
-                        onDeleteSelection = {},
                         searchOpen = false,
                         searchQuery = "",
                         onSearchQueryChange = {},
