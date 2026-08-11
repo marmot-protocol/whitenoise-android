@@ -25,18 +25,21 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.conversation.ConversationForegroundGeometry
+import dev.ipf.whitenoise.android.ui.conversation.ConversationForegroundRestoreToken
+import dev.ipf.whitenoise.android.ui.conversation.ConversationForegroundSnapshot
 import dev.ipf.whitenoise.android.ui.conversation.ConversationJumpToNewestButton
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollAnchor
-import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollBookmark
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollReason
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollWriter
+import dev.ipf.whitenoise.android.ui.conversation.ConversationTimelineStructure
 import dev.ipf.whitenoise.android.ui.conversation.LazyListConversationScrollWriter
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollAnchor
 import dev.ipf.whitenoise.android.ui.conversation.isNearBottom
 import dev.ipf.whitenoise.android.ui.conversation.jumpToNewest
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationNearBottom
-import dev.ipf.whitenoise.android.ui.conversation.restoreViewport
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -331,8 +334,9 @@ class ConversationNearBottomTest {
     /**
      * Drives the production pause/resume path: real [isNearBottom] feeds
      * [ConversationScrollCoordinator.onUserGestureSettled], the settled mode is
-     * bookmarked, and [restoreViewport] must land back on the same pixel.
+     * bookmarked, and the foreground transaction must land back on the same pixel.
      */
+    @Suppress("LongMethod") // Real LazyList pause, relayout, and resume must stay in one scenario.
     private fun assertTallTailResumePreservesOffset(resumeViewportHeight: Dp) {
         val listState = LazyListState()
         val timelineSize = 5
@@ -375,11 +379,24 @@ class ConversationNearBottomTest {
         assertFalse("Gesture settlement must not claim tail-follow intent", coordinator.isFollowingTail)
 
         val snapshot = coordinator.bookmark(anchor)
+        val pausedGeometry = ConversationForegroundGeometry(listState.layoutInfo.viewportSize.height, 0, 96)
+        val foregroundToken =
+            coordinator.beginForegroundRestore(
+                ConversationForegroundSnapshot(
+                    scrollBookmark = snapshot,
+                    geometry = pausedGeometry,
+                    timelineStructure =
+                        ConversationTimelineStructure(
+                            rowKeys = itemIds.zip(messageIds),
+                            olderHeaderCount = 1,
+                        ),
+                ),
+            )
         // Models a new message landing while backgrounded plus the resume relayout.
         scrollTo(listState, 2)
         composeRule.runOnUiThread { viewportHeight.value = resumeViewportHeight }
         composeRule.waitForIdle()
-        restoreOnResume(coordinator, snapshot, listState, messageIds)
+        restoreOnResume(coordinator, foregroundToken, listState, itemIds, messageIds)
 
         assertEquals("message-${timelineSize - 1}", snapshot.anchor.messageId)
         assertEquals(tailListIndex, listState.firstVisibleItemIndex)
@@ -411,19 +428,28 @@ class ConversationNearBottomTest {
                 writer = LazyListConversationScrollWriter(listState),
                 initialMode = ConversationScrollMode.ReadingHistory("reader", offsetBefore),
             )
-        val snapshot =
-            coordinator.bookmark(
-                ConversationScrollAnchor(indexBefore, offsetBefore, "msg:reader", "reader"),
+        val geometry = ConversationForegroundGeometry(listState.layoutInfo.viewportSize.height, 0, 96)
+        val structure = ConversationTimelineStructure(listOf("msg:reader" to "reader"), 1)
+        val token =
+            coordinator.beginForegroundRestore(
+                ConversationForegroundSnapshot(
+                    scrollBookmark =
+                        coordinator.bookmark(
+                            ConversationScrollAnchor(indexBefore, offsetBefore, "msg:reader", "reader"),
+                        ),
+                    geometry = geometry,
+                    timelineStructure = structure,
+                ),
             )
 
         composeRule.runOnUiThread {
             runBlocking {
-                coordinator.restoreViewport(
-                    snapshot = snapshot,
+                coordinator.completeForegroundRestore(
+                    token = token,
+                    resumedGeometry = geometry,
+                    resumedTimelineStructure = structure,
                     resolveAnchorIndex = { indexBefore },
                     resolveTailIndex = { listState.layoutInfo.totalItemsCount - 1 },
-                    frameCount = 1,
-                    awaitFrame = {},
                 )
             }
         }
@@ -432,6 +458,63 @@ class ConversationNearBottomTest {
         assertEquals(indexBefore, listState.firstVisibleItemIndex)
         assertEquals(offsetBefore, listState.firstVisibleItemScrollOffset)
         assertFalse(coordinator.isFollowingTail)
+    }
+
+    @Test
+    fun repeatedUnchangedForegroundHandoffsPerformZeroLazyListWritesOrDrift() {
+        val listState = LazyListState()
+        composeRule.setContent {
+            TimelineHarness(
+                listState = listState,
+                timelineSize = 50,
+                modifier = Modifier.height(100.dp),
+            )
+        }
+        composeRule.waitForIdle()
+        scrollTo(listState, 20, 17)
+        val indexBefore = listState.firstVisibleItemIndex
+        val offsetBefore = listState.firstVisibleItemScrollOffset
+        val writer = RecordingLazyListWriter(listState)
+        val coordinator =
+            ConversationScrollCoordinator(
+                writer = writer,
+                initialMode = ConversationScrollMode.ReadingHistory("reader", offsetBefore),
+            )
+        val anchor = ConversationScrollAnchor(indexBefore, offsetBefore, "msg:reader", "reader")
+        val geometry = ConversationForegroundGeometry(listState.layoutInfo.viewportSize.height, 0, 96)
+        val structure =
+            ConversationTimelineStructure(
+                rowKeys = (0 until 50).map { index -> "item-$index" to "message-$index" },
+                olderHeaderCount = 1,
+            )
+
+        repeat(20) {
+            composeRule.runOnUiThread {
+                runBlocking {
+                    val token =
+                        coordinator.beginForegroundRestore(
+                            ConversationForegroundSnapshot(
+                                scrollBookmark = coordinator.bookmark(anchor),
+                                geometry = geometry,
+                                timelineStructure = structure,
+                            ),
+                        )
+                    coordinator.completeForegroundRestore(
+                        token = token,
+                        resumedGeometry = geometry,
+                        resumedTimelineStructure = structure,
+                        resumedScrollAnchor = anchor,
+                        resolveAnchorIndex = { indexBefore },
+                        resolveTailIndex = { listState.layoutInfo.totalItemsCount - 1 },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(0, writer.writeCount)
+        assertEquals(indexBefore, listState.firstVisibleItemIndex)
+        assertEquals(offsetBefore, listState.firstVisibleItemScrollOffset)
     }
 
     @Test
@@ -448,21 +531,30 @@ class ConversationNearBottomTest {
         val tail = listState.layoutInfo.totalItemsCount - 1
         scrollTo(listState, tail)
         val coordinator = ConversationScrollCoordinator(LazyListConversationScrollWriter(listState))
-        val snapshot =
-            coordinator.bookmark(
-                ConversationScrollAnchor(tail, 0, "msg:last", "last"),
+        val pausedGeometry = ConversationForegroundGeometry(listState.layoutInfo.viewportSize.height, 0, 96)
+        val structure = ConversationTimelineStructure(listOf("msg:last" to "last"), 1)
+        val token =
+            coordinator.beginForegroundRestore(
+                ConversationForegroundSnapshot(
+                    scrollBookmark =
+                        coordinator.bookmark(
+                            ConversationScrollAnchor(tail, 0, "msg:last", "last"),
+                        ),
+                    geometry = pausedGeometry,
+                    timelineStructure = structure,
+                ),
             )
 
         // Models a transient viewport relayout before the IME settles.
         scrollTo(listState, 20)
         composeRule.runOnUiThread {
             runBlocking {
-                coordinator.restoreViewport(
-                    snapshot = snapshot,
+                coordinator.completeForegroundRestore(
+                    token = token,
+                    resumedGeometry = pausedGeometry.copy(viewportHeightPx = pausedGeometry.viewportHeightPx + 1),
+                    resumedTimelineStructure = structure,
                     resolveAnchorIndex = { tail },
                     resolveTailIndex = { tail },
-                    frameCount = 3,
-                    awaitFrame = {},
                 )
             }
         }
@@ -547,20 +639,37 @@ class ConversationNearBottomTest {
     /** Mirrors the resume observer: resolve the bookmarked message back to a live list index. */
     private fun restoreOnResume(
         coordinator: ConversationScrollCoordinator,
-        snapshot: ConversationScrollBookmark,
+        token: ConversationForegroundRestoreToken,
         listState: LazyListState,
+        itemIds: List<String>,
         messageIds: List<String>,
     ) {
         composeRule.runOnUiThread {
             runBlocking {
-                coordinator.restoreViewport(
-                    snapshot = snapshot,
+                coordinator.completeForegroundRestore(
+                    token = token,
+                    resumedGeometry =
+                        ConversationForegroundGeometry(
+                            viewportHeightPx = listState.layoutInfo.viewportSize.height,
+                            imeBottomPx = 0,
+                            bottomChromeHeightPx = 96,
+                        ),
+                    resumedTimelineStructure =
+                        ConversationTimelineStructure(
+                            rowKeys = itemIds.zip(messageIds),
+                            olderHeaderCount = 1,
+                        ),
+                    resumedScrollAnchor =
+                        conversationScrollAnchor(
+                            listState = listState,
+                            renderedItemIds = itemIds,
+                            renderedMessageIds = messageIds,
+                            hasOlderHeader = true,
+                        ),
                     resolveAnchorIndex = { anchor ->
                         messageIds.indexOf(anchor.messageId).takeIf { it >= 0 }?.plus(2)
                     },
                     resolveTailIndex = { listState.layoutInfo.totalItemsCount - 1 },
-                    frameCount = 1,
-                    awaitFrame = {},
                 )
             }
         }
@@ -576,6 +685,31 @@ class ConversationNearBottomTest {
             runBlocking { listState.scrollToItem(index, offset) }
         }
         composeRule.waitForIdle()
+    }
+
+    private class RecordingLazyListWriter(
+        private val state: LazyListState,
+    ) : ConversationScrollWriter {
+        var writeCount = 0
+            private set
+        override val firstVisibleItemIndex: Int
+            get() = state.firstVisibleItemIndex
+
+        override suspend fun scrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) {
+            writeCount++
+            state.scrollToItem(index, scrollOffset)
+        }
+
+        override suspend fun animateScrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) {
+            writeCount++
+            state.animateScrollToItem(index, scrollOffset)
+        }
     }
 }
 
