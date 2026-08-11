@@ -40,7 +40,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.state.ChatFolderRule
@@ -166,7 +165,7 @@ internal fun ChatFolderEditScreen(
                 FolderPickRow(
                     id = candidate.accountIdHex.lowercase(Locale.ROOT),
                     title = candidate.displayName,
-                    subtitle = IdentityFormatter.short(candidate.npub),
+                    subtitle = appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() },
                     avatarSeed = candidate.accountIdHex,
                     avatarUrl = appState.avatarUrl(candidate.accountIdHex),
                 )

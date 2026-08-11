@@ -26,6 +26,7 @@ import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.share.SharePayload
+import dev.ipf.whitenoise.android.state.BoundedNpubCache
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -539,17 +540,33 @@ class ShareChatPickerSheetProfileTest {
         profiles: MutableMap<String, UserProfileMetadataFfi> = mutableMapOf(),
         profileRefresh: suspend (String) -> Unit = {},
         profileDisplayName: suspend (String) -> String? = { profiles[it]?.displayName },
-    ): WhiteNoiseAppState =
-        WhiteNoiseAppState(
-            context = app,
-            draftStore = DraftStore(InMemoryDraftPersistence()),
-            accountIdHexResolver = { null },
-            accounts = listOf(activeAccount()),
-            activeAccountRef = ACCOUNT_REF,
-            profileReader = { profiles[it] },
-            profileDisplayNameReader = profileDisplayName,
-            profileRefreshRequest = profileRefresh,
-        )
+    ): WhiteNoiseAppState {
+        val appState =
+            WhiteNoiseAppState(
+                context = app,
+                draftStore = DraftStore(InMemoryDraftPersistence()),
+                accountIdHexResolver = { null },
+                accounts = listOf(activeAccount()),
+                activeAccountRef = ACCOUNT_REF,
+                profileReader = { profiles[it] },
+                profileDisplayNameReader = profileDisplayName,
+                profileRefreshRequest = profileRefresh,
+            )
+        seedTestNpub(appState, PEER_A, NPUB_PEER_A)
+        seedTestNpub(appState, PEER_B, NPUB_PEER_B)
+        return appState
+    }
+
+    private fun seedTestNpub(
+        appState: WhiteNoiseAppState,
+        accountIdHex: String,
+        npub: String,
+    ) {
+        val field = WhiteNoiseAppState::class.java.getDeclaredField("npubs")
+        field.isAccessible = true
+        val cache = field.get(appState) as BoundedNpubCache
+        cache.put(accountIdHex, npub)
+    }
 
     private fun refreshProfile(
         appState: WhiteNoiseAppState,
@@ -681,6 +698,8 @@ class ShareChatPickerSheetProfileTest {
 
     private companion object {
         const val ACCOUNT_REF = "alice"
+        const val NPUB_PEER_A = "npub1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        const val NPUB_PEER_B = "npub1zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
         val ACCOUNT_HEX = "a0".repeat(32)
         val PEER_A = "b1".repeat(32)
         val PEER_B = "b2".repeat(32)

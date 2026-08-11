@@ -1284,7 +1284,9 @@ internal fun ConversationScreen(
         }
 
     fun sendSharedUser(candidate: RecipientSearch.Candidate) {
-        val body = formatUserShareText(candidate.displayName, candidate.npub)
+        val presentationNpub = appState.npubForDisplay(candidate.accountIdHex)
+        if (presentationNpub.isBlank()) return
+        val body = formatUserShareText(candidate.displayName, presentationNpub)
         appState.launchMutation {
             controller.send(body) {
                 revealSentMessage()
@@ -2923,7 +2925,7 @@ internal fun ConversationScreen(
             status = infoSelection.status,
             mine = controller.isMessageMine(infoRecord),
             senderDisplayName = appState.displayName(infoRecord.sender),
-            senderNpub = appState.npub(infoRecord.sender),
+            senderNpub = appState.npubForDisplay(infoRecord.sender),
             onDismissRequest = { batchInfoSelection = null },
             onCopy = { value -> clipboard.setText(AnnotatedString(value)) },
         )

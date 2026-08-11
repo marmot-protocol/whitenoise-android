@@ -404,7 +404,7 @@ private fun shareTargetPresentation(
             otherMemberAccount = item.presentationOtherMemberAccount,
             memberCount = item.presentationMemberCount,
             memberTitle = { accountIdHex ->
-                accountAliases[accountIdHex]?.displayName ?: IdentityFormatter.short(accountIdHex)
+                accountAliases[accountIdHex]?.displayName ?: groupTitleCopy.unknownTitle
             },
             copy = groupTitleCopy,
             conversationKind = item.projection?.conversationKind,
