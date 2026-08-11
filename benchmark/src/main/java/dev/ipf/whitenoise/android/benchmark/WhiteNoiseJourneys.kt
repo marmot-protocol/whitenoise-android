@@ -131,7 +131,9 @@ internal class WhiteNoiseJourneys {
                 matchesPerformanceTag(tag) && isEnabled && isClickable
             },
         ) {
-            "Timed out waiting for enabled test tag '$tag'."
+            "Timed out waiting for enabled test tag '$tag'. " +
+                "Foreground package: ${device.currentPackageName ?: "unknown"}. " +
+                "Available performance tags: ${availablePerformanceTags()}."
         }
 
     private fun waitForText(

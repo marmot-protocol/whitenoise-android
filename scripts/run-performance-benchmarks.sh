@@ -127,6 +127,8 @@ device_output="/sdcard/Android/media/$test_package/$run_id"
 local_output="benchmark/build/outputs/manual/$run_id"
 mkdir -p "$local_output"
 device_output_pulled=false
+heads_up_setting_captured=false
+original_heads_up_notifications_enabled=""
 
 capture_device_state() {
   local destination="$1"
@@ -148,6 +150,15 @@ capture_device_state() {
 cleanup() {
   local status=$?
   trap - EXIT
+  if [[ "$heads_up_setting_captured" == true ]]; then
+    if [[ -z "$original_heads_up_notifications_enabled" ||
+      "$original_heads_up_notifications_enabled" == "null" ]]; then
+      adb_cmd shell settings delete global heads_up_notifications_enabled >/dev/null || true
+    else
+      adb_cmd shell settings put global heads_up_notifications_enabled \
+        "$original_heads_up_notifications_enabled" || true
+    fi
+  fi
   if [[ "$device_output_pulled" == true ]]; then
     adb_cmd shell rm -rf "$device_output" || true
   fi
@@ -159,6 +170,18 @@ cleanup() {
   exit "$status"
 }
 trap cleanup EXIT
+
+# A heads-up notification can cover a Compose target between UiAutomator
+# resolving its bounds and injecting the tap. That contaminates the sample and
+# can click through into another app. Disable only the overlay for this process
+# lifetime; notifications are still delivered, and the exit trap restores the
+# exact previous setting on success or failure.
+original_heads_up_notifications_enabled="$(
+  adb_cmd shell settings get global heads_up_notifications_enabled | tr -d '\r'
+)"
+heads_up_setting_captured=true
+adb_cmd shell settings put global heads_up_notifications_enabled 0
+adb_cmd shell cmd statusbar collapse
 
 # Replacing the target APK with the same application ID and debug certificate
 # preserves its authenticated data. The exit trap restores the normal dev debug
