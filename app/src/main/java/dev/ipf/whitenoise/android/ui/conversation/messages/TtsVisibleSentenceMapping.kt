@@ -45,6 +45,7 @@ internal fun speakableSentenceIndexAtVisibleOffset(
 internal fun visibleOffsetFromSelection(
     layouts: Collection<SelectableTextLayout>,
     selectedTexts: List<androidx.compose.ui.text.AnnotatedString>,
+    preferredVisibleOffset: Int? = null,
 ): Int? {
     if (selectedTexts.isEmpty()) return null
     val ordered =
@@ -59,25 +60,42 @@ internal fun visibleOffsetFromSelection(
     // concatenating it: Markdown block separators are not part of those clipped
     // strings, so concatenation loses every selection spanning two blocks.
     val matches =
-        ordered.indices.mapNotNull { firstLayoutIndex ->
-            if (firstLayoutIndex + selectedSegments.lastIndex > ordered.lastIndex) return@mapNotNull null
-            val localOffsets =
-                selectedSegments.mapIndexed { segmentIndex, segment ->
-                    uniqueSubstringOffset(
-                        text =
-                            ordered[firstLayoutIndex + segmentIndex]
-                                .layoutResult.layoutInput.text.text,
-                        substring = segment,
-                    ) ?: return@mapNotNull null
+        ordered.indices.flatMap { firstLayoutIndex ->
+            if (firstLayoutIndex + selectedSegments.lastIndex > ordered.lastIndex) return@flatMap emptyList()
+            val candidateLayouts = ordered.drop(firstLayoutIndex).take(selectedSegments.size)
+            if (
+                selectedSegments.indices.any { segmentIndex ->
+                    !candidateLayouts[segmentIndex]
+                        .layoutResult.layoutInput.text.text
+                        .contains(selectedSegments[segmentIndex])
                 }
-            firstLayoutIndex to localOffsets.first()
+            ) {
+                return@flatMap emptyList()
+            }
+            substringOffsets(
+                text =
+                    candidateLayouts
+                        .first()
+                        .layoutResult.layoutInput.text.text,
+                substring = selectedSegments.first(),
+            ).map { localOffset ->
+                val precedingLength =
+                    ordered
+                        .take(firstLayoutIndex)
+                        .sumOf { visibleLayoutSentence(it.layoutResult.layoutInput.text.text).length } +
+                        firstLayoutIndex
+                val visibleOffset = precedingLength + localOffset
+                SelectionOffsetMatch(
+                    visibleOffset = visibleOffset,
+                    selectedVisibleLength = selectedSegments.sumOf(String::length) + selectedSegments.lastIndex,
+                )
+            }
         }
-    val (firstLayoutIndex, localOffset) = matches.singleOrNull() ?: return null
-    val precedingLength =
-        ordered
-            .take(firstLayoutIndex)
-            .sumOf { visibleLayoutSentence(it.layoutResult.layoutInput.text.text).length } + firstLayoutIndex
-    return precedingLength + localOffset
+    matches.singleOrNull()?.let { return it.visibleOffset }
+    val preferred = preferredVisibleOffset ?: return null
+    return matches
+        .singleOrNull { match -> preferred in match.visibleOffset until match.selectionEndOffset }
+        ?.visibleOffset
 }
 
 internal fun concatenatedVisibleText(layouts: Collection<SelectableTextLayout>): String =
@@ -142,14 +160,25 @@ private fun visibleLayoutSentence(text: String): String {
     return if (lastVisibleCharacter in ".!?;:,") text else "$text."
 }
 
-private fun uniqueSubstringOffset(
+private data class SelectionOffsetMatch(
+    val visibleOffset: Int,
+    val selectedVisibleLength: Int,
+) {
+    val selectionEndOffset: Int
+        get() = visibleOffset + selectedVisibleLength
+}
+
+private fun substringOffsets(
     text: String,
     substring: String,
-): Int? {
-    val first = text.indexOf(substring)
-    if (first < 0) return null
-    return first.takeIf { text.indexOf(substring, first + 1) < 0 }
-}
+): List<Int> =
+    buildList {
+        var offset = text.indexOf(substring)
+        while (offset >= 0) {
+            add(offset)
+            offset = text.indexOf(substring, offset + 1)
+        }
+    }
 
 private val sentenceWhitespace = Regex("\\s+")
 private val spaceBeforeSentencePunctuation = Regex("\\s+([,.;:!?])")

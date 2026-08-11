@@ -671,7 +671,11 @@ internal fun MessageBubble(
             if (record.contentTokens.truncated) {
                 null
             } else if (selectionActive) {
-                visibleOffsetFromSelection(layouts, messageTextSelectionState.selectedTexts)
+                visibleOffsetFromSelection(
+                    layouts = layouts,
+                    selectedTexts = messageTextSelectionState.selectedTexts,
+                    preferredVisibleOffset = actionMenuVisibleOffset,
+                )
             } else {
                 actionMenuVisibleOffset
             }
@@ -1463,6 +1467,7 @@ internal fun MessageBubble(
                         speakFromHere()
                         onTextSelectionModeChange(false)
                     },
+                    onDismissRequest = { onTextSelectionModeChange(false) },
                 )
                 MessageActionMenu(
                     // Never render the menu for a deleted message or while batch

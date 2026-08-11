@@ -46,6 +46,7 @@ internal fun MessageTextSelectionToolbar(
     canSpeak: Boolean,
     selectionBoundsInWindow: Rect?,
     onSpeak: () -> Unit,
+    onDismissRequest: () -> Unit,
 ) {
     if (!visible || !canSpeak || selectionBoundsInWindow == null) return
     val speakLabel = stringResource(R.string.speak_aloud)
@@ -68,6 +69,7 @@ internal fun MessageTextSelectionToolbar(
         }
     var measured by remember(anchorBounds) { mutableStateOf(false) }
     Popup(
+        onDismissRequest = onDismissRequest,
         popupPositionProvider = positionProvider,
         properties = PopupProperties(focusable = true),
     ) {
@@ -111,7 +113,10 @@ private class MessageTextSelectionToolbarPositionProvider(
         val effectiveHeight = maxOf(popupContentSize.height, estimatedHeightPx)
         val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
         val maxY = (windowSize.height - effectiveHeight).coerceAtLeast(0)
-        val x = selectionBoundsInWindow.left.coerceIn(0, maxX)
+        // The native text-selection toolbar owns the selection's leading and
+        // center region. Keep this additional action on the opposite edge so
+        // both focusable surfaces remain visible and independently clickable.
+        val x = maxX
         val above = selectionBoundsInWindow.top - effectiveHeight
         val y =
             if (above >= 0) {

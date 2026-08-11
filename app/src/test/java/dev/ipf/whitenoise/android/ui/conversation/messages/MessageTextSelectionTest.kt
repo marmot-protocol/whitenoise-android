@@ -208,10 +208,11 @@ class MessageTextSelectionTest {
     @Test
     fun selectedTextOffsetRequiresAnUnambiguousMatch() {
         val key = Any()
+        val text = "Unique. Repeat. Repeat."
         val layouts = mutableMapOf<Any, SelectableTextLayout>()
         composeRule.setContent {
             WhiteNoiseTheme {
-                CaptureSelectableText(key, "Unique. Repeat. Repeat.") { layouts[key] = it }
+                CaptureSelectableText(key, text) { layouts[key] = it }
             }
         }
         composeRule.waitForIdle()
@@ -223,6 +224,14 @@ class MessageTextSelectionTest {
         assertEquals(
             null,
             visibleOffsetFromSelection(layouts.values, listOf(AnnotatedString("Repeat"))),
+        )
+        assertEquals(
+            text.lastIndexOf("Repeat"),
+            visibleOffsetFromSelection(
+                layouts = layouts.values,
+                selectedTexts = listOf(AnnotatedString("Repeat")),
+                preferredVisibleOffset = text.lastIndexOf("Repeat") + 1,
+            ),
         )
     }
 
