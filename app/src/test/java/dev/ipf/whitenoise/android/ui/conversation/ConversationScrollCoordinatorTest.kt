@@ -914,21 +914,27 @@ class ConversationScrollCoordinatorTest {
 
     @Test
     fun conversationScreenUsesOneForegroundTransactionWithoutFrameDelayedRestore() {
+        // The pause/resume machinery lives in ConversationForegroundRestoreEffects.kt,
+        // hoisted out of the screen body so the debug dex stays within what ART's
+        // bytecode verifier accepts.
         val screen = sourceFile("ConversationScreen.kt").readText()
+        val effects = sourceFile("ConversationForegroundRestoreEffects.kt").readText()
         val presentation = sourceFile("ConversationForegroundPresentation.kt").readText()
 
-        assertTrue(screen.contains("scrollCoordinator.beginForegroundRestore("))
-        assertTrue(screen.contains("scrollCoordinator.completeForegroundRestore("))
+        assertTrue(effects.contains("scrollCoordinator.beginForegroundRestore("))
+        assertTrue(effects.contains("scrollCoordinator.completeForegroundRestore("))
         assertTrue(screen.contains("scrollCoordinator.foregroundRestoreInProgress"))
-        assertTrue(screen.contains("ConversationForegroundDrawGateEffect"))
-        assertTrue(screen.contains("foregroundPreDrawSignals"))
-        assertTrue(screen.contains("awaitConversationForegroundPresentation("))
-        assertTrue(screen.contains("WindowInsets.imeAnimationTarget"))
-        assertTrue(screen.contains("expectedImeVisible = restoreToken.expectedImeVisible || restoreFocus"))
+        assertTrue(effects.contains("ConversationForegroundDrawGateEffect"))
+        assertTrue(effects.contains("foregroundPreDrawSignals"))
+        assertTrue(effects.contains("awaitConversationForegroundPresentation("))
+        assertTrue(effects.contains("WindowInsets.imeAnimationTarget"))
+        assertTrue(effects.contains("expectedImeVisible = restoreToken.expectedImeVisible || restoreFocus"))
         assertTrue(presentation.contains("it.isSettled(expectedImeVisible)"))
         assertTrue(presentation.contains("it.isGeometrySettled()"))
         assertFalse(screen.contains("RESUME_IME_SETTLE_MAX_FRAMES"))
+        assertFalse(effects.contains("RESUME_IME_SETTLE_MAX_FRAMES"))
         assertFalse(screen.contains("scrollCoordinator.restoreViewport("))
+        assertFalse(effects.contains("scrollCoordinator.restoreViewport("))
     }
 
     @Test
