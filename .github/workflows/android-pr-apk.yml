@@ -52,7 +52,9 @@ jobs:
           cache-read-only: true
 
       - name: Test preview workflow contract
-        run: .github/scripts/test-pr-preview-contract.sh
+        run: |
+          .github/scripts/test-pr-preview-contract.sh
+          .github/scripts/test-pr-preview-validation.sh
 
       # The Play distribution deliberately omits Zapstore's production-style
       # self-updater. Preview APKs are replaced only from the PR install link.

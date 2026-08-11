@@ -42,6 +42,14 @@ jobs:
           ref: ${{ github.event.workflow_run.repository.default_branch }}
           persist-credentials: false
 
+      # These checks are authoritative only here, against trusted default-
+      # branch code. The same tests in the PR job provide fast contributor
+      # feedback but cannot police PR-controlled workflow changes.
+      - name: Test trusted publisher contract
+        run: |
+          .github/scripts/test-pr-preview-contract.sh
+          .github/scripts/test-pr-preview-validation.sh
+
       - name: Download candidates from completed run
         env:
           GH_TOKEN: ${{ github.token }}
@@ -111,6 +119,20 @@ jobs:
             cp "candidates/$channel/provenance.env" "signed-check/$channel/provenance.env"
           done
           .github/scripts/verify-pr-preview-candidates.sh signed-check
+
+      - name: Recheck PR head before upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+            --jq '[.state, .head.sha] | @tsv')
+          expected=$(printf 'open\t%s' "$HEAD_SHA")
+          [[ "$current" == "$expected" ]] || {
+            printf 'PR changed before upload; refusing to publish stale APKs.\n' >&2
+            exit 1
+          }
 
       - name: Publish previews
         id: publish
