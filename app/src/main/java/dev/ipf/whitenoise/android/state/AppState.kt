@@ -919,7 +919,11 @@ data class ConversationNoticeDestination(
 internal fun TransientNotice.isForConversation(
     accountRef: String,
     groupIdHex: String,
-): Boolean = conversation == ConversationNoticeDestination(accountRef, groupIdHex)
+): Boolean =
+    conversation?.let { destination ->
+        destination.accountRef == accountRef &&
+            destination.groupIdHex.equals(groupIdHex, ignoreCase = true)
+    } == true
 
 private data class ProfilePresentation(
     val displayName: String?,

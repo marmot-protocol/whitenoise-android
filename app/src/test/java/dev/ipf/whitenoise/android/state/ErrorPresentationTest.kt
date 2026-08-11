@@ -24,12 +24,12 @@ class ErrorPresentationTest {
             TransientNotice(
                 id = 1L,
                 title = AppText.Plain("Admin removed"),
-                conversation = ConversationNoticeDestination("account-a", "group-a"),
+                conversation = ConversationNoticeDestination("account-a", "A1B2"),
             )
 
-        assertTrue(notice.isForConversation("account-a", "group-a"))
+        assertTrue(notice.isForConversation("account-a", "a1b2"))
         assertFalse(notice.isForConversation("account-a", "group-b"))
-        assertFalse(notice.isForConversation("account-b", "group-a"))
+        assertFalse(notice.isForConversation("account-b", "a1b2"))
     }
 
     @Test
