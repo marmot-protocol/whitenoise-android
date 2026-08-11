@@ -244,6 +244,22 @@ class NewChatFlowTest {
     }
 
     @Test
+    fun aHydrationPendingGroupReadsAsStillLoadingNotAsACreateFailure() {
+        val pending = MarmotKitException.GroupHydrationPending("7c3bdc38")
+
+        assertFalse(startProfileChatFailureIsMissingSetup(pending))
+        assertEquals(
+            AppText.Resource(R.string.toast_chat_still_loading),
+            groupCreateFailureDetail(pending) { "ignored" },
+        )
+        assertEquals(
+            AppText.Resource(R.string.toast_chat_still_loading),
+            startProfileChatFailureDetail(pending) { "ignored" },
+        )
+        assertFalse(startProfileChatFailureCopyable(pending))
+    }
+
+    @Test
     fun startProfileChatInviteCopyUsesKnownNameOrGenericFallback() {
         assertEquals(
             AppText.Resource(R.string.invite_to_white_noise_description, listOf("Alice")),

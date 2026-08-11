@@ -602,6 +602,7 @@
     <string name="toast_couldnt_publish_profile">Profil konnte nicht veröffentlicht werden</string>
     <string name="toast_send_failed">Senden fehlgeschlagen</string>
     <string name="toast_send_queue_full">In diesem Chat warten zu viele Nachrichten auf den Versand, deine wurde nicht gesendet. Versuche es erneut, sobald der Rückstand abgebaut ist.</string>
+    <string name="toast_chat_still_loading">Dieser Chat wird noch geladen. Versuche es gleich noch einmal.</string>
     <string name="toast_send_membership_verifying">Deine Gruppenmitgliedschaft wird überprüft — deine Nachricht wurde nicht gesendet. Sie bleibt im Eingabefeld; versuche es gleich erneut.</string>
     <string name="toast_reaction_failed">Reaktion fehlgeschlagen</string>
     <string name="toast_couldnt_delete_message">Nachricht konnte nicht gelöscht werden. Bitte erneut versuchen.</string>

@@ -602,6 +602,7 @@
     <string name="toast_couldnt_publish_profile">Profil yayınlanamadı</string>
     <string name="toast_send_failed">Gönderim başarısız oldu</string>
     <string name="toast_send_queue_full">Bu sohbette gönderilmeyi bekleyen çok fazla mesaj var, bu yüzden mesajınız gönderilmedi. Sıra ilerleyince yeniden deneyin.</string>
+    <string name="toast_chat_still_loading">Bu sohbet hâlâ yükleniyor. Birazdan yeniden deneyin.</string>
     <string name="toast_send_membership_verifying">Grup üyeliğin doğrulanıyor — mesajın gönderilmedi. Metin kutusunda saklandı; birazdan tekrar dene.</string>
     <string name="toast_reaction_failed">Tepki başarısız oldu</string>
     <string name="toast_couldnt_delete_message">Mesaj silinemedi. Lütfen tekrar deneyin.</string>
