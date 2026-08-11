@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -106,5 +107,19 @@ class ShareRequestTest {
             }
         val request = parseShareRequest(intent)
         assertEquals("conversation-abc", request?.shortcutId)
+    }
+
+    @Test
+    fun parseShareRequest_assignsEachInboundShareANewIdentity() {
+        val intent =
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, "shared")
+            }
+
+        val first = parseShareRequest(intent)
+        val second = parseShareRequest(intent)
+
+        assertNotEquals(first?.requestId, second?.requestId)
     }
 }
