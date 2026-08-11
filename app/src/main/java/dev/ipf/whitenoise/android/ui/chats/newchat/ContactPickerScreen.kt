@@ -46,6 +46,7 @@ import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.util.Locale
@@ -148,7 +149,7 @@ internal fun ContactPickerScreen(
     }
 
     Scaffold(
-        modifier = Modifier.imePadding(),
+        modifier = Modifier.imePadding().exposePerformanceTestTags(),
         topBar = {
             TopAppBar(
                 title = {

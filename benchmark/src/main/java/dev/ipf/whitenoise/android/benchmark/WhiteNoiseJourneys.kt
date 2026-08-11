@@ -115,6 +115,7 @@ internal class WhiteNoiseJourneys {
             },
         ) {
             "Timed out waiting for test tag '$tag'. " +
+                "Available performance tags: ${availablePerformanceTags()}. " +
                 "Confirm the dev app is authenticated and the fixture is in the expected state."
         }
 
@@ -180,6 +181,33 @@ internal class WhiteNoiseJourneys {
             .windows
             .any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
 
+    private fun availablePerformanceTags(): String {
+        val tags = linkedSetOf<String>()
+        InstrumentationRegistry
+            .getInstrumentation()
+            .uiAutomation
+            .windows
+            .mapNotNull(AccessibilityWindowInfo::getRoot)
+            .forEach { root -> collectPerformanceTags(root, tags) }
+        return tags.sorted().joinToString().ifEmpty { "none" }
+    }
+
+    private fun collectPerformanceTags(
+        node: AccessibilityNodeInfo,
+        destination: MutableSet<String>,
+    ) {
+        sequenceOf(
+            node.viewIdResourceName,
+            node.contentDescription?.toString(),
+            node.extras.getCharSequence(COMPOSE_TEST_TAG_KEY)?.toString(),
+        ).filterNotNull()
+            .filter { it.startsWith(PERFORMANCE_TAG_PREFIX) }
+            .forEach(destination::add)
+        repeat(node.childCount) { index ->
+            node.getChild(index)?.let { child -> collectPerformanceTags(child, destination) }
+        }
+    }
+
     private fun AccessibilityNodeInfo.matchesPerformanceTag(tag: String): Boolean =
         viewIdResourceName == tag ||
             contentDescription?.toString() == tag ||
@@ -187,6 +215,7 @@ internal class WhiteNoiseJourneys {
 
     private companion object {
         const val COMPOSE_TEST_TAG_KEY = "androidx.compose.ui.semantics.testTag"
+        const val PERFORMANCE_TAG_PREFIX = "performance."
         const val EDIT_TEXT_CLASS = "android.widget.EditText"
         const val DEFAULT_TIMEOUT_MS = 15_000L
         const val STARTUP_TIMEOUT_MS = 30_000L

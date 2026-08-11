@@ -126,6 +126,7 @@ run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 device_output="/sdcard/Android/media/$test_package/$run_id"
 local_output="benchmark/build/outputs/manual/$run_id"
 mkdir -p "$local_output"
+device_output_pulled=false
 
 capture_device_state() {
   local destination="$1"
@@ -147,6 +148,9 @@ capture_device_state() {
 cleanup() {
   local status=$?
   trap - EXIT
+  if [[ "$device_output_pulled" == true ]]; then
+    adb_cmd shell rm -rf "$device_output" || true
+  fi
   if ! adb_cmd install -r -d -t "$dev_app_apk"; then
     echo "Failed to restore the normal dev app: $dev_app_apk" >&2
     if ((status == 0)); then status=1; fi
@@ -234,6 +238,14 @@ adb_cmd shell "$instrument_command" | tee "$result_file" || instrumentation_stat
 cp "$result_file" "$local_output/instrumentation.log"
 capture_device_state "$local_output/device-after.txt"
 
+if adb_cmd shell test -d "$device_output"; then
+  if adb_cmd pull "$device_output/." "$local_output"; then
+    device_output_pulled=true
+  else
+    echo "Failed to pull benchmark output from $device_output; leaving it on the device." >&2
+  fi
+fi
+
 if ((instrumentation_status != 0)); then
   echo "Instrumentation command exited with status $instrumentation_status." >&2
   exit "$instrumentation_status"
@@ -250,11 +262,10 @@ if ! rg -q '^INSTRUMENTATION_CODE: -1\r?$' "$result_file" ||
   exit 1
 fi
 
-if ! adb_cmd shell test -d "$device_output"; then
+if [[ "$device_output_pulled" != true ]]; then
   echo "Benchmark output directory was not created: $device_output" >&2
   exit 1
 fi
-adb_cmd pull "$device_output/." "$local_output"
 
 benchmark_report_count=0
 while IFS= read -r report; do
@@ -278,7 +289,5 @@ if ((benchmark_trace_count == 0)); then
   echo "No fresh benchmark trace was pulled from $device_output." >&2
   exit 1
 fi
-
-adb_cmd shell rm -rf "$device_output"
 
 echo "Benchmark artifacts: $local_output ($benchmark_report_count JSON, $benchmark_trace_count traces)"

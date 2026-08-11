@@ -74,6 +74,7 @@ import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
@@ -316,7 +317,7 @@ internal fun NewGroupSetupScreen(
     }
 
     Scaffold(
-        modifier = Modifier.imePadding(),
+        modifier = Modifier.imePadding().exposePerformanceTestTags(),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.name_this_group)) },
