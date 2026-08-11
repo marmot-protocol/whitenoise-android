@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-group_name="${1:?usage: scripts/run-performance-benchmarks.sh <group-name>}"
+group_name="${1:-}"
 target_package="dev.ipf.whitenoise.android.dev"
 test_package="dev.ipf.whitenoise.android.benchmark"
 runner="$test_package/androidx.test.runner.AndroidJUnitRunner"
@@ -125,6 +125,25 @@ result_file="$(mktemp)"
 run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 device_output="/sdcard/Android/media/$test_package/$run_id"
 local_output="benchmark/build/outputs/manual/$run_id"
+mkdir -p "$local_output"
+
+capture_device_state() {
+  local destination="$1"
+  local battery thermal
+  battery="$(adb_cmd shell dumpsys battery)"
+  thermal="$(adb_cmd shell dumpsys thermalservice)"
+  {
+    printf 'captured_at_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'serial=%s\n' "${ANDROID_SERIAL:-default}"
+    printf 'model=%s\n' "$(adb_cmd shell getprop ro.product.model | tr -d '\r')"
+    printf 'android_release=%s\n' "$(adb_cmd shell getprop ro.build.version.release | tr -d '\r')"
+    printf 'api_level=%s\n' "$(adb_cmd shell getprop ro.build.version.sdk | tr -d '\r')"
+    printf 'build_fingerprint=%s\n' "$(adb_cmd shell getprop ro.build.fingerprint | tr -d '\r')"
+    printf '%s\n' "$battery" | awk '/USB powered:|level:|temperature:/{gsub(/^ +/, ""); print "battery_" $0}'
+    printf '%s\n' "$thermal" | awk '/^Thermal Status:/{print "thermal_status=" $3}'
+  } >"$destination"
+}
+
 cleanup() {
   local status=$?
   trap - EXIT
@@ -184,13 +203,41 @@ dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark#openGroupMembersNoCompi
 dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark#openGroupMembersBaselineProfile"
 benchmark_classes="${BENCHMARK_CLASS_FILTER:-$default_benchmark_classes}"
 
+if [[ -z "$group_name" && -z "${BENCHMARK_CLASS_FILTER:-}" ]]; then
+  echo "usage: scripts/run-performance-benchmarks.sh <group-name>" >&2
+  echo "A group name is required for the default startup + group-open suite." >&2
+  exit 1
+fi
+
 instrument_command="am instrument -w -r \
 -e class $(quote_device_shell_arg "$benchmark_classes") \
--e groupName $(quote_device_shell_arg "$group_name") \
 -e androidx.benchmark.output.enable true \
--e additionalTestOutputDir $(quote_device_shell_arg "$device_output") \
+-e additionalTestOutputDir $(quote_device_shell_arg "$device_output")"
+if [[ -n "$group_name" ]]; then
+  instrument_command="$instrument_command \
+-e groupName $(quote_device_shell_arg "$group_name")"
+fi
+if [[ -n "${CREATED_GROUP_PREFIX:-}" ]]; then
+  instrument_command="$instrument_command \
+-e createdGroupPrefix $(quote_device_shell_arg "$CREATED_GROUP_PREFIX")"
+fi
+if [[ -n "${INVITE_NAME:-}" ]]; then
+  instrument_command="$instrument_command \
+-e inviteName $(quote_device_shell_arg "$INVITE_NAME")"
+fi
+instrument_command="$instrument_command \
 $(quote_device_shell_arg "$runner")"
-adb_cmd shell "$instrument_command" | tee "$result_file"
+
+capture_device_state "$local_output/device-before.txt"
+instrumentation_status=0
+adb_cmd shell "$instrument_command" | tee "$result_file" || instrumentation_status=$?
+cp "$result_file" "$local_output/instrumentation.log"
+capture_device_state "$local_output/device-after.txt"
+
+if ((instrumentation_status != 0)); then
+  echo "Instrumentation command exited with status $instrumentation_status." >&2
+  exit "$instrumentation_status"
+fi
 
 if rg -q "FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed" "$result_file"; then
   echo "Instrumentation reported a failure." >&2
@@ -203,7 +250,6 @@ if ! rg -q '^INSTRUMENTATION_CODE: -1\r?$' "$result_file" ||
   exit 1
 fi
 
-mkdir -p "$local_output"
 if ! adb_cmd shell test -d "$device_output"; then
   echo "Benchmark output directory was not created: $device_output" >&2
   exit 1

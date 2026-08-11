@@ -38,7 +38,7 @@ class GroupFlowsBenchmark {
             // Group creation is measured independently of profile presence so
             // it can also provision a new physical-device fixture.
             compilationMode = CompilationMode.None(),
-            iterations = 3,
+            iterations = 10,
             setupBlock = {
                 pressHome()
                 journeys.run { resumeToChatList() }
@@ -77,7 +77,7 @@ class GroupFlowsBenchmark {
             packageName = BenchmarkConfig.TARGET_PACKAGE,
             metrics = journeyMetrics(OPEN_MEMBERS_TRACE),
             compilationMode = compilationMode,
-            iterations = 5,
+            iterations = 10,
             setupBlock = {
                 pressHome()
                 journeys.run { resumeToChatList() }

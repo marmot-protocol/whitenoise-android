@@ -65,30 +65,35 @@ package, so authenticated app data remains intact on a personal physical device.
 
 For a focused rerun, set AndroidJUnitRunner's comma-separated class filter via
 `BENCHMARK_CLASS_FILTER`; the script still uses the same state-preserving path.
+The group title argument is optional when the selected method does not use the
+existing-group fixture. Every run retains `instrumentation.log` plus before/after
+device, battery, and thermal metadata beside its JSON and traces.
 
-To measure group creation separately, use the connected task with an explicit
-mutation argument:
+To measure group creation separately, use the state-preserving runner with an
+explicit mutation argument. This creates ten persistent MLS groups:
 
 ```bash
-./gradlew :benchmark:connectedDevZapstoreBenchmarkReleaseAndroidTest \
-  -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
-  -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark#createGroupConversationOpen \
-  -Pandroid.testInstrumentationRunnerArguments.createdGroupPrefix="Benchmark group"
+BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark#createGroupConversationOpen" \
+  CREATED_GROUP_PREFIX="Benchmark group <run-id>" \
+  scripts/run-performance-benchmarks.sh
 ```
 
-`createdGroupPrefix` is an explicit mutation guard: the creation benchmark is
-skipped unless it is supplied, because each of its three measured iterations
+`CREATED_GROUP_PREFIX` is an explicit mutation guard: the creation benchmark is
+skipped unless it is supplied, because each of its ten measured iterations
 creates and syncs a persistent MLS group. Omit it when measuring only startup
 and the repeatable group-open journey.
 
 Run the one-shot invite journey by filtering to its test method:
 
 ```bash
-./gradlew :benchmark:connectedDevZapstoreBenchmarkReleaseAndroidTest \
-  -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
-  -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark#acceptInviteConversationReady \
-  -Pandroid.testInstrumentationRunnerArguments.inviteName="$INVITE_NAME"
+BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark#acceptInviteConversationReady" \
+  INVITE_NAME="$INVITE_NAME" \
+  scripts/run-performance-benchmarks.sh
 ```
+
+Invite acceptance consumes its fixture, so collect a ten-sample handoff set by
+running this command once for each of ten distinct prepared invitations and
+aggregate their `journeyDurationMs` values. Never reuse a consumed invite.
 
 `StartupBenchmark` reports `timeToInitialDisplayMs` and frame timing with no
 compilation and with the packaged Baseline Profile. `GroupFlowsBenchmark`
