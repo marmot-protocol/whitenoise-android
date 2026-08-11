@@ -578,6 +578,7 @@ class ShareChatPickerFullScreenProfileTest {
             }
         }
     }
+
     private fun profile(
         displayName: String,
         name: String = displayName.lowercase(),
