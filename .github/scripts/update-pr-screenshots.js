@@ -1,6 +1,10 @@
 const START = '<!-- pr-screenshots:start -->'
 const END = '<!-- pr-screenshots:end -->'
 const SNAPSHOT_PREFIX = 'app/src/test/snapshots/'
+// Opt-out for purely behavioral changes to UI sources, where nothing renders
+// differently and a screenshot baseline would be noise. The declaration is
+// deliberate prose in the PR description, so reviewers see and can challenge it.
+const NO_VISUAL_CHANGES_MARKER = /^visual changes:[ \t]*none\b/im
 
 function escapeCell(value) {
   return value.replaceAll('|', '\\|')
@@ -27,6 +31,16 @@ function isMissingVisualCoverage(files) {
   return hasUiChanges && !hasSnapshotChanges
 }
 
+function declaresNoVisualChanges(body) {
+  // The declaration must be visible prose: drop fenced code and HTML comments
+  // first so hidden text cannot disable enforcement, and require the marker to
+  // sit on one line.
+  const visible = (body || '')
+    .replace(/```[\s\S]*?(?:```|$)/g, '')
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, '')
+  return NO_VISUAL_CHANGES_MARKER.test(visible)
+}
+
 function renderSection(pr, files) {
   const snapshots = files
     .filter(file => file.filename.startsWith(SNAPSHOT_PREFIX) && file.filename.endsWith('.png'))
@@ -35,9 +49,13 @@ function renderSection(pr, files) {
   const lines = [START, '## Visual changes', '']
 
   if (snapshots.length === 0) {
-    lines.push(uiFiles.length === 0
-      ? 'No UI-affecting files were detected in this pull request.'
-      : '⚠️ UI-affecting files changed, but no committed Roborazzi screenshots changed. Please add or update a screenshot test when the change is visual.')
+    if (uiFiles.length === 0) {
+      lines.push('No UI-affecting files were detected in this pull request.')
+    } else if (declaresNoVisualChanges(pr.body)) {
+      lines.push('UI-affecting files changed, and the description declares "Visual changes: none" — the author states nothing renders differently.')
+    } else {
+      lines.push('⚠️ UI-affecting files changed, but no committed Roborazzi screenshots changed. Please add or update a screenshot test when the change is visual.')
+    }
   } else {
     lines.push(
       `Generated from the committed Roborazzi baselines at head \`${pr.head.sha}\`. This section updates automatically when new commits are pushed.`,
@@ -119,11 +137,16 @@ async function run({ github, context, core }) {
   }
 
   if (isMissingVisualCoverage(files)) {
-    core.setFailed(
-      'UI-affecting files changed without a committed Roborazzi screenshot baseline. ' +
-      'Add or update a screenshot test and commit its generated PNG.',
-    )
+    if (declaresNoVisualChanges(pr.body)) {
+      core.info('UI-affecting files changed, and the description declares "Visual changes: none" — accepting the behavioral opt-out.')
+    } else {
+      core.setFailed(
+        'UI-affecting files changed without a committed Roborazzi screenshot baseline. ' +
+        'Add or update a screenshot test and commit its generated PNG, ' +
+        'or declare "Visual changes: none" in the description when nothing renders differently.',
+      )
+    }
   }
 }
 
-module.exports = { isUiFile, isMissingVisualCoverage, renderSection, replaceSection, repoFileUrl, run }
+module.exports = { isUiFile, isMissingVisualCoverage, declaresNoVisualChanges, renderSection, replaceSection, repoFileUrl, run }
