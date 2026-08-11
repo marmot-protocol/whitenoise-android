@@ -7,10 +7,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
+import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
+import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchAccountScope
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchChatFilter
-import dev.ipf.whitenoise.android.ui.chats.GlobalSearchContentFilter
-import dev.ipf.whitenoise.android.ui.chats.GlobalSearchDateFilter
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchSenderFilter
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
 import org.junit.Assert.assertEquals
@@ -115,8 +116,9 @@ private fun populateSearch(state: GlobalSearchState): GlobalSearchState =
         query = "needle",
         chatFilters = setOf(GlobalSearchChatFilter("g1", "Alice")),
         senderFilters = setOf(GlobalSearchSenderFilter("npub1", "Bob")),
-        dateFilters = setOf(GlobalSearchDateFilter("today", "Today")),
-        contentFilters = setOf(GlobalSearchContentFilter("text", "Text")),
+        dateFilterSelection = GlobalSearchDateFilterSelection.Today,
+        contentFilterSelection =
+            GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.TEXT)),
     )
 
 private fun expectedSearchState(
@@ -139,6 +141,7 @@ private fun expectedSearchState(
             } else {
                 emptySet()
             },
-        dateFilters = setOf(GlobalSearchDateFilter("today", "Today")),
-        contentFilters = setOf(GlobalSearchContentFilter("text", "Text")),
+        dateFilterSelection = GlobalSearchDateFilterSelection.Today,
+        contentFilterSelection =
+            GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.TEXT)),
     )
