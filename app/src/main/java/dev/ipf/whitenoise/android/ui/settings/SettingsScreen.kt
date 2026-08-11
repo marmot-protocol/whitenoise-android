@@ -591,7 +591,7 @@ internal fun SelectableSettingsRow(
         modifier =
             Modifier
                 .settingsRowAmoledSurfaceBorder()
-                .clickable(onClick = onClick),
+                .selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(title) },
         trailingContent = {

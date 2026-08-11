@@ -1271,6 +1271,12 @@
     <string name="tts_bar_history_error">無法載入更多訊息。再次點按即可重試。</string>
     <string name="tts_auto_read_title">朗讀訊息</string>
     <string name="tts_auto_read_subtitle">開啟此聊天時朗讀未讀訊息</string>
+    <string name="tts_auto_read_default_global_title">預設朗讀訊息</string>
+    <string name="tts_auto_read_default_global_subtitle">開啟聊天時朗讀未讀訊息（除非該聊天另行設定）</string>
+    <string name="tts_auto_read_use_default_off">使用預設（關）</string>
+    <string name="tts_auto_read_use_default_on">使用預設（開）</string>
+    <string name="tts_auto_read_override_on">開</string>
+    <string name="tts_auto_read_override_off">關</string>
     <string name="tts_settings_rate_system">系統（跟隨裝置設定）</string>
     <string name="tts_bar_rate_control">語速，目前為 %1$s</string>
     <string name="tts_rate_custom">自訂</string>

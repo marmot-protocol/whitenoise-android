@@ -1297,6 +1297,12 @@
     <string name="tts_bar_history_error">Não foi possível carregar mais mensagens. Toque novamente para tentar de novo.</string>
     <string name="tts_auto_read_title">Ler mensagens em voz alta</string>
     <string name="tts_auto_read_subtitle">Ler as mensagens não lidas ao abrir esta conversa</string>
+    <string name="tts_auto_read_default_global_title">Ler mensagens em voz alta por padrão</string>
+    <string name="tts_auto_read_default_global_subtitle">Ler mensagens não lidas ao abrir uma conversa, exceto se a conversa tiver outra configuração</string>
+    <string name="tts_auto_read_use_default_off">Usar padrão (Desativado)</string>
+    <string name="tts_auto_read_use_default_on">Usar padrão (Ativado)</string>
+    <string name="tts_auto_read_override_on">Ativado</string>
+    <string name="tts_auto_read_override_off">Desativado</string>
     <string name="tts_settings_rate_system">Sistema (seguir a configuração do dispositivo)</string>
     <string name="tts_bar_rate_control">Velocidade da fala, atual %1$s</string>
     <string name="tts_rate_custom">Personalizada</string>

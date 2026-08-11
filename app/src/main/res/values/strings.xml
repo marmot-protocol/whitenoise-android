@@ -1387,6 +1387,12 @@
     <string name="tts_bar_history_error">Couldn\'t load more messages. Tap again to retry.</string>
     <string name="tts_auto_read_title">Read messages aloud</string>
     <string name="tts_auto_read_subtitle">Read the unread backlog when this chat opens</string>
+    <string name="tts_auto_read_default_global_title">Read messages aloud by default</string>
+    <string name="tts_auto_read_default_global_subtitle">Read the unread backlog when a chat opens unless a chat overrides this</string>
+    <string name="tts_auto_read_use_default_off">Use default (Off)</string>
+    <string name="tts_auto_read_use_default_on">Use default (On)</string>
+    <string name="tts_auto_read_override_on">On</string>
+    <string name="tts_auto_read_override_off">Off</string>
     <string name="tts_settings_rate_system">System (follow device setting)</string>
     <string name="tts_bar_rate_control">Speech rate, current %1$s</string>
     <string name="tts_rate_custom">Custom</string>
