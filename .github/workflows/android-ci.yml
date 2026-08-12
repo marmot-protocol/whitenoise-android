@@ -37,6 +37,9 @@ jobs:
       - name: Test PR screenshot renderer
         run: node --test .github/scripts/update-pr-screenshots.test.js
 
+      - name: Test GitHub triage reconciliation
+        run: python3 -m unittest scripts/test_check_github_triage.py
+
       - name: Verify generated performance profiles
         run: |
           bash .github/scripts/test-verify-generated-profiles.sh
