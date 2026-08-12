@@ -78,7 +78,8 @@ when product work already exists.
 
 ### Required structure
 
-- Every open issue must appear exactly once in the White Noise Android project.
+- Every open issue and pull request must appear exactly once in the White Noise
+  Android project. Open pull requests use `In Progress` status.
 - Give every issue one native GitHub type: `Bug`, `Feature`, `Task`, or
   `Tracking`.
 - A tracker must use the organization-native `Tracking` type. A `tracking`
@@ -111,7 +112,9 @@ recreate or reapply them. Their migration equivalents are `P1`, `P2`, `P3`,
 and the native `Tracking` type. Labels may still express useful cross-cutting
 classifications, but must not duplicate native types or project fields.
 
-When priority and readiness are otherwise equal, current product order is:
+Read the live Project 7 README before changing priority or rank. Its current
+steering overrides this static fallback. When priority and readiness are
+otherwise equal, current product order is:
 
 1. Text-to-speech
 2. Link previews
@@ -140,8 +143,9 @@ autonomous implementation and the source-grounded scope is safe and complete.
 
 ### Reconciliation
 
-Regular reconciliation must compare all open repository issues with project 7
-and flag missing or duplicate project items, missing native types, unset
+Regular reconciliation must compare all open repository issues and pull
+requests with project 7 and flag missing or duplicate project items, missing
+native types, and unset
 Priority/Area/Triage health fields, invalid tracker types, retired labels, and
 stale delivery status. Preserve user-authored content and native relationships.
 Surface ambiguous product priority, design, or upstream ownership for decision

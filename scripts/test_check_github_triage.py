@@ -31,12 +31,29 @@ def project_item(number=1, state="OPEN", **overrides):
     return item
 
 
+def pull_request(number=2):
+    return {
+        "number": number,
+        "html_url": f"https://github.com/marmot-protocol/whitenoise-android/pull/{number}",
+    }
+
+
+def project_pull_request(number=2, **overrides):
+    item = {
+        "content": {"number": number, "state": "OPEN", "type": "PullRequest"},
+        "status": "In Progress",
+    }
+    item.update(overrides)
+    return item
+
+
 class FindingsTest(unittest.TestCase):
-    def findings(self, issues=None, project=None):
+    def findings(self, issues=None, project=None, pull_requests=None):
         return checker.findings(
             {"closed": False, "public": True},
             {"closed": True},
             issues or [issue()],
+            pull_requests or [],
             project or [project_item()],
             set(),
         )
@@ -130,12 +147,31 @@ class FindingsTest(unittest.TestCase):
             checker.add_missing(
                 [issue(number=1), issue(number=2, state="CLOSED")],
                 [],
+                [],
             )
         finally:
             checker.gh = original
 
         self.assertEqual(1, len(calls))
         self.assertIn("/issues/1", calls[0][-1])
+
+    def test_reconciles_open_pull_request_membership_and_status(self):
+        missing = self.findings(
+            project=[project_item()],
+            pull_requests=[pull_request()],
+        )
+        stale = self.findings(
+            project=[project_item(), project_pull_request(status="Todo")],
+            pull_requests=[pull_request()],
+        )
+        healthy = self.findings(
+            project=[project_item(), project_pull_request()],
+            pull_requests=[pull_request()],
+        )
+
+        self.assertIn("open pull requests missing from project: [2]", missing)
+        self.assertIn("open pull requests without In Progress status: [2]", stale)
+        self.assertEqual([], healthy)
 
 
 if __name__ == "__main__":

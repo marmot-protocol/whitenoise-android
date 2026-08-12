@@ -54,7 +54,7 @@ def gh_json(*args: str):
     return json.loads(gh(*args))
 
 
-def snapshot() -> tuple[dict, dict, list[dict], list[dict], set[str]]:
+def snapshot() -> tuple[dict, dict, list[dict], list[dict], list[dict], set[str]]:
     current = gh_json("project", "view", PROJECT, "--owner", OWNER, "--format", "json")
     legacy = gh_json(
         "project", "view", LEGACY_PROJECT, "--owner", OWNER, "--format", "json"
@@ -66,6 +66,7 @@ def snapshot() -> tuple[dict, dict, list[dict], list[dict], set[str]]:
         "issue", "list", "-R", REPO, "--state", "open", "--limit", "500",
         "--json", "number,url,state,issueType,labels,title",
     )
+    pull_requests = gh_json("api", f"repos/{REPO}/pulls?state=open&per_page=100")
     project = gh_json(
         "project", "item-list", PROJECT, "--owner", OWNER, "--limit", "500",
         "--format", "json",
@@ -74,10 +75,10 @@ def snapshot() -> tuple[dict, dict, list[dict], list[dict], set[str]]:
         item["name"]
         for item in gh_json("label", "list", "-R", REPO, "--limit", "500", "--json", "name")
     }
-    return current, legacy, issues, project, labels
+    return current, legacy, issues, pull_requests, project, labels
 
 
-def findings(current, legacy, issues, project, labels) -> list[str]:
+def findings(current, legacy, issues, pull_requests, project, labels) -> list[str]:
     problems: list[str] = []
     if current.get("closed") or not current.get("public"):
         problems.append("project 7 must be open and public")
@@ -96,6 +97,30 @@ def findings(current, legacy, issues, project, labels) -> list[str]:
         problems.append(f"open issues missing from project: {missing}")
     if duplicates:
         problems.append(f"open issues duplicated in project: {duplicates}")
+
+    open_prs = {item["number"]: item for item in pull_requests}
+    project_prs = [
+        item
+        for item in project
+        if item.get("content", {}).get("type") == "PullRequest"
+        and item.get("content", {}).get("number") in open_prs
+    ]
+    pr_counts = Counter(item["content"]["number"] for item in project_prs)
+    missing_prs = sorted(set(open_prs) - set(pr_counts))
+    duplicate_prs = sorted(number for number, count in pr_counts.items() if count != 1)
+    if missing_prs:
+        problems.append(f"open pull requests missing from project: {missing_prs}")
+    if duplicate_prs:
+        problems.append(f"open pull requests duplicated in project: {duplicate_prs}")
+    stale_pr_status = sorted(
+        item["content"]["number"]
+        for item in project_prs
+        if item.get("status") != "In Progress"
+    )
+    if stale_pr_status:
+        problems.append(
+            f"open pull requests without In Progress status: {stale_pr_status}"
+        )
 
     issue_types = {
         item["number"]: (item.get("issueType") or {}).get("name") for item in open_issues
@@ -160,11 +185,17 @@ def findings(current, legacy, issues, project, labels) -> list[str]:
     return problems
 
 
-def add_missing(issues: list[dict], project: list[dict]) -> None:
+def add_missing(issues: list[dict], pull_requests: list[dict], project: list[dict]) -> None:
     present = {item.get("content", {}).get("number") for item in project}
     for issue in issues:
         if issue.get("state", "OPEN") == "OPEN" and issue["number"] not in present:
             gh("project", "item-add", PROJECT, "--owner", OWNER, "--url", issue["url"])
+    for pull_request in pull_requests:
+        if pull_request["number"] not in present:
+            gh(
+                "project", "item-add", PROJECT, "--owner", OWNER,
+                "--url", pull_request["html_url"],
+            )
 
 
 def main() -> int:
@@ -174,14 +205,15 @@ def main() -> int:
     )
     args = parser.parse_args()
     gh("auth", "status")
-    current, legacy, issues, project, labels = snapshot()
+    current, legacy, issues, pull_requests, project, labels = snapshot()
     if args.repair_additions:
-        add_missing(issues, project)
-        current, legacy, issues, project, labels = snapshot()
-    problems = findings(current, legacy, issues, project, labels)
+        add_missing(issues, pull_requests, project)
+        current, legacy, issues, pull_requests, project, labels = snapshot()
+    problems = findings(current, legacy, issues, pull_requests, project, labels)
     report = {
         "project_url": current.get("url"),
         "open_issue_count": sum(item.get("state", "OPEN") == "OPEN" for item in issues),
+        "open_pull_request_count": len(pull_requests),
         "project_item_count_including_native_closed_subissues": len(project),
         "healthy": not problems,
         "findings": problems,
