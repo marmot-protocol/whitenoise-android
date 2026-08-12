@@ -19,6 +19,19 @@ REQUIRED_ITEM_FIELDS = ("priority", "area", "triage health", "status")
 ALLOWED_ISSUE_TYPES = {"Bug", "Feature", "Task", "Tracking"}
 ALLOWED_ITEM_FIELD_VALUES = {
     "priority": {"P0", "P1", "P2", "P3"},
+    "area": {
+        "Conversations",
+        "Media",
+        "Notifications",
+        "Groups",
+        "Profiles & identity",
+        "Search",
+        "Accessibility",
+        "Performance & reliability",
+        "Security & privacy",
+        "Settings",
+        "Release & tooling",
+    },
     "triage health": {
         "Needs triage",
         "Ready",
@@ -46,9 +59,12 @@ def snapshot() -> tuple[dict, dict, list[dict], list[dict], set[str]]:
     legacy = gh_json(
         "project", "view", LEGACY_PROJECT, "--owner", OWNER, "--format", "json"
     )
+    # Fetch open issues directly. `--state all --limit 500` is not exhaustive in
+    # this long-lived repository: it returns only the newest 500 issues and can
+    # silently omit older issues that remain open.
     issues = gh_json(
         "issue", "list", "-R", REPO, "--state", "open", "--limit", "500",
-        "--json", "number,url,issueType,labels,title",
+        "--json", "number,url,state,issueType,labels,title",
     )
     project = gh_json(
         "project", "item-list", PROJECT, "--owner", OWNER, "--limit", "500",
@@ -68,7 +84,8 @@ def findings(current, legacy, issues, project, labels) -> list[str]:
     if not legacy.get("closed"):
         problems.append("legacy project 5 must remain closed")
 
-    open_by_number = {item["number"]: item for item in issues}
+    open_issues = [item for item in issues if item.get("state", "OPEN") == "OPEN"]
+    open_by_number = {item["number"]: item for item in open_issues}
     project_open = [
         item for item in project if item.get("content", {}).get("number") in open_by_number
     ]
@@ -81,7 +98,7 @@ def findings(current, legacy, issues, project, labels) -> list[str]:
         problems.append(f"open issues duplicated in project: {duplicates}")
 
     issue_types = {
-        item["number"]: (item.get("issueType") or {}).get("name") for item in issues
+        item["number"]: (item.get("issueType") or {}).get("name") for item in open_issues
     }
     untyped = sorted(number for number, issue_type in issue_types.items() if not issue_type)
     if untyped:
@@ -93,6 +110,14 @@ def findings(current, legacy, issues, project, labels) -> list[str]:
     )
     if invalid_types:
         problems.append(f"open issues with invalid native type: {invalid_types}")
+    invalid_trackers = sorted(
+        item["number"]
+        for item in open_issues
+        if item.get("title", "").casefold().startswith("tracking:")
+        and (item.get("issueType") or {}).get("name") != "Tracking"
+    )
+    if invalid_trackers:
+        problems.append(f"open trackers without native Tracking type: {invalid_trackers}")
 
     by_number = {item["content"]["number"]: item for item in project_open}
     for field in REQUIRED_ITEM_FIELDS:
@@ -108,12 +133,26 @@ def findings(current, legacy, issues, project, labels) -> list[str]:
         if invalid:
             problems.append(f"open issues with invalid {field}: {invalid}")
 
+    stale_open = sorted(
+        number for number, item in by_number.items() if item.get("status") == "Done"
+    )
+    if stale_open:
+        problems.append(f"open issues with stale Done status: {stale_open}")
+    stale_closed = sorted(
+        item["content"]["number"]
+        for item in project
+        if item.get("content", {}).get("state") == "CLOSED"
+        and item.get("status") != "Done"
+    )
+    if stale_closed:
+        problems.append(f"closed project issues without Done status: {stale_closed}")
+
     retired_present = sorted(RETIRED_LABELS & labels)
     if retired_present:
         problems.append(f"retired labels still exist: {retired_present}")
     retired_used = sorted(
         item["number"]
-        for item in issues
+        for item in open_issues
         if RETIRED_LABELS & {label["name"] for label in item.get("labels", [])}
     )
     if retired_used:
@@ -124,7 +163,7 @@ def findings(current, legacy, issues, project, labels) -> list[str]:
 def add_missing(issues: list[dict], project: list[dict]) -> None:
     present = {item.get("content", {}).get("number") for item in project}
     for issue in issues:
-        if issue["number"] not in present:
+        if issue.get("state", "OPEN") == "OPEN" and issue["number"] not in present:
             gh("project", "item-add", PROJECT, "--owner", OWNER, "--url", issue["url"])
 
 
@@ -142,7 +181,7 @@ def main() -> int:
     problems = findings(current, legacy, issues, project, labels)
     report = {
         "project_url": current.get("url"),
-        "open_issue_count": len(issues),
+        "open_issue_count": sum(item.get("state", "OPEN") == "OPEN" for item in issues),
         "project_item_count_including_native_closed_subissues": len(project),
         "healthy": not problems,
         "findings": problems,
