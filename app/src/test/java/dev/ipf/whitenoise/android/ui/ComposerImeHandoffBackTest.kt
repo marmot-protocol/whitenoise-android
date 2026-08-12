@@ -108,7 +108,30 @@ class ComposerImeHandoffBackTest {
         )
     }
 
-    private fun harness(): Harness {
+    @Test
+    fun overlayBackOwnerCanDeferFocusClearUntilTheImeInsetIsZero() {
+        val harness = harness(clearFocusOnBack = false)
+
+        harness.focusComposer()
+        harness.dispatchImeBottom(300)
+        composeRule.runOnIdle { checkNotNull(harness.overlayCallback).onBackInvoked() }
+        composeRule.waitForIdle()
+
+        harness.composer.assertIsFocused()
+        assertEquals(1, harness.backInvocations)
+        assertEquals(INITIAL_VALUE, harness.value)
+
+        harness.dispatchImeBottom(0)
+        harness.composer.assertIsFocused()
+
+        composeRule.runOnIdle { harness.focusManager.clearFocus(force = true) }
+        composeRule.waitForIdle()
+
+        harness.composer.assertIsNotFocused()
+        assertEquals(DRAFT, harness.value.text)
+    }
+
+    private fun harness(clearFocusOnBack: Boolean = true): Harness {
         val harness = Harness()
         composeRule.setContent {
             harness.view = LocalView.current
@@ -129,7 +152,7 @@ class ComposerImeHandoffBackTest {
                         preImeBackEnabled = true,
                         onPreImeBack = {
                             harness.backInvocations++
-                            harness.focusManager.clearFocus(force = true)
+                            if (clearFocusOnBack) harness.focusManager.clearFocus(force = true)
                         },
                         overlayBackRegistrar =
                             ComposerOverlayBackRegistrar { priority, callback ->
