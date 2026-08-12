@@ -31,7 +31,7 @@ class AmberSignerController(
     fun requestPublicKey(): String {
         if (!isSignerInstalled()) throw MarmotKitException.ExternalSignerUnavailable("")
         val requestId = UUID.randomUUID().toString()
-        val intent = Nip55.buildGetPublicKeyIntent(Nip55.defaultPermissionsJson(), requestId)
+        val intent = Nip55.buildGetPublicKeyIntent(requestId)
         return when (val outcome = coordinator.awaitApproval(intent, approvalTimeoutMs, requestId)) {
             is AmberActivityCoordinator.Outcome.Completed -> parsePublicKey(outcome)
             AmberActivityCoordinator.Outcome.NoForegroundActivity ->
