@@ -29,6 +29,20 @@ enum class SignerOp(
     Nip44Decrypt("nip44_decrypt", "NIP44_DECRYPT"),
 }
 
+/** One permission requested during NIP-55 login. */
+internal data class SignerPermission(
+    val operation: SignerOp,
+    val kind: Int? = null,
+) {
+    init {
+        require(operation != SignerOp.GetPublicKey) { "get_public_key is not a reusable signer permission" }
+        require((operation == SignerOp.SignEvent) == (kind != null)) {
+            "only sign_event permissions carry a kind"
+        }
+        require(kind == null || kind >= 0) { "event kind must not be negative" }
+    }
+}
+
 /** Interpretation of a NIP-55 ContentResolver row. */
 sealed interface ContentRowOutcome {
     data class Value(
@@ -94,22 +108,21 @@ object Nip55 {
     const val COLUMN_RESULT = "result"
     const val COLUMN_EVENT = "event"
 
-    // Kinds mirrored from the Flutter default-permissions list
-    // (android_signer_service.dart / nostr_event_kinds.dart): the MLS surfaces
-    // plus relay lists and gift wrap. Pre-approving these lets Amber answer the
-    // matching sign_event calls via ContentResolver without a per-call prompt.
-    private val SIGN_EVENT_PERMISSION_KINDS =
+    // The one canonical login grant set. Pre-approving these lets Amber answer
+    // matching ContentResolver calls without a foreground prompt.
+    internal val LOGIN_PERMISSIONS =
         listOf(
-            450, // identity proof — signed at login and on signer re-registration;
-            //      pre-approving lets a remembered signer answer it promptless
-            30443, // mlsKeyPackage
-            443, // mlsKeyPackageLegacy
-            444, // mlsWelcome
-            445, // mlsGroupMessage
-            1059, // giftWrap
-            10002, // relayListMetadata
-            10050, // inboxRelays
-            10051, // mlsKeyPackageRelays
+            SignerPermission(SignerOp.SignEvent, 450), // identity proof
+            SignerPermission(SignerOp.SignEvent, 30443), // mlsKeyPackage
+            SignerPermission(SignerOp.SignEvent, 443), // mlsKeyPackageLegacy
+            SignerPermission(SignerOp.SignEvent, 444), // mlsWelcome
+            SignerPermission(SignerOp.SignEvent, 445), // mlsGroupMessage
+            SignerPermission(SignerOp.SignEvent, 1059), // giftWrap
+            SignerPermission(SignerOp.SignEvent, 10002), // relayListMetadata
+            SignerPermission(SignerOp.SignEvent, 10050), // inboxRelays
+            SignerPermission(SignerOp.SignEvent, 10051), // mlsKeyPackageRelays
+            SignerPermission(SignerOp.Nip44Encrypt),
+            SignerPermission(SignerOp.Nip44Decrypt),
         )
 
     /** True when at least one app can handle the `nostrsigner:` scheme. */
@@ -143,33 +156,27 @@ object Nip55 {
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
 
-    /**
-     * The permissions JSON sent with `get_public_key`, mirroring the reference
-     * Flutter service: one `sign_event` entry per relevant kind plus
-     * `nip44_encrypt` / `nip44_decrypt`. Keyed by field, so object key order is
-     * irrelevant to the signer.
-     */
-    fun defaultPermissionsJson(): String {
+    private fun loginPermissionsJson(): String {
         val permissions = JSONArray()
-        SIGN_EVENT_PERMISSION_KINDS.forEach { kind ->
-            permissions.put(JSONObject().put("type", "sign_event").put("kind", kind))
+        LOGIN_PERMISSIONS.forEach { permission ->
+            val entry = JSONObject().put("type", permission.operation.intentType)
+            permission.kind?.let { entry.put("kind", it) }
+            permissions.put(entry)
         }
-        permissions.put(JSONObject().put("type", "nip44_encrypt"))
-        permissions.put(JSONObject().put("type", "nip44_decrypt"))
         return permissions.toString()
     }
 
     /** True when [content] is small enough to embed in a foreground Intent data URI. */
     fun contentFitsIntentFallbackBudget(content: String): Boolean = content.toByteArray(Charsets.UTF_8).size <= MAX_INTENT_FALLBACK_CONTENT_UTF8_BYTES
 
-    fun buildGetPublicKeyIntent(
-        permissionsJson: String,
-        id: String,
-    ): Intent =
+    /** Build the only supported login request, including the complete typed grant set. */
+    fun buildGetPublicKeyIntent(id: String): Intent =
         Intent(Intent.ACTION_VIEW, Uri.parse("$SCHEME:")).apply {
+            require(id.isNotBlank()) { "NIP-55 login request id must not be blank" }
             putExtra(EXTRA_TYPE, SignerOp.GetPublicKey.intentType)
             putExtra(EXTRA_ID, id)
-            if (permissionsJson.isNotEmpty()) putExtra(EXTRA_PERMISSIONS, permissionsJson)
+            putExtra(EXTRA_PERMISSIONS, loginPermissionsJson())
+            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
 
     fun buildSignEventIntent(

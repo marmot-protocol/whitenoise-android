@@ -1,8 +1,8 @@
 package dev.ipf.whitenoise.android.amber
 
-import org.json.JSONArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -279,25 +279,39 @@ class Nip55SignerParsingTest {
     }
 
     @Test
-    fun defaultPermissionsCoverEverySignedSurfaceIncludingTheIdentityProof() {
-        val permissions = JSONArray(Nip55.defaultPermissionsJson())
-
-        val signEventKinds = mutableListOf<Int>()
-        val bareTypes = mutableListOf<String>()
-        for (index in 0 until permissions.length()) {
-            val entry = permissions.getJSONObject(index)
-            when (val type = entry.getString("type")) {
-                "sign_event" -> signEventKinds += entry.getInt("kind")
-                else -> bareTypes += type
-            }
-        }
-
-        // 450 (identity proof) rides the remembered-permission path too, so
-        // re-login and signer re-registration stop prompting once approved.
+    fun typedLoginPermissionsCoverEverySignedSurfaceExactlyOnce() {
         assertEquals(
-            listOf(450, 30443, 443, 444, 445, 1059, 10002, 10050, 10051),
-            signEventKinds,
+            listOf(
+                SignerPermission(SignerOp.SignEvent, 450),
+                SignerPermission(SignerOp.SignEvent, 30443),
+                SignerPermission(SignerOp.SignEvent, 443),
+                SignerPermission(SignerOp.SignEvent, 444),
+                SignerPermission(SignerOp.SignEvent, 445),
+                SignerPermission(SignerOp.SignEvent, 1059),
+                SignerPermission(SignerOp.SignEvent, 10002),
+                SignerPermission(SignerOp.SignEvent, 10050),
+                SignerPermission(SignerOp.SignEvent, 10051),
+                SignerPermission(SignerOp.Nip44Encrypt),
+                SignerPermission(SignerOp.Nip44Decrypt),
+            ),
+            Nip55.LOGIN_PERMISSIONS,
         )
-        assertEquals(listOf("nip44_encrypt", "nip44_decrypt"), bareTypes)
+        assertEquals(Nip55.LOGIN_PERMISSIONS.size, Nip55.LOGIN_PERMISSIONS.toSet().size)
+    }
+
+    @Test
+    fun typedPermissionRejectsInvalidOperationKindPairs() {
+        assertThrows(IllegalArgumentException::class.java) {
+            SignerPermission(SignerOp.SignEvent)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            SignerPermission(SignerOp.Nip44Encrypt, kind = 1)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            SignerPermission(SignerOp.GetPublicKey)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            SignerPermission(SignerOp.SignEvent, kind = -1)
+        }
     }
 }

@@ -7,11 +7,13 @@ import android.content.pm.ActivityInfo
 import android.content.pm.ResolveInfo
 import android.net.Uri
 import android.os.Looper
+import android.os.Parcel
 import android.service.chooser.ChooserResult
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import org.json.JSONArray
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -103,10 +105,11 @@ class AmberActivityCoordinatorTest {
     }
 
     @Test
-    fun getPublicKeyIntentCarriesClientRequestId() {
+    fun getPublicKeyIntentCarriesCompleteTypedGrantSetAndLaunchContract() {
         val requestId = "login-req-7f3a"
-        val intent = Nip55.buildGetPublicKeyIntent(Nip55.defaultPermissionsJson(), requestId)
-        assertEquals(requestId, intent.getStringExtra(Nip55.EXTRA_ID))
+        val intent = Nip55.buildGetPublicKeyIntent(requestId)
+
+        assertSignerFacingLoginIntent(intent, requestId)
     }
 
     @Test
@@ -138,7 +141,7 @@ class AmberActivityCoordinatorTest {
     @Test
     fun soleResolvedSignerIsMadeExplicitAndRecordedAsHandled() {
         val requestId = "single-signer"
-        val signerIntent = Nip55.buildGetPublicKeyIntent("", requestId)
+        val signerIntent = Nip55.buildGetPublicKeyIntent(requestId)
         registerSignerHandler(signerIntent, "com.example.signer", "com.example.signer.SignerActivity")
 
         val prepared = AmberSignerRelay.prepareSignerLaunch(context, requestId, signerIntent)
@@ -147,7 +150,43 @@ class AmberActivityCoordinatorTest {
             ComponentName("com.example.signer", "com.example.signer.SignerActivity"),
             prepared?.component,
         )
+        assertSignerFacingLoginIntent(checkNotNull(prepared), requestId)
         assertEquals("com.example.signer", AmberSignerRelay.consumeHandledSignerPackage(requestId))
+    }
+
+    @Test
+    fun chooserTargetPreservesCompleteLoginPermissions() {
+        val requestId = "multiple-signers"
+        val signerIntent = Nip55.buildGetPublicKeyIntent(requestId)
+        registerSignerHandler(signerIntent, "com.example.first", "com.example.first.SignerActivity")
+        registerSignerHandler(signerIntent, "com.example.second", "com.example.second.SignerActivity")
+
+        val chooser = checkNotNull(AmberSignerRelay.prepareSignerLaunch(context, requestId, signerIntent))
+        val target = checkNotNull(chooser.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java))
+
+        assertEquals(Intent.ACTION_CHOOSER, chooser.action)
+        assertSignerFacingLoginIntent(target, requestId)
+        AmberSignerRelay.consumeHandledSignerPackage(requestId)
+    }
+
+    @Test
+    fun relayParcelBoundaryPreservesCompleteLoginPermissions() {
+        val requestId = "parcelled-login"
+        val relayIntent = AmberSignerRelay.buildLaunchIntent(requestId, Nip55.buildGetPublicKeyIntent(requestId))
+        val parcel = Parcel.obtain()
+        val restored =
+            try {
+                relayIntent.writeToParcel(parcel, 0)
+                parcel.setDataPosition(0)
+                Intent.CREATOR.createFromParcel(parcel)
+            } finally {
+                parcel.recycle()
+            }
+        val restoredSignerIntent =
+            checkNotNull(restored.getParcelableExtra(AmberSignerRelay.EXTRA_SIGNER_INTENT, Intent::class.java))
+
+        assertEquals(requestId, restored.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID))
+        assertSignerFacingLoginIntent(restoredSignerIntent, requestId)
     }
 
     @Test
@@ -213,7 +252,7 @@ class AmberActivityCoordinatorTest {
     @Test
     fun publicKeyLoginPersistsTheResolvedPackageNotOnlyTheSignerEcho() {
         val signerPackage = "com.example.signer"
-        val signerIntent = Nip55.buildGetPublicKeyIntent("", "probe")
+        val signerIntent = Nip55.buildGetPublicKeyIntent("probe")
         registerSignerHandler(signerIntent, signerPackage, "$signerPackage.SignerActivity")
         val result = AtomicReference<String>()
         val failure = AtomicReference<Throwable>()
@@ -263,7 +302,7 @@ class AmberActivityCoordinatorTest {
             Thread {
                 outcomeRef.set(
                     AmberActivityCoordinator.awaitApproval(
-                        Nip55.buildGetPublicKeyIntent(Nip55.defaultPermissionsJson(), requestId),
+                        Nip55.buildGetPublicKeyIntent(requestId),
                         timeoutMs = 5_000,
                         requestId = requestId,
                     ),
@@ -302,7 +341,7 @@ class AmberActivityCoordinatorTest {
         Thread {
             outcomeRef.set(
                 AmberActivityCoordinator.awaitApproval(
-                    Nip55.buildGetPublicKeyIntent(Nip55.defaultPermissionsJson(), requestId),
+                    Nip55.buildGetPublicKeyIntent(requestId),
                     timeoutMs = 5_000,
                     requestId = requestId,
                 ),
@@ -335,7 +374,7 @@ class AmberActivityCoordinatorTest {
             Thread {
                 firstOutcome.set(
                     AmberActivityCoordinator.awaitApproval(
-                        Nip55.buildGetPublicKeyIntent(Nip55.defaultPermissionsJson(), staleRequestId),
+                        Nip55.buildGetPublicKeyIntent(staleRequestId),
                         timeoutMs = 100,
                         requestId = staleRequestId,
                     ),
@@ -355,7 +394,7 @@ class AmberActivityCoordinatorTest {
             Thread {
                 secondOutcome.set(
                     AmberActivityCoordinator.awaitApproval(
-                        Nip55.buildGetPublicKeyIntent(Nip55.defaultPermissionsJson(), currentRequestId),
+                        Nip55.buildGetPublicKeyIntent(currentRequestId),
                         timeoutMs = 5_000,
                         requestId = currentRequestId,
                     ),
@@ -522,5 +561,30 @@ class AmberActivityCoordinatorTest {
             resolveInfo,
         )
         shadowOf(context.packageManager).addResolveInfoForIntent(intent, resolveInfo)
+    }
+
+    private fun assertSignerFacingLoginIntent(
+        intent: Intent,
+        requestId: String,
+    ) {
+        assertEquals(Intent.ACTION_VIEW, intent.action)
+        assertEquals(Uri.parse("${Nip55.SCHEME}:"), intent.data)
+        assertEquals(SignerOp.GetPublicKey.intentType, intent.getStringExtra(Nip55.EXTRA_TYPE))
+        assertEquals(requestId, intent.getStringExtra(Nip55.EXTRA_ID))
+        assertTrue(requestId.isNotBlank())
+        val requiredFlags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        assertEquals(requiredFlags, intent.flags and requiredFlags)
+
+        val permissions = JSONArray(checkNotNull(intent.getStringExtra(Nip55.EXTRA_PERMISSIONS)))
+        val actual =
+            buildList {
+                repeat(permissions.length()) { index ->
+                    val entry = permissions.getJSONObject(index)
+                    add(entry.getString("type") to entry.optInt("kind").takeIf { entry.has("kind") })
+                }
+            }
+        val expected = Nip55.LOGIN_PERMISSIONS.map { it.operation.intentType to it.kind }
+        assertEquals(expected, actual)
+        assertEquals(actual.size, actual.toSet().size)
     }
 }
