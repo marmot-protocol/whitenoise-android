@@ -73,7 +73,8 @@ class AppStartupReadinessTest {
                 recorder.indexOf("startupFirstLocalFrameRecorded = true"),
         )
         assertTrue("The deferred fold must survive screen disposal", recorder.contains("mutationsScope.launch"))
-        assertTrue(recorder.contains("startupUnreadRefreshIsCurrent"))
+        assertTrue(recorder.contains("StartupUnreadRevisionGuard"))
+        assertTrue(recorder.contains("revisionGuard::isCurrent"))
     }
 
     private fun appStateSource(): String =

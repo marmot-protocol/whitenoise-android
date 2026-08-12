@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.TransientNotice
-import dev.ipf.whitenoise.android.ui.onboarding.WhiteNoiseLogoLockup
 
 internal enum class LoadFailurePlacement {
     None,

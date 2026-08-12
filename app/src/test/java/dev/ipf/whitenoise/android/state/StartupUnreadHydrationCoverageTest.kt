@@ -60,7 +60,7 @@ class StartupUnreadHydrationCoverageTest {
         )
         assertTrue(
             "the deferred pass must reject stale account snapshots",
-            "startupUnreadRefreshIsCurrent" in recorder,
+            "StartupUnreadRevisionGuard" in recorder && "revisionGuard::isCurrent" in recorder,
         )
     }
 

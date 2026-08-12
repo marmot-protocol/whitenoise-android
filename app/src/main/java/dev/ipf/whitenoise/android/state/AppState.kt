@@ -1571,10 +1571,8 @@ class WhiteNoiseAppState private constructor(
     @Volatile
     private var client: MarmotClient? = null
 
-    // Serializes bootstrap so two concurrent callers can't both pass the
-    // null-client check and each construct a MarmotClient (TOCTOU). See #33.
-    private val bootstrapMutex = Mutex()
-    private var bootstrapAttempt: Deferred<Unit>? = null
+    private val bootstrapAttempts = BootstrapAttemptCoordinator()
+    private val bootstrapRuntime = BootstrapRuntimeCoordinator<MarmotClient>()
     private val startupTraceStartedAtMs = SystemClock.elapsedRealtime()
     private var startupFirstLocalFrameRecorded = false
     private var startupRelayCatchUpRecorded = false
@@ -3284,17 +3282,9 @@ class WhiteNoiseAppState private constructor(
     suspend fun bootstrap() {
         val attempt =
             withContext(Dispatchers.Main.immediate) {
-                bootstrapMutex.withLock {
-                    bootstrapAttempt?.takeIf { it.isActive }?.also {
-                        if (phase is AppPhase.Failed) phase = AppPhase.Bootstrapping
-                    } ?: run {
-                        // A completed failed attempt may have constructed the
-                        // client before a later stage failed. Force the full
-                        // bootstrap path on retry instead of taking the
-                        // client-non-null fast path and skipping that stage.
-                        if (phase is AppPhase.Failed) phase = AppPhase.Bootstrapping
-                        mutationsScope.async { bootstrapLocked() }.also { bootstrapAttempt = it }
-                    }
+                if (phase is AppPhase.Failed) phase = AppPhase.Bootstrapping
+                bootstrapAttempts.currentOrStart {
+                    mutationsScope.async { bootstrapLocked() }
                 }
             }
         val completed = awaitBootstrapAttempt(attempt, BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS)
@@ -3379,28 +3369,32 @@ class WhiteNoiseAppState private constructor(
 
     private suspend fun startBootstrapRuntime(): MarmotClient {
         val opened =
-            traceStartupStage("client-construction") {
-                withContext(Dispatchers.IO) {
-                    client ?: MarmotClient(appContext).also { client = it }
-                }
-            }
-        // Attach while the client exists but before start can expose any
-        // notification/avatar work. The lambda resolves marmot lazily.
-        AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
-            marmotIo { downloadProfileImage(url, maxBytes) }
-        }
-        appStateDebug { "bootstrap root=${opened.rootPath}" }
-        traceStartupStage("privacy-runtime-configuration") {
-            withContext(Dispatchers.IO) {
-                opened.marmot.configurePrivacyRuntime()
-            }
-        }
-        traceStartupStage("marmot-start") {
-            withContext(Dispatchers.IO) {
-                opened.marmot.start()
-            }
-        }
-        appStateDebug { "marmot started" }
+            bootstrapRuntime.open(
+                construct = {
+                    traceStartupStage("client-construction") {
+                        withContext(Dispatchers.IO) {
+                            MarmotClient(appContext).also { runtime ->
+                                AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
+                                    runtime.marmot.downloadProfileImage(url, maxBytes)
+                                }
+                            }
+                        }
+                    }
+                },
+                configure = { runtime ->
+                    appStateDebug { "bootstrap root=${runtime.rootPath}" }
+                    traceStartupStage("privacy-runtime-configuration") {
+                        withContext(Dispatchers.IO) { runtime.marmot.configurePrivacyRuntime() }
+                    }
+                },
+                start = { runtime ->
+                    traceStartupStage("marmot-start") {
+                        withContext(Dispatchers.IO) { runtime.marmot.start() }
+                    }
+                    appStateDebug { "marmot started" }
+                },
+            )
+        client = opened
         return opened
     }
 
@@ -3829,7 +3823,7 @@ class WhiteNoiseAppState private constructor(
                 marmotIo { accountUnreadSummary().associate { it.accountIdHex to it.unreadCount } }
             }.onFailure {
                 appStateDebug(it) { "account unread summary refresh failed: ${it.readableMessage()}" }
-        }.getOrNull()
+            }.getOrNull()
         if (!loadMemberRosters) {
             if (!stillCurrent()) return
             accountUnreadCounts = rawAccountUnreadCounts(signingAccounts, rawCountsByHex, previous)
@@ -4043,21 +4037,15 @@ class WhiteNoiseAppState private constructor(
         }
         val pending = pendingStartupUnreadRefresh ?: return
         pendingStartupUnreadRefresh = null
+        val revisionGuard =
+            StartupUnreadRevisionGuard(pending.accountListRevision) {
+                accountListRevision
+            }
         mutationsScope.launch {
             traceStartupStage("unread-aggregate-refresh") {
-                refreshAccountUnreadCounts(pending.accounts) {
-                    startupUnreadRefreshIsCurrent(
-                        expectedRevision = pending.accountListRevision,
-                        currentRevision = accountListRevision,
-                    )
-                }
+                refreshAccountUnreadCounts(pending.accounts, stillCurrent = revisionGuard::isCurrent)
             }
-            if (
-                startupUnreadRefreshIsCurrent(
-                    expectedRevision = pending.accountListRevision,
-                    currentRevision = accountListRevision,
-                )
-            ) {
+            if (revisionGuard.isCurrent()) {
                 startupTiming("unread-aggregate-ready", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
             }
         }
