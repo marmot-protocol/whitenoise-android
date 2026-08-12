@@ -35,11 +35,12 @@ import dev.ipf.marmotkit.AuditLogUploadSourceFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.marmotkit.Marmot
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
+import dev.ipf.marmotkit.NotificationsSubscription
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
 import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
@@ -697,6 +698,30 @@ internal suspend fun awaitNotificationRetryWindow(
         retryWake.first { it != capturedGeneration }
     }
 }
+
+internal interface AppNotificationSubscription {
+    suspend fun next(): NotificationUpdateFfi?
+
+    fun close()
+}
+
+internal data class AppMarmotRuntime(
+    val rootPath: String,
+    val marmot: MarmotInterface,
+)
+
+private fun openMarmotRuntime(context: Context) = MarmotClient(context).let { AppMarmotRuntime(it.rootPath, it.marmot) }
+
+private class NativeNotificationSubscription(
+    private val delegate: NotificationsSubscription,
+) : AppNotificationSubscription {
+    override suspend fun next(): NotificationUpdateFfi? = delegate.next()
+
+    override fun close() = delegate.close()
+}
+
+private suspend fun subscribeToNotifications(marmot: MarmotInterface): AppNotificationSubscription =
+    NativeNotificationSubscription(marmot.subscribeNotifications())
 
 internal class NotificationJobSlot {
     private val lock = Any()
@@ -1433,6 +1458,9 @@ class WhiteNoiseAppState private constructor(
     private val profileRefreshRequest: (suspend (String) -> Unit)?,
     private val identityLoginCalls: IdentityLoginCalls?,
     private val marmotAccessObserver: (() -> Unit)?,
+    private val marmotRuntimeFactory: (Context) -> AppMarmotRuntime,
+    private val notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription,
+    private val notificationReceiverTimeoutMillis: Long,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
@@ -1447,6 +1475,9 @@ class WhiteNoiseAppState private constructor(
             profileRefreshRequest = null,
             identityLoginCalls = null,
             marmotAccessObserver = null,
+            marmotRuntimeFactory = ::openMarmotRuntime,
+            notificationSubscriber = ::subscribeToNotifications,
+            notificationReceiverTimeoutMillis = NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
         )
@@ -1463,6 +1494,9 @@ class WhiteNoiseAppState private constructor(
         profileRefreshRequest: (suspend (String) -> Unit)? = null,
         identityLoginCalls: IdentityLoginCalls? = null,
         marmotAccessObserver: (() -> Unit)? = null,
+        marmotRuntimeFactory: (Context) -> AppMarmotRuntime = ::openMarmotRuntime,
+        notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription = ::subscribeToNotifications,
+        notificationReceiverTimeoutMillis: Long = NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS,
     ) : this(
         context = context,
         draftStore = draftStore,
@@ -1473,6 +1507,9 @@ class WhiteNoiseAppState private constructor(
         profileRefreshRequest = profileRefreshRequest,
         identityLoginCalls = identityLoginCalls,
         marmotAccessObserver = marmotAccessObserver,
+        marmotRuntimeFactory = marmotRuntimeFactory,
+        notificationSubscriber = notificationSubscriber,
+        notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
     )
@@ -1599,10 +1636,10 @@ class WhiteNoiseAppState private constructor(
         )
 
     @Volatile
-    private var client: MarmotClient? = null
+    private var client: AppMarmotRuntime? = null
 
     private val bootstrapAttempts = BootstrapAttemptCoordinator()
-    private val bootstrapRuntime = BootstrapRuntimeCoordinator<MarmotClient>()
+    private val bootstrapRuntime = BootstrapRuntimeCoordinator<AppMarmotRuntime>()
     private val startupTraceStartedAtMs = SystemClock.elapsedRealtime()
     private var startupFirstLocalFrameRecorded = false
     private var startupRelayCatchUpRecorded = false
@@ -2456,7 +2493,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    fun marmot(): Marmot {
+    fun marmot(): MarmotInterface {
         marmotAccessObserver?.invoke()
         return requireNotNull(client) { "Marmot is not initialized" }.marmot
     }
@@ -3177,14 +3214,14 @@ class WhiteNoiseAppState private constructor(
 
     private val marmotBridgeTracer = MarmotBridgeTracer()
 
-    suspend fun <T> marmotIo(block: suspend Marmot.() -> T): T =
+    suspend fun <T> marmotIo(block: suspend MarmotInterface.() -> T): T =
         withContext(Dispatchers.IO) {
             marmot().block()
         }
 
     suspend fun <T> marmotIo(
         traceSection: String,
-        block: suspend Marmot.() -> T,
+        block: suspend MarmotInterface.() -> T,
     ): T =
         withContext(Dispatchers.IO) {
             marmotBridgeTracer.trace(traceSection) { marmot().block() }
@@ -3412,13 +3449,13 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private suspend fun startBootstrapRuntime(): MarmotClient {
+    private suspend fun startBootstrapRuntime(): AppMarmotRuntime {
         val opened =
             bootstrapRuntime.open(
                 construct = {
                     traceStartupStage("client-construction") {
                         withContext(Dispatchers.IO) {
-                            MarmotClient(appContext).also { runtime ->
+                            marmotRuntimeFactory(appContext).also { runtime ->
                                 // Publish before start so the listener queued at
                                 // the post-start boundary can resolve Marmot.
                                 client = runtime
@@ -3463,7 +3500,7 @@ class WhiteNoiseAppState private constructor(
             notificationJob = notificationJob,
             receiverActive = notificationReceiverActive,
             receiverRetryWake = notificationReceiverRetryWake,
-            timeoutMillis = NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS,
+            timeoutMillis = notificationReceiverTimeoutMillis,
             launchListener = ::launchNotificationListenerLoop,
         )
     }
@@ -3499,7 +3536,7 @@ class WhiteNoiseAppState private constructor(
                 notificationJob = notificationJob,
                 receiverActive = notificationReceiverActive,
                 receiverRetryWake = notificationReceiverRetryWake,
-                timeoutMillis = NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS,
+                timeoutMillis = notificationReceiverTimeoutMillis,
                 launchListener = ::launchNotificationListenerLoop,
             )
         if (receiverReady && !networkNotificationRecoverySuppressed) {
@@ -7533,7 +7570,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private suspend fun Marmot.configurePrivacyRuntime() {
+    private suspend fun MarmotInterface.configurePrivacyRuntime() {
         val installId = runCatchingCancellable { telemetryInstallId() }.getOrNull().orEmpty()
         setRelayTelemetryRuntimeConfig(
             RelayTelemetryRuntimeConfigFfi(
@@ -8057,7 +8094,7 @@ class WhiteNoiseAppState private constructor(
             while (isActive) {
                 val retryWakeGeneration = notificationReceiverRetryWake.value
                 try {
-                    val subscription = marmot().subscribeNotifications()
+                    val subscription = notificationSubscriber(marmot())
                     notificationReceiverActive.value = true
                     try {
                         while (isActive) {

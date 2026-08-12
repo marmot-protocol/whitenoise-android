@@ -3,18 +3,8 @@ package dev.ipf.whitenoise.android.notifications
 import android.Manifest
 import android.app.Application
 import android.app.NotificationManager
-import androidx.core.app.NotificationCompat
-import dev.ipf.whitenoise.android.state.NotificationJobSlot
-import dev.ipf.whitenoise.android.state.awaitNotificationReceiverForStartup
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
+import android.os.Looper
+import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -26,12 +16,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/**
- * API 34 Android lifecycle coverage running in the required CI unit matrix.
- *
- * The fake has MDK's no-replay broadcast semantics while channel creation and
- * the final tray assertion use Android's real NotificationManager.
- */
+/** API 34 cold-process coverage through the production WhiteNoiseAppState bootstrap path. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class NotificationColdProcessStartupTest {
@@ -40,95 +25,37 @@ class NotificationColdProcessStartupTest {
         runBlocking {
             val context: Application = RuntimeEnvironment.getApplication()
             val manager = context.getSystemService(NotificationManager::class.java)
-            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-            val broadcast = NoReplayNotificationBroadcastFake(scope)
-            manager.cancel(TEST_TAG, TEST_NOTIFICATION_ID)
+            val fixture = NotificationBootstrapTestFixture(context)
             shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+            manager.activeNotifications.forEach { manager.cancel(it.tag, it.id) }
 
             try {
-                // WhiteNoiseAppState performs this platform-only setup before
-                // Marmot.start(), so the first receiver-delivered update cannot
-                // beat channel or permission readiness.
-                NotificationChannels.ensureChannels(context)
-                assertNotNull(manager.getNotificationChannel(NotificationChannelSpec.DIRECT_MESSAGES.id))
-                assertTrue(manager.areNotificationsEnabled())
-
-                assertTrue(broadcast.establishReceiver())
-                broadcast.emit {
-                    manager.notify(
-                        TEST_TAG,
-                        TEST_NOTIFICATION_ID,
-                        NotificationCompat
-                            .Builder(context, NotificationChannelSpec.DIRECT_MESSAGES.id)
-                            .setSmallIcon(android.R.drawable.ic_dialog_email)
-                            .setContentTitle("Startup message")
-                            .setContentText("Delivered while bootstrap is still running")
-                            .build(),
-                    )
-                }
-
+                fixture.appState.bootstrap()
+                fixture.awaitUpdateConsumed()
                 waitForNotification(manager)
+
+                assertTrue(fixture.receiverWasAttachedAtPostStartEmission)
+                assertTrue(fixture.channelsWereReadyAtPostStartEmission)
+                assertNotNull(manager.getNotificationChannel(NotificationChannelSpec.GROUP_MESSAGES.id))
                 assertEquals(
                     1,
-                    manager.activeNotifications.count {
-                        it.tag == TEST_TAG && it.id == TEST_NOTIFICATION_ID
-                    },
+                    manager.activeNotifications.size,
                 )
             } finally {
-                manager.cancel(TEST_TAG, TEST_NOTIFICATION_ID)
-                broadcast.close()
-                scope.cancel()
+                manager.activeNotifications.forEach { manager.cancel(it.tag, it.id) }
+                fixture.close()
             }
         }
 
     private fun waitForNotification(manager: NotificationManager) {
-        val deadline = System.nanoTime() + 2_000_000_000L
+        val deadline = System.nanoTime() + 5_000_000_000L
         while (
-            manager.activeNotifications.none { it.tag == TEST_TAG && it.id == TEST_NOTIFICATION_ID } &&
+            manager.activeNotifications.isEmpty() &&
             System.nanoTime() < deadline
         ) {
+            shadowOf(Looper.getMainLooper()).idle()
             Thread.sleep(25L)
         }
-    }
-
-    /** A passive, no-replay receiver matching MDK notification subscription semantics. */
-    private class NoReplayNotificationBroadcastFake(
-        private val scope: CoroutineScope,
-    ) {
-        private val slot = NotificationJobSlot()
-        private val receiverActive = MutableStateFlow(false)
-        private val retryWake = MutableStateFlow(0L)
-
-        suspend fun establishReceiver(): Boolean =
-            awaitNotificationReceiverForStartup(
-                notificationJob = slot,
-                receiverActive = receiverActive,
-                receiverRetryWake = retryWake,
-                timeoutMillis = 5_000L,
-                launchListener = ::launchListener,
-            )
-
-        fun emit(post: () -> Unit) {
-            if (receiverActive.value) post()
-        }
-
-        suspend fun close() {
-            slot.cancelAndJoin()
-        }
-
-        private fun launchListener(): Job =
-            scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                receiverActive.value = true
-                try {
-                    awaitCancellation()
-                } finally {
-                    receiverActive.value = false
-                }
-            }
-    }
-
-    private companion object {
-        const val TEST_TAG = "notification-startup-ordering"
-        const val TEST_NOTIFICATION_ID = 1_982
+        shadowOf(Looper.getMainLooper()).idle()
     }
 }

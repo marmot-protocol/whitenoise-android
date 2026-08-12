@@ -119,7 +119,7 @@ class NotificationNetworkReconnectCoverageTest {
         assertTrue(
             "a reconnect wake during subscribe failure or cleanup must skip the pending backoff",
             listenerLoop.indexOf("val retryWakeGeneration") in 0 until
-                listenerLoop.indexOf("subscribeNotifications()") &&
+                listenerLoop.indexOf("notificationSubscriber(marmot())") &&
                 "awaitNotificationRetryWindow(notificationReceiverRetryWake, retryWakeGeneration" in listenerLoop,
         )
         assertTrue(
