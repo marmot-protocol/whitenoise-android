@@ -5971,6 +5971,18 @@ class ConversationController(
     internal val boundAccountRef: String?
         get() = conversationAccountRef
 
+    private fun presentConversationTransient(
+        @StringRes titleRes: Int,
+    ) {
+        val accountRef = conversationAccountRef ?: return
+        appState.presentConversationTransient(accountRef, group.groupIdHex, titleRes)
+    }
+
+    private fun presentConversationTransient(title: AppText) {
+        val accountRef = conversationAccountRef ?: return
+        appState.presentConversationTransient(accountRef, group.groupIdHex, title)
+    }
+
     private val mediaUploadSessionEpoch = appState.mediaUploadSessionEpoch()
     private val messageById = linkedMapOf<String, AppMessageRecordFfi>()
     private val timelineRecords = linkedMapOf<String, TimelineMessageRecordFfi>()
@@ -8405,9 +8417,9 @@ class ConversationController(
                 appState.markGroupLeftOnChatList(account, group.groupIdHex)
                 val name = displayName?.takeIf { it.isNotBlank() }
                 if (name != null) {
-                    appState.presentTransient(AppText.Resource(R.string.toast_left_named, listOf(name)))
+                    presentConversationTransient(AppText.Resource(R.string.toast_left_named, listOf(name)))
                 } else {
-                    appState.presentTransient(R.string.toast_left_chat)
+                    presentConversationTransient(R.string.toast_left_chat)
                 }
                 true
             }.getOrElse {
@@ -8463,7 +8475,7 @@ class ConversationController(
             // local self-left latch before refreshMembers() so applyGroupDetails
             // is allowed to add self back to the roster (issue #787).
             selfMembership.clearSelfLeft()
-            if (notify) appState.presentTransient(R.string.toast_invite_accepted)
+            if (notify) presentConversationTransient(R.string.toast_invite_accepted)
             inviteStreamScope.launch {
                 runBestEffortPostCommitSteps(
                     steps =
@@ -8498,7 +8510,7 @@ class ConversationController(
                 appState.dismissConversationNotifications(account, group.groupIdHex)
                 group = group.copy(pendingConfirmation = false, archived = true)
                 appState.applyLocalGroupUpdate(group)
-                appState.presentTransient(R.string.toast_invite_declined)
+                presentConversationTransient(R.string.toast_invite_declined)
                 true
             }.getOrElse {
                 it.rethrowIfCancellation()
@@ -8517,7 +8529,9 @@ class ConversationController(
                     group = updated
                     appState.applyLocalGroupUpdate(updated)
                 }
-                appState.presentTransient(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
+                presentConversationTransient(
+                    if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored,
+                )
                 true
             }.onFailure {
                 recordMutationFailure(R.string.toast_couldnt_update_chat, "GROUP_ARCHIVE_UPDATE", it)
@@ -8530,7 +8544,7 @@ class ConversationController(
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatchingCancellable {
                 appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
-                appState.presentTransient(R.string.toast_chat_deleted_local)
+                presentConversationTransient(R.string.toast_chat_deleted_local)
                 true
             }.onFailure {
                 recordMutationFailure(R.string.toast_couldnt_delete_chat, "GROUP_LOCAL_DELETE", it)
@@ -8557,7 +8571,7 @@ class ConversationController(
                         )
                     }
                 }
-                appState.presentTransient(R.string.toast_group_updated)
+                presentConversationTransient(R.string.toast_group_updated)
                 true
             }.onFailure {
                 recordMutationFailure(R.string.toast_couldnt_update_group, "GROUP_PROFILE_UPDATE", it)
@@ -8600,7 +8614,7 @@ class ConversationController(
                 // Reflect the change locally so the avatar updates immediately,
                 // without waiting for the group-state subscription to converge.
                 group = groupWithPublicAvatar(group, normalized, encryptedImageCleared)
-                appState.presentTransient(R.string.toast_group_updated)
+                presentConversationTransient(R.string.toast_group_updated)
                 true
             }.onFailure {
                 recordMutationFailure(R.string.toast_couldnt_update_group, "GROUP_AVATAR_URL_UPDATE", it)
@@ -8653,7 +8667,7 @@ class ConversationController(
                     }
                 }
                 refreshMembers(probeEviction = false)
-                appState.presentTransient(R.string.toast_group_updated)
+                presentConversationTransient(R.string.toast_group_updated)
                 true
             }.onFailure {
                 presentGroupImageMutationFailure(it, requestedMutationKey, attemptedLegacyClear)
@@ -8723,7 +8737,9 @@ class ConversationController(
     ): Boolean =
         when (outcome) {
             GroupAdministrationCommitOutcome.COMMITTED -> {
-                appState.presentTransient(if (adminAdded) R.string.toast_admin_added else R.string.toast_admin_removed)
+                presentConversationTransient(
+                    if (adminAdded) R.string.toast_admin_added else R.string.toast_admin_removed,
+                )
                 true
             }
             GroupAdministrationCommitOutcome.ROSTER_CHANGED -> {
@@ -8779,7 +8795,7 @@ class ConversationController(
                         presentRosterChanged(R.string.toast_couldnt_add_members)
                         return@track false
                     }
-                    appState.presentTransient(R.string.toast_invite_sent)
+                    presentConversationTransient(R.string.toast_invite_sent)
                     true
                 } catch (throwable: Throwable) {
                     throwable.rethrowIfCancellation()
@@ -8843,7 +8859,7 @@ class ConversationController(
                         presentRosterChanged(R.string.toast_couldnt_remove_member)
                         return@track false
                     }
-                    appState.presentTransient(R.string.toast_member_removed)
+                    presentConversationTransient(R.string.toast_member_removed)
                     true
                 } catch (throwable: Throwable) {
                     throwable.rethrowIfCancellation()
@@ -8853,7 +8869,7 @@ class ConversationController(
                     // whether this specific target remains in the local roster.
                     refreshMembers(probeEviction = false)
                     if (members.none { it.memberIdHex.equals(target, ignoreCase = true) }) {
-                        appState.presentTransient(R.string.toast_member_removed)
+                        presentConversationTransient(R.string.toast_member_removed)
                         true
                     } else {
                         recordMutationFailure(R.string.toast_couldnt_remove_member, "GROUP_REMOVE_MEMBER", throwable)
@@ -8943,7 +8959,7 @@ class ConversationController(
                         Log.w("DMConversation", "refresh after retention update failed for ${group.groupIdHex.take(8)}", refreshError)
                         publishTimelineFromIndexes()
                     }
-                appState.presentTransient(R.string.toast_disappearing_messages_updated)
+                presentConversationTransient(R.string.toast_disappearing_messages_updated)
                 true
             }.onFailure {
                 recordMutationFailure(R.string.toast_couldnt_update_disappearing, "GROUP_RETENTION_UPDATE", it)
@@ -9111,7 +9127,7 @@ class ConversationController(
                     appState.present(R.string.toast_couldnt_update_admin, R.string.toast_cant_transfer_admin, copyable = true)
                     return@runCatchingCancellable false
                 }
-                appState.presentTransient(R.string.toast_admin_transferred)
+                presentConversationTransient(R.string.toast_admin_transferred)
                 true
             }.onFailure {
                 if (grantedBeforeDemote) {

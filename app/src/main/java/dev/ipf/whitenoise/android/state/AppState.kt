@@ -909,7 +909,22 @@ data class TransientNotice(
     val id: Long,
     val title: AppText,
     val detail: AppText? = null,
+    val conversation: ConversationNoticeDestination? = null,
 )
+
+data class ConversationNoticeDestination(
+    val accountRef: String,
+    val groupIdHex: String,
+)
+
+internal fun TransientNotice.isForConversation(
+    accountRef: String,
+    groupIdHex: String,
+): Boolean =
+    conversation?.let { destination ->
+        destination.accountRef == accountRef &&
+            destination.groupIdHex.equals(groupIdHex, ignoreCase = true)
+    } == true
 
 private data class ProfilePresentation(
     val displayName: String?,
@@ -2989,7 +3004,11 @@ class WhiteNoiseAppState private constructor(
                     }
                 chatsController?.applyProfileGroupDetails(account, result.details)
             }
-            presentTransient(R.string.toast_admin_added)
+            presentConversationTransient(
+                accountRef = account,
+                groupIdHex = groupId,
+                titleRes = R.string.toast_admin_added,
+            )
             true
         }.onFailure { error ->
             presentFailure(R.string.toast_couldnt_update_admin, "PROFILE_GROUP_ADMIN_UPDATE", error)
@@ -7244,8 +7263,44 @@ class WhiteNoiseAppState private constructor(
         title: AppText,
         detail: AppText? = null,
     ) {
+        setTransientNotice(title, detail)
+    }
+
+    fun presentConversationTransient(
+        accountRef: String,
+        groupIdHex: String,
+        @StringRes titleRes: Int,
+        detail: AppText? = null,
+    ) {
+        presentConversationTransient(accountRef, groupIdHex, AppText.Resource(titleRes), detail)
+    }
+
+    fun presentConversationTransient(
+        accountRef: String,
+        groupIdHex: String,
+        title: AppText,
+        detail: AppText? = null,
+    ) {
+        setTransientNotice(
+            title = title,
+            detail = detail,
+            conversation = ConversationNoticeDestination(accountRef, groupIdHex),
+        )
+    }
+
+    private fun setTransientNotice(
+        title: AppText,
+        detail: AppText? = null,
+        conversation: ConversationNoticeDestination? = null,
+    ) {
         transientNoticeSequence += 1L
-        transientNotice = TransientNotice(transientNoticeSequence, title, detail)
+        transientNotice =
+            TransientNotice(
+                id = transientNoticeSequence,
+                title = title,
+                detail = detail,
+                conversation = conversation,
+            )
     }
 
     fun presentTransient(

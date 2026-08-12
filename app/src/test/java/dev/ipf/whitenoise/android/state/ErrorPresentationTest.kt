@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class ErrorPresentationTest {
     @Test
@@ -13,6 +15,43 @@ class ErrorPresentationTest {
         assertNotEquals(
             TransientNotice(id = 1L, title = title),
             TransientNotice(id = 2L, title = title),
+        )
+    }
+
+    @Test
+    fun conversationNoticeMatchesOnlyItsOriginatingAccountAndGroup() {
+        val notice =
+            TransientNotice(
+                id = 1L,
+                title = AppText.Plain("Admin removed"),
+                conversation = ConversationNoticeDestination("account-a", "A1B2"),
+            )
+
+        assertTrue(notice.isForConversation("account-a", "a1b2"))
+        assertFalse(notice.isForConversation("account-a", "group-b"))
+        assertFalse(notice.isForConversation("account-b", "a1b2"))
+    }
+
+    @Test
+    fun globalNoticeNeverMatchesAConversation() {
+        val notice = TransientNotice(id = 1L, title = AppText.Plain("Saved"))
+
+        assertFalse(notice.isForConversation("account-a", "group-a"))
+    }
+
+    @Test
+    fun profileAdminPromotionScopesItsConfirmationToTheMutatedGroup() {
+        val body = appStateSource().readText().functionBody("promoteProfileInGroup")
+
+        assertTrue(
+            "profile-sheet admin success must use the originating account and group",
+            "presentConversationTransient(" in body &&
+                "accountRef = account" in body &&
+                "groupIdHex = groupId" in body,
+        )
+        assertFalse(
+            "profile-sheet admin success must not escape through the app-global confirmation host",
+            "presentTransient(R.string.toast_admin_added)" in body,
         )
     }
 
@@ -35,4 +74,11 @@ class ErrorPresentationTest {
         assertFalse(presentation.report.contains("failed with"))
         assertFalse((presentation.message as AppText.Plain).value.contains("IllegalStateException"))
     }
+
+    private fun appStateSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+        ).firstOrNull(File::exists)
+            ?: error("Missing AppState.kt source file")
 }
