@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -45,6 +46,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
+import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaFileBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageBubble
@@ -60,6 +62,12 @@ import dev.ipf.whitenoise.android.ui.conversation.share.SharedUser
 import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.share.formatCoordinate
 import kotlin.math.ceil
+
+internal fun ttsBodyIsCollapsed(
+    collapseEnabled: Boolean,
+    measuredBodyHeightPx: Int?,
+    maxBodyHeightPx: Int,
+): Boolean = collapseEnabled && (measuredBodyHeightPx == null || measuredBodyHeightPx > maxBodyHeightPx)
 
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
@@ -302,6 +310,8 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     onCopyMarkdownLink: (String) -> Unit,
     plainTextSelectionModifier: Modifier,
     onPlainTextLayout: (TextLayoutResult) -> Unit,
+    ttsLeafHighlightResolver: TtsLeafHighlightResolver? = null,
+    ttsReadAloudProgress: TtsReadAloudProgress? = null,
     selectionWrapper: @Composable (@Composable () -> Unit) -> Unit,
     collapsible: Boolean,
     replyPreviewPresent: Boolean,
@@ -347,9 +357,40 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             with(density) { (MaterialTheme.typography.bodyLarge.lineHeight).toPx() }
         val maxBodyHeightDp =
             with(density) { (lineHeightPx * MESSAGE_COLLAPSE_LINE_LIMIT).toDp() }
+        val maxBodyHeightPx = with(density) { maxBodyHeightDp.roundToPx() }
+        var measuredBodyHeightPx by
+            remember(record.messageIdHex, bodyText) {
+                mutableStateOf<Int?>(null)
+            }
+        val bodyIsCollapsed =
+            ttsBodyIsCollapsed(
+                collapseEnabled = collapsible,
+                measuredBodyHeightPx = measuredBodyHeightPx,
+                maxBodyHeightPx = maxBodyHeightPx,
+            )
+        val presentedTtsLeafHighlightResolver =
+            activeTtsLeafHighlightResolver(
+                resolver = ttsLeafHighlightResolver,
+                textSelectionMode = textSelectionMode,
+                suppressForCollapsed = bodyIsCollapsed,
+            )
+        val bodyMeasurementModifier =
+            if (collapsible) {
+                Modifier.onSizeChanged { measuredBodyHeightPx = it.height }
+            } else {
+                Modifier
+            }
+        val highlightColor = ttsReadAloudHighlightColor()
+        var plainLayoutResult by remember(bodyText) { mutableStateOf<TextLayoutResult?>(null) }
+        val plainHighlightRange = presentedTtsLeafHighlightResolver?.invoke("plain", bodyText)
+        val plainHighlightModifier =
+            Modifier.ttsReadAloudHighlight(plainLayoutResult, plainHighlightRange, highlightColor)
         val messageBody: @Composable () -> Unit = {
             if (renderMarkdownBody) {
-                Box {
+                readAloudMessageSemantics(
+                    progress = ttsReadAloudProgress,
+                    modifier = bodyMeasurementModifier,
+                ) {
                     val mentionMemberSnapshot =
                         remember(record.messageIdHex, controller.membersLoaded) {
                             if (controller.membersLoaded) controller.members else null
@@ -376,17 +417,25 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                         onSelectableTextLayoutChanged = selectableTextLayoutReporter,
                         onLinkTextLayoutChanged = markdownLinkLayoutReporter,
                         onCopyLink = onCopyMarkdownLink,
+                        ttsLeafHighlightResolver = presentedTtsLeafHighlightResolver,
                     )
                 }
             } else {
-                Text(
-                    bodyText,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = plainTextSelectionModifier,
-                    maxLines = if (collapsible) MESSAGE_COLLAPSE_LINE_LIMIT + 1 else Int.MAX_VALUE,
-                    onTextLayout = {
-                        lastLineLayout = it
-                        onPlainTextLayout(it)
+                readAloudMessageSemantics(
+                    progress = ttsReadAloudProgress,
+                    modifier = bodyMeasurementModifier,
+                    messageContent = {
+                        Text(
+                            bodyText,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = plainTextSelectionModifier.then(plainHighlightModifier),
+                            maxLines = if (collapsible) MESSAGE_COLLAPSE_LINE_LIMIT + 1 else Int.MAX_VALUE,
+                            onTextLayout = {
+                                lastLineLayout = it
+                                plainLayoutResult = it
+                                onPlainTextLayout(it)
+                            },
+                        )
                     },
                 )
             }

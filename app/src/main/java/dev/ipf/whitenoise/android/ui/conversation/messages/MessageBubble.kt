@@ -71,6 +71,7 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
@@ -288,6 +289,8 @@ internal fun MessageBubble(
     showSenderAvatar: Boolean = false,
     collapseLongMessages: Boolean = true,
     readOnly: Boolean = false,
+    ttsHighlightPassage: TtsPassage? = null,
+    ttsReadAloudProgress: TtsReadAloudProgress? = null,
 ) {
     val record = item.record
     val mine = controller.isMessageMine(record)
@@ -402,7 +405,7 @@ internal fun MessageBubble(
         }
     var textSelectionSeeded by remember(record.messageIdHex) { mutableStateOf(false) }
     var textSelectionBoundsInWindow by remember(record.messageIdHex) { mutableStateOf<Rect?>(null) }
-    val plainTextLayoutKey = remember(record.messageIdHex) { Any() }
+    val plainTextLayoutKey = remember(record.messageIdHex) { "plain" }
     val plainTextLayoutTracker = remember(record.messageIdHex) { SelectableTextLayoutTracker() }
     val textSelectionClipboard =
         rememberExitOnCopyClipboard { onTextSelectionModeChange(false) }
@@ -510,6 +513,42 @@ internal fun MessageBubble(
             ttsHasUsableEngine = appState.ttsHasUsableEngine,
         )
     val speakAloudLabel = stringResource(R.string.speak_aloud)
+    val effectiveTtsPassage =
+        if (textSelectionMode || ttsHighlightPassage?.messageIdHex != record.messageIdHex) {
+            null
+        } else {
+            ttsHighlightPassage
+        }
+    val speakableProjection =
+        remember(
+            record.messageIdHex,
+            displayedBody,
+            editState,
+            controller.membersLoaded,
+        ) {
+            messageSpeakableProjection(
+                record = record,
+                bodyText = displayedBody,
+                editedText = editState?.latestText,
+                mentionDisplayName = appState::mentionDisplayName,
+                isGroupMember =
+                    if (controller.membersLoaded) {
+                        { bech32: String -> appState.isRosterMember(bech32, controller.members) }
+                    } else {
+                        null
+                    },
+            )
+        }
+    val ttsLeafHighlightResolver =
+        remember(effectiveTtsPassage, speakableProjection, record.messageIdHex) {
+            rememberTtsLeafHighlightResolver(
+                passage = effectiveTtsPassage,
+                messageIdHex = record.messageIdHex,
+                projection = speakableProjection,
+                locale = java.util.Locale.getDefault(),
+            )
+        }
+    val effectiveTtsReadAloudProgress = ttsReadAloudProgress.takeIf { effectiveTtsPassage != null }
     // Issue #390 v1 forwards text only. Forward must be hidden for any record
     // whose displayed body is a synthetic surrogate (media filename/placeholder,
     // "Reacted …", delete/system summaries, agent-stream copy) — forwarding
@@ -1337,6 +1376,8 @@ internal fun MessageBubble(
                                     onCopyMarkdownLink = ::copyMarkdownLink,
                                     plainTextSelectionModifier = plainTextSelectionModifier,
                                     onPlainTextLayout = onPlainTextLayout,
+                                    ttsLeafHighlightResolver = ttsLeafHighlightResolver,
+                                    ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                                     selectionWrapper = selectionWrapper,
                                     collapsible = collapsible,
                                     replyPreviewPresent = replyPreview != null,
@@ -1396,6 +1437,8 @@ internal fun MessageBubble(
                                     onCopyMarkdownLink = ::copyMarkdownLink,
                                     plainTextSelectionModifier = plainTextSelectionModifier,
                                     onPlainTextLayout = onPlainTextLayout,
+                                    ttsLeafHighlightResolver = ttsLeafHighlightResolver,
+                                    ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                                     selectionWrapper = selectionWrapper,
                                     collapsible = collapsible,
                                     replyPreviewPresent = replyPreview != null,
@@ -1455,6 +1498,8 @@ internal fun MessageBubble(
                             onCopyMarkdownLink = ::copyMarkdownLink,
                             plainTextSelectionModifier = plainTextSelectionModifier,
                             onPlainTextLayout = onPlainTextLayout,
+                            ttsLeafHighlightResolver = ttsLeafHighlightResolver,
+                            ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                             selectionWrapper = selectionWrapper,
                             collapsible = collapsible,
                             replyPreviewPresent = replyPreview != null,

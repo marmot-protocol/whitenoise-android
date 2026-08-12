@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudProgress
 import java.util.Locale
 
 @Composable
@@ -63,6 +64,8 @@ internal fun TimelineRow(
     mentionCandidates: List<MentionComposer.Candidate>,
     mentionPickerEnabled: Boolean,
     collapseLongMessages: Boolean,
+    ttsHighlightPassage: dev.ipf.whitenoise.android.audio.tts.TtsPassage? = null,
+    ttsReadAloudProgress: TtsReadAloudProgress? = null,
 ) {
     Column(Modifier.fillMaxWidth()) {
         val daySeparatorLabel =
@@ -224,6 +227,8 @@ internal fun TimelineRow(
                 showSenderAvatar = senderDecoration.showAvatar,
                 collapseLongMessages = collapseLongMessages,
                 readOnly = controller.group.pendingConfirmation,
+                ttsHighlightPassage = ttsHighlightPassage,
+                ttsReadAloudProgress = ttsReadAloudProgress,
             )
         }
     }

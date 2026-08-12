@@ -47,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -160,6 +161,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInfoSheet
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudProgress
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
@@ -614,6 +616,23 @@ internal fun ConversationScreen(
     // gives a new last id while the previous one stays in the list; an
     // older-page load trims the newest rows, so the previous id is gone and
     // no follow fires. Keyed on id (not recordedAt) to survive same-second tails.
+    val ttsState by appState.ttsController.state.collectAsState()
+    val activeTtsPassage =
+        when (val state = ttsState) {
+            is TtsState.Speaking, is TtsState.Paused -> state.passage
+            else -> null
+        }
+    val activeTtsProgress =
+        when (val state = ttsState) {
+            is TtsState.Speaking, is TtsState.Paused ->
+                TtsReadAloudProgress(
+                    sentenceIndex = state.sentenceIndexWithinMessage,
+                    sentenceCount = state.sentenceCountWithinMessage,
+                    messageIndex = state.messageIndex,
+                    messageCount = state.messageCount,
+                )
+            else -> null
+        }
     // In-chat search (#292). Opening from the overflow menu swaps the top
     // bar into an inline search field; closing it restores the normal bar.
     // `searchPinnedMatchId` keeps the active match anchored to a concrete
@@ -2774,6 +2793,8 @@ internal fun ConversationScreen(
                                     mentionCandidates = mentionPicker.candidates,
                                     mentionPickerEnabled = mentionPicker.enabled,
                                     collapseLongMessages = collapseLongMessages,
+                                    ttsHighlightPassage = activeTtsPassage,
+                                    ttsReadAloudProgress = activeTtsProgress,
                                 )
                             }
                             conversationLoadErrorItem(

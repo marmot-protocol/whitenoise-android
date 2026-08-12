@@ -81,6 +81,8 @@ import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlight
+import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlightColor
 import java.net.IDN
 import java.net.URI
 import java.util.Locale
@@ -143,6 +145,7 @@ internal fun MarkdownMessageBody(
     onLinkTextLayoutChanged: MarkdownLinkTextLayoutReporter? = null,
     // Accessibility actions invoke the same copy path without a pointer event.
     onCopyLink: ((String) -> Unit)? = null,
+    ttsLeafHighlightResolver: TtsLeafHighlightResolver? = null,
 ) {
     val context = LocalContext.current
     // A tapped spoofable `[label](url)` link parks its destination here until
@@ -178,6 +181,7 @@ internal fun MarkdownMessageBody(
         LocalSelectableTextLayoutReporter provides onSelectableTextLayoutChanged,
         LocalMarkdownLinkTextLayoutReporter provides onLinkTextLayoutChanged,
         LocalMarkdownLinkCopyHandler provides onCopyLink,
+        LocalTtsLeafHighlightResolver provides ttsLeafHighlightResolver,
     ) {
         MarkdownBlockList(
             blocks = document.blocks,
@@ -352,6 +356,8 @@ private data class MarkdownBodyContext(
 internal typealias SelectableTextLayoutReporter =
     (key: Any, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates?) -> Unit
 
+internal typealias TtsLeafHighlightResolver = (leafId: String, renderedText: String) -> IntRange?
+
 internal typealias MarkdownLinkTextLayoutReporter =
     (key: Any, text: AnnotatedString, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates?) -> Unit
 
@@ -363,6 +369,9 @@ internal data class MarkdownLinkTextLayout(
 
 private val LocalSelectableTextLayoutReporter =
     staticCompositionLocalOf<SelectableTextLayoutReporter?> { null }
+
+private val LocalTtsLeafHighlightResolver =
+    staticCompositionLocalOf<TtsLeafHighlightResolver?> { null }
 
 private val LocalMarkdownLinkTextLayoutReporter =
     staticCompositionLocalOf<MarkdownLinkTextLayoutReporter?> { null }
@@ -378,6 +387,7 @@ private class MarkdownTextLayoutTracker {
 /** Text leaf used by the rendered Markdown document (dialog chrome excluded). */
 @Composable
 private fun MarkdownBodyText(
+    leafId: String,
     text: AnnotatedString,
     modifier: Modifier = Modifier,
     style: TextStyle = TextStyle.Default,
@@ -385,29 +395,33 @@ private fun MarkdownBodyText(
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     val reporter = LocalSelectableTextLayoutReporter.current
+    val highlightResolver = LocalTtsLeafHighlightResolver.current
     val linkReporter = LocalMarkdownLinkTextLayoutReporter.current
     val onCopyLink = LocalMarkdownLinkCopyHandler.current
     val copyLabel = stringResource(R.string.copy)
     val linkDestinations = remember(text) { markdownLinkDestinations(text) }
     val reportsLinks = linkDestinations.isNotEmpty()
-    val key = remember { Any() }
-    val tracker = remember { MarkdownTextLayoutTracker() }
+    val tracker = remember(leafId) { MarkdownTextLayoutTracker() }
+    val highlightColor = ttsReadAloudHighlightColor()
+    var layoutResult by remember(leafId) { mutableStateOf<TextLayoutResult?>(null) }
+    val highlightRange = highlightResolver?.invoke(leafId, text.text)
 
-    DisposableEffect(reporter, linkReporter, key, text) {
+    DisposableEffect(reporter, linkReporter, leafId, text) {
         onDispose {
-            reporter?.invoke(key, null, null)
-            linkReporter?.invoke(key, text, null, null)
+            reporter?.invoke(leafId, null, null)
+            linkReporter?.invoke(leafId, text, null, null)
         }
     }
 
     fun reportIfReady() {
-        val layoutResult = tracker.layoutResult ?: return
+        val measuredLayout = tracker.layoutResult ?: return
         val coordinates = tracker.coordinates ?: return
-        reporter?.invoke(key, layoutResult, coordinates)
+        layoutResult = measuredLayout
+        reporter?.invoke(leafId, measuredLayout, coordinates)
         if (reportsLinks) {
-            linkReporter?.invoke(key, text, layoutResult, coordinates)
+            linkReporter?.invoke(leafId, text, measuredLayout, coordinates)
         } else {
-            linkReporter?.invoke(key, text, null, null)
+            linkReporter?.invoke(leafId, text, null, null)
         }
     }
 
@@ -431,6 +445,7 @@ private fun MarkdownBodyText(
         modifier =
             modifier
                 .then(accessibilityModifier)
+                .ttsReadAloudHighlight(layoutResult, highlightRange, highlightColor)
                 .onGloballyPositioned { coordinates ->
                     tracker.coordinates = coordinates
                     reportIfReady()
@@ -503,6 +518,8 @@ private fun MarkdownBlockList(
     modifier: Modifier = Modifier,
     onLastTextLayout: ((TextLayoutResult) -> Unit)? = null,
     blankLinesBefore: ByteArray = ByteArray(0),
+    pathPrefix: String = "",
+    sourceIndexOffset: Int? = null,
 ) {
     val visibleBlocks = markdownVisibleSiblings(blocks)
     val blocksElided = markdownSiblingsElided(blocks)
@@ -529,18 +546,90 @@ private fun MarkdownBlockList(
             if (extraBlankLines > 0) {
                 Spacer(Modifier.height(markdownBlankRunSpacerHeight(extraBlankLines)))
             }
-            when (group) {
-                is MarkdownRenderGroup.Plain ->
-                    MarkdownBlockView(group.block, ctx, depth = depth, onTextLayout = lastPlainCallback)
-                is MarkdownRenderGroup.Details ->
-                    MarkdownDetailsBlocksView(group.summary, group.content, ctx, depth = depth)
-            }
+            markdownRenderGroupView(
+                group = group,
+                index = index,
+                grouped = grouped,
+                ctx = ctx,
+                depth = depth,
+                pathPrefix = pathPrefix,
+                sourceIndexOffset = sourceIndexOffset,
+                onLastTextLayout = lastPlainCallback,
+            )
         }
         if (blocksElided) {
-            MarkdownElisionMarker(onTextLayout = onLastTextLayout)
+            MarkdownElisionMarker(
+                leafId = markdownElisionLeafId(pathPrefix, sourceIndexOffset),
+                onTextLayout = onLastTextLayout,
+            )
         }
     }
 }
+
+@Composable
+private fun markdownRenderGroupView(
+    group: MarkdownRenderGroup,
+    index: Int,
+    grouped: MarkdownGroupedBlocks,
+    ctx: MarkdownBodyContext,
+    depth: Int,
+    pathPrefix: String,
+    sourceIndexOffset: Int?,
+    onLastTextLayout: ((TextLayoutResult) -> Unit)?,
+) {
+    when (group) {
+        is MarkdownRenderGroup.Plain -> {
+            val relativeSourceIndex = grouped.sourceIndices.getOrNull(index) ?: index
+            val blockPath =
+                markdownRenderedBlockPath(
+                    pathPrefix = pathPrefix,
+                    sourceIndexOffset = sourceIndexOffset,
+                    relativeSourceIndex = relativeSourceIndex,
+                )
+            MarkdownBlockView(
+                group.block,
+                ctx,
+                depth = depth,
+                path = blockPath,
+                onTextLayout = onLastTextLayout,
+            )
+        }
+        is MarkdownRenderGroup.Details -> {
+            val openerSourceIndex = grouped.sourceIndices.getOrNull(index) ?: index
+            MarkdownDetailsBlocksView(
+                group.summary,
+                group.content,
+                ctx,
+                depth = depth,
+                contentPathPrefix = pathPrefix,
+                contentSourceIndexOffset = (sourceIndexOffset ?: 0) + openerSourceIndex + 1,
+            )
+        }
+    }
+}
+
+internal fun markdownRenderedBlockPath(
+    pathPrefix: String,
+    sourceIndexOffset: Int?,
+    relativeSourceIndex: Int,
+): String {
+    val sourceIndex = (sourceIndexOffset ?: 0) + relativeSourceIndex
+    return if (pathPrefix.isEmpty()) {
+        "b$sourceIndex"
+    } else {
+        "$pathPrefix/b$sourceIndex"
+    }
+}
+
+internal fun markdownElisionLeafId(
+    pathPrefix: String,
+    sourceIndexOffset: Int?,
+): String =
+    when {
+        pathPrefix.isNotEmpty() -> "$pathPrefix/elided"
+        sourceIndexOffset != null -> "b$sourceIndexOffset/elided"
+        else -> "elided"
+    }
 
 /** Authored blank lines beyond the single one the paragraph gap already represents. */
 internal fun markdownExtraBlankLines(
@@ -566,11 +655,13 @@ internal fun markdownBlankRunSpacerHeight(extraBlankLines: Int): Dp =
 
 @Composable
 private fun MarkdownElisionMarker(
+    leafId: String,
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyLarge,
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     MarkdownBodyText(
+        leafId = leafId,
         text = AnnotatedString("…"),
         style = style,
         modifier = modifier,
@@ -583,13 +674,14 @@ private fun MarkdownBlockView(
     block: MarkdownBlockFfi,
     ctx: MarkdownBodyContext,
     depth: Int,
+    path: String,
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     // Past the nesting cap, stop descending: render a plain ellipsis marker
     // instead of recursing into another quote/list level. Bounds the render
     // stack against a maliciously deep document. See #156.
     if (markdownDepthExceeded(depth)) {
-        MarkdownElisionMarker()
+        MarkdownElisionMarker(leafId = markdownElisionLeafId(path, sourceIndexOffset = null))
         return
     }
     when (block) {
@@ -597,6 +689,7 @@ private fun MarkdownBlockView(
             val details = remember(block) { markdownDetailsSection(block.inlines) }
             if (details == null) {
                 MarkdownBodyText(
+                    leafId = path,
                     text = rememberMarkdownInlineText(block.inlines, ctx),
                     style = MaterialTheme.typography.bodyLarge,
                     onTextLayout = onTextLayout,
@@ -604,24 +697,35 @@ private fun MarkdownBlockView(
             } else {
                 // A collapsible has no stable trailing text line, so the
                 // inline-footer callback stays unset like other non-text blocks.
-                MarkdownDetailsView(details, ctx)
+                MarkdownDetailsView(details, ctx, path = path)
             }
         }
         is MarkdownBlockFfi.Heading ->
             MarkdownBodyText(
+                leafId = path,
                 text = rememberMarkdownInlineText(block.inlines, ctx),
                 style = markdownHeadingTextStyle(block.level.toInt(), MaterialTheme.typography),
                 onTextLayout = onTextLayout,
             )
         MarkdownBlockFfi.ThematicBreak ->
             HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.25f))
-        is MarkdownBlockFfi.CodeBlock -> MarkdownCodeBlockView(block.content, ctx.useDecorativeBackgrounds)
-        is MarkdownBlockFfi.BlockQuote -> MarkdownBlockQuoteView(block.blocks, ctx, depth)
-        is MarkdownBlockFfi.ListBlock -> MarkdownListView(block, ctx, depth)
-        is MarkdownBlockFfi.Table -> MarkdownTableView(block, ctx)
+        is MarkdownBlockFfi.CodeBlock ->
+            MarkdownCodeBlockView(
+                block.content,
+                ctx.useDecorativeBackgrounds,
+                leafId = "$path/code",
+            )
+        is MarkdownBlockFfi.BlockQuote -> MarkdownBlockQuoteView(block.blocks, ctx, depth, path = "$path/q")
+        is MarkdownBlockFfi.ListBlock -> MarkdownListView(block, ctx, depth, path = path)
+        is MarkdownBlockFfi.Table -> MarkdownTableView(block, ctx, path = path)
         // No math typesetting in v1 — show the raw TeX in the code treatment
         // so it at least reads as "source", not as broken prose.
-        is MarkdownBlockFfi.MathBlock -> MarkdownCodeBlockView(block.content, ctx.useDecorativeBackgrounds)
+        is MarkdownBlockFfi.MathBlock ->
+            MarkdownCodeBlockView(
+                block.content,
+                ctx.useDecorativeBackgrounds,
+                leafId = "$path/math",
+            )
     }
 }
 
@@ -652,6 +756,7 @@ internal fun markdownHeadingTextStyle(
 private fun MarkdownCodeBlockView(
     content: String,
     useDecorativeBackground: Boolean,
+    leafId: String,
 ) {
     // The parser keeps the block's trailing newline; trimming it avoids a
     // phantom empty line inside the chip. Code/math blocks can be large, so
@@ -659,6 +764,7 @@ private fun MarkdownCodeBlockView(
     val text = remember(content) { markdownSafeDisplayText(content, Int.MAX_VALUE).trimEnd('\n') }
 
     MarkdownBodyText(
+        leafId = leafId,
         text = AnnotatedString(text),
         style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
         modifier =
@@ -934,9 +1040,11 @@ private fun MarkdownDetailsScaffold(
 private fun MarkdownDetailsView(
     section: MarkdownDetailsSection,
     ctx: MarkdownBodyContext,
+    path: String,
 ) {
     MarkdownDetailsScaffold(stateKey = section, summary = section.summary) {
         MarkdownBodyText(
+            leafId = path,
             text = rememberMarkdownInlineText(section.content, ctx),
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(start = DETAILS_CONTENT_INDENT, top = 2.dp),
@@ -953,12 +1061,16 @@ private fun MarkdownDetailsBlocksView(
     content: List<MarkdownBlockFfi>,
     ctx: MarkdownBodyContext,
     depth: Int,
+    contentPathPrefix: String,
+    contentSourceIndexOffset: Int,
 ) {
     MarkdownDetailsScaffold(stateKey = content, summary = summary) {
         MarkdownBlockList(
             blocks = content,
             ctx = ctx,
             depth = depth + 1,
+            pathPrefix = contentPathPrefix,
+            sourceIndexOffset = contentSourceIndexOffset,
             modifier = Modifier.padding(start = DETAILS_CONTENT_INDENT, top = 2.dp),
         )
     }
@@ -969,6 +1081,7 @@ private fun MarkdownBlockQuoteView(
     blocks: List<MarkdownBlockFfi>,
     ctx: MarkdownBodyContext,
     depth: Int,
+    path: String,
 ) {
     Row(Modifier.height(IntrinsicSize.Min)) {
         Box(
@@ -985,6 +1098,7 @@ private fun MarkdownBlockQuoteView(
             blocks = blocks,
             ctx = ctx,
             depth = depth + 1,
+            pathPrefix = path,
             modifier = Modifier.weight(1f),
         )
     }
@@ -995,6 +1109,7 @@ private fun MarkdownListView(
     block: MarkdownBlockFfi.ListBlock,
     ctx: MarkdownBodyContext,
     depth: Int,
+    path: String,
 ) {
     val visibleItems = markdownVisibleSiblings(block.items)
     val itemsElided = markdownSiblingsElided(block.items)
@@ -1002,6 +1117,7 @@ private fun MarkdownListView(
         visibleItems.forEachIndexed { index, item ->
             Row {
                 MarkdownBodyText(
+                    leafId = "$path/m$index",
                     // Task-list checkboxes win over the plain bullet/number so
                     // `- [x] done` reads as a checked item, not a bullet.
                     text =
@@ -1019,12 +1135,13 @@ private fun MarkdownListView(
                     blocks = item.blocks,
                     ctx = ctx,
                     depth = depth + 1,
+                    pathPrefix = "$path/i$index",
                     modifier = Modifier.weight(1f),
                 )
             }
         }
         if (itemsElided) {
-            MarkdownElisionMarker()
+            MarkdownElisionMarker(leafId = markdownElisionLeafId(path, sourceIndexOffset = null))
         }
     }
 }
@@ -1042,17 +1159,18 @@ internal const val MARKDOWN_TABLE_DIVIDER_TAG = "markdown_table_row_divider"
 private fun MarkdownTableView(
     block: MarkdownBlockFfi.Table,
     ctx: MarkdownBodyContext,
+    path: String,
 ) {
     val visibleTable = markdownVisibleTable(block.header, block.rows)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        MarkdownTableRowView(visibleTable.header, block.alignments, header = true, ctx)
+        MarkdownTableRowView(visibleTable.header, block.alignments, header = true, ctx, path = path, rowIndex = null)
         // An empty body — or a header that exhausted the cell budget — would
         // otherwise leave a rule under the header separating nothing.
         if (visibleTable.rows.isNotEmpty()) {
             MarkdownTableRowDivider()
         }
         visibleTable.rows.forEachIndexed { index, row ->
-            MarkdownTableRowView(row, block.alignments, header = false, ctx)
+            MarkdownTableRowView(row, block.alignments, header = false, ctx, path = path, rowIndex = index)
             // Separates adjacent body rows only: a Column child sits below the
             // whole row, so wrapped cells get one rule after the full row height
             // rather than one per text line. No trailing rule after the last row,
@@ -1062,7 +1180,7 @@ private fun MarkdownTableView(
             }
         }
         if (visibleTable.rowsElided) {
-            MarkdownElisionMarker()
+            MarkdownElisionMarker(leafId = markdownElisionLeafId(path, sourceIndexOffset = null))
         }
     }
 }
@@ -1082,10 +1200,19 @@ private fun MarkdownTableRowView(
     alignments: List<MarkdownAlignmentFfi>,
     header: Boolean,
     ctx: MarkdownBodyContext,
+    path: String,
+    rowIndex: Int?,
 ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         row.cells.forEachIndexed { index, cell ->
+            val cellPath =
+                if (rowIndex == null) {
+                    "$path/h$index"
+                } else {
+                    "$path/r$rowIndex/c$index"
+                }
             MarkdownBodyText(
+                leafId = cellPath,
                 text = rememberMarkdownInlineText(cell.inlines, ctx),
                 style =
                     MaterialTheme.typography.bodyMedium.copy(
@@ -1101,7 +1228,9 @@ private fun MarkdownTableRowView(
             )
         }
         if (row.cellsElided) {
+            val rowPath = rowIndex?.let { "$path/r$it" } ?: path
             MarkdownElisionMarker(
+                leafId = markdownElisionLeafId(rowPath, sourceIndexOffset = null),
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
             )
