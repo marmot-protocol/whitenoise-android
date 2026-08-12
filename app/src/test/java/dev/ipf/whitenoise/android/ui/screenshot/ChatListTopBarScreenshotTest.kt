@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
+import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
+import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -27,8 +30,6 @@ import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_SEARCH_FILTERS_ACTION_TAG
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.chats.ConnectivityBannerState
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchChatFilter
-import dev.ipf.whitenoise.android.ui.chats.GlobalSearchContentFilter
-import dev.ipf.whitenoise.android.ui.chats.GlobalSearchDateFilter
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterControlsRow
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchSenderFilter
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
@@ -185,28 +186,25 @@ class ChatListTopBarScreenshotTest {
                 } else {
                     emptySet()
                 },
-            dateFilters =
+            dateFilterSelection =
+                when {
+                    withActiveFilters -> GlobalSearchDateFilterSelection.Today
+                    filterActionWithCount -> GlobalSearchDateFilterSelection.Last7Days
+                    else -> GlobalSearchDateFilterSelection.AnyTime
+                },
+            contentFilterSelection =
                 when {
                     withActiveFilters ->
-                        setOf(
-                            GlobalSearchDateFilter("today", "Today"),
-                            GlobalSearchDateFilter("last-30-days", "Last 30 days"),
+                        GlobalSearchContentFilterSelection(
+                            selectedKinds =
+                                setOf(
+                                    GlobalSearchContentKind.IMAGES_VIDEO,
+                                    GlobalSearchContentKind.LINKS,
+                                ),
                         )
                     filterActionWithCount ->
-                        setOf(
-                            GlobalSearchDateFilter("today", "Today"),
-                            GlobalSearchDateFilter("last-7-days", "Last 7 days"),
-                        )
-                    else -> emptySet()
-                },
-            contentFilters =
-                if (withActiveFilters) {
-                    setOf(
-                        GlobalSearchContentFilter("images", "Images"),
-                        GlobalSearchContentFilter("links", "Links"),
-                    )
-                } else {
-                    emptySet()
+                        GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.TEXT))
+                    else -> GlobalSearchContentFilterSelection.EMPTY
                 },
         )
 

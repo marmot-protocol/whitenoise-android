@@ -158,9 +158,9 @@ internal fun ChatsScreen(
     val folderHandoff = rememberFolderHandoff(appState.activeAccountRef)
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     val selectionMode = selectedChatIds.isNotEmpty()
-    // The filter state and reusable UI are introduced here, while interactive
-    // filter sections arrive in the follow-up typed-filter change. Do not expose
-    // an action that can only open an empty sheet in this intermediate commit.
+    // Typed Date and Content filters cannot be exposed until the MDK search
+    // contract executes them. Keeping this false prevents the UI from claiming
+    // that results are filtered when only the ordinary text query is applied.
     val interactiveGlobalSearchFilterSectionsAvailable = false
     val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
     val mutedConversations = chatNotificationState.mutedConversations

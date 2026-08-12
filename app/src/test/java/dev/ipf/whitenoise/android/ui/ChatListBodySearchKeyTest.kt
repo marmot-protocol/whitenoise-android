@@ -19,8 +19,26 @@ class ChatListBodySearchKeyTest {
                 "LaunchedEffect(trimmedQuery, sourceList)" !in source,
         )
         assertTrue(
-            "the expensive search still runs against the current source list snapshot",
+            "ordinary message-body search must keep using the trimmed text query",
             "controller.searchMessageBodies(sourceList, trimmedQuery)" in source,
+        )
+        assertTrue(
+            "unsupported typed filters must not suppress ordinary body matches",
+            "requiresTypedMdkContract" !in source,
+        )
+    }
+
+    @Test
+    fun typedFiltersStayOutOfProductionUntilMdkSearchSupportsThem() {
+        val source = chatsScreenSource().readText()
+
+        assertTrue(
+            "typed filter controls must stay gated while the MDK contract is unavailable",
+            "val interactiveGlobalSearchFilterSectionsAvailable = false" in source,
+        )
+        assertTrue(
+            "the typed filter sheet must not be wired into the production chat list yet",
+            "GlobalSearchTypedFilterSheet(" !in source,
         )
     }
 

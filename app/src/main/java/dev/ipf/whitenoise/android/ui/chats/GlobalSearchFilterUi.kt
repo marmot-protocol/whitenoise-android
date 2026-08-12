@@ -30,7 +30,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
+import dev.ipf.whitenoise.android.search.labelRes
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
+import dev.ipf.whitenoise.android.ui.search.globalSearchDateFilterLabel
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 internal const val CHAT_LIST_SEARCH_FILTERS_ACTION_TAG = "chat-list-search-filters-action"
@@ -77,11 +80,12 @@ internal fun GlobalSearchFilterControlsRow(
             }
         }
         chips.items.forEach { chip ->
-            val removeDescription = stringResource(R.string.chat_list_search_filter_remove, chip.displayLabel)
+            val chipLabel = globalSearchActiveChipLabel(chip, state)
+            val removeDescription = stringResource(R.string.chat_list_search_filter_remove, chipLabel)
             FilterChip(
                 selected = true,
                 onClick = { onRemoveFilter(chip.chipId) },
-                label = { Text(chip.displayLabel) },
+                label = { Text(chipLabel) },
                 trailingIcon = {
                     Icon(
                         Icons.Default.Close,
@@ -161,6 +165,23 @@ internal fun GlobalSearchFilterSheet(
         }
     }
 }
+
+@Composable
+internal fun globalSearchActiveChipLabel(
+    chip: GlobalSearchActiveChip,
+    state: GlobalSearchState,
+): String =
+    when (chip.category) {
+        GlobalSearchFilterCategory.Chat,
+        GlobalSearchFilterCategory.Sender,
+        -> chip.displayLabel
+        GlobalSearchFilterCategory.Date -> globalSearchDateFilterLabel(state.dateFilterSelection)
+        GlobalSearchFilterCategory.Content -> {
+            val kindName = chip.chipId.removePrefix("content:")
+            val kind = runCatching { GlobalSearchContentKind.valueOf(kindName) }.getOrNull()
+            if (kind == null) "" else stringResource(kind.labelRes())
+        }
+    }
 
 @Composable
 internal fun globalSearchFiltersButtonLabel(activeFilterCount: Int): String =
