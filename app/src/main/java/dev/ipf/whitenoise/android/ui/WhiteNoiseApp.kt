@@ -4,13 +4,14 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -19,7 +20,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -76,12 +76,23 @@ internal fun GlobalTransientNotice(
     notice?.takeIf { it.conversation == null }?.let {
         InlineConfirmationNotice(
             notice = it,
-            modifier =
-                modifier
-                    .statusBarsPadding()
-                    .padding(top = TopAppBarDefaults.TopAppBarExpandedHeight)
-                    .testTag(GLOBAL_TRANSIENT_NOTICE_TAG),
+            modifier = modifier.navigationBarsPadding().testTag(GLOBAL_TRANSIENT_NOTICE_TAG),
         )
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+internal fun ShellTransientNoticeLayout(
+    notice: TransientNotice?,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Column(modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+            content()
+        }
+        GlobalTransientNotice(notice)
     }
 }
 
@@ -202,16 +213,18 @@ fun WhiteNoiseApp(
                         AppPhase.Bootstrapping -> LoadingScreen()
                         AppPhase.Onboarding -> OnboardingScreen(appState)
                         AppPhase.Ready ->
-                            MainShell(
-                                appState = appState,
-                                inboundNotificationTarget = inboundNotificationTarget,
-                                inboundNotificationRequestId = inboundNotificationRequestId,
-                                onNotificationTargetHandled = onNotificationTargetHandled,
-                                inboundShareRequest = inboundShareRequest,
-                                onShareRequestHandled = onShareRequestHandled,
-                                inboundAppUpdateTap = inboundAppUpdateTap,
-                                onAppUpdateTapHandled = onAppUpdateTapHandled,
-                            )
+                            ShellTransientNoticeLayout(notice = transientNotice) {
+                                MainShell(
+                                    appState = appState,
+                                    inboundNotificationTarget = inboundNotificationTarget,
+                                    inboundNotificationRequestId = inboundNotificationRequestId,
+                                    onNotificationTargetHandled = onNotificationTargetHandled,
+                                    inboundShareRequest = inboundShareRequest,
+                                    onShareRequestHandled = onShareRequestHandled,
+                                    inboundAppUpdateTap = inboundAppUpdateTap,
+                                    onAppUpdateTapHandled = onAppUpdateTapHandled,
+                                )
+                            }
                         is AppPhase.Failed ->
                             ErrorContent(
                                 title = stringResource(R.string.white_noise_couldnt_start),
@@ -219,10 +232,6 @@ fun WhiteNoiseApp(
                                 onRetry = { scope.launch { appState.bootstrap() } },
                             )
                     }
-                    GlobalTransientNotice(
-                        notice = transientNotice,
-                        modifier = Modifier.align(Alignment.TopCenter),
-                    )
                     if (appState.appLockScreenVisible) {
                         AppLockScreen(
                             error = appState.appUnlockError,

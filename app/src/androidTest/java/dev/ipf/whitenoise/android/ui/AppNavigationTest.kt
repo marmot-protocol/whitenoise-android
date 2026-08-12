@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui
 
 import android.content.Context
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -31,6 +32,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsTopBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -184,6 +186,41 @@ class AppNavigationTest {
     }
 
     @Test
+    fun globalConfirmationStaysClearOfSettingsAccountActionsDuringNavigation() {
+        val appState = appState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ShellTransientNoticeLayout(notice = appState.transientNotice) {
+                    MainShell(appState = appState)
+                }
+            }
+        }
+        awaitAttachedChatsController(appState)
+
+        composeRule.runOnIdle {
+            appState.presentTransient(AppText.Plain(GLOBAL_NOTICE_TEXT))
+        }
+        composeRule.onNodeWithContentDescription("Open settings").performClick()
+
+        composeRule.onNodeWithText("Settings").assertIsDisplayed()
+        val selector =
+            composeRule
+                .onNodeWithContentDescription("Switch Account")
+                .assertIsDisplayed()
+                .assertHasClickAction()
+        val qr =
+            composeRule
+                .onNodeWithContentDescription("My QR code")
+                .assertIsDisplayed()
+                .assertHasClickAction()
+        val notice = composeRule.onNodeWithTag(GLOBAL_TRANSIENT_NOTICE_TAG).assertIsDisplayed()
+
+        val noticeBounds = notice.fetchSemanticsNode().boundsInRoot
+        assertTrue(selector.fetchSemanticsNode().boundsInRoot.bottom <= noticeBounds.top)
+        assertTrue(qr.fetchSemanticsNode().boundsInRoot.bottom <= noticeBounds.top)
+    }
+
+    @Test
     fun accountHeaderSeparatesSelectorFromQrAction() {
         var selectorClicks = 0
         var qrClicks = 0
@@ -313,5 +350,6 @@ class AppNavigationTest {
         const val GROUP_A_NAME = "Group A"
         const val GROUP_B_NAME = "Group B"
         const val NOTICE_TEXT = "Admin added"
+        const val GLOBAL_NOTICE_TEXT = "Notifications enabled"
     }
 }

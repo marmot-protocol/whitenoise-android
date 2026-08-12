@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
@@ -21,7 +20,7 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.ui.GLOBAL_TRANSIENT_NOTICE_TAG
-import dev.ipf.whitenoise.android.ui.GlobalTransientNotice
+import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
 import dev.ipf.whitenoise.android.ui.TRANSIENT_NOTICE_DURATION_MILLIS
 import dev.ipf.whitenoise.android.ui.TransientNoticeTimeoutEffect
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -103,22 +102,23 @@ class ConversationTransientNoticeTest {
     }
 
     @Test
-    fun globalNoticeFloatsBelowHeaderWithoutMovingIt() {
+    fun globalNoticeReservesSpaceBelowContentWithoutMovingHeader() {
         val notice = mutableStateOf<TransientNotice?>(null)
         composeRule.setContent {
             WhiteNoiseTheme {
-                Box(Modifier.fillMaxSize()) {
+                ShellTransientNoticeLayout(notice = notice.value) {
                     Box(
                         Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .height(TopAppBarDefaults.TopAppBarExpandedHeight)
-                            .testTag(HEADER_TAG),
-                    )
-                    GlobalTransientNotice(
-                        notice = notice.value,
-                        modifier = Modifier.align(Alignment.TopCenter),
-                    )
+                            .fillMaxSize()
+                            .testTag(CONTENT_TAG),
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .testTag(HEADER_TAG),
+                        )
+                    }
                 }
             }
         }
@@ -136,8 +136,9 @@ class ConversationTransientNoticeTest {
                 .fetchSemanticsNode()
                 .boundsInRoot
         val headerAfter = headerBounds()
+        val contentBounds = composeRule.onNodeWithTag(CONTENT_TAG).fetchSemanticsNode().boundsInRoot
         assertEquals(headerBefore, headerAfter)
-        assertTrue(noticeBounds.top >= headerAfter.bottom)
+        assertTrue(contentBounds.bottom <= noticeBounds.top)
     }
 
     private fun renderHarness(
@@ -185,6 +186,7 @@ class ConversationTransientNoticeTest {
         const val GROUP_A = "group-a"
         const val GROUP_B = "group-b"
         const val HEADER_TAG = "conversation-header"
+        const val CONTENT_TAG = "shell-content"
         const val NOTICE_TEXT = "Admin removed"
         const val POSITION_TOLERANCE = 0.5f
     }

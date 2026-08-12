@@ -2,10 +2,15 @@ package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.TransientNotice
+import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
 import dev.ipf.whitenoise.android.ui.settings.SETTINGS_HOME_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeAccount
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeContent
@@ -64,5 +69,59 @@ class SettingsScreenScreenshotTest {
         composeRule
             .onNodeWithTag(SETTINGS_HOME_CONTENT_TAG)
             .captureRoboImage("src/test/snapshots/settings_screen_default_dark.png")
+    }
+
+    @Test
+    fun settingsScreenWithGlobalConfirmationDark() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShellTransientNoticeLayout(
+                    notice = TransientNotice(id = 1L, title = AppText.Plain("Notifications enabled")),
+                    modifier = Modifier.testTag(SETTINGS_WITH_CONFIRMATION_TAG),
+                ) {
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        settingsHomeContent()
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(SETTINGS_WITH_CONFIRMATION_TAG)
+            .captureRoboImage("src/test/snapshots/settings_screen_global_confirmation_dark.png")
+    }
+
+    @Composable
+    private fun settingsHomeContent() {
+        SettingsHomeContent(
+            state = settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = false),
+            account =
+                SettingsHomeAccount(
+                    title = "Alice",
+                    subtitle = "npub1alice0000",
+                    seed = "alice-account-id",
+                    pictureUrl = null,
+                ),
+            appUpdateInfo =
+                AppUpdateInfo(
+                    installedVersion = "2026.8.6",
+                    latestVersion = null,
+                    checkedAtMillis = null,
+                    dismissedVersion = null,
+                    releasesBehind = null,
+                ),
+            versionName = "2026.8.6",
+            mdkShortSha = "abc1234",
+            staging = false,
+            onBackToChats = {},
+            onOpenAccountSelector = {},
+            onOpenQr = {},
+            onOpenDetail = {},
+            onAppUpdateAction = {},
+        )
+    }
+
+    private companion object {
+        const val SETTINGS_WITH_CONFIRMATION_TAG = "settings-with-global-confirmation"
     }
 }
