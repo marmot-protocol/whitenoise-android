@@ -96,6 +96,7 @@ import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
 import dev.ipf.whitenoise.android.media.editor.MarmotMessageDraftGateway
+import dev.ipf.whitenoise.android.media.editor.MessageDraftConditionalDeleteResult
 import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
@@ -2189,8 +2190,7 @@ class WhiteNoiseAppState private constructor(
         ShareInboundStager(
             stageText = { accountRef, groupIdHex, text ->
                 mutationsScope.launch {
-                    draftWriter.flush()
-                    when (val result = messageDraftRepository.mergeText(accountRef, groupIdHex, text)) {
+                    when (val result = draftWriter.mergeText(accountRef, groupIdHex, text)) {
                         is MessageDraftMutationResult.Success -> {
                             result.draft?.let { draft ->
                                 draftStore.hydrate(
@@ -2340,12 +2340,13 @@ class WhiteNoiseAppState private constructor(
     /** Hydrates the selected composer from MDK without retaining attachment plaintext in Android state. */
     fun loadDraft(groupIdHex: String) {
         val accountRef = activeAccountRef ?: return
+        val generation = draftWriter.generation(accountRef, groupIdHex)
         mutationsScope.launch {
-            draftWriter.flush()
-            messageDraftRepository
-                .draft(accountRef, groupIdHex)
-                .onSuccess { draft ->
+            draftWriter
+                .loadIfCurrent(accountRef, groupIdHex, generation)
+                ?.onSuccess { draft ->
                     if (activeAccountRef != accountRef) return@onSuccess
+                    if (!draftWriter.isCurrent(accountRef, groupIdHex, generation)) return@onSuccess
                     draftStore.replaceFromAuthoritative(
                         accountRef,
                         groupIdHex,
@@ -2353,21 +2354,29 @@ class WhiteNoiseAppState private constructor(
                         draft?.createdAtMs,
                     )
                     draftHydrationRevision += 1
-                }.onFailure { appStateDebug(it) { "draft load failed group=${groupIdHex.take(8)}" } }
+                }?.onFailure { appStateDebug(it) { "draft load failed group=${groupIdHex.take(8)}" } }
         }
     }
 
     fun clearDraftAfterSuccessfulSend(groupIdHex: String) {
         val accountRef = activeAccountRef ?: return
+        val sentGeneration = draftWriter.generation(accountRef, groupIdHex)
         draftStore.set(accountRef, groupIdHex, TextFieldValue(""))
         mutationsScope.launch {
-            draftWriter.flush()
-            when (val result = messageDraftRepository.delete(accountRef, groupIdHex)) {
-                is MessageDraftMutationResult.Success ->
-                    draftStore.applyAuthoritativeTimestamp(accountRef, groupIdHex, null)
-                is MessageDraftMutationResult.Failure ->
-                    appStateDebug(result.cause) { "sent draft cleanup failed group=${groupIdHex.take(8)}" }
-                else -> Unit
+            when (val deletion = draftWriter.deleteIfCurrent(accountRef, groupIdHex, sentGeneration)) {
+                is MessageDraftConditionalDeleteResult.Applied -> {
+                    when (val result = deletion.result) {
+                        is MessageDraftMutationResult.Success -> {
+                            if (draftWriter.isCurrent(accountRef, groupIdHex, sentGeneration)) {
+                                draftStore.applyAuthoritativeTimestamp(accountRef, groupIdHex, null)
+                            }
+                        }
+                        is MessageDraftMutationResult.Failure ->
+                            appStateDebug(result.cause) { "sent draft cleanup failed group=${groupIdHex.take(8)}" }
+                        else -> Unit
+                    }
+                }
+                MessageDraftConditionalDeleteResult.Superseded -> Unit
             }
         }
     }
