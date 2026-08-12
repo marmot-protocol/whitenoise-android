@@ -528,7 +528,10 @@ class LocalNotificationPresenter(
                                     .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
                                     .addExtras(
                                         Bundle().apply {
-                                            putCharSequence(EXTRA_EXPANDED_SINGLE_MESSAGE_BODY, notificationContent.body)
+                                            putCharSequence(
+                                                EXTRA_EXPANDED_SINGLE_MESSAGE_BODY,
+                                                notificationContent.body,
+                                            )
                                             putLong(EXTRA_EXPANDED_SINGLE_MESSAGE_TIMESTAMP, presentationTimestampMs)
                                             putBundle(EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER, messaging.sender.toBundle())
                                         },
@@ -936,26 +939,33 @@ class LocalNotificationPresenter(
     private fun existingConversationMessages(
         tag: String,
         id: Int,
-    ): List<NotificationCompat.MessagingStyle.Message>? {
-        val existing = activeConversationCard(tag, id) ?: return null
-        if (existing.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) return null
-        NotificationCompat.MessagingStyle
-            .extractMessagingStyleFromNotification(existing)
-            ?.messages
-            ?.let { return it }
-        val extras = existing.extras ?: return null
-        val body = extras.getCharSequence(EXTRA_EXPANDED_SINGLE_MESSAGE_BODY) ?: return null
-        val senderBundle = extras.getBundle(EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER) ?: return null
-        val timestamp = extras.getLong(EXTRA_EXPANDED_SINGLE_MESSAGE_TIMESTAMP, Long.MIN_VALUE)
-        if (timestamp == Long.MIN_VALUE) return null
-        return listOf(
-            NotificationCompat.MessagingStyle.Message(
-                boundedNotificationMessageText(body),
-                timestamp,
-                Person.fromBundle(senderBundle),
-            ),
-        )
-    }
+    ): List<NotificationCompat.MessagingStyle.Message>? =
+        activeConversationCard(tag, id)
+            ?.takeUnless { it.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true }
+            ?.let { existing ->
+                NotificationCompat.MessagingStyle
+                    .extractMessagingStyleFromNotification(existing)
+                    ?.messages
+                    ?: expandedSingleMessage(existing.extras)
+            }
+
+    private fun expandedSingleMessage(extras: Bundle?): List<NotificationCompat.MessagingStyle.Message>? =
+        extras?.let { bundle ->
+            val body = bundle.getCharSequence(EXTRA_EXPANDED_SINGLE_MESSAGE_BODY)
+            val senderBundle = bundle.getBundle(EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER)
+            val timestamp = bundle.getLong(EXTRA_EXPANDED_SINGLE_MESSAGE_TIMESTAMP, Long.MIN_VALUE)
+            if (body == null || senderBundle == null || timestamp == Long.MIN_VALUE) {
+                null
+            } else {
+                listOf(
+                    NotificationCompat.MessagingStyle.Message(
+                        boundedNotificationMessageText(body),
+                        timestamp,
+                        Person.fromBundle(senderBundle),
+                    ),
+                )
+            }
+        }
 
     private fun publishConversationShortcut(
         update: NotificationUpdateFfi,

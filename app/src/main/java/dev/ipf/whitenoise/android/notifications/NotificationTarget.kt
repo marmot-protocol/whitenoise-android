@@ -158,6 +158,7 @@ internal sealed interface NotificationMessageDirectLoadOutcome<out T> {
 }
 
 /** Performs the one-group local read without swallowing structured cancellation (#586). */
+@Suppress("MaxLineLength")
 internal suspend fun <T> loadNotificationMessageDirectly(load: suspend () -> T): NotificationMessageDirectLoadOutcome<T> =
     try {
         NotificationMessageDirectLoadOutcome.OpenConversation(load())
