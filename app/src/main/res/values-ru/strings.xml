@@ -29,6 +29,21 @@
     <string name="chat_list_voice_unavailable">Голосовой поиск недоступен на этом устройстве</string>
     <string name="toast_demoted_but_couldnt_leave">Вы больше не администратор, но не удалось выйти из группы</string>
     <string name="chat_list_search_hint">Поиск чатов</string>
+    <string name="chat_list_search_filters">Фильтры</string>
+    <string name="chat_list_search_filters_button">Фильтры (%1$d)</string>
+    <plurals name="chat_list_search_filters_active">
+        <item quantity="one">%1$d активный фильтр</item>
+        <item quantity="few">%1$d активных фильтра</item>
+        <item quantity="many">%1$d активных фильтров</item>
+        <item quantity="other">%1$d активных фильтров</item>
+    </plurals>
+    <string name="chat_list_search_clear_all_filters">Очистить все</string>
+    <string name="chat_list_search_filter_sheet_title">Фильтры</string>
+    <string name="chat_list_search_filter_chat">Чат</string>
+    <string name="chat_list_search_filter_sender">Отправитель</string>
+    <string name="chat_list_search_filter_date">Дата</string>
+    <string name="chat_list_search_filter_content">Содержимое</string>
+    <string name="chat_list_search_filter_remove">Удалить %1$s</string>
     <string name="chat_list_filter_all">Все</string>
     <string name="chat_list_filter_unread">Непрочитанные</string>
     <string name="chat_list_no_unread">Всё прочитано</string>

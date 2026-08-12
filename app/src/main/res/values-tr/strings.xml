@@ -29,6 +29,19 @@
     <string name="chat_list_voice_unavailable">Sesli arama bu cihazda kullanılamıyor</string>
     <string name="toast_demoted_but_couldnt_leave">Artık yönetici değilsiniz, ancak gruptan ayrılınamadı</string>
     <string name="chat_list_search_hint">Sohbet ara</string>
+    <string name="chat_list_search_filters">Filtreler</string>
+    <string name="chat_list_search_filters_button">Filtreler (%1$d)</string>
+    <plurals name="chat_list_search_filters_active">
+        <item quantity="one">%1$d aktif filtre</item>
+        <item quantity="other">%1$d aktif filtre</item>
+    </plurals>
+    <string name="chat_list_search_clear_all_filters">Tümünü temizle</string>
+    <string name="chat_list_search_filter_sheet_title">Filtreler</string>
+    <string name="chat_list_search_filter_chat">Sohbet</string>
+    <string name="chat_list_search_filter_sender">Gönderen</string>
+    <string name="chat_list_search_filter_date">Tarih</string>
+    <string name="chat_list_search_filter_content">İçerik</string>
+    <string name="chat_list_search_filter_remove">%1$s kaldır</string>
     <string name="chat_list_filter_all">Tümü</string>
     <string name="chat_list_filter_unread">Okunmamış</string>
     <string name="chat_list_no_unread">Hepsi okundu</string>

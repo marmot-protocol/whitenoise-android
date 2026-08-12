@@ -209,8 +209,8 @@ class ChatsScreenSelectionActionsCoverageTest {
 
         assertTrue("folder editor handoff must exist", handoffStart >= 0)
         listOf(
-            "var searchOpen by remember",
-            "var searchQuery by remember",
+            "globalSearchState:",
+            "onGlobalSearchStateChange:",
             "val chatListState = key(showArchived) { rememberLazyListState() }",
         ).forEach { declaration ->
             assertTrue(
@@ -218,6 +218,10 @@ class ChatsScreenSelectionActionsCoverageTest {
                 source.indexOf(declaration) in 0 until handoffStart,
             )
         }
+        assertTrue(
+            "global search must be shell-owned so the editor swap does not reset it",
+            "globalSearchState = scopedGlobalSearchState" in mainShellSource().readText(),
+        )
         assertTrue(
             "folder filter must be parent-owned so the editor swap does not reset it",
             "selectedFolderId:" in source.substring(0, handoffStart),
@@ -259,6 +263,13 @@ class ChatsScreenSelectionActionsCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing ChatsScreen.kt source file")
+
+    private fun mainShellSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing MainShell.kt source file")
 
     private fun groupDetailsSource(): File =
         listOf(

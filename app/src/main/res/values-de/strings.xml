@@ -29,6 +29,19 @@
     <string name="chat_list_voice_unavailable">Sprachsuche auf diesem Gerät nicht verfügbar</string>
     <string name="toast_demoted_but_couldnt_leave">Du bist kein Admin mehr, aber konntest die Gruppe nicht verlassen</string>
     <string name="chat_list_search_hint">Chats suchen</string>
+    <string name="chat_list_search_filters">Filter</string>
+    <string name="chat_list_search_filters_button">Filter (%1$d)</string>
+    <plurals name="chat_list_search_filters_active">
+        <item quantity="one">%1$d Filter aktiv</item>
+        <item quantity="other">%1$d Filter aktiv</item>
+    </plurals>
+    <string name="chat_list_search_clear_all_filters">Alle löschen</string>
+    <string name="chat_list_search_filter_sheet_title">Filter</string>
+    <string name="chat_list_search_filter_chat">Gespräch</string>
+    <string name="chat_list_search_filter_sender">Absender</string>
+    <string name="chat_list_search_filter_date">Datum</string>
+    <string name="chat_list_search_filter_content">Inhalt</string>
+    <string name="chat_list_search_filter_remove">%1$s entfernen</string>
     <string name="chat_list_filter_all">Alle</string>
     <string name="chat_list_filter_unread">Ungelesen</string>
     <string name="chat_list_no_unread">Alles erledigt</string>

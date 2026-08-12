@@ -141,6 +141,9 @@ internal fun ChatsScreen(
     onPresentProfile: (npub: String, visibleActiveListHeadId: String?) -> Unit = { npub, _ ->
         appState.presentProfile(npub)
     },
+    // Shell-owned global search state survives conversation navigation (#1941).
+    globalSearchState: GlobalSearchState = GlobalSearchState(),
+    onGlobalSearchStateChange: ((GlobalSearchState) -> GlobalSearchState) -> Unit = {},
     // Shell-owned so the filter survives conversation navigation (issue #1897).
     selectedFolderId: String? = null,
     onSelectFolder: (String?) -> Unit = {},
@@ -155,15 +158,20 @@ internal fun ChatsScreen(
     val folderHandoff = rememberFolderHandoff(appState.activeAccountRef)
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     val selectionMode = selectedChatIds.isNotEmpty()
+    // The filter state and reusable UI are introduced here, while interactive
+    // filter sections arrive in the follow-up typed-filter change. Do not expose
+    // an action that can only open an empty sheet in this intermediate commit.
+    val interactiveGlobalSearchFilterSectionsAvailable = false
     val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
     val mutedConversations = chatNotificationState.mutedConversations
-    // Search expand/collapse + live query. The search input is anchored in
-    // the top bar; tapping the magnifier swaps the chrome (account avatar
-    // + nav icons) for a TextField that filters in real time on title +
-    // last-message preview. Closing the search clears the query so the
-    // next open starts fresh.
-    var searchOpen by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
+    val searchOpen = globalSearchState.isOpen
+    val searchQuery = globalSearchState.query
+    val globalSearchPresentationState =
+        reconcileGlobalSearchFilterSheet(
+            searchState = globalSearchState,
+            interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
+            selectionMode = selectionMode,
+        )
     // Async message-body search results (issue #290), keyed by group id. The
     // title/preview match in `applyChatListSearchAndFilter` is synchronous;
     // body matching has to query each conversation's local timeline via the
@@ -273,18 +281,41 @@ internal fun ChatsScreen(
             // TextField node is already attached by the time we call
             // requestFocus — no explicit frame deferral needed.
             searchFocusRequester.requestFocus()
-        } else {
-            searchQuery = ""
         }
     }
-    // Back from chat-list search unwinds the search state — close the field and
-    // restore the normal top bar (which drops focus and the IME) — instead of
-    // exiting the app, matching the Settings/Diagnostics back behavior (#121,
-    // #149). See #320. Selection mode takes priority (#1169).
-    BackHandler(enabled = chatListBackHandlerEnabled(selectionMode, searchOpen)) {
-        when {
-            selectionMode -> clearSelection()
-            searchOpen -> searchOpen = false
+    LaunchedEffect(
+        selectionMode,
+        globalSearchState.filterSheetOpen,
+        interactiveGlobalSearchFilterSectionsAvailable,
+    ) {
+        if (globalSearchPresentationState != globalSearchState) {
+            onGlobalSearchStateChange { currentState ->
+                reconcileGlobalSearchFilterSheet(
+                    searchState = currentState,
+                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
+                    selectionMode = selectionMode,
+                )
+            }
+        }
+    }
+    // Back from chat-list search unwinds search state — dismiss the filter sheet,
+    // then close search (which resets query/filters per close rule) — instead of
+    // exiting the app (#121, #149, #320). Selection mode takes priority (#1169).
+    BackHandler(
+        enabled =
+            chatListBackHandlerEnabled(
+                selectionMode,
+                searchOpen,
+                globalSearchPresentationState.filterSheetOpen,
+            ),
+    ) {
+        when (chatListBackDismissal(selectionMode, globalSearchPresentationState)) {
+            ChatListBackDismissal.ClearSelection -> clearSelection()
+            ChatListBackDismissal.DismissFilterSheet ->
+                onGlobalSearchStateChange(GlobalSearchTransitions::dismissFilterSheet)
+            ChatListBackDismissal.CloseSearch ->
+                onGlobalSearchStateChange(GlobalSearchTransitions::closeSearch)
+            null -> Unit
         }
     }
 
@@ -304,7 +335,9 @@ internal fun ChatsScreen(
                         ?.firstOrNull()
                         ?.trim()
                 if (!recognized.isNullOrBlank()) {
-                    searchQuery = recognized
+                    onGlobalSearchStateChange { state ->
+                        GlobalSearchTransitions.setQuery(state, recognized)
+                    }
                 }
             }
         }
@@ -830,9 +863,15 @@ internal fun ChatsScreen(
                         searchOpen = searchOpen,
                         searchQuery = searchQuery,
                         searchFocusRequester = searchFocusRequester,
-                        onSearchQueryChange = { searchQuery = it },
-                        onSearchOpen = { searchOpen = true },
-                        onSearchClose = { searchOpen = false },
+                        onSearchQueryChange = { query ->
+                            onGlobalSearchStateChange { state -> GlobalSearchTransitions.setQuery(state, query) }
+                        },
+                        onSearchOpen = {
+                            onGlobalSearchStateChange(GlobalSearchTransitions::openSearch)
+                        },
+                        onSearchClose = {
+                            onGlobalSearchStateChange(GlobalSearchTransitions::closeSearch)
+                        },
                         onSwitchAccount = { label -> scope.launch { appState.setActiveAccount(label) } },
                         onMic = {
                             val intent =
@@ -879,6 +918,17 @@ internal fun ChatsScreen(
             }
         },
     ) { padding ->
+        GlobalSearchFilterSheet(
+            visible =
+                shouldPresentGlobalSearchFilterSheet(
+                    searchState = globalSearchState,
+                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
+                    selectionMode = selectionMode,
+                ),
+            onDismiss = {
+                onGlobalSearchStateChange(GlobalSearchTransitions::dismissFilterSheet)
+            },
+        )
         Column(Modifier.fillMaxSize().padding(padding)) {
             if (appState.appUpdateInfo.shouldShowBanner) {
                 AppUpdateBanner(
@@ -899,6 +949,31 @@ internal fun ChatsScreen(
                     onEditFolder = { folderHandoff.editingFolderId = it },
                 )
             }
+            if (
+                shouldShowGlobalSearchFilterControls(
+                    searchState = globalSearchState,
+                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
+                    selectionMode = selectionMode,
+                )
+            ) {
+                GlobalSearchFilterControlsRow(
+                    state = globalSearchState,
+                    onOpenFilters =
+                        if (interactiveGlobalSearchFilterSectionsAvailable) {
+                            {
+                                onGlobalSearchStateChange(GlobalSearchTransitions::openFilterSheet)
+                            }
+                        } else {
+                            null
+                        },
+                    onRemoveFilter = { chipId ->
+                        onGlobalSearchStateChange { state -> GlobalSearchTransitions.removeFilter(state, chipId) }
+                    },
+                    onClearAll = {
+                        onGlobalSearchStateChange(GlobalSearchTransitions::clearAllFilters)
+                    },
+                )
+            }
             // Pasted-identifier resolution result (#344). Sits above the list so
             // a recognized npub / NIP-05 surfaces a tappable result while
             // plain-text queries below keep filtering the list. When the active
@@ -912,11 +987,9 @@ internal fun ChatsScreen(
                 appState = appState,
                 existingDirectChat = { npub -> appState.existingDirectChat(npub) },
                 onOpenChat = { chat ->
-                    searchOpen = false
                     openGroupFromVisibleList(chat, null, false)
                 },
                 onOpenProfile = { npub ->
-                    searchOpen = false
                     presentProfileFromVisibleList(npub)
                 },
             )
