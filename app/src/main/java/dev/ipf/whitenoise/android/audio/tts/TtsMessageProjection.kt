@@ -3,8 +3,9 @@ package dev.ipf.whitenoise.android.audio.tts
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
-import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableText
-import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableText
+import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
+import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
+import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableProjection
 import kotlinx.coroutines.CancellationException
 
 /** Builds the single active message projection consumed by every TTS entry point. */
@@ -34,17 +35,17 @@ internal suspend fun projectTtsSpeakableEntry(
                 )
             }
         }
-    val speakableText =
+    val projection =
         if (document.blocks.isEmpty()) {
-            legacyTextToSpeakableText(source)
+            legacyTextToSpeakableProjection(source)
         } else {
-            markdownDocumentToSpeakableText(
+            markdownDocumentToSpeakableProjection(
                 document = document,
                 mentionDisplayName = mentionDisplayName,
                 isGroupMember = isGroupMember,
             )
         }
-    return speakableText
+    return projection.text
         .takeIf(String::isNotBlank)
         ?.let {
             TtsSpeakableEntry(
@@ -53,6 +54,16 @@ internal suspend fun projectTtsSpeakableEntry(
                 text = it,
                 messageIdHex = message.messageIdHex,
                 timelineAt = message.recordedAt,
+                spokenTextSpans = projection.toTtsSpans(),
+                projectionId = projection.projectionId,
             )
         }
 }
+
+private fun SpeakableTextProjection.toTtsSpans(): List<TtsSpokenTextSpan> =
+    spans.map { span ->
+        TtsSpokenTextSpan(
+            spoken = TtsTextRange(span.spokenStart, span.spokenEnd),
+            visible = TtsVisibleTextSpan(span.leafId, span.visibleStart, span.visibleEnd),
+        )
+    }

@@ -251,6 +251,93 @@ class MarkdownSpeakableTextTest {
     }
 
     @Test
+    @Suppress("LongMethod") // One mixed AST must prove leaf paths and projection identity together.
+    fun projectionUsesStableVisibleLeafCoordinatesAcrossListsCodeTablesAndMentions() {
+        val alice = "npub1" + "q".repeat(58)
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.ListBlock(
+                            kind = MarkdownListKindFfi.Bullet("-"),
+                            tight = true,
+                            items =
+                                listOf(
+                                    MarkdownListItemFfi(
+                                        blocks =
+                                            listOf(
+                                                MarkdownBlockFfi.Paragraph(
+                                                    listOf(MarkdownInlineFfi.Text("item")),
+                                                ),
+                                            ),
+                                        checked = null,
+                                        blankLinesBefore = byteArrayOf(),
+                                    ),
+                                ),
+                        ),
+                        MarkdownBlockFfi.CodeBlock(
+                            kind = MarkdownCodeBlockKindFfi.FENCED,
+                            info = "",
+                            content = "code",
+                        ),
+                        MarkdownBlockFfi.Table(
+                            alignments = listOf(MarkdownAlignmentFfi.NONE),
+                            header = listOf(MarkdownTableCellFfi(listOf(MarkdownInlineFfi.Text("head")))),
+                            rows =
+                                listOf(
+                                    listOf(
+                                        MarkdownTableCellFfi(listOf(MarkdownInlineFfi.Text("cell"))),
+                                    ),
+                                ),
+                        ),
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(
+                                MarkdownInlineFfi.NostrMention(
+                                    MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, alice),
+                                ),
+                            ),
+                        ),
+                    ),
+            )
+
+        val projection =
+            markdownDocumentToSpeakableProjection(
+                document = document,
+                mentionDisplayName = { "Alice" },
+                isGroupMember = { true },
+            )
+        val repeated =
+            markdownDocumentToSpeakableProjection(
+                document = document,
+                mentionDisplayName = { "Alice" },
+                isGroupMember = { true },
+            )
+        val renamed =
+            markdownDocumentToSpeakableProjection(
+                document = document,
+                mentionDisplayName = { "Alicia" },
+                isGroupMember = { true },
+            )
+
+        assertEquals("item. code. head. cell. @Alice.", projection.text)
+        assertEquals(
+            listOf(
+                SpeakableTextProjectionSpan(0, 4, "b0/i0/b0/n0", 0, 4),
+                SpeakableTextProjectionSpan(6, 10, "b1/code", 0, 4),
+                SpeakableTextProjectionSpan(12, 16, "b2/h0/n0", 0, 4),
+                SpeakableTextProjectionSpan(18, 22, "b2/r0/c0/n0", 0, 4),
+                SpeakableTextProjectionSpan(24, 30, "b3/n0", 0, 6),
+            ),
+            projection.spans,
+        )
+        assertTrue(projection.projectionId.isNotEmpty())
+        assertEquals(projection.projectionId, repeated.projectionId)
+        assertTrue(projection.projectionId != renamed.projectionId)
+    }
+
+    @Test
     fun nostrEntitiesMatchBubbleNamesMembershipPrefixesAndShortening() {
         val alice = "npub1" + "q".repeat(58)
         val bob = "npub1" + "p".repeat(58)

@@ -9,6 +9,83 @@ import java.util.Locale
 
 class TtsControllerTest {
     @Test
+    fun projectedMappingsSurviveChunkingAndEngineRangeCallbacks() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+        val entry =
+            TtsSpeakableEntry(
+                senderKey = "alice",
+                senderDisplayName = "Alice",
+                text = "Hello world.",
+                messageIdHex = "m1",
+                spokenTextSpans =
+                    listOf(
+                        TtsSpokenTextSpan(
+                            TtsTextRange(0, 11),
+                            TtsVisibleTextSpan("b0/n0", 0, 11),
+                        ),
+                    ),
+                projectionId = "projection-m1",
+            )
+
+        assertTrue(controller.speak(listOf(entry), Locale.US))
+        assertEquals(TtsPassage("m1", 0, "projection-m1"), controller.state.value.passage)
+
+        engine.range(index = 0, start = 13, end = 18)
+
+        assertEquals(
+            TtsPassage(
+                messageIdHex = "m1",
+                sentenceIndex = 0,
+                projectionId = "projection-m1",
+                visibleWord = listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
+            ),
+            controller.state.value.passage,
+        )
+
+        engine.stopped(index = 0)
+        assertEquals(TtsPassage("m1", 0, "projection-m1"), controller.state.value.passage)
+    }
+
+    @Test
+    fun projectedMappingsWithLeadingWhitespacePublishExactVisibleWord() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+        val entry =
+            TtsSpeakableEntry(
+                senderKey = "alice",
+                senderDisplayName = "Alice",
+                text = "  Hello world.  ",
+                messageIdHex = "m1",
+                spokenTextSpans =
+                    listOf(
+                        TtsSpokenTextSpan(
+                            TtsTextRange(2, 13),
+                            TtsVisibleTextSpan("b0/n0", 0, 11),
+                        ),
+                    ),
+                projectionId = "projection-m1",
+            )
+
+        assertTrue(controller.speak(listOf(entry), Locale.US))
+        assertEquals("Alice: Hello world.", engine.spoken.single().text)
+
+        engine.range(index = 0, start = 13, end = 18)
+
+        assertEquals(
+            TtsPassage(
+                messageIdHex = "m1",
+                sentenceIndex = 0,
+                projectionId = "projection-m1",
+                visibleWord = listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
+            ),
+            controller.state.value.passage,
+        )
+    }
+
+    @Test
     fun speakChunksTextAndAdvancesFromEngineCallbacks() {
         val engine = FakeTtsSpeechEngine()
         val focus = FakeTtsAudioFocus()
@@ -292,18 +369,24 @@ class TtsControllerTest {
     }
 
     @Test
-    fun staleCallbacksFromAReplacedEngineCannotAdvanceTheNewQueue() {
+    fun staleCallbacksFromAReplacedEngineCannotMutateTheNewQueue() {
         val firstEngine = FakeTtsSpeechEngine()
         val secondEngine = FakeTtsSpeechEngine()
         val controller = controller(FakeTtsAudioFocus())
         controller.attachEngine(firstEngine)
         controller.speak("Old one. Old two.", Locale.US)
         val staleCompletion = firstEngine.completionCallback
+        val staleError = firstEngine.errorCallback
+        val staleRange = firstEngine.rangeCallback
+        val staleStop = firstEngine.stopCallback
         val staleId = firstEngine.spoken.first().utteranceId
 
         controller.attachEngine(secondEngine)
         controller.speak("New one. New two.", Locale.US)
         staleCompletion?.invoke(staleId)
+        staleError?.invoke(staleId, TextToSpeech.ERROR_SYNTHESIS)
+        staleRange?.invoke(staleId, 0, 3, 0)
+        staleStop?.invoke(staleId, true)
 
         assertEquals(
             speakingTts(
@@ -599,7 +682,9 @@ class TtsControllerTest {
             private set
         var locale: Locale? = null
         var completionCallback: ((String?) -> Unit)? = null
-        private var errorCallback: ((String?, Int) -> Unit)? = null
+        var errorCallback: ((String?, Int) -> Unit)? = null
+        var rangeCallback: ((String?, Int, Int, Int) -> Unit)? = null
+        var stopCallback: ((String?, Boolean) -> Unit)? = null
 
         override fun setLanguage(locale: Locale): Int {
             this.locale = locale
@@ -615,15 +700,20 @@ class TtsControllerTest {
         override fun setCallbacks(
             onDone: (String?) -> Unit,
             onError: (String?, Int) -> Unit,
-            onRangeStart: (String?, Int, Int) -> Unit,
+            onRangeStart: (String?, Int, Int, Int) -> Unit,
+            onStop: (String?, Boolean) -> Unit,
         ) {
             completionCallback = onDone
             errorCallback = onError
+            rangeCallback = onRangeStart
+            stopCallback = onStop
         }
 
         override fun clearCallbacks() {
             completionCallback = null
             errorCallback = null
+            rangeCallback = null
+            stopCallback = null
         }
 
         override fun speak(
@@ -647,6 +737,18 @@ class TtsControllerTest {
             errorCode: Int,
         ) {
             errorCallback?.invoke(spoken[index].utteranceId, errorCode)
+        }
+
+        fun range(
+            index: Int,
+            start: Int,
+            end: Int,
+        ) {
+            rangeCallback?.invoke(spoken[index].utteranceId, start, end, 0)
+        }
+
+        fun stopped(index: Int) {
+            stopCallback?.invoke(spoken[index].utteranceId, true)
         }
     }
 

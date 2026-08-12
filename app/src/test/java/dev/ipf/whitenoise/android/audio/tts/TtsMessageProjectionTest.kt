@@ -8,10 +8,118 @@ import dev.ipf.marmotkit.MessageTagFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TtsMessageProjectionTest {
+    @Test
+    fun markdownProjectionKeepsStableVisibleLeafMappings() =
+        runBlocking {
+            val link =
+                MarkdownInlineFfi.Link(
+                    dest = "https://hidden.example/private",
+                    title = null,
+                    children = listOf(MarkdownInlineFfi.Text("docs")),
+                    classification = dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi.WEB,
+                )
+            val record =
+                message(
+                    plaintext = "Read **bold** [docs](https://hidden.example/private)",
+                    contentTokens =
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks =
+                                listOf(
+                                    MarkdownBlockFfi.Paragraph(
+                                        listOf(
+                                            MarkdownInlineFfi.Text("Read "),
+                                            MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("bold"))),
+                                            MarkdownInlineFfi.Text(" "),
+                                            link,
+                                        ),
+                                    ),
+                                ),
+                            blankLinesBefore = byteArrayOf(),
+                        ),
+                )
+
+            val entry =
+                projectTtsSpeakableEntry(
+                    message = record,
+                    editedText = null,
+                    senderDisplayName = "Alice",
+                    parseMarkdown = { error("stored tokens should win") },
+                )!!
+
+            assertEquals("Read bold docs.", entry.text)
+            assertEquals(
+                listOf(
+                    TtsSpokenTextSpan(TtsTextRange(0, 5), TtsVisibleTextSpan("b0/n0", 0, 5)),
+                    TtsSpokenTextSpan(TtsTextRange(5, 9), TtsVisibleTextSpan("b0/n1/n0", 0, 4)),
+                    TtsSpokenTextSpan(TtsTextRange(9, 10), TtsVisibleTextSpan("b0/n2", 0, 1)),
+                    TtsSpokenTextSpan(TtsTextRange(10, 14), TtsVisibleTextSpan("b0/n3/n0", 0, 4)),
+                ),
+                entry.spokenTextSpans,
+            )
+            assertTrue(entry.projectionId.isNotEmpty())
+            assertFalse(entry.text.contains("hidden.example"))
+        }
+
+    @Test
+    fun legacyProjectionMapsTextAfterARemovedUrlToItsActualVisibleOccurrence() =
+        runBlocking {
+            val emptyDocument =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = byteArrayOf(),
+                )
+            val entry =
+                projectTtsSpeakableEntry(
+                    message = message("before https://example.com/after after", contentTokens = emptyDocument),
+                    editedText = null,
+                    senderDisplayName = "Alice",
+                    parseMarkdown = { emptyDocument },
+                )!!
+
+            assertEquals("before after.", entry.text)
+            assertEquals(
+                listOf(
+                    TtsSpokenTextSpan(TtsTextRange(0, 7), TtsVisibleTextSpan("plain", 0, 7)),
+                    TtsSpokenTextSpan(TtsTextRange(7, 12), TtsVisibleTextSpan("plain", 33, 38)),
+                ),
+                entry.spokenTextSpans,
+            )
+        }
+
+    @Test
+    fun legacyProjectionMapsSanitizedVisibleOffsetsAndLeavesSyntheticPunctuationUnmapped() =
+        runBlocking {
+            val emptyDocument =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = byteArrayOf(),
+                )
+            val entry =
+                projectTtsSpeakableEntry(
+                    message = message("Hello😀 world", contentTokens = emptyDocument),
+                    editedText = null,
+                    senderDisplayName = "Alice",
+                    parseMarkdown = { emptyDocument },
+                )!!
+
+            assertEquals("Hello😀 world.", entry.text)
+            assertEquals(
+                listOf(
+                    TtsSpokenTextSpan(TtsTextRange(0, 13), TtsVisibleTextSpan("plain", 0, 13)),
+                ),
+                entry.spokenTextSpans,
+            )
+        }
+
     @Test
     fun originalAndEditedMessagesUseTheirActiveMarkdownDocument() =
         runBlocking {
