@@ -2193,7 +2193,13 @@ class WhiteNoiseAppState private constructor(
                     when (val result = messageDraftRepository.mergeText(accountRef, groupIdHex, text)) {
                         is MessageDraftMutationResult.Success -> {
                             result.draft?.let { draft ->
-                                draftStore.hydrate(accountRef, groupIdHex, draft.content, draft.createdAtMs, replaceExisting = true)
+                                draftStore.hydrate(
+                                    accountRef,
+                                    groupIdHex,
+                                    draft.content,
+                                    draft.createdAtMs,
+                                    replaceExisting = true,
+                                )
                             }
                             draftHydrationRevision += 1
                         }
@@ -5066,34 +5072,57 @@ class WhiteNoiseAppState private constructor(
         val accountRefsById = accounts.associate { it.accountIdHex to it.label }
         val legacyDrafts = withContext(Dispatchers.IO) { legacyDraftMigrationSource.read() }
         legacyDrafts.forEach { (legacyKey, encoded) ->
-            val separator = legacyKey.indexOf(' ')
-            if (separator <= 0 || separator == legacyKey.lastIndex) return@forEach
-            val accountRef = accountRefsById[legacyKey.substring(0, separator)] ?: return@forEach
-            val groupIdHex = legacyKey.substring(separator + 1)
-            val legacyContent = decodeLegacyDraftForMigration(encoded)
-            if (legacyContent == null) {
-                withContext(Dispatchers.IO) { legacyDraftMigrationSource.confirmMigrated(legacyKey) }
-                return@forEach
-            }
-            val currentResult = messageDraftRepository.draft(accountRef, groupIdHex)
-            if (currentResult.isFailure) return@forEach
-            val current = currentResult.getOrNull()
-            val result =
-                when {
-                    current == null -> messageDraftRepository.saveText(accountRef, groupIdHex, legacyContent)
-                    current.content.isBlank() && legacyContent.isNotBlank() ->
-                        messageDraftRepository.saveText(accountRef, groupIdHex, legacyContent)
-                    else -> MessageDraftMutationResult.Success(current)
+            migrateLegacyDraft(accountRefsById, legacyKey, encoded)
+        }
+    }
+
+    private suspend fun migrateLegacyDraft(
+        accountRefsById: Map<String, String>,
+        legacyKey: String,
+        encoded: String,
+    ) {
+        val separator = legacyKey.indexOf(' ')
+        separator.takeIf { it > 0 && it < legacyKey.lastIndex }?.let { validSeparator ->
+            accountRefsById[legacyKey.substring(0, validSeparator)]?.let { accountRef ->
+                val groupIdHex = legacyKey.substring(validSeparator + 1)
+                val legacyContent = decodeLegacyDraftForMigration(encoded)
+                if (legacyContent == null) {
+                    confirmLegacyDraftMigrated(legacyKey)
+                } else {
+                    migrateDecodedLegacyDraft(legacyKey, accountRef, groupIdHex, legacyContent)
                 }
-            val confirmed = result as? MessageDraftMutationResult.Success ?: return@forEach
-            if (
-                confirmed.draft?.content == legacyContent ||
-                (legacyContent.isBlank() && confirmed.draft == null) ||
-                current?.content?.isNotBlank() == true
-            ) {
-                withContext(Dispatchers.IO) { legacyDraftMigrationSource.confirmMigrated(legacyKey) }
             }
         }
+    }
+
+    private suspend fun migrateDecodedLegacyDraft(
+        legacyKey: String,
+        accountRef: String,
+        groupIdHex: String,
+        legacyContent: String,
+    ) {
+        val currentResult = messageDraftRepository.draft(accountRef, groupIdHex)
+        val current = currentResult.getOrNull()
+        if (currentResult.isSuccess) {
+            val result =
+                if (current == null || (current.content.isBlank() && legacyContent.isNotBlank())) {
+                    messageDraftRepository.saveText(accountRef, groupIdHex, legacyContent)
+                } else {
+                    MessageDraftMutationResult.Success(current)
+                }
+            (result as? MessageDraftMutationResult.Success)?.let { confirmed ->
+                val matchesLegacy = confirmed.draft?.content == legacyContent
+                val confirmedBlankDeletion = legacyContent.isBlank() && confirmed.draft == null
+                val authoritativeContentWins = current?.content?.isNotBlank() == true
+                if (matchesLegacy || confirmedBlankDeletion || authoritativeContentWins) {
+                    confirmLegacyDraftMigrated(legacyKey)
+                }
+            }
+        }
+    }
+
+    private suspend fun confirmLegacyDraftMigrated(legacyKey: String) {
+        withContext(Dispatchers.IO) { legacyDraftMigrationSource.confirmMigrated(legacyKey) }
     }
 
     suspend fun authoritativeConversationMuteSettings(groupIdHex: String) =

@@ -236,7 +236,11 @@ class DraftStore internal constructor(
     ) {
         synchronized(lock) {
             val k = key(accountRef, groupIdHex)
-            if (draftedAtMs == null) draftedAtSeconds.remove(k) else draftedAtSeconds[k] = draftedAtMs / MILLIS_PER_SECOND
+            if (draftedAtMs == null) {
+                draftedAtSeconds.remove(k)
+            } else {
+                draftedAtSeconds[k] = draftedAtMs / MILLIS_PER_SECOND
+            }
         }
         onDraftSortOrderChanged?.invoke()
     }

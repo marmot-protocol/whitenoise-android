@@ -58,17 +58,20 @@ class ChatMutePreferences(
         groupIdHex: String,
         mode: ChatNotifyMode,
     ) {
-        if (mode == ChatNotifyMode.NONE) return
-        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return
-        synchronized(mutationLock) {
-            val updated = _state.value.notificationModes.toMutableMap()
-            if (mode == ChatNotifyMode.ALL) updated.remove(key) else updated[key] = mode
-            if (updated == _state.value.notificationModes) return
-            _state.value = ChatNotificationState(updated.toMap())
-            preferences
-                .edit()
-                .putStringSet(KEY_MENTION_ONLY_CONVERSATIONS, updated.filterValues { it == ChatNotifyMode.MENTIONS_ONLY }.keys)
-                .apply()
+        val key = compositeKeyOrNull(accountRef, groupIdHex)
+        if (mode != ChatNotifyMode.NONE && key != null) {
+            synchronized(mutationLock) {
+                val updated = _state.value.notificationModes.toMutableMap()
+                if (mode == ChatNotifyMode.ALL) updated.remove(key) else updated[key] = mode
+                if (updated != _state.value.notificationModes) {
+                    _state.value = ChatNotificationState(updated.toMap())
+                    val mentionOnly = updated.filterValues { it == ChatNotifyMode.MENTIONS_ONLY }.keys
+                    preferences
+                        .edit()
+                        .putStringSet(KEY_MENTION_ONLY_CONVERSATIONS, mentionOnly)
+                        .apply()
+                }
+            }
         }
     }
 
@@ -130,14 +133,18 @@ class ChatMutePreferences(
 
         private fun decodeMuteExpiry(encoded: String): Pair<String, MuteExpiry>? {
             val fields = encoded.split(EXPIRY_FIELD_SEPARATOR, limit = EXPIRY_FIELD_COUNT)
-            if (fields.size != EXPIRY_FIELD_COUNT) return null
-            val expiry = fields[0].takeIf(String::isNotEmpty)?.toLongOrNull()
-            if (fields[0].isNotEmpty() && expiry == null) return null
-            val restore =
-                ChatNotifyMode.entries.firstOrNull { it.name == fields[1] }
-                    ?: fields[1].toIntOrNull()?.let(ChatNotifyMode.entries::getOrNull)
-                    ?: return null
-            return fields[2] to MuteExpiry(expiry, restore)
+            return fields.takeIf { it.size == EXPIRY_FIELD_COUNT }?.let { validFields ->
+                val expiry = validFields[0].takeIf(String::isNotEmpty)?.toLongOrNull()
+                val expiryIsValid = validFields[0].isEmpty() || expiry != null
+                val restore =
+                    ChatNotifyMode.entries.firstOrNull { it.name == validFields[1] }
+                        ?: validFields[1].toIntOrNull()?.let(ChatNotifyMode.entries::getOrNull)
+                if (expiryIsValid && restore != null) {
+                    validFields[2] to MuteExpiry(expiry, restore)
+                } else {
+                    null
+                }
+            }
         }
 
         fun compositeKey(

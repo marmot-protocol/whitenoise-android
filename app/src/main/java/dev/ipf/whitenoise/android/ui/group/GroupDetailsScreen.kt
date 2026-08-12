@@ -401,7 +401,11 @@ internal fun GroupDetailsScreen(
         }
     }
     val muteOverride = appState.conversationMuteOverride(controller.group.groupIdHex)
-    val conversationMuted = muteOverride?.muted ?: controller.latestChatListRow?.muted ?: targetedMuteSettings?.muted ?: engineMuted
+    val conversationMuted =
+        muteOverride?.muted
+            ?: controller.latestChatListRow?.muted
+            ?: targetedMuteSettings?.muted
+            ?: engineMuted
     val muteCommandPending = appState.isConversationMutePending(controller.group.groupIdHex)
     // Android retains only the All/Only-mentions preference behind MDK's mute.
     val conversationRestoreMode =
