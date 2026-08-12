@@ -75,6 +75,12 @@ class MessageBubbleTtsHighlightScreenshotTest {
         capture("message_bubble_tts_markdown_outgoing_word_large_font")
     }
 
+    @Test
+    fun editedMarkdownIncomingWordHighlightLight() {
+        renderEditedMarkdown(mine = false, darkTheme = false, amoled = false)
+        capture("message_bubble_tts_edited_markdown_incoming_word_light")
+    }
+
     private fun capture(name: String) {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/$name.png")
     }
@@ -141,6 +147,47 @@ class MessageBubbleTtsHighlightScreenshotTest {
         val resolver = rememberTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = if (largeFont) 1.3f else 1f) {
+                BubbleFixture(mine = mine, tag = TAG) {
+                    MarkdownMessageBody(
+                        document,
+                        ttsLeafHighlightResolver = resolver,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun renderEditedMarkdown(
+        mine: Boolean,
+        darkTheme: Boolean,
+        amoled: Boolean,
+    ) {
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            inlines =
+                                listOf(
+                                    MarkdownInlineFfi.Text("Edited "),
+                                    MarkdownInlineFfi.Emph(listOf(MarkdownInlineFfi.Text("value"))),
+                                ),
+                        ),
+                    ),
+            )
+        val projection = markdownDocumentToSpeakableProjection(document)
+        val passage =
+            TtsPassage(
+                messageIdHex = "m1",
+                sentenceIndex = 0,
+                projectionId = projection.projectionId,
+                visibleWord = listOf(TtsVisibleTextSpan("b0/n1/n0", 0, 5)),
+            )
+        val resolver = rememberTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 BubbleFixture(mine = mine, tag = TAG) {
                     MarkdownMessageBody(
                         document,

@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.retentionIndicatorVisible
@@ -301,6 +302,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
     bodyText: String?,
+    bodyMarkdownDocument: MarkdownDocumentFfi? = null,
     deleted: Boolean,
     persistedFailure: Boolean,
     textSelectionMode: Boolean,
@@ -346,12 +348,12 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     val readMoreLabel = stringResource(R.string.message_read_more)
     val readMoreStyle = SpanStyle(color = bubbleContentColor, fontWeight = FontWeight.Bold)
     if (bodyText != null) {
-        val markdownDocument = record.contentTokens
+        val markdownDocument = bodyMarkdownDocument ?: record.contentTokens
         val renderMarkdownBody =
             !deleted &&
                 !persistedFailure &&
                 markdownDocument.blocks.isNotEmpty() &&
-                bodyText == record.plaintext
+                (bodyText == record.plaintext || bodyMarkdownDocument != null)
         val density = LocalDensity.current
         val lineHeightPx =
             with(density) { (MaterialTheme.typography.bodyLarge.lineHeight).toPx() }

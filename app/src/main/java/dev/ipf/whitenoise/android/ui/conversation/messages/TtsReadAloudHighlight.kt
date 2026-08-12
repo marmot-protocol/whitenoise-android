@@ -21,14 +21,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
-import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
+import dev.ipf.whitenoise.android.audio.tts.speakableProjectionFromDocument
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
-import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
-import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableProjection
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -45,34 +43,35 @@ internal data class TtsReadAloudProgress(
 )
 
 internal fun messageSpeakableProjection(
-    record: AppMessageRecordFfi,
     bodyText: String,
-    editedText: String?,
+    document: MarkdownDocumentFfi,
     mentionDisplayName: ((String) -> String?)?,
     isGroupMember: ((String) -> Boolean)?,
-): SpeakableTextProjection? {
-    if (bodyText.isBlank()) return null
-    val hasActiveEdit = record.kind == 9uL && !editedText.isNullOrBlank()
-    val document =
-        if (!hasActiveEdit && record.contentTokens.blocks.isNotEmpty() && bodyText == record.plaintext) {
-            record.contentTokens
-        } else {
-            MarkdownDocumentFfi(
-                truncated = false,
-                blocks = emptyList(),
-                blankLinesBefore = byteArrayOf(),
-            )
-        }
-    return if (document.blocks.isEmpty()) {
-        legacyTextToSpeakableProjection(bodyText)
-    } else {
-        markdownDocumentToSpeakableProjection(
-            document = document,
-            mentionDisplayName = mentionDisplayName,
-            isGroupMember = isGroupMember,
-        )
+): SpeakableTextProjection? =
+    speakableProjectionFromDocument(
+        source = bodyText,
+        document = document,
+        mentionDisplayName = mentionDisplayName,
+        isGroupMember = isGroupMember,
+    )
+
+internal fun effectiveTtsHighlightPassage(
+    ttsHighlightPassage: TtsPassage?,
+    messageIdHex: String,
+    projectionId: String?,
+    textSelectionMode: Boolean,
+): TtsPassage? =
+    ttsHighlightPassage?.takeIf {
+        !textSelectionMode &&
+            !projectionId.isNullOrEmpty() &&
+            it.messageIdHex == messageIdHex &&
+            it.projectionId == projectionId
     }
-}
+
+internal fun effectiveTtsReadAloudProgress(
+    progress: TtsReadAloudProgress?,
+    effectivePassage: TtsPassage?,
+): TtsReadAloudProgress? = progress.takeIf { effectivePassage != null }
 
 internal fun rememberTtsLeafHighlightResolver(
     passage: TtsPassage?,

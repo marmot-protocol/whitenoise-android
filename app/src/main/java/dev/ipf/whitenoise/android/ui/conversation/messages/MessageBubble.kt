@@ -68,11 +68,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
+import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -121,6 +124,8 @@ import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.map
 import kotlin.math.roundToInt
 
@@ -513,31 +518,90 @@ internal fun MessageBubble(
             ttsHasUsableEngine = appState.ttsHasUsableEngine,
         )
     val speakAloudLabel = stringResource(R.string.speak_aloud)
-    val effectiveTtsPassage =
-        if (textSelectionMode || ttsHighlightPassage?.messageIdHex != record.messageIdHex) {
-            null
-        } else {
-            ttsHighlightPassage
+    val ttsSpeakableSource =
+        remember(record, editState, deleted, persistedFailure) {
+            if (deleted || persistedFailure) {
+                null
+            } else {
+                resolveTtsSpeakableSource(
+                    message = record,
+                    editedText = editState?.latestText?.takeIf { record.kind == 9uL },
+                )
+            }
         }
+    val speakableIdentity =
+        messageBubbleTtsSpeakableIdentity(
+            bodyText = ttsSpeakableSource?.text,
+            deleted = deleted,
+            persistedFailure = persistedFailure,
+        )
+    val ttsGateInput =
+        MessageBubbleTtsGateInput(
+            messageIdHex = record.messageIdHex,
+            ttsHighlightPassage = ttsHighlightPassage,
+            textSelectionMode = textSelectionMode,
+            deleted = deleted,
+            persistedFailure = persistedFailure,
+            speakableIdentity = speakableIdentity,
+        )
+    val effectiveTtsCandidate = messageBubbleTtsProjectionCandidate(ttsGateInput)
+    var activeSpeakableDocument by remember(record.messageIdHex, ttsSpeakableSource, record.contentTokens) {
+        mutableStateOf<MarkdownDocumentFfi?>(null)
+    }
+    LaunchedEffect(
+        effectiveTtsCandidate,
+        ttsSpeakableSource,
+        record.messageIdHex,
+        record.contentTokens,
+    ) {
+        if (!effectiveTtsCandidate || speakableIdentity == null || ttsSpeakableSource == null) {
+            activeSpeakableDocument = null
+            return@LaunchedEffect
+        }
+        val document =
+            resolveTtsSpeakableDocument(
+                message = record,
+                source = ttsSpeakableSource,
+                parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
+            )
+        currentCoroutineContext().ensureActive()
+        activeSpeakableDocument = document
+    }
     val speakableProjection =
         remember(
-            record.messageIdHex,
-            displayedBody,
-            editState,
+            activeSpeakableDocument,
+            effectiveTtsCandidate,
+            speakableIdentity,
             controller.membersLoaded,
         ) {
-            messageSpeakableProjection(
-                record = record,
-                bodyText = displayedBody,
-                editedText = editState?.latestText,
-                mentionDisplayName = appState::mentionDisplayName,
-                isGroupMember =
-                    if (controller.membersLoaded) {
-                        { bech32: String -> appState.isRosterMember(bech32, controller.members) }
-                    } else {
-                        null
-                    },
-            )
+            if (!effectiveTtsCandidate || speakableIdentity == null) {
+                null
+            } else {
+                activeSpeakableDocument?.let { document ->
+                    messageSpeakableProjection(
+                        bodyText = speakableIdentity.bodyText,
+                        document = document,
+                        mentionDisplayName = appState::mentionDisplayName,
+                        isGroupMember =
+                            if (controller.membersLoaded) {
+                                { bech32: String -> appState.isRosterMember(bech32, controller.members) }
+                            } else {
+                                null
+                            },
+                    )
+                }
+            }
+        }
+    val ttsProjectionState =
+        resolveMessageBubbleTtsProjectionState(
+            gateInput = ttsGateInput,
+            projectionId = speakableProjection?.projectionId,
+            progress = ttsReadAloudProgress,
+        )
+    val effectiveTtsPassage = ttsProjectionState.effectivePassage
+    val editedMarkdownDocument =
+        activeSpeakableDocument?.takeIf {
+            effectiveTtsCandidate && editState != null && record.kind == 9uL
         }
     val ttsLeafHighlightResolver =
         remember(effectiveTtsPassage, speakableProjection, record.messageIdHex) {
@@ -548,7 +612,7 @@ internal fun MessageBubble(
                 locale = java.util.Locale.getDefault(),
             )
         }
-    val effectiveTtsReadAloudProgress = ttsReadAloudProgress.takeIf { effectiveTtsPassage != null }
+    val effectiveTtsReadAloudProgress = ttsProjectionState.effectiveProgress
     // Issue #390 v1 forwards text only. Forward must be hidden for any record
     // whose displayed body is a synthetic surrogate (media filename/placeholder,
     // "Reacted …", delete/system summaries, agent-stream copy) — forwarding
@@ -1367,6 +1431,7 @@ internal fun MessageBubble(
                                     controller = controller,
                                     appState = appState,
                                     bodyText = bodyTextToRender,
+                                    bodyMarkdownDocument = editedMarkdownDocument,
                                     deleted = deleted,
                                     persistedFailure = persistedFailure,
                                     textSelectionMode = textSelectionMode,
@@ -1428,6 +1493,7 @@ internal fun MessageBubble(
                                     controller = controller,
                                     appState = appState,
                                     bodyText = bodyTextToRender,
+                                    bodyMarkdownDocument = editedMarkdownDocument,
                                     deleted = deleted,
                                     persistedFailure = persistedFailure,
                                     textSelectionMode = textSelectionMode,
@@ -1489,6 +1555,7 @@ internal fun MessageBubble(
                             controller = controller,
                             appState = appState,
                             bodyText = bodyTextToRender,
+                            bodyMarkdownDocument = editedMarkdownDocument,
                             deleted = deleted,
                             persistedFailure = persistedFailure,
                             textSelectionMode = textSelectionMode,
