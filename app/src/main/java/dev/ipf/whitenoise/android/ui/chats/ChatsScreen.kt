@@ -116,7 +116,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.time.ZoneId
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -159,9 +158,10 @@ internal fun ChatsScreen(
     val folderHandoff = rememberFolderHandoff(appState.activeAccountRef)
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     val selectionMode = selectedChatIds.isNotEmpty()
-    // This stacked change supplies the typed Date and Content sections that the
-    // base search-state shell intentionally leaves unavailable.
-    val interactiveGlobalSearchFilterSectionsAvailable = true
+    // Typed Date and Content filters cannot be exposed until the MDK search
+    // contract executes them. Keeping this false prevents the UI from claiming
+    // that results are filtered when only the ordinary text query is applied.
+    val interactiveGlobalSearchFilterSectionsAvailable = false
     val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
     val mutedConversations = chatNotificationState.mutedConversations
     val searchOpen = globalSearchState.isOpen
@@ -359,28 +359,13 @@ internal fun ChatsScreen(
     val trimmedQuery = searchQuery.trim()
     val ciSearchNeedle = remember(trimmedQuery) { trimmedQuery.lowercase(Locale.ROOT) }
     val bodySearchGroupIds = remember(sourceList) { sourceList.map { it.id }.sorted() }
-    LaunchedEffect(
-        trimmedQuery,
-        showArchived,
-        bodySearchGroupIds,
-        globalSearchState.dateFilterSelection,
-        globalSearchState.contentFilterSelection,
-    ) {
-        val searchProjection =
-            globalSearchState.projectSearchRequest(
-                zoneId = ZoneId.systemDefault(),
-                nowMillis = System.currentTimeMillis(),
-            )
-        if (searchProjection.requiresTypedMdkContract) {
-            bodyMatches = emptyMap()
-            return@LaunchedEffect
-        }
-        if (searchProjection.query.isEmpty()) {
+    LaunchedEffect(trimmedQuery, showArchived, bodySearchGroupIds) {
+        if (trimmedQuery.isEmpty()) {
             bodyMatches = emptyMap()
             return@LaunchedEffect
         }
         delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
-        bodyMatches = controller.searchMessageBodies(sourceList, searchProjection.query)
+        bodyMatches = controller.searchMessageBodies(sourceList, trimmedQuery)
     }
     // Resolve a pasted Nostr identifier in the search field (#344). An npub is
     // validated (and normalized) via the FFI key parser — no network. A NIP-05
@@ -933,9 +918,16 @@ internal fun ChatsScreen(
             }
         },
     ) { padding ->
-        GlobalSearchTypedFilterSheet(
-            state = globalSearchPresentationState,
-            onStateChange = onGlobalSearchStateChange,
+        GlobalSearchFilterSheet(
+            visible =
+                shouldPresentGlobalSearchFilterSheet(
+                    searchState = globalSearchState,
+                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
+                    selectionMode = selectionMode,
+                ),
+            onDismiss = {
+                onGlobalSearchStateChange(GlobalSearchTransitions::dismissFilterSheet)
+            },
         )
         Column(Modifier.fillMaxSize().padding(padding)) {
             if (appState.appUpdateInfo.shouldShowBanner) {

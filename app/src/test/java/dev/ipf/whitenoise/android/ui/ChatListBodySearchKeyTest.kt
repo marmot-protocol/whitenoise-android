@@ -8,22 +8,6 @@ class ChatListBodySearchKeyTest {
     @Test
     fun bodySearchEffectKeysOnStableGroupIdsNotLiveSourceListIdentity() {
         val source = chatsScreenSource().readText()
-        val stableEffectKey =
-            listOf(
-                "LaunchedEffect(",
-                "        trimmedQuery,",
-                "        showArchived,",
-                "        bodySearchGroupIds,",
-                "        globalSearchState.dateFilterSelection,",
-                "        globalSearchState.contentFilterSelection,",
-                "    )",
-            ).joinToString("\n")
-        val bodySearchEffectIndex = source.indexOf(stableEffectKey)
-        val projectionIndex = source.indexOf("globalSearchState.projectSearchRequest(")
-        val typedGuardIndex = source.indexOf("if (searchProjection.requiresTypedMdkContract)")
-        val clearMatchesIndex = source.indexOf("bodyMatches = emptyMap()", startIndex = typedGuardIndex)
-        val legacySearchIndex =
-            source.indexOf("controller.searchMessageBodies(sourceList, searchProjection.query)")
 
         assertTrue(
             "body-search must derive a stable sorted id snapshot",
@@ -31,24 +15,30 @@ class ChatListBodySearchKeyTest {
         )
         assertTrue(
             "body-search effect must not key directly on sourceList identity",
-            stableEffectKey in source &&
+            "LaunchedEffect(trimmedQuery, showArchived, bodySearchGroupIds)" in source &&
                 "LaunchedEffect(trimmedQuery, sourceList)" !in source,
         )
         assertTrue(
-            "the expensive search still runs against the current source list snapshot",
-            legacySearchIndex >= 0,
+            "ordinary message-body search must keep using the trimmed text query",
+            "controller.searchMessageBodies(sourceList, trimmedQuery)" in source,
         )
         assertTrue(
-            "time-sensitive date bounds must be projected when the body-search request runs",
-            bodySearchEffectIndex >= 0 &&
-                projectionIndex > bodySearchEffectIndex &&
-                projectionIndex < legacySearchIndex,
+            "unsupported typed filters must not suppress ordinary body matches",
+            "requiresTypedMdkContract" !in source,
+        )
+    }
+
+    @Test
+    fun typedFiltersStayOutOfProductionUntilMdkSearchSupportsThem() {
+        val source = chatsScreenSource().readText()
+
+        assertTrue(
+            "typed filter controls must stay gated while the MDK contract is unavailable",
+            "val interactiveGlobalSearchFilterSectionsAvailable = false" in source,
         )
         assertTrue(
-            "typed filters must clear matches before the legacy body-search call",
-            typedGuardIndex >= 0 &&
-                clearMatchesIndex > typedGuardIndex &&
-                clearMatchesIndex < legacySearchIndex,
+            "the typed filter sheet must not be wired into the production chat list yet",
+            "GlobalSearchTypedFilterSheet(" !in source,
         )
     }
 
