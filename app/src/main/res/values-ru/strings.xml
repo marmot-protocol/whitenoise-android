@@ -1356,6 +1356,7 @@
     <string name="tts_bar_next_message">Следующее сообщение</string>
     <string name="tts_bar_progress">Предложение %1$d из %2$d, сообщение %3$d из %4$d</string>
     <string name="tts_bar_stop">Остановить чтение</string>
+    <string name="tts_resume_follow">Возобновить слежение</string>
     <string name="tts_bar_error">Не удалось прочитать вслух</string>
     <string name="tts_bar_history_loading">Загрузка других сообщений…</string>
     <string name="tts_bar_history_error">Не удалось загрузить другие сообщения. Нажмите ещё раз, чтобы повторить.</string>

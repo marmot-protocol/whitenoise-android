@@ -27,6 +27,7 @@ internal class TtsRangeTracker {
                 messageIdHex = chunk.messageIdHex,
                 sentenceIndex = chunk.sentenceIndex,
                 projectionId = chunk.projectionId,
+                timelineAt = chunk.timelineAt,
             )
         }
 

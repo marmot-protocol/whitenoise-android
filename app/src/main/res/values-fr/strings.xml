@@ -1302,6 +1302,7 @@
     <string name="tts_bar_next_message">Message suivant</string>
     <string name="tts_bar_progress">Phrase %1$d sur %2$d, message %3$d sur %4$d</string>
     <string name="tts_bar_stop">Arrêter la lecture</string>
+    <string name="tts_resume_follow">Reprendre le suivi</string>
     <string name="tts_bar_error">Lecture à voix haute impossible</string>
     <string name="tts_bar_history_loading">Chargement d\'autres messages…</string>
     <string name="tts_bar_history_error">Impossible de charger d\'autres messages. Touchez à nouveau pour réessayer.</string>

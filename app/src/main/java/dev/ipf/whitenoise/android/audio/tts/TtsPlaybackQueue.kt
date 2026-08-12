@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 sealed interface TtsState {
+    /** Changes only when a new playback queue is started, not on pause or requeue. */
+    val sessionId: Long
     val chunkIndex: Int
     val chunkCount: Int
     val messageIndex: Int
@@ -18,6 +20,7 @@ sealed interface TtsState {
     val passage: TtsPassage?
 
     data class Idle(
+        override val sessionId: Long = 0L,
         override val chunkIndex: Int = 0,
         override val chunkCount: Int = 0,
         override val messageIndex: Int = 0,
@@ -31,6 +34,7 @@ sealed interface TtsState {
     ) : TtsState
 
     data class Speaking(
+        override val sessionId: Long = 0L,
         override val chunkIndex: Int,
         override val chunkCount: Int,
         override val messageIndex: Int,
@@ -44,6 +48,7 @@ sealed interface TtsState {
     ) : TtsState
 
     data class Paused(
+        override val sessionId: Long = 0L,
         override val chunkIndex: Int,
         override val chunkCount: Int,
         override val messageIndex: Int,
@@ -58,6 +63,7 @@ sealed interface TtsState {
 
     data class Error(
         val error: TtsError,
+        override val sessionId: Long = 0L,
         override val chunkIndex: Int,
         override val chunkCount: Int,
         override val messageIndex: Int,
@@ -137,6 +143,8 @@ internal class TtsPlaybackQueue(
     private var currentIndex = 0
     private var generation = 0L
     private var messageProgressGeneration = 0L
+    private var playbackSessionId: Long = 0L
+    private var nextPlaybackSessionId: Long = 0L
     private val rangeTracker = TtsRangeTracker()
     private var refreshAtNextBoundary = false
     private var announceSenderForCurrentMessage = false
@@ -179,6 +187,8 @@ internal class TtsPlaybackQueue(
         stopEngine()
         generation += 1
         messageProgressGeneration += 1
+        playbackSessionId = nextPlaybackSessionId
+        nextPlaybackSessionId += 1
         rangeTracker.clear()
         refreshAtNextBoundary = false
         replaceMessages(messages)
@@ -189,7 +199,7 @@ internal class TtsPlaybackQueue(
         pendingResumeAnnouncement = null
         messageIndexAtPause = null
         if (chunks.isEmpty()) {
-            _state.value = TtsState.Idle()
+            _state.value = TtsState.Idle(sessionId = playbackSessionId)
             return
         }
         enqueueFromCurrentIndex()
@@ -326,7 +336,7 @@ internal class TtsPlaybackQueue(
         senderAnnouncedAtMessageIndex = null
         pendingResumeAnnouncement = null
         messageIndexAtPause = null
-        _state.value = TtsState.Idle()
+        _state.value = TtsState.Idle(sessionId = playbackSessionId)
     }
 
     fun skipNextMessage(deferAtEdge: Boolean = false): TtsNavigationOutcome {
@@ -658,6 +668,7 @@ internal class TtsPlaybackQueue(
         messageIndexAtPause = null
         _state.value =
             TtsState.Idle(
+                sessionId = playbackSessionId,
                 chunkIndex = completedCount,
                 chunkCount = completedCount,
                 messageIndex = completedMessages,
@@ -695,6 +706,7 @@ internal class TtsPlaybackQueue(
         _state.value =
             TtsState.Error(
                 error = error,
+                sessionId = playbackSessionId,
                 chunkIndex = chunkIndex,
                 chunkCount = chunkCount,
                 messageIndex = messageIndex,
@@ -726,7 +738,7 @@ internal class TtsPlaybackQueue(
 
     private fun enqueueFromCurrentIndex() {
         if (chunks.isEmpty()) {
-            _state.value = TtsState.Idle()
+            _state.value = TtsState.Idle(sessionId = playbackSessionId)
             return
         }
         publishSpeaking(currentIndex)
@@ -868,6 +880,7 @@ internal class TtsPlaybackQueue(
         )
         _state.value =
             TtsState.Speaking(
+                sessionId = playbackSessionId,
                 chunkIndex = chunkIndex,
                 chunkCount = chunks.size,
                 messageIndex = messageIndex,
@@ -894,6 +907,7 @@ internal class TtsPlaybackQueue(
         )
         _state.value =
             TtsState.Paused(
+                sessionId = playbackSessionId,
                 chunkIndex = chunkIndex,
                 chunkCount = chunks.size,
                 messageIndex = messageIndex,

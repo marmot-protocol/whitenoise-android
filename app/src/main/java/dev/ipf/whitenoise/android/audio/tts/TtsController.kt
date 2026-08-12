@@ -334,6 +334,7 @@ class TtsController internal constructor(
                             index = 0,
                             messageIdHex = messageIdHex,
                             projectionId = projectionId,
+                            timelineAt = timelineAt,
                             visibleSpans = spokenTextSpans.forChunk(sourceStart, sourceEnd),
                         )
                     },
