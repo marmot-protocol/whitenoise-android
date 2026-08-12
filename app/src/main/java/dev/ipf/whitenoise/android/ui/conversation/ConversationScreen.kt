@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -528,7 +529,20 @@ internal fun ConversationScreen(
                     },
             )
         }
-    val ttsPlaybackState by appState.ttsController.state.collectAsState()
+
+    // Reading the source value here supplies the mapped StateFlow's real current
+    // projection; subsequent updates are observed by collectAsState.
+    @SuppressLint("StateFlowValueCalledInComposition")
+    val ttsFollowSignal by
+        remember(appState.ttsController) {
+            appState.ttsController.state
+                .map(TtsState::conversationFollowSignal)
+                .distinctUntilChanged()
+        }.collectAsState(
+            initial =
+                appState.ttsController.state.value
+                    .conversationFollowSignal(),
+        )
     val ownsTtsFollowSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
     val ttsFollowPolicy = remember(controller, listState) { ConversationTtsFollowPolicy() }
     var ttsFollowResumeGeneration by remember(controller, listState) { mutableStateOf(0L) }
@@ -1521,8 +1535,8 @@ internal fun ConversationScreen(
             appState.ttsController.state.value
                 .conversationFollowTargetOrNull() == target
 
-    val observedTtsFollowTarget = ttsPlaybackState.conversationFollowTargetOrNull()
-    val ttsFollowIsSpeaking = ttsPlaybackState is TtsState.Speaking
+    val observedTtsFollowTarget = ttsFollowSignal.target
+    val ttsFollowIsSpeaking = ttsFollowSignal.isSpeaking
     val ttsFollowMessageId = observedTtsFollowTarget?.messageIdHex
     val ttsFollowEdit = ttsFollowMessageId?.let(controller.editsByTarget::get)
     val ttsFollowDeleted = ttsFollowMessageId != null && ttsFollowMessageId in controller.deletedMessageIds
@@ -1535,7 +1549,7 @@ internal fun ConversationScreen(
         ttsFollowEdit,
         ttsFollowDeleted,
     ) {
-        ttsFollowPolicy.observe(ttsPlaybackState, ownsTtsFollowSession)
+        ttsFollowPolicy.observe(appState.ttsController.state.value, ownsTtsFollowSession)
         if (!initialTimelineAnchored) return@LaunchedEffect
         val target = ttsFollowPolicy.claimPendingTarget() ?: return@LaunchedEffect
         if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect

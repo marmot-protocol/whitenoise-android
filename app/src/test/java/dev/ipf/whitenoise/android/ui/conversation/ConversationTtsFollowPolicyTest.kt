@@ -5,6 +5,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -33,6 +34,35 @@ class ConversationTtsFollowPolicyTest {
         val second = speaking(sessionId = 1, sentenceIndex = 1)
         policy.observe(second, ownsSession = true)
         assertEquals(second.followTarget(), policy.claimPendingTarget())
+    }
+
+    @Test
+    fun wordProgressDoesNotChangeTheConversationFollowSignal() {
+        val sentenceFallback = speaking(sessionId = 1, sentenceIndex = 0)
+        val exactWord =
+            sentenceFallback.copy(
+                passage =
+                    sentenceFallback.passage?.copy(
+                        visibleWord = listOf(TtsVisibleTextSpan("plain", 0, 5)),
+                    ),
+            )
+
+        assertEquals(sentenceFallback.conversationFollowSignal(), exactWord.conversationFollowSignal())
+    }
+
+    @Test
+    fun followRelevantTransitionsChangeTheConversationFollowSignal() {
+        val firstSentence = speaking(sessionId = 1, sentenceIndex = 0)
+
+        assertNotEquals(firstSentence.conversationFollowSignal(), paused(firstSentence).conversationFollowSignal())
+        assertNotEquals(
+            firstSentence.conversationFollowSignal(),
+            speaking(sessionId = 1, sentenceIndex = 1).conversationFollowSignal(),
+        )
+        assertNotEquals(
+            firstSentence.conversationFollowSignal(),
+            TtsState.Idle(sessionId = 1).conversationFollowSignal(),
+        )
     }
 
     @Test

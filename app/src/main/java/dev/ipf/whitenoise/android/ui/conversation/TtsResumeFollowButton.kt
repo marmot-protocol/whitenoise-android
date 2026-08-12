@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -19,7 +20,7 @@ internal fun TtsResumeFollowButton(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.defaultMinSize(minHeight = 48.dp),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,

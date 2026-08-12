@@ -18,6 +18,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -49,6 +50,7 @@ class ConversationTtsFollowComposeTest {
     val composeRule = createComposeRule()
 
     @Test
+    @Config(qualifiers = "mdpi")
     fun directDragSuspendsFollowButProgrammaticScrollDoesNotAndResumeIsAccessible() {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -97,7 +99,8 @@ class ConversationTtsFollowComposeTest {
             .onNodeWithText(resumeLabel)
             .assertIsDisplayed()
             .assertHasClickAction()
-            .performClick()
+            .assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithText(resumeLabel).performClick()
         composeRule.onNodeWithText(resumeLabel).assertDoesNotExist()
     }
 

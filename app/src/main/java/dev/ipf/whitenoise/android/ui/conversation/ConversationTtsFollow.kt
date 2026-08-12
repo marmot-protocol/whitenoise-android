@@ -17,6 +17,11 @@ internal data class ConversationTtsFollowTarget(
     val timelineAt: ULong,
 )
 
+internal data class ConversationTtsFollowSignal(
+    val target: ConversationTtsFollowTarget?,
+    val isSpeaking: Boolean,
+)
+
 internal fun TtsState.conversationFollowTargetOrNull(): ConversationTtsFollowTarget? {
     val passage = passage
     if ((this !is TtsState.Speaking && this !is TtsState.Paused) || passage == null) return null
@@ -29,6 +34,12 @@ internal fun TtsState.conversationFollowTargetOrNull(): ConversationTtsFollowTar
         timelineAt = passage.timelineAt,
     )
 }
+
+internal fun TtsState.conversationFollowSignal(): ConversationTtsFollowSignal =
+    ConversationTtsFollowSignal(
+        target = conversationFollowTargetOrNull(),
+        isSpeaking = this is TtsState.Speaking,
+    )
 
 /**
  * Conversation-local follow policy. Only direct drag input calls [onUserDrag];
