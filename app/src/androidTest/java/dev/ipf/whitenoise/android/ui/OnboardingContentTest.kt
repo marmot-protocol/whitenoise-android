@@ -41,14 +41,14 @@ class OnboardingContentTest {
 
         composeRule.onNodeWithContentDescription("White Noise logo").assertIsDisplayed()
         composeRule.onNodeWithText("Sign Up").assertIsDisplayed()
-        composeRule.onNodeWithText("Login").assertIsDisplayed()
+        composeRule.onNodeWithText("Sign In").assertIsDisplayed()
         composeRule.onNodeWithText("Import Existing Identity").assertDoesNotExist()
         composeRule.onNodeWithText("Nostr nsec").assertDoesNotExist()
 
         composeRule.onNodeWithText("Sign Up").performClick()
         composeRule.runOnIdle { assertEquals(1, createClicks) }
 
-        composeRule.onNodeWithText("Login").performClick()
+        composeRule.onNodeWithText("Sign In").performClick()
         composeRule.onNodeWithText("Nostr nsec").assertIsDisplayed()
         composeRule.onNodeWithText("Import Existing Identity").assertDoesNotExist()
 

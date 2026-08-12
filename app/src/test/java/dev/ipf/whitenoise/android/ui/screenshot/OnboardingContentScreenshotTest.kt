@@ -25,7 +25,7 @@ import org.robolectric.annotation.GraphicsMode
  * frame is tall enough to show the whole lockup — plain WN mark, "White Noise"
  * wordmark, the rotating slogan (captured at its first frame, "Decentralized",
  * since the test doesn't advance the clock), and the bottom slate with the
- * Login and Sign Up actions — in one shot.
+ * Sign In and Sign Up actions — in one shot.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
