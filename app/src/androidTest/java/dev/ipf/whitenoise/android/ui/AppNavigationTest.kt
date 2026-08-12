@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -153,6 +155,9 @@ class AppNavigationTest {
         }
         composeRule.waitForIdle()
 
+        // Seeding promotes a new list head, which closes row input for the
+        // head-reorder gate window — click only once the row re-enables.
+        awaitEnabledRow(GROUP_A_NAME)
         composeRule.onNodeWithText(GROUP_A_NAME).performClick()
         composeRule.onNodeWithText(GROUP_A_NAME).assertIsDisplayed()
 
@@ -169,6 +174,7 @@ class AppNavigationTest {
         }
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        awaitEnabledRow(GROUP_B_NAME)
         composeRule.onNodeWithText(GROUP_B_NAME).performClick()
         composeRule.onNodeWithText(GROUP_B_NAME).assertIsDisplayed()
         val headerBefore = composeRule.onNodeWithTag(CONVERSATION_TOP_BAR_TAG).fetchSemanticsNode().boundsInRoot
@@ -287,6 +293,15 @@ class AppNavigationTest {
     private fun attachedChatsController(appState: WhiteNoiseAppState): ChatsController? {
         val field = WhiteNoiseAppState::class.java.getDeclaredField("chatsController").apply { isAccessible = true }
         return field.get(appState) as? ChatsController
+    }
+
+    private fun awaitEnabledRow(name: String) {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule
+                .onAllNodes(hasText(name) and isEnabled())
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
     }
 
     private fun seedGroup(
