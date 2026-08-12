@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+
 /**
  * Pure shell navigation state for deciding whether an in-flight group-create
  * completion may open its conversation. Each [ShellNavigationEvent.CreateSubmitted]
@@ -11,6 +14,32 @@ internal data class ShellNavigationState(
     /** Generation captured when [ShellNavigationEvent.NotificationRequestReceived] arms routing. */
     val notificationArmedGeneration: Long? = null,
 )
+
+/**
+ * Persists only the lightweight shell ownership generations. A restored
+ * NewGroupSetupScreen retains its create request token, so the matching shell
+ * token must survive the same Activity/process recreation for its eventual
+ * authoritative-read completion to remain eligible to navigate.
+ */
+internal val ShellNavigationStateSaver: Saver<ShellNavigationState, Any> =
+    listSaver<ShellNavigationState, Long>(
+        save = { state ->
+            listOf(
+                state.navigationGeneration,
+                state.pendingCreateRequestToken ?: NO_SHELL_NAVIGATION_TOKEN,
+                state.notificationArmedGeneration ?: NO_SHELL_NAVIGATION_TOKEN,
+            )
+        },
+        restore = { saved ->
+            ShellNavigationState(
+                navigationGeneration = saved[0],
+                pendingCreateRequestToken = saved[1].takeUnless { it == NO_SHELL_NAVIGATION_TOKEN },
+                notificationArmedGeneration = saved[2].takeUnless { it == NO_SHELL_NAVIGATION_TOKEN },
+            )
+        },
+    )
+
+private const val NO_SHELL_NAVIGATION_TOKEN = 0L
 
 internal data class ShellNavigationTransition(
     val state: ShellNavigationState,

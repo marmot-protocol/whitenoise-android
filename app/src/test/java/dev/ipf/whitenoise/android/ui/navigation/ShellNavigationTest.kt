@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import androidx.compose.runtime.saveable.SaverScope
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -7,6 +8,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ShellNavigationTest {
+    private val saveableScope = SaverScope { true }
+
     /**
      * Mirrors MainShell: explicit opens always commit; create completion commits
      * only when [ShellNavigationTransition.createOpenAccepted] is true.
@@ -364,5 +367,40 @@ class ShellNavigationTest {
 
         assertTrue(first.createRequestTokenMinted!! < second.createRequestTokenMinted!!)
         assertEquals(second.createRequestTokenMinted, second.state.pendingCreateRequestToken)
+    }
+
+    @Test
+    fun restoredCreateOwnershipAcceptsAuthoritativeReadRetryCompletion() {
+        val submitted = reduceShellNavigation(ShellNavigationState(), ShellNavigationEvent.CreateSubmitted)
+        val requestToken = submitted.createRequestTokenMinted!!
+        val saved = with(ShellNavigationStateSaver) { saveableScope.save(submitted.state) }!!
+        val restored = ShellNavigationStateSaver.restore(saved)!!
+
+        val completion =
+            reduceShellNavigation(
+                restored,
+                ShellNavigationEvent.CreateCompleted("created-group", requestToken),
+            )
+
+        assertEquals(submitted.state, restored)
+        assertTrue(completion.createOpenAccepted)
+    }
+
+    @Test
+    fun restoredRevokedOwnershipStillRejectsStaleCompletion() {
+        val submitted = reduceShellNavigation(ShellNavigationState(), ShellNavigationEvent.CreateSubmitted)
+        val requestToken = submitted.createRequestTokenMinted!!
+        val revoked = reduceShellNavigation(submitted.state, ShellNavigationEvent.CreateFlowSuperseded).state
+        val saved = with(ShellNavigationStateSaver) { saveableScope.save(revoked) }!!
+        val restored = ShellNavigationStateSaver.restore(saved)!!
+
+        val completion =
+            reduceShellNavigation(
+                restored,
+                ShellNavigationEvent.CreateCompleted("stale-group", requestToken),
+            )
+
+        assertEquals(revoked, restored)
+        assertFalse(completion.createOpenAccepted)
     }
 }

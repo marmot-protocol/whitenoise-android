@@ -264,7 +264,9 @@ internal fun MainShell(
     // Tracks whether an in-flight group-create completion may still open its
     // conversation. Explicit shell navigation advances [navigationGeneration]
     // and invalidates a captured pending generation (issue #1953).
-    var shellNavState by remember { mutableStateOf(ShellNavigationState()) }
+    var shellNavState by rememberSaveable(stateSaver = ShellNavigationStateSaver) {
+        mutableStateOf(ShellNavigationState())
+    }
     val profileGroupForegroundState =
         remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
     var armedNotificationRequestId by remember { mutableLongStateOf(0L) }
