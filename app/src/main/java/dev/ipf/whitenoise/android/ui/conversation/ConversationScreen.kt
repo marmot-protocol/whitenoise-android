@@ -3102,6 +3102,12 @@ internal fun ConversationScreen(
                         }
                     }
             }
+            ConversationTransientNotice(
+                notice = appState.transientNotice,
+                accountRef = appState.activeAccountRef,
+                groupIdHex = controller.group.groupIdHex,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
             if (composerAttachmentSheet.isOpen) {
                 // Transparent scrim over the transcript only — the composer
                 // stays reachable, so the keyboard and emoji toggles can still
@@ -3176,7 +3182,14 @@ internal fun ConversationScreen(
                                 },
                             )
                         when (result.succeeded) {
-                            result.attempted -> appState.presentTransient(R.string.batch_delete_complete)
+                            result.attempted ->
+                                controller.boundAccountRef?.let { accountRef ->
+                                    appState.presentConversationTransient(
+                                        accountRef = accountRef,
+                                        groupIdHex = controller.group.groupIdHex,
+                                        titleRes = R.string.batch_delete_complete,
+                                    )
+                                }
                             0 -> appState.present(R.string.batch_delete_failed, copyable = true)
                             else -> appState.present(R.string.batch_delete_partial, copyable = true)
                         }

@@ -1,17 +1,38 @@
 package dev.ipf.whitenoise.android.ui
 
+import android.content.Context
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.DraftPersistence
+import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isForConversation
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.account.SettingsAccountHeader
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TOP_BAR_TAG
+import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.settings.SettingsTopBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -118,6 +139,88 @@ class AppNavigationTest {
     }
 
     @Test
+    fun groupConfirmationStaysInsideItsOriginatingConversationWithoutMovingHeader() {
+        val appState = appState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MainShell(appState = appState)
+            }
+        }
+        val chatsController = awaitAttachedChatsController(appState)
+        composeRule.runOnIdle {
+            seedGroup(chatsController, GROUP_A, GROUP_A_NAME, activity = 2uL)
+            seedGroup(chatsController, GROUP_B, GROUP_B_NAME, activity = 1uL)
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(GROUP_A_NAME).performClick()
+        composeRule.onNodeWithText(GROUP_A_NAME).assertIsDisplayed()
+
+        val deliverGroupAResult = CompletableDeferred<Unit>()
+        composeRule.runOnIdle {
+            appState.launchMutation {
+                deliverGroupAResult.await()
+                appState.presentConversationTransient(
+                    accountRef = ACCOUNT_REF,
+                    groupIdHex = GROUP_A,
+                    title = AppText.Plain(NOTICE_TEXT),
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        composeRule.onNodeWithText(GROUP_B_NAME).performClick()
+        composeRule.onNodeWithText(GROUP_B_NAME).assertIsDisplayed()
+        val headerBefore = composeRule.onNodeWithTag(CONVERSATION_TOP_BAR_TAG).fetchSemanticsNode().boundsInRoot
+
+        composeRule.runOnIdle { deliverGroupAResult.complete(Unit) }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            appState.transientNotice?.isForConversation(ACCOUNT_REF, GROUP_A) == true
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(NOTICE_TEXT).assertDoesNotExist()
+        val headerAfter =
+            composeRule.onNodeWithTag(CONVERSATION_TOP_BAR_TAG).fetchSemanticsNode().boundsInRoot
+        assertEquals(headerBefore, headerAfter)
+    }
+
+    @Test
+    fun globalConfirmationStaysClearOfSettingsAccountActionsDuringNavigation() {
+        val appState = appState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ShellTransientNoticeLayout(notice = appState.transientNotice) {
+                    MainShell(appState = appState)
+                }
+            }
+        }
+        awaitAttachedChatsController(appState)
+
+        composeRule.runOnIdle {
+            appState.presentTransient(AppText.Plain(GLOBAL_NOTICE_TEXT))
+        }
+        composeRule.onNodeWithContentDescription("Open settings").performClick()
+
+        composeRule.onNodeWithText("Settings").assertIsDisplayed()
+        val selector =
+            composeRule
+                .onNodeWithContentDescription("Switch Account")
+                .assertIsDisplayed()
+                .assertHasClickAction()
+        val qr =
+            composeRule
+                .onNodeWithContentDescription("My QR code")
+                .assertIsDisplayed()
+                .assertHasClickAction()
+        val notice = composeRule.onNodeWithTag(GLOBAL_TRANSIENT_NOTICE_TAG).assertIsDisplayed()
+
+        val noticeBounds = notice.fetchSemanticsNode().boundsInRoot
+        assertTrue(selector.fetchSemanticsNode().boundsInRoot.bottom <= noticeBounds.top)
+        assertTrue(qr.fetchSemanticsNode().boundsInRoot.bottom <= noticeBounds.top)
+    }
+
+    @Test
     fun accountHeaderSeparatesSelectorFromQrAction() {
         var selectorClicks = 0
         var qrClicks = 0
@@ -149,5 +252,104 @@ class AppNavigationTest {
             assertEquals(1, selectorClicks)
             assertEquals(1, qrClicks)
         }
+    }
+
+    private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    private fun appState() =
+        WhiteNoiseAppState(
+            context = context,
+            draftStore = DraftStore(DiscardedDrafts),
+            accountIdHexResolver = { ACCOUNT_ID },
+            accounts =
+                listOf(
+                    AccountSummaryFfi(
+                        label = ACCOUNT_REF,
+                        accountIdHex = ACCOUNT_ID,
+                        localSigning = true,
+                        externalSigning = false,
+                        signedOut = false,
+                        running = true,
+                    ),
+                ),
+            activeAccountRef = ACCOUNT_REF,
+        )
+
+    private fun awaitAttachedChatsController(appState: WhiteNoiseAppState): ChatsController {
+        var controller: ChatsController? = null
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            controller = attachedChatsController(appState)
+            controller?.boundAccountRef == ACCOUNT_REF && controller?.isLoading == false
+        }
+        return requireNotNull(controller)
+    }
+
+    private fun attachedChatsController(appState: WhiteNoiseAppState): ChatsController? {
+        val field = WhiteNoiseAppState::class.java.getDeclaredField("chatsController").apply { isAccessible = true }
+        return field.get(appState) as? ChatsController
+    }
+
+    private fun seedGroup(
+        controller: ChatsController,
+        groupId: String,
+        name: String,
+        activity: ULong,
+    ) = controller.applyChatListRow(chatRow(groupId, name, activity))
+
+    private fun chatRow(
+        groupId: String,
+        name: String,
+        activity: ULong,
+    ) = ChatListRowFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
+        unreadMentionCount = 0uL,
+        unreadMention = false,
+        groupIdHex = groupId,
+        archived = false,
+        pendingConfirmation = false,
+        title = name,
+        groupName = name,
+        avatarUrl = null,
+        avatar = null,
+        lastMessage = null,
+        unreadCount = 0uL,
+        hasUnread = false,
+        firstUnreadMessageIdHex = null,
+        lastReadMessageIdHex = null,
+        lastReadTimelineAt = null,
+        conversationCreatedAt = activity,
+        activitySortAt = activity,
+        updatedAt = activity,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        manuallyMarkedUnread = false,
+        conversationKind = ChatConversationKindFfi.GROUP,
+        muted = false,
+        mutedUntilMs = null,
+        pinned = false,
+        pinnedPosition = null,
+        lifecycleState = GroupLifecycleStateFfi.STABLE,
+        disbanding = false,
+        disbandRequest = null,
+    )
+
+    private object DiscardedDrafts : DraftPersistence {
+        override fun read(): Map<String, String> = emptyMap()
+
+        override fun write(
+            key: String,
+            value: String?,
+        ) = Unit
+    }
+
+    private companion object {
+        const val ACCOUNT_REF = "alice"
+        val ACCOUNT_ID = "a0".repeat(32)
+        val GROUP_A = "c2".repeat(32)
+        val GROUP_B = "c3".repeat(32)
+        const val GROUP_A_NAME = "Group A"
+        const val GROUP_B_NAME = "Group B"
+        const val NOTICE_TEXT = "Admin added"
+        const val GLOBAL_NOTICE_TEXT = "Notifications enabled"
     }
 }

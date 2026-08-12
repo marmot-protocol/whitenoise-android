@@ -131,6 +131,7 @@ import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.conversation.ConversationTransientNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
 import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
@@ -879,6 +880,13 @@ internal fun GroupDetailsScreen(
                         )
                     }
                 },
+            )
+        },
+        bottomBar = {
+            ConversationTransientNotice(
+                notice = appState.transientNotice,
+                accountRef = appState.activeAccountRef,
+                groupIdHex = controller.group.groupIdHex,
             )
         },
     ) { padding ->
