@@ -2544,6 +2544,9 @@ internal fun ConversationScreen(
     // long-message reader's composer, so in-progress text never drifts between
     // them. Created at screen scope so both the bottom-bar composer and the
     // per-message reader can receive the same instance.
+    LaunchedEffect(appState.activeAccountRef, controller.group.groupIdHex) {
+        appState.loadDraft(controller.group.groupIdHex)
+    }
     val restoredDraftSnapshot = appState.draftSnapshotFor(controller.group.groupIdHex)
     val composerShareRevision =
         rememberComposerShareRevision(
@@ -2727,7 +2730,10 @@ internal fun ConversationScreen(
                 onDraftChange = { appState.setDraft(controller.group.groupIdHex, it) },
                 composerTextState = composerTextState,
                 composerAttachmentSheet = composerAttachmentSheet,
-                onAfterSend = { revealSentMessage() },
+                onAfterSend = {
+                    appState.clearDraftAfterSuccessfulSend(controller.group.groupIdHex)
+                    revealSentMessage()
+                },
                 onPickFromGallery = {
                     imagePickerLauncher.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
@@ -3290,7 +3296,7 @@ internal fun ConversationScreen(
         onCaptionAccepted = { seededCaption ->
             if (composerTextState.valueState.value.text == seededCaption) {
                 composerTextState.valueState.value = TextFieldValue("")
-                appState.setDraft(controller.group.groupIdHex, TextFieldValue(""))
+                appState.clearDraftAfterSuccessfulSend(controller.group.groupIdHex)
             }
         },
         onAddPhotos = {
@@ -3299,6 +3305,9 @@ internal fun ConversationScreen(
             )
         },
         onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
-        onAfterSend = { revealSentMessage(bottomTimelineIndex) },
+        onAfterSend = {
+            appState.clearDraftAfterSuccessfulSend(controller.group.groupIdHex)
+            revealSentMessage(bottomTimelineIndex)
+        },
     )
 }

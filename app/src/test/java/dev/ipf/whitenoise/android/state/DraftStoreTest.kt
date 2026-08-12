@@ -50,7 +50,7 @@ class DraftStoreTest {
 
     @Test
     fun getReturnsNullWhenNoDraft() {
-        assertNull(store().get(accountIdHex = "a", groupIdHex = "g"))
+        assertNull(store().get(accountRef = "a", groupIdHex = "g"))
     }
 
     @Test
@@ -58,7 +58,7 @@ class DraftStoreTest {
         val s = store()
 
         repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 25) { index ->
-            assertNull(s.get(accountIdHex = "a", groupIdHex = "missing-$index"))
+            assertNull(s.get(accountRef = "a", groupIdHex = "missing-$index"))
         }
 
         assertEquals(DraftStore.MAX_IN_MEMORY_DRAFT_STATES, s.draftStateCountForTest())
@@ -118,7 +118,7 @@ class DraftStoreTest {
         val s = store()
 
         repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 25) { index ->
-            s.set(accountIdHex = "a", groupIdHex = "missing-$index", value = TextFieldValue(" "))
+            s.set(accountRef = "a", groupIdHex = "missing-$index", value = TextFieldValue(" "))
         }
 
         assertEquals(0, s.draftStateCountForTest())
@@ -130,7 +130,7 @@ class DraftStoreTest {
         s.set("a", "kept", TextFieldValue("draft"))
 
         repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 25) { index ->
-            s.get(accountIdHex = "a", groupIdHex = "missing-$index")
+            s.get(accountRef = "a", groupIdHex = "missing-$index")
         }
 
         assertEquals("draft", s.get("a", "kept"))
@@ -197,6 +197,25 @@ class DraftStoreTest {
         val restored = s.getDraft("a", "g")!!
         assertEquals(malformed, restored.textFieldValue.text)
         assertFalse(restored.focusOnRestore)
+    }
+
+    @Test
+    fun legacyMigrationDropsMalformedVersionedBlobButKeepsRawText() {
+        val malformed = "${COMPOSER_DRAFT_VERSION_PREFIX}bad"
+
+        assertNull(decodeLegacyDraftForMigration(malformed))
+        assertEquals("legacy draft", decodeLegacyDraftForMigration("legacy draft"))
+    }
+
+    @Test
+    fun authoritativeReconcileClearsStaleLifecycleText() {
+        val s = store()
+        s.set("a", "g", TextFieldValue("stale"))
+
+        s.replaceFromAuthoritative("a", "g", content = null, draftedAtMs = null)
+
+        assertNull(s.get("a", "g"))
+        assertNull(s.draftedAtSecondsFor("a", "g"))
     }
 
     @Test

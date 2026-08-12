@@ -54,6 +54,19 @@ internal fun decodeComposerDraftStored(stored: String): ComposerDraftSnapshot =
         else -> legacyComposerDraftSnapshot(stored)
     }
 
+/**
+ * Decodes a value from the retired Android draft store for one-time MDK migration.
+ * Raw legacy text remains valid, while malformed versioned blobs are dropped instead
+ * of being copied into MDK as control-character-prefixed message text.
+ */
+internal fun decodeLegacyDraftForMigration(stored: String): String? {
+    val decoded = decodeComposerDraftStored(stored)
+    val isVersioned =
+        stored.startsWith(COMPOSER_DRAFT_V2_PREFIX) ||
+            stored.startsWith(COMPOSER_DRAFT_VERSION_PREFIX)
+    return decoded.textFieldValue.text.takeUnless { isVersioned && !decoded.focusOnRestore }
+}
+
 private fun decodeVersionedComposerDraftV2(stored: String): ComposerDraftSnapshot {
     val body = stored.substring(COMPOSER_DRAFT_V2_PREFIX.length)
     val fields = body.split(FIELD_SEPARATOR, limit = VERSIONED_DRAFT_V2_FIELD_COUNT)

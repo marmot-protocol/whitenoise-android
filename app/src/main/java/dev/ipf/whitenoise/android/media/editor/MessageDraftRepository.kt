@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.media.editor
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
+import dev.ipf.marmotkit.MessageDraftSummaryFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,8 @@ internal interface MessageDraftGateway {
         accountRef: String,
         groupIdHex: String,
     )
+
+    fun summaries(accountRef: String): List<MessageDraftSummaryFfi> = emptyList()
 }
 
 internal class MarmotMessageDraftGateway(
@@ -57,6 +60,8 @@ internal class MarmotMessageDraftGateway(
         accountRef: String,
         groupIdHex: String,
     ) = marmot().deleteMessageDraft(accountRef, groupIdHex)
+
+    override fun summaries(accountRef: String): List<MessageDraftSummaryFfi> = marmot().messageDrafts(accountRef)
 }
 
 internal sealed interface MessageDraftMutationResult {
@@ -112,22 +117,42 @@ internal class MessageDraftRepository(
             }
         }
 
+    @Suppress("TooGenericExceptionCaught") // FFI failures are returned; cancellation must retain structured semantics.
+    suspend fun summaries(accountRef: String): Result<List<MessageDraftSummaryFfi>> =
+        withContext(ioDispatcher) {
+            try {
+                Result.success(gateway.summaries(accountRef))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (cause: Exception) {
+                Result.failure(cause)
+            }
+        }
+
     suspend fun saveText(
         accountRef: String,
         groupIdHex: String,
         content: String,
+    ): MessageDraftMutationResult = mutate(accountRef, groupIdHex) { saveTextLocked(accountRef, groupIdHex, content) }
+
+    suspend fun mergeText(
+        accountRef: String,
+        groupIdHex: String,
+        incoming: String,
     ): MessageDraftMutationResult =
         mutate(accountRef, groupIdHex) {
+            val trimmedIncoming = incoming.trim()
+            if (trimmedIncoming.isEmpty()) {
+                return@mutate MessageDraftMutationResult.Success(gateway.read(accountRef, groupIdHex))
+            }
             val current = gateway.read(accountRef, groupIdHex)
-            MessageDraftMutationResult.Success(
-                gateway.save(
-                    accountRef = accountRef,
-                    groupIdHex = groupIdHex,
-                    content = content,
-                    replyToMessageIdHex = current?.replyToMessageIdHex,
-                    mediaAttachments = current?.mediaAttachments.orEmpty(),
-                ),
-            )
+            val merged =
+                if (current?.content.isNullOrBlank()) {
+                    trimmedIncoming
+                } else {
+                    "${current.content.trimEnd()}\n$trimmedIncoming"
+                }
+            saveTextLocked(accountRef, groupIdHex, merged, current)
         }
 
     suspend fun addAttachment(
@@ -230,10 +255,11 @@ internal class MessageDraftRepository(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (cause: Exception) {
-                val reread = runCatching { gateway.read(accountRef, groupIdHex) }.getOrNull()
+                val rereadResult = authoritativeDraft(accountRef, groupIdHex)
+                val reread = rereadResult.getOrNull()
                 val committed =
                     if (deleteEmptyDraft) {
-                        reread == null
+                        rereadResult.isSuccess && reread == null
                     } else {
                         reread?.mediaAttachments?.none { it.id == attachmentId } == true
                     }
@@ -251,9 +277,66 @@ internal class MessageDraftRepository(
         groupIdHex: String,
     ): MessageDraftMutationResult =
         mutate(accountRef, groupIdHex) {
-            gateway.delete(accountRef, groupIdHex)
-            MessageDraftMutationResult.Success(draft = null)
+            try {
+                gateway.delete(accountRef, groupIdHex)
+                MessageDraftMutationResult.Success(draft = null)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (cause: Exception) {
+                val authoritative = authoritativeDraft(accountRef, groupIdHex)
+                if (authoritative.isSuccess && authoritative.getOrNull() == null) {
+                    MessageDraftMutationResult.Success(draft = null)
+                } else {
+                    MessageDraftMutationResult.Failure(cause)
+                }
+            }
         }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun saveTextLocked(
+        accountRef: String,
+        groupIdHex: String,
+        content: String,
+        alreadyRead: MessageDraftFfi? = null,
+    ): MessageDraftMutationResult {
+        val current = alreadyRead ?: gateway.read(accountRef, groupIdHex)
+        val deleteEmpty =
+            content.isBlank() &&
+                current?.replyToMessageIdHex == null &&
+                current?.mediaAttachments.orEmpty().isEmpty()
+        return try {
+            val saved =
+                if (deleteEmpty) {
+                    gateway.delete(accountRef, groupIdHex)
+                    null
+                } else {
+                    gateway.save(
+                        accountRef = accountRef,
+                        groupIdHex = groupIdHex,
+                        content = content,
+                        replyToMessageIdHex = current?.replyToMessageIdHex,
+                        mediaAttachments = current?.mediaAttachments.orEmpty(),
+                    )
+                }
+            MessageDraftMutationResult.Success(saved)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (cause: Exception) {
+            val authoritativeResult = authoritativeDraft(accountRef, groupIdHex)
+            val authoritative = authoritativeResult.getOrNull()
+            val committed =
+                if (deleteEmpty) {
+                    authoritativeResult.isSuccess && authoritative == null
+                } else {
+                    authoritative?.content == content
+                }
+            if (committed) {
+                MessageDraftMutationResult.Success(authoritative)
+            } else {
+                MessageDraftMutationResult.Failure(cause)
+            }
+        }
+    }
 
     /**
      * Repairs pending adjunct records against authoritative MDK attachment
@@ -336,7 +419,7 @@ internal class MessageDraftRepository(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (cause: Exception) {
-            val reread = runCatching { gateway.read(accountRef, groupIdHex) }.getOrNull()
+            val reread = authoritativeDraft(accountRef, groupIdHex).getOrNull()
             val committed =
                 reread?.mediaAttachments?.any {
                     it.id == changedAttachment.id && it.editorDigest() == changedDigest
@@ -359,6 +442,18 @@ internal class MessageDraftRepository(
             }
         }
     }
+
+    private fun authoritativeDraft(
+        accountRef: String,
+        groupIdHex: String,
+    ): Result<MessageDraftFfi?> =
+        try {
+            Result.success(gateway.read(accountRef, groupIdHex))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (cause: Exception) {
+            Result.failure(cause)
+        }
 
     private fun finishAttachmentCommit(
         accountRef: String,
