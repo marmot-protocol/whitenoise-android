@@ -2,7 +2,9 @@ package dev.ipf.whitenoise.android.ui.group
 
 import android.text.format.DateUtils
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -156,7 +158,9 @@ class MuteDurationDialogTest {
         )
 
         composeRule.onNodeWithText(context.getString(R.string.mute_duration_custom)).performScrollTo().performClick()
-        composeRule.onNodeWithText("Wednesday, August 12, 2026").performClick()
+        composeRule
+            .onNode(hasText("12", substring = true) and hasClickAction())
+            .performClick()
         composeRule.onNodeWithTag(MUTE_CUSTOM_DATE_CONFIRM_TAG).performClick()
         composeRule.onNode(hasContentDescription("7 o'clock", substring = true)).performClick()
         composeRule.onNodeWithTag(MUTE_CUSTOM_TIME_CONFIRM_TAG).performClick()
