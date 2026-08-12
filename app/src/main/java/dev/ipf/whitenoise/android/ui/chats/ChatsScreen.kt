@@ -88,7 +88,6 @@ import dev.ipf.whitenoise.android.core.applyChatListSearchAndFilter
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
-import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
@@ -162,8 +161,6 @@ internal fun ChatsScreen(
     // contract executes them. Keeping this false prevents the UI from claiming
     // that results are filtered when only the ordinary text query is applied.
     val interactiveGlobalSearchFilterSectionsAvailable = false
-    val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
-    val mutedConversations = chatNotificationState.mutedConversations
     val searchOpen = globalSearchState.isOpen
     val searchQuery = globalSearchState.query
     val globalSearchPresentationState =
@@ -199,28 +196,12 @@ internal fun ChatsScreen(
     // Effective folder membership: manual members plus rule matches,
     // re-derived from the live list so rule-driven chats join and leave
     // folders as rosters, unread state, and mute state change.
-    val isLocallyMuted: (String) -> Boolean =
-        remember(mutedConversations, appState.activeAccountRef) {
-            { groupIdHex ->
-                appState.activeAccountRef
-                    ?.let { ChatMutePreferences.compositeKey(it, groupIdHex) in mutedConversations } == true
-            }
-        }
-    val engineMutedChatIds =
-        remember(controller.items) {
-            controller.items
-                .asSequence()
-                .filter { it.engineMuted() }
-                .map { it.group.groupIdHex }
-                .toSet()
-        }
     val resolveFolderChatIds: (String) -> Set<String> =
         remember(
             folderStoreState,
             appState.activeAccountRef,
             controller.items,
             controller.archivedItems,
-            mutedConversations,
             groupTitleCopy,
             // Keyword rules match the rendered row title, which resolves as
             // peer profiles land — re-derive when the presentation cache bumps.
@@ -233,14 +214,20 @@ internal fun ChatsScreen(
                         // list; every other folder from the active one.
                         val rule = appState.chatFolderPreferences.folderRule(accountRef, folderId)
                         val archivedSource = rule?.archivedOnly == true
+                        val sourceItems = if (archivedSource) controller.archivedItems else controller.items
+                        val engineMutedChatIds =
+                            sourceItems
+                                .asSequence()
+                                .filter { it.engineMuted() }
+                                .map { it.group.groupIdHex }
+                                .toSet()
                         chatFolderChatIds(
-                            items = if (archivedSource) controller.archivedItems else controller.items,
+                            items = sourceItems,
                             manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folderId),
                             rule = rule,
                             activeAccountIdHex = appState.activeAccount?.accountIdHex,
                             isMuted = { groupIdHex ->
-                                ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations ||
-                                    groupIdHex in engineMutedChatIds
+                                groupIdHex in engineMutedChatIds
                             },
                             displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
                         )
@@ -486,10 +473,7 @@ internal fun ChatsScreen(
     val singleSelectedPinnedIndex = singleSelectedItem?.let(::pinnedIndex)
     val singleSelectionMuted =
         singleSelectedItem?.let { item ->
-            item.engineMuted() ||
-                appState.activeAccountRef?.let { accountRef ->
-                    ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in mutedConversations
-                } == true
+            item.engineMuted()
         } ?: false
 
     fun archiveChats(
@@ -1105,7 +1089,7 @@ internal fun ChatsScreen(
                                             item = item,
                                             appState = appState,
                                             isMuted =
-                                                item.engineMuted() || isLocallyMuted(item.group.groupIdHex),
+                                                item.engineMuted(),
                                             interactionsEnabled = !headReorderInProgress,
                                             selectionMode = selectionMode,
                                             selected = item.id in selectedChatIds,
@@ -1213,7 +1197,7 @@ internal fun ChatsScreen(
         ?.let { id -> visibleItems.firstOrNull { it.id == id } }
         ?.let { item ->
             val hasUnread = item.effectiveHasUnread(appState.activeAccount?.accountIdHex)
-            val muted = item.engineMuted() || isLocallyMuted(item.group.groupIdHex)
+            val muted = item.engineMuted()
             val pinnedIndex = pinnedIndex(item)
             ChatActionSheet(
                 hasUnread = hasUnread,

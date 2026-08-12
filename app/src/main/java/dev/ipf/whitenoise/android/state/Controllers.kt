@@ -1589,6 +1589,7 @@ private suspend fun WhiteNoiseAppState.deleteGroupLocalWithClientCleanup(
     groupIdHex: String,
 ) {
     evictGroupMediaCaches(account, groupIdHex)
+    deleteDraftBeforeGroupRemoval(account, groupIdHex)
     marmotIo { deleteGroupLocal(account, groupIdHex) }
     dismissConversationNotifications(account, groupIdHex)
 }
@@ -3415,6 +3416,7 @@ class ChatsController private constructor(
             }
             return
         }
+        appState.refreshDraftSummaries(accountRef)
         try {
             var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
             var catchUpStarted = keepLoadedContent
@@ -4067,6 +4069,9 @@ class ChatsController private constructor(
         row: ChatListRowFfi,
         trigger: ChatListUpdateTriggerFfi? = null,
     ) {
+        if (trigger == ChatListUpdateTriggerFfi.MUTE_CHANGED || trigger == ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH) {
+            appState.acceptAuthoritativeMuteProjection(accountRef, row.groupIdHex, row.muted, row.mutedUntilMs)
+        }
         val key = chatRowKey(row.groupIdHex)
         val state = optimisticChatListPreviewByGroup[key]
         val current = state?.baselineRow ?: chatRowsByGroup[key]
@@ -4121,6 +4126,9 @@ class ChatsController private constructor(
     }
 
     private fun replaceChatRows(rows: List<ChatListRowFfi>) {
+        rows.forEach {
+            appState.acceptAuthoritativeMuteProjection(accountRef, it.groupIdHex, it.muted, it.mutedUntilMs)
+        }
         val previousRowsByGroup =
             chatRowsByGroup.keys.associateWith { key ->
                 optimisticChatListPreviewByGroup[key]?.baselineRow ?: chatRowsByGroup.getValue(key)
@@ -5016,12 +5024,9 @@ class ChatsController private constructor(
             return
         }
         pendingRecompute = false
-        // Drafts are keyed by accountIdHex; accountRef is the bound label, so
-        // translate before the lookup or every draft misses.
-        val draftAccountIdHex = appState.draftAccountIdHexForRef(accountRef)
         val all =
             sortChatListItems(projected) { item ->
-                draftAccountIdHex?.let { appState.draftStore.draftedAtSecondsFor(it, item.group.groupIdHex) }
+                accountRef?.let { appState.draftStore.draftedAtSecondsFor(it, item.group.groupIdHex) }
             }
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }

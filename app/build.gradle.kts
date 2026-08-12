@@ -770,6 +770,7 @@ dependencies {
         ),
     )
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp)
     testImplementation(libs.okhttp.mockwebserver)
     // Real org.json for JVM unit tests — the android.jar stubs throw on use.

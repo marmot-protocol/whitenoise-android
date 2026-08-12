@@ -109,8 +109,6 @@ import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
-import dev.ipf.whitenoise.android.state.ChatMutePreferences
-import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
@@ -393,26 +391,38 @@ internal fun GroupDetailsScreen(
     val engineMuted =
         controller.latestChatListRow?.muted
             ?: appState.engineConversationMuted(controller.group.groupIdHex)
-    val conversationMuted = conversationNotifyMode == ChatNotifyMode.NONE || engineMuted
-    // The All/Only-mentions preference behind the mute, and the timed-mute expiry,
-    // resolved off the same state key so an elapsed mute settles once (not per frame).
+    var targetedMuteSettings by remember(appState.activeAccountRef, controller.group.groupIdHex) {
+        mutableStateOf<dev.ipf.marmotkit.ChatNotificationSettingsFfi?>(null)
+    }
+    LaunchedEffect(appState.activeAccountRef, controller.group.groupIdHex, controller.latestChatListRow) {
+        targetedMuteSettings = null
+        if (controller.latestChatListRow == null) {
+            targetedMuteSettings = appState.authoritativeConversationMuteSettings(controller.group.groupIdHex)
+        }
+    }
+    val muteOverride = appState.conversationMuteOverride(controller.group.groupIdHex)
+    val conversationMuted =
+        muteOverride?.muted
+            ?: controller.latestChatListRow?.muted
+            ?: targetedMuteSettings?.muted
+            ?: engineMuted
+    val muteCommandPending = appState.isConversationMutePending(controller.group.groupIdHex)
+    // Android retains only the All/Only-mentions preference behind MDK's mute.
     val conversationRestoreMode =
         remember(
             appState.activeAccountRef,
             controller.group.groupIdHex,
             notificationModes,
-            chatNotificationState.muteExpiries,
         ) {
             appState.conversationRestoreNotifyMode(controller.group.groupIdHex)
         }
     val conversationMuteExpiry =
-        remember(
-            appState.activeAccountRef,
-            controller.group.groupIdHex,
-            notificationModes,
-            chatNotificationState.muteExpiries,
-        ) {
-            appState.conversationMuteExpiryMillis(controller.group.groupIdHex)
+        if (muteOverride != null) {
+            muteOverride.mutedUntilMs
+        } else {
+            controller.latestChatListRow?.mutedUntilMs
+                ?: targetedMuteSettings?.mutedUntilMs
+                ?: appState.conversationMuteExpiryMillis(controller.group.groupIdHex)
         }
 
     suspend fun refreshMlsDetails() {
@@ -600,6 +610,7 @@ internal fun GroupDetailsScreen(
             conversationAvatarUrl = controller.avatarUrl,
             isDm = isDm,
             isMuted = conversationMuted,
+            muteCommandPending = muteCommandPending,
             muteExpiryMillis = conversationMuteExpiry,
             notifyForMode = conversationRestoreMode,
             vibrationPattern = conversationVibrationPattern,
@@ -997,7 +1008,6 @@ internal fun GroupDetailsScreen(
                 val folderNames =
                     remember(
                         folderStoreState,
-                        chatNotificationState,
                         appState.chatListItems,
                         appState.profileRevisionForCompose,
                         folderAccountRef,
@@ -1019,9 +1029,10 @@ internal fun GroupDetailsScreen(
                                                 appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
                                             rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
                                             activeAccountIdHex = appState.activeAccount?.accountIdHex,
-                                            isMuted = {
-                                                ChatMutePreferences.compositeKey(accountRef, it) in
-                                                    chatNotificationState.mutedConversations
+                                            isMuted = { groupIdHex ->
+                                                thisChatRow.any {
+                                                    it.group.groupIdHex == groupIdHex && it.engineMuted()
+                                                }
                                             },
                                             displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
                                         )

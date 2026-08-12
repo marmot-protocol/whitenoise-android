@@ -2,25 +2,18 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import android.content.SharedPreferences
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
 enum class ChatNotifyMode {
     ALL,
     MENTIONS_ONLY,
+
+    /** Command-only compatibility value. MDK, never Android preferences, owns active mute state. */
     NONE,
 }
 
-/**
- * A mute and the mode to restore when it ends. [expiryMillis] is the epoch time to
- * silence until, or null for a permanent mute — kept (rather than dropping the
- * record) so a permanent mute still remembers the notify mode it hid.
- */
 data class MuteExpiry(
     val expiryMillis: Long?,
     val restoreMode: ChatNotifyMode,
@@ -28,115 +21,57 @@ data class MuteExpiry(
 
 data class ChatNotificationState(
     val notificationModes: Map<String, ChatNotifyMode>,
-    val muteExpiries: Map<String, MuteExpiry>,
-) {
-    val mutedConversations: Set<String> = ChatMutePreferences.mutedKeysOf(notificationModes)
-}
+)
 
-/**
- * Applies elapsed timed mutes to [storedModes]: any key whose [expiries] entry
- * is at or past [now] restores its saved mode and drops the expiry. Pure so the
- * restore semantics are unit-testable without the clock or SharedPreferences.
- */
-internal fun resolveExpiredMutes(
-    storedModes: Map<String, ChatNotifyMode>,
-    expiries: Map<String, MuteExpiry>,
-    now: Long,
-): Triple<Map<String, ChatNotifyMode>, Map<String, MuteExpiry>, Boolean> {
-    val elapsed = expiries.filterValues { entry -> entry.expiryMillis?.let { now >= it } == true }
-    if (elapsed.isEmpty()) return Triple(storedModes, expiries, false)
-    val modes =
-        storedModes.toMutableMap().apply {
-            elapsed.forEach { (key, expiry) ->
-                if (expiry.restoreMode == ChatNotifyMode.ALL) remove(key) else put(key, expiry.restoreMode)
-            }
-        }
-    return Triple(modes.toMap(), expiries - elapsed.keys, true)
-}
+internal data class LegacyMuteEntry(
+    val key: String,
+    val accountRef: String,
+    val groupIdHex: String,
+    val expiryMillis: Long?,
+    val restoreMode: ChatNotifyMode,
+)
 
-/**
- * Per-account, per-conversation notification mode (#1179, #1252).
- * Android notification preference — not White Noise protocol data.
- */
-@Suppress("TooManyFunctions") // Cohesive per-chat notify store + expiry scheduler.
+/** Android-owned ALL/MENTIONS delivery preference plus a read-once legacy mute migration source. */
 class ChatMutePreferences(
     context: Context,
-    private val preferences: SharedPreferences = context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
-    private val now: () -> Long = { System.currentTimeMillis() },
-    scope: CoroutineScope? = null,
+    private val preferences: SharedPreferences =
+        context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
 ) {
     private val mutationLock = Any()
-    private var muteExpiries: Map<String, MuteExpiry> = readMuteExpiries(preferences)
-    private val _state =
-        MutableStateFlow(
-            ChatNotificationState(
-                notificationModes = readNotificationModes(preferences),
-                muteExpiries = muteExpiries,
-            ),
-        )
+    private val _state = MutableStateFlow(ChatNotificationState(readNotificationModes(preferences)))
     val state: StateFlow<ChatNotificationState> = _state.asStateFlow()
-
-    // When set, a coroutine sleeps until the nearest timed mute elapses and then
-    // resolves + republishes, so the state flow *emits* on expiry — chat-list
-    // icons and folder rules update without waiting for a getter call.
-    private var expiryScope: CoroutineScope? = scope
-    private var expiryJob: Job? = null
-
-    init {
-        synchronized(mutationLock) { scheduleNextExpiryLocked() }
-    }
-
-    /** Attach a scope after construction (field-init order) to drive scheduled
-     *  expiry emission; resolves anything already elapsed first. */
-    fun attachExpiryScheduler(scope: CoroutineScope) {
-        synchronized(mutationLock) {
-            expiryScope = scope
-            resolveExpiredLockedInternal()
-            scheduleNextExpiryLocked()
-        }
-    }
 
     fun mode(
         accountRef: String,
         groupIdHex: String,
-    ): ChatNotifyMode {
-        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return ChatNotifyMode.ALL
-        synchronized(mutationLock) { resolveExpiredLockedInternal() }
-        return _state.value.notificationModes[key] ?: ChatNotifyMode.ALL
-    }
+    ): ChatNotifyMode =
+        compositeKeyOrNull(accountRef, groupIdHex)?.let(_state.value.notificationModes::get)
+            ?: ChatNotifyMode.ALL
 
-    fun isMuted(
-        accountRef: String,
-        groupIdHex: String,
-    ): Boolean = mode(accountRef, groupIdHex) == ChatNotifyMode.NONE
-
-    /**
-     * The notify preference to show and restore when the chat is *not* muted:
-     * the live mode when it isn't [ChatNotifyMode.NONE], otherwise the mute's
-     * saved restore mode (a legacy permanent mute without one defaults to ALL).
-     * Lets the UI present Mute and the All/Only-mentions choice as separate rows.
-     */
     fun restoreNotifyMode(
         accountRef: String,
         groupIdHex: String,
-    ): ChatNotifyMode {
-        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return ChatNotifyMode.ALL
-        return synchronized(mutationLock) {
-            resolveExpiredLockedInternal()
-            val current = _state.value.notificationModes[key] ?: ChatNotifyMode.ALL
-            if (current != ChatNotifyMode.NONE) current else muteExpiries[key]?.restoreMode ?: ChatNotifyMode.ALL
-        }
-    }
+    ): ChatNotifyMode = mode(accountRef, groupIdHex)
 
-    /** Remaining timed-mute expiry (epoch millis) for the chat, or null. */
-    fun muteExpiryMillis(
+    fun setNotifyForMode(
         accountRef: String,
         groupIdHex: String,
-    ): Long? {
-        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return null
-        return synchronized(mutationLock) {
-            resolveExpiredLockedInternal()
-            muteExpiries[key]?.expiryMillis
+        mode: ChatNotifyMode,
+    ) {
+        val key = compositeKeyOrNull(accountRef, groupIdHex)
+        if (mode != ChatNotifyMode.NONE && key != null) {
+            synchronized(mutationLock) {
+                val updated = _state.value.notificationModes.toMutableMap()
+                if (mode == ChatNotifyMode.ALL) updated.remove(key) else updated[key] = mode
+                if (updated != _state.value.notificationModes) {
+                    _state.value = ChatNotificationState(updated.toMap())
+                    val mentionOnly = updated.filterValues { it == ChatNotifyMode.MENTIONS_ONLY }.keys
+                    preferences
+                        .edit()
+                        .putStringSet(KEY_MENTION_ONLY_CONVERSATIONS, mentionOnly)
+                        .apply()
+                }
+            }
         }
     }
 
@@ -144,179 +79,35 @@ class ChatMutePreferences(
         accountRef: String,
         groupIdHex: String,
         mode: ChatNotifyMode,
-    ) {
-        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return
+    ) = setNotifyForMode(accountRef, groupIdHex, mode)
+
+    /** Legacy values are inputs only; callers must confirm the MDK result before clearing one. */
+    internal fun legacyMuteEntries(): List<LegacyMuteEntry> {
+        val expiries = readMuteExpiries(preferences)
+        return readMutedSet(preferences).mapNotNull { key ->
+            val separator = key.lastIndexOf(COMPOSITE_SEPARATOR)
+            if (separator <= 0 || separator == key.lastIndex) return@mapNotNull null
+            val expiry = expiries[key]
+            LegacyMuteEntry(
+                key = key,
+                accountRef = key.substring(0, separator),
+                groupIdHex = key.substring(separator + 1),
+                expiryMillis = expiry?.expiryMillis,
+                restoreMode = expiry?.restoreMode?.takeUnless { it == ChatNotifyMode.NONE } ?: ChatNotifyMode.ALL,
+            )
+        }
+    }
+
+    internal fun confirmLegacyMuteMigrated(key: String) {
         synchronized(mutationLock) {
-            val current = _state.value.notificationModes
-            val updated =
-                current.toMutableMap().apply {
-                    if (mode == ChatNotifyMode.ALL) remove(key) else put(key, mode)
-                }
-            // An explicit mode choice cancels any pending timed-mute restore.
-            val nextExpiries = muteExpiries - key
-            if (updated == current && nextExpiries == muteExpiries) return
-            publishLocked(updated.toMap(), nextExpiries)
+            val remainingMuted = readMutedSet(preferences) - key
+            val remainingExpiries = readMuteExpiries(preferences) - key
+            preferences
+                .edit()
+                .putStringSet(KEY_MUTED_CONVERSATIONS, remainingMuted)
+                .putStringSet(KEY_MUTE_EXPIRIES, remainingExpiries.map(::encodeMuteExpiry).toSet())
+                .apply()
         }
-    }
-
-    /**
-     * Updates the All/Only-mentions preference without ending an active mute.
-     * When unmuted this is the same as [setMode].
-     */
-    fun setNotifyForMode(
-        accountRef: String,
-        groupIdHex: String,
-        mode: ChatNotifyMode,
-    ) {
-        val key = compositeKeyOrNull(accountRef, groupIdHex)
-        if (mode == ChatNotifyMode.NONE || key == null) return
-        synchronized(mutationLock) {
-            resolveExpiredLockedInternal()
-            if (_state.value.notificationModes[key] != ChatNotifyMode.NONE) {
-                setMode(accountRef, groupIdHex, mode)
-            } else {
-                // A legacy permanent mute may have no metadata yet. Create a
-                // null-expiry record so its newly selected restore mode persists.
-                val expiry = muteExpiries[key]?.expiryMillis
-                val nextExpiries = muteExpiries + (key to MuteExpiry(expiry, mode))
-                if (nextExpiries != muteExpiries) {
-                    publishLocked(_state.value.notificationModes, nextExpiries)
-                }
-            }
-        }
-    }
-
-    fun setMuted(
-        accountRef: String,
-        groupIdHex: String,
-        muted: Boolean,
-    ) {
-        if (muted) {
-            muteFor(accountRef, groupIdHex, durationMillis = 0L)
-        } else {
-            // Hold the lock across reading the hidden mode and applying it so a
-            // concurrent update cannot be overwritten by a stale restore.
-            synchronized(mutationLock) {
-                setMode(accountRef, groupIdHex, restoreNotifyMode(accountRef, groupIdHex))
-            }
-        }
-    }
-
-    /**
-     * Mute the chat until [durationMillis] from now, then auto-restore whatever
-     * mode is active today. A non-positive duration mutes permanently (no
-     * expiry), matching [setMuted] with `true`.
-     */
-    fun muteFor(
-        accountRef: String,
-        groupIdHex: String,
-        durationMillis: Long,
-    ) {
-        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return
-        synchronized(mutationLock) {
-            resolveExpiredLockedInternal()
-            val expiry = if (durationMillis <= 0) null else now() + durationMillis
-            muteUntilLocked(key, expiry)
-        }
-    }
-
-    /** Mute until the exact future Unix epoch-millisecond [expiryMillis]. */
-    fun muteUntil(
-        accountRef: String,
-        groupIdHex: String,
-        expiryMillis: Long,
-    ) {
-        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return
-        synchronized(mutationLock) {
-            resolveExpiredLockedInternal()
-            if (expiryMillis <= now()) return
-            muteUntilLocked(key, expiryMillis)
-        }
-    }
-
-    // Caller must hold [mutationLock].
-    private fun muteUntilLocked(
-        key: String,
-        expiryMillis: Long?,
-    ) {
-        // Re-muting an already-timed-muted chat keeps its original restore
-        // mode, so extending a mute never loses the pre-mute state. A timed
-        // mute never restores to NONE — muting a permanently-muted chat for
-        // an hour must unmute it after, not re-mute it — so coerce to ALL.
-        val priorRestore =
-            muteExpiries[key]?.restoreMode ?: (_state.value.notificationModes[key] ?: ChatNotifyMode.ALL)
-        val restoreMode = if (priorRestore == ChatNotifyMode.NONE) ChatNotifyMode.ALL else priorRestore
-        val modes =
-            _state.value.notificationModes
-                .toMutableMap()
-                .apply { put(key, ChatNotifyMode.NONE) }
-        // A null expiry is a permanent mute: keep a record so it still
-        // remembers [restoreMode] for when the user unmutes it.
-        val nextExpiries = muteExpiries + (key to MuteExpiry(expiryMillis, restoreMode))
-        publishLocked(modes.toMap(), nextExpiries)
-    }
-
-    /**
-     * Resolve any mutes that have elapsed by wall-clock time and re-arm the next
-     * timer. The scheduler coroutine's [delay] runs on a clock that excludes
-     * device deep sleep (Handler uptime), so a mute can elapse in real time while
-     * that timer is still counting down; call this from a foreground/lifecycle
-     * signal so the visible chat-list and folder state catch up immediately
-     * instead of waiting for the delayed timer or the next notification getter.
-     */
-    fun resolveExpiredNow() {
-        synchronized(mutationLock) {
-            // publishLocked re-arms the timer whenever it publishes; when nothing
-            // elapsed (an early wake, or the wall clock moved backward) re-arm
-            // here so the pending timer is never dropped.
-            if (!resolveExpiredLockedInternal()) scheduleNextExpiryLocked()
-        }
-    }
-
-    // Caller must hold [mutationLock]. Restores any elapsed timed mutes and
-    // republishes if anything changed. Returns whether it published.
-    private fun resolveExpiredLockedInternal(): Boolean {
-        val (modes, expiries, changed) =
-            resolveExpiredMutes(_state.value.notificationModes, muteExpiries, now())
-        if (changed) publishLocked(modes, expiries)
-        return changed
-    }
-
-    // Caller must hold [mutationLock].
-    private fun publishLocked(
-        modes: Map<String, ChatNotifyMode>,
-        expiries: Map<String, MuteExpiry>,
-    ) {
-        muteExpiries = expiries
-        _state.value = ChatNotificationState(modes, expiries)
-        preferences
-            .edit()
-            .putStringSet(KEY_MUTED_CONVERSATIONS, modes.filterValues { it == ChatNotifyMode.NONE }.keys)
-            .putStringSet(
-                KEY_MENTION_ONLY_CONVERSATIONS,
-                modes.filterValues { it == ChatNotifyMode.MENTIONS_ONLY }.keys,
-            ).putStringSet(KEY_MUTE_EXPIRIES, expiries.map(::encodeMuteExpiry).toSet())
-            .apply()
-        scheduleNextExpiryLocked()
-    }
-
-    // Caller must hold [mutationLock]. Sleeps until the nearest timed mute
-    // elapses, then resolves + re-arms. The wake goes through resolveExpiredNow()
-    // so that if the wall clock has not actually reached the expiry (the delay
-    // fired early, or the clock moved backward) the timer re-arms instead of
-    // exiting and dropping the pending mute.
-    private fun scheduleNextExpiryLocked() {
-        expiryJob?.cancel()
-        expiryJob = null
-        val scope = expiryScope ?: return
-        // Permanent mutes (null expiry) carry no timer.
-        val nearest = muteExpiries.values.mapNotNull { it.expiryMillis }.minOrNull() ?: return
-        val delayMillis = (nearest - now()).coerceAtLeast(0)
-        expiryJob =
-            scope.launch {
-                delay(delayMillis)
-                resolveExpiredNow()
-            }
     }
 
     internal companion object {
@@ -326,16 +117,11 @@ class ChatMutePreferences(
         private const val KEY_MUTE_EXPIRIES = "muteExpiries"
         private const val EXPIRY_FIELD_SEPARATOR = "\u0000"
         private const val EXPIRY_FIELD_COUNT = 3
+        private const val COMPOSITE_SEPARATOR = '|'
 
-        // Key goes last: it can contain the separator (account labels may have
-        // spaces), and split(limit = 3) leaves the final field whole. The mode
-        // persists by stable name, not ordinal, so reordering the enum can't
-        // silently reinterpret an installed user's pending timers.
-        // A permanent mute has no expiry, encoded as an empty first field.
         fun encodeMuteExpiry(entry: Map.Entry<String, MuteExpiry>): String {
             val expiryField = entry.value.expiryMillis?.toString() ?: ""
-            return listOf(expiryField, entry.value.restoreMode.name, entry.key)
-                .joinToString(EXPIRY_FIELD_SEPARATOR)
+            return listOf(expiryField, entry.value.restoreMode.name, entry.key).joinToString(EXPIRY_FIELD_SEPARATOR)
         }
 
         fun readMuteExpiries(preferences: SharedPreferences): Map<String, MuteExpiry> =
@@ -347,49 +133,40 @@ class ChatMutePreferences(
 
         private fun decodeMuteExpiry(encoded: String): Pair<String, MuteExpiry>? {
             val fields = encoded.split(EXPIRY_FIELD_SEPARATOR, limit = EXPIRY_FIELD_COUNT)
-            if (fields.size != EXPIRY_FIELD_COUNT) return null
-            val expiryField = fields[0]
-            val expiry = expiryField.toLongOrNull()
-            // Empty field = permanent mute (null expiry); a non-empty non-number is
-            // corrupt and dropped.
-            val corruptExpiry = expiryField.isNotEmpty() && expiry == null
-            val restore = decodeRestoreMode(fields[1])
-            return if (!corruptExpiry && restore != null) fields[2] to MuteExpiry(expiry, restore) else null
+            return fields.takeIf { it.size == EXPIRY_FIELD_COUNT }?.let { validFields ->
+                val expiry = validFields[0].takeIf(String::isNotEmpty)?.toLongOrNull()
+                val expiryIsValid = validFields[0].isEmpty() || expiry != null
+                val restore =
+                    ChatNotifyMode.entries.firstOrNull { it.name == validFields[1] }
+                        ?: validFields[1].toIntOrNull()?.let(ChatNotifyMode.entries::getOrNull)
+                if (expiryIsValid && restore != null) {
+                    validFields[2] to MuteExpiry(expiry, restore)
+                } else {
+                    null
+                }
+            }
         }
-
-        // Prefer the stable name; fall back to the legacy ordinal form so a blob
-        // written by an earlier build of this feature still decodes.
-        private fun decodeRestoreMode(field: String): ChatNotifyMode? =
-            ChatNotifyMode.entries.firstOrNull { it.name == field }
-                ?: field.toIntOrNull()?.let { ChatNotifyMode.entries.getOrNull(it) }
 
         fun compositeKey(
             accountRef: String,
             groupIdHex: String,
-        ): String = "$accountRef|$groupIdHex"
+        ): String = "$accountRef$COMPOSITE_SEPARATOR$groupIdHex"
 
         fun compositeKeyOrNull(
             accountRef: String?,
             groupIdHex: String?,
         ): String? {
-            val account = accountRef?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-            val group = groupIdHex?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            val account = accountRef?.trim()?.takeIf(String::isNotEmpty) ?: return null
+            val group = groupIdHex?.trim()?.takeIf(String::isNotEmpty) ?: return null
             return compositeKey(account, group)
         }
 
-        fun readMutedSet(preferences: SharedPreferences): Set<String> = preferences.getStringSet(KEY_MUTED_CONVERSATIONS, emptySet())?.toSet() ?: emptySet()
-
-        fun mutedKeysOf(modes: Map<String, ChatNotifyMode>): Set<String> = modes.filterValues { it == ChatNotifyMode.NONE }.keys.toSet()
+        fun readMutedSet(preferences: SharedPreferences): Set<String> = preferences.getStringSet(KEY_MUTED_CONVERSATIONS, emptySet())?.toSet().orEmpty()
 
         fun readNotificationModes(preferences: SharedPreferences): Map<String, ChatNotifyMode> =
-            buildMap {
-                preferences
-                    .getStringSet(KEY_MENTION_ONLY_CONVERSATIONS, emptySet())
-                    .orEmpty()
-                    .forEach { put(it, ChatNotifyMode.MENTIONS_ONLY) }
-                // The existing mute set remains the migration source of truth.
-                // If corrupt preferences contain a key in both sets, NONE wins.
-                readMutedSet(preferences).forEach { put(it, ChatNotifyMode.NONE) }
-            }
+            preferences
+                .getStringSet(KEY_MENTION_ONLY_CONVERSATIONS, emptySet())
+                .orEmpty()
+                .associateWith { ChatNotifyMode.MENTIONS_ONLY }
     }
 }
