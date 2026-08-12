@@ -240,6 +240,14 @@ internal fun MainShell(
     // conversation does not dispose the selection when ChatsScreen leaves
     // composition (issue #1897).
     var selectedChatListFolderId by remember { mutableStateOf<String?>(null) }
+    // Global chat-list search survives conversation navigation and rotation
+    // (issue #1941). Saveable codec only — no protocol or preference storage.
+    val globalSearch =
+        rememberMainShellGlobalSearchState(
+            accountRef = appState.activeAccountRef,
+            runtimeGeneration = appState.runtimeGeneration,
+        )
+    val scopedGlobalSearchState = globalSearch.scopedState
     // True while a tapped notification for a non-active account is mid-resolution
     // (switching account / awaiting its chat list). Holds a single stable loading
     // state over the multi-step route so the chat list never paints as an
@@ -883,6 +891,8 @@ internal fun MainShell(
                         ChatsScreen(
                             appState = appState,
                             controller = chatsController,
+                            globalSearchState = scopedGlobalSearchState,
+                            onGlobalSearchStateChange = globalSearch.update,
                             selectedFolderId = selectedChatListFolderId,
                             onSelectFolder = { selectedChatListFolderId = it },
                             conversationReturnHeadId = publishedConversationReturnHead(chatListReturnHeadSnap),

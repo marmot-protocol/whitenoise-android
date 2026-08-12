@@ -104,6 +104,18 @@ internal fun ChatListTopBar(
                                 focusedBorderColor = Color.Transparent,
                                 unfocusedBorderColor = Color.Transparent,
                             ),
+                        // Keep Clear inside the field so the query retains usable
+                        // width on narrow screens; Mic remains the sole top-bar action.
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { onSearchQueryChange("") }) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.chat_list_search_clear),
+                                    )
+                                }
+                            }
+                        },
                         keyboardOptions =
                             KeyboardOptions(
                                 capitalization = KeyboardCapitalization.Sentences,
@@ -160,14 +172,6 @@ internal fun ChatListTopBar(
         },
         actions = {
             if (searchOpen) {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { onSearchQueryChange("") }) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = stringResource(R.string.chat_list_search_clear),
-                        )
-                    }
-                }
                 IconButton(onClick = onMic) {
                     Icon(
                         Icons.Default.Mic,

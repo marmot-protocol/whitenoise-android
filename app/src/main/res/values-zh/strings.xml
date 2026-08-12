@@ -29,6 +29,18 @@
     <string name="chat_list_voice_unavailable">此设备不支持语音搜索</string>
     <string name="toast_demoted_but_couldnt_leave">您已不再是管理员,但无法退出群组</string>
     <string name="chat_list_search_hint">搜索聊天</string>
+    <string name="chat_list_search_filters">筛选</string>
+    <string name="chat_list_search_filters_button">筛选（%1$d）</string>
+    <plurals name="chat_list_search_filters_active">
+        <item quantity="other">%1$d 个筛选条件已启用</item>
+    </plurals>
+    <string name="chat_list_search_clear_all_filters">全部清除</string>
+    <string name="chat_list_search_filter_sheet_title">筛选</string>
+    <string name="chat_list_search_filter_chat">聊天</string>
+    <string name="chat_list_search_filter_sender">发送者</string>
+    <string name="chat_list_search_filter_date">日期</string>
+    <string name="chat_list_search_filter_content">内容</string>
+    <string name="chat_list_search_filter_remove">移除%1$s</string>
     <string name="chat_list_filter_all">全部</string>
     <string name="chat_list_filter_unread">未读</string>
     <string name="chat_list_no_unread">全部已读</string>

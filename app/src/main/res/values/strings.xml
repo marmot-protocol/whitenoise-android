@@ -33,6 +33,19 @@
     <string name="chat_list_voice_unavailable">Voice search isn\'t available on this device</string>
     <string name="toast_demoted_but_couldnt_leave">You\'re no longer admin, but couldn\'t leave the group</string>
     <string name="chat_list_search_hint">Search chats</string>
+    <string name="chat_list_search_filters">Filters</string>
+    <string name="chat_list_search_filters_button">Filters (%1$d)</string>
+    <plurals name="chat_list_search_filters_active">
+        <item quantity="one">%1$d filter active</item>
+        <item quantity="other">%1$d filters active</item>
+    </plurals>
+    <string name="chat_list_search_clear_all_filters">Clear all</string>
+    <string name="chat_list_search_filter_sheet_title">Filters</string>
+    <string name="chat_list_search_filter_chat">Chat</string>
+    <string name="chat_list_search_filter_sender">Sender</string>
+    <string name="chat_list_search_filter_date">Date</string>
+    <string name="chat_list_search_filter_content">Content</string>
+    <string name="chat_list_search_filter_remove">Remove %1$s</string>
     <string name="chat_list_filter_all">All</string>
     <string name="chat_list_filter_unread">Unread</string>
     <string name="chat_list_filter_groups">Groups</string>
