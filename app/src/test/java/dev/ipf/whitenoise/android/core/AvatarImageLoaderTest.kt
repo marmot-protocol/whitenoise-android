@@ -7,10 +7,39 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
 
 class AvatarImageLoaderTest {
+    @Test
+    fun profileImageBytesDelegateHostClassificationAndBoundToMarmot() =
+        runBlocking {
+            var requestedUrl: String? = null
+            var requestedMaxBytes: ULong? = null
+            AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
+                requestedUrl = url
+                requestedMaxBytes = maxBytes
+                byteArrayOf(1, 2, 3)
+            }
+
+            val bytes = AvatarImageLoader.fetchBytes("https://127.0.0.1/alice.png", 8)
+
+            // Android must not pre-classify a protocol URL. Production MDK
+            // rejects this loopback host before dialing it.
+            assertEquals("https://127.0.0.1/alice.png", requestedUrl)
+            assertEquals(8uL, requestedMaxBytes)
+            assertEquals(listOf<Byte>(1, 2, 3), bytes?.toList())
+        }
+
+    @Test
+    fun profileImageBytesRejectAContractViolatingOversizedResult() =
+        runBlocking {
+            AvatarImageLoader.attachProfileImageFetcher { _, _ -> ByteArray(9) }
+
+            assertNull(AvatarImageLoader.fetchBytes("https://profiles.example/alice.png", 8))
+        }
+
     @Test
     fun notificationAvatarsUseDedicatedLanesWhenPreWarmsAreSaturated() {
         runBlocking {

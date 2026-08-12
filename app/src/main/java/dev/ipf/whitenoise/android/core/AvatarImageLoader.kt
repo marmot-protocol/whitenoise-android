@@ -14,8 +14,6 @@ import kotlinx.coroutines.sync.Semaphore
 import java.util.LinkedHashMap
 
 object AvatarImageLoader {
-    private const val CONNECT_TIMEOUT_MS = 5_000
-    private const val READ_TIMEOUT_MS = 10_000
     private const val MAX_AVATAR_BYTES = 2 * 1024 * 1024
     private const val MAX_AVATAR_DIMENSION = 512
 
@@ -42,11 +40,24 @@ object AvatarImageLoader {
     private val inFlight = mutableMapOf<String, AvatarInFlightRequest>()
     private val preWarmQueuedGeneration = mutableMapOf<String, Long>()
     private val failureExpiresAt = AvatarFailureExpiryCache(FAILURE_CACHE_MAX_ENTRIES)
+    private var profileImageFetcher: (suspend (String, ULong) -> ByteArray)? = null
 
     // Bumped by clear(); fetches launched under an older generation discard
     // their results so a logout/account-switch can't be re-polluted by an
     // in-flight request that was already on the network.
     private var generation = 0L
+
+    /**
+     * Attach the process-owned Marmot profile-image fetch. MDK owns URL
+     * validation, DNS pinning, redirect validation, timeouts, and byte bounds;
+     * this loader owns only request deduplication, decoding, and the memory
+     * cache used by Android presentation surfaces.
+     */
+    internal fun attachProfileImageFetcher(fetcher: suspend (String, ULong) -> ByteArray) {
+        synchronized(lock) {
+            profileImageFetcher = fetcher
+        }
+    }
 
     suspend fun load(url: String): ImageBitmap? =
         load(
@@ -222,18 +233,17 @@ object AvatarImageLoader {
         nowMillis: Long,
     ): Boolean = failureExpiresAt.isFresh(url, nowMillis)
 
-    private fun fetch(url: String): ImageBitmap? {
-        // Avatar URLs come from remote profile records, so a malicious peer can
-        // publish an https URL that 30x-redirects to http or a private host.
-        // SafeHttpsGet re-validates scheme/host/port at every hop and bounds the
-        // body; we only have to decode the result.
-        val bytes =
-            SafeHttpsGet.get(
-                url = url,
-                maxBodyBytes = MAX_AVATAR_BYTES,
-                connectTimeoutMillis = CONNECT_TIMEOUT_MS,
-                readTimeoutMillis = READ_TIMEOUT_MS,
-            ) ?: return null
+    internal suspend fun fetchBytes(
+        url: String,
+        maxBytes: Int,
+    ): ByteArray? {
+        if (maxBytes <= 0) return null
+        val fetcher = synchronized(lock) { profileImageFetcher } ?: return null
+        return fetcher(url, maxBytes.toULong()).takeIf { it.size <= maxBytes }
+    }
+
+    private suspend fun fetch(url: String): ImageBitmap? {
+        val bytes = fetchBytes(url, MAX_AVATAR_BYTES) ?: return null
         return decode(bytes)?.asImageBitmap()
     }
 

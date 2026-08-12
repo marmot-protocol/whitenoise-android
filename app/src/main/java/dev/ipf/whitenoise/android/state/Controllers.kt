@@ -33,6 +33,7 @@ import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
+import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotKitException
@@ -111,7 +112,6 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
-import java.net.InetAddress
 import java.util.UUID
 import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
@@ -2484,6 +2484,66 @@ internal fun resolveAuthoritativeGroupRoster(
     )
 }
 
+/** Convert the lightweight MDK roster projection without a second details read. */
+internal fun applyAuthoritativeGroupRoster(
+    currentGroup: AppGroupRecordFfi,
+    roster: GroupRosterFfi,
+): AppliedGroupDetails =
+    AppliedGroupDetails(
+        group =
+            currentGroup.copy(
+                admins = roster.members.filter { it.isAdmin }.map { it.memberIdHex },
+                selfMembership = roster.selfMembership,
+                unrecoverable = roster.lifecycleState == GroupLifecycleStateFfi.UNRECOVERABLE,
+                disbanded = roster.lifecycleState == GroupLifecycleStateFfi.DISBANDED,
+            ),
+        members =
+            GroupProjector.identityDistinctMembers(
+                roster.members.map { member ->
+                    AppGroupMemberRecordFfi(
+                        memberIdHex = member.memberIdHex,
+                        account = member.account,
+                        local = member.local,
+                    )
+                },
+            ),
+    )
+
+internal fun resolveAuthoritativeGroupRoster(
+    currentGroup: AppGroupRecordFfi,
+    roster: GroupRosterFfi,
+    activeAccountIdHex: String?,
+): GroupRosterResolution {
+    val applied = applyAuthoritativeGroupRoster(currentGroup, roster)
+    val uniqueMemberCount = GroupProjector.uniqueMemberCount(applied.members)
+    val containsLocalMember =
+        roster.members.any { member ->
+            member.isSelf ||
+                activeAccountIdHex?.let { accountId ->
+                    member.memberIdHex.equals(accountId, ignoreCase = true)
+                } == true
+        }
+    val activeJoinedGroup =
+        applied.group.selfMembership == SelfMembershipFfi.MEMBER &&
+            !applied.group.pendingConfirmation
+    val invariant =
+        when {
+            !activeJoinedGroup -> null
+            uniqueMemberCount == 0 -> GroupRosterInvariant.EMPTY_JOINED_ROSTER
+            !containsLocalMember -> GroupRosterInvariant.LOCAL_MEMBER_MISSING
+            roster.members.size.toLong() != roster.memberCount.toLong() ->
+                GroupRosterInvariant.MEMBER_COUNT_MISMATCH
+            else -> null
+        }
+    return GroupRosterResolution(
+        applied = applied,
+        invariant = invariant,
+        uniqueMemberCount = uniqueMemberCount,
+        mlsMemberCount = roster.memberCount,
+        containsLocalMember = containsLocalMember,
+    )
+}
+
 /**
  * Build a conversation-open [ChatListItem] from a targeted authoritative
  * [groupDetails] read. Used immediately after create returns a canonical group
@@ -2537,30 +2597,6 @@ internal fun reconcileProvisionalOpenChat(
             ?.takeIf { it.projection != null }
     return authoritative?.let { reconcileOpenChatWithAuthoritativeRow(open, it) }
 }
-
-/**
- * Returns true when a pushed group record should pay the forced OpenMLS replay
- * before reading group details.
- *
- * AppGroupRecordFfi does not carry the full roster, epoch, member count, or a
- * roster revision. That means Android cannot use this record to prove an update
- * is not a non-admin member add/remove, so the subscription loop still refreshes
- * groupDetails() for every emitted update. This helper only gates the extra
- * groupMlsState() eviction probe: display-only record changes can use the cheap
- * details refresh, while local membership/admin transitions and unchanged
- * records keep the replay path because they may be membership-bearing.
- */
-internal fun groupStateUpdateNeedsEvictionProbe(
-    previous: AppGroupRecordFfi,
-    update: AppGroupRecordFfi,
-): Boolean =
-    previous == update ||
-        previous.groupIdHex != update.groupIdHex ||
-        previous.pendingConfirmation != update.pendingConfirmation ||
-        previous.selfMembership != update.selfMembership ||
-        previous.admins.normalizedMemberIds() != update.admins.normalizedMemberIds()
-
-private fun List<String>.normalizedMemberIds(): Set<String> = mapNotNull { it.trim().takeIf(String::isNotEmpty)?.lowercase() }.toSet()
 
 internal fun groupStateUpdateRemovesSelf(
     previous: AppGroupRecordFfi,
@@ -5726,6 +5762,11 @@ class ConversationController(
     initialLastReadMessageId: String? = null,
     initialLastReadTimelineAt: ULong? = null,
     private val copy: ConversationControllerCopy = ConversationControllerCopy(),
+    private val groupRosterReader: suspend (String, String) -> GroupRosterFfi = { account, groupIdHex ->
+        appState.marmotIo(MarmotTraceSection.REFRESH_GROUP_ROSTER) {
+            groupRoster(account, groupIdHex)
+        }
+    },
 ) {
     var group by mutableStateOf(initialGroup)
         private set
@@ -5839,10 +5880,10 @@ class ConversationController(
     //
     // The engine eviction (GroupStateError::UseAfterEviction) that
     // refreshMembers() relies on may not have landed locally yet right after a
-    // self-leave, so a transient refreshMembers()/applyGroupDetails()
+    // self-leave, so a transient authoritative roster refresh
     // round-trip would otherwise re-read the full roster (self still present),
     // restore the member count and re-enable the composer. While set,
-    // isSelfMember reads false and applyGroupDetails() refuses to re-add self,
+    // isSelfMember reads false and roster application refuses to re-add self,
     // keeping the left state durable.
     //
     // Seeded from an authoritative synchronous not-member signal
@@ -6598,9 +6639,7 @@ class ConversationController(
             if (groupStateUpdateRemovesSelf(previousGroup, update)) {
                 conversationAccountRef?.let(::markActiveAccountRemovedFromMembers)
             }
-            refreshMembers(
-                probeEviction = groupStateUpdateNeedsEvictionProbe(previousGroup, update),
-            )
+            refreshMembers()
         }
     }
 
@@ -7931,25 +7970,6 @@ class ConversationController(
         withContext(Dispatchers.IO) { appState.diskMediaCache.remove(cacheKey) }
     }
 
-    // Resolve-time SSRF guard before the native Blossom fetch. The imeta gate
-    // only validates the literal host, so an attacker's public-looking locator
-    // name can still resolve to loopback / RFC-1918. This Kotlin preflight is
-    // defense in depth; the bundled native Blossom client independently
-    // re-resolves, rejects every non-public address, pins the vetted addresses
-    // for the actual socket, and repeats that validation on each redirect hop.
-    // MediaReferenceSupport also rewrites fetchable locators from the parsed
-    // authority before native sees them, so Kotlin and native do not disagree
-    // about the raw locator host.
-    private suspend fun assertMediaLocatorsResolveSafe(reference: MediaAttachmentReferenceFfi): MediaAttachmentReferenceFfi {
-        val safeReference =
-            withContext(Dispatchers.IO) {
-                MediaReferenceSupport.safeDownloadReference(reference) { host ->
-                    runCatching { InetAddress.getAllByName(host).toList() }.getOrNull()
-                }
-            }
-        return safeReference ?: error("blocked private/loopback media locator")
-    }
-
     /**
      * Fetch and decrypt a Blossom-stored attachment. Backed by the app-level
      * LRU ([WhiteNoiseAppState.cachedMediaPlaintext], keyed via [mediaCacheKey])
@@ -7989,8 +8009,10 @@ class ConversationController(
                 val publicationToken = appState.diskMediaCache.capturePublicationToken()
                 val result =
                     runCatchingCancellable {
-                        val safeReference = assertMediaLocatorsResolveSafe(reference)
-                        appState.marmotIo { downloadMedia(account, groupIdHex, safeReference) }
+                        // The reference crosses directly into MDK: its downloader
+                        // owns scheme/authority checks, per-hop redirect validation,
+                        // DNS pinning, and the bounded response read.
+                        appState.marmotIo { downloadMedia(account, groupIdHex, reference) }
                     }.onFailure {
                         // Strip path AND query/fragment so any signed tokens or
                         // capabilities in the locator don't end up in logs — a
@@ -8396,7 +8418,7 @@ class ConversationController(
                 }
                 // Authoritative local self-leave: record it before the
                 // synchronous snapshot drop so any subsequent
-                // refreshMembers()/applyGroupDetails() round-trip that still
+                // authoritative roster round-trip that still
                 // sees the engine pre-eviction cannot re-add self and re-enable
                 // the composer / restore the full member count (issue #787).
                 recordSelfLeft()
@@ -8472,7 +8494,7 @@ class ConversationController(
             appState.applyLocalGroupUpdate(group)
             appState.dismissConversationNotifications(account, group.groupIdHex)
             // Accepting an invite (re-)joins the group, so clear any stale
-            // local self-left latch before refreshMembers() so applyGroupDetails
+            // local self-left latch before refreshMembers() so roster application
             // is allowed to add self back to the roster (issue #787).
             selfMembership.clearSelfLeft()
             if (notify) presentConversationTransient(R.string.toast_invite_accepted)
@@ -8666,7 +8688,7 @@ class ConversationController(
                         pendingLegacyAvatarClearAfterImageMutationKey = null
                     }
                 }
-                refreshMembers(probeEviction = false)
+                refreshMembers()
                 presentConversationTransient(R.string.toast_group_updated)
                 true
             }.onFailure {
@@ -8867,7 +8889,7 @@ class ConversationController(
                     // failed. One authoritative details read is enough here; an MLS
                     // replay probe would duplicate bridge work and does not affect
                     // whether this specific target remains in the local roster.
-                    refreshMembers(probeEviction = false)
+                    refreshMembers()
                     if (members.none { it.memberIdHex.equals(target, ignoreCase = true) }) {
                         presentConversationTransient(R.string.toast_member_removed)
                         true
@@ -10655,37 +10677,21 @@ class ConversationController(
         refreshMembers()
     }
 
-    private suspend fun refreshMembers(
-        probeEviction: Boolean = true,
-        retryOnHydrationPending: Boolean = true,
-    ) {
+    private suspend fun refreshMembers(retryOnHydrationPending: Boolean = true) {
         val account = conversationAccountRef ?: return
         val refreshGeneration = memberRosterRefreshGeneration.begin()
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
         try {
             runCatchingCancellable {
-                if (probeEviction) {
-                    // Force OpenMLS replay before trusting cached group details.
-                    // For an evicted account this is where Rust currently reports
-                    // GroupStateError::UseAfterEviction, which we map to read-only
-                    // UI. Display-only group-record updates skip this replay but
-                    // still read details below so non-admin roster changes are not
-                    // hidden behind AppGroupRecordFfi's coarse shape.
-                    appState.marmotIo(MarmotTraceSection.REFRESH_GROUP_MLS_STATE) {
-                        groupMlsState(account, group.groupIdHex)
-                    }
-                }
+                // One authoritative projection replaces the old serialized
+                // groupMlsState() eviction probe + groupDetails() roster load.
+                // It carries membership, admins, epoch/revision, lifecycle, and
+                // self-membership in one worker round-trip.
+                val roster = groupRosterReader(account, group.groupIdHex)
                 if (!memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
                     return@runCatchingCancellable
                 }
-                val details =
-                    appState.marmotIo(MarmotTraceSection.REFRESH_GROUP_DETAILS) {
-                        groupDetails(account, group.groupIdHex)
-                    }
-                if (!memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
-                    return@runCatchingCancellable
-                }
-                val applied = applyGroupDetails(account, details) ?: return@runCatchingCancellable
+                val applied = applyGroupRoster(account, roster) ?: return@runCatchingCancellable
                 appState.applyLocalGroupDetails(account, applied.group, applied.members)
             }.onFailure { throwable ->
                 if (!memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
@@ -10700,7 +10706,7 @@ class ConversationController(
                         // a failed roster.
                         delay(GROUP_HYDRATION_RETRY_DELAY_MS)
                         if (memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
-                            refreshMembers(probeEviction, retryOnHydrationPending = false)
+                            refreshMembers(retryOnHydrationPending = false)
                         }
                     }
                     else -> {
@@ -10725,7 +10731,7 @@ class ConversationController(
         val activeAccountIdHex = conversationAccountIdHex ?: return
         // Engine-confirmed removal (UseAfterEviction). Record the same
         // authoritative local-left marker the leaveGroup() success path sets so
-        // a later applyGroupDetails() that races ahead of eviction can't re-add
+        // a later authoritative roster result that races ahead of eviction can't re-add
         // self (issue #787).
         recordSelfLeft()
         val updatedMembers =
@@ -10744,7 +10750,7 @@ class ConversationController(
      * Latch the authoritative local self-leave marker (issue #787). Set on a
      * confirmed self-leave (leaveGroup success) or engine eviction
      * ([markActiveAccountRemovedFromMembers]); honoured by [isSelfMember] and
-     * [applyGroupDetails] so a transient roster round-trip can't restore self
+     * roster application so a transient round-trip can't restore self
      * before the engine eviction is observed locally.
      */
     private fun recordSelfLeft() {
@@ -10767,12 +10773,44 @@ class ConversationController(
         account: String,
         details: GroupDetailsFfi,
     ): AppliedGroupDetails? {
+        val resolution = resolveAuthoritativeGroupRoster(details, conversationAccountIdHex)
+        return applyResolvedGroupRoster(
+            account = account,
+            resolution = resolution,
+            returnedRowCount = details.members.size,
+            returnedMembership = details.group.selfMembership,
+        )
+    }
+
+    private fun applyGroupRoster(
+        account: String,
+        roster: GroupRosterFfi,
+    ): AppliedGroupDetails? {
+        val resolution = resolveAuthoritativeGroupRoster(group, roster, conversationAccountIdHex)
+        return applyResolvedGroupRoster(
+            account = account,
+            resolution = resolution,
+            returnedRowCount = roster.members.size,
+            returnedMembership = roster.selfMembership,
+        )
+    }
+
+    private fun applyResolvedGroupRoster(
+        account: String,
+        resolution: GroupRosterResolution,
+        returnedRowCount: Int,
+        returnedMembership: SelfMembershipFfi,
+    ): AppliedGroupDetails? {
         val previousRetention = group.disappearingMessageSecs
         val previousSelfMembership = group.selfMembership
-        val resolution = resolveAuthoritativeGroupRoster(details, conversationAccountIdHex)
         resolution.invariant?.let { invariant ->
             memberRosterLoadTracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
-            logGroupRosterInvariant(details, resolution, invariant)
+            logGroupRosterInvariant(
+                resolution = resolution,
+                invariant = invariant,
+                returnedRowCount = returnedRowCount,
+                returnedMembership = returnedMembership,
+            )
             return null
         }
         val applied = resolution.applied
@@ -10813,9 +10851,10 @@ class ConversationController(
     }
 
     private fun logGroupRosterInvariant(
-        details: GroupDetailsFfi,
         resolution: GroupRosterResolution,
         invariant: GroupRosterInvariant,
+        returnedRowCount: Int,
+        returnedMembership: SelfMembershipFfi,
     ) {
         fun normalizedIds(rows: List<AppGroupMemberRecordFfi>): Set<String> =
             rows
@@ -10841,7 +10880,7 @@ class ConversationController(
             "DMConversation",
             "joined roster invariant" +
                 " reason=${invariant.name.lowercase()}" +
-                " rows=${details.members.size}" +
+                " rows=$returnedRowCount" +
                 " unique=${resolution.uniqueMemberCount}" +
                 " mls=${resolution.mlsMemberCount}" +
                 " cached_unique=${cachedIds.size}" +
@@ -10851,7 +10890,7 @@ class ConversationController(
                 " returned_self=${resolution.containsLocalMember}" +
                 " cached_self=$cachedContainsLocal" +
                 " current_membership=${group.selfMembership.name.lowercase()}" +
-                " returned_membership=${details.group.selfMembership.name.lowercase()}",
+                " returned_membership=${returnedMembership.name.lowercase()}",
         )
     }
 

@@ -8,10 +8,10 @@ import java.text.Normalizer
 import java.util.Locale
 
 /**
- * First-layer SSRF guard for URLs that arrive from untrusted protocol data —
- * relay hints, imeta media URLs, and profile avatar URLs. Classifies a literal
- * host as private / loopback / link-local purely from the host string (no DNS),
- * so it is cheap and safe to call on any thread, including composition.
+ * SSRF guard for Android-owned directory and user-initiated HTTPS fetches.
+ * Protocol-owned media and profile-image fetches use Marmot's dial-safety
+ * implementation instead of this Kotlin classifier. Classifies a literal host
+ * as private / loopback / link-local purely from the host string (no DNS).
  *
  * The string check ([isPrivateOrLoopbackHost]) deliberately does NOT defend
  * against DNS-rebinding (a public hostname that resolves to a private address).

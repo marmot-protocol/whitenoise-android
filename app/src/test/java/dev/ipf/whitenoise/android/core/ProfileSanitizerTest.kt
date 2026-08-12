@@ -81,16 +81,16 @@ class ProfileSanitizerTest {
     }
 
     @Test
-    fun imageUrlsRejectPrivateAndLoopbackHosts() {
-        // SSRF guard: an avatar URL must not point the app at the device's own
-        // loopback or the local network. See issue #89.
-        assertNull(ProfileSanitizer.imageUrl("https://127.0.0.1/avatar.png"))
-        assertNull(ProfileSanitizer.imageUrl("https://192.168.1.1/avatar.png"))
-        assertNull(ProfileSanitizer.imageUrl("https://10.0.0.5:8443/secret.png"))
-        assertNull(ProfileSanitizer.imageUrl("https://169.254.1.1/avatar.png"))
-        assertNull(ProfileSanitizer.imageUrl("https://[::1]/avatar.png"))
-        assertNull(ProfileSanitizer.imageUrl("https://localhost/avatar.png"))
-        // Public hosts still pass.
+    fun imageUrlsLeaveHostClassificationToTheNetworkFetcher() {
+        // Protocol profile URLs are classified by MDK at the network boundary;
+        // user-initiated URLs are classified by SafeHttpsGet. Keeping host
+        // classification out of this shared structural sanitizer prevents the
+        // two SSRF policies from drifting.
+        assertEquals("https://127.0.0.1/avatar.png", ProfileSanitizer.imageUrl("https://127.0.0.1/avatar.png"))
+        assertEquals("https://192.168.1.1/avatar.png", ProfileSanitizer.imageUrl("https://192.168.1.1/avatar.png"))
+        assertEquals("https://169.254.1.1/avatar.png", ProfileSanitizer.imageUrl("https://169.254.1.1/avatar.png"))
+        assertEquals("https://[::1]/avatar.png", ProfileSanitizer.imageUrl("https://[::1]/avatar.png"))
+        assertEquals("https://localhost/avatar.png", ProfileSanitizer.imageUrl("https://localhost/avatar.png"))
         assertEquals("https://example.com/avatar.png", ProfileSanitizer.imageUrl("https://example.com/avatar.png"))
     }
 

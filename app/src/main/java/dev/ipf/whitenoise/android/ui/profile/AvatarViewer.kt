@@ -65,7 +65,6 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
-import dev.ipf.whitenoise.android.core.SafeHttpsGet
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.AvatarDragDismissResult
@@ -84,10 +83,6 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 private const val AVATAR_VIEWER_MAX_BYTES = 8 * 1024 * 1024
-
-private const val AVATAR_VIEWER_CONNECT_TIMEOUT_MS = 5_000
-
-private const val AVATAR_VIEWER_READ_TIMEOUT_MS = 15_000
 
 @Composable
 internal fun rememberAvatarImageAvailable(pictureUrl: String?): Boolean {
@@ -203,12 +198,9 @@ private fun rememberAvatarViewerImageState(
         value = AvatarViewerImageState.Loading
         val bytes =
             withContext(Dispatchers.IO) {
-                SafeHttpsGet.get(
-                    url = remoteUrl,
-                    maxBodyBytes = AVATAR_VIEWER_MAX_BYTES,
-                    connectTimeoutMillis = AVATAR_VIEWER_CONNECT_TIMEOUT_MS,
-                    readTimeoutMillis = AVATAR_VIEWER_READ_TIMEOUT_MS,
-                )
+                runCatching {
+                    AvatarImageLoader.fetchBytes(remoteUrl, AVATAR_VIEWER_MAX_BYTES)
+                }.getOrNull()
             }
         val bitmap =
             bytes?.let { data ->

@@ -3282,6 +3282,9 @@ class WhiteNoiseAppState private constructor(
                 opened.marmot.configurePrivacyRuntime()
                 opened.marmot.start()
             }
+            AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
+                marmotIo { downloadProfileImage(url, maxBytes) }
+            }
             appStateDebug { "marmot started" }
             localNotificationPresenter.ensureChannels()
             refreshLocalNotificationPermission()
