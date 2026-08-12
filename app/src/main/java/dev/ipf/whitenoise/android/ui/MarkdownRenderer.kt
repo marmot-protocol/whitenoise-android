@@ -32,6 +32,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -371,7 +372,7 @@ private val LocalSelectableTextLayoutReporter =
     staticCompositionLocalOf<SelectableTextLayoutReporter?> { null }
 
 private val LocalTtsLeafHighlightResolver =
-    staticCompositionLocalOf<TtsLeafHighlightResolver?> { null }
+    compositionLocalOf<TtsLeafHighlightResolver?> { null }
 
 private val LocalMarkdownLinkTextLayoutReporter =
     staticCompositionLocalOf<MarkdownLinkTextLayoutReporter?> { null }
@@ -404,7 +405,10 @@ private fun MarkdownBodyText(
     val tracker = remember(leafId) { MarkdownTextLayoutTracker() }
     val highlightColor = ttsReadAloudHighlightColor()
     var layoutResult by remember(leafId) { mutableStateOf<TextLayoutResult?>(null) }
-    val highlightRange = highlightResolver?.invoke(leafId, text.text)
+    val highlightRange =
+        remember(highlightResolver, leafId, text.text) {
+            highlightResolver?.invoke(leafId, text.text)
+        }
 
     DisposableEffect(reporter, linkReporter, leafId, text) {
         onDispose {
@@ -630,6 +634,9 @@ internal fun markdownElisionLeafId(
         sourceIndexOffset != null -> "b$sourceIndexOffset/elided"
         else -> "elided"
     }
+
+@Suppress("MaxLineLength")
+internal fun markdownTableHeaderCellElisionLeafId(rowPath: String): String = markdownElisionLeafId("$rowPath/h", sourceIndexOffset = null)
 
 /** Authored blank lines beyond the single one the paragraph gap already represents. */
 internal fun markdownExtraBlankLines(
@@ -1230,7 +1237,12 @@ private fun MarkdownTableRowView(
         if (row.cellsElided) {
             val rowPath = rowIndex?.let { "$path/r$it" } ?: path
             MarkdownElisionMarker(
-                leafId = markdownElisionLeafId(rowPath, sourceIndexOffset = null),
+                leafId =
+                    if (header) {
+                        markdownTableHeaderCellElisionLeafId(rowPath)
+                    } else {
+                        markdownElisionLeafId(rowPath, sourceIndexOffset = null)
+                    },
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
             )

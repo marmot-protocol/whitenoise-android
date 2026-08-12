@@ -5,11 +5,13 @@ import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 class TtsSpeakableSourceTest {
@@ -55,6 +57,37 @@ class TtsSpeakableSourceTest {
 
             assertEquals(1, parseCalls)
             assertEquals(editedDocument, document)
+        }
+
+    @Test
+    fun resolveTtsSpeakableDocumentRethrowsCancellation() =
+        runBlocking {
+            val record = message(contentTokens = markdownDocument("Original **value**"))
+            val source = resolveTtsSpeakableSource(record, editedText = "Edited *value*")!!
+
+            try {
+                resolveTtsSpeakableDocument(record, source) {
+                    throw CancellationException("parse cancelled")
+                }
+                fail("Expected CancellationException")
+            } catch (_: CancellationException) {
+                // Expected.
+            }
+        }
+
+    @Test
+    fun resolveTtsSpeakableDocumentFallsBackToEmptyDocumentOnParseFailure() =
+        runBlocking {
+            val record = message(contentTokens = markdownDocument("Original **value**"))
+            val source = resolveTtsSpeakableSource(record, editedText = "Edited *value*")!!
+
+            val document =
+                resolveTtsSpeakableDocument(record, source) {
+                    throw IllegalStateException("parse failed")
+                }
+
+            assertTrue(document.blocks.isEmpty())
+            assertFalse(document.truncated)
         }
 
     private fun markdownDocument(

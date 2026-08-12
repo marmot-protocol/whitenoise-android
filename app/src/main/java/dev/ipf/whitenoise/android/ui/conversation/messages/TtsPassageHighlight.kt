@@ -1,6 +1,9 @@
+@file:Suppress("TooManyFunctions")
+
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import android.speech.tts.TextToSpeech
+import dev.ipf.whitenoise.android.audio.tts.TtsChunk
 import dev.ipf.whitenoise.android.audio.tts.TtsChunker
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
@@ -16,6 +19,32 @@ internal fun ttsHighlightMaxChunkLength(): Int =
 
 private const val TTS_HIGHLIGHT_FALLBACK_MAX_CHUNK_LENGTH = 4_000
 
+internal fun createTtsLeafHighlightResolver(
+    passage: TtsPassage,
+    messageIdHex: String,
+    projection: SpeakableTextProjection,
+    locale: Locale,
+): (String, String) -> IntRange? {
+    val sentenceChunks =
+        TtsChunker.chunk(
+            projection.text,
+            locale,
+            maxChunkLength = ttsHighlightMaxChunkLength(),
+        )
+    val leafSpanCache = HashMap<Pair<String, String>, List<RenderedProjectionSpan>?>()
+    return { renderedLeafId, renderedText ->
+        resolveTtsRenderedHighlight(
+            passage = passage,
+            messageIdHex = messageIdHex,
+            projection = projection,
+            renderedLeafId = renderedLeafId,
+            renderedText = renderedText,
+            sentenceChunks = sentenceChunks,
+            leafSpanCache = leafSpanCache,
+        )
+    }
+}
+
 /**
  * Resolves the active read-aloud passage into a half-open UTF-16 range inside
  * one rendered text leaf. Returns null when identity does not match, the leaf is
@@ -30,19 +59,54 @@ internal fun resolveTtsRenderedHighlight(
     renderedText: String,
     locale: Locale,
 ): IntRange? {
+    val sentenceChunks =
+        TtsChunker.chunk(
+            projection.text,
+            locale,
+            maxChunkLength = ttsHighlightMaxChunkLength(),
+        )
+    return resolveTtsRenderedHighlight(
+        passage = passage,
+        messageIdHex = messageIdHex,
+        projection = projection,
+        renderedLeafId = renderedLeafId,
+        renderedText = renderedText,
+        sentenceChunks = sentenceChunks,
+        leafSpanCache = null,
+    )
+}
+
+@Suppress("ReturnCount")
+private fun resolveTtsRenderedHighlight(
+    passage: TtsPassage?,
+    messageIdHex: String,
+    projection: SpeakableTextProjection,
+    renderedLeafId: String,
+    renderedText: String,
+    sentenceChunks: List<TtsChunk>,
+    leafSpanCache: MutableMap<Pair<String, String>, List<RenderedProjectionSpan>?>?,
+): IntRange? {
     if (passage == null || passage.messageIdHex != messageIdHex) return null
     if (passage.projectionId != projection.projectionId) return null
     if (renderedText.isEmpty()) return null
+    val cacheKey = renderedLeafId to renderedText
     val mappedSpans =
-        mapProjectionSpansToRenderedLeaf(
+        leafSpanCache?.getOrPut(cacheKey) {
+            mapProjectionSpansToRenderedLeaf(
+                projection = projection,
+                renderedLeafId = renderedLeafId,
+                renderedText = renderedText,
+            )
+        } ?: mapProjectionSpansToRenderedLeaf(
             projection = projection,
             renderedLeafId = renderedLeafId,
             renderedText = renderedText,
-        ) ?: return null
+        )
+    if (mappedSpans == null) return null
     return if (passage.visibleWord.isNotEmpty()) {
         visibleWordHighlight(passage.visibleWord, renderedLeafId, mappedSpans)
     } else {
-        sentenceHighlight(passage.sentenceIndex, projection, mappedSpans, locale)
+        sentenceHighlight(passage.sentenceIndex, mappedSpans, sentenceChunks)
     }
 }
 
@@ -192,18 +256,10 @@ private fun visibleWordHighlight(
 @Suppress("ReturnCount")
 private fun sentenceHighlight(
     sentenceIndex: Int,
-    projection: SpeakableTextProjection,
     mappedSpans: List<RenderedProjectionSpan>,
-    locale: Locale,
+    sentenceChunks: List<TtsChunk>,
 ): IntRange? {
-    val sentence =
-        TtsChunker
-            .chunk(
-                projection.text,
-                locale,
-                maxChunkLength = ttsHighlightMaxChunkLength(),
-            ).firstOrNull { it.sentenceIndex == sentenceIndex }
-            ?: return null
+    val sentence = sentenceChunks.firstOrNull { it.sentenceIndex == sentenceIndex } ?: return null
     val intervals = ArrayList<RenderedInterval>()
     for (mapped in mappedSpans) {
         val overlapStart = max(sentence.sourceStart, mapped.source.spokenStart)

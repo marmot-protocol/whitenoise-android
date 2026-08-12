@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -73,23 +74,35 @@ internal fun effectiveTtsReadAloudProgress(
     effectivePassage: TtsPassage?,
 ): TtsReadAloudProgress? = progress.takeIf { effectivePassage != null }
 
+@Composable
 internal fun rememberTtsLeafHighlightResolver(
+    passage: TtsPassage?,
+    messageIdHex: String,
+    projection: SpeakableTextProjection?,
+    locale: Locale,
+): TtsLeafHighlightResolver? =
+    remember(passage, messageIdHex, projection, locale) {
+        buildTtsLeafHighlightResolver(
+            passage = passage,
+            messageIdHex = messageIdHex,
+            projection = projection,
+            locale = locale,
+        )
+    }
+
+internal fun buildTtsLeafHighlightResolver(
     passage: TtsPassage?,
     messageIdHex: String,
     projection: SpeakableTextProjection?,
     locale: Locale,
 ): TtsLeafHighlightResolver? {
     if (passage == null || projection == null || passage.messageIdHex != messageIdHex) return null
-    return { leafId, renderedText ->
-        resolveTtsRenderedHighlight(
-            passage = passage,
-            messageIdHex = messageIdHex,
-            projection = projection,
-            renderedLeafId = leafId,
-            renderedText = renderedText,
-            locale = locale,
-        )
-    }
+    return createTtsLeafHighlightResolver(
+        passage = passage,
+        messageIdHex = messageIdHex,
+        projection = projection,
+        locale = locale,
+    )
 }
 
 internal fun activeTtsLeafHighlightResolver(

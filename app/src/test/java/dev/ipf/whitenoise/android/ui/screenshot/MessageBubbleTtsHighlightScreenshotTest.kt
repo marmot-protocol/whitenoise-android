@@ -30,7 +30,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
-import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsLeafHighlightResolver
+import dev.ipf.whitenoise.android.ui.conversation.messages.buildTtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlight
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlightColor
 import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
@@ -98,8 +98,7 @@ class MessageBubbleTtsHighlightScreenshotTest {
                 projectionId = projection.projectionId,
                 visibleWord = listOf(TtsVisibleTextSpan("plain", 6, 12)),
             )
-        val resolver =
-            rememberTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
+        val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 BubbleFixture(mine = mine, tag = TAG) {
@@ -144,7 +143,7 @@ class MessageBubbleTtsHighlightScreenshotTest {
                     visibleWord = listOf(TtsVisibleTextSpan("b0/n1/n0", 0, 5)),
                 )
             }
-        val resolver = rememberTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
+        val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = if (largeFont) 1.3f else 1f) {
                 BubbleFixture(mine = mine, tag = TAG) {
@@ -185,7 +184,7 @@ class MessageBubbleTtsHighlightScreenshotTest {
                 projectionId = projection.projectionId,
                 visibleWord = listOf(TtsVisibleTextSpan("b0/n1/n0", 0, 5)),
             )
-        val resolver = rememberTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
+        val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 BubbleFixture(mine = mine, tag = TAG) {

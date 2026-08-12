@@ -56,6 +56,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
@@ -545,6 +546,14 @@ internal fun MessageBubble(
             speakableIdentity = speakableIdentity,
         )
     val effectiveTtsCandidate = messageBubbleTtsProjectionCandidate(ttsGateInput)
+    val editedMarkdownDocument =
+        rememberMessageBubbleEditedDisplayMarkdownDocument(
+            record = record,
+            editState = editState,
+            deleted = deleted,
+            persistedFailure = persistedFailure,
+            parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
+        )
     var activeSpeakableDocument by remember(record.messageIdHex, ttsSpeakableSource, record.contentTokens) {
         mutableStateOf<MarkdownDocumentFfi?>(null)
     }
@@ -553,9 +562,14 @@ internal fun MessageBubble(
         ttsSpeakableSource,
         record.messageIdHex,
         record.contentTokens,
+        editedMarkdownDocument,
     ) {
         if (!effectiveTtsCandidate || speakableIdentity == null || ttsSpeakableSource == null) {
             activeSpeakableDocument = null
+            return@LaunchedEffect
+        }
+        if (!ttsSpeakableSource.useStoredContentTokens) {
+            activeSpeakableDocument = editedMarkdownDocument
             return@LaunchedEffect
         }
         val document =
@@ -599,19 +613,13 @@ internal fun MessageBubble(
             progress = ttsReadAloudProgress,
         )
     val effectiveTtsPassage = ttsProjectionState.effectivePassage
-    val editedMarkdownDocument =
-        activeSpeakableDocument?.takeIf {
-            effectiveTtsCandidate && editState != null && record.kind == 9uL
-        }
     val ttsLeafHighlightResolver =
-        remember(effectiveTtsPassage, speakableProjection, record.messageIdHex) {
-            rememberTtsLeafHighlightResolver(
-                passage = effectiveTtsPassage,
-                messageIdHex = record.messageIdHex,
-                projection = speakableProjection,
-                locale = java.util.Locale.getDefault(),
-            )
-        }
+        rememberTtsLeafHighlightResolver(
+            passage = effectiveTtsPassage,
+            messageIdHex = record.messageIdHex,
+            projection = speakableProjection,
+            locale = LocalLocale.current.platformLocale,
+        )
     val effectiveTtsReadAloudProgress = ttsProjectionState.effectiveProgress
     // Issue #390 v1 forwards text only. Forward must be hidden for any record
     // whose displayed body is a synthetic surrogate (media filename/placeholder,

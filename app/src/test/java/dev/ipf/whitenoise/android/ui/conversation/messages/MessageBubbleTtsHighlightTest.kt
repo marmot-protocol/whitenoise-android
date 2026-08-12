@@ -57,7 +57,7 @@ class MessageBubbleTtsHighlightTest {
                 visibleWord = listOf(TtsVisibleTextSpan("plain", 6, 12)),
             )
         val resolver =
-            rememberTtsLeafHighlightResolver(
+            buildTtsLeafHighlightResolver(
                 passage = passage,
                 messageIdHex = "m1",
                 projection = projection,
@@ -135,7 +135,7 @@ class MessageBubbleTtsHighlightTest {
                 visibleWord = listOf(TtsVisibleTextSpan("plain", 0, 5)),
             )
         val resolver =
-            rememberTtsLeafHighlightResolver(
+            buildTtsLeafHighlightResolver(
                 passage = passage,
                 messageIdHex = "m1",
                 projection = projection,
@@ -197,7 +197,7 @@ class MessageBubbleTtsHighlightTest {
                 visibleWord = listOf(TtsVisibleTextSpan("plain", 0, 5)),
             )
         val resolver =
-            rememberTtsLeafHighlightResolver(
+            buildTtsLeafHighlightResolver(
                 passage = passage,
                 messageIdHex = "m1",
                 projection = projection,
@@ -260,7 +260,7 @@ class MessageBubbleTtsHighlightTest {
                 visibleWord = listOf(TtsVisibleTextSpan("plain", 0, 5)),
             )
         val resolver =
-            rememberTtsLeafHighlightResolver(
+            buildTtsLeafHighlightResolver(
                 passage = passage,
                 messageIdHex = "m1",
                 projection = projection,

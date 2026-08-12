@@ -65,6 +65,35 @@ class ComposeHotPathCoverageTest {
     }
 
     @Test
+    fun conversationScreenDoesNotSubscribeToTtsPlaybackState() {
+        val screenSource = source("conversation/ConversationScreen.kt").readText()
+        val timelineRowSource = source("conversation/TimelineRow.kt").readText()
+        val timelineRowTtsSource = source("conversation/TimelineRowTtsHighlight.kt").readText()
+
+        assertFalse(
+            "ConversationScreen must not collect TTS playback state",
+            "ttsController.state.collectAsState()" in screenSource,
+        )
+        assertTrue(
+            "TimelineRow must delegate bubble rendering to a row-scoped restart scope",
+            "TimelineRowMessageBubble(" in timelineRowSource,
+        )
+        assertTrue(
+            "TimelineRow must key the row-scoped restart scope by message id",
+            "key(item.record.messageIdHex)" in timelineRowSource,
+        )
+        assertTrue(
+            "Row-scoped TTS highlight projection must filter by message id",
+            "timelineRowTtsHighlightPassage(" in timelineRowTtsSource,
+        )
+        assertTrue(
+            "Row-scoped TTS subscription must filter playback updates per message",
+            "produceState" in timelineRowTtsSource &&
+                "distinctUntilChanged()" in timelineRowTtsSource,
+        )
+    }
+
+    @Test
     fun chatListScrollAndRowSearchWorkAreIsolatedFromScreenComposition() {
         val source = source("chats/ChatsScreen.kt").readText()
 
