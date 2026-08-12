@@ -126,10 +126,11 @@ private suspend fun runNewGroupCreateMutation(
     retentionSecs: Long,
     retryLoadGroupIdHex: String?,
     isRetryLoad: Boolean,
+    createRequestToken: Long,
     onStage: (NewGroupCreateStage?) -> Unit,
     onRetryGroupId: (String) -> Unit,
     onCreateError: (Throwable) -> Unit,
-    onOpenConversation: (ChatListItem, Boolean) -> Unit,
+    onCreateCompletedOpen: (ChatListItem, Long) -> Unit,
     onRetryGroupIdCleared: () -> Unit,
     onAuthoritativeReadFailed: (Throwable) -> Unit,
 ) {
@@ -169,7 +170,8 @@ private suspend fun runNewGroupCreateMutation(
             groupIdHex = groupIdHex,
             showCreatedToast = !isRetryLoad,
             retentionOutcome = retentionOutcome,
-            onOpenConversation = onOpenConversation,
+            createRequestToken = createRequestToken,
+            onCreateCompletedOpen = onCreateCompletedOpen,
             onRetryGroupIdCleared = onRetryGroupIdCleared,
             onAuthoritativeReadFailed = onAuthoritativeReadFailed,
         )
@@ -184,7 +186,8 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
     groupIdHex: String,
     showCreatedToast: Boolean,
     retentionOutcome: GroupRetentionApplyOutcome,
-    onOpenConversation: (ChatListItem, Boolean) -> Unit,
+    createRequestToken: Long,
+    onCreateCompletedOpen: (ChatListItem, Long) -> Unit,
     onRetryGroupIdCleared: () -> Unit,
     onAuthoritativeReadFailed: (Throwable) -> Unit,
 ) {
@@ -192,7 +195,7 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
     runCatchingCancellable {
         val item = appState.loadCreatedChatListItem(groupIdHex)
         onRetryGroupIdCleared()
-        onOpenConversation(item, false)
+        onCreateCompletedOpen(item, createRequestToken)
     }.onFailure {
         appState.abandonGroupCreateTiming(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_FAILED)
         onAuthoritativeReadFailed(it)
@@ -210,7 +213,8 @@ internal fun NewGroupSetupScreen(
     appState: WhiteNoiseAppState,
     members: List<RecipientSearch.Candidate>,
     onBack: () -> Unit,
-    onOpenConversation: (ChatListItem, Boolean) -> Unit,
+    onCreateCompletedOpen: (ChatListItem, Long) -> Unit,
+    onCreateSubmitted: () -> Long = { 0L },
     initialRetryGroupIdHex: String? = null,
 ) {
     var groupName by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
@@ -223,6 +227,7 @@ internal fun NewGroupSetupScreen(
     var busy by remember { mutableStateOf(false) }
     var createStage by remember { mutableStateOf<NewGroupCreateStage?>(null) }
     var retryGroupIdHex by rememberSaveable { mutableStateOf(initialRetryGroupIdHex) }
+    var createRequestToken by rememberSaveable { mutableLongStateOf(0L) }
     var error by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val recentEmojiRecentsOwner = rememberRecentEmojiRecentsOwner(context)
@@ -267,6 +272,9 @@ internal fun NewGroupSetupScreen(
         busy = true
         createStage = null
         error = null
+        if (!isRetryLoad) {
+            createRequestToken = onCreateSubmitted()
+        }
         appState.beginChatCreateOpenTiming()
         appState.launchMutation {
             try {
@@ -279,10 +287,11 @@ internal fun NewGroupSetupScreen(
                     retentionSecs = retentionSecs,
                     retryLoadGroupIdHex = retryLoadGroupIdHex,
                     isRetryLoad = isRetryLoad,
+                    createRequestToken = createRequestToken,
                     onStage = { createStage = it },
                     onRetryGroupId = { retryGroupIdHex = it },
                     onCreateError = { error = createGroupErrorMessage(it) },
-                    onOpenConversation = onOpenConversation,
+                    onCreateCompletedOpen = onCreateCompletedOpen,
                     onRetryGroupIdCleared = { retryGroupIdHex = null },
                     onAuthoritativeReadFailed = { error = createGroupErrorMessage(it) },
                 )
