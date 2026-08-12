@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.media.editor
 
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
+import dev.ipf.marmotkit.MessageDraftSummaryFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -588,6 +589,8 @@ private class FakeDraftGateway(
             error("delete failed after commit")
         }
     }
+
+    override fun summaries(accountRef: String): List<MessageDraftSummaryFfi> = emptyList()
 }
 
 private class RepositorySessionStrings(

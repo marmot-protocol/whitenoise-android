@@ -65,6 +65,43 @@ class DraftStoreTest {
     }
 
     @Test
+    fun repeatedAuthoritativeHydrationDoesNotGrowInMemoryStateWithoutBound() {
+        val s = store()
+
+        repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 25) { index ->
+            s.hydrate("a", "g-$index", "draft", draftedAtMs = index.toLong())
+        }
+
+        assertEquals(DraftStore.MAX_IN_MEMORY_DRAFT_STATES, s.draftStateCountForTest())
+    }
+
+    @Test
+    fun clearingEvictedNonEmptyDraftRemovesItsCachedValue() {
+        val s = store()
+        s.set("a", "evicted", TextFieldValue("draft"))
+        repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES) { index ->
+            s.hydrate("a", "g-$index", "draft-$index", draftedAtMs = index.toLong())
+        }
+
+        s.set("a", "evicted", TextFieldValue(""))
+
+        assertNull(s.get("a", "evicted"))
+    }
+
+    @Test
+    fun hydrationNotifiesWhenAuthoritativeSortTimestampChanges() {
+        val s = store()
+        var sortNotifications = 0
+        s.onDraftSortOrderChanged = { sortNotifications += 1 }
+
+        s.hydrate("a", "g", "draft", draftedAtMs = 1_000)
+        s.hydrate("a", "g", "draft", draftedAtMs = 1_000, replaceExisting = true)
+        s.hydrate("a", "g", "draft", draftedAtMs = 2_000, replaceExisting = true)
+
+        assertEquals(2, sortNotifications)
+    }
+
+    @Test
     fun settingEvictedObservedEmptyDraftUpdatesOriginalState() {
         val s = store()
         val observedReads = HashSet<Any>()
@@ -438,7 +475,7 @@ class DraftStoreTest {
 
     private fun DraftStore.evictedDraftStateReferencesForTest(): List<WeakReference<*>> {
         val referencesField =
-            DraftStore::class.java.getDeclaredField("evictedEmptyDraftStates").apply { isAccessible = true }
+            DraftStore::class.java.getDeclaredField("evictedDraftStates").apply { isAccessible = true }
         val references = referencesField.get(this) as Map<*, *>
         return references.values.map { it as WeakReference<*> }
     }

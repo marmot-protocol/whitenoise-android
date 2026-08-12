@@ -30,7 +30,7 @@ class ShareInboundStager(
         accountIdHex: String,
         groupIds: List<String>,
         payload: SharePayload,
-        draftAccountRef: String = accountIdHex,
+        draftAccountRef: String,
     ) {
         if (accountIdHex.isBlank() || groupIds.isEmpty()) return
         val streamStaging =

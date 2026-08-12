@@ -196,14 +196,6 @@ internal fun ChatsScreen(
     // Effective folder membership: manual members plus rule matches,
     // re-derived from the live list so rule-driven chats join and leave
     // folders as rosters, unread state, and mute state change.
-    val engineMutedChatIds =
-        remember(controller.items) {
-            controller.items
-                .asSequence()
-                .filter { it.engineMuted() }
-                .map { it.group.groupIdHex }
-                .toSet()
-        }
     val resolveFolderChatIds: (String) -> Set<String> =
         remember(
             folderStoreState,
@@ -222,8 +214,15 @@ internal fun ChatsScreen(
                         // list; every other folder from the active one.
                         val rule = appState.chatFolderPreferences.folderRule(accountRef, folderId)
                         val archivedSource = rule?.archivedOnly == true
+                        val sourceItems = if (archivedSource) controller.archivedItems else controller.items
+                        val engineMutedChatIds =
+                            sourceItems
+                                .asSequence()
+                                .filter { it.engineMuted() }
+                                .map { it.group.groupIdHex }
+                                .toSet()
                         chatFolderChatIds(
-                            items = if (archivedSource) controller.archivedItems else controller.items,
+                            items = sourceItems,
                             manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folderId),
                             rule = rule,
                             activeAccountIdHex = appState.activeAccount?.accountIdHex,

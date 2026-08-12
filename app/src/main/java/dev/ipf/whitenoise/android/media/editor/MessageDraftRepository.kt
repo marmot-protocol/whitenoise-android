@@ -30,7 +30,7 @@ internal interface MessageDraftGateway {
         groupIdHex: String,
     )
 
-    fun summaries(accountRef: String): List<MessageDraftSummaryFfi> = emptyList()
+    fun summaries(accountRef: String): List<MessageDraftSummaryFfi>
 }
 
 internal class MarmotMessageDraftGateway(

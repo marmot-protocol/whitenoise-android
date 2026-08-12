@@ -37,6 +37,7 @@ class ShareInboundStagerTest {
             accountIdHex = "acct",
             groupIds = listOf("g1", "g2"),
             payload = SharePayload("shared text", emptyList(), "text/plain"),
+            draftAccountRef = "acct",
         )
         assertEquals("shared text", draftStore.get("acct", "g1"))
         assertEquals("shared text", draftStore.get("acct", "g2"))
@@ -56,6 +57,7 @@ class ShareInboundStagerTest {
             accountIdHex = "acct",
             groupIds = listOf("g1"),
             payload = SharePayload("incoming", emptyList(), "text/plain"),
+            draftAccountRef = "acct",
         )
         assertEquals("existing\nincoming", draftStore.get("acct", "g1"))
     }
@@ -70,6 +72,7 @@ class ShareInboundStagerTest {
             accountIdHex = "acct",
             groupIds = listOf("g1"),
             payload = SharePayload(null, listOf(image, doc), "image/*"),
+            draftAccountRef = "acct",
         )
         val staged = shareStaging.consume("acct", "g1")
         assertEquals(listOf(image), staged?.mediaUris)

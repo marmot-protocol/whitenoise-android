@@ -54,7 +54,8 @@ class DraftStore internal constructor(
     private val lock = Any()
     private val drafts = LinkedHashMap<String, MutableState<String?>>(16, 0.75f, true)
     private val collectedEvictedDraftStates = ReferenceQueue<MutableState<String?>>()
-    private val evictedEmptyDraftStates = mutableMapOf<String, EvictedDraftStateReference>()
+    private val evictedDraftStates = mutableMapOf<String, EvictedDraftStateReference>()
+    private val evictedDraftValues = mutableMapOf<String, String>()
 
     // Unix-seconds "drafted-at" per key, updated only when a draft starts
     // (empty→non-empty) or clears — never on an ordinary keystroke — so the
@@ -85,13 +86,14 @@ class DraftStore internal constructor(
     // write, while unobserved states remain eligible for garbage collection.
     private fun stateFor(k: String): MutableState<String?> =
         synchronized(lock) {
-            stateForLocked(k).also { pruneEmptyDraftStatesLocked(retainedState = it) }
+            stateForLocked(k).also { pruneDraftStatesLocked(retainedState = it) }
         }
 
     private fun stateForLocked(k: String): MutableState<String?> {
         drainCollectedEvictedDraftStatesLocked()
         drafts[k]?.let { return it }
-        val state = evictedEmptyDraftStates.remove(k)?.get() ?: mutableStateOf<String?>(null)
+        val state = evictedDraftStates.remove(k)?.get() ?: mutableStateOf(evictedDraftValues[k])
+        evictedDraftValues.remove(k)
         drafts[k] = state
         return state
     }
@@ -99,8 +101,8 @@ class DraftStore internal constructor(
     private fun drainCollectedEvictedDraftStatesLocked() {
         while (true) {
             val reference = collectedEvictedDraftStates.poll() as? EvictedDraftStateReference ?: return
-            if (evictedEmptyDraftStates[reference.key] === reference) {
-                evictedEmptyDraftStates.remove(reference.key)
+            if (evictedDraftStates[reference.key] === reference) {
+                evictedDraftStates.remove(reference.key)
             }
         }
     }
@@ -133,12 +135,18 @@ class DraftStore internal constructor(
         // set/clear cannot interleave between the in-memory and backing-store updates.
         synchronized(lock) {
             if (value.text.isBlank()) {
-                val state = drafts[k] ?: return@synchronized
+                val state =
+                    drafts[k]
+                        ?: if (k in evictedDraftValues || evictedDraftStates[k]?.get()?.value != null) {
+                            stateForLocked(k)
+                        } else {
+                            return@synchronized
+                        }
                 if (state.value != null) {
                     state.value = null
                     persistence.write(k, null)
                     if (draftedAtSeconds.remove(k) != null) sortOrderChanged = true
-                    pruneEmptyDraftStatesLocked()
+                    pruneDraftStatesLocked()
                 }
                 return@synchronized
             }
@@ -157,7 +165,7 @@ class DraftStore internal constructor(
                 state.value = encoded
                 persistence.write(k, encoded)
             }
-            pruneEmptyDraftStatesLocked(retainedState = state)
+            pruneDraftStatesLocked(retainedState = state)
         }
         if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
     }
@@ -192,15 +200,19 @@ class DraftStore internal constructor(
         replaceExisting: Boolean = false,
     ) {
         val k = key(accountRef, groupIdHex)
+        var sortOrderChanged = false
         synchronized(lock) {
             val state = stateForLocked(k)
             if ((state.value == null || replaceExisting) && content.isNotBlank()) {
                 val selection = TextRange(content.length)
                 val draftedAt = draftedAtMs / MILLIS_PER_SECOND
+                sortOrderChanged = draftedAtSeconds[k] != draftedAt
                 draftedAtSeconds[k] = draftedAt
                 state.value = encodeComposerDraft(TextFieldValue(content, selection), draftedAt)
             }
+            pruneDraftStatesLocked(retainedState = state)
         }
+        if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
     }
 
     /** Reconciles lifecycle text after pending writes have been flushed to MDK. */
@@ -225,6 +237,7 @@ class DraftStore internal constructor(
                         draftedAtSeconds[k],
                     )
             }
+            pruneDraftStatesLocked(retainedState = state)
         }
         onDraftSortOrderChanged?.invoke()
     }
@@ -272,19 +285,22 @@ class DraftStore internal constructor(
         var sortOrderChanged = false
         synchronized(lock) {
             val matchingDrafts =
-                drafts.entries
-                    .mapNotNull { (k, state) ->
-                        val value = state.value
-                        if (k.startsWith(prefix) && value != null) Triple(k, state, value) else null
-                    }
+                (drafts.keys + evictedDraftStates.keys + evictedDraftValues.keys)
+                    .asSequence()
+                    .filter { it.startsWith(prefix) }
+                    .distinct()
+                    .mapNotNull { k ->
+                        val state = stateForLocked(k)
+                        state.value?.let { value -> Triple(k, state, value) }
+                    }.toList()
             matchingDrafts.forEach { (k, state, snapshottedValue) ->
                 if (state.value == snapshottedValue) {
                     state.value = null
                     persistence.write(k, null)
                     if (draftedAtSeconds.remove(k) != null) sortOrderChanged = true
-                    pruneEmptyDraftStatesLocked()
                 }
             }
+            pruneDraftStatesLocked()
         }
         if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
     }
@@ -292,15 +308,17 @@ class DraftStore internal constructor(
     /** Durably drains any coalesced background persistence work. */
     fun flush() = persistence.flush()
 
-    private fun pruneEmptyDraftStatesLocked(retainedState: MutableState<String?>? = null) {
+    private fun pruneDraftStatesLocked(retainedState: MutableState<String?>? = null) {
         drainCollectedEvictedDraftStatesLocked()
         if (drafts.size <= MAX_IN_MEMORY_DRAFT_STATES) return
         val iterator = drafts.entries.iterator()
         while (drafts.size > MAX_IN_MEMORY_DRAFT_STATES && iterator.hasNext()) {
             val entry = iterator.next()
-            if (entry.value !== retainedState && entry.value.value == null) {
+            if (entry.value !== retainedState) {
                 iterator.remove()
-                evictedEmptyDraftStates[entry.key] =
+                entry.value.value?.let { evictedDraftValues[entry.key] = it }
+                    ?: evictedDraftValues.remove(entry.key)
+                evictedDraftStates[entry.key] =
                     EvictedDraftStateReference(entry.key, entry.value, collectedEvictedDraftStates)
             }
         }

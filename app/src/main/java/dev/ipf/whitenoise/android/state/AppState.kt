@@ -4857,7 +4857,10 @@ class WhiteNoiseAppState private constructor(
 
     fun isConversationMuted(groupIdHex: String): Boolean {
         val accountRef = activeAccountRef ?: return false
-        return authoritativeMuteOverrides[ChatMutePreferences.compositeKey(accountRef, groupIdHex)]?.muted
+        return effectiveMuteOverride(
+            authoritativeMuteOverrides[ChatMutePreferences.compositeKey(accountRef, groupIdHex)],
+            System.currentTimeMillis(),
+        )?.muted
             ?: engineConversationMuted(groupIdHex)
     }
 
@@ -4868,7 +4871,10 @@ class WhiteNoiseAppState private constructor(
 
     internal fun conversationMuteOverride(groupIdHex: String): dev.ipf.marmotkit.ChatNotificationSettingsFfi? {
         val accountRef = activeAccountRef ?: return null
-        return authoritativeMuteOverrides[ChatMutePreferences.compositeKey(accountRef, groupIdHex)]
+        return effectiveMuteOverride(
+            authoritativeMuteOverrides[ChatMutePreferences.compositeKey(accountRef, groupIdHex)],
+            System.currentTimeMillis(),
+        )
     }
 
     fun conversationNotifyMode(groupIdHex: String): ChatNotifyMode {
@@ -4958,7 +4964,8 @@ class WhiteNoiseAppState private constructor(
         accountRef ?: return
         val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
         val override = authoritativeMuteOverrides[key] ?: return
-        if (override.muted == muted && override.mutedUntilMs == mutedUntilMs) {
+        val commandPending = (pendingMuteCommands[key] ?: 0) > 0
+        if (shouldDropMuteOverride(override, muted, mutedUntilMs, commandPending)) {
             authoritativeMuteOverrides.remove(key)
         }
     }
@@ -5131,11 +5138,15 @@ class WhiteNoiseAppState private constructor(
     /** Remaining timed-mute expiry (epoch millis) for the chat, or null. */
     fun conversationMuteExpiryMillis(groupIdHex: String): Long? {
         val accountRef = activeAccountRef ?: return null
-        return authoritativeMuteOverrides[ChatMutePreferences.compositeKey(accountRef, groupIdHex)]?.mutedUntilMs
-            ?: (chatsController?.items.orEmpty() + chatsController?.archivedItems.orEmpty())
+        val override = authoritativeMuteOverrides[ChatMutePreferences.compositeKey(accountRef, groupIdHex)]
+        return if (override != null) {
+            effectiveMuteOverride(override, System.currentTimeMillis())?.mutedUntilMs
+        } else {
+            (chatsController?.items.orEmpty() + chatsController?.archivedItems.orEmpty())
                 .firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
                 ?.projection
                 ?.mutedUntilMs
+        }
     }
 
     fun ttsEngineChoice(): TtsEngineChoice = ttsResolution?.engineChoice() ?: TtsEngineChoice(null, emptyList())
