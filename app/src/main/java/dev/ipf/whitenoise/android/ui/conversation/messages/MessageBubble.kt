@@ -297,6 +297,7 @@ internal fun MessageBubble(
     readOnly: Boolean = false,
     ttsHighlightPassage: TtsPassage? = null,
     ttsReadAloudProgress: TtsReadAloudProgress? = null,
+    parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
 ) {
     val record = item.record
     val mine = controller.isMessageMine(record)
@@ -552,7 +553,7 @@ internal fun MessageBubble(
             editState = editState,
             deleted = deleted,
             persistedFailure = persistedFailure,
-            parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
+            parseMarkdown = parseMarkdown,
         )
     var activeSpeakableDocument by remember(record.messageIdHex, ttsSpeakableSource, record.contentTokens) {
         mutableStateOf<MarkdownDocumentFfi?>(null)

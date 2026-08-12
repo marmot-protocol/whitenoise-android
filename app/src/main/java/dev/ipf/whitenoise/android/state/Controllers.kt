@@ -6031,7 +6031,7 @@ class ConversationController(
      * timeline publish. The bubble reads `.latestText` and the "(edited · N)"
      * affordance reads `.count`. Null entry == message never edited. */
     var editsByTarget by mutableStateOf<Map<String, EditState>>(emptyMap())
-        private set
+        internal set
 
     /**
      * Local optimistic edits keyed by target message id, applied immediately on
