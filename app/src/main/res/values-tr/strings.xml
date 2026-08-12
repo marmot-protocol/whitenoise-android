@@ -1413,4 +1413,21 @@
     <string name="attachment_type_video">Video</string>
     <string name="attachment_type_image">Görsel</string>
     <string name="attachment_type_file">Dosya</string>
+
+    <string name="global_search_date_filter_title">Tarih</string>
+    <string name="global_search_date_any_time">Her zaman</string>
+    <string name="global_search_date_today">Bugün</string>
+    <string name="global_search_date_last_7_days">Son 7 gün</string>
+    <string name="global_search_date_last_30_days">Son 30 gün</string>
+    <string name="global_search_date_custom">Özel aralık…</string>
+    <string name="global_search_date_custom_from">Başlangıç tarihi</string>
+    <string name="global_search_date_custom_to">Bitiş tarihi</string>
+    <string name="global_search_date_custom_summary">%1$s - %2$s</string>
+    <string name="global_search_date_custom_reversed_error">Bitiş tarihi, başlangıç tarihinden önce olamaz.</string>
+    <string name="global_search_content_text">Metin</string>
+    <string name="global_search_content_links">Bağlantılar</string>
+    <string name="global_search_content_images_video">Görseller ve video</string>
+    <string name="global_search_content_voice_audio">Ses ve sesli mesaj</string>
+    <string name="global_search_content_files_documents">Dosyalar ve belgeler</string>
+    <string name="global_search_content_any_attachment">Herhangi bir ek</string>
 </resources>

@@ -1508,4 +1508,21 @@
     <string name="photo_editor_source_unavailable">The prepared photo can still be sent, but its original editing source is unavailable.</string>
     <string name="photo_editor_prepared">Prepared photo</string>
     <string name="photo_editor_send_as_file">Sent as a file; photo editing is unavailable.</string>
+
+    <string name="global_search_date_filter_title">Date</string>
+    <string name="global_search_date_any_time">Any time</string>
+    <string name="global_search_date_today">Today</string>
+    <string name="global_search_date_last_7_days">Last 7 days</string>
+    <string name="global_search_date_last_30_days">Last 30 days</string>
+    <string name="global_search_date_custom">Custom range…</string>
+    <string name="global_search_date_custom_from">Start date</string>
+    <string name="global_search_date_custom_to">End date</string>
+    <string name="global_search_date_custom_summary">%1$s to %2$s</string>
+    <string name="global_search_date_custom_reversed_error">End date must be on or after the start date.</string>
+    <string name="global_search_content_text">Text</string>
+    <string name="global_search_content_links">Links</string>
+    <string name="global_search_content_images_video">Images &amp; video</string>
+    <string name="global_search_content_voice_audio">Voice &amp; audio</string>
+    <string name="global_search_content_files_documents">Files &amp; documents</string>
+    <string name="global_search_content_any_attachment">Any attachment</string>
 </resources>

@@ -1388,4 +1388,21 @@
     <string name="attachment_type_video">影片</string>
     <string name="attachment_type_image">圖片</string>
     <string name="attachment_type_file">檔案</string>
+
+    <string name="global_search_date_filter_title">日期</string>
+    <string name="global_search_date_any_time">不限時間</string>
+    <string name="global_search_date_today">今天</string>
+    <string name="global_search_date_last_7_days">最近 7 天</string>
+    <string name="global_search_date_last_30_days">最近 30 天</string>
+    <string name="global_search_date_custom">自訂範圍…</string>
+    <string name="global_search_date_custom_from">開始日期</string>
+    <string name="global_search_date_custom_to">結束日期</string>
+    <string name="global_search_date_custom_summary">%1$s 至 %2$s</string>
+    <string name="global_search_date_custom_reversed_error">結束日期不能早於開始日期。</string>
+    <string name="global_search_content_text">文字</string>
+    <string name="global_search_content_links">連結</string>
+    <string name="global_search_content_images_video">圖片和影片</string>
+    <string name="global_search_content_voice_audio">語音和音訊</string>
+    <string name="global_search_content_files_documents">檔案和文件</string>
+    <string name="global_search_content_any_attachment">任意附件</string>
 </resources>

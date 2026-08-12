@@ -1415,4 +1415,21 @@
     <string name="attachment_type_video">Video</string>
     <string name="attachment_type_image">Immagine</string>
     <string name="attachment_type_file">File</string>
+
+    <string name="global_search_date_filter_title">Data</string>
+    <string name="global_search_date_any_time">In qualsiasi momento</string>
+    <string name="global_search_date_today">Oggi</string>
+    <string name="global_search_date_last_7_days">Ultimi 7 giorni</string>
+    <string name="global_search_date_last_30_days">Ultimi 30 giorni</string>
+    <string name="global_search_date_custom">Intervallo personalizzato…</string>
+    <string name="global_search_date_custom_from">Data di inizio</string>
+    <string name="global_search_date_custom_to">Data di fine</string>
+    <string name="global_search_date_custom_summary">%1$s - %2$s</string>
+    <string name="global_search_date_custom_reversed_error">La data di fine deve essere uguale o successiva a quella di inizio.</string>
+    <string name="global_search_content_text">Testo</string>
+    <string name="global_search_content_links">Link</string>
+    <string name="global_search_content_images_video">Immagini e video</string>
+    <string name="global_search_content_voice_audio">Voce e audio</string>
+    <string name="global_search_content_files_documents">File e documenti</string>
+    <string name="global_search_content_any_attachment">Qualsiasi allegato</string>
 </resources>
