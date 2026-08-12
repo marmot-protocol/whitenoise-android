@@ -4,7 +4,8 @@ The public [White Noise Android project](https://github.com/orgs/marmot-protocol
 is the authoritative product planning view. Hermes Kanban may track agent
 execution, but it must not become a competing product backlog.
 
-Every open issue must appear exactly once in project 7 and have:
+Every open issue and pull request must appear exactly once in project 7. Open
+pull requests use `In Progress` status. Every open issue must also have:
 
 - a native `Bug`, `Feature`, `Task`, or `Tracking` issue type;
 - `Priority` set to P0, P1, P2, or P3;
@@ -14,7 +15,9 @@ Every open issue must appear exactly once in project 7 and have:
 
 Use native `Tracking`; never recreate the retired `tracking` label. The retired
 `HIGH`, `MEDIUM`, and `LOW` labels are represented by P1, P2, and P3 project
-values. Product rank is intentionally sparse and currently records:
+values. Read the live Project 7 README before changing priority or rank; its
+current steering overrides this static fallback. Product rank is intentionally
+sparse and currently records:
 
 1. Text-to-speech
 2. Link previews
