@@ -159,7 +159,7 @@ class MuteDurationDialogTest {
 
         composeRule.onNodeWithText(context.getString(R.string.mute_duration_custom)).performScrollTo().performClick()
         composeRule
-            .onNode(hasText("12", substring = true) and hasClickAction())
+            .onNode(hasText("Wednesday, August 12, 2026", substring = true) and hasClickAction())
             .performClick()
         composeRule.onNodeWithTag(MUTE_CUSTOM_DATE_CONFIRM_TAG).performClick()
         composeRule.onNode(hasContentDescription("7 o'clock", substring = true)).performClick()
