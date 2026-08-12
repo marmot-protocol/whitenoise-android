@@ -2,17 +2,23 @@ name: Android PR APK
 
 # This pull_request workflow is intentionally unprivileged. It compiles the PR
 # code and hands unsigned preview candidates to android-pr-preview-publish.yml;
-# it never receives signing or upload credentials.
+# it never receives signing or upload credentials. workflow_dispatch lets a
+# current internal PR head be rebuilt after merge to restore a missing comment.
 on:
   pull_request:
-    branches: [master]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
       - '.github/ISSUE_TEMPLATE/**'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Open internal PR to rebuild and republish
+        required: true
+        type: string
 
 concurrency:
-  group: android-pr-apk-${{ github.event.pull_request.number }}
+  group: android-pr-apk-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
   cancel-in-progress: true
 
 permissions:
@@ -27,17 +33,51 @@ jobs:
       matrix:
         channel: [stable, isolated]
     env:
-      PR_NUMBER: ${{ github.event.pull_request.number }}
       PR_PREVIEW_CHANNEL: ${{ matrix.channel }}
-      PREVIEW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       GITHUB_RUN_NUMBER: ${{ github.run_number }}
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
 
     steps:
+      - name: Resolve exact current internal PR head
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          REQUESTED_PR_NUMBER: ${{ inputs.pr_number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            pr_number=$EVENT_PR_NUMBER
+            head_sha=$EVENT_HEAD_SHA
+            head_repository=$EVENT_HEAD_REPOSITORY
+          else
+            [[ "$REQUESTED_PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+            pr_number=$REQUESTED_PR_NUMBER
+            read -r state head_sha head_repository < <(
+              gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" \
+                --jq '[.state, .head.sha, .head.repo.full_name] | @tsv'
+            )
+            [[ "$state" == open ]]
+          fi
+          [[ "$head_repository" == "$GITHUB_REPOSITORY" ]]
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
+          # Re-read immediately before exporting so a dispatch racing a new PR
+          # commit cannot build stale code under current provenance.
+          current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" \
+            --jq '[.state, .head.sha, .head.repo.full_name] | @tsv')
+          expected=$(printf 'open\t%s\t%s' "$head_sha" "$GITHUB_REPOSITORY")
+          [[ "$current" == "$expected" ]]
+          printf 'pr_number=%s\nhead_sha=%s\n' "$pr_number" "$head_sha" >> "$GITHUB_OUTPUT"
+          printf 'PR_NUMBER=%s\nPREVIEW_HEAD_SHA=%s\n' "$pr_number" "$head_sha" >> "$GITHUB_ENV"
+
       - name: Checkout PR commit without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ steps.resolve.outputs.head_sha }}
           persist-credentials: false
 
       - name: Set up JDK 17
@@ -73,7 +113,7 @@ jobs:
           printf '%s\n' \
             "pr_number=$PR_NUMBER" \
             "channel=$PR_PREVIEW_CHANNEL" \
-            "head_sha=${{ github.event.pull_request.head.sha }}" \
+            "head_sha=$PREVIEW_HEAD_SHA" \
             "run_number=$GITHUB_RUN_NUMBER" > preview-candidate/provenance.env
 
       - name: Upload untrusted candidate
