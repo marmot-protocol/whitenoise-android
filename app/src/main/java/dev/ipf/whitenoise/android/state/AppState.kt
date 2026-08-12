@@ -3808,7 +3808,7 @@ class WhiteNoiseAppState private constructor(
 
     @Suppress(
         "ReturnCount", // Empty, stale-empty, and stale-in-flight snapshots each stop before publishing.
-        "CyclomaticComplexMethod", // Raw and roster-aware paths share one guarded publication point.
+        "CyclomaticComplexMethod", // Raw and roster-aware paths deliberately share one guarded publication point.
     )
     private suspend fun refreshAccountUnreadCounts(
         accountSummaries: List<AccountSummaryFfi> = accounts,
