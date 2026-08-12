@@ -158,10 +158,20 @@ internal fun ChatsScreen(
     val folderHandoff = rememberFolderHandoff(appState.activeAccountRef)
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     val selectionMode = selectedChatIds.isNotEmpty()
+    // The filter state and reusable UI are introduced here, while interactive
+    // filter sections arrive in the follow-up typed-filter change. Do not expose
+    // an action that can only open an empty sheet in this intermediate commit.
+    val interactiveGlobalSearchFilterSectionsAvailable = false
     val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
     val mutedConversations = chatNotificationState.mutedConversations
     val searchOpen = globalSearchState.isOpen
     val searchQuery = globalSearchState.query
+    val globalSearchPresentationState =
+        reconcileGlobalSearchFilterSheet(
+            searchState = globalSearchState,
+            interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
+            selectionMode = selectionMode,
+        )
     // Async message-body search results (issue #290), keyed by group id. The
     // title/preview match in `applyChatListSearchAndFilter` is synchronous;
     // body matching has to query each conversation's local timeline via the
@@ -273,11 +283,33 @@ internal fun ChatsScreen(
             searchFocusRequester.requestFocus()
         }
     }
+    LaunchedEffect(
+        selectionMode,
+        globalSearchState.filterSheetOpen,
+        interactiveGlobalSearchFilterSectionsAvailable,
+    ) {
+        if (globalSearchPresentationState != globalSearchState) {
+            onGlobalSearchStateChange { currentState ->
+                reconcileGlobalSearchFilterSheet(
+                    searchState = currentState,
+                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
+                    selectionMode = selectionMode,
+                )
+            }
+        }
+    }
     // Back from chat-list search unwinds search state — dismiss the filter sheet,
     // then close search (which resets query/filters per close rule) — instead of
     // exiting the app (#121, #149, #320). Selection mode takes priority (#1169).
-    BackHandler(enabled = chatListBackHandlerEnabled(selectionMode, searchOpen, globalSearchState.filterSheetOpen)) {
-        when (chatListBackDismissal(selectionMode, globalSearchState)) {
+    BackHandler(
+        enabled =
+            chatListBackHandlerEnabled(
+                selectionMode,
+                searchOpen,
+                globalSearchPresentationState.filterSheetOpen,
+            ),
+    ) {
+        when (chatListBackDismissal(selectionMode, globalSearchPresentationState)) {
             ChatListBackDismissal.ClearSelection -> clearSelection()
             ChatListBackDismissal.DismissFilterSheet ->
                 onGlobalSearchStateChange(GlobalSearchTransitions::dismissFilterSheet)
@@ -887,7 +919,12 @@ internal fun ChatsScreen(
         },
     ) { padding ->
         GlobalSearchFilterSheet(
-            visible = globalSearchState.filterSheetOpen,
+            visible =
+                shouldPresentGlobalSearchFilterSheet(
+                    searchState = globalSearchState,
+                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
+                    selectionMode = selectionMode,
+                ),
             onDismiss = {
                 onGlobalSearchStateChange(GlobalSearchTransitions::dismissFilterSheet)
             },
@@ -912,12 +949,23 @@ internal fun ChatsScreen(
                     onEditFolder = { folderHandoff.editingFolderId = it },
                 )
             }
-            if (searchOpen) {
+            if (
+                shouldShowGlobalSearchFilterControls(
+                    searchState = globalSearchState,
+                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
+                    selectionMode = selectionMode,
+                )
+            ) {
                 GlobalSearchFilterControlsRow(
                     state = globalSearchState,
-                    onOpenFilters = {
-                        onGlobalSearchStateChange(GlobalSearchTransitions::openFilterSheet)
-                    },
+                    onOpenFilters =
+                        if (interactiveGlobalSearchFilterSectionsAvailable) {
+                            {
+                                onGlobalSearchStateChange(GlobalSearchTransitions::openFilterSheet)
+                            }
+                        } else {
+                            null
+                        },
                     onRemoveFilter = { chipId ->
                         onGlobalSearchStateChange { state -> GlobalSearchTransitions.removeFilter(state, chipId) }
                     },

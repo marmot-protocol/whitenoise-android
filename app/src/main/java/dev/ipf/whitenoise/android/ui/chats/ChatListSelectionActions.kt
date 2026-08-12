@@ -51,3 +51,29 @@ internal fun chatListBackDismissal(
         searchState.isOpen -> ChatListBackDismissal.CloseSearch
         else -> null
     }
+
+internal fun shouldShowGlobalSearchFilterControls(
+    searchState: GlobalSearchState,
+    interactiveSectionsAvailable: Boolean,
+    selectionMode: Boolean,
+): Boolean =
+    searchState.isOpen &&
+        !selectionMode &&
+        (interactiveSectionsAvailable || GlobalSearchActiveChips.from(searchState).count > 0)
+
+internal fun shouldPresentGlobalSearchFilterSheet(
+    searchState: GlobalSearchState,
+    interactiveSectionsAvailable: Boolean,
+    selectionMode: Boolean,
+): Boolean = searchState.filterSheetOpen && interactiveSectionsAvailable && !selectionMode
+
+internal fun reconcileGlobalSearchFilterSheet(
+    searchState: GlobalSearchState,
+    interactiveSectionsAvailable: Boolean,
+    selectionMode: Boolean,
+): GlobalSearchState =
+    if (searchState.filterSheetOpen && (!interactiveSectionsAvailable || selectionMode)) {
+        GlobalSearchTransitions.dismissFilterSheet(searchState)
+    } else {
+        searchState
+    }

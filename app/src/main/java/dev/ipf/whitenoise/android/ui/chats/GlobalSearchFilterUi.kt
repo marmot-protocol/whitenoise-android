@@ -43,7 +43,7 @@ internal fun globalSearchFilterChipTag(chipId: String): String = "chat-list-sear
 @Composable
 internal fun GlobalSearchFilterControlsRow(
     state: GlobalSearchState,
-    onOpenFilters: () -> Unit,
+    onOpenFilters: (() -> Unit)?,
     onRemoveFilter: (String) -> Unit,
     onClearAll: () -> Unit,
     modifier: Modifier = Modifier,
@@ -63,16 +63,18 @@ internal fun GlobalSearchFilterControlsRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        TextButton(
-            onClick = onOpenFilters,
-            modifier =
-                Modifier
-                    .testTag(CHAT_LIST_SEARCH_FILTERS_ACTION_TAG)
-                    .semantics {
-                        contentDescription = filtersContentDescription
-                    },
-        ) {
-            Text(filtersButtonLabel)
+        if (onOpenFilters != null) {
+            TextButton(
+                onClick = onOpenFilters,
+                modifier =
+                    Modifier
+                        .testTag(CHAT_LIST_SEARCH_FILTERS_ACTION_TAG)
+                        .semantics {
+                            contentDescription = filtersContentDescription
+                        },
+            ) {
+                Text(filtersButtonLabel)
+            }
         }
         chips.items.forEach { chip ->
             val removeDescription = stringResource(R.string.chat_list_search_filter_remove, chip.displayLabel)
@@ -114,12 +116,14 @@ internal fun GlobalSearchFilterControlsRow(
 internal fun GlobalSearchFilterSheet(
     visible: Boolean,
     onDismiss: () -> Unit,
-    chatSection: @Composable () -> Unit = {},
-    senderSection: @Composable () -> Unit = {},
-    dateSection: @Composable () -> Unit = {},
-    contentSection: @Composable () -> Unit = {},
+    chatSection: (@Composable () -> Unit)? = null,
+    senderSection: (@Composable () -> Unit)? = null,
+    dateSection: (@Composable () -> Unit)? = null,
+    contentSection: (@Composable () -> Unit)? = null,
 ) {
-    if (!visible) return
+    val hasInteractiveSections =
+        chatSection != null || senderSection != null || dateSection != null || contentSection != null
+    if (!visible || !hasInteractiveSections) return
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = amoledSheetContainerColor(),
@@ -138,14 +142,22 @@ internal fun GlobalSearchFilterSheet(
                 text = stringResource(R.string.chat_list_search_filter_sheet_title),
                 style = MaterialTheme.typography.titleMedium,
             )
-            SectionHeader(stringResource(R.string.chat_list_search_filter_chat))
-            chatSection()
-            SectionHeader(stringResource(R.string.chat_list_search_filter_sender))
-            senderSection()
-            SectionHeader(stringResource(R.string.chat_list_search_filter_date))
-            dateSection()
-            SectionHeader(stringResource(R.string.chat_list_search_filter_content))
-            contentSection()
+            if (chatSection != null) {
+                SectionHeader(stringResource(R.string.chat_list_search_filter_chat))
+                chatSection()
+            }
+            if (senderSection != null) {
+                SectionHeader(stringResource(R.string.chat_list_search_filter_sender))
+                senderSection()
+            }
+            if (dateSection != null) {
+                SectionHeader(stringResource(R.string.chat_list_search_filter_date))
+                dateSection()
+            }
+            if (contentSection != null) {
+                SectionHeader(stringResource(R.string.chat_list_search_filter_content))
+                contentSection()
+            }
         }
     }
 }

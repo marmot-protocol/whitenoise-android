@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertTextEquals
@@ -94,6 +95,39 @@ class GlobalSearchFilterInteractionTest {
     }
 
     @Test
+    fun unavailableFiltersActionIsHiddenWhileActiveFiltersRemainClearable() {
+        val chat = GlobalSearchChatFilter("g1", "Alice")
+        composeRule.setContent {
+            Surface {
+                GlobalSearchFilterControlsRow(
+                    state = GlobalSearchState(isOpen = true, chatFilters = setOf(chat)),
+                    onOpenFilters = null,
+                    onRemoveFilter = {},
+                    onClearAll = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTERS_ACTION_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(globalSearchFilterChipTag(chat.chipId)).assertExists()
+        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG).assertExists()
+    }
+
+    @Test
+    fun emptyFilterSheetIsNotPresented() {
+        composeRule.setContent {
+            Surface {
+                GlobalSearchFilterSheet(
+                    visible = true,
+                    onDismiss = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTER_SHEET_TAG).assertDoesNotExist()
+    }
+
+    @Test
     fun backDismissesFilterSheet() {
         val visible = mutableStateOf(true)
         composeRule.setContent {
@@ -101,6 +135,7 @@ class GlobalSearchFilterInteractionTest {
                 GlobalSearchFilterSheet(
                     visible = visible.value,
                     onDismiss = { visible.value = false },
+                    chatSection = { Text("Chat controls") },
                 )
             }
         }
