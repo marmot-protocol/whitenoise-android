@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.ChatNotificationSettingsFfi
-import dev.ipf.marmotkit.Marmot
+import dev.ipf.marmotkit.MarmotInterface
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -29,7 +29,7 @@ internal interface ChatMuteGateway {
 }
 
 internal class MarmotChatMuteGateway(
-    private val marmot: () -> Marmot,
+    private val marmot: () -> MarmotInterface,
 ) : ChatMuteGateway {
     override fun read(
         accountRef: String,
