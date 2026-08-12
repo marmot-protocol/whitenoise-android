@@ -101,6 +101,21 @@ reports `journeyDurationMs`, frame timing, and a Perfetto trace for group open �
 members visible, group creation → conversation ready, and invite acceptance →
 conversation ready.
 
+The same traces include async `WhiteNoise.marmot.*` slices for the awaited MDK
+calls in create, invite, accept, member-roster refresh, and admin flows. In
+Perfetto, search the slice table for `WhiteNoise.marmot.` to separate bridge
+time from Compose and coroutine scheduling time. For an ad-hoc 30-second capture
+outside Macrobenchmark, start this command and perform one flow before it ends:
+
+```bash
+adb shell perfetto -o /data/misc/perfetto-traces/whitenoise-groups.perfetto-trace \
+  -t 30s -a dev.ipf.whitenoise.android.dev sched freq idle am wm gfx view binder_driver
+adb pull /data/misc/perfetto-traces/whitenoise-groups.perfetto-trace .
+```
+
+Trace section names contain only operation names, never account, group, member,
+message, or relay identifiers.
+
 The state-preserving script copies results and `.perfetto-trace` files under:
 
 ```text
