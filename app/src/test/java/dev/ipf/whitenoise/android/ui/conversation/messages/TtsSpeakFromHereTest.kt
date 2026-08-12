@@ -104,7 +104,16 @@ class TtsSpeakFromHereTest {
 
         assertTrue(secondGeneration.toLong() > firstGeneration.toLong())
         assertEquals(
-            speakingTts(1, 3, 0, 2, "First one. First two.", sentenceIndex = 1, sentenceCount = 2),
+            speakingTts(
+                1,
+                3,
+                0,
+                2,
+                "First one. First two.",
+                sentenceIndex = 1,
+                sentenceCount = 2,
+                messageProgressGeneration = 2,
+            ).copy(sessionId = 1),
             harness.queue.state.value,
         )
     }
@@ -162,7 +171,16 @@ class TtsSpeakFromHereTest {
         )
 
         assertEquals(
-            speakingTts(1, 3, 0, 2, "Above one. Above two.", sentenceIndex = 1, sentenceCount = 2),
+            speakingTts(
+                1,
+                3,
+                0,
+                2,
+                "Above one. Above two.",
+                sentenceIndex = 1,
+                sentenceCount = 2,
+                messageProgressGeneration = 2,
+            ).copy(sessionId = 1),
             aboveHarness.queue.state.value,
         )
         assertTrue(
@@ -179,7 +197,16 @@ class TtsSpeakFromHereTest {
         belowHarness.queue.start(listOf(ttsMessage("bob", "Bob", "Below.")))
 
         assertEquals(
-            speakingTts(0, 1, 0, 1, "Below.", sentenceIndex = 0, sentenceCount = 1),
+            speakingTts(
+                0,
+                1,
+                0,
+                1,
+                "Below.",
+                sentenceIndex = 0,
+                sentenceCount = 1,
+                messageProgressGeneration = 2,
+            ).copy(sessionId = 1),
             belowHarness.queue.state.value,
         )
         assertEquals(
