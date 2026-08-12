@@ -35,11 +35,13 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,6 +50,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.util.Locale
+import java.util.TimeZone
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -55,6 +58,16 @@ import java.util.Locale
 class MessageBubbleEditedMarkdownTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Before
+    fun setDeterministicTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    @After
+    fun resetDefaultTimeZone() {
+        TimeZone.setDefault(ORIGINAL_TIME_ZONE)
+    }
 
     @Test
     fun editedDisplayMarkdownIsIndependentOfTtsCandidateGate() {
@@ -383,6 +396,7 @@ class MessageBubbleEditedMarkdownTest {
     }
 
     private companion object {
+        val ORIGINAL_TIME_ZONE: TimeZone = TimeZone.getDefault()
         const val ACCOUNT_REF = "personal"
         val ACCOUNT_ID = "01" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
