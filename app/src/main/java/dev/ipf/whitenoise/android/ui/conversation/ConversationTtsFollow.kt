@@ -1,8 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import kotlin.math.roundToInt
@@ -41,21 +45,32 @@ internal fun TtsState.conversationFollowSignal(): ConversationTtsFollowSignal =
         isSpeaking = this is TtsState.Speaking,
     )
 
+@Composable
+internal fun rememberConversationTtsFollowPolicy(groupIdHex: String): ConversationTtsFollowPolicy =
+    rememberSaveable(groupIdHex, saver = ConversationTtsFollowPolicy.Saver) {
+        ConversationTtsFollowPolicy()
+    }
+
 /**
  * Conversation-local follow policy. Only direct drag input calls [onUserDrag];
  * programmatic list motion therefore cannot suspend itself.
  */
-internal class ConversationTtsFollowPolicy {
-    var isFollowEnabled: Boolean by mutableStateOf(false)
+internal class ConversationTtsFollowPolicy private constructor(
+    private var sessionId: Long?,
+    initialFollowEnabled: Boolean,
+) {
+    constructor() : this(sessionId = null, initialFollowEnabled = false)
+
+    var isFollowEnabled: Boolean by mutableStateOf(initialFollowEnabled)
         private set
 
-    var showResumeAction: Boolean by mutableStateOf(false)
+    var showResumeAction: Boolean by mutableStateOf(sessionId != null && !initialFollowEnabled)
         private set
 
-    private var sessionId: Long? = null
     private var activeTarget: ConversationTtsFollowTarget? = null
     private var evaluatedTarget: ConversationTtsFollowTarget? = null
     private var pendingTarget: ConversationTtsFollowTarget? = null
+    private var retriedTarget: ConversationTtsFollowTarget? = null
     private var isSpeaking = false
 
     fun observe(
@@ -77,8 +92,10 @@ internal class ConversationTtsFollowPolicy {
         if (newSession) {
             isFollowEnabled = true
             evaluatedTarget = null
+            retriedTarget = null
         } else if (newSentence && isFollowEnabled) {
             evaluatedTarget = null
+            retriedTarget = null
         }
 
         pendingTarget =
@@ -95,6 +112,15 @@ internal class ConversationTtsFollowPolicy {
         pendingTarget = null
         evaluatedTarget = target
         return target
+    }
+
+    /** Returns true when one bounded retry was scheduled for the current sentence. */
+    fun retryFailedFollowAttempt(target: ConversationTtsFollowTarget): Boolean {
+        if (!isCurrentTarget(target) || retriedTarget == target) return false
+        retriedTarget = target
+        evaluatedTarget = null
+        pendingTarget = target
+        return true
     }
 
     fun isCurrentTarget(target: ConversationTtsFollowTarget): Boolean {
@@ -114,6 +140,7 @@ internal class ConversationTtsFollowPolicy {
         isFollowEnabled = true
         showResumeAction = false
         evaluatedTarget = null
+        retriedTarget = null
         pendingTarget = target.takeIf { isSpeaking }
     }
 
@@ -122,9 +149,23 @@ internal class ConversationTtsFollowPolicy {
         activeTarget = null
         evaluatedTarget = null
         pendingTarget = null
+        retriedTarget = null
         isSpeaking = false
         isFollowEnabled = false
         showResumeAction = false
+    }
+
+    companion object {
+        val Saver: Saver<ConversationTtsFollowPolicy, Any> =
+            listSaver(
+                save = { listOf(it.sessionId, it.isFollowEnabled) },
+                restore = { restored ->
+                    ConversationTtsFollowPolicy(
+                        sessionId = restored[0] as Long?,
+                        initialFollowEnabled = restored[1] as Boolean,
+                    )
+                },
+            )
     }
 }
 

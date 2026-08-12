@@ -544,7 +544,7 @@ internal fun ConversationScreen(
                     .conversationFollowSignal(),
         )
     val ownsTtsFollowSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
-    val ttsFollowPolicy = remember(controller, listState) { ConversationTtsFollowPolicy() }
+    val ttsFollowPolicy = rememberConversationTtsFollowPolicy(controller.group.groupIdHex)
     var ttsFollowResumeGeneration by remember(controller, listState) { mutableStateOf(0L) }
 
     fun suspendTtsFollowForDirectDrag() {
@@ -1552,76 +1552,89 @@ internal fun ConversationScreen(
         ttsFollowPolicy.observe(appState.ttsController.state.value, ownsTtsFollowSession)
         if (!initialTimelineAnchored) return@LaunchedEffect
         val target = ttsFollowPolicy.claimPendingTarget() ?: return@LaunchedEffect
-        if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
+        var followSucceeded = false
+        try {
+            if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
 
-        var row = renderedTimeline.firstOrNull { it.record.messageIdHex == target.messageIdHex }
-        if (row == null) {
-            if (target.timelineAt == 0uL ||
-                !controller.loadTimelineMessageAvailable(target.messageIdHex, target.timelineAt)
+            var row = renderedTimeline.firstOrNull { it.record.messageIdHex == target.messageIdHex }
+            if (row == null) {
+                if (target.timelineAt == 0uL ||
+                    !controller.loadTimelineMessageAvailable(target.messageIdHex, target.timelineAt)
+                ) {
+                    return@LaunchedEffect
+                }
+                if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
+                // Give the LazyColumn one bounded remount opportunity after paging.
+                // The follow effect deliberately does not key itself on timeline
+                // mutations, because its own page load would otherwise cancel it.
+                withFrameNanos { }
+                if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
+                row =
+                    controller.timeline
+                        .filterNot { MessageProjector.isEdit(it.record) }
+                        .firstOrNull { it.record.messageIdHex == target.messageIdHex }
+                        ?: return@LaunchedEffect
+            }
+            if (
+                target.messageIdHex in controller.deletedMessageIds ||
+                row.projected?.deleted == true ||
+                row.projected?.invalidationStatus != null
             ) {
                 return@LaunchedEffect
             }
+            val currentProjection = ttsEntry(row.record) ?: return@LaunchedEffect
             if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
-            // Give the LazyColumn one bounded remount opportunity after paging.
-            // The follow effect deliberately does not key itself on timeline
-            // mutations, because its own page load would otherwise cancel it.
-            withFrameNanos { }
-            if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
-            row =
-                controller.timeline
-                    .filterNot { MessageProjector.isEdit(it.record) }
-                    .firstOrNull { it.record.messageIdHex == target.messageIdHex }
-                    ?: return@LaunchedEffect
-        }
-        if (
-            target.messageIdHex in controller.deletedMessageIds ||
-            row.projected?.deleted == true ||
-            row.projected?.invalidationStatus != null
-        ) {
-            return@LaunchedEffect
-        }
-        val currentProjection = ttsEntry(row.record) ?: return@LaunchedEffect
-        if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
-        if (target.projectionId.isBlank() || currentProjection.projectionId != target.projectionId) {
-            return@LaunchedEffect
-        }
-
-        val targetIndex = currentTimelineListIndex(target.messageIdHex) ?: return@LaunchedEffect
-        val layoutInfo = listState.layoutInfo
-        val visibleTarget = layoutInfo.visibleItemsInfo.firstOrNull { it.key == row.id }
-        val renderedForHeightSample = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        val visibleTimelineHeights =
-            layoutInfo.visibleItemsInfo.mapNotNull { visible ->
-                val liveOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-                val timelineIndex = visible.index - 1 - liveOlderHeaderCount
-                renderedForHeightSample
-                    .getOrNull(timelineIndex)
-                    ?.takeIf { timelineRowKind(it.record, appState.streamingDebugEnabled) == TimelineRowKind.Bubble }
-                    ?.let { visible.size }
+            if (target.projectionId.isBlank() || currentProjection.projectionId != target.projectionId) {
+                return@LaunchedEffect
             }
-        val itemHeight =
-            ReplyNavigation.itemHeightForScrollPx(
-                targetMessageId = target.messageIdHex,
-                measuredItemHeightsByMessageId = timelineItemHeightsPx,
-                visibleTargetHeightPx = visibleTarget?.size,
-                visibleTimelineItemHeightsPx = visibleTimelineHeights,
-            )
-        if (scrollCoordinator.isFollowingTail) {
-            // Read-aloud now owns vertical intent; incoming messages must not
-            // race it back to the tail between sentence transitions.
-            scrollCoordinator.settleReadingAt(currentScrollAnchor())
+
+            val targetIndex = currentTimelineListIndex(target.messageIdHex) ?: return@LaunchedEffect
+            val layoutInfo = listState.layoutInfo
+            val visibleTarget = layoutInfo.visibleItemsInfo.firstOrNull { it.key == row.id }
+            val renderedForHeightSample = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+            val visibleTimelineHeights =
+                layoutInfo.visibleItemsInfo.mapNotNull { visible ->
+                    val liveOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+                    val timelineIndex = visible.index - 1 - liveOlderHeaderCount
+                    renderedForHeightSample
+                        .getOrNull(timelineIndex)
+                        ?.takeIf {
+                            timelineRowKind(it.record, appState.streamingDebugEnabled) ==
+                                TimelineRowKind.Bubble
+                        }?.let { visible.size }
+                }
+            val itemHeight =
+                ReplyNavigation.itemHeightForScrollPx(
+                    targetMessageId = target.messageIdHex,
+                    measuredItemHeightsByMessageId = timelineItemHeightsPx,
+                    visibleTargetHeightPx = visibleTarget?.size,
+                    visibleTimelineItemHeightsPx = visibleTimelineHeights,
+                )
+            if (scrollCoordinator.isFollowingTail) {
+                // Read-aloud now owns vertical intent; incoming messages must not
+                // race it back to the tail between sentence transitions.
+                scrollCoordinator.settleReadingAt(currentScrollAnchor())
+            }
+            followSucceeded =
+                followTtsTargetInViewport(
+                    target = target,
+                    itemKey = row.id,
+                    targetIndex = targetIndex,
+                    estimatedItemHeightPx = itemHeight,
+                    listState = listState,
+                    scrollCoordinator = scrollCoordinator,
+                    resolveTargetIndex = { currentTimelineListIndex(target.messageIdHex) },
+                    isCurrentTarget = { isCurrentTtsFollowTarget(target) },
+                    currentScrollAnchor = ::currentScrollAnchor,
+                )
+        } finally {
+            if (!followSucceeded &&
+                isCurrentTtsFollowTarget(target) &&
+                ttsFollowPolicy.retryFailedFollowAttempt(target)
+            ) {
+                ttsFollowResumeGeneration++
+            }
         }
-        followTtsTargetInViewport(
-            target = target,
-            itemKey = row.id,
-            targetIndex = targetIndex,
-            estimatedItemHeightPx = itemHeight,
-            listState = listState,
-            scrollCoordinator = scrollCoordinator,
-            resolveTargetIndex = { currentTimelineListIndex(target.messageIdHex) },
-            isCurrentTarget = { isCurrentTtsFollowTarget(target) },
-            currentScrollAnchor = ::currentScrollAnchor,
-        )
     }
 
     // Scroll the lazy list so the item at [targetMessageId] sits roughly in the

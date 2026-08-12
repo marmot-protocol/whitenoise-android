@@ -37,6 +37,22 @@ class ConversationTtsFollowPolicyTest {
     }
 
     @Test
+    fun failedFollowAttemptGetsOneBoundedRetry() {
+        val policy = ConversationTtsFollowPolicy()
+        val speaking = speaking(sessionId = 1, sentenceIndex = 0)
+        val target = speaking.followTarget()
+        policy.observe(speaking, ownsSession = true)
+
+        assertEquals(target, policy.claimPendingTarget())
+        assertTrue(policy.retryFailedFollowAttempt(target))
+        assertEquals(target, policy.claimPendingTarget())
+        assertFalse(policy.retryFailedFollowAttempt(target))
+
+        policy.observe(speaking, ownsSession = true)
+        assertNull(policy.claimPendingTarget())
+    }
+
+    @Test
     fun wordProgressDoesNotChangeTheConversationFollowSignal() {
         val sentenceFallback = speaking(sessionId = 1, sentenceIndex = 0)
         val exactWord =

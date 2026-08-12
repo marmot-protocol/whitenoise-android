@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -101,6 +102,49 @@ class ConversationTtsFollowComposeTest {
             .assertHasClickAction()
             .assertHeightIsAtLeast(48.dp)
         composeRule.onNodeWithText(resumeLabel).performClick()
+        composeRule.onNodeWithText(resumeLabel).assertDoesNotExist()
+    }
+
+    @Test
+    fun manualScrollSuspensionSurvivesRestorationForTheActiveSession() {
+        val restorationTester = StateRestorationTester(composeRule)
+        var groupId by mutableStateOf("group-1")
+        var state: TtsState by mutableStateOf(speakingState())
+        lateinit var suspendFollow: () -> Unit
+        restorationTester.setContent {
+            WhiteNoiseTheme {
+                val policy = rememberConversationTtsFollowPolicy(groupIdHex = groupId)
+                suspendFollow = policy::onUserDrag
+                LaunchedEffect(state) {
+                    policy.observe(state, ownsSession = true)
+                }
+                if (policy.showResumeAction) {
+                    TtsResumeFollowButton(onClick = policy::resumeFollow)
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val resumeLabel =
+            ApplicationProvider
+                .getApplicationContext<android.content.Context>()
+                .getString(R.string.tts_resume_follow)
+
+        composeRule.runOnIdle { suspendFollow() }
+        composeRule.onNodeWithText(resumeLabel).assertIsDisplayed()
+
+        restorationTester.emulateSavedInstanceStateRestore()
+        composeRule.runOnIdle {
+            val passage = requireNotNull(state.passage)
+            state =
+                (state as TtsState.Speaking).copy(
+                    sentenceIndexWithinMessage = 2,
+                    passage = passage.copy(sentenceIndex = 2),
+                )
+        }
+
+        composeRule.onNodeWithText(resumeLabel).assertIsDisplayed()
+
+        composeRule.runOnIdle { groupId = "group-2" }
         composeRule.onNodeWithText(resumeLabel).assertDoesNotExist()
     }
 
