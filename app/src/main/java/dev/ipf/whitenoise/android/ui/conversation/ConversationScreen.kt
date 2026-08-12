@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -47,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -527,6 +529,31 @@ internal fun ConversationScreen(
                     },
             )
         }
+
+    // Reading the source value here supplies the mapped StateFlow's real current
+    // projection; subsequent updates are observed by collectAsState.
+    @SuppressLint("StateFlowValueCalledInComposition")
+    val ttsFollowSignal by
+        remember(appState.ttsController) {
+            appState.ttsController.state
+                .map(TtsState::conversationFollowSignal)
+                .distinctUntilChanged()
+        }.collectAsState(
+            initial =
+                appState.ttsController.state.value
+                    .conversationFollowSignal(),
+        )
+    val ownsTtsFollowSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
+    val ttsFollowPolicy = rememberConversationTtsFollowPolicy(controller.group.groupIdHex)
+    var ttsFollowResumeGeneration by remember(controller, listState) { mutableStateOf(0L) }
+
+    fun suspendTtsFollowForDirectDrag() {
+        ttsFollowPolicy.observe(
+            state = appState.ttsController.state.value,
+            ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+        )
+        ttsFollowPolicy.onUserDrag()
+    }
     val postInitialReanchorGate =
         remember(controller, listState) {
             ConversationPostInitialReanchorGate()
@@ -1040,7 +1067,10 @@ internal fun ConversationScreen(
     // follower or overwrite a history anchor.
     LaunchedEffect(listState, scrollCoordinator) {
         listState.interactionSource.interactions.collectConversationDragInteractions(
-            onStarted = { scrollCoordinator.onUserGestureStarted(currentScrollAnchor()) },
+            onStarted = {
+                suspendTtsFollowForDirectDrag()
+                scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
+            },
             awaitScrollSettled = {
                 snapshotFlow { listState.isScrollInProgress }.filter { !it }.first()
             },
@@ -1496,6 +1526,115 @@ internal fun ConversationScreen(
                 ?: return null
         val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
         return 1 + olderMessagesHeaderCount + timelineIndex
+    }
+
+    fun isCurrentTtsFollowTarget(target: ConversationTtsFollowTarget): Boolean =
+        ttsFollowPolicy.isCurrentTarget(target) &&
+            appState.ownsTtsAutoReadSession(controller.group.groupIdHex) &&
+            appState.ttsController.state.value is TtsState.Speaking &&
+            appState.ttsController.state.value
+                .conversationFollowTargetOrNull() == target
+
+    val observedTtsFollowTarget = ttsFollowSignal.target
+    val ttsFollowIsSpeaking = ttsFollowSignal.isSpeaking
+    val ttsFollowMessageId = observedTtsFollowTarget?.messageIdHex
+    val ttsFollowEdit = ttsFollowMessageId?.let(controller.editsByTarget::get)
+    val ttsFollowDeleted = ttsFollowMessageId != null && ttsFollowMessageId in controller.deletedMessageIds
+    LaunchedEffect(
+        observedTtsFollowTarget,
+        ttsFollowIsSpeaking,
+        ownsTtsFollowSession,
+        ttsFollowResumeGeneration,
+        initialTimelineAnchored,
+        ttsFollowEdit,
+        ttsFollowDeleted,
+    ) {
+        ttsFollowPolicy.observe(appState.ttsController.state.value, ownsTtsFollowSession)
+        if (!initialTimelineAnchored) return@LaunchedEffect
+        val target = ttsFollowPolicy.claimPendingTarget() ?: return@LaunchedEffect
+        var followSucceeded = false
+        try {
+            if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
+
+            var row = renderedTimeline.firstOrNull { it.record.messageIdHex == target.messageIdHex }
+            if (row == null) {
+                if (target.timelineAt == 0uL ||
+                    !controller.loadTimelineMessageAvailable(target.messageIdHex, target.timelineAt)
+                ) {
+                    return@LaunchedEffect
+                }
+                if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
+                // Give the LazyColumn one bounded remount opportunity after paging.
+                // The follow effect deliberately does not key itself on timeline
+                // mutations, because its own page load would otherwise cancel it.
+                withFrameNanos { }
+                if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
+                row =
+                    controller.timeline
+                        .filterNot { MessageProjector.isEdit(it.record) }
+                        .firstOrNull { it.record.messageIdHex == target.messageIdHex }
+                        ?: return@LaunchedEffect
+            }
+            if (
+                target.messageIdHex in controller.deletedMessageIds ||
+                row.projected?.deleted == true ||
+                row.projected?.invalidationStatus != null
+            ) {
+                return@LaunchedEffect
+            }
+            val currentProjection = ttsEntry(row.record) ?: return@LaunchedEffect
+            if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
+            if (target.projectionId.isBlank() || currentProjection.projectionId != target.projectionId) {
+                return@LaunchedEffect
+            }
+
+            val targetIndex = currentTimelineListIndex(target.messageIdHex) ?: return@LaunchedEffect
+            val layoutInfo = listState.layoutInfo
+            val visibleTarget = layoutInfo.visibleItemsInfo.firstOrNull { it.key == row.id }
+            val renderedForHeightSample = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+            val visibleTimelineHeights =
+                layoutInfo.visibleItemsInfo.mapNotNull { visible ->
+                    val liveOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+                    val timelineIndex = visible.index - 1 - liveOlderHeaderCount
+                    renderedForHeightSample
+                        .getOrNull(timelineIndex)
+                        ?.takeIf {
+                            timelineRowKind(it.record, appState.streamingDebugEnabled) ==
+                                TimelineRowKind.Bubble
+                        }?.let { visible.size }
+                }
+            val itemHeight =
+                ReplyNavigation.itemHeightForScrollPx(
+                    targetMessageId = target.messageIdHex,
+                    measuredItemHeightsByMessageId = timelineItemHeightsPx,
+                    visibleTargetHeightPx = visibleTarget?.size,
+                    visibleTimelineItemHeightsPx = visibleTimelineHeights,
+                )
+            if (scrollCoordinator.isFollowingTail) {
+                // Read-aloud now owns vertical intent; incoming messages must not
+                // race it back to the tail between sentence transitions.
+                scrollCoordinator.settleReadingAt(currentScrollAnchor())
+            }
+            followSucceeded =
+                followTtsTargetInViewport(
+                    target = target,
+                    itemKey = row.id,
+                    targetIndex = targetIndex,
+                    estimatedItemHeightPx = itemHeight,
+                    listState = listState,
+                    scrollCoordinator = scrollCoordinator,
+                    resolveTargetIndex = { currentTimelineListIndex(target.messageIdHex) },
+                    isCurrentTarget = { isCurrentTtsFollowTarget(target) },
+                    currentScrollAnchor = ::currentScrollAnchor,
+                )
+        } finally {
+            if (!followSucceeded &&
+                isCurrentTtsFollowTarget(target) &&
+                ttsFollowPolicy.retryFailedFollowAttempt(target)
+            ) {
+                ttsFollowResumeGeneration++
+            }
+        }
     }
 
     // Scroll the lazy list so the item at [targetMessageId] sits roughly in the
@@ -2828,6 +2967,7 @@ internal fun ConversationScreen(
                                     onDragSelectionStart = { pointerWindowY ->
                                         openActionMenuId = null
                                         clearTextSelection()
+                                        suspendTtsFollowForDirectDrag()
                                         scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
                                         dragAnchorTimelineId = item.id
                                         dragPointerWindowY = pointerWindowY
@@ -2899,6 +3039,14 @@ internal fun ConversationScreen(
                                 horizontalAlignment = Alignment.End,
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
+                                if (ttsFollowPolicy.showResumeAction) {
+                                    TtsResumeFollowButton(
+                                        onClick = {
+                                            ttsFollowPolicy.resumeFollow()
+                                            ttsFollowResumeGeneration += 1L
+                                        },
+                                    )
+                                }
                                 // Jump-to-mention chip: tap visits the oldest unread
                                 // mention and marks it read, so the count steps down.
                                 val mentionCount = unreadMentionMessageIds.size

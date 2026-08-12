@@ -45,6 +45,8 @@ data class TtsPassage(
     val sentenceIndex: Int,
     /** Stable identity of the rendered projection these coordinates address. */
     val projectionId: String = "",
+    /** Canonical conversation position used to remount a paged-out row. */
+    val timelineAt: ULong = 0uL,
     val visibleWord: List<TtsVisibleTextSpan> = emptyList(),
 )
 

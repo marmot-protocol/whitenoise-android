@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.audio.tts.errorTts
 import dev.ipf.whitenoise.android.audio.tts.idleTts
 import dev.ipf.whitenoise.android.audio.tts.pausedTts
 import dev.ipf.whitenoise.android.audio.tts.speakingTts
+import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBarContent
 import dev.ipf.whitenoise.android.ui.conversation.ttsTerminalCompletionDisplayState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -144,6 +145,24 @@ class TtsTransportBarScreenshotTest {
         capture("tts_transport_bar_terminal_completion_amoled")
     }
 
+    @Test
+    fun ttsResumeFollowLight() {
+        renderResumeFollow(darkTheme = false, amoled = false)
+        capture("tts_resume_follow_light")
+    }
+
+    @Test
+    fun ttsResumeFollowDark() {
+        renderResumeFollow(darkTheme = true, amoled = false)
+        capture("tts_resume_follow_dark")
+    }
+
+    @Test
+    fun ttsResumeFollowAmoled() {
+        renderResumeFollow(darkTheme = true, amoled = true)
+        capture("tts_resume_follow_amoled")
+    }
+
     private val preview = "Alice: The quick brown fox jumps over it"
 
     private fun speaking(): TtsState =
@@ -236,6 +255,20 @@ class TtsTransportBarScreenshotTest {
                     onStop = {},
                     modifier = Modifier.width(360.dp).testTag(TAG),
                     historyEdge = historyEdge,
+                )
+            }
+        }
+    }
+
+    private fun renderResumeFollow(
+        darkTheme: Boolean,
+        amoled: Boolean,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
+                TtsResumeFollowButton(
+                    onClick = {},
+                    modifier = Modifier.testTag(TAG),
                 )
             }
         }

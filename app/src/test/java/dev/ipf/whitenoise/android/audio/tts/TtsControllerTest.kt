@@ -27,10 +27,14 @@ class TtsControllerTest {
                         ),
                     ),
                 projectionId = "projection-m1",
+                timelineAt = 42uL,
             )
 
         assertTrue(controller.speak(listOf(entry), Locale.US))
-        assertEquals(TtsPassage("m1", 0, "projection-m1"), controller.state.value.passage)
+        assertEquals(
+            TtsPassage("m1", 0, "projection-m1", timelineAt = 42uL),
+            controller.state.value.passage,
+        )
 
         engine.range(index = 0, start = 13, end = 18)
 
@@ -39,13 +43,17 @@ class TtsControllerTest {
                 messageIdHex = "m1",
                 sentenceIndex = 0,
                 projectionId = "projection-m1",
+                timelineAt = 42uL,
                 visibleWord = listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
             ),
             controller.state.value.passage,
         )
 
         engine.stopped(index = 0)
-        assertEquals(TtsPassage("m1", 0, "projection-m1"), controller.state.value.passage)
+        assertEquals(
+            TtsPassage("m1", 0, "projection-m1", timelineAt = 42uL),
+            controller.state.value.passage,
+        )
     }
 
     @Test
@@ -398,7 +406,7 @@ class TtsControllerTest {
                 sentenceIndex = 0,
                 sentenceCount = 2,
                 messageProgressGeneration = 2L,
-            ),
+            ).copy(sessionId = 1L),
             controller.state.value,
         )
         assertEquals(listOf("New one.", "New two."), secondEngine.spoken.map { it.text })

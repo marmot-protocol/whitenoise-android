@@ -1276,6 +1276,7 @@
     <string name="tts_bar_next_message">下一条消息</string>
     <string name="tts_bar_progress">第 %1$d/%2$d 句，第 %3$d/%4$d 条消息</string>
     <string name="tts_bar_stop">停止朗读</string>
+    <string name="tts_resume_follow">恢复跟随</string>
     <string name="tts_bar_error">无法朗读</string>
     <string name="tts_bar_history_loading">正在加载更多消息…</string>
     <string name="tts_bar_history_error">无法加载更多消息。再次点按可重试。</string>
