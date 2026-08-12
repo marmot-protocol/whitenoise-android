@@ -1636,7 +1636,7 @@ class WhiteNoiseAppState private constructor(
         )
 
     @Volatile
-    private var client: AppMarmotRuntime? = null
+    private var marmotRuntime: AppMarmotRuntime? = null
 
     private val bootstrapAttempts = BootstrapAttemptCoordinator()
     private val bootstrapRuntime = BootstrapRuntimeCoordinator<AppMarmotRuntime>()
@@ -2495,7 +2495,7 @@ class WhiteNoiseAppState private constructor(
 
     fun marmot(): MarmotInterface {
         marmotAccessObserver?.invoke()
-        return requireNotNull(client) { "Marmot is not initialized" }.marmot
+        return requireNotNull(marmotRuntime) { "Marmot is not initialized" }.marmot
     }
 
     /**
@@ -3458,7 +3458,7 @@ class WhiteNoiseAppState private constructor(
                             marmotRuntimeFactory(appContext).also { runtime ->
                                 // Publish before start so the listener queued at
                                 // the post-start boundary can resolve Marmot.
-                                client = runtime
+                                marmotRuntime = runtime
                                 AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
                                     runtime.marmot.downloadProfileImage(url, maxBytes)
                                 }
@@ -3485,10 +3485,10 @@ class WhiteNoiseAppState private constructor(
                     traceStartupStage("failed-runtime-close") {
                         withContext(Dispatchers.IO) { runtime.marmot.shutdownAndClose() }
                     }
-                    if (client === runtime) client = null
+                    if (marmotRuntime === runtime) marmotRuntime = null
                 },
             )
-        client = opened
+        marmotRuntime = opened
         return opened
     }
 
@@ -6006,7 +6006,7 @@ class WhiteNoiseAppState private constructor(
      */
     suspend fun sweepExpiredDisappearingMessages() {
         ensureNotificationRuntimeStarted()
-        if (client == null) return
+        if (marmotRuntime == null) return
         val signedInAccounts = accounts.filter { it.isSignedInSigningAccount() }
         for (account in signedInAccounts) {
             currentCoroutineContext().ensureActive()
@@ -6549,7 +6549,7 @@ class WhiteNoiseAppState private constructor(
             // authoritative. setAppInForeground() can trigger this before
             // bootstrap/refreshAccounts() has loaded accounts; clearing then
             // would strand a signed-in device on a stale push token.
-            if (client == null) return false
+            if (marmotRuntime == null) return false
             refreshAccounts()
             accountRefs = accounts.map { it.label }
             if (accountRefs.isEmpty()) {
