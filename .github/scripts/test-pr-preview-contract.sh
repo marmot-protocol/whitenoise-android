@@ -27,6 +27,8 @@ grep -Fq 'Test trusted publisher contract' "$workflow"
 grep -Fq '.github/scripts/test-pr-preview-validation.sh' "$workflow"
 grep -Fq 'commits/${HEAD_SHA}/pulls' "$workflow"
 grep -Fq 'workflow_run.head_repository.full_name' "$workflow"
+grep -Fq 'github.event.repository.default_branch' "$workflow"
+! grep -Fq 'github.event.workflow_run.repository.default_branch' "$workflow"
 grep -Fq -- '--min-sdk-version 34' .github/scripts/sign-pr-preview-candidates.sh
 grep -Fq 'cancel-in-progress: true' "$workflow"
 grep -Fq 'Verify signed previews' "$workflow"
