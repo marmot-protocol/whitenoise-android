@@ -31,6 +31,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
+import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -8366,10 +8367,7 @@ class ConversationController(
                     } else {
                         if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, liveMemberCount)) {
                             withContext(NonCancellable) {
-                                val demoteResult =
-                                    appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                                        selfDemoteAdminDetailed(account, group.groupIdHex)
-                                    }
+                                val demoteResult = selfDemoteBeforeLeave(account)
                                 demotedBeforeLeave = true
                                 applyMutationDetails(account, demoteResult.details)
                                 appState.marmotIo { leaveGroup(account, group.groupIdHex) }
@@ -8420,6 +8418,11 @@ class ConversationController(
                 )
                 false
             }
+        }
+
+    private suspend fun selfDemoteBeforeLeave(account: String): GroupMutationResultFfi =
+        appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+            selfDemoteAdminDetailed(account, group.groupIdHex)
         }
 
     suspend fun dismissConversationNotifications() {
