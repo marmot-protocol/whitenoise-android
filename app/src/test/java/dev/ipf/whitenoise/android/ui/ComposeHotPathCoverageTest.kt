@@ -72,7 +72,8 @@ class ComposeHotPathCoverageTest {
 
         assertFalse(
             "ConversationScreen must not collect TTS playback state",
-            "ttsController.state.collectAsState()" in screenSource,
+            Regex("""ttsController\.state\s*\.?\s*collectAsState(WithLifecycle)?\s*\(""")
+                .containsMatchIn(screenSource),
         )
         assertTrue(
             "TimelineRow must delegate bubble rendering to a row-scoped restart scope",

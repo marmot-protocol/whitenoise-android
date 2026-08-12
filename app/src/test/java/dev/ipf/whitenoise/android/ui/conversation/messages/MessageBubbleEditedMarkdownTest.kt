@@ -162,15 +162,31 @@ class MessageBubbleEditedMarkdownTest {
 
     @Test
     fun activeEditedMarkdownKeepsMarkdownWhileHighlighting() {
+        val editedDocument = editedDocument("value")
+        val projection =
+            messageSpeakableProjection(
+                bodyText = "Edited *value*",
+                document = editedDocument,
+                mentionDisplayName = null,
+                isGroupMember = null,
+            )!!
+        val passage =
+            TtsPassage(
+                messageIdHex = MESSAGE_ID,
+                sentenceIndex = 0,
+                projectionId = projection.projectionId,
+                visibleWord = listOf(TtsVisibleTextSpan("b0/n1/n0", 0, 5)),
+            )
+        val resolver = buildTtsLeafHighlightResolver(passage, MESSAGE_ID, projection, Locale.US)
+        assertNotNull("resolver must be built for the active passage", resolver)
+        assertNotNull(
+            "the rendered leaf must resolve to a highlight range",
+            resolver!!("b0/n1/n0", "value"),
+        )
+
         renderEditedMarkdownHarness(
             textSelectionMode = false,
-            effectivePassage =
-                TtsPassage(
-                    messageIdHex = MESSAGE_ID,
-                    sentenceIndex = 0,
-                    projectionId = "shared-projection",
-                    visibleWord = listOf(TtsVisibleTextSpan("b0/n1/n0", 0, 5)),
-                ),
+            effectivePassage = passage,
         )
 
         composeRule.waitForIdle()

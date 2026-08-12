@@ -8,9 +8,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableSource
-import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
 import dev.ipf.whitenoise.android.core.EditState
+import dev.ipf.whitenoise.android.ui.parseMarkdownOrEmptyDocument
 import kotlinx.coroutines.ensureActive
 import kotlin.coroutines.coroutineContext
 
@@ -55,12 +54,7 @@ internal fun rememberMessageBubbleEditedDisplayMarkdownDocument(
             parsedDocument = null
             return@LaunchedEffect
         }
-        val document =
-            resolveTtsSpeakableDocument(
-                message = record,
-                source = TtsSpeakableSource(text = sourceText, useStoredContentTokens = false),
-                parseMarkdown = parseMarkdown,
-            )
+        val document = parseMarkdownOrEmptyDocument(sourceText, parseMarkdown)
         coroutineContext.ensureActive()
         parsedDocument = document
     }

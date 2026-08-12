@@ -91,17 +91,15 @@ private fun resolveTtsRenderedHighlight(
     if (renderedText.isEmpty()) return null
     val cacheKey = renderedLeafId to renderedText
     val mappedSpans =
-        leafSpanCache?.getOrPut(cacheKey) {
+        if (leafSpanCache != null && leafSpanCache.containsKey(cacheKey)) {
+            leafSpanCache[cacheKey]
+        } else {
             mapProjectionSpansToRenderedLeaf(
                 projection = projection,
                 renderedLeafId = renderedLeafId,
                 renderedText = renderedText,
-            )
-        } ?: mapProjectionSpansToRenderedLeaf(
-            projection = projection,
-            renderedLeafId = renderedLeafId,
-            renderedText = renderedText,
-        )
+            ).also { leafSpanCache?.put(cacheKey, it) }
+        }
     if (mappedSpans == null) return null
     return if (passage.visibleWord.isNotEmpty()) {
         visibleWordHighlight(passage.visibleWord, renderedLeafId, mappedSpans)

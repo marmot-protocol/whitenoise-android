@@ -22,4 +22,20 @@ class MarkdownElisionLeafIdTest {
             markdownElisionLeafId(tablePath, sourceIndexOffset = null),
         )
     }
+
+    @Test
+    fun rootElisionUsesSourceIndexOffsetWhenPathPrefixIsEmpty() {
+        assertEquals(
+            "b4/elided",
+            markdownElisionLeafId(pathPrefix = "", sourceIndexOffset = 4),
+        )
+    }
+
+    @Test
+    fun rootElisionWithoutPrefixOrOffsetUsesBareLeafId() {
+        assertEquals(
+            "elided",
+            markdownElisionLeafId(pathPrefix = "", sourceIndexOffset = null),
+        )
+    }
 }

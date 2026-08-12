@@ -5,7 +5,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
 import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableProjection
-import kotlinx.coroutines.CancellationException
+import dev.ipf.whitenoise.android.ui.parseMarkdownOrEmptyDocument
 
 /** Builds the single active message projection consumed by every TTS entry point. */
 @Suppress("ReturnCount")
@@ -52,17 +52,7 @@ internal suspend fun resolveTtsSpeakableDocument(
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
 ): MarkdownDocumentFfi {
     if (source.useStoredContentTokens) return message.contentTokens
-    return try {
-        parseMarkdown(source.text)
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (_: Exception) {
-        MarkdownDocumentFfi(
-            truncated = false,
-            blocks = emptyList(),
-            blankLinesBefore = byteArrayOf(),
-        )
-    }
+    return parseMarkdownOrEmptyDocument(source.text, parseMarkdown)
 }
 
 internal fun speakableProjectionFromDocument(
