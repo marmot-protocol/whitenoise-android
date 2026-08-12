@@ -22,10 +22,12 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.notifications.NotificationInviteAuthoritativeOutcome
+import dev.ipf.whitenoise.android.notifications.NotificationMessageDirectLoadOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.notifications.inviteAuthoritativeGroupAvailable
+import dev.ipf.whitenoise.android.notifications.loadNotificationMessageDirectly
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
 import dev.ipf.whitenoise.android.notifications.retryInviteAuthoritativeLoad
 import dev.ipf.whitenoise.android.share.EncryptedPendingShareRequestStore
@@ -339,7 +341,8 @@ internal fun MainShell(
     }
 
     // Notification tap routing: switch to the target account if needed, wait
-    // for its chat list, then open the conversation — or fall back to the chat
+    // read a message conversation directly (invites still await their row),
+    // then open it — or fall back to the chat
     // list with a toast for a stale/removed target. Pure logic in
     // [resolveNotificationNav]; this effect just acts on each step and re-fires
     // as account/chat-list state changes.
@@ -425,6 +428,18 @@ internal fun MainShell(
             onNotificationTargetHandled(target, routingRequestId)
         }
 
+        fun markNotificationTargetRead() {
+            target.messageIdHex?.let { messageIdHex ->
+                appState.launchMutation {
+                    appState.markNotificationMessageRead(
+                        accountRef = target.accountRef,
+                        groupIdHex = target.groupIdHex,
+                        messageIdHex = messageIdHex,
+                    )
+                }
+            }
+        }
+
         fun fallBackToChatList() {
             sectionName = MainSection.Chats.name
             settingsDetailName = null
@@ -458,7 +473,29 @@ internal fun MainShell(
                 // switch would cancel itself the moment the ref flips.
                 appState.launchMutation { appState.setActiveAccount(step.accountRef) }
             }
-            NotificationNavStep.AwaitChatList -> Unit // re-fires when list state settles
+            NotificationNavStep.LoadMessageDirectly -> {
+                routingNotification = true
+                when (
+                    val outcome =
+                        loadNotificationMessageDirectly {
+                            appState.loadNotificationChatListItem(
+                                accountRef = target.accountRef,
+                                groupIdHex = target.groupIdHex,
+                            )
+                        }
+                ) {
+                    is NotificationMessageDirectLoadOutcome.OpenConversation -> {
+                        markNotificationTargetRead()
+                        commitNotificationConversationOpen(outcome.item)
+                    }
+                    NotificationMessageDirectLoadOutcome.AwaitChatList -> {
+                        // A transient local-read failure does not consume the tap;
+                        // the existing chat-list state will re-fire this route.
+                        routingNotification = false
+                    }
+                }
+            }
+            NotificationNavStep.AwaitChatList -> Unit // invite route re-fires when list state settles
             NotificationNavStep.AwaitInviteRow -> {
                 routingNotification = true
                 var authoritativeItem: ChatListItem? = null
@@ -501,15 +538,7 @@ internal fun MainShell(
                         // the conversation composition so a quick back press
                         // cannot cancel the scroll-driven mark-read before it
                         // reaches the store (#1016).
-                        step.readThroughMessageIdHex?.let { messageIdHex ->
-                            appState.launchMutation {
-                                appState.markNotificationMessageRead(
-                                    accountRef = target.accountRef,
-                                    groupIdHex = target.groupIdHex,
-                                    messageIdHex = messageIdHex,
-                                )
-                            }
-                        }
+                        if (step.readThroughMessageIdHex != null) markNotificationTargetRead()
                         commitNotificationConversationOpen(item)
                     }
                     ?: run {

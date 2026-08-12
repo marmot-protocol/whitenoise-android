@@ -6865,9 +6865,29 @@ class WhiteNoiseAppState private constructor(
     suspend fun loadCreatedChatListItem(groupIdHex: String): ChatListItem {
         val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
         markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_START)
-        val details = marmotIo { groupDetails(account, groupIdHex) }
+        val item = loadAuthoritativeChatListItem(account, groupIdHex)
         markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_RETURN)
-        val activeAccountIdHex = accounts.firstOrNull { it.label == account }?.accountIdHex
+        return item
+    }
+
+    /**
+     * Targeted local read for a message-notification tap. This avoids waiting
+     * for the target account's broad chat-list projection to bind (#586).
+     */
+    suspend fun loadNotificationChatListItem(
+        accountRef: String,
+        groupIdHex: String,
+    ): ChatListItem {
+        check(activeAccountRef == accountRef) { "notification target account is not active" }
+        return loadAuthoritativeChatListItem(accountRef, groupIdHex)
+    }
+
+    private suspend fun loadAuthoritativeChatListItem(
+        accountRef: String,
+        groupIdHex: String,
+    ): ChatListItem {
+        val details = marmotIo { groupDetails(accountRef, groupIdHex) }
+        val activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
         return chatListItemFromAuthoritativeGroupDetails(details, activeAccountIdHex)
     }
 

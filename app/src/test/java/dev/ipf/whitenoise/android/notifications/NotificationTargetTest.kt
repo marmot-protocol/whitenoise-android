@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -758,7 +759,7 @@ class NotificationTargetTest {
     }
 
     @Test
-    fun nav_activeAccountButChatListNotReady_awaits() {
+    fun nav_messageOnActiveAccountLoadsDirectlyBeforeChatListIsReady() {
         val step =
             resolveNotificationNav(
                 target,
@@ -767,8 +768,45 @@ class NotificationTargetTest {
                 chatListReady = false,
                 availableGroupIds = emptySet(),
             )
+        assertEquals(NotificationNavStep.LoadMessageDirectly, step)
+    }
+
+    @Test
+    fun nav_inviteOnActiveAccountStillAwaitsChatList() {
+        val step =
+            resolveNotificationNav(
+                target.copy(kind = NotificationTargetKind.INVITE),
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = false,
+                availableGroupIds = emptySet(),
+            )
         assertEquals(NotificationNavStep.AwaitChatList, step)
     }
+
+    @Test
+    fun directMessageLoadOpensAuthoritativeItemWithoutWaitingForChatList() =
+        runTest {
+            assertEquals(
+                NotificationMessageDirectLoadOutcome.OpenConversation("local conversation"),
+                loadNotificationMessageDirectly { "local conversation" },
+            )
+        }
+
+    @Test
+    fun directMessageLoadFailureKeepsTapPendingForChatListFallback() =
+        runTest {
+            assertEquals(
+                NotificationMessageDirectLoadOutcome.AwaitChatList,
+                loadNotificationMessageDirectly<String> { error("sqlite busy") },
+            )
+        }
+
+    @Test(expected = CancellationException::class)
+    fun directMessageLoadPropagatesCancellation() =
+        runTest {
+            loadNotificationMessageDirectly<String> { throw CancellationException("recomposed") }
+        }
 
     @Test
     fun nav_readyButGroupAbsent_isMissingConversation() {
