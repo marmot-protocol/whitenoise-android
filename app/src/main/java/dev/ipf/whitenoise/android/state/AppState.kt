@@ -3376,11 +3376,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun bootstrapLocked() {
         phase = AppPhase.Bootstrapping
         try {
-            if (bootstrapCompleted) {
-                ensureNotificationRuntimeStarted()
-                phase = if (accounts.isEmpty()) AppPhase.Onboarding else AppPhase.Ready
-                return
-            }
+            if (resumeCompletedBootstrap()) return
             traceStartupStage("notification-platform-setup") {
                 // Tray readiness must precede Marmot.start(): the passive MDK
                 // broadcast has no replay once the startup receiver attaches.
@@ -3490,6 +3486,13 @@ class WhiteNoiseAppState private constructor(
             )
         marmotRuntime = opened
         return opened
+    }
+
+    private suspend fun resumeCompletedBootstrap(): Boolean {
+        if (!bootstrapCompleted) return false
+        ensureNotificationRuntimeStarted()
+        phase = if (accounts.isEmpty()) AppPhase.Onboarding else AppPhase.Ready
+        return true
     }
 
     private fun receiverUnavailable() = IllegalStateException("notification receiver unavailable during bootstrap")
