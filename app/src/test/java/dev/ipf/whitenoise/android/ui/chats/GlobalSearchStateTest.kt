@@ -53,7 +53,7 @@ class GlobalSearchStateTest {
     }
 
     @Test
-    fun setQueryUpdatesTrimmedValue() {
+    fun setQueryPreservesSurroundingWhitespace() {
         val updated = GlobalSearchTransitions.setQuery(GlobalSearchState(isOpen = true), "  hello  ")
         assertEquals("  hello  ", updated.query)
     }
