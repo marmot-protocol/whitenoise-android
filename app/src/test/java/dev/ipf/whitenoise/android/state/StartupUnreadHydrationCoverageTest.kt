@@ -9,27 +9,29 @@ import java.io.File
 /** Regression coverage for cold-start contention with MDK's deferred group hydration. */
 class StartupUnreadHydrationCoverageTest {
     @Test
-    fun bootstrapLoadsRawUnreadCountsWithoutWaitingForMemberRosters() {
+    fun bootstrapDefersUnreadRosterWorkUntilAfterTheLocalSnapshot() {
         val source = appStateSource().readText()
         val bootstrap = source.functionBody("bootstrapLocked")
-        val startupRefresh = source.functionBody("refreshAccountsForBootstrap")
 
         assertTrue(
-            "bootstrap must use the startup-scoped account refresh",
-            "refreshAccountsForBootstrap()" in bootstrap,
+            "bootstrap must load only the account snapshot on its critical path",
+            "refreshAccountSnapshot()" in bootstrap,
         )
-        assertFalse("bootstrap must not run the suppression-aware bulk refresh", "refreshAccounts()" in bootstrap)
         assertTrue(
-            "startup account refresh must skip membership-aware roster reads",
-            "refreshAccounts(loadMemberRosters = false)" in startupRefresh,
+            "bootstrap must retain the snapshot for the post-frame unread pass",
+            "prepareStartupUnreadRefresh(refreshedAccounts)" in bootstrap,
+        )
+        assertFalse(
+            "bootstrap must not run the suppression-aware bulk refresh",
+            "refreshAccountUnreadCounts" in bootstrap,
         )
     }
 
     @Test
     fun bootstrapPublishesReadyAtTheExistingLocalActivationBoundary() {
         val bootstrap = appStateSource().readText().functionBody("bootstrapLocked")
-        val activate = bootstrap.indexOf("setActiveAccount(targetAccountRef)")
-        val ready = bootstrap.indexOf("phase = AppPhase.Ready", startIndex = activate)
+        val activate = bootstrap.indexOf("setActiveAccount(")
+        val ready = bootstrap.indexOf("onActivated = { phase = AppPhase.Ready }", startIndex = activate)
 
         assertTrue("bootstrap must select an account before publishing Ready", activate >= 0)
         assertTrue("Ready must be published from the account's local activation callback", ready > activate)
@@ -42,20 +44,23 @@ class StartupUnreadHydrationCoverageTest {
     @Test
     fun suppressionAwareUnreadReconciliationStartsAfterTheFirstLocalFrame() {
         val source = appStateSource().readText()
-        val recorder = source.functionBody("recordAccountSwitchLocalSnapshotRendered")
-        val launcher = source.functionBody("launchPendingStartupUnreadReconciliation")
+        val recorder = source.functionBody("recordStartupLocalSnapshotRendered")
 
         assertTrue(
             "the first-frame hook must release the deferred unread pass",
-            "launchPendingStartupUnreadReconciliation()" in recorder,
+            "pendingStartupUnreadRefresh" in recorder,
         )
         assertTrue(
             "the deferred pass must run on a process-lifetime scope",
-            "notificationScope.launch" in launcher,
+            "mutationsScope.launch" in recorder,
         )
         assertTrue(
             "the deferred pass must restore suppression-aware counts",
-            "refreshAccountUnreadCounts()" in launcher,
+            "refreshAccountUnreadCounts" in recorder,
+        )
+        assertTrue(
+            "the deferred pass must reject stale account snapshots",
+            "startupUnreadRefreshIsCurrent" in recorder,
         )
     }
 
