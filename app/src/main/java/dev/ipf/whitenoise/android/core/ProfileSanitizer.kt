@@ -23,15 +23,20 @@ object ProfileSanitizer {
     }
 
     /**
-     * The single avatar-URL sanitizer for the whole app (profile records, image
-     * search results, the avatar preview);
-     * [dev.ipf.whitenoise.android.media.sanitizeHttpsAvatarUrl] delegates here so
-     * the two can't drift on policy. Returns the sanitized https URL string, or
-     * null when it isn't a structurally valid HTTPS URL. Network-bound safety
-     * belongs to the fetcher: MDK classifies protocol profile URLs, while
-     * Android's [SafeHttpsGet] classifies user-initiated search/upload URLs.
+     * Normalize a URL received from protocol state without classifying it.
+     * MDK is the sole owner of scheme, authority, host, port, redirect, DNS,
+     * and size policy when [AvatarImageLoader] fetches these URLs.
      */
-    fun imageUrl(raw: String?): String? {
+    fun protocolImageUrl(raw: String?): String? = raw?.trim()?.takeIf(String::isNotEmpty)
+
+    /**
+     * Validate an Android-owned, user-initiated HTTPS image URL before a
+     * platform fetch or upload workflow. Protocol profile/group URLs must use
+     * [protocolImageUrl] instead so their fetchability policy cannot drift from
+     * MDK. [dev.ipf.whitenoise.android.media.sanitizeHttpsAvatarUrl] delegates
+     * here for image search and paste-link flows.
+     */
+    fun androidOwnedHttpsImageUrl(raw: String?): String? {
         if (raw.isNullOrBlank()) return null
         var candidate = raw.trim()
         // Upgrade a scheme-relative `//host/path` to https so a record that omits
@@ -45,6 +50,7 @@ object ProfileSanitizer {
         // to the host and let `user@` mask the real authority.
         if (!uri.rawUserInfo.isNullOrEmpty()) return null
         if (uri.port != -1 && uri.port != 443) return null
+        if (HostSafety.isPrivateOrLoopbackHost(host)) return null
         return candidate
     }
 

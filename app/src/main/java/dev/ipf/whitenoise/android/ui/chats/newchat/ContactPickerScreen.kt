@@ -314,7 +314,7 @@ internal fun ContactPickerScreen(
                             avatarSeed = candidate.accountIdHex,
                             avatarUrl =
                                 appState.avatarUrl(candidate.accountIdHex)
-                                    ?: ProfileSanitizer.imageUrl(candidate.searchProfile?.picture),
+                                    ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
                             enabled = !busy,
                             onClick = { toggle(candidate) },
                             onLongClick = {

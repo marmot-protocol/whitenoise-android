@@ -81,7 +81,7 @@ fun SettingsAccountHeader(
     onEditProfilePicture: () -> Unit = {},
 ) {
     val switchAccountDescription = stringResource(R.string.switch_account)
-    val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
+    val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
     val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
     var viewerOpen by remember(safePictureUrl) { mutableStateOf(false) }
     ListItem(

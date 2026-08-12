@@ -72,41 +72,55 @@ class ProfileSanitizerTest {
     }
 
     @Test
-    fun imageUrlsOnlyAllowHttpsUrlsWithHosts() {
-        assertEquals("https://example.com/avatar.png", ProfileSanitizer.imageUrl(" https://example.com/avatar.png "))
-        assertNull(ProfileSanitizer.imageUrl("http://example.com/avatar.png"))
-        assertNull(ProfileSanitizer.imageUrl("data:image/png;base64,abc"))
-        assertNull(ProfileSanitizer.imageUrl("file:///tmp/avatar.png"))
-        assertNull(ProfileSanitizer.imageUrl("https:///missing-host.png"))
+    fun androidOwnedImageUrlsOnlyAllowPublicHttpsUrlsWithHosts() {
+        assertEquals(
+            "https://example.com/avatar.png",
+            ProfileSanitizer.androidOwnedHttpsImageUrl(" https://example.com/avatar.png "),
+        )
+        assertNull(ProfileSanitizer.androidOwnedHttpsImageUrl("http://example.com/avatar.png"))
+        assertNull(ProfileSanitizer.androidOwnedHttpsImageUrl("data:image/png;base64,abc"))
+        assertNull(ProfileSanitizer.androidOwnedHttpsImageUrl("file:///tmp/avatar.png"))
+        assertNull(ProfileSanitizer.androidOwnedHttpsImageUrl("https:///missing-host.png"))
+        assertNull(ProfileSanitizer.androidOwnedHttpsImageUrl("https://127.0.0.1/avatar.png"))
+        assertNull(ProfileSanitizer.androidOwnedHttpsImageUrl("https://192.168.1.1/avatar.png"))
+        assertNull(ProfileSanitizer.androidOwnedHttpsImageUrl("https://localhost/avatar.png"))
     }
 
     @Test
-    fun imageUrlsLeaveHostClassificationToTheNetworkFetcher() {
-        // Protocol profile URLs are classified by MDK at the network boundary;
-        // user-initiated URLs are classified by SafeHttpsGet. Keeping host
-        // classification out of this shared structural sanitizer prevents the
-        // two SSRF policies from drifting.
-        assertEquals("https://127.0.0.1/avatar.png", ProfileSanitizer.imageUrl("https://127.0.0.1/avatar.png"))
-        assertEquals("https://192.168.1.1/avatar.png", ProfileSanitizer.imageUrl("https://192.168.1.1/avatar.png"))
-        assertEquals("https://169.254.1.1/avatar.png", ProfileSanitizer.imageUrl("https://169.254.1.1/avatar.png"))
-        assertEquals("https://[::1]/avatar.png", ProfileSanitizer.imageUrl("https://[::1]/avatar.png"))
-        assertEquals("https://localhost/avatar.png", ProfileSanitizer.imageUrl("https://localhost/avatar.png"))
-        assertEquals("https://example.com/avatar.png", ProfileSanitizer.imageUrl("https://example.com/avatar.png"))
+    fun protocolImageUrlsAreOnlyNormalizedBeforeMdk() {
+        // Android must not duplicate MDK's scheme, authority, host, port, DNS,
+        // redirect, or size policy for URLs read from protocol state.
+        assertEquals(
+            "http://user@127.0.0.1:9200/avatar.png",
+            ProfileSanitizer.protocolImageUrl(" http://user@127.0.0.1:9200/avatar.png "),
+        )
+        assertEquals("data:image/png;base64,abc", ProfileSanitizer.protocolImageUrl("data:image/png;base64,abc"))
+        assertNull(ProfileSanitizer.protocolImageUrl("  "))
+        assertNull(ProfileSanitizer.protocolImageUrl(null))
     }
 
     @Test
-    fun imageUrlsRejectEmbeddedCredentials() {
-        assertNull(ProfileSanitizer.imageUrl("https://user:pass@example.com/avatar.png"))
-        assertNull(ProfileSanitizer.imageUrl("https://user@example.com/avatar.png"))
+    fun androidOwnedImageUrlsRejectEmbeddedCredentials() {
+        assertNull(ProfileSanitizer.androidOwnedHttpsImageUrl("https://user:pass@example.com/avatar.png"))
+        assertNull(ProfileSanitizer.androidOwnedHttpsImageUrl("https://user@example.com/avatar.png"))
         // The same host without userinfo still passes.
-        assertEquals("https://example.com/avatar.png", ProfileSanitizer.imageUrl("https://example.com/avatar.png"))
+        assertEquals(
+            "https://example.com/avatar.png",
+            ProfileSanitizer.androidOwnedHttpsImageUrl("https://example.com/avatar.png"),
+        )
     }
 
     @Test
-    fun imageUrlsRejectExplicitNonStandardPorts() {
-        assertEquals("https://example.com/avatar.png", ProfileSanitizer.imageUrl("https://example.com/avatar.png"))
-        assertEquals("https://example.com:443/avatar.png", ProfileSanitizer.imageUrl("https://example.com:443/avatar.png"))
-        assertNull(ProfileSanitizer.imageUrl("https://example.com:9200/avatar.png"))
+    fun androidOwnedImageUrlsRejectExplicitNonStandardPorts() {
+        assertEquals(
+            "https://example.com/avatar.png",
+            ProfileSanitizer.androidOwnedHttpsImageUrl("https://example.com/avatar.png"),
+        )
+        assertEquals(
+            "https://example.com:443/avatar.png",
+            ProfileSanitizer.androidOwnedHttpsImageUrl("https://example.com:443/avatar.png"),
+        )
+        assertNull(ProfileSanitizer.androidOwnedHttpsImageUrl("https://example.com:9200/avatar.png"))
     }
 
     @Test

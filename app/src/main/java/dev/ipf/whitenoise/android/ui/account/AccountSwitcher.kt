@@ -52,7 +52,7 @@ fun AccountAvatarButton(
     val openSettingsDescription = stringResource(R.string.open_settings)
     val accountUnreadDescription =
         stringResource(R.string.account_unread_indicator)
-    val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
+    val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
     val avatarContentDescription =
         if (showUnreadDot) {
             "$openSettingsDescription, $accountUnreadDescription"

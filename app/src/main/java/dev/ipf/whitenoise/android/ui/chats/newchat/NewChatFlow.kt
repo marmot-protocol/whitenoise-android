@@ -601,7 +601,7 @@ private fun NewMessageScreen(
                             avatarSeed = candidate.accountIdHex,
                             avatarUrl =
                                 appState.avatarUrl(candidate.accountIdHex)
-                                    ?: ProfileSanitizer.imageUrl(candidate.searchProfile?.picture),
+                                    ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
                             enabled = creatingHex == null,
                             onClick = {
                                 if (candidate.source == null && candidate.searchProfile != null) {

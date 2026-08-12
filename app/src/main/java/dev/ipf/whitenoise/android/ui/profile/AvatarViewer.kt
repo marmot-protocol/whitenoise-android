@@ -106,7 +106,7 @@ internal fun AvatarFullScreenViewer(
     onEditPicture: (() -> Unit)? = null,
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
 ) {
-    val safePictureUrl = remember(pictureUrl) { ProfileSanitizer.imageUrl(pictureUrl) }
+    val safePictureUrl = remember(pictureUrl) { ProfileSanitizer.protocolImageUrl(pictureUrl) }
     if (safePictureUrl == null && picture == null) {
         LaunchedEffect(Unit) { onDismiss() }
         return

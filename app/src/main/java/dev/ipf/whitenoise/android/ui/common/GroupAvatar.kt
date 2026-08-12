@@ -63,7 +63,7 @@ internal fun GroupAvatar(
     size: Dp,
     fallbackPictureUrl: String? = null,
 ) {
-    val legacyUrl = ProfileSanitizer.imageUrl(group.avatarUrl)
+    val legacyUrl = ProfileSanitizer.protocolImageUrl(group.avatarUrl)
     val encryptedImage = rememberEncryptedGroupAvatar(appState, group)
     Avatar(
         title = title,

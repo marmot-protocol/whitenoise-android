@@ -4917,8 +4917,8 @@ class ChatsController private constructor(
 
     private fun preWarmNotificationAvatars(item: ChatListItem) {
         val conversationAvatar =
-            ProfileSanitizer.imageUrl(item.group.avatarUrl)
-                ?: ProfileSanitizer.imageUrl(item.projection?.avatarUrl)
+            ProfileSanitizer.protocolImageUrl(item.group.avatarUrl)
+                ?: ProfileSanitizer.protocolImageUrl(item.projection?.avatarUrl)
         AvatarImageLoader.preWarm(conversationAvatar)
         GroupProjector
             .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
