@@ -89,7 +89,6 @@ import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatListItem
-import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
@@ -457,7 +456,7 @@ private fun forwardFolderBulkRows(
 ): List<Pair<ChatFolder, List<String>>> {
     val accountRef = appState.activeAccountRef ?: return emptyList()
     val store = appState.chatFolderPreferences
-    val mutedConversations = appState.chatMutePreferences.state.value.mutedConversations
+    val mutedGroupIds = targets.filter(ChatListItem::engineMuted).mapTo(hashSetOf()) { it.group.groupIdHex }
     return store
         .foldersFor(accountRef)
         // These rows render and query-match the stored name, so folders
@@ -472,7 +471,7 @@ private fun forwardFolderBulkRows(
                     rule = store.folderRule(accountRef, folder.id),
                     activeAccountIdHex = appState.activeAccount?.accountIdHex,
                     isMuted = { groupIdHex ->
-                        ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations
+                        groupIdHex in mutedGroupIds
                     },
                     displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
                 ).toList()

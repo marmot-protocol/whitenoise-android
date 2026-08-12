@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -56,6 +57,7 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 private const val MILLIS_PER_SECOND = 1_000L
 private val MUTE_ROW_MIN_HEIGHT = 56.dp
+internal const val MUTE_SWITCH_ROW_TAG = "conversation-mute-switch-row"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod") // Compose screen owns one cohesive settings surface.
@@ -67,6 +69,7 @@ internal fun ConversationNotificationSettingsScreen(
     conversationAvatarUrl: String?,
     isDm: Boolean,
     isMuted: Boolean,
+    muteCommandPending: Boolean,
     muteExpiryMillis: Long?,
     notifyForMode: ChatNotifyMode,
     vibrationPattern: ConversationVibrationPattern,
@@ -124,6 +127,7 @@ internal fun ConversationNotificationSettingsScreen(
             MuteSwitchRow(
                 muted = isMuted,
                 mutedUntil = if (isMuted && muteExpiryMillis != null) mutedUntilLabel(muteExpiryMillis) else null,
+                enabled = !muteCommandPending,
                 onToggle = onToggleMute,
             )
             SettingsActionRow(
@@ -215,9 +219,10 @@ private fun mutedUntilLabel(expiryMillis: Long): String =
 
 @Suppress("FunctionNaming")
 @Composable
-private fun MuteSwitchRow(
+internal fun MuteSwitchRow(
     muted: Boolean,
     mutedUntil: String?,
+    enabled: Boolean,
     onToggle: (Boolean) -> Unit,
 ) {
     Row(
@@ -225,7 +230,8 @@ private fun MuteSwitchRow(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = MUTE_ROW_MIN_HEIGHT)
-                .toggleable(value = muted, role = Role.Switch, onValueChange = onToggle)
+                .testTag(MUTE_SWITCH_ROW_TAG)
+                .toggleable(value = muted, enabled = enabled, role = Role.Switch, onValueChange = onToggle)
                 .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
@@ -245,7 +251,7 @@ private fun MuteSwitchRow(
                 )
             }
         }
-        Switch(checked = muted, onCheckedChange = null)
+        Switch(checked = muted, enabled = enabled, onCheckedChange = null)
     }
 }
 

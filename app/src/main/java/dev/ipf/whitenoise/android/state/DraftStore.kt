@@ -6,17 +6,14 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
-import java.io.IOException
 import java.lang.ref.ReferenceQueue
 import java.lang.ref.WeakReference
-import java.security.GeneralSecurityException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 /**
- * Persistence layer for unsent conversation drafts. The storage map is keyed
- * by `"<accountIdHex> <groupIdHex>"`; values are versioned draft blobs.
+ * Injectable persistence seam retained for lifecycle-state tests. Production
+ * passes a no-op implementation because MDK owns durable message drafts.
  *
  * Split out from [DraftStore] so the in-memory cache can be unit-tested
  * without an Android `SharedPreferences` instance.
@@ -39,11 +36,12 @@ private class EvictedDraftStateReference(
 ) : WeakReference<MutableState<String?>>(state, queue)
 
 /**
- * Holds unsent draft text per `(accountIdHex, groupIdHex)`. Reads return the
- * in-memory cache; writes update the cache and the backing persistence layer.
+ * Lifecycle cache for MDK-owned drafts per `(accountRef, groupIdHex)`.
+ * Production uses a no-op persistence; the injectable persistence remains for
+ * deterministic state-holder tests and the one-time legacy migration reader.
  *
  * Each draft is held in its own Compose [MutableState] keyed by
- * `(accountIdHex, groupIdHex)`, so a composable that called [get] re-composes
+ * `(accountRef, groupIdHex)`, so a composable that called [get] re-composes
  * only when *that* draft changes. (A single shared revision counter — or a
  * SnapshotStateMap, which tracks reads at whole-map granularity — would
  * recompose every chat-list row on every keystroke in any conversation.)
@@ -56,7 +54,8 @@ class DraftStore internal constructor(
     private val lock = Any()
     private val drafts = LinkedHashMap<String, MutableState<String?>>(16, 0.75f, true)
     private val collectedEvictedDraftStates = ReferenceQueue<MutableState<String?>>()
-    private val evictedEmptyDraftStates = mutableMapOf<String, EvictedDraftStateReference>()
+    private val evictedDraftStates = mutableMapOf<String, EvictedDraftStateReference>()
+    private val evictedDraftValues = mutableMapOf<String, String>()
 
     // Unix-seconds "drafted-at" per key, updated only when a draft starts
     // (empty→non-empty) or clears — never on an ordinary keystroke — so the
@@ -87,13 +86,14 @@ class DraftStore internal constructor(
     // write, while unobserved states remain eligible for garbage collection.
     private fun stateFor(k: String): MutableState<String?> =
         synchronized(lock) {
-            stateForLocked(k).also { pruneEmptyDraftStatesLocked(retainedState = it) }
+            stateForLocked(k).also { pruneDraftStatesLocked(retainedState = it) }
         }
 
     private fun stateForLocked(k: String): MutableState<String?> {
         drainCollectedEvictedDraftStatesLocked()
         drafts[k]?.let { return it }
-        val state = evictedEmptyDraftStates.remove(k)?.get() ?: mutableStateOf<String?>(null)
+        val state = evictedDraftStates.remove(k)?.get() ?: mutableStateOf(evictedDraftValues[k])
+        evictedDraftValues.remove(k)
         drafts[k] = state
         return state
     }
@@ -101,22 +101,22 @@ class DraftStore internal constructor(
     private fun drainCollectedEvictedDraftStatesLocked() {
         while (true) {
             val reference = collectedEvictedDraftStates.poll() as? EvictedDraftStateReference ?: return
-            if (evictedEmptyDraftStates[reference.key] === reference) {
-                evictedEmptyDraftStates.remove(reference.key)
+            if (evictedDraftStates[reference.key] === reference) {
+                evictedDraftStates.remove(reference.key)
             }
         }
     }
 
     fun get(
-        accountIdHex: String,
+        accountRef: String,
         groupIdHex: String,
-    ): String? = getDraft(accountIdHex, groupIdHex)?.textFieldValue?.text
+    ): String? = getDraft(accountRef, groupIdHex)?.textFieldValue?.text
 
     fun getDraft(
-        accountIdHex: String,
+        accountRef: String,
         groupIdHex: String,
     ): ComposerDraftSnapshot? {
-        val stored = stateFor(key(accountIdHex, groupIdHex)).value ?: return null
+        val stored = stateFor(key(accountRef, groupIdHex)).value ?: return null
         return decodeComposerDraftStored(stored)
     }
 
@@ -125,22 +125,28 @@ class DraftStore internal constructor(
      * don't store noise. Selection-only updates are persisted too.
      */
     fun set(
-        accountIdHex: String,
+        accountRef: String,
         groupIdHex: String,
         value: TextFieldValue,
     ) {
-        val k = key(accountIdHex, groupIdHex)
+        val k = key(accountRef, groupIdHex)
         var sortOrderChanged = false
         // Keep persistence writes inside the same lock as the cache mutation so
         // set/clear cannot interleave between the in-memory and backing-store updates.
         synchronized(lock) {
             if (value.text.isBlank()) {
-                val state = drafts[k] ?: return@synchronized
+                val state =
+                    drafts[k]
+                        ?: if (k in evictedDraftValues || evictedDraftStates[k]?.get()?.value != null) {
+                            stateForLocked(k)
+                        } else {
+                            return@synchronized
+                        }
                 if (state.value != null) {
                     state.value = null
                     persistence.write(k, null)
                     if (draftedAtSeconds.remove(k) != null) sortOrderChanged = true
-                    pruneEmptyDraftStatesLocked()
+                    pruneDraftStatesLocked()
                 }
                 return@synchronized
             }
@@ -159,16 +165,98 @@ class DraftStore internal constructor(
                 state.value = encoded
                 persistence.write(k, encoded)
             }
-            pruneEmptyDraftStatesLocked(retainedState = state)
+            pruneDraftStatesLocked(retainedState = state)
         }
         if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
     }
 
     /** Drafted-at (unix seconds) for the chat, or null when it has no draft. */
     fun draftedAtSecondsFor(
-        accountIdHex: String,
+        accountRef: String,
         groupIdHex: String,
-    ): ULong? = synchronized(lock) { draftedAtSeconds[key(accountIdHex, groupIdHex)]?.toULong() }
+    ): ULong? = synchronized(lock) { draftedAtSeconds[key(accountRef, groupIdHex)]?.toULong() }
+
+    /** Seeds authoritative MDK metadata without hydrating attachment plaintext. */
+    fun replaceSummaries(
+        accountRef: String,
+        draftedAtMillisByGroup: Map<String, Long>,
+    ) {
+        val prefix = "$accountRef "
+        synchronized(lock) {
+            draftedAtSeconds.keys.removeAll { it.startsWith(prefix) }
+            draftedAtMillisByGroup.forEach { (groupIdHex, draftedAtMs) ->
+                draftedAtSeconds[key(accountRef, groupIdHex)] = draftedAtMs / MILLIS_PER_SECOND
+            }
+        }
+        onDraftSortOrderChanged?.invoke()
+    }
+
+    /** Hydrates content once; a local edit that already exists always wins. */
+    fun hydrate(
+        accountRef: String,
+        groupIdHex: String,
+        content: String,
+        draftedAtMs: Long,
+        replaceExisting: Boolean = false,
+    ) {
+        val k = key(accountRef, groupIdHex)
+        var sortOrderChanged = false
+        synchronized(lock) {
+            val state = stateForLocked(k)
+            if ((state.value == null || replaceExisting) && content.isNotBlank()) {
+                val selection = TextRange(content.length)
+                val draftedAt = draftedAtMs / MILLIS_PER_SECOND
+                sortOrderChanged = draftedAtSeconds[k] != draftedAt
+                draftedAtSeconds[k] = draftedAt
+                state.value = encodeComposerDraft(TextFieldValue(content, selection), draftedAt)
+            }
+            pruneDraftStatesLocked(retainedState = state)
+        }
+        if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
+    }
+
+    /** Reconciles lifecycle text after pending writes have been flushed to MDK. */
+    fun replaceFromAuthoritative(
+        accountRef: String,
+        groupIdHex: String,
+        content: String?,
+        draftedAtMs: Long?,
+    ) {
+        val k = key(accountRef, groupIdHex)
+        synchronized(lock) {
+            val state = stateForLocked(k)
+            if (content.isNullOrBlank()) {
+                state.value = null
+                draftedAtSeconds.remove(k)
+            } else {
+                val draftedAt = draftedAtMs?.div(MILLIS_PER_SECOND)
+                if (draftedAt != null) draftedAtSeconds[k] = draftedAt
+                state.value =
+                    encodeComposerDraft(
+                        TextFieldValue(content, TextRange(content.length)),
+                        draftedAtSeconds[k],
+                    )
+            }
+            pruneDraftStatesLocked(retainedState = state)
+        }
+        onDraftSortOrderChanged?.invoke()
+    }
+
+    fun applyAuthoritativeTimestamp(
+        accountRef: String,
+        groupIdHex: String,
+        draftedAtMs: Long?,
+    ) {
+        synchronized(lock) {
+            val k = key(accountRef, groupIdHex)
+            if (draftedAtMs == null) {
+                draftedAtSeconds.remove(k)
+            } else {
+                draftedAtSeconds[k] = draftedAtMs / MILLIS_PER_SECOND
+            }
+        }
+        onDraftSortOrderChanged?.invoke()
+    }
 
     /**
      * Appends [incoming] to an existing draft with a newline separator. Blank
@@ -176,40 +264,43 @@ class DraftStore internal constructor(
      * an existing composer draft.
      */
     fun mergeText(
-        accountIdHex: String,
+        accountRef: String,
         groupIdHex: String,
         incoming: String,
     ) {
         val trimmedIncoming = incoming.trim()
         if (trimmedIncoming.isEmpty()) return
-        val existing = get(accountIdHex, groupIdHex)
+        val existing = get(accountRef, groupIdHex)
         val merged =
             if (existing.isNullOrBlank()) {
                 trimmedIncoming
             } else {
                 "${existing.trimEnd()}\n$trimmedIncoming"
             }
-        set(accountIdHex, groupIdHex, TextFieldValue(merged, TextRange(merged.length)))
+        set(accountRef, groupIdHex, TextFieldValue(merged, TextRange(merged.length)))
     }
 
-    fun clearAllForAccount(accountIdHex: String) {
-        val prefix = "$accountIdHex "
+    fun clearAllForAccount(accountRef: String) {
+        val prefix = "$accountRef "
         var sortOrderChanged = false
         synchronized(lock) {
             val matchingDrafts =
-                drafts.entries
-                    .mapNotNull { (k, state) ->
-                        val value = state.value
-                        if (k.startsWith(prefix) && value != null) Triple(k, state, value) else null
-                    }
+                (drafts.keys + evictedDraftStates.keys + evictedDraftValues.keys)
+                    .asSequence()
+                    .filter { it.startsWith(prefix) }
+                    .distinct()
+                    .mapNotNull { k ->
+                        val state = stateForLocked(k)
+                        state.value?.let { value -> Triple(k, state, value) }
+                    }.toList()
             matchingDrafts.forEach { (k, state, snapshottedValue) ->
                 if (state.value == snapshottedValue) {
                     state.value = null
                     persistence.write(k, null)
                     if (draftedAtSeconds.remove(k) != null) sortOrderChanged = true
-                    pruneEmptyDraftStatesLocked()
                 }
             }
+            pruneDraftStatesLocked()
         }
         if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
     }
@@ -217,43 +308,40 @@ class DraftStore internal constructor(
     /** Durably drains any coalesced background persistence work. */
     fun flush() = persistence.flush()
 
-    private fun pruneEmptyDraftStatesLocked(retainedState: MutableState<String?>? = null) {
+    private fun pruneDraftStatesLocked(retainedState: MutableState<String?>? = null) {
         drainCollectedEvictedDraftStatesLocked()
         if (drafts.size <= MAX_IN_MEMORY_DRAFT_STATES) return
         val iterator = drafts.entries.iterator()
         while (drafts.size > MAX_IN_MEMORY_DRAFT_STATES && iterator.hasNext()) {
             val entry = iterator.next()
-            if (entry.value !== retainedState && entry.value.value == null) {
+            if (entry.value !== retainedState) {
                 iterator.remove()
-                evictedEmptyDraftStates[entry.key] =
+                entry.value.value?.let { evictedDraftValues[entry.key] = it }
+                    ?: evictedDraftValues.remove(entry.key)
+                evictedDraftStates[entry.key] =
                     EvictedDraftStateReference(entry.key, entry.value, collectedEvictedDraftStates)
             }
         }
     }
 
     private fun key(
-        accountIdHex: String,
+        accountRef: String,
         groupIdHex: String,
-    ): String = "$accountIdHex $groupIdHex"
+    ): String = "$accountRef $groupIdHex"
 
     companion object {
         internal const val MAX_IN_MEMORY_DRAFT_STATES = 512
         private const val MILLIS_PER_SECOND = 1_000L
 
-        fun forContext(context: Context): DraftStore = DraftStore(EncryptedDraftPersistence(context.applicationContext))
+        fun forContext(
+            @Suppress("UNUSED_PARAMETER") context: Context,
+        ): DraftStore = DraftStore(NoOpDraftPersistence)
     }
 }
 
-/**
- * Draft text is message-shaped plaintext, so it is sealed with an AES-GCM key
- * held in the Android Keystore rather than written to a plaintext file. The
- * previous implementation used the now-EOL `androidx.security-crypto` stack;
- * existing drafts are imported once from that file and it is then deleted.
- */
-internal class EncryptedDraftPersistence(
+internal class LegacyDraftMigrationSource(
     context: Context,
-    writeExecutor: ExecutorService = newDraftWriteExecutor(),
-) : DraftPersistence {
+) {
     private val app = context.applicationContext
     private val store =
         KeystoreSecureStore(
@@ -261,119 +349,37 @@ internal class EncryptedDraftPersistence(
             fileName = SECURE_FILE,
             keyProvider = AndroidKeystoreSecretKeyProvider(KEY_ALIAS),
         )
-    private val writer: CoalescingDraftWriter
 
-    init {
-        importLegacyDrafts()
-        writer =
-            CoalescingDraftWriter(
-                initial = readSecureStore(),
-                executor = writeExecutor,
-                persist = ::persistSnapshot,
-            )
-    }
-
-    override fun read(): Map<String, String> = writer.read()
-
-    override fun write(
-        key: String,
-        value: String?,
-    ) = writer.write(key, value)
-
-    override fun flush() = writer.flush()
-
-    private fun readSecureStore(): Map<String, String> =
-        try {
-            store.readAll()
-        } catch (error: GeneralSecurityException) {
-            // A rotated/cleared Keystore key or a tampered payload leaves the
-            // store undecryptable; drafts are disposable, so drop it and start
-            // fresh rather than failing every read.
-            Log.w(LOG_TAG, "draft store unreadable, recreating", error)
-            recreateAfterCorruption()
+    fun read(): Map<String, String> =
+        runCatching { store.readAll() }.getOrElse {
+            Log.w(LOG_TAG, "legacy draft store unreadable", it)
             emptyMap()
         }
 
-    private fun persistSnapshot(values: Map<String, String>) {
-        try {
-            if (!store.replaceAllDurably(values)) {
-                Log.w(LOG_TAG, "draft snapshot commit failed")
+    fun confirmMigrated(key: String): Boolean =
+        runCatching {
+            val remaining = store.readAll() - key
+            store.replaceAllDurably(remaining).also { committed ->
+                if (committed && remaining.isEmpty()) {
+                    store.clear()
+                }
             }
-        } catch (error: GeneralSecurityException) {
-            Log.w(LOG_TAG, "draft write failed, recreating store", error)
-            recreateAfterCorruption()
-            runCatching { store.replaceAllDurably(values) }
-        }
-    }
-
-    private fun recreateAfterCorruption() {
-        runCatching { store.clear() }
-    }
-
-    /**
-     * One-way import from the retired library, routed through [migrateDrafts]
-     * so it keeps that helper's two guarantees: encrypted values win over the
-     * legacy copy, and the legacy file is deleted only once the new store has
-     * DURABLY committed. Deleting on a transient failure — or before the write
-     * reaches disk — would lose a draft the user is mid-way through typing.
-     */
-    private fun importLegacyDrafts() {
-        val legacy = readLegacyDrafts()
-        val existingKeys = if (legacy == null) null else secureKeys()
-        if (legacy != null && existingKeys != null) {
-            migrateDrafts(
-                legacy = legacy,
-                existingSecureKeys = existingKeys,
-                persistSecure = ::persistImportedDrafts,
-                clearLegacy = { app.deleteSharedPreferences(LEGACY_SECURE_FILE) },
-            )
-        }
-    }
-
-    // Null when there is nothing to import, or when the legacy keyset is
-    // unreadable — in which case the file is only dead weight and is dropped.
-    private fun readLegacyDrafts(): Map<String, String>? =
-        try {
-            LegacySecurePreferences.read(app, LEGACY_SECURE_FILE)
-        } catch (error: GeneralSecurityException) {
-            Log.w(LOG_TAG, "legacy draft store unreadable, discarding", error)
-            app.deleteSharedPreferences(LEGACY_SECURE_FILE)
-            null
-        } catch (error: IOException) {
-            Log.w(LOG_TAG, "legacy draft store unreadable, discarding", error)
-            app.deleteSharedPreferences(LEGACY_SECURE_FILE)
-            null
-        }
-
-    // Null aborts the import: without knowing what the new store already holds,
-    // migrateDrafts cannot honour "encrypted values win".
-    private fun secureKeys(): Set<String>? =
-        try {
-            store.readAll().keys
-        } catch (error: GeneralSecurityException) {
-            Log.w(LOG_TAG, "draft store unreadable during import", error)
-            null
-        }
-
-    private fun persistImportedDrafts(fresh: Map<String, String>): Boolean =
-        try {
-            store.putAllDurably(fresh)
-        } catch (error: GeneralSecurityException) {
-            Log.w(LOG_TAG, "draft import write failed, keeping legacy file", error)
-            false
-        }
+        }.getOrDefault(false)
 
     private companion object {
         const val LOG_TAG = "DMDrafts"
         const val SECURE_FILE = "whitenoise.drafts.keystore"
-        const val LEGACY_SECURE_FILE = "whitenoise.drafts.secure"
         const val KEY_ALIAS = "whitenoise.drafts.aes_gcm.v1"
-
-        fun newDraftWriteExecutor(): ExecutorService =
-            Executors.newSingleThreadExecutor { task ->
-                Thread(task, "WhiteNoiseDraftWriter").apply { isDaemon = true }
-            }
     }
+}
+
+private object NoOpDraftPersistence : DraftPersistence {
+    override fun read(): Map<String, String> = emptyMap()
+
+    override fun write(
+        key: String,
+        value: String?,
+    ) = Unit
 }
 
 /**

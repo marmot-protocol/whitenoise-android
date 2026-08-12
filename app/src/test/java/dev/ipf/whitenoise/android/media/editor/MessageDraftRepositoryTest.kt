@@ -2,9 +2,13 @@ package dev.ipf.whitenoise.android.media.editor
 
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
+import dev.ipf.marmotkit.MessageDraftSummaryFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -13,6 +17,72 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MessageDraftRepositoryTest {
+    @Test
+    fun coalescedWriterPersistsOnlyLatestTextFromKeystrokeBurst() =
+        runTest {
+            val gateway = FakeDraftGateway(null)
+            val writer =
+                CoalescingMessageDraftWriter(
+                    scope = this,
+                    drafts =
+                        MessageDraftRepository(
+                            gateway = gateway,
+                            editorSessions = EditorSessionStore(RepositorySessionStrings()),
+                            ioDispatcher = StandardTestDispatcher(testScheduler),
+                        ),
+                    debounceMillis = 250,
+                )
+
+            writer.submit(ACCOUNT, GROUP, "h")
+            writer.submit(ACCOUNT, GROUP, "he")
+            writer.submit(ACCOUNT, GROUP, "hello")
+            runCurrent()
+            advanceTimeBy(249)
+            runCurrent()
+            assertEquals(0, gateway.saveCalls)
+
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(1, gateway.saveCalls)
+            assertEquals("hello", gateway.current?.content)
+        }
+
+    @Test
+    fun coalescedWriterDoesNotPublishStaleCompletionAfterNewerEditIsAccepted() =
+        runTest {
+            val gateway = FakeDraftGateway(null)
+            val published = mutableListOf<String>()
+            lateinit var writer: CoalescingMessageDraftWriter
+            gateway.onSave = { content ->
+                if (content == "first") writer.submit(ACCOUNT, GROUP, "second")
+            }
+            writer =
+                CoalescingMessageDraftWriter(
+                    scope = this,
+                    drafts = repository(gateway),
+                    debounceMillis = 0,
+                    onResult = { _, _, content, _ -> published += content },
+                )
+
+            writer.submit(ACCOUNT, GROUP, "first")
+            runCurrent()
+            writer.flush()
+
+            assertEquals(listOf("second"), published)
+            assertEquals("second", gateway.current?.content)
+        }
+
+    @Test
+    fun ambiguousDeleteFailureReturnsConfirmedAuthoritativeDeletion() =
+        runTest {
+            val gateway = FakeDraftGateway(draft(content = "sent")).apply { throwAfterNextDelete = true }
+
+            val result = repository(gateway).delete(ACCOUNT, GROUP)
+
+            assertTrue(result is MessageDraftMutationResult.Success)
+            assertNull(gateway.current)
+        }
+
     @Test
     fun replacementPreservesLatestTextReplyOrderAndOtherAttachments() =
         runTest {
@@ -185,6 +255,54 @@ class MessageDraftRepositoryTest {
                     ?.mediaAttachments
                     ?.single()
                     ?.editorDigest(),
+            )
+        }
+
+    @Test
+    fun textSavePreservesReplyAndAmbiguousCommitIsConfirmed() =
+        runTest {
+            val gateway =
+                FakeDraftGateway(draft(content = "old", replyTo = "reply")).apply {
+                    throwAfterNextSave = true
+                }
+
+            val result = repository(gateway).saveText(ACCOUNT, GROUP, "latest")
+
+            assertTrue(result is MessageDraftMutationResult.Success)
+            assertEquals("latest", gateway.current?.content)
+            assertEquals("reply", gateway.current?.replyToMessageIdHex)
+        }
+
+    @Test
+    fun blankTextDeletesOnlyAnOtherwiseEmptyDraft() =
+        runTest {
+            val empty = FakeDraftGateway(draft(content = "old"))
+            val withReply = FakeDraftGateway(draft(content = "old", replyTo = "reply"))
+
+            repository(empty).saveText(ACCOUNT, GROUP, " ")
+            repository(withReply).saveText(ACCOUNT, GROUP, " ")
+
+            assertNull(empty.current)
+            assertEquals("reply", withReply.current?.replyToMessageIdHex)
+        }
+
+    @Test
+    fun inboundMergeUsesAuthoritativeContentAndPreservesOtherFields() =
+        runTest {
+            val attachment = attachment("target", byteArrayOf(1))
+            val gateway = FakeDraftGateway(draft(content = "existing", replyTo = "reply", attachment))
+
+            val result = repository(gateway).mergeText(ACCOUNT, GROUP, " incoming ")
+
+            assertTrue(result is MessageDraftMutationResult.Success)
+            assertEquals("existing\nincoming", gateway.current?.content)
+            assertEquals("reply", gateway.current?.replyToMessageIdHex)
+            assertEquals(
+                "target",
+                gateway.current
+                    ?.mediaAttachments
+                    ?.single()
+                    ?.id,
             )
         }
 
@@ -420,6 +538,8 @@ private class FakeDraftGateway(
     var readFailure: Throwable? = null
     var throwBeforeNextSave = false
     var throwAfterNextSave = false
+    var throwAfterNextDelete = false
+    var onSave: (String) -> Unit = {}
 
     override fun read(
         accountRef: String,
@@ -451,6 +571,7 @@ private class FakeDraftGateway(
                 updatedAtMs = (current?.updatedAtMs ?: 0) + 1,
             )
         current = saved
+        onSave(content)
         if (throwAfterNextSave) {
             throwAfterNextSave = false
             error("save failed after commit")
@@ -463,7 +584,13 @@ private class FakeDraftGateway(
         groupIdHex: String,
     ) {
         current = null
+        if (throwAfterNextDelete) {
+            throwAfterNextDelete = false
+            error("delete failed after commit")
+        }
     }
+
+    override fun summaries(accountRef: String): List<MessageDraftSummaryFfi> = emptyList()
 }
 
 private class RepositorySessionStrings(

@@ -50,7 +50,7 @@ class DraftStoreTest {
 
     @Test
     fun getReturnsNullWhenNoDraft() {
-        assertNull(store().get(accountIdHex = "a", groupIdHex = "g"))
+        assertNull(store().get(accountRef = "a", groupIdHex = "g"))
     }
 
     @Test
@@ -58,10 +58,47 @@ class DraftStoreTest {
         val s = store()
 
         repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 25) { index ->
-            assertNull(s.get(accountIdHex = "a", groupIdHex = "missing-$index"))
+            assertNull(s.get(accountRef = "a", groupIdHex = "missing-$index"))
         }
 
         assertEquals(DraftStore.MAX_IN_MEMORY_DRAFT_STATES, s.draftStateCountForTest())
+    }
+
+    @Test
+    fun repeatedAuthoritativeHydrationDoesNotGrowInMemoryStateWithoutBound() {
+        val s = store()
+
+        repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 25) { index ->
+            s.hydrate("a", "g-$index", "draft", draftedAtMs = index.toLong())
+        }
+
+        assertEquals(DraftStore.MAX_IN_MEMORY_DRAFT_STATES, s.draftStateCountForTest())
+    }
+
+    @Test
+    fun clearingEvictedNonEmptyDraftRemovesItsCachedValue() {
+        val s = store()
+        s.set("a", "evicted", TextFieldValue("draft"))
+        repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES) { index ->
+            s.hydrate("a", "g-$index", "draft-$index", draftedAtMs = index.toLong())
+        }
+
+        s.set("a", "evicted", TextFieldValue(""))
+
+        assertNull(s.get("a", "evicted"))
+    }
+
+    @Test
+    fun hydrationNotifiesWhenAuthoritativeSortTimestampChanges() {
+        val s = store()
+        var sortNotifications = 0
+        s.onDraftSortOrderChanged = { sortNotifications += 1 }
+
+        s.hydrate("a", "g", "draft", draftedAtMs = 1_000)
+        s.hydrate("a", "g", "draft", draftedAtMs = 1_000, replaceExisting = true)
+        s.hydrate("a", "g", "draft", draftedAtMs = 2_000, replaceExisting = true)
+
+        assertEquals(2, sortNotifications)
     }
 
     @Test
@@ -118,7 +155,7 @@ class DraftStoreTest {
         val s = store()
 
         repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 25) { index ->
-            s.set(accountIdHex = "a", groupIdHex = "missing-$index", value = TextFieldValue(" "))
+            s.set(accountRef = "a", groupIdHex = "missing-$index", value = TextFieldValue(" "))
         }
 
         assertEquals(0, s.draftStateCountForTest())
@@ -130,7 +167,7 @@ class DraftStoreTest {
         s.set("a", "kept", TextFieldValue("draft"))
 
         repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 25) { index ->
-            s.get(accountIdHex = "a", groupIdHex = "missing-$index")
+            s.get(accountRef = "a", groupIdHex = "missing-$index")
         }
 
         assertEquals("draft", s.get("a", "kept"))
@@ -197,6 +234,25 @@ class DraftStoreTest {
         val restored = s.getDraft("a", "g")!!
         assertEquals(malformed, restored.textFieldValue.text)
         assertFalse(restored.focusOnRestore)
+    }
+
+    @Test
+    fun legacyMigrationDropsMalformedVersionedBlobButKeepsRawText() {
+        val malformed = "${COMPOSER_DRAFT_VERSION_PREFIX}bad"
+
+        assertNull(decodeLegacyDraftForMigration(malformed))
+        assertEquals("legacy draft", decodeLegacyDraftForMigration("legacy draft"))
+    }
+
+    @Test
+    fun authoritativeReconcileClearsStaleLifecycleText() {
+        val s = store()
+        s.set("a", "g", TextFieldValue("stale"))
+
+        s.replaceFromAuthoritative("a", "g", content = null, draftedAtMs = null)
+
+        assertNull(s.get("a", "g"))
+        assertNull(s.draftedAtSecondsFor("a", "g"))
     }
 
     @Test
@@ -419,7 +475,7 @@ class DraftStoreTest {
 
     private fun DraftStore.evictedDraftStateReferencesForTest(): List<WeakReference<*>> {
         val referencesField =
-            DraftStore::class.java.getDeclaredField("evictedEmptyDraftStates").apply { isAccessible = true }
+            DraftStore::class.java.getDeclaredField("evictedDraftStates").apply { isAccessible = true }
         val references = referencesField.get(this) as Map<*, *>
         return references.values.map { it as WeakReference<*> }
     }

@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
+import dev.ipf.marmotkit.MessageDraftSummaryFfi
 import dev.ipf.whitenoise.android.state.MediaQuality
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -229,6 +230,8 @@ private class CommitGateway(
     ) {
         current = null
     }
+
+    override fun summaries(accountRef: String): List<MessageDraftSummaryFfi> = emptyList()
 }
 
 private class CommitPayloads : EditorEncryptedPayloadStore {
