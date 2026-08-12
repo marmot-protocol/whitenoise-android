@@ -86,6 +86,18 @@ internal sealed interface MessageDraftMutationResult {
     ) : MessageDraftMutationResult
 }
 
+internal sealed interface MessageDraftConditionalDeleteResult {
+    data class Applied(
+        val result: MessageDraftMutationResult,
+    ) : MessageDraftConditionalDeleteResult
+
+    data object Superseded : MessageDraftConditionalDeleteResult
+}
+
+internal data class MessageDraftGeneration(
+    val value: Long,
+)
+
 /**
  * The only Android-side mutation boundary for hydrated MDK message drafts.
  *
@@ -100,6 +112,14 @@ internal class MessageDraftRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val draftLocks = MessageDraftLocks()
+    private val mutationGenerations = MessageDraftMutationGenerations()
+    internal val coordinated =
+        MessageDraftCoordinatedOperations(
+            gateway = gateway,
+            draftLocks = draftLocks,
+            mutationGenerations = mutationGenerations,
+            ioDispatcher = ioDispatcher,
+        )
 
     @Suppress("TooGenericExceptionCaught") // FFI gateway failures are returned; cancellation is rethrown first.
     suspend fun draft(
@@ -284,19 +304,7 @@ internal class MessageDraftRepository(
         groupIdHex: String,
     ): MessageDraftMutationResult =
         mutate(accountRef, groupIdHex) {
-            try {
-                gateway.delete(accountRef, groupIdHex)
-                MessageDraftMutationResult.Success(draft = null)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (cause: Exception) {
-                val authoritative = authoritativeDraft(gateway, accountRef, groupIdHex)
-                if (authoritative.isSuccess && authoritative.getOrNull() == null) {
-                    MessageDraftMutationResult.Success(draft = null)
-                } else {
-                    MessageDraftMutationResult.Failure(cause)
-                }
-            }
+            deleteDraft(gateway, accountRef, groupIdHex)
         }
 
     /**
@@ -344,25 +352,156 @@ internal class MessageDraftRepository(
             }
         }
 
-    @Suppress("TooGenericExceptionCaught") // Repository boundary converts non-cancellation gateway failures to results.
     private suspend fun mutate(
         accountRef: String,
         groupIdHex: String,
         block: suspend () -> MessageDraftMutationResult,
+    ): MessageDraftMutationResult {
+        val key = DraftKey(accountRef, groupIdHex)
+        return withContext(ioDispatcher) {
+            draftLocks.withLock(key) {
+                val result = runDraftMutation(block)
+                if (result is MessageDraftMutationResult.Success) mutationGenerations.advance(key)
+                result
+            }
+        }
+    }
+}
+
+internal class MessageDraftCoordinatedOperations(
+    private val gateway: MessageDraftGateway,
+    private val draftLocks: MessageDraftLocks,
+    private val mutationGenerations: MessageDraftMutationGenerations,
+    private val ioDispatcher: CoroutineDispatcher,
+) {
+    fun acceptMutation(
+        accountRef: String,
+        groupIdHex: String,
+    ): MessageDraftGeneration = mutationGenerations.advance(DraftKey(accountRef, groupIdHex))
+
+    fun generation(
+        accountRef: String,
+        groupIdHex: String,
+    ): MessageDraftGeneration = mutationGenerations.current(DraftKey(accountRef, groupIdHex))
+
+    fun isCurrent(
+        accountRef: String,
+        groupIdHex: String,
+        generation: MessageDraftGeneration,
+    ): Boolean = mutationGenerations.isCurrent(DraftKey(accountRef, groupIdHex), generation)
+
+    suspend fun saveAcceptedText(
+        accountRef: String,
+        groupIdHex: String,
+        content: String,
     ): MessageDraftMutationResult =
         withContext(ioDispatcher) {
-            val key = DraftKey(accountRef, groupIdHex)
-            draftLocks.withLock(key) {
-                try {
-                    block()
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (cause: Exception) {
-                    MessageDraftMutationResult.Failure(cause)
+            draftLocks.withLock(DraftKey(accountRef, groupIdHex)) {
+                runDraftMutation { saveDraftText(gateway, accountRef, groupIdHex, content) }
+            }
+        }
+
+    suspend fun mergeAcceptedText(
+        accountRef: String,
+        groupIdHex: String,
+        incoming: String,
+    ): MessageDraftMutationResult =
+        withContext(ioDispatcher) {
+            draftLocks.withLock(DraftKey(accountRef, groupIdHex)) {
+                runDraftMutation {
+                    val current = gateway.read(accountRef, groupIdHex)
+                    val merged = mergeDraftText(current?.content.orEmpty(), incoming)
+                    saveDraftText(gateway, accountRef, groupIdHex, merged, current)
                 }
             }
         }
+
+    @Suppress("TooGenericExceptionCaught") // FFI gateway failures are returned; cancellation is rethrown first.
+    suspend fun draftIf(
+        accountRef: String,
+        groupIdHex: String,
+        generation: MessageDraftGeneration,
+    ): Result<MessageDraftFfi?>? =
+        withContext(ioDispatcher) {
+            draftLocks.withLock(DraftKey(accountRef, groupIdHex)) {
+                try {
+                    val draft = gateway.read(accountRef, groupIdHex)
+                    Result.success(draft).takeIf {
+                        mutationGenerations.isCurrent(DraftKey(accountRef, groupIdHex), generation)
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (cause: Exception) {
+                    Result.failure<MessageDraftFfi?>(cause).takeIf {
+                        mutationGenerations.isCurrent(DraftKey(accountRef, groupIdHex), generation)
+                    }
+                }
+            }
+        }
+
+    suspend fun deleteIf(
+        accountRef: String,
+        groupIdHex: String,
+        generation: MessageDraftGeneration,
+    ): MessageDraftConditionalDeleteResult =
+        withContext(ioDispatcher) {
+            draftLocks.withLock(DraftKey(accountRef, groupIdHex)) {
+                if (!mutationGenerations.isCurrent(DraftKey(accountRef, groupIdHex), generation)) {
+                    return@withLock MessageDraftConditionalDeleteResult.Superseded
+                }
+                MessageDraftConditionalDeleteResult.Applied(deleteDraft(gateway, accountRef, groupIdHex))
+            }
+        }
 }
+
+internal class MessageDraftMutationGenerations {
+    private val lock = Any()
+    private val values = mutableMapOf<DraftKey, Long>()
+
+    fun advance(key: DraftKey): MessageDraftGeneration =
+        synchronized(lock) {
+            val next = (values[key] ?: 0L) + 1L
+            values[key] = next
+            MessageDraftGeneration(next)
+        }
+
+    fun current(key: DraftKey) = synchronized(lock) { MessageDraftGeneration(values[key] ?: 0L) }
+
+    fun isCurrent(
+        key: DraftKey,
+        generation: MessageDraftGeneration,
+    ): Boolean = synchronized(lock) { (values[key] ?: 0L) == generation.value }
+}
+
+@Suppress("TooGenericExceptionCaught") // Repository boundary converts non-cancellation gateway failures to results.
+private suspend fun runDraftMutation(block: suspend () -> MessageDraftMutationResult): MessageDraftMutationResult =
+    try {
+        block()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (cause: Exception) {
+        MessageDraftMutationResult.Failure(cause)
+    }
+
+@Suppress("TooGenericExceptionCaught")
+private fun deleteDraft(
+    gateway: MessageDraftGateway,
+    accountRef: String,
+    groupIdHex: String,
+): MessageDraftMutationResult =
+    try {
+        gateway.delete(accountRef, groupIdHex)
+        MessageDraftMutationResult.Success(draft = null)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (cause: Exception) {
+        val authoritative = authoritativeDraft(gateway, accountRef, groupIdHex)
+        if (authoritative.isSuccess && authoritative.getOrNull() == null) {
+            MessageDraftMutationResult.Success(draft = null)
+        } else {
+            MessageDraftMutationResult.Failure(cause)
+        }
+    }
 
 @Suppress("TooGenericExceptionCaught")
 private fun saveDraftText(
@@ -519,12 +658,12 @@ private fun finishAttachmentCommit(
     )
 }
 
-private data class DraftKey(
+internal data class DraftKey(
     val accountRef: String,
     val groupIdHex: String,
 )
 
-private class MessageDraftLocks {
+internal class MessageDraftLocks {
     private val tableGuard = Any()
     private val table = mutableMapOf<DraftKey, DraftLock>()
 
