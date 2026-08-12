@@ -5,7 +5,6 @@ import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,7 +24,7 @@ class NotificationAvatarPreWarmTriggerTest {
     }
 
     @Test
-    fun groupPreWarmRejectsUnsafePayloadUrlsAndRequestsTheGroupAvatar() {
+    fun groupPreWarmDelegatesPayloadUrlClassificationToMdkAndRequestsTheGroupAvatar() {
         val target =
             notificationAvatarPreWarmTarget(
                 update = update(isDm = false, pictureUrl = "http://127.0.0.1/alice.png"),
@@ -33,7 +32,7 @@ class NotificationAvatarPreWarmTriggerTest {
             )
 
         assertEquals("alice", target.senderAccountIdHex)
-        assertNull(target.senderAvatarUrl)
+        assertEquals("http://127.0.0.1/alice.png", target.senderAvatarUrl)
         assertEquals(true, target.resolveGroupAvatar)
         assertEquals(false, target.preWarmRemoteImages)
     }
