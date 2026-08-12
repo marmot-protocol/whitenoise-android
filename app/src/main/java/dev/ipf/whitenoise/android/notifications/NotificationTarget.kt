@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.nextRetryBackoffMillis
 import kotlinx.coroutines.delay
+import kotlin.coroutines.cancellation.CancellationException
 
 /** What a tapped notification should open. */
 enum class NotificationTargetKind { MESSAGE, INVITE }
@@ -44,7 +45,10 @@ sealed interface NotificationNavStep {
         val accountRef: String,
     ) : NotificationNavStep
 
-    /** Right account is active but its chat list hasn't loaded yet — wait. */
+    /** Right account is active; read the notified message conversation directly from SQLite. */
+    data object LoadMessageDirectly : NotificationNavStep
+
+    /** Right account is active but its chat list hasn't loaded yet — wait for an invite row. */
     data object AwaitChatList : NotificationNavStep
 
     /**
@@ -74,7 +78,8 @@ sealed interface NotificationNavStep {
  *  - unknown account → [NotificationNavStep.MissingAccount] (untrusted input)
  *  - background account → [NotificationNavStep.SwitchAccount] (no switch when
  *    already active)
- *  - active account, chat list not ready → [NotificationNavStep.AwaitChatList]
+ *  - active account, chat list not ready + message → [NotificationNavStep.LoadMessageDirectly]
+ *  - active account, chat list not ready + invite → [NotificationNavStep.AwaitChatList]
  *  - ready + group present → [NotificationNavStep.OpenConversation], carrying the
  *    notified message id (already non-blank and MESSAGE-only by construction) so
  *    the persisted read cursor can advance before composition
@@ -104,7 +109,13 @@ fun resolveNotificationNav(
 ): NotificationNavStep {
     if (target.accountRef !in knownAccountRefs) return NotificationNavStep.MissingAccount
     if (target.accountRef != activeAccountRef) return NotificationNavStep.SwitchAccount(target.accountRef)
-    if (!chatListReady) return NotificationNavStep.AwaitChatList
+    if (!chatListReady) {
+        return if (target.kind == NotificationTargetKind.MESSAGE) {
+            NotificationNavStep.LoadMessageDirectly
+        } else {
+            NotificationNavStep.AwaitChatList
+        }
+    }
     if (target.kind == NotificationTargetKind.MESSAGE) {
         if (target.groupIdHex in availableGroupIds) {
             return NotificationNavStep.OpenConversation(target.groupIdHex, target.messageIdHex)
@@ -136,6 +147,26 @@ internal sealed interface NotificationInviteAuthoritativeOutcome {
     /** Transient failure or not yet materialized — keep waiting on the live row. */
     data object Inconclusive : NotificationInviteAuthoritativeOutcome
 }
+
+internal sealed interface NotificationMessageDirectLoadOutcome<out T> {
+    data class OpenConversation<T>(
+        val item: T,
+    ) : NotificationMessageDirectLoadOutcome<T>
+
+    /** Keep the tap pending and let the broad chat-list route settle. */
+    data object AwaitChatList : NotificationMessageDirectLoadOutcome<Nothing>
+}
+
+/** Performs the one-group local read without swallowing structured cancellation (#586). */
+@Suppress("MaxLineLength")
+internal suspend fun <T> loadNotificationMessageDirectly(load: suspend () -> T): NotificationMessageDirectLoadOutcome<T> =
+    try {
+        NotificationMessageDirectLoadOutcome.OpenConversation(load())
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (_: Throwable) {
+        NotificationMessageDirectLoadOutcome.AwaitChatList
+    }
 
 /**
  * Classifies whether an authoritative invite target is still openable.
