@@ -5,11 +5,19 @@ workflow=.github/workflows/android-pr-preview-publish.yml
 build=.github/workflows/android-pr-apk.yml
 gradle=app/build.gradle.kts
 
+reject() {
+  local pattern=$1 file=$2
+  if grep -Fq -- "$pattern" "$file"; then
+    printf 'Forbidden preview-workflow pattern found in %s: %s\n' "$file" "$pattern" >&2
+    exit 1
+  fi
+}
+
 # Guard the security and update-in-place contracts against accidental edits.
 grep -Fq 'workflow_run:' "$workflow"
 grep -Fq "head_repository.full_name == github.repository" "$workflow"
 grep -Fq 'PR_PREVIEW_KEYSTORE_BASE64: ${{ secrets.PR_PREVIEW_KEYSTORE_BASE64 }}' "$workflow"
-! grep -Fq 'PR_PREVIEW_KEYSTORE' "$build"
+reject 'PR_PREVIEW_KEYSTORE' "$build"
 grep -Fq 'create("preview")' "$gradle"
 grep -Fq 'applicationIdSuffix = ".preview"' "$gradle"
 grep -Fq 'applicationIdSuffix = ".preview.pr$previewIdentity"' "$gradle"
@@ -32,12 +40,18 @@ grep -Fq 'Resolve exact current internal PR head' "$build"
 grep -Fq 'Resolve exact candidate provenance and current PR' "$workflow"
 grep -Fq 'stable_pr=$(provenance_value "$stable" pr_number)' "$workflow"
 grep -Fq '[[ "$stable_pr" == "$isolated_pr"' "$workflow"
-! grep -Fq 'branches: [master]' "$build"
+reject 'branches: [master]' "$build"
 grep -Fq 'stable app identity; keeps app data when switching PRs' "$workflow"
 grep -Fq 'github.event.repository.default_branch' "$workflow"
-! grep -Fq 'github.event.workflow_run.repository.default_branch' "$workflow"
-grep -Fq 'HEAD_SHA: ${{ github.event.workflow_run.head_sha }}' "$workflow"
-grep -Fq 'workflow_dispatch:' "$build"
+reject 'github.event.workflow_run.repository.default_branch' "$workflow"
+# workflow_run.head_sha may gate pull_request runs, but must not override the
+# candidate-provenance HEAD_SHA in the comment step used by manual backfills.
+grep -Fq 'WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}' "$workflow"
+if grep -Eq '^[[:space:]]+HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}$' "$workflow"; then
+  printf 'Comment step must use the validated candidate HEAD_SHA.\n' >&2
+  exit 1
+fi
+grep -Fq 'process.env.HEAD_SHA.slice(0, 12)' "$workflow"
 grep -Fq 'ref: ${{ steps.resolve.outputs.head_sha }}' "$build"
 grep -Fq 'restore a missing comment' "$build"
 grep -Fq -- '--min-sdk-version 34' .github/scripts/sign-pr-preview-candidates.sh
@@ -45,4 +59,4 @@ grep -Fq 'cancel-in-progress: true' "$workflow"
 grep -Fq 'Verify signed previews' "$workflow"
 grep -Fq '.github/scripts/stage-signed-pr-preview-candidates.sh signed candidates signed-check' "$workflow"
 grep -Fq 'PR_PREVIEW_CERT_SHA256: ${{ secrets.PR_PREVIEW_CERT_SHA256 }}' "$workflow"
-! grep -Fq 'pull_request_target:' "$build"
+reject 'pull_request_target:' "$build"

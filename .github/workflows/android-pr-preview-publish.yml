@@ -206,7 +206,6 @@ jobs:
         env:
           STABLE_URL: ${{ steps.publish.outputs.stable_url }}
           ISOLATED_URL: ${{ steps.publish.outputs.isolated_url }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         with:
           script: |
             const marker = '<!-- pr-apk-preview -->';
