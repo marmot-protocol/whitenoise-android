@@ -20,7 +20,7 @@ internal fun TtsResumeFollowButton(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = 48.dp),
+        modifier = modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
