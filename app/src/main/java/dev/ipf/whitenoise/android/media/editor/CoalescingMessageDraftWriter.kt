@@ -8,8 +8,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-internal data class MessageDraftGeneration(
-    val value: Long,
+internal data class MessageDraftMergeCompletion(
+    val result: MessageDraftMutationResult,
+    val contentForHydration: String?,
+    val draftedAtMs: Long?,
 )
 
 /** Coalesces composer keystrokes while the repository serializes them with attachment edits. */
@@ -21,7 +23,6 @@ internal class CoalescingMessageDraftWriter(
 ) {
     private val lock = Any()
     private val pending = mutableMapOf<Key, Pending>()
-    private val acceptedGenerations = mutableMapOf<Key, Long>()
     private val activeMerges = mutableMapOf<Key, ActiveMerge>()
     private val mergeLocks = mutableMapOf<Key, Mutex>()
 
@@ -32,31 +33,25 @@ internal class CoalescingMessageDraftWriter(
     ): MessageDraftGeneration {
         val key = Key(accountRef, groupIdHex)
         return synchronized(lock) {
-            val state = pending.getOrPut(key) { Pending(generation = acceptedGenerations[key] ?: 0) }
+            val generation = drafts.coordinated.acceptMutation(accountRef, groupIdHex)
+            val state = pending.getOrPut(key) { Pending() }
             state.content = activeMerges[key]?.let { merge -> mergeDraftText(content, merge.incoming) } ?: content
-            state.generation++
-            acceptedGenerations[key] = state.generation
+            state.generation = generation.value
             if (state.job == null) state.job = scope.launch { drain(key, state) }
-            MessageDraftGeneration(state.generation)
+            generation
         }
     }
 
     fun generation(
         accountRef: String,
         groupIdHex: String,
-    ): MessageDraftGeneration =
-        synchronized(lock) {
-            MessageDraftGeneration(acceptedGenerations[Key(accountRef, groupIdHex)] ?: 0)
-        }
+    ): MessageDraftGeneration = drafts.coordinated.generation(accountRef, groupIdHex)
 
     fun isCurrent(
         accountRef: String,
         groupIdHex: String,
         generation: MessageDraftGeneration,
-    ): Boolean =
-        synchronized(lock) {
-            (acceptedGenerations[Key(accountRef, groupIdHex)] ?: 0) == generation.value
-        }
+    ): Boolean = drafts.coordinated.isCurrent(accountRef, groupIdHex, generation)
 
     suspend fun flush() {
         while (true) {
@@ -73,9 +68,7 @@ internal class CoalescingMessageDraftWriter(
     ): Result<MessageDraftFfi?>? {
         val key = Key(accountRef, groupIdHex)
         flush(key)
-        return drafts.conditional.draftIf(accountRef, groupIdHex) {
-            isCurrent(accountRef, groupIdHex, generation)
-        }
+        return drafts.coordinated.draftIf(accountRef, groupIdHex, generation)
     }
 
     suspend fun deleteIfCurrent(
@@ -85,25 +78,30 @@ internal class CoalescingMessageDraftWriter(
     ): MessageDraftConditionalDeleteResult {
         val key = Key(accountRef, groupIdHex)
         flush(key)
-        return drafts.conditional.deleteIf(accountRef, groupIdHex) {
-            isCurrent(accountRef, groupIdHex, generation)
-        }
+        return drafts.coordinated.deleteIf(accountRef, groupIdHex, generation)
     }
 
     suspend fun mergeText(
         accountRef: String,
         groupIdHex: String,
         incoming: String,
-    ): MessageDraftMutationResult {
+    ): MessageDraftMergeCompletion {
         val trimmedIncoming = incoming.trim()
-        if (trimmedIncoming.isEmpty()) return drafts.mergeText(accountRef, groupIdHex, incoming)
+        if (trimmedIncoming.isEmpty()) {
+            return MessageDraftMergeCompletion(
+                result = MessageDraftMutationResult.Success(draft = null),
+                contentForHydration = null,
+                draftedAtMs = null,
+            )
+        }
         val key = Key(accountRef, groupIdHex)
+        drafts.coordinated.acceptMutation(accountRef, groupIdHex)
         val mergeLock = synchronized(lock) { mergeLocks.getOrPut(key) { Mutex() } }
         return mergeLock.withLock {
             val activeMerge = ActiveMerge(trimmedIncoming)
             beginMerge(key, activeMerge)
             try {
-                val mergeResult = drafts.mergeText(accountRef, groupIdHex, trimmedIncoming)
+                val mergeResult = drafts.coordinated.mergeAcceptedText(accountRef, groupIdHex, trimmedIncoming)
                 finishMerge(key, activeMerge, mergeResult)
             } finally {
                 synchronized(lock) { activeMerges.remove(key, activeMerge) }
@@ -131,7 +129,7 @@ internal class CoalescingMessageDraftWriter(
         key: Key,
         activeMerge: ActiveMerge,
         mergeResult: MessageDraftMutationResult,
-    ): MessageDraftMutationResult {
+    ): MessageDraftMergeCompletion {
         while (true) {
             flush(key)
             val completed =
@@ -142,7 +140,9 @@ internal class CoalescingMessageDraftWriter(
                         false
                     }
                 }
-            if (completed) return activeMerge.latestResult ?: mergeResult
+            if (completed) {
+                return mergeCompletion(activeMerge.latestResult, activeMerge.latestContent, mergeResult)
+            }
         }
     }
 
@@ -160,11 +160,16 @@ internal class CoalescingMessageDraftWriter(
         delay(debounceMillis)
         while (true) {
             val (content, generation) = synchronized(lock) { state.content to state.generation }
-            val result = drafts.saveText(key.accountRef, key.groupIdHex, content)
+            val result = drafts.coordinated.saveAcceptedText(key.accountRef, key.groupIdHex, content)
             val isLatest =
                 synchronized(lock) {
                     activeMerges[key]?.latestResult = result
-                    acceptedGenerations[key] == generation
+                    activeMerges[key]?.latestContent = content
+                    drafts.coordinated.isCurrent(
+                        key.accountRef,
+                        key.groupIdHex,
+                        MessageDraftGeneration(generation),
+                    )
                 }
             if (isLatest) runCatching { onResult(key.accountRef, key.groupIdHex, content, result) }
             val caughtUp =
@@ -188,13 +193,14 @@ internal class CoalescingMessageDraftWriter(
 
     private class Pending(
         var content: String = "",
-        var generation: Long = 0,
+        var generation: Long = 0L,
         var job: Job? = null,
     )
 
     private class ActiveMerge(
         val incoming: String,
         var latestResult: MessageDraftMutationResult? = null,
+        var latestContent: String? = null,
     )
 
     private companion object {
@@ -202,7 +208,22 @@ internal class CoalescingMessageDraftWriter(
     }
 }
 
-private fun mergeDraftText(
+private fun mergeCompletion(
+    latestResult: MessageDraftMutationResult?,
+    latestContent: String?,
+    mergeResult: MessageDraftMutationResult,
+): MessageDraftMergeCompletion {
+    val result = latestResult ?: mergeResult
+    val savedDraft = (result as? MessageDraftMutationResult.Success)?.draft
+    val mergedDraft = (mergeResult as? MessageDraftMutationResult.Success)?.draft
+    return MessageDraftMergeCompletion(
+        result = result,
+        contentForHydration = savedDraft?.content ?: latestContent ?: mergedDraft?.content,
+        draftedAtMs = savedDraft?.createdAtMs ?: mergedDraft?.createdAtMs,
+    )
+}
+
+internal fun mergeDraftText(
     existing: String,
     incoming: String,
 ): String =

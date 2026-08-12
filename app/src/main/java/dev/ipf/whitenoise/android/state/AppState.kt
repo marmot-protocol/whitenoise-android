@@ -2190,19 +2190,18 @@ class WhiteNoiseAppState private constructor(
         ShareInboundStager(
             stageText = { accountRef, groupIdHex, text ->
                 mutationsScope.launch {
-                    when (val result = draftWriter.mergeText(accountRef, groupIdHex, text)) {
-                        is MessageDraftMutationResult.Success -> {
-                            result.draft?.let { draft ->
-                                draftStore.hydrate(
-                                    accountRef,
-                                    groupIdHex,
-                                    draft.content,
-                                    draft.createdAtMs,
-                                    replaceExisting = true,
-                                )
-                            }
-                            draftHydrationRevision += 1
-                        }
+                    val completion = draftWriter.mergeText(accountRef, groupIdHex, text)
+                    completion.contentForHydration?.let { content ->
+                        draftStore.hydrate(
+                            accountRef,
+                            groupIdHex,
+                            content,
+                            completion.draftedAtMs ?: System.currentTimeMillis(),
+                            replaceExisting = true,
+                        )
+                        draftHydrationRevision += 1
+                    }
+                    when (val result = completion.result) {
                         is MessageDraftMutationResult.Failure ->
                             appStateDebug(result.cause) { "shared text staging failed group=${groupIdHex.take(8)}" }
                         else -> Unit

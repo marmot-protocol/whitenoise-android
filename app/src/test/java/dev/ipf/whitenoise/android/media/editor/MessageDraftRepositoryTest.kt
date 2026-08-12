@@ -111,6 +111,46 @@ class MessageDraftRepositoryTest {
         }
 
     @Test
+    fun successfulSendCleanupDoesNotDeleteInboundShareAcceptedAfterSend() =
+        runTest {
+            val gateway = FakeDraftGateway(null)
+            val drafts = repository(gateway)
+            val writer = writer(drafts)
+            writer.submit(ACCOUNT, GROUP, "sent")
+            writer.flush()
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+
+            writer.mergeText(ACCOUNT, GROUP, "shared next")
+            val result = writer.deleteIfCurrent(ACCOUNT, GROUP, sentGeneration)
+
+            assertEquals(MessageDraftConditionalDeleteResult.Superseded, result)
+            assertEquals("sent\nshared next", gateway.current?.content)
+        }
+
+    @Test
+    fun successfulSendCleanupDoesNotDeleteAttachmentAcceptedAfterSend() =
+        runTest {
+            val gateway = FakeDraftGateway(null)
+            val drafts = repository(gateway)
+            val writer = writer(drafts)
+            writer.submit(ACCOUNT, GROUP, "sent")
+            writer.flush()
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+
+            drafts.addAttachment(ACCOUNT, GROUP, attachment("next", byteArrayOf(1)))
+            val result = writer.deleteIfCurrent(ACCOUNT, GROUP, sentGeneration)
+
+            assertEquals(MessageDraftConditionalDeleteResult.Superseded, result)
+            assertEquals(
+                "next",
+                gateway.current
+                    ?.mediaAttachments
+                    ?.single()
+                    ?.id,
+            )
+        }
+
+    @Test
     fun asynchronousHydrationIsDiscardedWhenTextIsAcceptedDuringRead() =
         runTest {
             val gateway = FakeDraftGateway(draft(content = "authoritative"))
@@ -134,9 +174,41 @@ class MessageDraftRepositoryTest {
 
             val result = writer.mergeText(ACCOUNT, GROUP, "shared")
 
-            assertTrue(result is MessageDraftMutationResult.Success)
+            assertTrue(result.result is MessageDraftMutationResult.Success)
             assertEquals("typed while sharing\nshared", gateway.current?.content)
-            assertEquals("typed while sharing\nshared", (result as MessageDraftMutationResult.Success).draft?.content)
+            assertEquals("typed while sharing\nshared", result.contentForHydration)
+        }
+
+    @Test
+    fun failedCatchUpSaveReturnsComposedTextForHydration() =
+        runTest {
+            val gateway = FakeDraftGateway(draft(content = "existing"))
+            val writer = writer(gateway)
+            gateway.onSave = { content ->
+                if (content == "existing\nshared") {
+                    gateway.onSave = {}
+                    gateway.throwBeforeNextSave = true
+                    writer.submit(ACCOUNT, GROUP, "typed while sharing")
+                }
+            }
+
+            val result = writer.mergeText(ACCOUNT, GROUP, "shared")
+
+            assertTrue(result.result is MessageDraftMutationResult.Failure)
+            assertEquals("existing\nshared", gateway.current?.content)
+            assertEquals("typed while sharing\nshared", result.contentForHydration)
+        }
+
+    @Test
+    fun inboundShareReadFailureIsReturned() =
+        runTest {
+            val gateway = FakeDraftGateway(null).apply { readFailure = IllegalStateException("read failed") }
+            val writer = writer(gateway)
+
+            val result = writer.mergeText(ACCOUNT, GROUP, "shared")
+
+            assertTrue(result.result is MessageDraftMutationResult.Failure)
+            assertNull(result.contentForHydration)
         }
 
     @Test
@@ -552,10 +624,12 @@ class MessageDraftRepositoryTest {
         ioDispatcher = UnconfinedTestDispatcher(),
     )
 
-    private fun CoroutineScope.writer(gateway: FakeDraftGateway) =
+    private fun CoroutineScope.writer(gateway: FakeDraftGateway) = writer(repository(gateway))
+
+    private fun CoroutineScope.writer(drafts: MessageDraftRepository) =
         CoalescingMessageDraftWriter(
             scope = this,
-            drafts = repository(gateway),
+            drafts = drafts,
             debounceMillis = 0,
         )
 
