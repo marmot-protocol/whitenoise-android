@@ -4,12 +4,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.geometry.Rect
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
@@ -86,6 +88,7 @@ internal fun TimelineRowMessageBubble(
     showSenderAvatar: Boolean,
     collapseLongMessages: Boolean,
     readOnly: Boolean,
+    parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
 ) {
     val ttsHighlightState by rememberRowScopedTtsHighlightState(messageIdHex, appState)
     MessageBubble(
@@ -131,6 +134,7 @@ internal fun TimelineRowMessageBubble(
         readOnly = readOnly,
         ttsHighlightPassage = ttsHighlightState.passage,
         ttsReadAloudProgress = ttsHighlightState.progress,
+        parseMarkdown = parseMarkdown,
     )
 }
 

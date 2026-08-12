@@ -31,6 +31,8 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
+import dev.ipf.whitenoise.android.core.EditState
+import dev.ipf.whitenoise.android.core.EditVersion
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -75,15 +77,17 @@ class TimelineRowTtsReuseBehaviorTest {
     @Test
     @Suppress("LongMethod")
     fun keyedRowReuseClearsHighlightAndReadAloudProgress() {
-        val activeRecord = speakableRecord(MESSAGE_A, "Hello bright world.")
+        val activeEdit = "Hello *bright* world."
+        val activeRecord = speakableRecord(MESSAGE_A, "Original body.")
         val otherRecord = speakableRecord(MESSAGE_B, "Other message body.")
+        controller.editsByTarget = mapOf(MESSAGE_A to editState(activeEdit))
         val entry =
             runBlocking {
                 projectTtsSpeakableEntry(
                     message = activeRecord,
-                    editedText = null,
+                    editedText = activeEdit,
                     senderDisplayName = "Alice",
-                    parseMarkdown = { error("stored tokens should win") },
+                    parseMarkdown = { editedDocument() },
                 )!!
             }
         check(appState.ttsController.speak(listOf(entry), Locale.US))
@@ -132,6 +136,7 @@ class TimelineRowTtsReuseBehaviorTest {
                             showSenderAvatar = false,
                             collapseLongMessages = false,
                             readOnly = false,
+                            parseMarkdown = { editedDocument() },
                         )
                     }
                 }
@@ -207,6 +212,37 @@ class TimelineRowTtsReuseBehaviorTest {
                 listOf(
                     MarkdownBlockFfi.Paragraph(
                         inlines = listOf(MarkdownInlineFfi.Text(text)),
+                    ),
+                ),
+        )
+
+    private fun editState(text: String) =
+        EditState(
+            latestText = text,
+            count = 1,
+            versions =
+                listOf(
+                    EditVersion(
+                        messageIdHex = MESSAGE_A,
+                        text = text,
+                        recordedAt = 2uL,
+                    ),
+                ),
+        )
+
+    private fun editedDocument() =
+        MarkdownDocumentFfi(
+            truncated = false,
+            blankLinesBefore = byteArrayOf(),
+            blocks =
+                listOf(
+                    MarkdownBlockFfi.Paragraph(
+                        inlines =
+                            listOf(
+                                MarkdownInlineFfi.Text("Hello "),
+                                MarkdownInlineFfi.Emph(listOf(MarkdownInlineFfi.Text("bright"))),
+                                MarkdownInlineFfi.Text(" world."),
+                            ),
                     ),
                 ),
         )

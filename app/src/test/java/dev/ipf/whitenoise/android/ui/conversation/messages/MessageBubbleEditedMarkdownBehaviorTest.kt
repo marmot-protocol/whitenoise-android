@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import android.speech.tts.TextToSpeech
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -24,8 +25,8 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.audio.tts.TtsPassage
-import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
+import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.EditVersion
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -34,12 +35,14 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.TimelineRowMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -48,6 +51,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -64,28 +68,9 @@ class MessageBubbleEditedMarkdownBehaviorTest {
         val editedDocument = editedDocument("value")
         val editedText = "Edited *value*"
         val record = editedRecord()
-        val projection =
-            messageSpeakableProjection(
-                bodyText = editedText,
-                document = editedDocument,
-                mentionDisplayName = null,
-                isGroupMember = null,
-            )!!
-        val activePassage =
-            TtsPassage(
-                messageIdHex = MESSAGE_ID,
-                sentenceIndex = 0,
-                projectionId = projection.projectionId,
-                visibleWord = listOf(TtsVisibleTextSpan("b0/n1/n0", 0, 5)),
-            )
-        val readAloudProgress =
-            TtsReadAloudProgress(
-                sentenceIndex = 1,
-                sentenceCount = 3,
-                messageIndex = 0,
-                messageCount = 2,
-            )
         val appState = appState()
+        val engine = FakeMessageBubbleTtsSpeechEngine()
+        appState.ttsController.attachEngine(engine)
         val controller = ConversationController(appState = appState, initialGroup = group())
         controller.editsByTarget = mapOf(MESSAGE_ID to editState(editedText))
         val item =
@@ -96,12 +81,11 @@ class MessageBubbleEditedMarkdownBehaviorTest {
             )
         val composerTextState = ComposerTextState(TextFieldValue(""))
         var textSelectionMode by mutableStateOf(false)
-        var ttsPassage by mutableStateOf<TtsPassage?>(null)
-        var ttsProgress by mutableStateOf<TtsReadAloudProgress?>(null)
 
         composeRule.setContent {
             WhiteNoiseTheme {
-                MessageBubble(
+                TimelineRowMessageBubble(
+                    messageIdHex = MESSAGE_ID,
                     item = item,
                     controller = controller,
                     appState = appState,
@@ -128,14 +112,13 @@ class MessageBubbleEditedMarkdownBehaviorTest {
                     onQuickReactionsReset = {},
                     onReplyPreviewClick = {},
                     composerGate = ComposerGate.COMPOSER,
-                    inviteMutationInFlight = false,
-                    onJoinInvite = {},
-                    onDeclineInvite = {},
+                    onBack = {},
                     mentionCandidates = emptyList(),
                     mentionPickerEnabled = false,
+                    showSenderName = false,
+                    showSenderAvatar = false,
                     collapseLongMessages = false,
-                    ttsHighlightPassage = ttsPassage,
-                    ttsReadAloudProgress = ttsProgress,
+                    readOnly = false,
                     parseMarkdown = { editedDocument },
                 )
             }
@@ -145,8 +128,17 @@ class MessageBubbleEditedMarkdownBehaviorTest {
         composeRule.onNodeWithText("Edited value").assertExists()
         assertNull(highlightRange("value"))
 
-        ttsPassage = activePassage
-        ttsProgress = readAloudProgress
+        val entry =
+            runBlocking {
+                projectTtsSpeakableEntry(
+                    message = record,
+                    editedText = editedText,
+                    senderDisplayName = "Alice",
+                    parseMarkdown = { editedDocument },
+                )!!
+            }
+        check(appState.ttsController.speak(listOf(entry), Locale.US))
+        engine.range(index = 0, start = 14, end = 19)
         composeRule.waitForIdle()
         assertEquals(7 until 12, highlightRange("value"))
         composeRule
@@ -154,7 +146,7 @@ class MessageBubbleEditedMarkdownBehaviorTest {
             .assert(
                 SemanticsMatcher.expectValue(
                     SemanticsProperties.ContentDescription,
-                    listOf(app.getString(R.string.tts_bar_progress, 2, 3, 1, 2)),
+                    listOf(app.getString(R.string.tts_bar_progress, 1, 1, 1, 1)),
                 ),
             )
 
@@ -165,8 +157,7 @@ class MessageBubbleEditedMarkdownBehaviorTest {
         composeRule.onNodeWithText("Edited value").assertExists()
 
         textSelectionMode = false
-        ttsPassage = null
-        ttsProgress = null
+        appState.ttsController.stop()
         composeRule.waitForIdle()
         assertNull(highlightRange("value"))
         composeRule.onNodeWithTag("tts-read-aloud-progress").assertDoesNotExist()
@@ -176,8 +167,11 @@ class MessageBubbleEditedMarkdownBehaviorTest {
     @Test
     @Suppress("LongMethod")
     fun supersededEditParseCompletingLateDoesNotRevertDisplay() {
-        val parseAGate = CompletableDeferred<Unit>()
+        val parseBStarted = CompletableDeferred<Unit>()
+        val parseBGate = CompletableDeferred<Unit>()
         val appState = appState()
+        val engine = FakeMessageBubbleTtsSpeechEngine()
+        appState.ttsController.attachEngine(engine)
         val controller = ConversationController(appState = appState, initialGroup = group())
         controller.editsByTarget = mapOf(MESSAGE_ID to editState(EDIT_A))
         val record = editedRecord()
@@ -191,7 +185,8 @@ class MessageBubbleEditedMarkdownBehaviorTest {
 
         composeRule.setContent {
             WhiteNoiseTheme {
-                MessageBubble(
+                TimelineRowMessageBubble(
+                    messageIdHex = MESSAGE_ID,
                     item = item,
                     controller = controller,
                     appState = appState,
@@ -218,24 +213,27 @@ class MessageBubbleEditedMarkdownBehaviorTest {
                     onQuickReactionsReset = {},
                     onReplyPreviewClick = {},
                     composerGate = ComposerGate.COMPOSER,
-                    inviteMutationInFlight = false,
-                    onJoinInvite = {},
-                    onDeclineInvite = {},
+                    onBack = {},
                     mentionCandidates = emptyList(),
                     mentionPickerEnabled = false,
+                    showSenderName = false,
+                    showSenderAvatar = false,
                     collapseLongMessages = false,
+                    readOnly = false,
                     parseMarkdown = { text ->
                         when (text) {
-                            EDIT_A -> {
+                            EDIT_A -> editedDocument("alpha")
+                            EDIT_B -> {
+                                parseBStarted.complete(Unit)
                                 try {
-                                    parseAGate.await()
+                                    parseBGate.await()
                                 } catch (_: CancellationException) {
                                     // Model an FFI parser that finishes after its caller was cancelled.
-                                    withContext(NonCancellable) { parseAGate.await() }
+                                    withContext(NonCancellable) { parseBGate.await() }
                                 }
-                                editedDocument("alpha")
+                                editedDocument("beta")
                             }
-                            EDIT_B -> editedDocument("beta")
+                            EDIT_C -> editedDocument("gamma")
                             else -> emptyDocument()
                         }
                     },
@@ -244,17 +242,47 @@ class MessageBubbleEditedMarkdownBehaviorTest {
         }
 
         composeRule.waitForIdle()
+        composeRule.onNodeWithText("Edited alpha").assertExists()
+        val entry =
+            runBlocking {
+                projectTtsSpeakableEntry(
+                    message = record,
+                    editedText = EDIT_A,
+                    senderDisplayName = "Alice",
+                    parseMarkdown = { editedDocument("alpha") },
+                )!!
+            }
+        check(appState.ttsController.speak(listOf(entry), Locale.US))
+        engine.range(index = 0, start = 14, end = 19)
+        composeRule.waitForIdle()
+        assertEquals(7 until 12, highlightRange("alpha"))
+        composeRule.onNodeWithTag("tts-read-aloud-progress").assertExists()
+
         composeRule.runOnIdle {
             controller.editsByTarget = mapOf(MESSAGE_ID to editState(EDIT_B))
         }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText("Edited beta").assertExists()
+        composeRule.onNodeWithText(EDIT_B).assertExists()
         composeRule.onNodeWithText("Edited alpha", substring = true).assertDoesNotExist()
+        assertNull(highlightRange(EDIT_B))
+        composeRule.onNodeWithTag("tts-read-aloud-progress").assertDoesNotExist()
+        composeRule.waitUntil(timeoutMillis = 5_000) { parseBStarted.isCompleted }
+        composeRule.runOnIdle {
+            controller.editsByTarget = mapOf(MESSAGE_ID to editState(EDIT_C))
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Edited gamma").assertExists()
+        composeRule.onNodeWithText("Edited alpha", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Edited beta", substring = true).assertDoesNotExist()
+        assertNull(highlightRange("gamma"))
+        composeRule.onNodeWithTag("tts-read-aloud-progress").assertDoesNotExist()
 
-        parseAGate.complete(Unit)
+        parseBGate.complete(Unit)
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Edited beta").assertExists()
+        composeRule.onNodeWithText("Edited gamma").assertExists()
         composeRule.onNodeWithText("Edited alpha", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Edited beta", substring = true).assertDoesNotExist()
+        assertNull(highlightRange("gamma"))
+        composeRule.onNodeWithTag("tts-read-aloud-progress").assertDoesNotExist()
     }
 
     private fun highlightRange(text: String): IntRange? =
@@ -405,10 +433,56 @@ class MessageBubbleEditedMarkdownBehaviorTest {
         ) = Unit
     }
 
+    private class FakeMessageBubbleTtsSpeechEngine : TtsSpeechEngine {
+        private val spoken = mutableListOf<Spoken>()
+        private var rangeCallback: ((String?, Int, Int, Int) -> Unit)? = null
+
+        override fun setLanguage(locale: Locale): Int = TextToSpeech.LANG_AVAILABLE
+
+        override fun setSpeechRate(rate: Float) = Unit
+
+        override fun setCallbacks(
+            onDone: (String?) -> Unit,
+            onError: (String?, Int) -> Unit,
+            onRangeStart: (String?, Int, Int, Int) -> Unit,
+            onStop: (String?, Boolean) -> Unit,
+        ) {
+            rangeCallback = onRangeStart
+        }
+
+        override fun clearCallbacks() {
+            rangeCallback = null
+        }
+
+        override fun speak(
+            text: String,
+            utteranceId: String,
+        ): Int {
+            spoken += Spoken(text, utteranceId)
+            return TextToSpeech.SUCCESS
+        }
+
+        override fun stop() = Unit
+
+        fun range(
+            index: Int,
+            start: Int,
+            end: Int,
+        ) {
+            rangeCallback?.invoke(spoken[index].utteranceId, start, end, 0)
+        }
+
+        private data class Spoken(
+            val text: String,
+            val utteranceId: String,
+        )
+    }
+
     private companion object {
         const val ACCOUNT_REF = "personal"
         const val EDIT_A = "Edited *alpha*"
         const val EDIT_B = "Edited *beta*"
+        const val EDIT_C = "Edited *gamma*"
         val ACCOUNT_ID = "01" + "00".repeat(31)
         val SENDER_ID = "02" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
