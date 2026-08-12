@@ -19,7 +19,8 @@ class MessageBubbleTtsProjectionContractTest {
     fun legacyMessageIdOnlyCandidateWouldStayActiveAfterDelete() {
         val activePassage = passage()
         // The old gate ignored deletion and considered only the passage's message id.
-        val legacyCandidate = activePassage.messageIdHex == MESSAGE_ID
+        val legacyGateIgnoresDeleted = true
+        val legacyCandidate = activePassage.messageIdHex == MESSAGE_ID && legacyGateIgnoresDeleted
 
         assertTrue(legacyCandidate)
         assertNull(
