@@ -2035,15 +2035,23 @@ internal fun ConversationScreen(
             ConversationBackAction.CLOSE_SEARCH -> closeSearch()
             ConversationBackAction.DISMISS_COMPOSER -> {
                 composerDismissInProgress = true
-                focusManager.clearFocus(force = true)
                 keyboardController?.hide()
             }
             ConversationBackAction.NAVIGATE_UP -> onBack()
         }
     }
 
-    LaunchedEffect(imeIsOpen) {
-        if (!imeIsOpen) composerDismissInProgress = false
+    // Explicit Back must let the IME finish releasing its inset before focus
+    // is cleared. Clearing focus while the closing animation still owns a
+    // non-zero inset can detach the text input before the final zero-inset
+    // dispatch, leaving the Scaffold measured against the old keyboard height.
+    // A voice/dictation handoff never sets composerDismissInProgress, so its
+    // temporary inset collapse continues to preserve focus and selection.
+    LaunchedEffect(imeIsOpen, composerDismissInProgress) {
+        if (!imeIsOpen && composerDismissInProgress) {
+            focusManager.clearFocus(force = true)
+            composerDismissInProgress = false
+        }
     }
 
     // Auto-focus the field on open; clear transient highlight on close.
@@ -2812,7 +2820,6 @@ internal fun ConversationScreen(
                         onBack()
                     } else {
                         composerDismissInProgress = true
-                        focusManager.clearFocus(force = true)
                         keyboardController?.hide()
                     }
                 },

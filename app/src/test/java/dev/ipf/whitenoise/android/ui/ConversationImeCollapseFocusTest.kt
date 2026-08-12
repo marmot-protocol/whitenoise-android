@@ -10,12 +10,14 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -32,11 +34,13 @@ import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * Screen-level coverage for the rule that an IME closure is not a composer
@@ -50,7 +54,8 @@ import org.robolectric.annotation.Config
  * keyboard-to-voice handoff and a Back dispatch — confirm that on a device.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 class ConversationImeCollapseFocusTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -103,7 +108,47 @@ class ConversationImeCollapseFocusTest {
         assertEquals("dismissing the composer must not discard the draft", DRAFT, draftAfterBack)
     }
 
-    private fun showConversation(): View {
+    @Test
+    fun explicitBackWaitsForZeroImeInsetBeforeClearingFocusAndReclaimsTheGap() {
+        var navigationCount = 0
+        val view = showConversation { navigationCount++ }
+        val composer = composeRule.onNode(hasSetTextAction())
+
+        composer.performClick()
+        composer.performTextInput(DRAFT)
+        dispatchImeBottom(view, 300)
+        val openImeComposerBottom = composer.fetchSemanticsNode().boundsInRoot.bottom
+
+        composeRule.runOnUiThread {
+            (view.context.lifecycleOwner() as ComponentActivity).onBackPressedDispatcher.onBackPressed()
+        }
+        composeRule.waitForIdle()
+
+        composer.assertIsFocused()
+        assertEquals("the first Back must not leave the conversation", 0, navigationCount)
+
+        dispatchImeBottom(view, 0)
+
+        val closedImeComposerBottom = composer.fetchSemanticsNode().boundsInRoot.bottom
+        val draftAfterDismissal =
+            composer
+                .fetchSemanticsNode()
+                .config
+                .getOrNull(EditableText)
+                ?.text
+        composer.assertIsNotFocused()
+        assertTrue(
+            "the composer must move into the released IME area",
+            closedImeComposerBottom > openImeComposerBottom,
+        )
+        assertEquals(DRAFT, draftAfterDismissal)
+        assertEquals(0, navigationCount)
+        composeRule
+            .onRoot()
+            .captureRoboImage("src/test/snapshots/ime_back_dismissed_composer_light.png")
+    }
+
+    private fun showConversation(onBack: () -> Unit = {}): View {
         val appState = appState()
         val group = group()
         val controller = ConversationController(appState = appState, initialGroup = group)
@@ -123,7 +168,7 @@ class ConversationImeCollapseFocusTest {
                     appState = appState,
                     chat = chat,
                     controller = controller,
-                    onBack = {},
+                    onBack = onBack,
                 )
             }
         }
