@@ -5,43 +5,31 @@ import java.util.Locale
 
 private val speakableUrl = Regex("(?i)\\b(?:https?://|www\\.)[^\\s<>\\]}\"']+")
 private val speakableScheme = Regex("^[a-z][a-z0-9+.-]*://", RegexOption.IGNORE_CASE)
-private val speakableWhitespace = Regex("\\s+")
-private val emptySpeakableDelimiters = Regex("\\(\\s*\\)|\\[\\s*\\]|\\{\\s*\\}")
-private val spaceBeforeSpeakablePunctuation = Regex("\\s+([,.;:!?])")
+internal val speakableWhitespace = Regex("\\s+")
+internal val emptySpeakableDelimiters = Regex("\\(\\s*\\)|\\[\\s*\\]|\\{\\s*\\}")
+internal val spaceBeforeSpeakablePunctuation = Regex("\\s+([,.;:!?])")
+
+internal data class SpeakableUrlOmission(
+    val start: Int,
+    val end: Int,
+    val preservedSuffixStart: Int,
+)
 
 /** URL-safe last-resort projection when legacy content has no usable Markdown AST. */
-internal fun legacyTextToSpeakableText(text: String): String {
-    val visible = markdownSafeDisplayText(text, MARKDOWN_SPEAKABLE_MAX_LENGTH)
-    val output = StringBuilder(minOf(MARKDOWN_SPEAKABLE_MAX_LENGTH, 256))
-    for (line in visible.lineSequence()) {
-        if (output.length >= MARKDOWN_SPEAKABLE_MAX_LENGTH) break
-        output.appendSpeakableSegment(line.withoutSpeakableUrls())
-    }
-    return output.toString().trimEnd()
-}
+internal fun legacyTextToSpeakableText(text: String): String = legacyTextToSpeakableProjection(text).text
 
-internal fun markdownSpeakableLeafText(
-    content: String,
-    maxChars: Int,
-): String {
-    if (maxChars <= 0) return ""
-    val visible = markdownSafeDisplayText(content, maxChars)
-    return visible.withoutSpeakableUrls().safeUtf16Prefix(maxChars)
-}
-
-private fun String.withoutSpeakableUrls(): String {
-    var removedUrl = false
-    val withoutUrls =
-        speakableUrl.replace(this) { match ->
-            removedUrl = true
-            " ${match.value.unmatchedClosingParenthesisSuffix()}"
-        }
-    return if (removedUrl) {
-        withoutUrls.trimEnd().trimEnd(':', ';', ',')
-    } else {
-        withoutUrls
-    }
-}
+internal fun speakableUrlOmissions(text: String): List<SpeakableUrlOmission> =
+    speakableUrl
+        .findAll(text)
+        .map { match ->
+            val end = match.range.last + 1
+            val suffixLength = match.value.unmatchedClosingParenthesisSuffix().length
+            SpeakableUrlOmission(
+                start = match.range.first,
+                end = end,
+                preservedSuffixStart = end - suffixLength,
+            )
+        }.toList()
 
 private fun String.unmatchedClosingParenthesisSuffix(): String {
     var openParentheses = 0
