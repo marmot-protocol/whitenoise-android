@@ -13,6 +13,22 @@ class AppStartupReadinessTest {
     }
 
     @Test
+    fun staleBackgroundUnreadFoldGuardsAllStatePublication() {
+        val source = appStateSource()
+        val start = source.indexOf("private suspend fun refreshAccountUnreadCounts(")
+        val end = source.indexOf("private suspend fun refreshAccountUnreadFold(", startIndex = start)
+        check(start >= 0 && end > start) { "Missing account unread refresh section" }
+        val refresh = source.substring(start, end)
+        val revisionGuard = refresh.lastIndexOf("if (!stillCurrent()) return")
+        val manualUnreadPublication = refresh.indexOf("updateAccountManualUnread", startIndex = revisionGuard)
+        val countPublication = refresh.indexOf("accountUnreadCounts = merged", startIndex = revisionGuard)
+
+        assertTrue(revisionGuard >= 0)
+        assertTrue(manualUnreadPublication > revisionGuard)
+        assertTrue(countPublication > manualUnreadPublication)
+    }
+
+    @Test
     fun failedRetryRestoresBootstrappingBeforeLaunchingAFullAttempt() {
         val bootstrap = appStateSource().functionBody("bootstrap")
         val newAttempt = bootstrap.indexOf("mutationsScope.async { bootstrapLocked() }")

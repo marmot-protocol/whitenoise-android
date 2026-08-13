@@ -377,7 +377,7 @@ internal const val MAX_RETAINED_SYSTEM_SPLASH_MILLIS = 1_500L
 /**
  * The platform splash is deliberately brief. A slow engine handoff continues
  * on the branded Compose startup surface instead of looking like a frozen,
- * featureless window (#1921).
+ * featureless window.
  */
 internal fun shouldRetainSystemSplash(
     phase: AppPhase,

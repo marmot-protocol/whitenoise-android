@@ -1393,6 +1393,12 @@ private data class StartupUnreadRefresh(
     val accountListRevision: Long,
 )
 
+private data class AccountUnreadFoldResult(
+    val accountRef: String,
+    val unreadCount: ULong,
+    val hasManualUnread: Boolean?,
+)
+
 class WhiteNoiseAppState private constructor(
     context: Context,
     val draftStore: DraftStore,
@@ -3277,7 +3283,7 @@ class WhiteNoiseAppState private constructor(
      * Bootstrap belongs to the process, not the first composition that awaited
      * it. A caller gets an actionable timeout while the single underlying
      * attempt remains alive; retry re-awaits that attempt instead of starting a
-     * second Marmot runtime beside a blocked native call (#1921).
+     * second Marmot runtime beside a blocked native call.
      */
     suspend fun bootstrap() {
         val attempt =
@@ -3349,7 +3355,7 @@ class WhiteNoiseAppState private constructor(
                             ?: accounts.first().label
                     // The callback is the local-ready boundary. The shell mounts
                     // before profile/notification/push warmup and before the
-                    // cross-account unread roster fold (#1010).
+                    // cross-account unread roster fold.
                     setActiveAccount(
                         label = target,
                         deferUnreadRefresh = true,
@@ -3840,35 +3846,26 @@ class WhiteNoiseAppState private constructor(
                     .map { summary ->
                         async {
                             accountGate.withPermit {
-                                val rawCount = rawCountsByHex?.get(summary.accountIdHex)
-                                val cheapZero =
-                                    rawCount == 0uL &&
-                                        manualUnreadFolded(summary.label) &&
-                                        summary.label !in accountManualUnreadRefs
-                                // The cheap engine total can't see the client's
-                                // manual-unread flag, so an account we believe is
-                                // manually flagged always takes the row fold —
-                                // which also refreshes that flag from the rows.
-                                summary.label to
-                                    if (cheapZero) {
-                                        0uL
-                                    } else {
-                                        refreshEffectiveAccountUnreadCount(summary, memberGate)
-                                            ?: rawCount
-                                            ?: previous[summary.label]
-                                            ?: 0uL
-                                    }
+                                refreshAccountUnreadFold(
+                                    summary = summary,
+                                    rawCount = rawCountsByHex?.get(summary.accountIdHex),
+                                    previousCount = previous[summary.label],
+                                    memberGate = memberGate,
+                                )
                             }
                         }
                     }.awaitAll()
             }
         val refreshedCounts = linkedMapOf<String, ULong>()
-        refreshedPairs.forEach { (label, count) -> refreshedCounts[label] = count }
+        refreshedPairs.forEach { refreshedCounts[it.accountRef] = it.unreadCount }
         // A sign-out/account refresh may have completed while the cold-start
         // fold was suspended. Discard that obsolete result rather than
         // resurrecting counts for an account no longer in the authoritative
         // list; the newer lifecycle operation owns convergence.
         if (!stillCurrent()) return
+        refreshedPairs.forEach { result ->
+            result.hasManualUnread?.let { updateAccountManualUnread(result.accountRef, it) }
+        }
         // Re-read after the FFI suspension: a single-key merge
         // (updateAccountUnreadCount / refreshAccountUnreadCount) may have landed
         // while we were suspended. Those values are fresher than our snapshot, so
@@ -3883,6 +3880,28 @@ class WhiteNoiseAppState private constructor(
         retainManualUnreadRefs(refreshedCounts.keys)
     }
 
+    private suspend fun refreshAccountUnreadFold(
+        summary: AccountSummaryFfi,
+        rawCount: ULong?,
+        previousCount: ULong?,
+        memberGate: Semaphore,
+    ): AccountUnreadFoldResult {
+        val cheapZero =
+            rawCount == 0uL &&
+                manualUnreadFolded(summary.label) &&
+                summary.label !in accountManualUnreadRefs
+        // The cheap engine total can't see the client's manual-unread flag, so
+        // an account believed to be manually flagged still takes the row fold.
+        if (!cheapZero) {
+            refreshEffectiveAccountUnreadCount(summary, memberGate)?.let { return it }
+        }
+        return AccountUnreadFoldResult(
+            accountRef = summary.label,
+            unreadCount = if (cheapZero) 0uL else rawCount ?: previousCount ?: 0uL,
+            hasManualUnread = null,
+        )
+    }
+
     /**
      * Reads one account's durable chat-list rows and folds them with loaded
      * member rosters so removed/left groups no longer contribute frozen unread
@@ -3894,7 +3913,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun refreshEffectiveAccountUnreadCount(
         summary: AccountSummaryFfi,
         memberGate: Semaphore = Semaphore(ACCOUNT_UNREAD_MEMBER_FANOUT),
-    ): ULong? {
+    ): AccountUnreadFoldResult? {
         val ref = summary.label.takeIf { it.isNotBlank() } ?: return null
         return runCatchingCancellable {
             marmotIo {
@@ -3913,11 +3932,11 @@ class WhiteNoiseAppState private constructor(
                     ) { groupIdHex ->
                         groupMembers(ref, groupIdHex)
                     }
-                updateAccountManualUnread(
-                    ref,
-                    accountHasManualUnread(rows, summary.accountIdHex, membersByGroupId),
+                AccountUnreadFoldResult(
+                    accountRef = ref,
+                    unreadCount = accountUnreadCount(rows, summary.accountIdHex, membersByGroupId),
+                    hasManualUnread = accountHasManualUnread(rows, summary.accountIdHex, membersByGroupId),
                 )
-                accountUnreadCount(rows, summary.accountIdHex, membersByGroupId)
             }
         }.onFailure {
             appStateDebug(it) { "account unread refresh failed for ${ref.take(8)}: ${it.readableMessage()}" }
@@ -3941,8 +3960,9 @@ class WhiteNoiseAppState private constructor(
         // skip refs we don't know about (matches refreshAccountUnreadCounts'
         // filter).
         val summary = accounts.firstOrNull { it.isSignedInSigningAccount() && it.label == ref } ?: return
-        val unreadCount = refreshEffectiveAccountUnreadCount(summary) ?: return
-        accountUnreadCounts = accountUnreadCounts + (ref to unreadCount)
+        val result = refreshEffectiveAccountUnreadCount(summary) ?: return
+        result.hasManualUnread?.let { updateAccountManualUnread(result.accountRef, it) }
+        accountUnreadCounts = accountUnreadCounts + (ref to result.unreadCount)
     }
 
     suspend fun setActiveAccount(
