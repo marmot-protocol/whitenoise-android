@@ -3,9 +3,9 @@ name: Android Instrumented Tests
 # Runs app/src/androidTest on an emulator (connectedDevZapstoreDebugAndroidTest).
 # Zapstore debug exercises the direct-distribution manifest/config (self-update
 # permissions). These tests are slow and need a booted emulator + KVM, so they live in their own
-# workflow off the fast unit/ktlint path (see android-ci.yml). It runs on
-# pushes to master ONLY — never on pull requests — so a slow emulator boot can
-# never gate a PR merge.
+# workflow off the fast unit/ktlint path (see android-ci.yml). Ordinary PRs do
+# not run it, but MarmotKit artifact-integration changes must prove the pinned
+# x86_64 native library loads before merge.
 #
 # Dev debug variant only: no signing secrets, no Firebase config,
 # matching the unit-test workflow's no-credentials posture.
@@ -13,6 +13,12 @@ name: Android Instrumented Tests
 on:
   push:
     branches: [master]
+  pull_request:
+    paths:
+      - 'app/build.gradle.kts'
+      - 'app/src/main/marmotkit/**'
+      - 'scripts/prepare_marmotkit_artifact.py'
+      - 'scripts/test_prepare_marmotkit_artifact.py'
 
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant (and expensive) emulator runs.
@@ -61,7 +67,14 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: ./gradlew :app:connectedDevZapstoreDebugAndroidTest --no-daemon --stacktrace
+          script: |
+            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+              ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
+                -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.ProfileImageDialSafetyIntegrationTest \
+                --no-daemon --stacktrace
+            else
+              ./gradlew :app:connectedDevZapstoreDebugAndroidTest --no-daemon --stacktrace
+            fi
 
       - name: Upload instrumented test reports
         if: always()

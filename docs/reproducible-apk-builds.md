@@ -16,7 +16,9 @@ reproducibility and what remains out of scope.
   dependency, execution, or build-cache state produced by the first.
 - No `local.properties`, no `app/google-services.json`, and no release signing
   environment variables (defaults / empty runtime config only).
-- Checked-in JNI libraries and Kotlin bindings are compiled into the APK as-is.
+- The exact MarmotKit Android archive is pinned by immutable URL, source SHA,
+  and SHA-256. Each isolated build verifies and extracts that same archive
+  through Gradle before compiling its Kotlin and JNI payload.
 - The two resulting APK files must be **byte-identical** on that verifier host.
 - Each APK must be **unsigned** (`apksigner verify` must exit 1 with output
   beginning `DOES NOT VERIFY`).
@@ -33,9 +35,10 @@ artifact retention); it is not a durable release distribution asset.
 - **Signed APKs** — signing keys and v2/v3 signature blocks are not stable
   byte-for-byte targets. Distribution builds should be validated with certificate
   / signature checks, not `cmp` against CI bytes.
-- **JNI / MDK provenance** — reproducibility of how `libmarmot_uniffi.so` was
-  built is tracked separately in [marmot-protocol/mdk#814](https://github.com/marmot-protocol/mdk/issues/814).
-  This repo only pins whatever `.so` bytes are committed.
+- **Rebuilding MarmotKit from Rust source** — this verifier consumes the
+  immutable release archive and verifies its MDK source identity and checksum;
+  reproducing the archive from its Rust/NDK toolchain remains an upstream MDK
+  concern.
 - **Staging / dev flavors**, other ABIs, Play distribution, or PR preview APKs.
 - **Hermetic cross-toolchain reproducibility.** The workflow pins Ubuntu 24.04 and
   exact Temurin **21.0.7+6.0.LTS** as `JAVA_HOME`. The verifier runs Gradle with
@@ -43,13 +46,14 @@ artifact retention); it is not a durable release distribution asset.
   (`org.gradle.java.installations.paths` plus auto-detect/auto-download disabled),
   and records each Gradle build JVM’s actual home, vendor, version, and runtime
   version from a generated init script. Those properties must match the configured
-  `JAVA_HOME` JVM and match between both builds (the checked-in
+  `JAVA_HOME` JVM and match between both builds (the
   `gradle/gradle-daemon-jvm.properties` criteria remain unchanged). This report
   covers the JVM executing Gradle, not separate compiler or worker processes.
   The Gradle wrapper checksum and repository dependency versions are pinned, and CI
   records installed Android SDK packages in `repro-build-environment.txt` before
   the verifier cleans up its temporary Gradle state. Android SDK packages and Maven
-  dependencies are not yet checked in or pinned by repository-owned content hashes.
+  Maven dependencies are not yet pinned by repository-owned content hashes.
+  MarmotKit is pinned separately by the repository-owned lock and archive SHA-256.
   The two-build check therefore proves path/build-order determinism on one verifier
   host with that pinned JVM; cross-host matching still requires reconciling the
   recorded toolchain inputs.

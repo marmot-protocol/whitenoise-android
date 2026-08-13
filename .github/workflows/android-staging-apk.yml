@@ -132,7 +132,7 @@ jobs:
           WHITENOISE_STAGING_TELEMETRY_TENANT: ${{ secrets.WHITENOISE_STAGING_TELEMETRY_TENANT }}
           WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX: ${{ secrets.WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX }}
           WHITENOISE_STAGING_PUSH_RELAY_HINT: ${{ secrets.WHITENOISE_STAGING_PUSH_RELAY_HINT }}
-        run: ./scripts/release.sh --skip-bindings --flavor staging --abi arm64-v8a
+        run: ./scripts/release.sh --flavor staging --abi arm64-v8a
 
       - name: Compute short SHA
         id: sha

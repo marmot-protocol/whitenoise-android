@@ -1,5 +1,14 @@
+schema=1
 source=marmot-protocol/mdk
 mdk-sha=3fc4eb83974eb64ecb298856b0db70cc3055af57
 mdk-short-sha=3fc4eb83
 mdk-branch=master
 features=otlp-export
+artifact-id=0.9.12
+artifact-tag=marmotkit-v0.9.12
+artifact-url=https://github.com/marmot-protocol/mdk/releases/download/marmotkit-v0.9.12/marmotkit-android-0.9.12.zip
+artifact-sha256=d8ce67581623be39042efb4a61585a7435e2e358a9dfa96fa7a05f4af97c22d3
+archive-root=marmotkit-android-0.9.12
+manifest-schema=mdk-android-v1
+workspace-version=0.9.12
+android-api=26

@@ -72,38 +72,37 @@ format:
     ./gradlew ktlintFormat
 
 # Build signed production and staging release APKs (per-ABI splits + universal).
-# Requires signing creds in local.properties. Rebuilds the MDK/Marmot bindings +
-# native libs.
+# Requires signing creds in local.properties. Gradle prepares the pinned,
+# checksum-verified MarmotKit artifact automatically.
 release:
     ./scripts/release.sh --flavor all
 
-# Build the production arm64-v8a APK immediately using the current
-# checked-in Marmot bindings + native libs, then print the release folder as
+# Build the production arm64-v8a APK using the pinned MarmotKit artifact, then
+# print the release folder as
 
 # the final line so it is easy to open in Finder.
 apk: apk-production
 
 # Build the production arm64-v8a APK.
 apk-production:
-    ./scripts/release.sh --skip-bindings --flavor production --abi arm64-v8a
+    ./scripts/release.sh --flavor production --abi arm64-v8a
     @printf '%s\n' "$PWD/{{ PRODUCTION_APK_DIR }}"
 
 # Build the staging arm64-v8a APK.
 apk-staging:
-    ./scripts/release.sh --skip-bindings --flavor staging --abi arm64-v8a
+    ./scripts/release.sh --flavor staging --abi arm64-v8a
     @printf '%s\n' "$PWD/{{ STAGING_APK_DIR }}"
 
-# Same as `release` but skip the (slow) Rust rebuild — use whatever .so's
-
-# are already checked in.
+# Backward-compatible alias: remote MarmotKit preparation makes every release
+# use the same fast, verified dependency path.
 release-fast:
-    ./scripts/release.sh --skip-bindings --flavor all
+    ./scripts/release.sh --flavor all
 
 # Install the arm64-v8a production APK on the connected device. Useful for
 
 # sanity-checking a release build on your own phone.
 install-production:
-    ./scripts/release.sh --skip-bindings --flavor production --abi arm64-v8a
+    ./scripts/release.sh --flavor production --abi arm64-v8a
     adb install -r "$(ls -t {{ PRODUCTION_APK_DIR }}/whitenoise-production-v8a-release-*.apk | head -1)"
 
 # Launch the installed production variant.
@@ -119,7 +118,7 @@ uninstall-production:
 
 # Install the arm64-v8a staging APK on the connected device.
 install-staging:
-    ./scripts/release.sh --skip-bindings --flavor staging --abi arm64-v8a
+    ./scripts/release.sh --flavor staging --abi arm64-v8a
     adb install -r "$(ls -t {{ STAGING_APK_DIR }}/whitenoise-staging-v8a-release-*.apk | head -1)"
 
 # Launch the installed staging variant.

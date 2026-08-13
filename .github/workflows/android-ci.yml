@@ -43,6 +43,9 @@ jobs:
       - name: Test package-replacement startup reporter
         run: bash .github/scripts/test-package-replacement-startup-report.sh
 
+      - name: Test MarmotKit artifact preparation
+        run: ./scripts/test-prepare-marmotkit-artifact.sh
+
       - name: Verify generated performance profiles
         run: |
           bash .github/scripts/test-verify-generated-profiles.sh
@@ -59,6 +62,17 @@ jobs:
       # across runs (read/write on master pushes, read-only on PRs).
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Prepare MarmotKit API signature
+        run: ./gradlew :app:stageMarmotKitApiSignature --no-daemon --stacktrace
+
+      - name: Upload MarmotKit API signature
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: marmotkit-api-signature
+          path: app/build/reports/marmotkit/marmotkit-api-signature.txt
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Compile (Kotlin)
         run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --no-daemon --stacktrace
