@@ -201,6 +201,7 @@
     <string name="profile_contact_editor_private_hint">Só você vê o apelido e as notas neste dispositivo. Limpar o apelido restaura o nome do perfil. Apelidos salvos são limpos e limitados a 80 caracteres.</string>
     <string name="dismiss">Fechar</string>
     <string name="edit">Editar</string>
+    <string name="edit_group_info_title">Editar informações do grupo</string>
     <string name="save_group">Salvar grupo</string>
     <string name="saving_group">Salvando grupo...</string>
     <string name="no_description">Sem descrição</string>

@@ -201,6 +201,7 @@
     <string name="profile_contact_editor_private_hint">Solo tu vedi soprannome e note su questo dispositivo. Svuotando il soprannome si ripristina il nome del profilo. I soprannomi salvati vengono puliti e limitati a 80 caratteri.</string>
     <string name="dismiss">Chiudi</string>
     <string name="edit">Modifica</string>
+    <string name="edit_group_info_title">Modifica info gruppo</string>
     <string name="save_group">Salva gruppo</string>
     <string name="saving_group">Salvataggio gruppo...</string>
     <string name="no_description">Nessuna descrizione</string>

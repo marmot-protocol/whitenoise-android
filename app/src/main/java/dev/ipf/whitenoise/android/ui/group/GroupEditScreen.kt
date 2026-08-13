@@ -212,7 +212,7 @@ internal fun GroupEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.edit)) },
+                title = { Text(stringResource(R.string.edit_group_info_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
