@@ -6,12 +6,24 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
 
+@RunWith(RobolectricTestRunner::class)
 class AvatarImageLoaderTest {
+    @After
+    fun tearDownProfileImageFetcher() {
+        AvatarImageLoader.resetProfileImageFetcherForTests()
+        AvatarImageLoader.clear()
+    }
+
     @Test
     fun profileImageBytesDelegateHostClassificationAndBoundToMarmot() =
         runBlocking {
@@ -23,13 +35,13 @@ class AvatarImageLoaderTest {
                 byteArrayOf(1, 2, 3)
             }
 
-            val bytes = AvatarImageLoader.fetchBytes("https://127.0.0.1/alice.png", 8)
+            val result = AvatarImageLoader.fetchBytes("https://127.0.0.1/alice.png", 8)
 
             // Android must not pre-classify a protocol URL. Production MDK
             // rejects this loopback host before dialing it.
             assertEquals("https://127.0.0.1/alice.png", requestedUrl)
             assertEquals(8uL, requestedMaxBytes)
-            assertEquals(listOf<Byte>(1, 2, 3), bytes?.toList())
+            assertEquals(listOf<Byte>(1, 2, 3), (result as AvatarByteFetchResult.Success).bytes.toList())
         }
 
     @Test
@@ -37,8 +49,51 @@ class AvatarImageLoaderTest {
         runBlocking {
             AvatarImageLoader.attachProfileImageFetcher { _, _ -> ByteArray(9) }
 
-            assertNull(AvatarImageLoader.fetchBytes("https://profiles.example/alice.png", 8))
+            assertEquals(
+                AvatarByteFetchResult.Failed,
+                AvatarImageLoader.fetchBytes("https://profiles.example/alice.png", 8),
+            )
         }
+
+    @Test
+    fun unavailableFetcherIsDistinctAndResetRestoresIsolation() =
+        runBlocking {
+            AvatarImageLoader.resetProfileImageFetcherForTests()
+            assertEquals(
+                AvatarByteFetchResult.Unavailable,
+                AvatarImageLoader.fetchBytes("https://profiles.example/alice.png", 8),
+            )
+
+            AvatarImageLoader.attachProfileImageFetcher { _, _ -> byteArrayOf(1) }
+            assertEquals(
+                listOf<Byte>(1),
+                (AvatarImageLoader.fetchBytes("https://profiles.example/alice.png", 8) as AvatarByteFetchResult.Success)
+                    .bytes
+                    .toList(),
+            )
+        }
+
+    @Test
+    fun unavailableFetcherDoesNotPoisonTheFailureCache() =
+        runBlocking {
+            val url = "https://profiles.example/late-bootstrap.png"
+            AvatarImageLoader.resetProfileImageFetcherForTests()
+
+            assertNull(AvatarImageLoader.load(url))
+
+            var fetchCount = 0
+            AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+                fetchCount++
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+            assertNotNull(AvatarImageLoader.load(url))
+            assertEquals(1, fetchCount)
+        }
+
+    private companion object {
+        const val ONE_PIXEL_PNG_BASE64 =
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    }
 
     @Test
     fun notificationAvatarsUseDedicatedLanesWhenPreWarmsAreSaturated() {

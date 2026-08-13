@@ -63,9 +63,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarByteFetchResult
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.AvatarDragDismissResult
 import dev.ipf.whitenoise.android.ui.common.AvatarDragDismissState
@@ -198,9 +200,11 @@ private fun rememberAvatarViewerImageState(
         value = AvatarViewerImageState.Loading
         val bytes =
             withContext(Dispatchers.IO) {
-                runCatching {
+                runCatchingCancellable {
                     AvatarImageLoader.fetchBytes(remoteUrl, AVATAR_VIEWER_MAX_BYTES)
-                }.getOrNull()
+                }.getOrElse { AvatarByteFetchResult.Failed }
+            }.let { result ->
+                (result as? AvatarByteFetchResult.Success)?.bytes
             }
         val bitmap =
             bytes?.let { data ->

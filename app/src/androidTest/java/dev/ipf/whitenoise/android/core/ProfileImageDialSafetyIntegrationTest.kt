@@ -5,6 +5,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.parseMediaImetaTag
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertTrue
@@ -40,5 +42,73 @@ class ProfileImageDialSafetyIntegrationTest {
                 "Expected packaged MDK to reject a loopback profile image as an invalid media reference; got $failure",
                 failure is MarmotKitException.InvalidMediaReference,
             )
+        }
+
+    @Test
+    fun packagedMdkRejectsOtherUnsafeProfileImageAuthoritiesBeforeDial() =
+        withMarmot { marmot ->
+            listOf(
+                "http://profiles.example/avatar.png",
+                "https://user@profiles.example/avatar.png",
+                "https://profiles.example:8443/avatar.png",
+                "https://profiles.example/avatar.png#fragment",
+            ).forEach { url ->
+                val failure =
+                    try {
+                        withTimeout(5_000L) { marmot.downloadProfileImage(url, 1_024uL) }
+                        null
+                    } catch (error: Throwable) {
+                        error
+                    }
+
+                assertTrue(
+                    "Expected packaged MDK to reject $url as an invalid media reference; got $failure",
+                    failure is MarmotKitException.InvalidMediaReference,
+                )
+            }
+        }
+
+    @Test
+    fun packagedMdkRejectsPeerSuppliedLoopbackMediaLocator() {
+        val hash = "01".repeat(32)
+        val failure =
+            try {
+                parseMediaImetaTag(
+                    MessageTagFfi(
+                        values =
+                            listOf(
+                                "imeta",
+                                "v encrypted-media-v1",
+                                "locator blossom-v1 https://127.0.0.1/$hash.bin",
+                                "ciphertext_sha256 $hash",
+                                "plaintext_sha256 ${"02".repeat(32)}",
+                                "nonce ${"03".repeat(12)}",
+                                "m image/png",
+                                "filename hostile.png",
+                            ),
+                    ),
+                    1uL,
+                )
+                null
+            } catch (error: Throwable) {
+                error
+            }
+
+        assertTrue(
+            "Expected packaged MDK to reject a peer-supplied loopback media locator; got $failure",
+            failure is MarmotKitException.InvalidMediaReference,
+        )
+    }
+
+    private fun withMarmot(block: suspend (Marmot) -> Unit) =
+        runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            MarmotAndroid.initialize(context)
+            val root = File(context.cacheDir, "profile-image-safety-${UUID.randomUUID()}").apply { mkdirs() }
+            try {
+                Marmot(root.absolutePath, emptyList()).use { marmot -> block(marmot) }
+            } finally {
+                root.deleteRecursively()
+            }
         }
 }

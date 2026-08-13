@@ -596,7 +596,7 @@ internal fun ProfileEditScreen(
                             )
                         }
                     val safeUploaded =
-                        ProfileSanitizer.protocolImageUrl(uploaded)
+                        ProfileSanitizer.androidOwnedHttpsImageUrl(uploaded)
                             ?: throw IllegalStateException("profile image upload returned an unsafe URL")
                     val activeAccountRef = appState.activeAccountRef
                     imageDrafts =

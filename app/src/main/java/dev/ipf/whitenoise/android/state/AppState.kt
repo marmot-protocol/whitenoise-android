@@ -3277,13 +3277,15 @@ class WhiteNoiseAppState private constructor(
                 withContext(Dispatchers.IO) {
                     client ?: MarmotClient(appContext).also { client = it }
                 }
+            // Attach while the client exists but before start can expose any
+            // notification/avatar work. The lambda resolves marmot lazily.
+            AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
+                marmotIo { downloadProfileImage(url, maxBytes) }
+            }
             appStateDebug { "bootstrap root=${opened.rootPath}" }
             withContext(Dispatchers.IO) {
                 opened.marmot.configurePrivacyRuntime()
                 opened.marmot.start()
-            }
-            AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
-                marmotIo { downloadProfileImage(url, maxBytes) }
             }
             appStateDebug { "marmot started" }
             localNotificationPresenter.ensureChannels()
