@@ -13,13 +13,15 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val body = controllersSource().readText().kotlinFunctionBody("bind")
         val firstSnapshot = body.indexOf("chatListStream.snapshot()")
         val secondSnapshot = body.indexOf("chatStream.snapshot()")
+        val memberProjection = body.indexOf("seedInitialMemberIdProjection(accountRef, bindEpoch)")
         val publishReady = body.indexOf("isLoading = false", startIndex = secondSnapshot)
         val renderFrame = body.indexOf("awaitRenderedChatListFrame()", startIndex = publishReady)
         val catchUp = body.indexOf("appState.launchCatchUpAccounts()")
 
         assertTrue("chat-list snapshot must be read", firstSnapshot >= 0)
         assertTrue("chats snapshot must follow the chat-list snapshot", secondSnapshot > firstSnapshot)
-        assertTrue("local rows must be published before waiting for a frame", publishReady > secondSnapshot)
+        assertTrue("the local member projection must follow both row snapshots", memberProjection > secondSnapshot)
+        assertTrue("member-derived UI must be ready before the first visible frame", publishReady > memberProjection)
         assertTrue("the local snapshot must get a rendered frame before catch-up", renderFrame > publishReady)
         assertTrue("relay catch-up must start only after the rendered local frame", catchUp > renderFrame)
         assertTrue("one bind must start catch-up only once", "if (!catchUpStarted)" in body)
@@ -30,12 +32,29 @@ class AccountSwitchLocalSnapshotOrderingTest {
     }
 
     @Test
+    fun initialMemberProjectionDropsResultsInvalidatedWhileTheBatchReadWasInFlight() {
+        val body = controllersSource().readText().kotlinFunctionBody("seedInitialMemberIdProjection")
+        val capturedEpoch = body.indexOf("expectedCacheEpoch = memberCacheEpoch")
+        val ffiRead = body.indexOf("loadGroupMemberIdsPages", startIndex = capturedEpoch)
+        val staleCheck = body.indexOf("memberCacheEpoch != expectedCacheEpoch", startIndex = ffiRead)
+        val publish = body.indexOf("memberCacheByGroup = updatedCache", startIndex = staleCheck)
+
+        assertTrue("the current cache generation must be captured before suspension", capturedEpoch >= 0)
+        assertTrue("the batch FFI read must follow the generation snapshot", ffiRead > capturedEpoch)
+        assertTrue("live invalidation must be checked after the FFI read", staleCheck > ffiRead)
+        assertTrue("stale batch results must be rejected before cache publication", publish > staleCheck)
+    }
+
+    @Test
     fun catchUpLaunchIsProcessScopedAndDeduplicated() {
         val body = appStateSource().readText().kotlinFunctionBody("launchCatchUpAccounts")
 
         assertTrue("a blocked catch-up must run outside the controller bind job", "notificationScope.launch" in body)
         assertTrue("rapid account rebinds must share an active catch-up", "accountCatchUpJob?.isActive == true" in body)
-        assertTrue("the background job must run the best-effort catch-up", "catchUpAccounts()" in body)
+        assertTrue(
+            "the background job must run the result-bearing best-effort catch-up",
+            "catchUpAccountsBestEffort()" in body,
+        )
     }
 
     @Test
@@ -100,6 +119,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue(
             "trace must reject a controller that is no longer active",
             "activeAccountRef != accountRef" in recorder,
+        )
+        assertTrue(
+            "a stale controller must be rejected before publishing startup readiness",
+            recorder.indexOf("activeAccountRef != accountRef") <
+                recorder.indexOf("recordStartupLocalSnapshotRendered()"),
         )
         assertTrue(
             "trace must use a monotonic elapsed clock",

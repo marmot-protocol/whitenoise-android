@@ -15,6 +15,13 @@ class SendFailureMessageTest {
     }
 
     @Test
+    fun aHydrationPendingSendReadsAsStillLoadingRatherThanAFailure() {
+        val pending = MarmotKitException.GroupHydrationPending("7c3bdc38")
+
+        assertEquals(R.string.toast_chat_still_loading, sendFailureMessageRes(pending))
+    }
+
+    @Test
     fun everyOtherFailureKeepsTheGenericMessage() {
         listOf(
             MarmotKitException.Publish("relay refused"),
@@ -23,7 +30,7 @@ class SendFailureMessageTest {
             IllegalStateException("illegal queue_app_message transition"),
         ).forEach { throwable ->
             assertEquals(
-                "only a refused send earns its own message",
+                "only a refused or still-loading send earns its own message",
                 R.string.toast_send_failed,
                 sendFailureMessageRes(throwable),
             )

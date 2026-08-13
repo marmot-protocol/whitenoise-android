@@ -12,6 +12,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,10 +23,12 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.notifications.NotificationInviteAuthoritativeOutcome
+import dev.ipf.whitenoise.android.notifications.NotificationMessageDirectLoadOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.notifications.inviteAuthoritativeGroupAvailable
+import dev.ipf.whitenoise.android.notifications.loadNotificationMessageDirectly
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
 import dev.ipf.whitenoise.android.notifications.retryInviteAuthoritativeLoad
 import dev.ipf.whitenoise.android.share.EncryptedPendingShareRequestStore
@@ -109,14 +112,18 @@ internal fun profileForegroundRoute(
 internal fun ProfileGroupForegroundCoordinator(
     appState: WhiteNoiseAppState,
     conversationController: ConversationController?,
+    profileGroupForegroundState: ProfileGroupForegroundState,
     secureWindowEnabled: Boolean?,
     profileSecurePolicy: SecureFlagPolicy,
     onOpenConversation: (ChatListItem, Boolean) -> Unit,
+    onGroupCreateSubmitted: () -> Long = { 0L },
+    onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ -> onOpenConversation(item, false) },
+    onGroupCreateFlowSuperseded: () -> Unit = {},
     onDismissProfile: () -> Unit,
     onClosePicker: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    val foregroundState = remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
+    val foregroundState = profileGroupForegroundState
     val route =
         profileForegroundRoute(
             pendingProfileNpub = appState.pendingProfileNpub,
@@ -129,13 +136,16 @@ internal fun ProfileGroupForegroundCoordinator(
             NewGroupFlow(
                 appState = appState,
                 initialMembers = listOf(route.initialMember),
-                onOpenConversation = { item, justCreated ->
+                onCreateCompletedOpen = { item, requestToken ->
                     foregroundState.close()
-                    onOpenConversation(item, justCreated)
+                    onGroupCreateCompletedOpen(item, requestToken)
                 },
+                onCreateSubmitted = onGroupCreateSubmitted,
+                onCreateFlowSuperseded = onGroupCreateFlowSuperseded,
                 onClose = {
                     onClosePicker()
                     foregroundState.close()
+                    onGroupCreateFlowSuperseded()
                 },
             )
             return
@@ -238,11 +248,59 @@ internal fun MainShell(
     // conversation does not dispose the selection when ChatsScreen leaves
     // composition (issue #1897).
     var selectedChatListFolderId by remember { mutableStateOf<String?>(null) }
+    // Global chat-list search survives conversation navigation and rotation
+    // (issue #1941). Saveable codec only — no protocol or preference storage.
+    val globalSearch =
+        rememberMainShellGlobalSearchState(
+            accountRef = appState.activeAccountRef,
+            runtimeGeneration = appState.runtimeGeneration,
+        )
+    val scopedGlobalSearchState = globalSearch.scopedState
     // True while a tapped notification for a non-active account is mid-resolution
     // (switching account / awaiting its chat list). Holds a single stable loading
     // state over the multi-step route so the chat list never paints as an
     // intermediate stop between the account switch and the opened conversation.
     var routingNotification by remember { mutableStateOf(false) }
+    // Tracks whether an in-flight group-create completion may still open its
+    // conversation. Explicit shell navigation advances [navigationGeneration]
+    // and invalidates a captured pending generation (issue #1953).
+    var shellNavState by rememberSaveable(stateSaver = ShellNavigationStateSaver) {
+        mutableStateOf(ShellNavigationState())
+    }
+    val profileGroupForegroundState =
+        remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
+    var armedNotificationRequestId by remember { mutableLongStateOf(0L) }
+    var previousPendingProfileNpub by remember { mutableStateOf<String?>(null) }
+    val supersedePendingGroupCreateOpen: () -> Unit = {
+        shellNavState =
+            reduceShellNavigation(shellNavState, ShellNavigationEvent.CreateFlowSuperseded).state
+    }
+    val onGroupCreateSubmitted: () -> Long = {
+        val transition = reduceShellNavigation(shellNavState, ShellNavigationEvent.CreateSubmitted)
+        shellNavState = transition.state
+        transition.createRequestTokenMinted ?: 0L
+    }
+
+    fun commitExplicitConversationOpen(chatId: String) {
+        shellNavState =
+            reduceShellNavigation(
+                shellNavState,
+                ShellNavigationEvent.ExplicitConversationOpened(chatId),
+            ).state
+    }
+
+    fun commitGroupCreateCompletionOpen(
+        chatId: String,
+        requestToken: Long,
+    ): Boolean {
+        val transition =
+            reduceShellNavigation(
+                shellNavState,
+                ShellNavigationEvent.CreateCompleted(chatId, requestToken),
+            )
+        shellNavState = transition.state
+        return transition.createOpenAccepted
+    }
     var notificationInviteAuthoritativelyUnavailable by remember(
         inboundNotificationRequestId,
         inboundNotificationTarget?.accountRef,
@@ -339,10 +397,19 @@ internal fun MainShell(
     }
 
     // Notification tap routing: switch to the target account if needed, wait
-    // for its chat list, then open the conversation — or fall back to the chat
+    // read a message conversation directly (invites still await their row),
+    // then open it — or fall back to the chat
     // list with a toast for a stale/removed target. Pure logic in
     // [resolveNotificationNav]; this effect just acts on each step and re-fires
     // as account/chat-list state changes.
+    LaunchedEffect(appState.pendingProfileNpub) {
+        val current = appState.pendingProfileNpub
+        if (current != null && current != previousPendingProfileNpub) {
+            shellNavState = armShellProfileForeground(shellNavState, profileGroupForegroundState)
+        }
+        previousPendingProfileNpub = current
+    }
+
     LaunchedEffect(
         inboundNotificationTarget,
         inboundNotificationRequestId,
@@ -368,6 +435,10 @@ internal fun MainShell(
                 routingNotification = false
                 return@LaunchedEffect
             }
+        if (routingRequestId != armedNotificationRequestId) {
+            armedNotificationRequestId = routingRequestId
+            shellNavState = armShellNotificationRequest(shellNavState, profileGroupForegroundState)
+        }
         if (appState.accounts.isEmpty()) {
             // Accounts are not loaded yet; release any routing overlay so we do
             // not stick on NotificationLoading. Do not touch chat-list await
@@ -415,6 +486,13 @@ internal fun MainShell(
         fun commitNotificationConversationOpen(chatItem: ChatListItem) {
             sectionName = MainSection.Chats.name
             settingsDetailName = null
+            shellNavState =
+                reduceShellNavigation(
+                    shellNavState,
+                    ShellNavigationEvent.NotificationRoutedConversationOpened(
+                        chatItem.group.groupIdHex,
+                    ),
+                ).state
             selectedChatOpenContext =
                 nextNotificationConversationOpenContext(selectedChatOpenContext)
             selectedChatJustCreated = false
@@ -425,10 +503,23 @@ internal fun MainShell(
             onNotificationTargetHandled(target, routingRequestId)
         }
 
+        fun markNotificationTargetRead() {
+            target.messageIdHex?.let { messageIdHex ->
+                appState.launchMutation {
+                    appState.markNotificationMessageRead(
+                        accountRef = target.accountRef,
+                        groupIdHex = target.groupIdHex,
+                        messageIdHex = messageIdHex,
+                    )
+                }
+            }
+        }
+
         fun fallBackToChatList() {
             sectionName = MainSection.Chats.name
             settingsDetailName = null
             chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+            supersedePendingGroupCreateOpen()
             selectedChat = null
             // Notification routing never opens a just-created conversation, so
             // clear any leftover open-time state from a prior New Chat / Create
@@ -450,6 +541,7 @@ internal fun MainShell(
                 // here makes tapping from inside a chat take the same clean path
                 // as tapping after returning to the chat list.
                 chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+                supersedePendingGroupCreateOpen()
                 selectedChat = null
                 selectedChatOpenContext = ConversationOpenContext()
                 selectedChatJustCreated = false
@@ -458,7 +550,29 @@ internal fun MainShell(
                 // switch would cancel itself the moment the ref flips.
                 appState.launchMutation { appState.setActiveAccount(step.accountRef) }
             }
-            NotificationNavStep.AwaitChatList -> Unit // re-fires when list state settles
+            NotificationNavStep.LoadMessageDirectly -> {
+                routingNotification = true
+                when (
+                    val outcome =
+                        loadNotificationMessageDirectly {
+                            appState.loadNotificationChatListItem(
+                                accountRef = target.accountRef,
+                                groupIdHex = target.groupIdHex,
+                            )
+                        }
+                ) {
+                    is NotificationMessageDirectLoadOutcome.OpenConversation -> {
+                        markNotificationTargetRead()
+                        commitNotificationConversationOpen(outcome.item)
+                    }
+                    NotificationMessageDirectLoadOutcome.AwaitChatList -> {
+                        // A transient local-read failure does not consume the tap;
+                        // the existing chat-list state will re-fire this route.
+                        routingNotification = false
+                    }
+                }
+            }
+            NotificationNavStep.AwaitChatList -> Unit // invite route re-fires when list state settles
             NotificationNavStep.AwaitInviteRow -> {
                 routingNotification = true
                 var authoritativeItem: ChatListItem? = null
@@ -501,15 +615,7 @@ internal fun MainShell(
                         // the conversation composition so a quick back press
                         // cannot cancel the scroll-driven mark-read before it
                         // reaches the store (#1016).
-                        step.readThroughMessageIdHex?.let { messageIdHex ->
-                            appState.launchMutation {
-                                appState.markNotificationMessageRead(
-                                    accountRef = target.accountRef,
-                                    groupIdHex = target.groupIdHex,
-                                    messageIdHex = messageIdHex,
-                                )
-                            }
-                        }
+                        if (step.readThroughMessageIdHex != null) markNotificationTargetRead()
                         commitNotificationConversationOpen(item)
                     }
                     ?: run {
@@ -539,6 +645,7 @@ internal fun MainShell(
         if (tap == 0 || appState.phase != AppPhase.Ready) return@LaunchedEffect
         sectionName = MainSection.Chats.name
         settingsDetailName = null
+        supersedePendingGroupCreateOpen()
         selectedChat = null
         selectedChatOpenContext = ConversationOpenContext()
         selectedChatJustCreated = false
@@ -554,6 +661,7 @@ internal fun MainShell(
                 sectionName = MainSection.Chats.name
                 settingsDetailName = null
                 chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+                commitExplicitConversationOpen(item.group.groupIdHex)
                 selectedChatOpenContext = ConversationOpenContext()
                 selectedChatJustCreated = false
                 selectedChatOpenedAsDmHint = false
@@ -711,6 +819,8 @@ internal fun MainShell(
         val current = appState.activeAccountRef
         if (shouldResetNavOnAccountChange(previousActiveAccountRef, current)) {
             clearSharePickerRequest()
+            shellNavState =
+                reduceShellNavigation(shellNavState, ShellNavigationEvent.AccountSwitched).state
             selectedChat = null
             selectedChatOpenContext = ConversationOpenContext()
             selectedChatJustCreated = false
@@ -728,6 +838,7 @@ internal fun MainShell(
     // uses this for both shell and in-conversation sheets (#635).
     val openGroupFromProfile: (ChatListItem, Boolean) -> Unit = { item, justCreated ->
         chatListReturnHeadSnap = openGroupFromProfileSheet(chatListReturnHeadSnap)
+        commitExplicitConversationOpen(item.group.groupIdHex)
         selectedChatOpenContext = ConversationOpenContext()
         selectedChatJustCreated = justCreated
         // `justCreated` is true only for freshly-created DMs; group creation and
@@ -736,6 +847,16 @@ internal fun MainShell(
         selectedChatOpenedAsDmHint = justCreated
         selectedChat = item
         appState.clearPresentedProfile()
+    }
+    val openGroupFromGroupCreateCompletion: (ChatListItem, Long) -> Unit = { item, requestToken ->
+        if (commitGroupCreateCompletionOpen(item.group.groupIdHex, requestToken)) {
+            chatListReturnHeadSnap = openGroupFromProfileSheet(chatListReturnHeadSnap)
+            selectedChatOpenContext = ConversationOpenContext()
+            selectedChatJustCreated = false
+            selectedChatOpenedAsDmHint = false
+            selectedChat = item
+            appState.clearPresentedProfile()
+        }
     }
 
     val conversationControllerCopy = rememberConversationControllerCopy()
@@ -781,6 +902,7 @@ internal fun MainShell(
     ProfileGroupForegroundCoordinator(
         appState = appState,
         conversationController = conversationController,
+        profileGroupForegroundState = profileGroupForegroundState,
         secureWindowEnabled =
             if (selectedChat != null || section == MainSection.Chats) {
                 !appState.allowChatScreenshotsInChats
@@ -796,6 +918,9 @@ internal fun MainShell(
                 else -> SecureFlagPolicy.SecureOn
             },
         onOpenConversation = openGroupFromProfile,
+        onGroupCreateSubmitted = onGroupCreateSubmitted,
+        onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
+        onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
         onDismissProfile = {
             chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap)
             appState.clearPresentedProfile()
@@ -822,6 +947,9 @@ internal fun MainShell(
                     openedAsDmHint = selectedChatOpenedAsDmHint,
                     restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
                     onOpenConversation = openGroupFromProfile,
+                    onGroupCreateSubmitted = onGroupCreateSubmitted,
+                    onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
+                    onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
                     onSaveScrollSnapshot = { snapshot ->
                         if (snapshot == null) {
                             conversationScrollSnapshots.remove(scrollKey)
@@ -834,6 +962,11 @@ internal fun MainShell(
                         // drawn return frame already has the optimistic preview
                         // in its final recency slot (#900).
                         chatsController.setChatListVisible(true)
+                        shellNavState =
+                            reduceShellNavigation(
+                                shellNavState,
+                                ShellNavigationEvent.ConversationBackedOut,
+                            ).state
                         selectedChat = null
                         selectedChatOpenContext = ConversationOpenContext()
                         selectedChatJustCreated = false
@@ -854,18 +987,25 @@ internal fun MainShell(
                         ChatsScreen(
                             appState = appState,
                             controller = chatsController,
+                            globalSearchState = scopedGlobalSearchState,
+                            onGlobalSearchStateChange = globalSearch.update,
                             selectedFolderId = selectedChatListFolderId,
                             onSelectFolder = { selectedChatListFolderId = it },
+                            onGroupCreateSubmitted = onGroupCreateSubmitted,
+                            onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
+                            onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
                             conversationReturnHeadId = publishedConversationReturnHead(chatListReturnHeadSnap),
                             onConversationReturnHeadHandled = {
                                 chatListReturnHeadSnap = onConversationReturnHeadHandled(chatListReturnHeadSnap)
                             },
                             onOpenSettings = {
                                 chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+                                supersedePendingGroupCreateOpen()
                                 sectionName = MainSection.Settings.name
                                 settingsDetailName = null
                             },
                             onOpenGroup = { item, focusMessageId, justCreated, visibleHeadId ->
+                                commitExplicitConversationOpen(item.group.groupIdHex)
                                 selectedChatOpenContext = ConversationOpenContext(focusMessageId = focusMessageId)
                                 selectedChatJustCreated = justCreated
                                 // `justCreated` is true only for freshly-created DMs; group
@@ -878,6 +1018,9 @@ internal fun MainShell(
                             onPresentProfile = { npub, visibleHeadId ->
                                 chatListReturnHeadSnap =
                                     presentProfileFromChatList(chatListReturnHeadSnap, visibleHeadId)
+                                shellNavState =
+                                    armShellProfileForeground(shellNavState, profileGroupForegroundState)
+                                previousPendingProfileNpub = npub
                                 appState.presentProfile(npub)
                             },
                         )
@@ -899,6 +1042,7 @@ internal fun MainShell(
                             onOpenSupportChat = { item ->
                                 // Land in the conversation itself, not the chat list; no
                                 // list scroll state exists to snapshot from Settings.
+                                commitExplicitConversationOpen(item.group.groupIdHex)
                                 selectedChatOpenedAsDmHint = false
                                 selectedChat = item
                                 sectionName = MainSection.Chats.name

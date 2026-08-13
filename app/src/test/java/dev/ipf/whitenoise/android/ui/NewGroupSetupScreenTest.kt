@@ -35,7 +35,7 @@ class NewGroupSetupScreenTest {
                     appState = appState(),
                     members = emptyList(),
                     onBack = {},
-                    onOpenConversation = { _, _ -> },
+                    onCreateCompletedOpen = { _, _ -> },
                     initialRetryGroupIdHex = "created-group",
                 )
             }

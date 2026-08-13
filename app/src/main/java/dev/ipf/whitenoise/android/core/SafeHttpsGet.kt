@@ -23,8 +23,10 @@ import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 
 /**
- * The single SSRF-hardened HTTPS GET used by every outbound fetch in the app
- * (NIP-05 resolution, avatar loading, image search). Manual redirect handling
+ * SSRF-hardened HTTPS GET for Android-owned directory and user-initiated
+ * fetches such as NIP-05, Lightning-address resolution, and image search.
+ * Protocol profile images and encrypted media are fetched through Marmot so
+ * their hostile-network policy has one owner. Manual redirect handling
  * re-validates the destination at EVERY hop, because
  * `HttpURLConnection.instanceFollowRedirects = true` would silently follow an
  * `https`→`http` downgrade or a redirect to a private/loopback host.

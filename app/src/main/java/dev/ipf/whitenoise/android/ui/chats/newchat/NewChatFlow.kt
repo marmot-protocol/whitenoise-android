@@ -64,6 +64,8 @@ import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 internal enum class NewGroupCreateStage {
@@ -268,6 +270,9 @@ internal fun NewChatFlowHost(
     appState: WhiteNoiseAppState,
     onOpenConversation: (ChatListItem, Boolean) -> Unit,
     onClose: () -> Unit,
+    onGroupCreateSubmitted: () -> Long = { 0L },
+    onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ -> onOpenConversation(item, false) },
+    onGroupCreateFlowSuperseded: () -> Unit = {},
 ) {
     var stepName by rememberSaveable { mutableStateOf(NewChatStep.NewMessage.name) }
     val step = runCatching { NewChatStep.valueOf(stepName) }.getOrDefault(NewChatStep.NewMessage)
@@ -282,8 +287,13 @@ internal fun NewChatFlowHost(
         NewChatStep.NewGroup ->
             NewGroupFlow(
                 appState = appState,
-                onOpenConversation = onOpenConversation,
-                onClose = { stepName = NewChatStep.NewMessage.name },
+                onCreateCompletedOpen = onGroupCreateCompletedOpen,
+                onCreateSubmitted = onGroupCreateSubmitted,
+                onCreateFlowSuperseded = onGroupCreateFlowSuperseded,
+                onClose = {
+                    onGroupCreateFlowSuperseded()
+                    stepName = NewChatStep.NewMessage.name
+                },
             )
     }
 }
@@ -295,8 +305,10 @@ internal fun NewChatFlowHost(
 @Composable
 internal fun NewGroupFlow(
     appState: WhiteNoiseAppState,
-    onOpenConversation: (ChatListItem, Boolean) -> Unit,
+    onCreateCompletedOpen: (ChatListItem, Long) -> Unit,
     onClose: () -> Unit,
+    onCreateSubmitted: () -> Long = { 0L },
+    onCreateFlowSuperseded: () -> Unit = {},
     initialMembers: List<RecipientSearch.Candidate> = emptyList(),
 ) {
     val selected = remember { mutableStateListOf<RecipientSearch.Candidate>().apply { addAll(initialMembers) } }
@@ -305,8 +317,12 @@ internal fun NewGroupFlow(
         NewGroupSetupScreen(
             appState = appState,
             members = selected,
-            onBack = { setupOpen = false },
-            onOpenConversation = onOpenConversation,
+            onBack = {
+                setupOpen = false
+                onCreateFlowSuperseded()
+            },
+            onCreateCompletedOpen = onCreateCompletedOpen,
+            onCreateSubmitted = onCreateSubmitted,
         )
     } else {
         ContactPickerScreen(
@@ -471,6 +487,7 @@ private fun NewMessageScreen(
                             icon = Icons.Default.Group,
                             title = stringResource(R.string.new_group),
                             onClick = onNewGroup,
+                            modifier = Modifier.performanceTestTag(PerformanceTestTags.NEW_GROUP),
                         )
                     }
                     item {
@@ -584,7 +601,7 @@ private fun NewMessageScreen(
                             avatarSeed = candidate.accountIdHex,
                             avatarUrl =
                                 appState.avatarUrl(candidate.accountIdHex)
-                                    ?: ProfileSanitizer.imageUrl(candidate.searchProfile?.picture),
+                                    ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
                             enabled = creatingHex == null,
                             onClick = {
                                 if (candidate.source == null && candidate.searchProfile != null) {

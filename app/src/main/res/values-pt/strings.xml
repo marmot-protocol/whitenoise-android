@@ -3,6 +3,8 @@
     <string name="app_name">White Noise</string>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">Não foi possível iniciar o White Noise</string>
+    <string name="starting_securely">Inicialização segura…</string>
+    <string name="startup_taking_too_long">A inicialização está demorando mais do que o esperado. Tente novamente.</string>
     <string name="error_try_again">Algo deu errado. Tente novamente; se o problema persistir, copie o relatório de erro.</string>
     <string name="error_loaded_content_may_be_out_of_date">O conteúdo carregado continua disponível, mas pode estar desatualizado. Tentando novamente…</string>
     <string name="error_loaded_content_kept">Não foi possível carregar mais conteúdo. Suas mensagens continuam disponíveis; tente novamente quando quiser.</string>
@@ -29,6 +31,19 @@
     <string name="chat_list_voice_unavailable">A pesquisa por voz não está disponível neste dispositivo</string>
     <string name="toast_demoted_but_couldnt_leave">Você não é mais administrador, mas não foi possível sair do grupo</string>
     <string name="chat_list_search_hint">Pesquisar chats</string>
+    <string name="chat_list_search_filters">Filtros</string>
+    <string name="chat_list_search_filters_button">Filtros (%1$d)</string>
+    <plurals name="chat_list_search_filters_active">
+        <item quantity="one">%1$d filtro ativo</item>
+        <item quantity="other">%1$d filtros ativos</item>
+    </plurals>
+    <string name="chat_list_search_clear_all_filters">Limpar tudo</string>
+    <string name="chat_list_search_filter_sheet_title">Filtros</string>
+    <string name="chat_list_search_filter_chat">Conversa</string>
+    <string name="chat_list_search_filter_sender">Remetente</string>
+    <string name="chat_list_search_filter_date">Data</string>
+    <string name="chat_list_search_filter_content">Conteúdo</string>
+    <string name="chat_list_search_filter_remove">Remover %1$s</string>
     <string name="chat_list_filter_all">Todos</string>
     <string name="chat_list_filter_unread">Não lidos</string>
     <string name="chat_list_no_unread">Tudo em dia</string>
@@ -602,6 +617,7 @@
     <string name="toast_couldnt_publish_profile">Não foi possível publicar o perfil</string>
     <string name="toast_send_failed">Falha no envio</string>
     <string name="toast_send_queue_full">Esta conversa tem mensagens demais aguardando envio, então a sua não foi enviada. Tente de novo quando ela se atualizar.</string>
+    <string name="toast_chat_still_loading">Esta conversa ainda está carregando. Tente de novo em instantes.</string>
     <string name="toast_send_membership_verifying">Verificando sua participação no grupo — sua mensagem não foi enviada. Ela ficou na caixa de texto; tente novamente em instantes.</string>
     <string name="toast_reaction_failed">A reação falhou</string>
     <string name="toast_couldnt_delete_message">Falha ao excluir mensagem. Por favor, tente novamente.</string>
@@ -1301,6 +1317,7 @@
     <string name="tts_bar_next_message">Próxima mensagem</string>
     <string name="tts_bar_progress">Frase %1$d de %2$d, mensagem %3$d de %4$d</string>
     <string name="tts_bar_stop">Parar leitura</string>
+    <string name="tts_resume_follow">Retomar acompanhamento</string>
     <string name="tts_bar_error">Não foi possível ler em voz alta</string>
     <string name="tts_bar_history_loading">Carregando mais mensagens…</string>
     <string name="tts_bar_history_error">Não foi possível carregar mais mensagens. Toque novamente para tentar de novo.</string>
@@ -1400,4 +1417,21 @@
     <string name="attachment_type_video">Vídeo</string>
     <string name="attachment_type_image">Imagem</string>
     <string name="attachment_type_file">Arquivo</string>
+
+    <string name="global_search_date_filter_title">Data</string>
+    <string name="global_search_date_any_time">A qualquer momento</string>
+    <string name="global_search_date_today">Hoje</string>
+    <string name="global_search_date_last_7_days">Últimos 7 dias</string>
+    <string name="global_search_date_last_30_days">Últimos 30 dias</string>
+    <string name="global_search_date_custom">Intervalo personalizado…</string>
+    <string name="global_search_date_custom_from">Data de início</string>
+    <string name="global_search_date_custom_to">Data de fim</string>
+    <string name="global_search_date_custom_summary">%1$s a %2$s</string>
+    <string name="global_search_date_custom_reversed_error">A data de fim deve ser igual ou posterior à data de início.</string>
+    <string name="global_search_content_text">Texto</string>
+    <string name="global_search_content_links">Links da web</string>
+    <string name="global_search_content_images_video">Imagens e vídeo</string>
+    <string name="global_search_content_voice_audio">Voz e áudio</string>
+    <string name="global_search_content_files_documents">Arquivos e documentos</string>
+    <string name="global_search_content_any_attachment">Qualquer anexo</string>
 </resources>

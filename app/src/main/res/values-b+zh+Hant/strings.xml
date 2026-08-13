@@ -3,6 +3,8 @@
     <string name="app_name">White Noise</string>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise 無法啟動</string>
+    <string name="starting_securely">正在安全啟動…</string>
+    <string name="startup_taking_too_long">啟動時間超出預期。請再試一次。</string>
     <string name="error_try_again">發生錯誤。請重試；如果問題持續發生，請複製錯誤報告。</string>
     <string name="error_loaded_content_may_be_out_of_date">已載入的內容仍可使用，但可能不是最新版本。正在重試…</string>
     <string name="error_loaded_content_kept">無法載入更多內容。你的訊息仍可使用；請在方便時重試。</string>
@@ -29,6 +31,18 @@
     <string name="chat_list_voice_unavailable">此裝置不支援語音搜尋</string>
     <string name="toast_demoted_but_couldnt_leave">您不再是管理員,但無法離開群組</string>
     <string name="chat_list_search_hint">搜尋聊天</string>
+    <string name="chat_list_search_filters">篩選</string>
+    <string name="chat_list_search_filters_button">篩選（%1$d）</string>
+    <plurals name="chat_list_search_filters_active">
+        <item quantity="other">%1$d 個篩選條件已啟用</item>
+    </plurals>
+    <string name="chat_list_search_clear_all_filters">全部清除</string>
+    <string name="chat_list_search_filter_sheet_title">篩選</string>
+    <string name="chat_list_search_filter_chat">聊天</string>
+    <string name="chat_list_search_filter_sender">傳送者</string>
+    <string name="chat_list_search_filter_date">日期</string>
+    <string name="chat_list_search_filter_content">內容</string>
+    <string name="chat_list_search_filter_remove">移除%1$s</string>
     <string name="chat_list_filter_all">全部</string>
     <string name="chat_list_filter_unread">未讀</string>
     <string name="chat_list_no_unread">全部已讀</string>
@@ -592,6 +606,7 @@
     <string name="toast_couldnt_publish_profile">無法發布個人檔案</string>
     <string name="toast_send_failed">發送失敗</string>
     <string name="toast_send_queue_full">此聊天有太多訊息正在等待傳送，因此你的訊息未傳送。等積壓清空後再試。</string>
+    <string name="toast_chat_still_loading">此聊天仍在載入中，稍後再試。</string>
     <string name="toast_send_membership_verifying">正在確認群組成員身分 — 訊息尚未送出。文字已保留在輸入框中，請稍後再試。</string>
     <string name="toast_reaction_failed">反應失敗</string>
     <string name="toast_couldnt_delete_message">刪除訊息失敗。請再試一次。</string>
@@ -1275,6 +1290,7 @@
     <string name="tts_bar_next_message">下一則訊息</string>
     <string name="tts_bar_progress">第 %1$d/%2$d 句，第 %3$d/%4$d 則訊息</string>
     <string name="tts_bar_stop">停止朗讀</string>
+    <string name="tts_resume_follow">恢復跟隨</string>
     <string name="tts_bar_error">無法朗讀</string>
     <string name="tts_bar_history_loading">正在載入更多訊息…</string>
     <string name="tts_bar_history_error">無法載入更多訊息。再次點按即可重試。</string>
@@ -1374,4 +1390,21 @@
     <string name="attachment_type_video">影片</string>
     <string name="attachment_type_image">圖片</string>
     <string name="attachment_type_file">檔案</string>
+
+    <string name="global_search_date_filter_title">日期</string>
+    <string name="global_search_date_any_time">不限時間</string>
+    <string name="global_search_date_today">今天</string>
+    <string name="global_search_date_last_7_days">最近 7 天</string>
+    <string name="global_search_date_last_30_days">最近 30 天</string>
+    <string name="global_search_date_custom">自訂範圍…</string>
+    <string name="global_search_date_custom_from">開始日期</string>
+    <string name="global_search_date_custom_to">結束日期</string>
+    <string name="global_search_date_custom_summary">%1$s 至 %2$s</string>
+    <string name="global_search_date_custom_reversed_error">結束日期不能早於開始日期。</string>
+    <string name="global_search_content_text">文字</string>
+    <string name="global_search_content_links">連結</string>
+    <string name="global_search_content_images_video">圖片和影片</string>
+    <string name="global_search_content_voice_audio">語音和音訊</string>
+    <string name="global_search_content_files_documents">檔案和文件</string>
+    <string name="global_search_content_any_attachment">任意附件</string>
 </resources>

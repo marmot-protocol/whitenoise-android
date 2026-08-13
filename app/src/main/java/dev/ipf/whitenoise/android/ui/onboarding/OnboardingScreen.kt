@@ -5,7 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -42,21 +40,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.state.IdentityImportOutcome
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLogoLockup
 import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -469,27 +464,4 @@ private fun OnboardingRotatingSlogan() {
             textAlign = TextAlign.Center,
         )
     }
-}
-
-/**
- * The White Noise brand mark shown on the onboarding surfaces: the bare WN "M"
- * mark, tinted with the foreground content color (white on the dark AMOLED
- * background, near-black in light theme). No container/badge — this mirrors the
- * old app's plain-logo treatment. The tint reads off the background luminance
- * (matching how the rest of this file derives light/dark) rather than
- * `isSystemInDarkTheme()`, so a forced-theme preview/test resolves correctly.
- */
-@Composable
-internal fun WhiteNoiseLogoLockup(
-    modifier: Modifier = Modifier,
-    size: Dp = 96.dp,
-) {
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val markColor = if (isLight) MaterialTheme.colorScheme.onBackground else Color.White
-    Icon(
-        painter = painterResource(R.drawable.ic_wn_mark),
-        contentDescription = stringResource(R.string.white_noise_logo),
-        modifier = modifier.size(size),
-        tint = markColor,
-    )
 }

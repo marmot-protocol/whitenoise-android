@@ -17,27 +17,11 @@ internal class AndroidTtsSpeechEngine(
     override fun setCallbacks(
         onDone: (String?) -> Unit,
         onError: (String?, Int) -> Unit,
+        onRangeStart: (String?, Int, Int, Int) -> Unit,
+        onStop: (String?, Boolean) -> Unit,
     ) {
         textToSpeech.setOnUtteranceProgressListener(
-            object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) = Unit
-
-                override fun onDone(utteranceId: String?) {
-                    onDone(utteranceId)
-                }
-
-                @Deprecated("Framework fallback without a detailed error code")
-                override fun onError(utteranceId: String?) {
-                    onError(utteranceId, TextToSpeech.ERROR)
-                }
-
-                override fun onError(
-                    utteranceId: String?,
-                    errorCode: Int,
-                ) {
-                    onError(utteranceId, errorCode)
-                }
-            },
+            androidTtsProgressListener(onDone, onError, onRangeStart, onStop),
         )
     }
 
@@ -60,3 +44,45 @@ internal class AndroidTtsSpeechEngine(
         textToSpeech.stop()
     }
 }
+
+internal fun androidTtsProgressListener(
+    onDone: (String?) -> Unit,
+    onError: (String?, Int) -> Unit,
+    onRangeStart: (String?, Int, Int, Int) -> Unit,
+    onStop: (String?, Boolean) -> Unit,
+): UtteranceProgressListener =
+    object : UtteranceProgressListener() {
+        override fun onStart(utteranceId: String?) = Unit
+
+        override fun onDone(utteranceId: String?) {
+            onDone(utteranceId)
+        }
+
+        override fun onStop(
+            utteranceId: String?,
+            interrupted: Boolean,
+        ) {
+            onStop(utteranceId, interrupted)
+        }
+
+        override fun onRangeStart(
+            utteranceId: String?,
+            start: Int,
+            end: Int,
+            frame: Int,
+        ) {
+            onRangeStart(utteranceId, start, end, frame)
+        }
+
+        @Deprecated("Framework fallback without a detailed error code")
+        override fun onError(utteranceId: String?) {
+            onError(utteranceId, TextToSpeech.ERROR)
+        }
+
+        override fun onError(
+            utteranceId: String?,
+            errorCode: Int,
+        ) {
+            onError(utteranceId, errorCode)
+        }
+    }

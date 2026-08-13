@@ -7,6 +7,8 @@
          "White Noise". Kept identical across locales (see LocalizationResourceTest). -->
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise couldn\'t start</string>
+    <string name="starting_securely">Starting securely…</string>
+    <string name="startup_taking_too_long">Startup is taking longer than expected. Please try again.</string>
     <string name="refresh">Refresh</string>
     <string name="retry">Retry</string>
     <string name="error_try_again">Something went wrong. Try again; if it keeps happening, copy the error report.</string>
@@ -33,6 +35,19 @@
     <string name="chat_list_voice_unavailable">Voice search isn\'t available on this device</string>
     <string name="toast_demoted_but_couldnt_leave">You\'re no longer admin, but couldn\'t leave the group</string>
     <string name="chat_list_search_hint">Search chats</string>
+    <string name="chat_list_search_filters">Filters</string>
+    <string name="chat_list_search_filters_button">Filters (%1$d)</string>
+    <plurals name="chat_list_search_filters_active">
+        <item quantity="one">%1$d filter active</item>
+        <item quantity="other">%1$d filters active</item>
+    </plurals>
+    <string name="chat_list_search_clear_all_filters">Clear all</string>
+    <string name="chat_list_search_filter_sheet_title">Filters</string>
+    <string name="chat_list_search_filter_chat">Chat</string>
+    <string name="chat_list_search_filter_sender">Sender</string>
+    <string name="chat_list_search_filter_date">Date</string>
+    <string name="chat_list_search_filter_content">Content</string>
+    <string name="chat_list_search_filter_remove">Remove %1$s</string>
     <string name="chat_list_filter_all">All</string>
     <string name="chat_list_filter_unread">Unread</string>
     <string name="chat_list_filter_groups">Groups</string>
@@ -842,6 +857,7 @@
     <string name="toast_couldnt_publish_profile">Couldn\'t publish profile</string>
     <string name="toast_send_failed">Send failed</string>
     <string name="toast_send_queue_full">This chat has too many messages waiting to send, so yours wasn\'t sent. Try again once it catches up.</string>
+    <string name="toast_chat_still_loading">This chat is still loading. Try again in a moment.</string>
     <string name="toast_send_membership_verifying">Checking your group membership — your message wasn\'t sent. It\'s kept in the box; try again in a moment.</string>
     <string name="toast_reaction_failed">Reaction failed</string>
     <string name="toast_couldnt_delete_message">Couldn\'t delete message</string>
@@ -1286,9 +1302,9 @@
     <string name="toast_disappearing_not_applied">The group was created, but disappearing messages could not be turned on</string>
     <string name="search_members">Search members</string>
     <string name="recent_chats">Recent chats</string>
-    <string name="onboarding_login">Login</string>
+    <string name="onboarding_login">Sign In</string>
     <string name="onboarding_sign_up">Sign Up</string>
-    <string name="onboarding_login_with_amber">Log in with Amber</string>
+    <string name="onboarding_login_with_amber">Sign in with Amber</string>
     <string name="toast_couldnt_login_amber">Couldn\'t sign in with Amber</string>
     <string name="toast_amber_sign_in_cancelled">Amber sign-in cancelled</string>
     <string name="onboarding_slogan_decentralized">Decentralized</string>
@@ -1391,6 +1407,7 @@
     <string name="tts_bar_next_message">Next message</string>
     <string name="tts_bar_progress">Sentence %1$d of %2$d, message %3$d of %4$d</string>
     <string name="tts_bar_stop">Stop reading</string>
+    <string name="tts_resume_follow">Resume follow</string>
     <string name="tts_bar_error">Couldn\'t read aloud</string>
     <string name="tts_bar_history_loading">Loading more messages…</string>
     <string name="tts_bar_history_error">Couldn\'t load more messages. Tap again to retry.</string>
@@ -1493,4 +1510,21 @@
     <string name="photo_editor_source_unavailable">The prepared photo can still be sent, but its original editing source is unavailable.</string>
     <string name="photo_editor_prepared">Prepared photo</string>
     <string name="photo_editor_send_as_file">Sent as a file; photo editing is unavailable.</string>
+
+    <string name="global_search_date_filter_title">Date</string>
+    <string name="global_search_date_any_time">Any time</string>
+    <string name="global_search_date_today">Today</string>
+    <string name="global_search_date_last_7_days">Last 7 days</string>
+    <string name="global_search_date_last_30_days">Last 30 days</string>
+    <string name="global_search_date_custom">Custom range…</string>
+    <string name="global_search_date_custom_from">Start date</string>
+    <string name="global_search_date_custom_to">End date</string>
+    <string name="global_search_date_custom_summary">%1$s to %2$s</string>
+    <string name="global_search_date_custom_reversed_error">End date must be on or after the start date.</string>
+    <string name="global_search_content_text">Text</string>
+    <string name="global_search_content_links">Links</string>
+    <string name="global_search_content_images_video">Images &amp; video</string>
+    <string name="global_search_content_voice_audio">Voice &amp; audio</string>
+    <string name="global_search_content_files_documents">Files &amp; documents</string>
+    <string name="global_search_content_any_attachment">Any attachment</string>
 </resources>

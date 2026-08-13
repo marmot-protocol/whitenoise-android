@@ -653,6 +653,63 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
+    fun longFirstMessageUsesExpandedTextWithoutLosingConversationActions() {
+        presenter.ensureChannels()
+        val body = "A long message sentence. ".repeat(12).trim()
+
+        assertTrue(
+            runBlocking {
+                presenter.show(
+                    update(isMention = false),
+                    previewTextOverride = body,
+                    shortNpub = { "npub1test" },
+                )
+            },
+        )
+
+        val notification = manager.activeNotifications.single().notification
+        assertEquals(body, notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString())
+        assertNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification))
+        assertEquals(3, notification.actions.size)
+        assertEquals(
+            context.getString(R.string.reply),
+            notification.actions
+                .first()
+                .title
+                .toString(),
+        )
+        assertEquals(conversationShortcutId("account-a", "group-a"), notification.shortcutId)
+    }
+
+    @Test
+    fun secondMessageTransitionsExpandedFirstMessageBackToMessagingHistory() {
+        presenter.ensureChannels()
+        val first = "A long message sentence. ".repeat(12).trim()
+
+        runBlocking {
+            presenter.show(
+                update(isMention = false, messageIdHex = "first"),
+                previewTextOverride = first,
+                shortNpub = { "npub1test" },
+            )
+            presenter.show(
+                update(isMention = false, messageIdHex = "second"),
+                previewTextOverride = "second",
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        val notification = manager.activeNotifications.single().notification
+        assertEquals(
+            listOf(first, "second"),
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(notification)
+                ?.messages
+                ?.map { it.text.toString() },
+        )
+    }
+
+    @Test
     fun reusedPresenterRestampsPublicVersionOnEachPost() {
         var clockMs = 1_000_000L
         val clockPresenter =

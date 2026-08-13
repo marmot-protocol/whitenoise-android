@@ -109,8 +109,6 @@ import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
-import dev.ipf.whitenoise.android.state.ChatMutePreferences
-import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
@@ -133,6 +131,7 @@ import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.conversation.ConversationTransientNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
 import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
@@ -146,6 +145,8 @@ import dev.ipf.whitenoise.android.ui.settings.ChatBubbleColorsScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
 import dev.ipf.whitenoise.android.ui.settings.chatFolderDisplayName
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
@@ -254,6 +255,9 @@ internal fun GroupDetailsScreen(
     // Shared-group rows and a newly-created group replace the currently open
     // conversation in the shell without bouncing through the chat list.
     onOpenConversation: (ChatListItem, Boolean) -> Unit = { _, _ -> },
+    onGroupCreateSubmitted: () -> Long = { 0L },
+    onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ -> onOpenConversation(item, false) },
+    onGroupCreateFlowSuperseded: () -> Unit = {},
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var showEditGroup by remember { mutableStateOf(false) }
@@ -391,26 +395,38 @@ internal fun GroupDetailsScreen(
     val engineMuted =
         controller.latestChatListRow?.muted
             ?: appState.engineConversationMuted(controller.group.groupIdHex)
-    val conversationMuted = conversationNotifyMode == ChatNotifyMode.NONE || engineMuted
-    // The All/Only-mentions preference behind the mute, and the timed-mute expiry,
-    // resolved off the same state key so an elapsed mute settles once (not per frame).
+    var targetedMuteSettings by remember(appState.activeAccountRef, controller.group.groupIdHex) {
+        mutableStateOf<dev.ipf.marmotkit.ChatNotificationSettingsFfi?>(null)
+    }
+    LaunchedEffect(appState.activeAccountRef, controller.group.groupIdHex, controller.latestChatListRow) {
+        targetedMuteSettings = null
+        if (controller.latestChatListRow == null) {
+            targetedMuteSettings = appState.authoritativeConversationMuteSettings(controller.group.groupIdHex)
+        }
+    }
+    val muteOverride = appState.conversationMuteOverride(controller.group.groupIdHex)
+    val conversationMuted =
+        muteOverride?.muted
+            ?: controller.latestChatListRow?.muted
+            ?: targetedMuteSettings?.muted
+            ?: engineMuted
+    val muteCommandPending = appState.isConversationMutePending(controller.group.groupIdHex)
+    // Android retains only the All/Only-mentions preference behind MDK's mute.
     val conversationRestoreMode =
         remember(
             appState.activeAccountRef,
             controller.group.groupIdHex,
             notificationModes,
-            chatNotificationState.muteExpiries,
         ) {
             appState.conversationRestoreNotifyMode(controller.group.groupIdHex)
         }
     val conversationMuteExpiry =
-        remember(
-            appState.activeAccountRef,
-            controller.group.groupIdHex,
-            notificationModes,
-            chatNotificationState.muteExpiries,
-        ) {
-            appState.conversationMuteExpiryMillis(controller.group.groupIdHex)
+        if (muteOverride != null) {
+            muteOverride.mutedUntilMs
+        } else {
+            controller.latestChatListRow?.mutedUntilMs
+                ?: targetedMuteSettings?.mutedUntilMs
+                ?: appState.conversationMuteExpiryMillis(controller.group.groupIdHex)
         }
 
     suspend fun refreshMlsDetails() {
@@ -598,6 +614,7 @@ internal fun GroupDetailsScreen(
             conversationAvatarUrl = controller.avatarUrl,
             isDm = isDm,
             isMuted = conversationMuted,
+            muteCommandPending = muteCommandPending,
             muteExpiryMillis = conversationMuteExpiry,
             notifyForMode = conversationRestoreMode,
             vibrationPattern = conversationVibrationPattern,
@@ -731,8 +748,13 @@ internal fun GroupDetailsScreen(
         NewGroupFlow(
             appState = appState,
             initialMembers = listOf(dmPeerCandidate),
-            onOpenConversation = onOpenConversation,
-            onClose = { showStartGroupWithContact = false },
+            onCreateCompletedOpen = onGroupCreateCompletedOpen,
+            onCreateSubmitted = onGroupCreateSubmitted,
+            onCreateFlowSuperseded = onGroupCreateFlowSuperseded,
+            onClose = {
+                showStartGroupWithContact = false
+                onGroupCreateFlowSuperseded()
+            },
         )
         return
     }
@@ -858,6 +880,13 @@ internal fun GroupDetailsScreen(
                         )
                     }
                 },
+            )
+        },
+        bottomBar = {
+            ConversationTransientNotice(
+                notice = appState.transientNotice,
+                accountRef = appState.activeAccountRef,
+                groupIdHex = controller.group.groupIdHex,
             )
         },
     ) { padding ->
@@ -995,7 +1024,6 @@ internal fun GroupDetailsScreen(
                 val folderNames =
                     remember(
                         folderStoreState,
-                        chatNotificationState,
                         appState.chatListItems,
                         appState.profileRevisionForCompose,
                         folderAccountRef,
@@ -1017,9 +1045,10 @@ internal fun GroupDetailsScreen(
                                                 appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
                                             rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
                                             activeAccountIdHex = appState.activeAccount?.accountIdHex,
-                                            isMuted = {
-                                                ChatMutePreferences.compositeKey(accountRef, it) in
-                                                    chatNotificationState.mutedConversations
+                                            isMuted = { groupIdHex ->
+                                                thisChatRow.any {
+                                                    it.group.groupIdHex == groupIdHex && it.engineMuted()
+                                                }
                                             },
                                             displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
                                         )
@@ -1208,7 +1237,10 @@ internal fun GroupDetailsScreen(
                         )
                     } else {
                         Row(
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 56.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
@@ -1312,7 +1344,7 @@ internal fun GroupDetailsScreen(
                         // Row taps route into the profile sheet, which carries the same
                         // admin actions (grant/revoke admin, remove) the old per-row menu
                         // exposed (#444/#635 scope rules).
-                        GroupMemberIdentityRows(visibleMembers) { _, member ->
+                        GroupMemberIdentityRows(visibleMembers) { index, member ->
                             val isSelfRow = GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
                             val rowMutationPending =
                                 controller.isMemberMutationPending(member.memberIdHex) ||
@@ -1328,6 +1360,12 @@ internal fun GroupDetailsScreen(
                                     },
                                 avatarSeed = member.memberIdHex,
                                 avatarUrl = controller.memberAvatarUrl(member),
+                                modifier =
+                                    if (index == 0) {
+                                        Modifier.performanceTestTag(PerformanceTestTags.MEMBER_LIST)
+                                    } else {
+                                        Modifier
+                                    },
                                 onSubtitleClick =
                                     if (isSelfRow || memberNpub.isBlank()) {
                                         null
@@ -1745,7 +1783,7 @@ internal fun GroupDetailsHeader(
     descriptionCopyValue: String? = null,
 ) {
     val clipboard = LocalClipboardManager.current
-    val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
+    val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
     val remoteImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
     val avatarImageAvailable = picture != null || remoteImageAvailable
     var viewerOpen by remember(safePictureUrl, picture) { mutableStateOf(false) }

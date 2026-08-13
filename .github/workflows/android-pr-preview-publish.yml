@@ -1,0 +1,229 @@
+name: Publish Android PR Preview
+
+# Privilege boundary: workflow_run executes the version from the trusted base
+# branch, never PR-controlled workflow code. It validates package/version
+# identity before exposing the narrowly scoped preview signing key.
+on:
+  workflow_run:
+    workflows: [Android PR APK]
+    types: [completed]
+
+concurrency:
+  # One publisher per PR: a new push cancels a superseded signer/publisher so
+  # an older build cannot finish after the latest build and replace its link.
+  # Internal PR branch names are stable across pushes, including when GitHub's
+  # optional workflow_run.pull_requests association is empty.
+  group: android-pr-preview-publish-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      BUILD_RUN_ID: ${{ github.event.workflow_run.id }}
+      BUILD_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+
+    steps:
+      - name: Checkout trusted publisher only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      # These checks are authoritative only here, against trusted default-
+      # branch code. The same tests in the PR job provide fast contributor
+      # feedback but cannot police PR-controlled workflow changes.
+      - name: Test trusted publisher contract
+        run: |
+          .github/scripts/test-pr-preview-contract.sh
+          .github/scripts/test-pr-preview-validation.sh
+
+      - name: Download candidates from completed run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p candidates/stable candidates/isolated
+          gh run download "$BUILD_RUN_ID" --name pr-preview-stable --dir candidates/stable
+          gh run download "$BUILD_RUN_ID" --name pr-preview-isolated --dir candidates/isolated
+
+      # workflow_run.pull_requests is optional and can be empty. Resolve the PR
+      # from the immutable head SHA through GitHub, fail closed on ambiguity,
+      # then use that trusted number for provenance and publication checks.
+      - name: Resolve the single current PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t matches < <(
+            gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/pulls" --paginate |
+              jq -r --arg head_sha "$HEAD_SHA" --arg repo "$GITHUB_REPOSITORY" --arg default_branch "$DEFAULT_BRANCH" \
+                '.[] | select(.state == "open" and .head.sha == $head_sha and .head.repo.full_name == $repo and .base.ref == $default_branch) | .number'
+          )
+          if (( ${#matches[@]} != 1 )); then
+            printf 'Expected exactly one open internal PR for %s, found %d.\n' \
+              "$HEAD_SHA" "${#matches[@]}" >&2
+            exit 1
+          fi
+          printf 'PR_NUMBER=%s\n' "${matches[0]}" >> "$GITHUB_ENV"
+
+      - name: Verify current PR head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+            --jq '[.state, .head.sha, .head.repo.full_name, .base.ref] | @tsv')
+          expected=$(printf 'open\t%s\t%s\t%s' "$HEAD_SHA" "$GITHUB_REPOSITORY" \
+            "$DEFAULT_BRANCH")
+          [[ "$current" == "$expected" ]] || {
+            printf 'Refusing stale or mismatched preview build.\n' >&2
+            exit 1
+          }
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK tools
+        uses: android-actions/setup-android@07976c6290703d34c16d382cb36445f98bb43b1f # v3
+
+      - name: Verify untrusted candidates
+        shell: bash
+        run: .github/scripts/verify-pr-preview-candidates.sh candidates
+
+      - name: Decode isolated preview signing key
+        env:
+          PR_PREVIEW_KEYSTORE_BASE64: ${{ secrets.PR_PREVIEW_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PR_PREVIEW_KEYSTORE_BASE64"
+          printf '%s' "$PR_PREVIEW_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/pr-preview.p12"
+          chmod 600 "$RUNNER_TEMP/pr-preview.p12"
+
+      - name: Sign and verify previews
+        env:
+          PR_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.PR_PREVIEW_KEYSTORE_PASSWORD }}
+          PR_PREVIEW_KEY_ALIAS: ${{ secrets.PR_PREVIEW_KEY_ALIAS }}
+          PR_PREVIEW_KEY_PASSWORD: ${{ secrets.PR_PREVIEW_KEY_PASSWORD }}
+          PR_PREVIEW_CERT_SHA256: ${{ secrets.PR_PREVIEW_CERT_SHA256 }}
+        shell: bash
+        run: .github/scripts/sign-pr-preview-candidates.sh candidates signed "$RUNNER_TEMP/pr-preview.p12"
+
+      - name: Verify signed previews
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p signed-check/stable signed-check/isolated
+          for channel in stable isolated; do
+            cp "signed/$channel/whitenoise-pr-${PR_NUMBER}-${channel}.apk" \
+              "signed-check/$channel/whitenoise-pr-${PR_NUMBER}-${channel}.apk"
+            sha256sum "signed-check/$channel/"*.apk > "signed-check/$channel/SHA256SUMS"
+            cp "candidates/$channel/provenance.env" "signed-check/$channel/provenance.env"
+          done
+          .github/scripts/verify-pr-preview-candidates.sh signed-check
+
+      - name: Recheck PR head before upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+            --jq '[.state, .head.sha] | @tsv')
+          expected=$(printf 'open\t%s' "$HEAD_SHA")
+          [[ "$current" == "$expected" ]] || {
+            printf 'PR changed before upload; refusing to publish stale APKs.\n' >&2
+            exit 1
+          }
+
+      - name: Publish previews
+        id: publish
+        env:
+          BLOSSOM_SERVER: https://nostr.download
+          BLOSSOM_UPLOAD_NSEC: ${{ secrets.BLOSSOM_UPLOAD_NSEC }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          go install github.com/fiatjaf/nak@62fa610a063b708743456e49f9befaef4a441a37
+          for channel in stable isolated; do
+            apk=$(find "signed/$channel" -type f -name '*.apk' -print -quit)
+            url=$(APK_PATH="$apk" .github/scripts/upload-pr-apk-to-blossom.sh)
+            remote_sha=$(curl --fail --location --retry 3 --retry-all-errors --max-time 240 "$url" | sha256sum | awk '{print $1}')
+            local_sha=$(sha256sum "$apk" | awk '{print $1}')
+            [[ "$remote_sha" == "$local_sha" ]] || {
+              printf 'Published %s APK digest does not match the signed file.\n' "$channel" >&2
+              exit 1
+            }
+            printf '%s_url=%s\n' "$channel" "$url" >> "$GITHUB_OUTPUT"
+          done
+
+      # A push can land while validation/signing/upload runs. Do not let a
+      # superseded run overwrite the sticky comment with stale APK links.
+      - name: Recheck PR head before comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+            --jq '[.state, .head.sha] | @tsv')
+          expected=$(printf 'open\t%s' "$HEAD_SHA")
+          [[ "$current" == "$expected" ]] || {
+            printf 'PR changed while publishing; refusing to post stale links.\n' >&2
+            exit 1
+          }
+
+      - name: Upsert concise PR comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v8
+        env:
+          STABLE_URL: ${{ steps.publish.outputs.stable_url }}
+          ISOLATED_URL: ${{ steps.publish.outputs.isolated_url }}
+        with:
+          script: |
+            const marker = '<!-- pr-apk-preview -->';
+            const pr = Number(process.env.PR_NUMBER);
+            const body = [
+              marker,
+              '### PR Preview APK',
+              '',
+              `**[Install/update Preview White Noise](${process.env.STABLE_URL})** — keeps app data when switching PRs.`,
+              '',
+              `This replaces the current PR Preview and retains its accounts and history.`,
+              '',
+              `[Isolated PR #${pr}](${process.env.ISOLATED_URL}) — use for storage/auth changes or side-by-side testing.`,
+            ].join('\n');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: pr, per_page: 100,
+            });
+            const existing = comments.find(comment =>
+              comment.user?.login === 'github-actions[bot]' && comment.body?.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: pr, body,
+              });
+            }

@@ -11,6 +11,22 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 class LocalizationResourceTest {
     @Test
+    fun defaultUserVisibleStringsUseSignInAndSignOutTerminology() {
+        val resDir =
+            listOf(File("src/main/res"), File("app/src/main/res"))
+                .first { it.exists() }
+        val forbiddenTerminology = Regex("\\b(?:login|log\\s+in|logout|log\\s+out)\\b", RegexOption.IGNORE_CASE)
+        val strings = parseStringsResource(File(resDir, "values"))
+
+        val offendingKeys =
+            strings.strings
+                .filterValues { forbiddenTerminology.containsMatchIn(it) }
+                .keys
+
+        assertTrue("User-visible strings use login/logout terminology: $offendingKeys", offendingKeys.isEmpty())
+    }
+
+    @Test
     fun localizedStringFilesHaveTheSameKeysAsDefaultEnglish() {
         val resDir =
             listOf(File("src/main/res"), File("app/src/main/res"))

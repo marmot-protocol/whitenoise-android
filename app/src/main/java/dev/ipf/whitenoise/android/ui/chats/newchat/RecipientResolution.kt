@@ -62,7 +62,7 @@ internal fun rememberRecipientResolution(
     }
 
     val profile = resolvedHex?.let { appState.userProfile(it) }
-    val pictureUrl = resolvedHex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.imageUrl(profile?.picture)
+    val pictureUrl = resolvedHex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.protocolImageUrl(profile?.picture)
     val about = ProfileSanitizer.about(profile?.about)
     val nip05 = profile?.nip05?.trim()?.takeIf { ProfileFieldValidation.isAcceptableNip05(it) }
     val hasProfile =

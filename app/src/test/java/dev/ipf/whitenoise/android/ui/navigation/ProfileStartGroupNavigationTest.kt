@@ -112,6 +112,133 @@ class ProfileStartGroupNavigationTest {
     }
 
     @Test
+    fun notificationArmDismissesProfileNewGroupOverlay() {
+        val foregroundState = ProfileGroupForegroundState().apply { open(viewedCandidate()) }
+        val fixture = profileFixture(CONVERSATION_SURFACE)
+        val controller = conversationController(fixture.appState)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileGroupForegroundCoordinator(
+                    appState = fixture.appState,
+                    conversationController = controller,
+                    profileGroupForegroundState = foregroundState,
+                    secureWindowEnabled = null,
+                    profileSecurePolicy = SecureFlagPolicy.Inherit,
+                    onOpenConversation = { _, _ -> },
+                    onDismissProfile = fixture.appState::clearPresentedProfile,
+                    onClosePicker = {},
+                ) {
+                    Text(fixture.ownerSurface)
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(app.getString(R.string.new_group)).assertIsDisplayed()
+        composeRule.onNodeWithText(fixture.ownerSurface).assertDoesNotExist()
+
+        composeRule.runOnIdle {
+            armShellNotificationRequest(ShellNavigationState(), foregroundState)
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(fixture.ownerSurface).assertIsDisplayed()
+        composeRule
+            .onNodeWithText(app.getString(R.string.new_group))
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun profileArmDismissesProfileNewGroupOverlay() {
+        val foregroundState = ProfileGroupForegroundState().apply { open(viewedCandidate()) }
+        val fixture = profileFixture(SHELL_SURFACE)
+        fixture.appState.presentProfile(TARGET_NPROFILE)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileGroupForegroundCoordinator(
+                    appState = fixture.appState,
+                    conversationController = null,
+                    profileGroupForegroundState = foregroundState,
+                    secureWindowEnabled = null,
+                    profileSecurePolicy = SecureFlagPolicy.Inherit,
+                    onOpenConversation = { _, _ -> },
+                    onDismissProfile = fixture.appState::clearPresentedProfile,
+                    onClosePicker = {},
+                ) {
+                    Text(fixture.ownerSurface)
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(app.getString(R.string.new_group)).assertIsDisplayed()
+        composeRule.onNodeWithText(fixture.ownerSurface).assertDoesNotExist()
+        assertProfileOverlayAbsent(fixture)
+
+        composeRule.runOnIdle {
+            armShellProfileForeground(ShellNavigationState(), foregroundState)
+        }
+        composeRule.waitForIdle()
+
+        assertProfileActionVisible(fixture, scrollToAction = false)
+        assertOwnerSurfaceVisible(fixture)
+        composeRule
+            .onNodeWithText(app.getString(R.string.new_group))
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun profileReplacementWhileNewGroupActive_showsReplacementProfile() {
+        val foregroundState = ProfileGroupForegroundState().apply { open(viewedCandidate()) }
+        val fixture = replacementProfileFixture()
+        fixture.appState.presentProfile(TARGET_NPROFILE)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileGroupForegroundCoordinator(
+                    appState = fixture.appState,
+                    conversationController = null,
+                    profileGroupForegroundState = foregroundState,
+                    secureWindowEnabled = null,
+                    profileSecurePolicy = SecureFlagPolicy.Inherit,
+                    onOpenConversation = { _, _ -> },
+                    onDismissProfile = fixture.appState::clearPresentedProfile,
+                    onClosePicker = {},
+                ) {
+                    Text(fixture.ownerSurface)
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(app.getString(R.string.new_group)).assertIsDisplayed()
+        assertProfileOverlayAbsent(fixture)
+
+        composeRule.runOnIdle {
+            armShellProfileForeground(ShellNavigationState(), foregroundState)
+            fixture.appState.presentProfile(REPLACEMENT_NPROFILE)
+        }
+        composeRule.waitForIdle()
+
+        composeRule
+            .onNodeWithText(
+                app.getString(
+                    R.string.profile_start_new_group_with,
+                    fixture.replacementLabel,
+                ),
+                substring = false,
+            ).assertIsDisplayed()
+        composeRule
+            .onNodeWithText(
+                app.getString(
+                    R.string.profile_start_new_group_with,
+                    fixture.targetLabel,
+                ),
+                substring = false,
+            ).assertDoesNotExist()
+        composeRule
+            .onNodeWithText(app.getString(R.string.new_group))
+            .assertDoesNotExist()
+        assertOwnerSurfaceVisible(fixture)
+    }
+
+    @Test
     fun shellProfileHandoffShowsSelectedMemberAndBackClearsOverlays() {
         val fixture = renderProfileHandoff(conversationController = null, ownerSurface = SHELL_SURFACE)
 
@@ -170,6 +297,7 @@ class ProfileStartGroupNavigationTest {
                 ProfileGroupForegroundCoordinator(
                     appState = fixture.appState,
                     conversationController = conversationController,
+                    profileGroupForegroundState = ProfileGroupForegroundState(),
                     secureWindowEnabled = null,
                     profileSecurePolicy = SecureFlagPolicy.Inherit,
                     onOpenConversation = { _, _ -> },
@@ -202,6 +330,37 @@ class ProfileStartGroupNavigationTest {
                 ),
             targetLabel = targetLabel,
             ownerSurface = ownerSurface,
+            replacementLabel = null,
+        )
+    }
+
+    private fun replacementProfileFixture(): HandoffFixture {
+        val appState =
+            WhiteNoiseAppState(
+                context = app,
+                draftStore = DraftStore(EmptyDraftPersistence()),
+                accountIdHexResolver = { reference ->
+                    when (reference) {
+                        TARGET_NPROFILE -> TARGET_HEX
+                        REPLACEMENT_NPROFILE -> REPLACEMENT_HEX
+                        else -> null
+                    }
+                },
+                accounts = listOf(activeAccount()),
+                activeAccountRef = ACTIVE_ACCOUNT_REF,
+            )
+        appState.setContactNickname(TARGET_HEX, TARGET_DISPLAY)
+        appState.setContactNickname(REPLACEMENT_HEX, REPLACEMENT_DISPLAY)
+        return HandoffFixture(
+            appState = appState,
+            candidate =
+                viewedCandidate().copy(
+                    displayName = TARGET_DISPLAY,
+                    npub = TARGET_NPROFILE,
+                ),
+            targetLabel = TARGET_DISPLAY,
+            ownerSurface = SHELL_SURFACE,
+            replacementLabel = REPLACEMENT_DISPLAY,
         )
     }
 
@@ -289,6 +448,7 @@ class ProfileStartGroupNavigationTest {
         val candidate: RecipientSearch.Candidate,
         val targetLabel: String,
         val ownerSurface: String,
+        val replacementLabel: String? = null,
     )
 
     private fun activeAccount() =
@@ -373,6 +533,11 @@ class ProfileStartGroupNavigationTest {
         const val TARGET_HEX =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         const val TARGET_NPROFILE = "nprofile-test-alice"
+        const val TARGET_DISPLAY = "Profile Alice"
+        const val REPLACEMENT_DISPLAY = "Profile Bob"
+        const val REPLACEMENT_NPROFILE = "nprofile-test-bob"
+        const val REPLACEMENT_HEX =
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
         const val SHELL_SURFACE = "Chat list shell"
         const val CONVERSATION_SURFACE = "Active group conversation"
     }

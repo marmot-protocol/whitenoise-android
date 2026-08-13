@@ -12,10 +12,10 @@ object ProfileFieldValidation {
     // stricter resolver parser so URL delimiters never reach resolution.
     private val INTERNET_IDENTIFIER = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 
-    /** True when [raw] is blank or a sanitizable https avatar URL (see [ProfileSanitizer.imageUrl]). */
+    /** True when [raw] is blank or a safe user-supplied HTTPS image URL. */
     fun isAcceptablePictureUrl(raw: String): Boolean {
         val trimmed = raw.trim()
-        return trimmed.isEmpty() || ProfileSanitizer.imageUrl(trimmed) != null
+        return trimmed.isEmpty() || ProfileSanitizer.androidOwnedHttpsImageUrl(trimmed) != null
     }
 
     /** True when [raw] is blank or a well-formed NIP-05 `user@domain` identifier. */

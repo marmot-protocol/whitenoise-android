@@ -1092,8 +1092,8 @@ private fun UrlLibraryRow(
     // URL-only v1: the host stands in for the title, with a globe glyph for the
     // favicon and no description. follow-up: when an in-conversation link-preview
     // cache lands, render the row immediately and populate title/desc/favicon
-    // from it opportunistically; any favicon/metadata fetch must be https-only
-    // and pass HostSafety.isPrivateOrLoopbackHost before any network hop.
+    // from it opportunistically; any Android-owned favicon/metadata fetch must
+    // use SafeHttpsGet so safety is enforced at the network boundary.
     val host = remember(entry.url) { hostOf(entry.url) }
     val recordedAtLabel = rememberRelativeTimestamp(entry.recordedAt)
     Row(

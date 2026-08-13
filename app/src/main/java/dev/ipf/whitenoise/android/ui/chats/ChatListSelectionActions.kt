@@ -32,4 +32,48 @@ internal fun reconcileChatListSelection(
 internal fun chatListBackHandlerEnabled(
     selectionMode: Boolean,
     searchOpen: Boolean,
-): Boolean = selectionMode || searchOpen
+    filterSheetOpen: Boolean = false,
+): Boolean = selectionMode || searchOpen || filterSheetOpen
+
+internal enum class ChatListBackDismissal {
+    ClearSelection,
+    DismissFilterSheet,
+    CloseSearch,
+}
+
+internal fun chatListBackDismissal(
+    selectionMode: Boolean,
+    searchState: GlobalSearchState,
+): ChatListBackDismissal? =
+    when {
+        selectionMode -> ChatListBackDismissal.ClearSelection
+        searchState.filterSheetOpen -> ChatListBackDismissal.DismissFilterSheet
+        searchState.isOpen -> ChatListBackDismissal.CloseSearch
+        else -> null
+    }
+
+internal fun shouldShowGlobalSearchFilterControls(
+    searchState: GlobalSearchState,
+    interactiveSectionsAvailable: Boolean,
+    selectionMode: Boolean,
+): Boolean =
+    searchState.isOpen &&
+        !selectionMode &&
+        (interactiveSectionsAvailable || GlobalSearchActiveChips.from(searchState).count > 0)
+
+internal fun shouldPresentGlobalSearchFilterSheet(
+    searchState: GlobalSearchState,
+    interactiveSectionsAvailable: Boolean,
+    selectionMode: Boolean,
+): Boolean = searchState.filterSheetOpen && interactiveSectionsAvailable && !selectionMode
+
+internal fun reconcileGlobalSearchFilterSheet(
+    searchState: GlobalSearchState,
+    interactiveSectionsAvailable: Boolean,
+    selectionMode: Boolean,
+): GlobalSearchState =
+    if (searchState.filterSheetOpen && (!interactiveSectionsAvailable || selectionMode)) {
+        GlobalSearchTransitions.dismissFilterSheet(searchState)
+    } else {
+        searchState
+    }

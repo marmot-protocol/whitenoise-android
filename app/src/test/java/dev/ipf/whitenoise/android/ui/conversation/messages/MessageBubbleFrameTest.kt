@@ -25,6 +25,7 @@ import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -59,6 +60,59 @@ class MessageBubbleFrameTest {
 
         composeRule.onNodeWithText("Quoted message").assertIsDisplayed()
         composeRule.onNodeWithText("May not be visible to everyone").assertIsDisplayed()
+    }
+
+    @Test
+    fun targetHighlightColorUsesSideSpecificEffectiveBubbleColors() {
+        val fallback = Color.Cyan
+        val incoming = messageTargetHighlightColor(INCOMING_HIGHLIGHT_COLOR, fallback)
+        val outgoing = messageTargetHighlightColor(OUTGOING_HIGHLIGHT_COLOR, fallback)
+
+        assertEquals(colorFromArgb(INCOMING_HIGHLIGHT_COLOR), incoming)
+        assertEquals(colorFromArgb(OUTGOING_HIGHLIGHT_COLOR), outgoing)
+        assertNotEquals(incoming, outgoing)
+    }
+
+    @Test
+    fun targetHighlightColorFallsBackWhenThereIsNoCustomBubbleColor() {
+        val fallback = Color.Cyan
+
+        assertEquals(fallback, messageTargetHighlightColor(customBorderArgb = null, fallback = fallback))
+    }
+
+    @Test
+    fun highlightedPlainAndMediaFramesRenderWithTheirEffectivePresentations() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Column {
+                    MessageBubbleFrame(
+                        presentation = customAmoledPresentation(customArgb = INCOMING_HIGHLIGHT_COLOR),
+                        highlighted = true,
+                        mine = false,
+                        mentionedSelf = false,
+                        mentionedYouLabel = "Mentioned you",
+                        modifier = Modifier.size(width = 120.dp, height = 60.dp).testTag(HIGHLIGHTED_PLAIN_TAG),
+                    ) {
+                        Box(Modifier.size(8.dp))
+                    }
+                    MediaCaptionFrame(
+                        presentation = customAmoledPresentation(mine = true, customArgb = OUTGOING_HIGHLIGHT_COLOR),
+                        highlighted = true,
+                        mine = true,
+                        mentionedSelf = false,
+                        mentionedYouLabel = "Mentioned you",
+                        alignEnd = true,
+                        modifier = Modifier.size(width = 120.dp, height = 80.dp).testTag(HIGHLIGHTED_MEDIA_TAG),
+                        media = { Box(Modifier.width(80.dp).height(40.dp)) },
+                    ) {
+                        Box(Modifier.size(8.dp))
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(HIGHLIGHTED_PLAIN_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(HIGHLIGHTED_MEDIA_TAG).assertIsDisplayed()
     }
 
     @Test
@@ -177,12 +231,15 @@ class MessageBubbleFrameTest {
         }
     }
 
-    private fun customAmoledPresentation() =
+    private fun customAmoledPresentation(
+        mine: Boolean = false,
+        customArgb: Long? = CUSTOM_BACKGROUND,
+    ): BubblePresentation =
         resolveBubblePresentationArgb(
             deleted = false,
             amoled = true,
-            mine = false,
-            customArgb = CUSTOM_BACKGROUND,
+            mine = mine,
+            customArgb = customArgb,
             tokens =
                 BubblePresentationTokens(
                     errorBackgroundArgb = 0xFFFFDAD6,
@@ -294,6 +351,10 @@ class MessageBubbleFrameTest {
     }
 
     private companion object {
+        const val HIGHLIGHTED_PLAIN_TAG = "highlighted-plain-bubble"
+        const val HIGHLIGHTED_MEDIA_TAG = "highlighted-media-bubble"
+        const val INCOMING_HIGHLIGHT_COLOR = 0xFFE91E63L
+        const val OUTGOING_HIGHLIGHT_COLOR = 0xFF9C27B0L
         const val CAPTION_TAG = "custom-caption-bubble"
         const val PLAIN_TAG = "custom-plain-bubble"
         const val CUSTOM_BACKGROUND = 0xFF336699

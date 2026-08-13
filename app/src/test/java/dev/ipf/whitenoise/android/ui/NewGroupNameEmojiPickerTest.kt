@@ -184,7 +184,7 @@ class NewGroupNameEmojiPickerTest {
                     appState = state,
                     members = emptyList(),
                     onBack = {},
-                    onOpenConversation = { _, _ -> },
+                    onCreateCompletedOpen = { _, _ -> },
                 )
             }
         }
@@ -252,7 +252,7 @@ class NewGroupNameEmojiPickerTest {
                         appState = state,
                         members = emptyList(),
                         onBack = {},
-                        onOpenConversation = { _, _ -> },
+                        onCreateCompletedOpen = { _, _ -> },
                         initialRetryGroupIdHex = initialRetryGroupIdHex,
                     )
                 }

@@ -90,6 +90,23 @@ repro_verify_assert_build_jvm "$fake_jvm_report" "$fake_expected_jvm_report" tre
 unset WHITENOISE_PRODUCTION_KEYSTORE_PATH WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN
 unset WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN JAVA_TOOL_OPTIONS
 
+distribution_source="$FIXTURE_DIR/distribution-source"
+distribution_destination="$FIXTURE_DIR/distribution-destination"
+mkdir -p "$distribution_source/wrapper/dists/gradle-test/bin"
+printf 'gradle-distribution' >"$distribution_source/wrapper/dists/gradle-test/bin/gradle"
+repro_verify_seed_gradle_distribution "$distribution_source" "$distribution_destination"
+cmp \
+  "$distribution_source/wrapper/dists/gradle-test/bin/gradle" \
+  "$distribution_destination/wrapper/dists/gradle-test/bin/gradle" || {
+  echo 'error: Gradle wrapper distribution was not seeded for the second build' >&2
+  exit 1
+}
+if repro_verify_seed_gradle_distribution "$FIXTURE_DIR/missing-distribution" \
+  "$distribution_destination" 2>/dev/null; then
+  echo 'error: missing first-build Gradle wrapper distribution was accepted' >&2
+  exit 1
+fi
+
 if grep -Eq 'must-not-leak|WHITENOISE_PRODUCTION_KEYSTORE_PATH|WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN|WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN|JAVA_TOOL_OPTIONS' "$fake_tree/captured-env"; then
   echo 'error: build inherited non-canonical environment variables' >&2
   exit 1

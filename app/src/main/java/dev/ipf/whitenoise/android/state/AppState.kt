@@ -92,9 +92,12 @@ import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
+import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
 import dev.ipf.whitenoise.android.media.editor.MarmotMessageDraftGateway
+import dev.ipf.whitenoise.android.media.editor.MessageDraftConditionalDeleteResult
+import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
@@ -464,6 +467,7 @@ internal fun groupCreateFailureDetail(
         is MarmotKitException.InvalidKeyPackageEvent -> AppText.Resource(R.string.error_missing_key_package)
         is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_invalid_identity_reference)
         is MarmotKitException.Publish -> AppText.Resource(R.string.error_group_create_failed_retry)
+        is MarmotKitException.GroupHydrationPending -> AppText.Resource(R.string.toast_chat_still_loading)
         is MarmotKitException -> AppText.Resource(R.string.error_group_create_failed_retry)
         else -> AppText.Resource(R.string.error_group_create_failed_retry)
     }
@@ -905,7 +909,22 @@ data class TransientNotice(
     val id: Long,
     val title: AppText,
     val detail: AppText? = null,
+    val conversation: ConversationNoticeDestination? = null,
 )
+
+data class ConversationNoticeDestination(
+    val accountRef: String,
+    val groupIdHex: String,
+)
+
+internal fun TransientNotice.isForConversation(
+    accountRef: String,
+    groupIdHex: String,
+): Boolean =
+    conversation?.let { destination ->
+        destination.accountRef == accountRef &&
+            destination.groupIdHex.equals(groupIdHex, ignoreCase = true)
+    } == true
 
 private data class ProfilePresentation(
     val displayName: String?,
@@ -969,7 +988,7 @@ internal fun notificationAvatarPreWarmTarget(
             update.sender.accountIdHex
                 .trim()
                 .takeIf { it.isNotEmpty() },
-        senderAvatarUrl = ProfileSanitizer.imageUrl(update.sender.pictureUrl),
+        senderAvatarUrl = ProfileSanitizer.protocolImageUrl(update.sender.pictureUrl),
         resolveGroupAvatar = !update.isDm,
         preWarmRemoteImages = !appLockScreenVisible,
     )
@@ -1369,6 +1388,17 @@ private data class PendingAccountSwitchTrace(
     val startedAtMs: Long,
 )
 
+private data class StartupUnreadRefresh(
+    val accounts: List<AccountSummaryFfi>,
+    val accountListRevision: Long,
+)
+
+private data class AccountUnreadFoldResult(
+    val accountRef: String,
+    val unreadCount: ULong,
+    val hasManualUnread: Boolean?,
+)
+
 class WhiteNoiseAppState private constructor(
     context: Context,
     val draftStore: DraftStore,
@@ -1425,6 +1455,7 @@ class WhiteNoiseAppState private constructor(
 
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    private val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
     internal val editorSessionStore: EditorSessionStore = EditorSessionStore.create(appContext)
     internal val messageDraftRepository: MessageDraftRepository =
@@ -1432,6 +1463,7 @@ class WhiteNoiseAppState private constructor(
             gateway = MarmotMessageDraftGateway(::marmot),
             editorSessions = editorSessionStore,
         )
+    private val chatMuteRepository = ChatMuteRepository(MarmotChatMuteGateway(::marmot))
 
     // Which of the two sequential signer round-trips the Amber sign-in is
     // waiting on (1 = identity request, 2 = identity proof), or null when
@@ -1551,9 +1583,13 @@ class WhiteNoiseAppState private constructor(
     @Volatile
     private var client: MarmotClient? = null
 
-    // Serializes bootstrap so two concurrent callers can't both pass the
-    // null-client check and each construct a MarmotClient (TOCTOU). See #33.
-    private val bootstrapMutex = Mutex()
+    private val bootstrapAttempts = BootstrapAttemptCoordinator()
+    private val bootstrapRuntime = BootstrapRuntimeCoordinator<MarmotClient>()
+    private val startupTraceStartedAtMs = SystemClock.elapsedRealtime()
+    private var startupFirstLocalFrameRecorded = false
+    private var startupRelayCatchUpRecorded = false
+    private var accountListRevision = 0L
+    private var pendingStartupUnreadRefresh: StartupUnreadRefresh? = null
     private val nativePushSyncMutex = Mutex()
     private val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
@@ -1565,6 +1601,8 @@ class WhiteNoiseAppState private constructor(
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
     private val appSelfUpdateFlow = AppSelfUpdateFlows.create(appContext)
     internal val chatMutePreferences = ChatMutePreferences(appContext)
+    private val authoritativeMuteOverrides = mutableStateMapOf<String, dev.ipf.marmotkit.ChatNotificationSettingsFfi>()
+    private val pendingMuteCommands = mutableStateMapOf<String, Int>()
     internal val chatFolderPreferences = ChatFolderPreferences(appContext)
     internal val ttsWarningPreferences = TtsWarningPreferences(appContext)
     internal val ttsEnginePreferences = TtsEnginePreferences(appContext)
@@ -2179,13 +2217,33 @@ class WhiteNoiseAppState private constructor(
     private val conversationStateRetention = ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES)
 
     val shareStaging: ShareStagingStore = ShareStagingStore()
+    private var draftHydrationRevision by mutableStateOf(0)
 
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
     val inboundShareRevision: Int
-        get() = shareStaging.revision
+        get() = shareStaging.revision + draftHydrationRevision
     private val shareInboundStager =
         ShareInboundStager(
-            draftStore = draftStore,
+            stageText = { accountRef, groupIdHex, text ->
+                mutationsScope.launch {
+                    val completion = draftWriter.mergeText(accountRef, groupIdHex, text)
+                    completion.contentForHydration?.let { content ->
+                        draftStore.hydrate(
+                            accountRef,
+                            groupIdHex,
+                            content,
+                            completion.draftedAtMs ?: System.currentTimeMillis(),
+                            replaceExisting = true,
+                        )
+                        draftHydrationRevision += 1
+                    }
+                    when (val result = completion.result) {
+                        is MessageDraftMutationResult.Failure ->
+                            appStateDebug(result.cause) { "shared text staging failed group=${groupIdHex.take(8)}" }
+                        else -> Unit
+                    }
+                }
+            },
             shareStaging = shareStaging,
             resolveMime = { context, uri -> shareResolveMime(context, uri) },
         )
@@ -2204,6 +2262,24 @@ class WhiteNoiseAppState private constructor(
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
     private val mutationsScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    private val draftWriter =
+        CoalescingMessageDraftWriter(
+            scope = mutationsScope,
+            drafts = messageDraftRepository,
+            onResult = { accountRef, groupIdHex, _, result ->
+                when (result) {
+                    is MessageDraftMutationResult.Success -> {
+                        draftStore.applyAuthoritativeTimestamp(accountRef, groupIdHex, result.draft?.createdAtMs)
+                    }
+                    is MessageDraftMutationResult.Failure -> {
+                        appStateDebug(result.cause) {
+                            "draft save failed group=${groupIdHex.take(8)}: ${result.cause.readableMessage()}"
+                        }
+                    }
+                    else -> Unit
+                }
+            },
+        )
     private val notificationScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private var accountCatchUpJob: Job? = null
@@ -2275,22 +2351,12 @@ class WhiteNoiseAppState private constructor(
     val activeAccount: AccountSummaryFfi?
         get() = activeAccountRef?.let { ref -> accounts.firstOrNull { it.label == ref } }
 
-    /**
-     * The draft-store account id for an account [ref] (a label). Drafts are
-     * keyed by `accountIdHex`, not the label a controller binds to, so the
-     * chat-list draft-sort lookup must translate through here.
-     */
-    internal fun draftAccountIdHexForRef(ref: String?): String? {
-        val label = ref ?: return null
-        return accounts.firstOrNull { it.label == label }?.accountIdHex
-    }
-
     /** Convenience: return the active account's draft for [groupIdHex], or null. */
     fun draftFor(groupIdHex: String): String? = draftSnapshotFor(groupIdHex)?.textFieldValue?.text
 
     /** Convenience: return the active account's restored composer draft for [groupIdHex]. */
     fun draftSnapshotFor(groupIdHex: String): ComposerDraftSnapshot? {
-        val account = activeAccount?.accountIdHex ?: return null
+        val account = activeAccountRef ?: return null
         return draftStore.getDraft(account, groupIdHex)
     }
 
@@ -2299,8 +2365,75 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         value: TextFieldValue,
     ) {
-        val account = activeAccount?.accountIdHex ?: return
+        val account = activeAccountRef ?: return
         draftStore.set(account, groupIdHex, value)
+        draftWriter.submit(account, groupIdHex, value.text)
+    }
+
+    /** Hydrates the selected composer from MDK without retaining attachment plaintext in Android state. */
+    fun loadDraft(groupIdHex: String) {
+        val accountRef = activeAccountRef ?: return
+        val generation = draftWriter.generation(accountRef, groupIdHex)
+        mutationsScope.launch {
+            draftWriter
+                .loadIfCurrent(accountRef, groupIdHex, generation)
+                ?.onSuccess { draft ->
+                    if (activeAccountRef != accountRef) return@onSuccess
+                    if (!draftWriter.isCurrent(accountRef, groupIdHex, generation)) return@onSuccess
+                    draftStore.replaceFromAuthoritative(
+                        accountRef,
+                        groupIdHex,
+                        draft?.content,
+                        draft?.createdAtMs,
+                    )
+                    draftHydrationRevision += 1
+                }?.onFailure { appStateDebug(it) { "draft load failed group=${groupIdHex.take(8)}" } }
+        }
+    }
+
+    fun clearDraftAfterSuccessfulSend(groupIdHex: String) {
+        val accountRef = activeAccountRef ?: return
+        val sentGeneration = draftWriter.generation(accountRef, groupIdHex)
+        draftStore.set(accountRef, groupIdHex, TextFieldValue(""))
+        mutationsScope.launch {
+            when (val deletion = draftWriter.deleteIfCurrent(accountRef, groupIdHex, sentGeneration)) {
+                is MessageDraftConditionalDeleteResult.Applied -> {
+                    when (val result = deletion.result) {
+                        is MessageDraftMutationResult.Success -> {
+                            if (draftWriter.isCurrent(accountRef, groupIdHex, sentGeneration)) {
+                                draftStore.applyAuthoritativeTimestamp(accountRef, groupIdHex, null)
+                            }
+                        }
+                        is MessageDraftMutationResult.Failure ->
+                            appStateDebug(result.cause) { "sent draft cleanup failed group=${groupIdHex.take(8)}" }
+                        else -> Unit
+                    }
+                }
+                MessageDraftConditionalDeleteResult.Superseded -> Unit
+            }
+        }
+    }
+
+    internal suspend fun deleteDraftBeforeGroupRemoval(
+        accountRef: String,
+        groupIdHex: String,
+    ): MessageDraftMutationResult {
+        draftWriter.flush()
+        return messageDraftRepository.delete(accountRef, groupIdHex)
+    }
+
+    internal fun refreshDraftSummaries(accountRef: String) {
+        mutationsScope.launch {
+            messageDraftRepository
+                .summaries(accountRef)
+                .onSuccess { summaries ->
+                    if (activeAccountRef != accountRef) return@onSuccess
+                    draftStore.replaceSummaries(
+                        accountRef,
+                        summaries.associate { it.groupIdHex to it.createdAtMs },
+                    )
+                }.onFailure { appStateDebug(it) { "draft summaries load failed account=${accountRef.take(8)}" } }
+        }
     }
 
     fun marmot(): Marmot {
@@ -2689,8 +2822,15 @@ class WhiteNoiseAppState private constructor(
         targetGroupIds: List<String>,
         payload: SharePayload,
     ) {
+        val accountRef = activeAccountRef ?: return
         val accountIdHex = activeAccount?.accountIdHex ?: return
-        shareInboundStager.stageToChats(appContext, accountIdHex, targetGroupIds, payload)
+        shareInboundStager.stageToChats(
+            context = appContext,
+            accountIdHex = accountIdHex,
+            groupIds = targetGroupIds,
+            payload = payload,
+            draftAccountRef = accountRef,
+        )
     }
 
     fun consumeInboundShareStreamsCapped(
@@ -2877,10 +3017,17 @@ class WhiteNoiseAppState private constructor(
         if (target.isEmpty() || groupId.isEmpty() || account == null) return false
         return runCatchingCancellable {
             withGroupCommitLock(account, groupId) {
-                val result = marmotIo { promoteAdminDetailed(account, groupId, target) }
+                val result =
+                    marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
+                        promoteAdminDetailed(account, groupId, target)
+                    }
                 chatsController?.applyProfileGroupDetails(account, result.details)
             }
-            presentTransient(R.string.toast_admin_added)
+            presentConversationTransient(
+                accountRef = account,
+                groupIdHex = groupId,
+                titleRes = R.string.toast_admin_added,
+            )
             true
         }.onFailure { error ->
             presentFailure(R.string.toast_couldnt_update_admin, "PROFILE_GROUP_ADMIN_UPDATE", error)
@@ -2915,7 +3062,7 @@ class WhiteNoiseAppState private constructor(
             runCatchingCancellable {
                 withGroupCommitLock(account, groupIdHex) {
                     val result =
-                        marmotIo {
+                        marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
                             inviteMembersDetailed(account, groupIdHex, listOf(ref))
                         }
                     chatsController?.applyProfileGroupDetails(account, result.details)
@@ -3008,9 +3155,19 @@ class WhiteNoiseAppState private constructor(
         activeConversationAccountRef == accountRef &&
             activeConversationGroupIdHex?.equals(groupIdHex, ignoreCase = true) == true
 
+    private val marmotBridgeTracer = MarmotBridgeTracer()
+
     suspend fun <T> marmotIo(block: suspend Marmot.() -> T): T =
         withContext(Dispatchers.IO) {
             marmot().block()
+        }
+
+    suspend fun <T> marmotIo(
+        traceSection: String,
+        block: suspend Marmot.() -> T,
+    ): T =
+        withContext(Dispatchers.IO) {
+            marmotBridgeTracer.trace(traceSection) { marmot().block() }
         }
 
     /**
@@ -3045,7 +3202,10 @@ class WhiteNoiseAppState private constructor(
      */
     internal fun launchCatchUpAccounts() {
         if (accountCatchUpJob?.isActive == true) return
-        accountCatchUpJob = notificationScope.launch { catchUpAccounts() }
+        accountCatchUpJob =
+            notificationScope.launch {
+                if (catchUpAccountsBestEffort()) recordStartupRelayCatchUpReady()
+            }
     }
 
     private suspend fun catchUpAccountsBestEffort(): Boolean =
@@ -3127,7 +3287,36 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    suspend fun bootstrap() = bootstrapMutex.withLock { bootstrapLocked() }
+    /**
+     * Bootstrap belongs to the process, not the first composition that awaited
+     * it. A caller gets an actionable timeout while the single underlying
+     * attempt remains alive; retry re-awaits that attempt instead of starting a
+     * second Marmot runtime beside a blocked native call.
+     */
+    suspend fun bootstrap() {
+        val attempt =
+            withContext(Dispatchers.Main.immediate) {
+                if (phase is AppPhase.Failed) phase = AppPhase.Bootstrapping
+                bootstrapAttempts.currentOrStart {
+                    mutationsScope.async { bootstrapLocked() }
+                }
+            }
+        val completed = awaitBootstrapAttempt(attempt, BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS)
+        if (!completed) {
+            withContext(Dispatchers.Main.immediate) {
+                if (attempt.isActive && phase == AppPhase.Bootstrapping) {
+                    phase =
+                        AppPhase.Failed(
+                            privacySafeErrorPresentation(
+                                operationCode = "APP_BOOTSTRAP_TIMEOUT",
+                                throwable = IllegalStateException("bootstrap stage exceeded deadline"),
+                                message = AppText.Resource(R.string.startup_taking_too_long),
+                            ),
+                        )
+                }
+            }
+        }
+    }
 
     private suspend fun bootstrapLocked() {
         if (client != null && phase != AppPhase.Bootstrapping) {
@@ -3137,25 +3326,23 @@ class WhiteNoiseAppState private constructor(
         }
         phase = AppPhase.Bootstrapping
         try {
-            val opened =
-                withContext(Dispatchers.IO) {
-                    client ?: MarmotClient(appContext).also { client = it }
-                }
-            appStateDebug { "bootstrap root=${opened.rootPath}" }
-            withContext(Dispatchers.IO) {
-                opened.marmot.configurePrivacyRuntime()
-                opened.marmot.start()
+            startBootstrapRuntime()
+            traceStartupStage("notification-privacy-setup") {
+                localNotificationPresenter.ensureChannels()
+                refreshLocalNotificationPermission()
+                startNotificationListener()
+                refreshSecurityPrivacySettings()
             }
-            appStateDebug { "marmot started" }
-            localNotificationPresenter.ensureChannels()
-            refreshLocalNotificationPermission()
-            startNotificationListener()
-            refreshSecurityPrivacySettings()
-            refreshAccounts()
+            val refreshedAccounts = traceStartupStage("account-refresh") { refreshAccountSnapshot() }
+            prepareStartupUnreadRefresh(refreshedAccounts)
+            migrateLegacyDrafts()
+            migrateLegacyMutePreferences()
             // Resolve interrupted editor commits against MDK before any draft
             // is reopened, and reclaim encrypted sources with no live session.
-            messageDraftRepository.reconcileEditorState(editorSourceStore).onFailure {
-                appStateDebug(it) { "photo editor reconciliation deferred: ${it.readableMessage()}" }
+            traceStartupStage("draft-reconciliation") {
+                messageDraftRepository.reconcileEditorState(editorSourceStore).onFailure {
+                    appStateDebug(it) { "photo editor reconciliation deferred: ${it.readableMessage()}" }
+                }
             }
             appStateDebug {
                 "accounts loaded count=${accounts.size} active=$activeAccountRef labels=${accounts.map { it.label.take(8) to it.running }}"
@@ -3164,28 +3351,70 @@ class WhiteNoiseAppState private constructor(
             // BEFORE the reconciliation below (setActiveAccount can sign in a
             // signed-out account / re-key media, warmProfile publishes) drives any
             // signing for an external-signing account.
-            reregisterExternalSigners()
+            traceStartupStage("external-signer-registration") { reregisterExternalSigners() }
             if (accounts.isEmpty()) {
                 localNotificationSettings = null
+                pendingStartupUnreadRefresh = null
                 phase = AppPhase.Onboarding
             } else {
-                if (activeAccountRef == null || accounts.none { it.label == activeAccountRef }) {
-                    setActiveAccount(accounts.first().label)
-                } else {
-                    // Reconcile the persisted active ref with the engine — e.g.
-                    // sign in if the account was non-destructively signed out, and
-                    // re-key the media matrix that was seeded before accounts loaded.
-                    setActiveAccount(activeAccountRef!!)
+                traceStartupStage("account-activation") {
+                    val target =
+                        activeAccountRef?.takeIf { ref -> accounts.any { it.label == ref } }
+                            ?: accounts.first().label
+                    // The callback is the local-ready boundary. The shell mounts
+                    // before profile/notification/push warmup and before the
+                    // cross-account unread roster fold.
+                    setActiveAccount(
+                        label = target,
+                        deferUnreadRefresh = true,
+                        onActivated = { phase = AppPhase.Ready },
+                    )
                 }
-                refreshLocalNotificationSettings()
-                phase = AppPhase.Ready
-                activeAccount?.accountIdHex?.let { warmProfile(it) }
+                // Preserve the old behavior when an attempted sign-in returns
+                // before reaching setActiveAccount's activation callback.
+                if (phase == AppPhase.Bootstrapping) phase = AppPhase.Ready
             }
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
             appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
             phase = AppPhase.Failed(privacySafeErrorPresentation("APP_BOOTSTRAP", error))
         }
+    }
+
+    private suspend fun startBootstrapRuntime(): MarmotClient {
+        val opened =
+            bootstrapRuntime.open(
+                construct = {
+                    traceStartupStage("client-construction") {
+                        withContext(Dispatchers.IO) {
+                            MarmotClient(appContext).also { runtime ->
+                                AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
+                                    runtime.marmot.downloadProfileImage(url, maxBytes)
+                                }
+                            }
+                        }
+                    }
+                },
+                configure = { runtime ->
+                    appStateDebug { "bootstrap root=${runtime.rootPath}" }
+                    traceStartupStage("privacy-runtime-configuration") {
+                        withContext(Dispatchers.IO) { runtime.marmot.configurePrivacyRuntime() }
+                    }
+                },
+                start = { runtime ->
+                    traceStartupStage("marmot-start") {
+                        withContext(Dispatchers.IO) { runtime.marmot.start() }
+                    }
+                    appStateDebug { "marmot started" }
+                },
+                closeAfterFailure = { runtime ->
+                    traceStartupStage("failed-runtime-close") {
+                        withContext(Dispatchers.IO) { runtime.marmot.shutdownAndClose() }
+                    }
+                },
+            )
+        client = opened
+        return opened
     }
 
     suspend fun ensureNotificationRuntimeStarted() {
@@ -3298,6 +3527,7 @@ class WhiteNoiseAppState private constructor(
             clearCrossAccountCaches()
         }
         accounts = accountSummariesWithCreatedIdentity(accounts, summary)
+        accountListRevision += 1L
         activeAccountRef = summary.label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, summary.label).apply()
         localNotificationSettings = null
@@ -3504,7 +3734,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    suspend fun refreshAccounts() {
+    private suspend fun refreshAccountSnapshot(): List<AccountSummaryFfi> {
         val refreshedAccounts = marmotIo { listAccounts() }
         val bubbleColorMigrationSucceeded =
             withContext(Dispatchers.IO) {
@@ -3520,7 +3750,13 @@ class WhiteNoiseAppState private constructor(
             globalBubbleColors.clear()
         }
         accounts = refreshedAccounts
+        accountListRevision += 1L
         releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+        return refreshedAccounts
+    }
+
+    suspend fun refreshAccounts() {
+        val refreshedAccounts = refreshAccountSnapshot()
         refreshAccountUnreadCounts(refreshedAccounts)
     }
 
@@ -3583,9 +3819,18 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private suspend fun refreshAccountUnreadCounts(accountSummaries: List<AccountSummaryFfi> = accounts) {
+    @Suppress(
+        "ReturnCount", // Empty, stale-empty, and stale-in-flight snapshots each stop before publishing.
+        "CyclomaticComplexMethod", // Raw and roster-aware paths deliberately share one guarded publication point.
+    )
+    private suspend fun refreshAccountUnreadCounts(
+        accountSummaries: List<AccountSummaryFfi> = accounts,
+        loadMemberRosters: Boolean = true,
+        stillCurrent: () -> Boolean = { true },
+    ) {
         val signingAccounts = accountSummaries.filter { it.isSignedInSigningAccount() }
         if (signingAccounts.isEmpty()) {
+            if (!stillCurrent()) return
             accountUnreadCounts = emptyMap()
             retainManualUnreadRefs(emptySet())
             return
@@ -3594,10 +3839,16 @@ class WhiteNoiseAppState private constructor(
         val previous = accountUnreadCounts
         val rawCountsByHex =
             runCatchingCancellable {
-                marmotIo { accountUnreadSummary().associateBy { it.accountIdHex } }
+                marmotIo { accountUnreadSummary().associate { it.accountIdHex to it.unreadCount } }
             }.onFailure {
                 appStateDebug(it) { "account unread summary refresh failed: ${it.readableMessage()}" }
             }.getOrNull()
+        if (!loadMemberRosters) {
+            if (!stillCurrent()) return
+            accountUnreadCounts = rawAccountUnreadCounts(signingAccounts, rawCountsByHex, previous)
+            retainManualUnreadRefs(signingAccounts.mapTo(mutableSetOf(), AccountSummaryFfi::label))
+            return
+        }
         val accountGate = Semaphore(ACCOUNT_UNREAD_ACCOUNT_FANOUT)
         // Share one roster gate across the whole bulk refresh so member FFI
         // fan-out stays bounded across all signed-in accounts, not per account.
@@ -3608,30 +3859,26 @@ class WhiteNoiseAppState private constructor(
                     .map { summary ->
                         async {
                             accountGate.withPermit {
-                                val rawCount = rawCountsByHex?.get(summary.accountIdHex)?.unreadCount
-                                val cheapZero =
-                                    rawCount == 0uL &&
-                                        manualUnreadFolded(summary.label) &&
-                                        summary.label !in accountManualUnreadRefs
-                                // The cheap engine total can't see the client's
-                                // manual-unread flag, so an account we believe is
-                                // manually flagged always takes the row fold —
-                                // which also refreshes that flag from the rows.
-                                summary.label to
-                                    if (cheapZero) {
-                                        0uL
-                                    } else {
-                                        refreshEffectiveAccountUnreadCount(summary, memberGate)
-                                            ?: rawCount
-                                            ?: previous[summary.label]
-                                            ?: 0uL
-                                    }
+                                refreshAccountUnreadFold(
+                                    summary = summary,
+                                    rawCount = rawCountsByHex?.get(summary.accountIdHex),
+                                    previousCount = previous[summary.label],
+                                    memberGate = memberGate,
+                                )
                             }
                         }
                     }.awaitAll()
             }
         val refreshedCounts = linkedMapOf<String, ULong>()
-        refreshedPairs.forEach { (label, count) -> refreshedCounts[label] = count }
+        refreshedPairs.forEach { refreshedCounts[it.accountRef] = it.unreadCount }
+        // A sign-out/account refresh may have completed while the cold-start
+        // fold was suspended. Discard that obsolete result rather than
+        // resurrecting counts for an account no longer in the authoritative
+        // list; the newer lifecycle operation owns convergence.
+        if (!stillCurrent()) return
+        refreshedPairs.forEach { result ->
+            result.hasManualUnread?.let { updateAccountManualUnread(result.accountRef, it) }
+        }
         // Re-read after the FFI suspension: a single-key merge
         // (updateAccountUnreadCount / refreshAccountUnreadCount) may have landed
         // while we were suspended. Those values are fresher than our snapshot, so
@@ -3646,6 +3893,28 @@ class WhiteNoiseAppState private constructor(
         retainManualUnreadRefs(refreshedCounts.keys)
     }
 
+    private suspend fun refreshAccountUnreadFold(
+        summary: AccountSummaryFfi,
+        rawCount: ULong?,
+        previousCount: ULong?,
+        memberGate: Semaphore,
+    ): AccountUnreadFoldResult {
+        val cheapZero =
+            rawCount == 0uL &&
+                manualUnreadFolded(summary.label) &&
+                summary.label !in accountManualUnreadRefs
+        // The cheap engine total can't see the client's manual-unread flag, so
+        // an account believed to be manually flagged still takes the row fold.
+        if (!cheapZero) {
+            refreshEffectiveAccountUnreadCount(summary, memberGate)?.let { return it }
+        }
+        return AccountUnreadFoldResult(
+            accountRef = summary.label,
+            unreadCount = if (cheapZero) 0uL else rawCount ?: previousCount ?: 0uL,
+            hasManualUnread = null,
+        )
+    }
+
     /**
      * Reads one account's durable chat-list rows and folds them with loaded
      * member rosters so removed/left groups no longer contribute frozen unread
@@ -3657,7 +3926,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun refreshEffectiveAccountUnreadCount(
         summary: AccountSummaryFfi,
         memberGate: Semaphore = Semaphore(ACCOUNT_UNREAD_MEMBER_FANOUT),
-    ): ULong? {
+    ): AccountUnreadFoldResult? {
         val ref = summary.label.takeIf { it.isNotBlank() } ?: return null
         return runCatchingCancellable {
             marmotIo {
@@ -3676,11 +3945,11 @@ class WhiteNoiseAppState private constructor(
                     ) { groupIdHex ->
                         groupMembers(ref, groupIdHex)
                     }
-                updateAccountManualUnread(
-                    ref,
-                    accountHasManualUnread(rows, summary.accountIdHex, membersByGroupId),
+                AccountUnreadFoldResult(
+                    accountRef = ref,
+                    unreadCount = accountUnreadCount(rows, summary.accountIdHex, membersByGroupId),
+                    hasManualUnread = accountHasManualUnread(rows, summary.accountIdHex, membersByGroupId),
                 )
-                accountUnreadCount(rows, summary.accountIdHex, membersByGroupId)
             }
         }.onFailure {
             appStateDebug(it) { "account unread refresh failed for ${ref.take(8)}: ${it.readableMessage()}" }
@@ -3704,12 +3973,14 @@ class WhiteNoiseAppState private constructor(
         // skip refs we don't know about (matches refreshAccountUnreadCounts'
         // filter).
         val summary = accounts.firstOrNull { it.isSignedInSigningAccount() && it.label == ref } ?: return
-        val unreadCount = refreshEffectiveAccountUnreadCount(summary) ?: return
-        accountUnreadCounts = accountUnreadCounts + (ref to unreadCount)
+        val result = refreshEffectiveAccountUnreadCount(summary) ?: return
+        result.hasManualUnread?.let { updateAccountManualUnread(result.accountRef, it) }
+        accountUnreadCounts = accountUnreadCounts + (ref to result.unreadCount)
     }
 
     suspend fun setActiveAccount(
         label: String,
+        deferUnreadRefresh: Boolean = false,
         onActivated: () -> Unit = {},
     ) {
         val switchingAccounts = label != activeAccountRef
@@ -3742,7 +4013,12 @@ class WhiteNoiseAppState private constructor(
                 presentFailure(R.string.toast_couldnt_sign_in_account, "ACCOUNT_SIGN_IN", it)
                 return
             }
-            refreshAccounts()
+            val refreshedAccounts = refreshAccountSnapshot()
+            if (deferUnreadRefresh) {
+                prepareStartupUnreadRefresh(refreshedAccounts)
+            } else {
+                refreshAccountUnreadCounts(refreshedAccounts)
+            }
         }
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
@@ -3761,15 +4037,74 @@ class WhiteNoiseAppState private constructor(
      * Records switch-to-first-local-frame latency without logging an account id.
      * A stale controller cannot finish a newer switch's trace.
      */
+    @Suppress("ReturnCount") // Stale controllers and absent/superseded traces are independent terminal states.
     internal fun recordAccountSwitchLocalSnapshotRendered(
         accountRef: String,
         rowCount: Int,
     ) {
+        // A controller that was superseded during startup can still finish its
+        // already-awaited draw. It must not publish the process-wide local-ready
+        // boundary or start the deferred unread fold for the new account.
+        if (activeAccountRef != accountRef) return
+        recordStartupLocalSnapshotRendered()
         val trace = pendingAccountSwitchTrace ?: return
-        if (trace.accountRef != accountRef || activeAccountRef != accountRef) return
+        if (trace.accountRef != accountRef) return
         pendingAccountSwitchTrace = null
         val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
         appStateDebug { "account-switch first-local-frame +${elapsedMs}ms rows=$rowCount" }
+    }
+
+    private fun prepareStartupUnreadRefresh(accountSummaries: List<AccountSummaryFfi>) {
+        pendingStartupUnreadRefresh =
+            StartupUnreadRefresh(
+                accounts = accountSummaries,
+                accountListRevision = accountListRevision,
+            )
+    }
+
+    /** Called only after the controller's authoritative SQLite snapshot drew. */
+    private fun recordStartupLocalSnapshotRendered() {
+        if (!startupFirstLocalFrameRecorded) {
+            startupFirstLocalFrameRecorded = true
+            startupTiming("first-local-frame", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+        }
+        val pending = pendingStartupUnreadRefresh ?: return
+        pendingStartupUnreadRefresh = null
+        val revisionGuard =
+            StartupUnreadRevisionGuard(pending.accountListRevision) {
+                accountListRevision
+            }
+        mutationsScope.launch {
+            traceStartupStage("unread-aggregate-refresh") {
+                refreshAccountUnreadCounts(pending.accounts, stillCurrent = revisionGuard::isCurrent)
+            }
+            if (revisionGuard.isCurrent()) {
+                startupTiming("unread-aggregate-ready", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+            }
+        }
+    }
+
+    private fun recordStartupRelayCatchUpReady() {
+        if (startupRelayCatchUpRecorded) return
+        startupRelayCatchUpRecorded = true
+        startupTiming("relay-catch-up-ready", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+    }
+
+    private suspend fun <T> traceStartupStage(
+        stage: String,
+        block: suspend () -> T,
+    ): T {
+        val startedAtMs = SystemClock.elapsedRealtime()
+        return try {
+            block()
+        } finally {
+            val nowMs = SystemClock.elapsedRealtime()
+            startupTiming(
+                stage = stage,
+                elapsedMs = nowMs - startupTraceStartedAtMs,
+                durationMs = nowMs - startedAtMs,
+            )
+        }
     }
 
     /**
@@ -3929,6 +4264,8 @@ class WhiteNoiseAppState private constructor(
         assertMainThread { "clearCrossAccountCaches" }
         profileCacheEpoch.incrementAndGet()
         accountScopedCaches.clearAll()
+        authoritativeMuteOverrides.clear()
+        pendingMuteCommands.clear()
         GroupAvatarImageLoader.clear()
         pruneIdleGroupCommitLocks()
         profileRevision += 1
@@ -4079,6 +4416,7 @@ class WhiteNoiseAppState private constructor(
             }
             val refreshedAccounts = runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())
             accounts = refreshedAccounts
+            accountListRevision += 1L
             releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
             refreshAccountUnreadCounts(refreshedAccounts)
             val next = refreshedAccounts.firstOrNull()?.label
@@ -4706,7 +5044,24 @@ class WhiteNoiseAppState private constructor(
 
     fun isConversationMuted(groupIdHex: String): Boolean {
         val accountRef = activeAccountRef ?: return false
-        return chatMutePreferences.isMuted(accountRef, groupIdHex)
+        return effectiveMuteOverride(
+            authoritativeMuteOverrides[ChatMutePreferences.compositeKey(accountRef, groupIdHex)],
+            System.currentTimeMillis(),
+        )?.muted
+            ?: engineConversationMuted(groupIdHex)
+    }
+
+    fun isConversationMutePending(groupIdHex: String): Boolean {
+        val accountRef = activeAccountRef ?: return false
+        return (pendingMuteCommands[ChatMutePreferences.compositeKey(accountRef, groupIdHex)] ?: 0) > 0
+    }
+
+    internal fun conversationMuteOverride(groupIdHex: String): dev.ipf.marmotkit.ChatNotificationSettingsFfi? {
+        val accountRef = activeAccountRef ?: return null
+        return effectiveMuteOverride(
+            authoritativeMuteOverrides[ChatMutePreferences.compositeKey(accountRef, groupIdHex)],
+            System.currentTimeMillis(),
+        )
     }
 
     fun conversationNotifyMode(groupIdHex: String): ChatNotifyMode {
@@ -4773,12 +5128,34 @@ class WhiteNoiseAppState private constructor(
         mode: ChatNotifyMode,
     ) {
         val accountRef = activeAccountRef ?: return
-        chatMutePreferences.setMode(accountRef, groupIdHex, mode)
-        syncEngineMute(accountRef, groupIdHex)
+        if (mode == ChatNotifyMode.NONE) {
+            setConversationMuted(groupIdHex, true)
+        } else {
+            chatMutePreferences.setNotifyForMode(accountRef, groupIdHex, mode)
+            setConversationMuted(groupIdHex, false)
+        }
     }
 
     /** The engine's durable mute projection for the chat, from the live list. */
-    fun engineConversationMuted(groupIdHex: String): Boolean = chatsController?.items?.firstOrNull { it.group.groupIdHex == groupIdHex }?.engineMuted() == true
+    fun engineConversationMuted(groupIdHex: String): Boolean =
+        (chatsController?.items.orEmpty() + chatsController?.archivedItems.orEmpty())
+            .firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+            ?.engineMuted() == true
+
+    internal fun acceptAuthoritativeMuteProjection(
+        accountRef: String?,
+        groupIdHex: String,
+        muted: Boolean,
+        mutedUntilMs: Long?,
+    ) {
+        accountRef ?: return
+        val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
+        val override = authoritativeMuteOverrides[key] ?: return
+        val commandPending = (pendingMuteCommands[key] ?: 0) > 0
+        if (shouldDropMuteOverride(override, muted, mutedUntilMs, commandPending)) {
+            authoritativeMuteOverrides.remove(key)
+        }
+    }
 
     fun setConversationNotifyForMode(
         groupIdHex: String,
@@ -4793,8 +5170,7 @@ class WhiteNoiseAppState private constructor(
         muted: Boolean,
     ) {
         val accountRef = activeAccountRef ?: return
-        chatMutePreferences.setMuted(accountRef, groupIdHex, muted)
-        syncEngineMute(accountRef, groupIdHex)
+        if (muted) submitMuteCommand(accountRef, groupIdHex, null) else submitUnmuteCommand(accountRef, groupIdHex)
     }
 
     /** Mute the chat for [durationMillis], auto-restoring the current mode after. */
@@ -4803,8 +5179,8 @@ class WhiteNoiseAppState private constructor(
         durationMillis: Long,
     ) {
         val accountRef = activeAccountRef ?: return
-        chatMutePreferences.muteFor(accountRef, groupIdHex, durationMillis)
-        syncEngineMute(accountRef, groupIdHex)
+        val expiry = if (durationMillis <= 0) null else System.currentTimeMillis() + durationMillis
+        submitMuteCommand(accountRef, groupIdHex, expiry)
     }
 
     /** Mute the chat until the exact future Unix epoch-millisecond [expiryMillis]. */
@@ -4813,48 +5189,151 @@ class WhiteNoiseAppState private constructor(
         expiryMillis: Long,
     ) {
         val accountRef = activeAccountRef ?: return
-        chatMutePreferences.muteUntil(accountRef, groupIdHex, expiryMillis)
-        syncEngineMute(accountRef, groupIdHex)
+        if (expiryMillis > System.currentTimeMillis()) submitMuteCommand(accountRef, groupIdHex, expiryMillis)
     }
 
-    /**
-     * Mirror the app-side mute decision into the engine's durable notification
-     * settings, so the projected row (`muted`/`mutedUntilMs`) and any other
-     * device agree with this one. Local preferences stay the immediate source
-     * for notification suppression — this write is convergence, not gating.
-     */
-    private val engineMuteMutex = Mutex()
+    /** Sends the command to MDK; UI changes only after MDK returns its authoritative settings. */
+    private fun submitMuteCommand(
+        accountRef: String,
+        groupIdHex: String,
+        mutedUntilMs: Long?,
+    ) {
+        val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
+        pendingMuteCommands[key] = (pendingMuteCommands[key] ?: 0) + 1
+        mutationsScope.launch {
+            chatMuteRepository
+                .setMuted(accountRef, groupIdHex, mutedUntilMs)
+                .onSuccess { if (activeAccountRef == accountRef) authoritativeMuteOverrides[key] = it }
+                .onFailure { presentFailure(R.string.toast_couldnt_update_notifications, "CHAT_MUTE_UPDATE", it) }
+            finishMuteCommand(key)
+        }
+    }
 
-    private fun syncEngineMute(
+    private fun submitUnmuteCommand(
         accountRef: String,
         groupIdHex: String,
     ) {
+        val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
+        pendingMuteCommands[key] = (pendingMuteCommands[key] ?: 0) + 1
         mutationsScope.launch {
-            // Serialize writes and read the preferences inside the lock, so
-            // the last write always mirrors the newest local decision even
-            // when rapid toggles race their IO completions.
-            engineMuteMutex.withLock {
-                val muted = chatMutePreferences.isMuted(accountRef, groupIdHex)
-                val expiry = chatMutePreferences.muteExpiryMillis(accountRef, groupIdHex)
-                runCatchingCancellable {
-                    marmotIo {
-                        if (muted) {
-                            setChatMuted(accountRef, groupIdHex, expiry)
-                        } else {
-                            clearChatMuted(accountRef, groupIdHex)
-                        }
-                    }
-                }.onFailure {
-                    appStateDebug(it) { "engine mute sync failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
+            chatMuteRepository
+                .clearMuted(accountRef, groupIdHex)
+                .onSuccess { if (activeAccountRef == accountRef) authoritativeMuteOverrides[key] = it }
+                .onFailure { presentFailure(R.string.toast_couldnt_update_notifications, "CHAT_MUTE_UPDATE", it) }
+            finishMuteCommand(key)
+        }
+    }
+
+    private fun finishMuteCommand(key: String) {
+        val remaining = (pendingMuteCommands[key] ?: 0) - 1
+        if (remaining <= 0) pendingMuteCommands.remove(key) else pendingMuteCommands[key] = remaining
+    }
+
+    private suspend fun migrateLegacyMutePreferences() {
+        chatMutePreferences.legacyMuteEntries().forEach { legacy ->
+            val authoritative =
+                chatMuteRepository.settings(legacy.accountRef, legacy.groupIdHex).getOrNull()
+                    ?: return@forEach
+            if (legacy.expiryMillis?.let { it <= System.currentTimeMillis() } == true) {
+                chatMutePreferences.setNotifyForMode(legacy.accountRef, legacy.groupIdHex, legacy.restoreMode)
+                chatMutePreferences.confirmLegacyMuteMigrated(legacy.key)
+                return@forEach
+            }
+            // Existing MDK state always wins. A local-only legacy mute is copied once.
+            val confirmed =
+                if (authoritative.muted || authoritative.updatedAtMs > 0L) {
+                    authoritative
+                } else {
+                    chatMuteRepository
+                        .setMuted(
+                            legacy.accountRef,
+                            legacy.groupIdHex,
+                            legacy.expiryMillis?.takeIf { it > System.currentTimeMillis() },
+                        ).getOrNull()
+                }
+            if (confirmed?.muted == true) {
+                chatMutePreferences.setNotifyForMode(
+                    legacy.accountRef,
+                    legacy.groupIdHex,
+                    legacy.restoreMode,
+                )
+                chatMutePreferences.confirmLegacyMuteMigrated(legacy.key)
+            }
+        }
+    }
+
+    private suspend fun migrateLegacyDrafts() {
+        val accountRefsById = accounts.associate { it.accountIdHex to it.label }
+        val legacyDrafts = withContext(Dispatchers.IO) { legacyDraftMigrationSource.read() }
+        legacyDrafts.forEach { (legacyKey, encoded) ->
+            migrateLegacyDraft(accountRefsById, legacyKey, encoded)
+        }
+    }
+
+    private suspend fun migrateLegacyDraft(
+        accountRefsById: Map<String, String>,
+        legacyKey: String,
+        encoded: String,
+    ) {
+        val separator = legacyKey.indexOf(' ')
+        separator.takeIf { it > 0 && it < legacyKey.lastIndex }?.let { validSeparator ->
+            accountRefsById[legacyKey.substring(0, validSeparator)]?.let { accountRef ->
+                val groupIdHex = legacyKey.substring(validSeparator + 1)
+                val legacyContent = decodeLegacyDraftForMigration(encoded)
+                if (legacyContent == null) {
+                    confirmLegacyDraftMigrated(legacyKey)
+                } else {
+                    migrateDecodedLegacyDraft(legacyKey, accountRef, groupIdHex, legacyContent)
                 }
             }
         }
     }
 
+    private suspend fun migrateDecodedLegacyDraft(
+        legacyKey: String,
+        accountRef: String,
+        groupIdHex: String,
+        legacyContent: String,
+    ) {
+        val currentResult = messageDraftRepository.draft(accountRef, groupIdHex)
+        val current = currentResult.getOrNull()
+        if (currentResult.isSuccess) {
+            val result =
+                if (current == null || (current.content.isBlank() && legacyContent.isNotBlank())) {
+                    messageDraftRepository.saveText(accountRef, groupIdHex, legacyContent)
+                } else {
+                    MessageDraftMutationResult.Success(current)
+                }
+            (result as? MessageDraftMutationResult.Success)?.let { confirmed ->
+                val matchesLegacy = confirmed.draft?.content == legacyContent
+                val confirmedBlankDeletion = legacyContent.isBlank() && confirmed.draft == null
+                val authoritativeContentWins = current?.content?.isNotBlank() == true
+                if (matchesLegacy || confirmedBlankDeletion || authoritativeContentWins) {
+                    confirmLegacyDraftMigrated(legacyKey)
+                }
+            }
+        }
+    }
+
+    private suspend fun confirmLegacyDraftMigrated(legacyKey: String) {
+        withContext(Dispatchers.IO) { legacyDraftMigrationSource.confirmMigrated(legacyKey) }
+    }
+
+    suspend fun authoritativeConversationMuteSettings(groupIdHex: String) =
+        activeAccountRef?.let { accountRef -> chatMuteRepository.settings(accountRef, groupIdHex).getOrNull() }
+
     /** Remaining timed-mute expiry (epoch millis) for the chat, or null. */
     fun conversationMuteExpiryMillis(groupIdHex: String): Long? {
         val accountRef = activeAccountRef ?: return null
-        return chatMutePreferences.muteExpiryMillis(accountRef, groupIdHex)
+        val override = authoritativeMuteOverrides[ChatMutePreferences.compositeKey(accountRef, groupIdHex)]
+        return if (override != null) {
+            effectiveMuteOverride(override, System.currentTimeMillis())?.mutedUntilMs
+        } else {
+            (chatsController?.items.orEmpty() + chatsController?.archivedItems.orEmpty())
+                .firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+                ?.projection
+                ?.mutedUntilMs
+        }
     }
 
     fun ttsEngineChoice(): TtsEngineChoice = ttsResolution?.engineChoice() ?: TtsEngineChoice(null, emptyList())
@@ -5331,13 +5810,9 @@ class WhiteNoiseAppState private constructor(
         if (foreground) {
             maybeShowAppLockForForeground()
             dismissVisibleConversationNotifications()
-            // The timed-mute scheduler's delay is frozen during device deep sleep,
-            // so mutes that elapsed while asleep must be resolved on resume or the
-            // chat-list badge and folder rules stay muted until a getter runs.
-            chatMutePreferences.resolveExpiredNow()
         } else {
             recordAppLockBackgrounded()
-            mutationsScope.launch(Dispatchers.IO) { draftStore.flush() }
+            mutationsScope.launch { draftWriter.flush() }
             // Read-aloud is foreground-only in v1 (no mediaPlayback FGS):
             // spoken private messages must not continue after an app switch.
             stopSpeaking()
@@ -5375,7 +5850,7 @@ class WhiteNoiseAppState private constructor(
      */
     fun onTaskRemoved() {
         updateNotificationSuppression(suppression.onTaskRemoved())
-        mutationsScope.launch(Dispatchers.IO) { draftStore.flush() }
+        mutationsScope.launch { draftWriter.flush() }
     }
 
     private fun applyActiveConversationTransition(groupIdHex: String?) {
@@ -6665,7 +7140,7 @@ class WhiteNoiseAppState private constructor(
             val presentation =
                 ProfilePresentation(
                     displayName = displayName,
-                    avatarUrl = ProfileSanitizer.imageUrl(profile.picture),
+                    avatarUrl = ProfileSanitizer.protocolImageUrl(profile.picture),
                 )
             // Drop the result if an account switch / sign-out cleared the caches
             // while this refresh was in flight, so we don't repopulate them with
@@ -6797,7 +7272,7 @@ class WhiteNoiseAppState private constructor(
      */
     suspend fun createProfileChatGroup(npub: String): String {
         val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
-        return marmotIo { createGroup(account, "", listOf(npub), null) }
+        return marmotIo(MarmotTraceSection.CREATE_GROUP) { createGroup(account, "", listOf(npub), null) }
     }
 
     private var chatCreateOpenTiming: ChatCreateOpenTiming? = null
@@ -6832,9 +7307,29 @@ class WhiteNoiseAppState private constructor(
     suspend fun loadCreatedChatListItem(groupIdHex: String): ChatListItem {
         val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
         markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_START)
-        val details = marmotIo { groupDetails(account, groupIdHex) }
+        val item = loadAuthoritativeChatListItem(account, groupIdHex)
         markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_RETURN)
-        val activeAccountIdHex = accounts.firstOrNull { it.label == account }?.accountIdHex
+        return item
+    }
+
+    /**
+     * Targeted local read for a message-notification tap. This avoids waiting
+     * for the target account's broad chat-list projection to bind (#586).
+     */
+    suspend fun loadNotificationChatListItem(
+        accountRef: String,
+        groupIdHex: String,
+    ): ChatListItem {
+        check(activeAccountRef == accountRef) { "notification target account is not active" }
+        return loadAuthoritativeChatListItem(accountRef, groupIdHex)
+    }
+
+    private suspend fun loadAuthoritativeChatListItem(
+        accountRef: String,
+        groupIdHex: String,
+    ): ChatListItem {
+        val details = marmotIo { groupDetails(accountRef, groupIdHex) }
+        val activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
         return chatListItemFromAuthoritativeGroupDetails(details, activeAccountIdHex)
     }
 
@@ -6928,8 +7423,44 @@ class WhiteNoiseAppState private constructor(
         title: AppText,
         detail: AppText? = null,
     ) {
+        setTransientNotice(title, detail)
+    }
+
+    fun presentConversationTransient(
+        accountRef: String,
+        groupIdHex: String,
+        @StringRes titleRes: Int,
+        detail: AppText? = null,
+    ) {
+        presentConversationTransient(accountRef, groupIdHex, AppText.Resource(titleRes), detail)
+    }
+
+    fun presentConversationTransient(
+        accountRef: String,
+        groupIdHex: String,
+        title: AppText,
+        detail: AppText? = null,
+    ) {
+        setTransientNotice(
+            title = title,
+            detail = detail,
+            conversation = ConversationNoticeDestination(accountRef, groupIdHex),
+        )
+    }
+
+    private fun setTransientNotice(
+        title: AppText,
+        detail: AppText? = null,
+        conversation: ConversationNoticeDestination? = null,
+    ) {
         transientNoticeSequence += 1L
-        transientNotice = TransientNotice(transientNoticeSequence, title, detail)
+        transientNotice =
+            TransientNotice(
+                id = transientNoticeSequence,
+                title = title,
+                detail = detail,
+                conversation = conversation,
+            )
     }
 
     fun presentTransient(
@@ -7219,8 +7750,8 @@ class WhiteNoiseAppState private constructor(
     // asynchronously. Fall back to the payload picture when the local profile
     // has none. Sanitize every URL before fetching it.
     private suspend fun notificationSenderAvatarUrl(update: NotificationUpdateFfi): String? =
-        ProfileSanitizer.imageUrl(loadUserProfile(update.sender.accountIdHex)?.picture)
-            ?: ProfileSanitizer.imageUrl(update.sender.pictureUrl)
+        ProfileSanitizer.protocolImageUrl(loadUserProfile(update.sender.accountIdHex)?.picture)
+            ?: ProfileSanitizer.protocolImageUrl(update.sender.pictureUrl)
 
     private fun shouldPostNotification(
         update: NotificationUpdateFfi,
@@ -7241,7 +7772,7 @@ class WhiteNoiseAppState private constructor(
      * update in [processNotificationUpdate] and threaded through pre-warm,
      * the post decision, and the presenter's sync post-time re-check (which
      * cannot suspend). Prefers the active account's loaded projection;
-     * otherwise reads the engine's chat list directly, which also covers the
+     * otherwise reads the engine's notification settings directly, which also covers the
      * cold FCM process with no UI-owned controllers. Fail-open on errors: a
      * spurious notification from a muted chat beats a silently swallowed
      * real one.
@@ -7256,9 +7787,7 @@ class WhiteNoiseAppState private constructor(
                 ?.let { return it.engineMuted() }
         }
         return runCatchingCancellable {
-            marmotIo { chatList(update.accountRef, includeArchived = true) }
-                .firstOrNull { it.groupIdHex.equals(update.groupIdHex, ignoreCase = true) }
-                ?.muted == true
+            chatMuteRepository.settings(update.accountRef, update.groupIdHex).getOrThrow().muted
         }.getOrDefault(false)
     }
 
@@ -7297,7 +7826,7 @@ class WhiteNoiseAppState private constructor(
             if (target.resolveGroupAvatar) {
                 bestEffortNotificationAvatarLookup {
                     marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group.avatarUrl
-                }?.let { ProfileSanitizer.imageUrl(it) }
+                }?.let { ProfileSanitizer.protocolImageUrl(it) }
             } else {
                 null
             }
@@ -7331,7 +7860,7 @@ class WhiteNoiseAppState private constructor(
             preWarmedGroupAvatarUrl
                 ?: bestEffortNotificationAvatarLookup {
                     marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group.avatarUrl
-                }?.let { ProfileSanitizer.imageUrl(it) }
+                }?.let { ProfileSanitizer.protocolImageUrl(it) }
         }
 
     private fun notificationGroupTitleCopy(): GroupTitleCopy =
@@ -7740,7 +8269,7 @@ class WhiteNoiseAppState private constructor(
         val presentation =
             ProfilePresentation(
                 displayName = displayName,
-                avatarUrl = ProfileSanitizer.imageUrl(profile?.picture),
+                avatarUrl = ProfileSanitizer.protocolImageUrl(profile?.picture),
             )
         withContext(Dispatchers.Main.immediate) {
             if (profileCacheEpoch.get() == epoch) {
@@ -7807,9 +8336,6 @@ class WhiteNoiseAppState private constructor(
     init {
         applyLanguageTag(languageTag)
         if (startPlatformServices) {
-            // Drive timed-mute expiry emission so muted icons and folder rules
-            // refresh when a mute elapses, not only on the next getter call.
-            chatMutePreferences.attachExpiryScheduler(mutationsScope)
             if (BuildConfig.SELF_UPDATE_ENABLED) {
                 // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
                 mutationsScope.launch(Dispatchers.IO) { appSelfUpdateFlow.sweepStaleApks() }
@@ -7913,6 +8439,33 @@ private inline fun appStateDebug(
         Log.e("DMAppState", "operation failed: ${error.javaClass.simpleName}")
     }
 }
+
+internal suspend fun awaitBootstrapAttempt(
+    attempt: Deferred<Unit>,
+    timeoutMillis: Long,
+): Boolean =
+    withTimeoutOrNull(timeoutMillis) {
+        attempt.await()
+        true
+    } ?: false
+
+internal fun startupUnreadRefreshIsCurrent(
+    expectedRevision: Long,
+    currentRevision: Long,
+): Boolean = expectedRevision == currentRevision
+
+private fun startupTiming(
+    stage: String,
+    elapsedMs: Long,
+    durationMs: Long? = null,
+) {
+    if (BuildConfig.DEBUG || BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT == "staging") {
+        val duration = durationMs?.let { " duration_ms=${it.coerceAtLeast(0L)}" }.orEmpty()
+        Log.i("WNStartup", "stage=$stage elapsed_ms=${elapsedMs.coerceAtLeast(0L)}$duration")
+    }
+}
+
+private const val BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS = 15_000L
 
 private fun String?.nonBlankOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
 

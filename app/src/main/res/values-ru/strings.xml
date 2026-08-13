@@ -3,6 +3,8 @@
     <string name="app_name">White Noise</string>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">Не удалось запустить White Noise</string>
+    <string name="starting_securely">Безопасный запуск…</string>
+    <string name="startup_taking_too_long">Запуск занимает больше времени, чем ожидалось. Повторите попытку.</string>
     <string name="error_try_again">Что-то пошло не так. Повторите попытку. Если проблема не исчезнет, скопируйте отчёт об ошибке.</string>
     <string name="error_loaded_content_may_be_out_of_date">Загруженные данные по-прежнему доступны, но могли устареть. Повторная попытка…</string>
     <string name="error_loaded_content_kept">Не удалось загрузить дополнительные данные. Ваши сообщения по-прежнему доступны; повторите попытку, когда будете готовы.</string>
@@ -29,6 +31,21 @@
     <string name="chat_list_voice_unavailable">Голосовой поиск недоступен на этом устройстве</string>
     <string name="toast_demoted_but_couldnt_leave">Вы больше не администратор, но не удалось выйти из группы</string>
     <string name="chat_list_search_hint">Поиск чатов</string>
+    <string name="chat_list_search_filters">Фильтры</string>
+    <string name="chat_list_search_filters_button">Фильтры (%1$d)</string>
+    <plurals name="chat_list_search_filters_active">
+        <item quantity="one">%1$d активный фильтр</item>
+        <item quantity="few">%1$d активных фильтра</item>
+        <item quantity="many">%1$d активных фильтров</item>
+        <item quantity="other">%1$d активных фильтров</item>
+    </plurals>
+    <string name="chat_list_search_clear_all_filters">Очистить все</string>
+    <string name="chat_list_search_filter_sheet_title">Фильтры</string>
+    <string name="chat_list_search_filter_chat">Чат</string>
+    <string name="chat_list_search_filter_sender">Отправитель</string>
+    <string name="chat_list_search_filter_date">Дата</string>
+    <string name="chat_list_search_filter_content">Содержимое</string>
+    <string name="chat_list_search_filter_remove">Удалить %1$s</string>
     <string name="chat_list_filter_all">Все</string>
     <string name="chat_list_filter_unread">Непрочитанные</string>
     <string name="chat_list_no_unread">Всё прочитано</string>
@@ -626,6 +643,7 @@
     <string name="toast_couldnt_publish_profile">Не удалось опубликовать профиль</string>
     <string name="toast_send_failed">Отправить не удалось</string>
     <string name="toast_send_queue_full">В этом чате слишком много сообщений ожидает отправки, поэтому ваше не отправлено. Повторите попытку, когда очередь разберётся.</string>
+    <string name="toast_chat_still_loading">Этот чат ещё загружается. Повторите попытку чуть позже.</string>
     <string name="toast_send_membership_verifying">Проверяем ваше участие в группе — сообщение не отправлено. Оно сохранено в поле ввода; повторите попытку через мгновение.</string>
     <string name="toast_reaction_failed">Реакция не удалась</string>
     <string name="toast_couldnt_delete_message">Не удалось удалить сообщение. Попробуйте снова.</string>
@@ -1355,6 +1373,7 @@
     <string name="tts_bar_next_message">Следующее сообщение</string>
     <string name="tts_bar_progress">Предложение %1$d из %2$d, сообщение %3$d из %4$d</string>
     <string name="tts_bar_stop">Остановить чтение</string>
+    <string name="tts_resume_follow">Возобновить слежение</string>
     <string name="tts_bar_error">Не удалось прочитать вслух</string>
     <string name="tts_bar_history_loading">Загрузка других сообщений…</string>
     <string name="tts_bar_history_error">Не удалось загрузить другие сообщения. Нажмите ещё раз, чтобы повторить.</string>
@@ -1454,4 +1473,21 @@
     <string name="attachment_type_video">Видео</string>
     <string name="attachment_type_image">Изображение</string>
     <string name="attachment_type_file">Файл</string>
+
+    <string name="global_search_date_filter_title">Дата</string>
+    <string name="global_search_date_any_time">В любое время</string>
+    <string name="global_search_date_today">Сегодня</string>
+    <string name="global_search_date_last_7_days">Последние 7 дней</string>
+    <string name="global_search_date_last_30_days">Последние 30 дней</string>
+    <string name="global_search_date_custom">Свой диапазон…</string>
+    <string name="global_search_date_custom_from">Дата начала</string>
+    <string name="global_search_date_custom_to">Дата окончания</string>
+    <string name="global_search_date_custom_summary">%1$s — %2$s</string>
+    <string name="global_search_date_custom_reversed_error">Дата окончания должна быть не раньше даты начала.</string>
+    <string name="global_search_content_text">Текст</string>
+    <string name="global_search_content_links">Ссылки</string>
+    <string name="global_search_content_images_video">Изображения и видео</string>
+    <string name="global_search_content_voice_audio">Голос и аудио</string>
+    <string name="global_search_content_files_documents">Файлы и документы</string>
+    <string name="global_search_content_any_attachment">Любое вложение</string>
 </resources>

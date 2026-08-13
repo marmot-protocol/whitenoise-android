@@ -68,7 +68,8 @@ import kotlinx.coroutines.CancellationException
  * back, so a host that answers with anything but a safe HTTPS URL can never
  * become the group's public avatar.
  */
-internal fun safeAvatarUploadUrl(url: String): String = ProfileSanitizer.imageUrl(url) ?: error("unsafe upload URL")
+@Suppress("MaxLineLength")
+internal fun safeAvatarUploadUrl(url: String): String = ProfileSanitizer.androidOwnedHttpsImageUrl(url) ?: error("unsafe upload URL")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,7 +92,7 @@ internal fun GroupEditScreen(
     var imageSaving by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val canEdit = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
-    val groupAvatarUrl = ProfileSanitizer.imageUrl(controller.group.avatarUrl)
+    val groupAvatarUrl = ProfileSanitizer.protocolImageUrl(controller.group.avatarUrl)
     val encryptedGroupAvatar = rememberEncryptedGroupAvatar(appState, controller.group)
     val legacyGroupAvatarAvailable = rememberAvatarImageAvailable(groupAvatarUrl)
     val groupAvatarImageAvailable = encryptedGroupAvatar != null || legacyGroupAvatarAvailable
@@ -136,7 +137,7 @@ internal fun GroupEditScreen(
         if (imageSaving || controller.mutationInFlight) return
         // Same HTTPS/credential/loopback policy the upload path enforces, but a
         // hand-typed URL earns a toast rather than safeAvatarUploadUrl's throw.
-        val safeUrl = ProfileSanitizer.imageUrl(url)
+        val safeUrl = ProfileSanitizer.androidOwnedHttpsImageUrl(url)
         if (safeUrl == null) {
             appState.present(R.string.profile_picture_invalid, copyable = true)
             return

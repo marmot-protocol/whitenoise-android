@@ -55,6 +55,7 @@ internal enum class ConversationScrollReason {
     Mention,
     Search,
     FocusMessage,
+    ReadAloudFollow,
     JumpToNewest,
     Send,
 }
@@ -100,6 +101,24 @@ internal data class ConversationScrollBookmark(
     val anchor: ConversationScrollAnchor,
     val settledMode: ConversationScrollMode,
     internal val intentRevision: Long,
+)
+
+/** Stable layout inputs that determine the transcript's visible viewport. */
+internal data class ConversationForegroundGeometry(
+    val viewportHeightPx: Int,
+    val imeBottomPx: Int,
+    val bottomChromeHeightPx: Int,
+)
+
+internal data class ConversationForegroundSnapshot(
+    val scrollBookmark: ConversationScrollBookmark,
+    val geometry: ConversationForegroundGeometry,
+    val timelineStructure: ConversationTimelineStructure = ConversationTimelineStructure(emptyList(), 0),
+)
+
+internal class ConversationForegroundRestoreToken internal constructor(
+    internal val revision: Long,
+    internal val expectedImeVisible: Boolean,
 )
 
 internal data class ConversationTimelineStructure(
@@ -156,6 +175,7 @@ internal class ConversationScrollIntentToken internal constructor(
  * its token before cancelling its coroutine so a stale frame chase cannot resume
  * after the gesture.
  */
+@Suppress("TooManyFunctions") // Cohesive scroll-intent state machine and its foreground transaction.
 internal class ConversationScrollCoordinator(
     private val writer: ConversationScrollWriter,
     initialMode: ConversationScrollMode = ConversationScrollMode.FollowingTail,
@@ -166,8 +186,13 @@ internal class ConversationScrollCoordinator(
     private var intentRevision = 0L
     private var activeCommand: Job? = null
     private var userGestureInProgress = false
+    private var foregroundRestoreRevision = 0L
+    private var foregroundSnapshot: ConversationForegroundSnapshot? = null
 
     var mode by mutableStateOf(settledMode)
+        private set
+
+    var foregroundRestoreInProgress by mutableStateOf(false)
         private set
 
     val isFollowingTail: Boolean
@@ -190,7 +215,114 @@ internal class ConversationScrollCoordinator(
         )
     }
 
+    fun beginForegroundRestore(snapshot: ConversationForegroundSnapshot): ConversationForegroundRestoreToken {
+        invalidateActiveCommand()
+        mode = settledMode
+        foregroundRestoreRevision++
+        foregroundSnapshot = snapshot
+        foregroundRestoreInProgress = true
+        return ConversationForegroundRestoreToken(
+            revision = foregroundRestoreRevision,
+            expectedImeVisible = snapshot.geometry.imeBottomPx > 0,
+        )
+    }
+
+    suspend fun completeForegroundRestore(
+        token: ConversationForegroundRestoreToken,
+        resumedGeometry: ConversationForegroundGeometry,
+        resumedTimelineStructure: ConversationTimelineStructure =
+            foregroundSnapshot?.timelineStructure ?: ConversationTimelineStructure(emptyList(), 0),
+        resumedScrollAnchor: ConversationScrollAnchor? = null,
+        resolveAnchorIndex: (ConversationScrollAnchor) -> Int?,
+        resolveTailIndex: () -> Int,
+    ): Boolean {
+        val snapshot = foregroundSnapshot
+        return if (snapshot == null || token.revision != foregroundRestoreRevision) {
+            false
+        } else {
+            val presentationChanged =
+                snapshot.geometry != resumedGeometry ||
+                    snapshot.timelineStructure != resumedTimelineStructure ||
+                    (resumedScrollAnchor != null && resumedScrollAnchor != snapshot.scrollBookmark.anchor)
+            if (!presentationChanged) {
+                clearForegroundRestore(token)
+                true
+            } else {
+                try {
+                    correctForegroundPresentation(
+                        snapshot = snapshot,
+                        resolveAnchorIndex = resolveAnchorIndex,
+                        resolveTailIndex = resolveTailIndex,
+                    )
+                } finally {
+                    clearForegroundRestore(token)
+                }
+            }
+        }
+    }
+
+    private suspend fun correctForegroundPresentation(
+        snapshot: ConversationForegroundSnapshot,
+        resolveAnchorIndex: (ConversationScrollAnchor) -> Int?,
+        resolveTailIndex: () -> Int,
+    ): Boolean =
+        when (snapshot.scrollBookmark.settledMode) {
+            ConversationScrollMode.FollowingTail ->
+                runCommand(
+                    transientMode =
+                        ConversationScrollMode.ProgrammaticJump(
+                            targetMessageId = null,
+                            reason = ConversationScrollReason.LifecycleResume,
+                        ),
+                    resultingMode = ConversationScrollMode.FollowingTail,
+                    preserveForegroundRestore = true,
+                ) {
+                    scrollToItem(resolveTailIndex())
+                }
+            is ConversationScrollMode.ReadingHistory -> {
+                val bookmark = snapshot.scrollBookmark
+                if (bookmark.intentRevision != intentRevision) {
+                    false
+                } else {
+                    val anchor = bookmark.anchor
+                    readingAnchor = anchor
+                    runCommand(
+                        transientMode = ConversationScrollMode.Restoring(anchor.messageId, anchor.pixelOffset),
+                        resultingMode = bookmark.settledMode,
+                        preserveForegroundRestore = true,
+                    ) {
+                        scrollToItem(resolveAnchorIndex(anchor) ?: anchor.listIndex, anchor.pixelOffset)
+                    }
+                }
+            }
+            else -> false
+        }
+
+    fun cancelForegroundRestore() {
+        foregroundRestoreRevision++
+        foregroundSnapshot = null
+        foregroundRestoreInProgress = false
+    }
+
+    /**
+     * Opens the draw gate after the bounded settle deadline while keeping the
+     * captured snapshot, so the next settled geometry can still apply the one
+     * deferred correction. User intent, navigation, and disposal discard the
+     * retained snapshot through the existing cancellation paths.
+     */
+    fun releaseForegroundRestoreGate(token: ConversationForegroundRestoreToken) {
+        if (token.revision != foregroundRestoreRevision) return
+        foregroundRestoreInProgress = false
+    }
+
+    private fun clearForegroundRestore(token: ConversationForegroundRestoreToken) {
+        if (token.revision != foregroundRestoreRevision) return
+        foregroundSnapshot = null
+        foregroundRestoreInProgress = false
+    }
+
     fun onUserGestureStarted(anchor: ConversationScrollAnchor) {
+        cancelForegroundRestore()
         invalidateActiveCommand()
         userGestureInProgress = true
         readingAnchor = anchor
@@ -232,6 +364,7 @@ internal class ConversationScrollCoordinator(
     }
 
     suspend fun reanchorReadingHistory(resolveAnchorIndex: (ConversationScrollAnchor) -> Int?): Boolean {
+        if (foregroundRestoreInProgress) return false
         val anchor = readingAnchor
         val canRestore =
             !userGestureInProgress &&
@@ -289,19 +422,23 @@ internal class ConversationScrollCoordinator(
         reason: ConversationScrollReason,
         resultingMode: ConversationScrollMode? = null,
         operation: suspend ConversationScrollCommandScope.() -> Unit,
-    ): Boolean =
-        runCommand(
+    ): Boolean {
+        if (foregroundRestoreInProgress && reason.defersDuringForegroundRestore) return false
+        return runCommand(
             transientMode = ConversationScrollMode.ProgrammaticJump(targetMessageId, reason),
             resultingMode = resultingMode ?: settledMode,
             operation = operation,
         )
+    }
 
     private suspend fun runCommand(
         transientMode: ConversationScrollMode,
         resultingMode: ConversationScrollMode,
+        preserveForegroundRestore: Boolean = false,
         operation: suspend ConversationScrollCommandScope.() -> Unit,
-    ): Boolean =
-        supervisorScope {
+    ): Boolean {
+        if (!preserveForegroundRestore) cancelForegroundRestore()
+        return supervisorScope {
             val previous = activeCommand
             val serial = ++commandSerial
             val command =
@@ -333,6 +470,7 @@ internal class ConversationScrollCoordinator(
                 }
             }
         }
+    }
 
     private fun invalidateActiveCommand() {
         commandSerial++
@@ -370,24 +508,27 @@ internal class ConversationScrollCoordinator(
         suspend fun animateScrollToItem(
             index: Int,
             scrollOffset: Int = 0,
-            resolveIndex: () -> Int = { index },
-        ) {
+            resolveIndex: () -> Int? = { index },
+        ): Boolean {
             ensureCurrent()
-            var targetIndex = resolveIndex().coerceAtLeast(0)
+            var targetIndex = resolveIndex()?.coerceAtLeast(0)
             var repositionAttempts = 0
             while (
+                targetIndex != null &&
                 repositionAttempts < MAX_TARGET_REPOSITION_ATTEMPTS &&
                 prePositionIfFar(targetIndex)
             ) {
                 repositionAttempts++
                 ensureCurrent()
-                targetIndex = resolveIndex().coerceAtLeast(0)
+                targetIndex = resolveIndex()?.coerceAtLeast(0)
             }
-            if (isFar(targetIndex)) {
-                writer.scrollToItem(targetIndex, scrollOffset)
+            val resolvedTargetIndex = targetIndex ?: return false
+            if (isFar(resolvedTargetIndex)) {
+                writer.scrollToItem(resolvedTargetIndex, scrollOffset)
             } else {
-                writer.animateScrollToItem(targetIndex, scrollOffset)
+                writer.animateScrollToItem(resolvedTargetIndex, scrollOffset)
             }
+            return true
         }
 
         private suspend fun prePositionIfFar(targetIndex: Int): Boolean {
@@ -509,26 +650,6 @@ private suspend fun awaitStableInitialAnchorLayout(
     return false
 }
 
-internal suspend fun ConversationScrollCoordinator.restoreViewport(
-    snapshot: ConversationScrollBookmark,
-    resolveAnchorIndex: (ConversationScrollAnchor) -> Int?,
-    resolveTailIndex: () -> Int,
-    frameCount: Int = 24,
-    awaitFrame: suspend () -> Unit = { withFrameNanos { } },
-): Boolean =
-    when (snapshot.settledMode) {
-        ConversationScrollMode.FollowingTail ->
-            followTailIfAllowed(
-                resolveTailIndex = resolveTailIndex,
-                reason = ConversationScrollReason.LifecycleResume,
-                frameCount = frameCount,
-                awaitFrame = awaitFrame,
-            )
-        is ConversationScrollMode.ReadingHistory ->
-            restoreBookmark(snapshot, resolveAnchorIndex = resolveAnchorIndex)
-        else -> false
-    }
-
 internal interface ConversationScrollWriter {
     val firstVisibleItemIndex: Int
 
@@ -571,3 +692,15 @@ private fun ConversationScrollMode.requireSettled(): ConversationScrollMode {
     }
     return this
 }
+
+private val ConversationScrollReason.defersDuringForegroundRestore: Boolean
+    get() =
+        when (this) {
+            ConversationScrollReason.ImeTransition,
+            ConversationScrollReason.ViewportChange,
+            ConversationScrollReason.NewMessage,
+            ConversationScrollReason.ReactionLayout,
+            ConversationScrollReason.BottomInput,
+            -> true
+            else -> false
+        }

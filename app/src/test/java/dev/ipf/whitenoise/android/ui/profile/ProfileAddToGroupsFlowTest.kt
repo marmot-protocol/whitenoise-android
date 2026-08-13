@@ -28,6 +28,7 @@ import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundCoordinator
+import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -200,6 +201,7 @@ class ProfileAddToGroupsFlowTest {
                 ProfileGroupForegroundCoordinator(
                     appState = appState,
                     conversationController = null,
+                    profileGroupForegroundState = ProfileGroupForegroundState(),
                     secureWindowEnabled = null,
                     profileSecurePolicy = SecureFlagPolicy.Inherit,
                     onOpenConversation = { _, _ -> },

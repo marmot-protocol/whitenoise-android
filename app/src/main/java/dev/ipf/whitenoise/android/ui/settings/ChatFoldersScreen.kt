@@ -58,7 +58,6 @@ import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatListItem
-import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
@@ -103,8 +102,6 @@ internal fun ChatFoldersScreen(
     val store = appState.chatFolderPreferences
     val storeState by store.state.collectAsState()
     val folders = remember(storeState, accountRef) { accountRef?.let(store::foldersFor).orEmpty() }
-    val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
-    val mutedConversations = chatNotificationState.mutedConversations
     val groupTitleCopy = rememberGroupTitleCopy()
     // Keyword rules match rendered row titles; subscribe like ChatsScreen's folder resolver.
     val profileRevision = appState.profileRevisionForCompose
@@ -147,7 +144,6 @@ internal fun ChatFoldersScreen(
                         folder = folder,
                         appState = appState,
                         accountRef = accountRef,
-                        mutedConversations = mutedConversations,
                         displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
                     ),
                 canMoveUp = folders.firstOrNull()?.id != folder.id,
@@ -352,7 +348,6 @@ private fun folderChatCount(
     folder: ChatFolder,
     appState: WhiteNoiseAppState,
     accountRef: String?,
-    mutedConversations: Set<String>,
     displayTitle: (ChatListItem) -> String,
 ): Int {
     if (accountRef == null) return 0
@@ -365,7 +360,7 @@ private fun folderChatCount(
             manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
             rule = rule,
             activeAccountIdHex = appState.activeAccount?.accountIdHex,
-            isMuted = { ChatMutePreferences.compositeKey(accountRef, it) in mutedConversations },
+            isMuted = { groupIdHex -> source.any { it.group.groupIdHex == groupIdHex && it.engineMuted() } },
             displayTitle = displayTitle,
         )
     return source.count { it.group.groupIdHex.lowercase(Locale.ROOT) in ids }

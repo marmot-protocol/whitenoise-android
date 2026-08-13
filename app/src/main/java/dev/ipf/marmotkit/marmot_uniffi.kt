@@ -1141,6 +1141,16 @@ internal open class UniffiVTableCallbackInterfaceExternalAccountSignerFfi(
 
 
 
+
+
+
+
+
+
+
+
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is 
 // rather `InterfaceTooLargeException`, caused by too many methods 
@@ -1260,6 +1270,8 @@ fun uniffi_marmot_uniffi_checksum_method_marmot_download_group_blossom_image(
 ): Short
 fun uniffi_marmot_uniffi_checksum_method_marmot_download_media(
 ): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_download_profile_image(
+): Short
 fun uniffi_marmot_uniffi_checksum_method_marmot_edit_message(
 ): Short
 fun uniffi_marmot_uniffi_checksum_method_marmot_enable_group_disbanding(
@@ -1274,11 +1286,15 @@ fun uniffi_marmot_uniffi_checksum_method_marmot_group_maintenance_status(
 ): Short
 fun uniffi_marmot_uniffi_checksum_method_marmot_group_management_state(
 ): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_group_member_ids_page(
+): Short
 fun uniffi_marmot_uniffi_checksum_method_marmot_group_members(
 ): Short
 fun uniffi_marmot_uniffi_checksum_method_marmot_group_mls_state(
 ): Short
 fun uniffi_marmot_uniffi_checksum_method_marmot_group_push_debug_info(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_group_roster(
 ): Short
 fun uniffi_marmot_uniffi_checksum_method_marmot_initialize_chat_read_state(
 ): Short
@@ -1428,6 +1444,8 @@ fun uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_settings(
 ): Short
 fun uniffi_marmot_uniffi_checksum_method_marmot_shutdown(
 ): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_shutdown_and_close(
+): Short
 fun uniffi_marmot_uniffi_checksum_method_marmot_sign_in_account(
 ): Short
 fun uniffi_marmot_uniffi_checksum_method_marmot_sign_out(
@@ -1437,6 +1455,8 @@ fun uniffi_marmot_uniffi_checksum_method_marmot_sign_out_and_wipe(
 fun uniffi_marmot_uniffi_checksum_method_marmot_start(
 ): Short
 fun uniffi_marmot_uniffi_checksum_method_marmot_start_agent_text_stream(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_storage_is_closed(
 ): Short
 fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_chat_list(
 ): Short
@@ -1690,6 +1710,8 @@ fun uniffi_marmot_uniffi_fn_method_marmot_download_group_blossom_image(`ptr`: Po
 ): Long
 fun uniffi_marmot_uniffi_fn_method_marmot_download_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,
 ): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_download_profile_image(`ptr`: Pointer,`url`: RustBuffer.ByValue,`maxBytes`: Long,
+): Long
 fun uniffi_marmot_uniffi_fn_method_marmot_edit_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,
 ): Long
 fun uniffi_marmot_uniffi_fn_method_marmot_enable_group_disbanding(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
@@ -1704,11 +1726,15 @@ fun uniffi_marmot_uniffi_fn_method_marmot_group_maintenance_status(`ptr`: Pointe
 ): Long
 fun uniffi_marmot_uniffi_fn_method_marmot_group_management_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
 ): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_group_member_ids_page(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdsHex`: RustBuffer.ByValue,
+): Long
 fun uniffi_marmot_uniffi_fn_method_marmot_group_members(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
 ): Long
 fun uniffi_marmot_uniffi_fn_method_marmot_group_mls_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
 ): Long
 fun uniffi_marmot_uniffi_fn_method_marmot_group_push_debug_info(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_group_roster(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
 ): Long
 fun uniffi_marmot_uniffi_fn_method_marmot_initialize_chat_read_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
@@ -1858,6 +1884,8 @@ fun uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_settings(`ptr`: Po
 ): Long
 fun uniffi_marmot_uniffi_fn_method_marmot_shutdown(`ptr`: Pointer,
 ): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_shutdown_and_close(`ptr`: Pointer,
+): Long
 fun uniffi_marmot_uniffi_fn_method_marmot_sign_in_account(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
 ): Long
 fun uniffi_marmot_uniffi_fn_method_marmot_sign_out(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`deleteKeyPackages`: Byte,
@@ -1868,6 +1896,8 @@ fun uniffi_marmot_uniffi_fn_method_marmot_start(`ptr`: Pointer,
 ): Long
 fun uniffi_marmot_uniffi_fn_method_marmot_start_agent_text_stream(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`streamIdHex`: RustBuffer.ByValue,`quicCandidates`: RustBuffer.ByValue,
 ): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_storage_is_closed(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
 fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_chat_list(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,
 ): Long
 fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_chats(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,
@@ -2230,6 +2260,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_download_media() != 56125.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_download_profile_image() != 9636.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_edit_message() != 43927.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2251,6 +2284,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_management_state() != 47526.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_member_ids_page() != 13997.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_members() != 54987.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2258,6 +2294,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_push_debug_info() != 25626.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_roster() != 8835.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_initialize_chat_read_state() != 22879.toShort()) {
@@ -2479,7 +2518,10 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_settings() != 50897.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_shutdown() != 57342.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_shutdown() != 50597.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_shutdown_and_close() != 15326.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_sign_in_account() != 63258.toShort()) {
@@ -2491,10 +2533,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_sign_out_and_wipe() != 44173.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_start() != 2138.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_start() != 63391.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_start_agent_text_stream() != 35574.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_storage_is_closed() != 37723.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_subscribe_chat_list() != 8274.toShort()) {
@@ -5203,6 +5248,12 @@ public interface MarmotInterface {
     suspend fun `downloadMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaAttachmentReferenceFfi): MediaDownloadResultFfi
     
     /**
+     * Fetch one untrusted kind:0 profile `picture` URL with MDK dial-safe
+     * HTTPS policy, address pinning, and bounded streaming.
+     */
+    suspend fun `downloadProfileImage`(`url`: kotlin.String, `maxBytes`: kotlin.ULong): kotlin.ByteArray
+    
+    /**
      * Edit `target_message_id` by publishing a kind-1009 event that
      * references it and carries the replacement plaintext in `content`.
      * Recipients honour the edit only when its authenticated author matches
@@ -5259,6 +5310,15 @@ public interface MarmotInterface {
     suspend fun `groupManagementState`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupManagementStateFfi
     
     /**
+     * Identifier-only rosters for a bounded page of groups.
+     *
+     * This is the chat-projection companion read: it is one worker command,
+     * performs no profile enrichment, and fails the whole page if any group
+     * is unknown or quarantined.
+     */
+    suspend fun `groupMemberIdsPage`(`accountRef`: kotlin.String, `groupIdsHex`: List<kotlin.String>): List<AppGroupMemberIdsFfi>
+    
+    /**
      * Membership roster for `group_id_hex`.
      */
     suspend fun `groupMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): List<AppGroupMemberRecordFfi>
@@ -5270,6 +5330,11 @@ public interface MarmotInterface {
     suspend fun `groupMlsState`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): AppGroupMlsStateFfi
     
     suspend fun `groupPushDebugInfo`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupPushDebugInfoFfi
+    
+    /**
+     * Lightweight membership roster projection for membership screens.
+     */
+    suspend fun `groupRoster`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupRosterFfi
     
     /**
      * Establish the unread baseline the first time a user opens a group.
@@ -5717,8 +5782,40 @@ public interface MarmotInterface {
      * Tear the runtime down. Drops all subscriptions; long-lived
      * [`EventsSubscription`] / [`ChatsSubscription`] / etc. instances on the
      * host side will see their `next()` return `None` shortly after.
+     *
+     * This stops work but does **not** release the store's file locks — the
+     * SQLite connections stay open. Hosts whose process can be suspended
+     * should call [`Marmot::shutdown_and_close`] instead.
      */
     suspend fun `shutdown`()
+    
+    /**
+     * [`Marmot::shutdown`], then close every SQLite database and release the
+     * Marmot root's runtime lease.
+     *
+     * Await this before letting the process be suspended. When it returns,
+     * nothing this process owns holds a file lock inside the Marmot root —
+     * which is the fact iOS actually checks: a process suspended while holding
+     * a lock in a shared App Group container is killed with `0xdead10cc`, and
+     * a WAL connection holds one on its `-shm` sidecar for its entire
+     * lifetime. [`Marmot::shutdown`] cannot deliver that on its own; it stops
+     * workers, but the databases are shared behind `Arc`s that no host can
+     * observe or await going away.
+     *
+     * **Terminal: this handle is finished.** Every subsequent call that
+     * touches storage fails with [`MarmotKitError::StorageClosed`] rather than
+     * reopening the databases, because reopening would re-lock the container
+     * this method just cleared. Construct a new `Marmot` on resume — which is
+     * what a foregrounding app does anyway.
+     *
+     * Safe to call twice, and safe to call with or without a preceding
+     * [`Marmot::shutdown`]. Bounded: worker drain has a fixed budget and the
+     * close itself waits only for the SQLite statement currently executing.
+     * An error means at least one database reported a problem while closing;
+     * every database is still attempted and left closed, so a failure is not
+     * a reason to retry or to keep the process alive.
+     */
+    suspend fun `shutdownAndClose`()
     
     /**
      * Re-activate a non-destructively signed-out local account. This clears
@@ -5762,11 +5859,19 @@ public interface MarmotInterface {
     /**
      * Bring the runtime to local readiness.
      *
-     * On success, persisted account state is hydrated and worker-routed local
-     * reads are available. Relay activation, group-subscription registration,
-     * shared-directory synchronization, and initial catch-up continue
+     * On success, persisted account state is seeded and worker-routed local
+     * reads are available: group reads issued before a group's background
+     * hydration completes wait for exactly that group. Relay activation,
+     * group-subscription registration, shared-directory synchronization,
+     * remaining group hydration, and initial catch-up continue
      * asynchronously. Hosts should render local projections immediately and
      * represent network progress separately.
+     *
+     * Ready is NOT "safe to send without waiting" (mdk#1161): mutations
+     * issued before the initial catch-up completes are queued and replayed
+     * in arrival order after it, so first-send latency can still cover
+     * remaining hydration plus catch-up even when the target group is
+     * already readable.
      *
      * The binding signature and result type are unchanged; this local-ready
      * completion point is the behavioral contract for this implementation.
@@ -5780,6 +5885,13 @@ public interface MarmotInterface {
      * generate a 32-byte stream id.
      */
     suspend fun `startAgentTextStream`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `streamIdHex`: kotlin.String?, `quicCandidates`: List<kotlin.String>): AgentStreamStartFfi
+    
+    /**
+     * True once [`Marmot::shutdown_and_close`] has closed the store. A host
+     * can check this to confirm it is safe to be suspended, or to notice it is
+     * holding a spent handle and needs a fresh one.
+     */
+    fun `storageIsClosed`(): kotlin.Boolean
     
     /**
      * Per-account durable chat-list projection. Async for the same
@@ -6807,6 +6919,31 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface
 
     
     /**
+     * Fetch one untrusted kind:0 profile `picture` URL with MDK dial-safe
+     * HTTPS policy, address pinning, and bounded streaming.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `downloadProfileImage`(`url`: kotlin.String, `maxBytes`: kotlin.ULong) : kotlin.ByteArray {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_download_profile_image(
+                thisPtr,
+                FfiConverterString.lower(`url`),FfiConverterULong.lower(`maxBytes`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterByteArray.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * Edit `target_message_id` by publishing a kind-1009 event that
      * references it and carries the replacement plaintext in `content`.
      * Recipients honour the edit only when its authenticated author matches
@@ -6988,6 +7125,34 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface
 
     
     /**
+     * Identifier-only rosters for a bounded page of groups.
+     *
+     * This is the chat-projection companion read: it is one worker command,
+     * performs no profile enrichment, and fails the whole page if any group
+     * is unknown or quarantined.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `groupMemberIdsPage`(`accountRef`: kotlin.String, `groupIdsHex`: List<kotlin.String>) : List<AppGroupMemberIdsFfi> {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_group_member_ids_page(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterSequenceString.lower(`groupIdsHex`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterSequenceTypeAppGroupMemberIdsFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * Membership roster for `group_id_hex`.
      */
     @Throws(MarmotKitException::class)
@@ -7051,6 +7216,30 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeGroupPushDebugInfoFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Lightweight membership roster projection for membership screens.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `groupRoster`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : GroupRosterFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_group_roster(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeGroupRosterFfi.lift(it) },
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
@@ -8692,6 +8881,10 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface
      * Tear the runtime down. Drops all subscriptions; long-lived
      * [`EventsSubscription`] / [`ChatsSubscription`] / etc. instances on the
      * host side will see their `next()` return `None` shortly after.
+     *
+     * This stops work but does **not** release the store's file locks — the
+     * SQLite connections stay open. Hosts whose process can be suspended
+     * should call [`Marmot::shutdown_and_close`] instead.
      */
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `shutdown`() {
@@ -8710,6 +8903,54 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface
         
         // Error FFI converter
         UniffiNullRustCallStatusErrorHandler,
+    )
+    }
+
+    
+    /**
+     * [`Marmot::shutdown`], then close every SQLite database and release the
+     * Marmot root's runtime lease.
+     *
+     * Await this before letting the process be suspended. When it returns,
+     * nothing this process owns holds a file lock inside the Marmot root —
+     * which is the fact iOS actually checks: a process suspended while holding
+     * a lock in a shared App Group container is killed with `0xdead10cc`, and
+     * a WAL connection holds one on its `-shm` sidecar for its entire
+     * lifetime. [`Marmot::shutdown`] cannot deliver that on its own; it stops
+     * workers, but the databases are shared behind `Arc`s that no host can
+     * observe or await going away.
+     *
+     * **Terminal: this handle is finished.** Every subsequent call that
+     * touches storage fails with [`MarmotKitError::StorageClosed`] rather than
+     * reopening the databases, because reopening would re-lock the container
+     * this method just cleared. Construct a new `Marmot` on resume — which is
+     * what a foregrounding app does anyway.
+     *
+     * Safe to call twice, and safe to call with or without a preceding
+     * [`Marmot::shutdown`]. Bounded: worker drain has a fixed budget and the
+     * close itself waits only for the SQLite statement currently executing.
+     * An error means at least one database reported a problem while closing;
+     * every database is still attempted and left closed, so a failure is not
+     * a reason to retry or to keep the process alive.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `shutdownAndClose`() {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_shutdown_and_close(
+                thisPtr,
+                
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_void(future) },
+        // lift function
+        { Unit },
+        
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
     )
     }
 
@@ -8813,11 +9054,19 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface
     /**
      * Bring the runtime to local readiness.
      *
-     * On success, persisted account state is hydrated and worker-routed local
-     * reads are available. Relay activation, group-subscription registration,
-     * shared-directory synchronization, and initial catch-up continue
+     * On success, persisted account state is seeded and worker-routed local
+     * reads are available: group reads issued before a group's background
+     * hydration completes wait for exactly that group. Relay activation,
+     * group-subscription registration, shared-directory synchronization,
+     * remaining group hydration, and initial catch-up continue
      * asynchronously. Hosts should render local projections immediately and
      * represent network progress separately.
+     *
+     * Ready is NOT "safe to send without waiting" (mdk#1161): mutations
+     * issued before the initial catch-up completes are queued and replayed
+     * in arrival order after it, so first-send latency can still cover
+     * remaining hydration plus catch-up even when the target group is
+     * already readable.
      *
      * The binding signature and result type are unchanged; this local-ready
      * completion point is the behavioral contract for this implementation.
@@ -8869,6 +9118,23 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface
         MarmotKitException.ErrorHandler,
     )
     }
+
+    
+    /**
+     * True once [`Marmot::shutdown_and_close`] has closed the store. A host
+     * can check this to confirm it is safe to be suspended, or to notice it is
+     * holding a spent handle and needs a fresh one.
+     */override fun `storageIsClosed`(): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_storage_is_closed(
+        it, _status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -10970,6 +11236,38 @@ public object FfiConverterTypeAppGroupEncryptedMediaComponentFfi: FfiConverterRu
 
 
 
+data class AppGroupMemberIdsFfi (
+    var `groupIdHex`: kotlin.String, 
+    var `memberIdsHex`: List<kotlin.String>
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAppGroupMemberIdsFfi: FfiConverterRustBuffer<AppGroupMemberIdsFfi> {
+    override fun read(buf: ByteBuffer): AppGroupMemberIdsFfi {
+        return AppGroupMemberIdsFfi(
+            FfiConverterString.read(buf),
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AppGroupMemberIdsFfi) = (
+            FfiConverterString.allocationSize(value.`groupIdHex`) +
+            FfiConverterSequenceString.allocationSize(value.`memberIdsHex`)
+    )
+
+    override fun write(value: AppGroupMemberIdsFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`groupIdHex`, buf)
+            FfiConverterSequenceString.write(value.`memberIdsHex`, buf)
+    }
+}
+
+
+
 data class AppGroupMemberRecordFfi (
     var `memberIdHex`: kotlin.String, 
     var `account`: kotlin.String?, 
@@ -12650,6 +12948,63 @@ public object FfiConverterTypeGroupPushTokenDebugEntryFfi: FfiConverterRustBuffe
             FfiConverterBoolean.write(value.`memberMatchesActiveLeaf`, buf)
             FfiConverterBoolean.write(value.`isLocalMember`, buf)
             FfiConverterLong.write(value.`updatedAtMs`, buf)
+    }
+}
+
+
+
+data class GroupRosterFfi (
+    var `groupIdHex`: kotlin.String, 
+    var `members`: List<GroupMemberDetailsFfi>, 
+    var `epoch`: kotlin.ULong, 
+    /**
+     * Monotonic change token for MLS roster state plus caller membership.
+     * Non-roster MLS commits may bump this revision; directory-only
+     * display-name changes do not.
+     */
+    var `rosterRevision`: kotlin.ULong, 
+    var `selfMembership`: SelfMembershipFfi, 
+    var `memberCount`: kotlin.UInt, 
+    var `lifecycleState`: GroupLifecycleStateFfi
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeGroupRosterFfi: FfiConverterRustBuffer<GroupRosterFfi> {
+    override fun read(buf: ByteBuffer): GroupRosterFfi {
+        return GroupRosterFfi(
+            FfiConverterString.read(buf),
+            FfiConverterSequenceTypeGroupMemberDetailsFfi.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterTypeSelfMembershipFfi.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterTypeGroupLifecycleStateFfi.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: GroupRosterFfi) = (
+            FfiConverterString.allocationSize(value.`groupIdHex`) +
+            FfiConverterSequenceTypeGroupMemberDetailsFfi.allocationSize(value.`members`) +
+            FfiConverterULong.allocationSize(value.`epoch`) +
+            FfiConverterULong.allocationSize(value.`rosterRevision`) +
+            FfiConverterTypeSelfMembershipFfi.allocationSize(value.`selfMembership`) +
+            FfiConverterUInt.allocationSize(value.`memberCount`) +
+            FfiConverterTypeGroupLifecycleStateFfi.allocationSize(value.`lifecycleState`)
+    )
+
+    override fun write(value: GroupRosterFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`groupIdHex`, buf)
+            FfiConverterSequenceTypeGroupMemberDetailsFfi.write(value.`members`, buf)
+            FfiConverterULong.write(value.`epoch`, buf)
+            FfiConverterULong.write(value.`rosterRevision`, buf)
+            FfiConverterTypeSelfMembershipFfi.write(value.`selfMembership`, buf)
+            FfiConverterUInt.write(value.`memberCount`, buf)
+            FfiConverterTypeGroupLifecycleStateFfi.write(value.`lifecycleState`, buf)
     }
 }
 
@@ -16431,13 +16786,6 @@ sealed class GroupEventKindFfi {
         companion object
     }
     
-    data class ForkRecovered(
-        val `sourceEpoch`: kotlin.ULong, 
-        val `recoveredEpoch`: kotlin.ULong, 
-        val `invalidatedCommitIdHex`: kotlin.String) : GroupEventKindFfi() {
-        companion object
-    }
-    
     data class CommitRolledBack(
         val `invalidatedCommitIdHex`: kotlin.String) : GroupEventKindFfi() {
         companion object
@@ -16513,24 +16861,19 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
                 FfiConverterULong.read(buf),
                 FfiConverterULong.read(buf),
                 )
-            9 -> GroupEventKindFfi.ForkRecovered(
-                FfiConverterULong.read(buf),
-                FfiConverterULong.read(buf),
+            9 -> GroupEventKindFfi.CommitRolledBack(
                 FfiConverterString.read(buf),
                 )
-            10 -> GroupEventKindFfi.CommitRolledBack(
-                FfiConverterString.read(buf),
-                )
-            11 -> GroupEventKindFfi.GroupStateInvalidated(
+            10 -> GroupEventKindFfi.GroupStateInvalidated(
                 FfiConverterULong.read(buf),
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            12 -> GroupEventKindFfi.GroupUnrecoverable
-            13 -> GroupEventKindFfi.PendingCommitRecovered(
+            11 -> GroupEventKindFfi.GroupUnrecoverable
+            12 -> GroupEventKindFfi.PendingCommitRecovered(
                 FfiConverterULong.read(buf),
                 )
-            14 -> GroupEventKindFfi.GroupHydrationRecovered(
+            13 -> GroupEventKindFfi.GroupHydrationRecovered(
                 FfiConverterULong.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
@@ -16601,15 +16944,6 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
                 4UL
                 + FfiConverterULong.allocationSize(value.`from`)
                 + FfiConverterULong.allocationSize(value.`to`)
-            )
-        }
-        is GroupEventKindFfi.ForkRecovered -> {
-            // Add the size for the Int that specifies the variant plus the size needed for all fields
-            (
-                4UL
-                + FfiConverterULong.allocationSize(value.`sourceEpoch`)
-                + FfiConverterULong.allocationSize(value.`recoveredEpoch`)
-                + FfiConverterString.allocationSize(value.`invalidatedCommitIdHex`)
             )
         }
         is GroupEventKindFfi.CommitRolledBack -> {
@@ -16701,36 +17035,29 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
                 FfiConverterULong.write(value.`to`, buf)
                 Unit
             }
-            is GroupEventKindFfi.ForkRecovered -> {
-                buf.putInt(9)
-                FfiConverterULong.write(value.`sourceEpoch`, buf)
-                FfiConverterULong.write(value.`recoveredEpoch`, buf)
-                FfiConverterString.write(value.`invalidatedCommitIdHex`, buf)
-                Unit
-            }
             is GroupEventKindFfi.CommitRolledBack -> {
-                buf.putInt(10)
+                buf.putInt(9)
                 FfiConverterString.write(value.`invalidatedCommitIdHex`, buf)
                 Unit
             }
             is GroupEventKindFfi.GroupStateInvalidated -> {
-                buf.putInt(11)
+                buf.putInt(10)
                 FfiConverterULong.write(value.`epoch`, buf)
                 FfiConverterString.write(value.`invalidatedCommitIdHex`, buf)
                 FfiConverterString.write(value.`reason`, buf)
                 Unit
             }
             is GroupEventKindFfi.GroupUnrecoverable -> {
-                buf.putInt(12)
+                buf.putInt(11)
                 Unit
             }
             is GroupEventKindFfi.PendingCommitRecovered -> {
-                buf.putInt(13)
+                buf.putInt(12)
                 FfiConverterULong.write(value.`recoveredEpoch`, buf)
                 Unit
             }
             is GroupEventKindFfi.GroupHydrationRecovered -> {
-                buf.putInt(14)
+                buf.putInt(13)
                 FfiConverterULong.write(value.`recoveredEpoch`, buf)
                 Unit
             }
@@ -18070,6 +18397,29 @@ sealed class MarmotKitException: kotlin.Exception() {
             get() = "groupIdHex=${ `groupIdHex` }"
     }
     
+    class InvalidGroupMembershipPage(
+        
+        val `maxGroups`: kotlin.ULong
+        ) : MarmotKitException() {
+        override val message
+            get() = "maxGroups=${ `maxGroups` }"
+    }
+    
+    /**
+     * The group exists but its full hydration has not completed yet
+     * (mdk#1161). Retryable: the runtime's background pipeline promotes the
+     * group shortly after account readiness, and worker-routed reads wait
+     * for exactly the named group. Distinct from `UnknownGroup` so hosts can
+     * render "still loading" instead of "no such group".
+     */
+    class GroupHydrationPending(
+        
+        val `groupIdHex`: kotlin.String
+        ) : MarmotKitException() {
+        override val message
+            get() = "groupIdHex=${ `groupIdHex` }"
+    }
+    
     class InvalidChatPin(
         
         val `details`: kotlin.String
@@ -18345,6 +18695,25 @@ sealed class MarmotKitException: kotlin.Exception() {
     }
     
     /**
+     * The store has been closed by [`Marmot::shutdown_and_close`][crate::Marmot::shutdown_and_close]
+     * and this call reached a database that is no longer open.
+     *
+     * Typed, and deliberately not [`MarmotKitError::Runtime`], because it is
+     * an *expected* outcome rather than a fault: a host closing its store
+     * before suspension races whatever work was still in flight, and that work
+     * must be reportable as "we shut down" instead of as a storage failure the
+     * user gets told about. Never retryable — the handle is spent; construct a
+     * new `Marmot` when the app resumes.
+     */
+    class StorageClosed(
+        
+        val `details`: kotlin.String
+        ) : MarmotKitException() {
+        override val message
+            get() = "details=${ `details` }"
+    }
+    
+    /**
      * The account exists but its raw private key could not be located in the
      * keystore — e.g. a public-only / watch-only account, or a secret that was
      * never loaded. Distinct, typed variant (#543) so a key-backup surface can
@@ -18499,101 +18868,110 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
             3 -> MarmotKitException.UnknownGroup(
                 FfiConverterString.read(buf),
                 )
-            4 -> MarmotKitException.InvalidChatPin(
+            4 -> MarmotKitException.InvalidGroupMembershipPage(
+                FfiConverterULong.read(buf),
+                )
+            5 -> MarmotKitException.GroupHydrationPending(
                 FfiConverterString.read(buf),
                 )
-            5 -> MarmotKitException.InvalidMessageDraft(
+            6 -> MarmotKitException.InvalidChatPin(
                 FfiConverterString.read(buf),
                 )
-            6 -> MarmotKitException.InvalidMediaReference(
+            7 -> MarmotKitException.InvalidMessageDraft(
                 FfiConverterString.read(buf),
                 )
-            7 -> MarmotKitException.InvalidHex(
+            8 -> MarmotKitException.InvalidMediaReference(
                 FfiConverterString.read(buf),
                 )
-            8 -> MarmotKitException.InvalidIdentity(
+            9 -> MarmotKitException.InvalidHex(
                 FfiConverterString.read(buf),
                 )
-            9 -> MarmotKitException.InvalidKeyPackageEvent(
+            10 -> MarmotKitException.InvalidIdentity(
                 FfiConverterString.read(buf),
                 )
-            10 -> MarmotKitException.MissingKeyPackage(
+            11 -> MarmotKitException.InvalidKeyPackageEvent(
                 FfiConverterString.read(buf),
                 )
-            11 -> MarmotKitException.Publish(
+            12 -> MarmotKitException.MissingKeyPackage(
                 FfiConverterString.read(buf),
                 )
-            12 -> MarmotKitException.FollowListUnavailable()
-            13 -> MarmotKitException.TransportClosed()
-            14 -> MarmotKitException.RuntimeBusy()
-            15 -> MarmotKitException.AccountSessionBusy()
-            16 -> MarmotKitException.AccountSetupRecoveryRequired()
-            17 -> MarmotKitException.AccountSetupRetryRequired()
-            18 -> MarmotKitException.AccountSetupResetNotApplicable()
-            19 -> MarmotKitException.AccountSetupKeyPackageRecoveryAvailable()
-            20 -> MarmotKitException.RuntimeStopping()
-            21 -> MarmotKitException.AccountCatchUp(
+            13 -> MarmotKitException.Publish(
                 FfiConverterString.read(buf),
                 )
-            22 -> MarmotKitException.NotGroupAdmin(
+            14 -> MarmotKitException.FollowListUnavailable()
+            15 -> MarmotKitException.TransportClosed()
+            16 -> MarmotKitException.RuntimeBusy()
+            17 -> MarmotKitException.AccountSessionBusy()
+            18 -> MarmotKitException.AccountSetupRecoveryRequired()
+            19 -> MarmotKitException.AccountSetupRetryRequired()
+            20 -> MarmotKitException.AccountSetupResetNotApplicable()
+            21 -> MarmotKitException.AccountSetupKeyPackageRecoveryAvailable()
+            22 -> MarmotKitException.RuntimeStopping()
+            23 -> MarmotKitException.AccountCatchUp(
                 FfiConverterString.read(buf),
                 )
-            23 -> MarmotKitException.AdminCannotSelfRemove(
+            24 -> MarmotKitException.NotGroupAdmin(
                 FfiConverterString.read(buf),
                 )
-            24 -> MarmotKitException.LeaveAlreadyRequested(
+            25 -> MarmotKitException.AdminCannotSelfRemove(
                 FfiConverterString.read(buf),
                 )
-            25 -> MarmotKitException.WouldRemoveLastAdmin(
+            26 -> MarmotKitException.LeaveAlreadyRequested(
                 FfiConverterString.read(buf),
                 )
-            26 -> MarmotKitException.DisbandingUnsupportedMembers(
+            27 -> MarmotKitException.WouldRemoveLastAdmin(
+                FfiConverterString.read(buf),
+                )
+            28 -> MarmotKitException.DisbandingUnsupportedMembers(
                 FfiConverterString.read(buf),
                 FfiConverterSequenceString.read(buf),
                 )
-            27 -> MarmotKitException.DisbandingNotEnabled(
+            29 -> MarmotKitException.DisbandingNotEnabled(
                 FfiConverterString.read(buf),
                 )
-            28 -> MarmotKitException.GroupDisbanding(
+            30 -> MarmotKitException.GroupDisbanding(
                 FfiConverterString.read(buf),
                 )
-            29 -> MarmotKitException.MemberNotInGroup(
-                FfiConverterString.read(buf),
-                FfiConverterString.read(buf),
-                )
-            30 -> MarmotKitException.AlreadyAdmin(
+            31 -> MarmotKitException.MemberNotInGroup(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            31 -> MarmotKitException.NotAdmin(
+            32 -> MarmotKitException.AlreadyAdmin(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            32 -> MarmotKitException.StorageBusy(
+            33 -> MarmotKitException.NotAdmin(
+                FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            33 -> MarmotKitException.SecretNotFound(
+            34 -> MarmotKitException.StorageBusy(
                 FfiConverterString.read(buf),
                 )
-            34 -> MarmotKitException.KeystoreUnavailable(
+            35 -> MarmotKitException.StorageClosed(
                 FfiConverterString.read(buf),
                 )
-            35 -> MarmotKitException.EmptyPassphrase()
-            36 -> MarmotKitException.EncryptionFailed(
+            36 -> MarmotKitException.SecretNotFound(
                 FfiConverterString.read(buf),
                 )
-            37 -> MarmotKitException.Io(
+            37 -> MarmotKitException.KeystoreUnavailable(
                 FfiConverterString.read(buf),
                 )
-            38 -> MarmotKitException.ExternalSignerUnavailable(
+            38 -> MarmotKitException.EmptyPassphrase()
+            39 -> MarmotKitException.EncryptionFailed(
                 FfiConverterString.read(buf),
                 )
-            39 -> MarmotKitException.ExternalSignerMismatch()
-            40 -> MarmotKitException.ExternalSignerRejected()
-            41 -> MarmotKitException.GroupSendQueueFull(
+            40 -> MarmotKitException.Io(
                 FfiConverterString.read(buf),
                 )
-            42 -> MarmotKitException.Runtime(
+            41 -> MarmotKitException.ExternalSignerUnavailable(
+                FfiConverterString.read(buf),
+                )
+            42 -> MarmotKitException.ExternalSignerMismatch()
+            43 -> MarmotKitException.ExternalSignerRejected()
+            44 -> MarmotKitException.GroupSendQueueFull(
+                FfiConverterString.read(buf),
+                )
+            45 -> MarmotKitException.Runtime(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -18613,6 +18991,16 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 + FfiConverterString.allocationSize(value.`accountRef`)
             )
             is MarmotKitException.UnknownGroup -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`groupIdHex`)
+            )
+            is MarmotKitException.InvalidGroupMembershipPage -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterULong.allocationSize(value.`maxGroups`)
+            )
+            is MarmotKitException.GroupHydrationPending -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
                 + FfiConverterString.allocationSize(value.`groupIdHex`)
@@ -18757,6 +19145,11 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 4UL
                 + FfiConverterString.allocationSize(value.`details`)
             )
+            is MarmotKitException.StorageClosed -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`details`)
+            )
             is MarmotKitException.SecretNotFound -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
@@ -18824,190 +19217,205 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidChatPin -> {
+            is MarmotKitException.InvalidGroupMembershipPage -> {
                 buf.putInt(4)
-                FfiConverterString.write(value.`details`, buf)
+                FfiConverterULong.write(value.`maxGroups`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidMessageDraft -> {
+            is MarmotKitException.GroupHydrationPending -> {
                 buf.putInt(5)
-                FfiConverterString.write(value.`details`, buf)
+                FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidMediaReference -> {
+            is MarmotKitException.InvalidChatPin -> {
                 buf.putInt(6)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidHex -> {
+            is MarmotKitException.InvalidMessageDraft -> {
                 buf.putInt(7)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidIdentity -> {
+            is MarmotKitException.InvalidMediaReference -> {
                 buf.putInt(8)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidKeyPackageEvent -> {
+            is MarmotKitException.InvalidHex -> {
                 buf.putInt(9)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.MissingKeyPackage -> {
+            is MarmotKitException.InvalidIdentity -> {
                 buf.putInt(10)
-                FfiConverterString.write(value.`account`, buf)
+                FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.Publish -> {
+            is MarmotKitException.InvalidKeyPackageEvent -> {
                 buf.putInt(11)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.FollowListUnavailable -> {
+            is MarmotKitException.MissingKeyPackage -> {
                 buf.putInt(12)
+                FfiConverterString.write(value.`account`, buf)
                 Unit
             }
-            is MarmotKitException.TransportClosed -> {
+            is MarmotKitException.Publish -> {
                 buf.putInt(13)
+                FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.RuntimeBusy -> {
+            is MarmotKitException.FollowListUnavailable -> {
                 buf.putInt(14)
                 Unit
             }
-            is MarmotKitException.AccountSessionBusy -> {
+            is MarmotKitException.TransportClosed -> {
                 buf.putInt(15)
                 Unit
             }
-            is MarmotKitException.AccountSetupRecoveryRequired -> {
+            is MarmotKitException.RuntimeBusy -> {
                 buf.putInt(16)
                 Unit
             }
-            is MarmotKitException.AccountSetupRetryRequired -> {
+            is MarmotKitException.AccountSessionBusy -> {
                 buf.putInt(17)
                 Unit
             }
-            is MarmotKitException.AccountSetupResetNotApplicable -> {
+            is MarmotKitException.AccountSetupRecoveryRequired -> {
                 buf.putInt(18)
                 Unit
             }
-            is MarmotKitException.AccountSetupKeyPackageRecoveryAvailable -> {
+            is MarmotKitException.AccountSetupRetryRequired -> {
                 buf.putInt(19)
                 Unit
             }
-            is MarmotKitException.RuntimeStopping -> {
+            is MarmotKitException.AccountSetupResetNotApplicable -> {
                 buf.putInt(20)
                 Unit
             }
-            is MarmotKitException.AccountCatchUp -> {
+            is MarmotKitException.AccountSetupKeyPackageRecoveryAvailable -> {
                 buf.putInt(21)
+                Unit
+            }
+            is MarmotKitException.RuntimeStopping -> {
+                buf.putInt(22)
+                Unit
+            }
+            is MarmotKitException.AccountCatchUp -> {
+                buf.putInt(23)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.NotGroupAdmin -> {
-                buf.putInt(22)
-                FfiConverterString.write(value.`groupIdHex`, buf)
-                Unit
-            }
-            is MarmotKitException.AdminCannotSelfRemove -> {
-                buf.putInt(23)
-                FfiConverterString.write(value.`groupIdHex`, buf)
-                Unit
-            }
-            is MarmotKitException.LeaveAlreadyRequested -> {
                 buf.putInt(24)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.WouldRemoveLastAdmin -> {
+            is MarmotKitException.AdminCannotSelfRemove -> {
                 buf.putInt(25)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.DisbandingUnsupportedMembers -> {
+            is MarmotKitException.LeaveAlreadyRequested -> {
                 buf.putInt(26)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                Unit
+            }
+            is MarmotKitException.WouldRemoveLastAdmin -> {
+                buf.putInt(27)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                Unit
+            }
+            is MarmotKitException.DisbandingUnsupportedMembers -> {
+                buf.putInt(28)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterSequenceString.write(value.`memberIdsHex`, buf)
                 Unit
             }
             is MarmotKitException.DisbandingNotEnabled -> {
-                buf.putInt(27)
+                buf.putInt(29)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.GroupDisbanding -> {
-                buf.putInt(28)
+                buf.putInt(30)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.MemberNotInGroup -> {
-                buf.putInt(29)
-                FfiConverterString.write(value.`groupIdHex`, buf)
-                FfiConverterString.write(value.`memberIdHex`, buf)
-                Unit
-            }
-            is MarmotKitException.AlreadyAdmin -> {
-                buf.putInt(30)
-                FfiConverterString.write(value.`groupIdHex`, buf)
-                FfiConverterString.write(value.`memberIdHex`, buf)
-                Unit
-            }
-            is MarmotKitException.NotAdmin -> {
                 buf.putInt(31)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.StorageBusy -> {
+            is MarmotKitException.AlreadyAdmin -> {
                 buf.putInt(32)
-                FfiConverterString.write(value.`details`, buf)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.SecretNotFound -> {
+            is MarmotKitException.NotAdmin -> {
                 buf.putInt(33)
-                FfiConverterString.write(value.`details`, buf)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.KeystoreUnavailable -> {
+            is MarmotKitException.StorageBusy -> {
                 buf.putInt(34)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.EmptyPassphrase -> {
+            is MarmotKitException.StorageClosed -> {
                 buf.putInt(35)
+                FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.EncryptionFailed -> {
+            is MarmotKitException.SecretNotFound -> {
                 buf.putInt(36)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.Io -> {
+            is MarmotKitException.KeystoreUnavailable -> {
                 buf.putInt(37)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.ExternalSignerUnavailable -> {
+            is MarmotKitException.EmptyPassphrase -> {
                 buf.putInt(38)
+                Unit
+            }
+            is MarmotKitException.EncryptionFailed -> {
+                buf.putInt(39)
+                FfiConverterString.write(value.`details`, buf)
+                Unit
+            }
+            is MarmotKitException.Io -> {
+                buf.putInt(40)
+                FfiConverterString.write(value.`details`, buf)
+                Unit
+            }
+            is MarmotKitException.ExternalSignerUnavailable -> {
+                buf.putInt(41)
                 FfiConverterString.write(value.`account`, buf)
                 Unit
             }
             is MarmotKitException.ExternalSignerMismatch -> {
-                buf.putInt(39)
+                buf.putInt(42)
                 Unit
             }
             is MarmotKitException.ExternalSignerRejected -> {
-                buf.putInt(40)
+                buf.putInt(43)
                 Unit
             }
             is MarmotKitException.GroupSendQueueFull -> {
-                buf.putInt(41)
+                buf.putInt(44)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.Runtime -> {
-                buf.putInt(42)
+                buf.putInt(45)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
@@ -21200,6 +21608,34 @@ public object FfiConverterSequenceTypeAppBlobEndpointFfi: FfiConverterRustBuffer
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeAppBlobEndpointFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeAppGroupMemberIdsFfi: FfiConverterRustBuffer<List<AppGroupMemberIdsFfi>> {
+    override fun read(buf: ByteBuffer): List<AppGroupMemberIdsFfi> {
+        val len = buf.getInt()
+        return List<AppGroupMemberIdsFfi>(len) {
+            FfiConverterTypeAppGroupMemberIdsFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<AppGroupMemberIdsFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeAppGroupMemberIdsFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<AppGroupMemberIdsFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeAppGroupMemberIdsFfi.write(it, buf)
         }
     }
 }

@@ -1,9 +1,11 @@
+import com.android.build.api.attributes.ProductFlavorAttr
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.androidx.baselineprofile)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.detekt)
@@ -133,17 +135,21 @@ val allowUnsignedRelease =
     runtimeConfigProperty("WHITENOISE_ALLOW_UNSIGNED_RELEASE", "false")
         .equals("true", ignoreCase = true)
 
-// Per-PR preview build inputs. When CI sets PR_NUMBER on a pull-request build,
-// the dev flavor branches to a distinct applicationId, versionCode, versionName,
-// and launcher label so the resulting APK installs side-by-side with the
-// production/staging apps and is visually distinguishable on the home screen
-// (see .github/workflows/android-pr-apk.yml).
+// PR preview inputs. The default "stable" channel deliberately keeps one
+// applicationId so every PR preview updates the same app and retains its data.
+// The "isolated" channel remains available when a reviewer needs side-by-side
+// installs or a clean data directory. Both are signed later by a privileged,
+// base-branch-only workflow; Gradle never receives the preview signing key.
 val prNumber: String? = System.getenv("PR_NUMBER")?.takeIf { it.isNotBlank() }
-val prRunNumber: Int? = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
-val basePrVersionCode = 100_000
+val prPreviewChannel: String? = System.getenv("PR_PREVIEW_CHANNEL")?.takeIf { it.isNotBlank() }
+// Android accepts an update whose versionCode equals the installed version.
+// A fixed preview-only code therefore lets a tester move between any two PR
+// builds without uninstalling and losing the preview app's data.
+val prPreviewVersionCode = 2_000_000_000
 val defaultAppName = "White Noise"
 val buildShortSha =
-    System.getenv("GITHUB_SHA")?.take(7)
+    System.getenv("PREVIEW_HEAD_SHA")?.take(7)
+        ?: System.getenv("GITHUB_SHA")?.take(7)
         ?: System.getenv("GIT_COMMIT")?.take(7)
         ?: "local"
 
@@ -159,8 +165,11 @@ android {
         targetSdk = 36
         versionCode = 8
         versionName = "2026.8.6"
+        manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
+        manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_round"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "false")
         buildConfigField(
             "String",
             "MDK_SHORT_SHA",
@@ -193,23 +202,9 @@ android {
     productFlavors {
         create("dev") {
             dimension = "environment"
-            // On CI pull-request builds, PR_NUMBER isolates the APK to its own
-            // applicationId (side-by-side install), monotonic versionCode, and a
-            // launcher label prefixed by the PR number so the icon on a tester's
-            // home screen is unambiguous. Local dev builds fall through to the
-            // plain .dev suffix and default label.
-            if (prNumber != null) {
-                applicationIdSuffix = ".dev.pr$prNumber"
-                versionNameSuffix = "-dev-pr$prNumber"
-                manifestPlaceholders["appName"] = "$prNumber $defaultAppName"
-                if (prRunNumber != null) {
-                    versionCode = basePrVersionCode + prRunNumber
-                }
-            } else {
-                applicationIdSuffix = ".dev"
-                versionNameSuffix = "-dev"
-                manifestPlaceholders["appName"] = defaultAppName
-            }
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            manifestPlaceholders["appName"] = defaultAppName
             manifestPlaceholders["deepLinkScheme"] = "whitenoise-dev"
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-dev".asBuildConfigString())
             buildConfigField(
@@ -256,6 +251,45 @@ android {
                 "WHITENOISE_PUSH_RELAY_HINT",
                 environmentRuntimeConfigProperty("dev", "PUSH_RELAY_HINT").asBuildConfigString(),
             )
+        }
+
+        create("preview") {
+            dimension = "environment"
+            val previewIdentity = prNumber ?: "local"
+            val previewChannel = prPreviewChannel ?: "stable"
+            manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher_preview"
+            manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_preview"
+            manifestPlaceholders["deepLinkScheme"] = "whitenoise-preview"
+            buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-preview".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_OTLP_ENDPOINT", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_OTLP_AUTH_TOKEN", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_AUDIT_LOG_ENDPOINT", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_AUDIT_LOG_AUTH_TOKEN", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "preview".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_TELEMETRY_TENANT", "whitenoise-android-preview".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_PUSH_SERVER_PUBKEY_HEX", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_PUSH_RELAY_HINT", "".asBuildConfigString())
+            versionCode = prPreviewVersionCode
+            when (previewChannel) {
+                "stable" -> {
+                    applicationIdSuffix = ".preview"
+                    versionNameSuffix = "-preview-pr$previewIdentity-$buildShortSha"
+                    manifestPlaceholders["appName"] = "PR $previewIdentity Preview"
+                }
+                "isolated" -> {
+                    applicationIdSuffix = ".preview.pr$previewIdentity"
+                    versionNameSuffix = "-preview-pr$previewIdentity-$buildShortSha-isolated"
+                    manifestPlaceholders["appName"] = "PR $previewIdentity Isolated"
+                    val isolatedDeepLinkScheme = "whitenoise-preview-pr$previewIdentity"
+                    manifestPlaceholders["deepLinkScheme"] = isolatedDeepLinkScheme
+                    buildConfigField(
+                        "String",
+                        "WHITENOISE_DEEP_LINK_SCHEME",
+                        isolatedDeepLinkScheme.asBuildConfigString(),
+                    )
+                }
+                else -> error("PR_PREVIEW_CHANNEL must be 'stable' or 'isolated'")
+            }
         }
 
         create("production") {
@@ -418,16 +452,6 @@ android {
         }
     }
 
-    // PR preview builds reuse the staging flavor's blueprint launcher icon so
-    // the app on a tester's home screen is visually distinct from the
-    // production/local-dev icon. Layered on top of the dev flavor's own
-    // resources so anything else in src/dev/res still wins over src/staging/res.
-    if (prNumber != null) {
-        sourceSets.getByName("dev") {
-            res.srcDirs("src/staging/res")
-        }
-    }
-
     buildTypes {
         debug {
             // Debug builds keep each flavor's applicationId so the local
@@ -446,6 +470,19 @@ android {
             // public, so a release APK signed with it is trivially forgeable.
             // When signing is absent, the release packaging tasks fail (see the
             // guard below) instead of producing an unsigned artifact.
+        }
+        // Created by the Baseline Profile plugin from `release`. Keep both
+        // performance-only variants installable without weakening the signing
+        // contract of a production or staging release APK. They intentionally
+        // reuse the dev package so an authenticated dev fixture survives swaps
+        // between the debug and release-like benchmark APKs.
+        create("benchmarkRelease") {
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "true")
+        }
+        create("nonMinifiedRelease") {
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "true")
         }
     }
     compileOptions {
@@ -492,7 +529,14 @@ androidComponents {
                 ?.second
         val enabled =
             when (environment) {
-                "dev" -> variantBuilder.buildType == "debug"
+                "dev" ->
+                    variantBuilder.buildType in
+                        setOf(
+                            "debug",
+                            "benchmarkRelease",
+                            "nonMinifiedRelease",
+                        )
+                "preview" -> variantBuilder.buildType == "release"
                 "production", "staging" -> variantBuilder.buildType == "release"
                 else -> true
             }
@@ -529,6 +573,50 @@ androidComponents {
     }
 }
 
+// Compose compiler reports are opt-in because they add work and generate a
+// large number of files. CI enables the property for an optimized staging
+// compilation and publishes both the metrics and stability reports.
+val enableComposeCompilerReports =
+    providers
+        .gradleProperty("whitenoise.enableComposeCompilerReports")
+        .map(String::toBooleanStrict)
+        .getOrElse(false)
+
+composeCompiler {
+    if (enableComposeCompilerReports) {
+        metricsDestination = layout.buildDirectory.dir("compose-metrics")
+        reportsDestination = layout.buildDirectory.dir("compose-reports")
+    }
+}
+
+baselineProfile {
+    automaticGenerationDuringBuild = false
+    dexLayoutOptimization = true
+    mergeIntoMain = true
+    saveInSrc = true
+    warnings {
+        // Other environments intentionally expose only their supported release
+        // variant; performance tooling is scoped to the safe dev package.
+        disabledVariants = false
+    }
+}
+
+// The producer intentionally has one safe dev/zapstore fixture variant. Point
+// every release consumer's profile-only configuration at that artifact without
+// adding broad flavor fallbacks to the app's runtime dependency graph.
+val baselineProfileEnvironment = objects.named(ProductFlavorAttr::class.java, "dev")
+val baselineProfileDistribution = objects.named(ProductFlavorAttr::class.java, "zapstore")
+afterEvaluate {
+    configurations
+        .matching { it.name.endsWith("ReleaseBaselineProfile") }
+        .configureEach {
+            attributes {
+                attribute(ProductFlavorAttr.of("environment"), baselineProfileEnvironment)
+                attribute(ProductFlavorAttr.of("distribution"), baselineProfileDistribution)
+            }
+        }
+}
+
 // Task names carry the distribution flavor between the environment and the build
 // type (e.g. packageStagingZapstoreRelease…), so match on the environment alone.
 // This runs only on release package tasks, so the build type is already implied.
@@ -556,17 +644,23 @@ fun releaseSigningHintForPackageTask(taskName: String): String =
 // unsigned release APK is uninstallable, so a build that "succeeds" while
 // emitting one hides a release-blocking failure. Override with
 // WHITENOISE_ALLOW_UNSIGNED_RELEASE=true.
-tasks.matching { it.name.startsWith("package") && it.name.contains("Release") }.configureEach {
-    doFirst {
-        if (!releaseSigningConfiguredForPackageTask(name) && !allowUnsignedRelease) {
-            throw GradleException(
-                "Release signing is not configured for $name (set ${releaseSigningHintForPackageTask(name)}). " +
-                    "Refusing to produce an unsigned release artifact; " +
-                    "set WHITENOISE_ALLOW_UNSIGNED_RELEASE=true to override.",
-            )
+tasks
+    .matching {
+        it.name.startsWith("package") &&
+            it.name.endsWith("Release") &&
+            !it.name.contains("BenchmarkRelease") &&
+            !it.name.contains("NonMinifiedRelease")
+    }.configureEach {
+        doFirst {
+            if (!releaseSigningConfiguredForPackageTask(name) && !allowUnsignedRelease) {
+                throw GradleException(
+                    "Release signing is not configured for $name (set ${releaseSigningHintForPackageTask(name)}). " +
+                        "Refusing to produce an unsigned release artifact; " +
+                        "set WHITENOISE_ALLOW_UNSIGNED_RELEASE=true to override.",
+                )
+            }
         }
     }
-}
 
 kover {
     reports {
@@ -662,8 +756,21 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.profileinstaller)
+    implementation(libs.androidx.tracing)
     implementation(libs.okhttp)
+    // One profile is generated from the authenticated dev/zapstore fixture and
+    // merged into main for every release consumer. Select that producer
+    // configuration explicitly so staging/play/production consumers do not
+    // demand unsafe benchmark variants with their own package identities.
+    baselineProfile(
+        project(
+            path = ":benchmark",
+            configuration = "devZapstoreReleaseBaselineProfile",
+        ),
+    )
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp)
     testImplementation(libs.okhttp.mockwebserver)
     // Real org.json for JVM unit tests — the android.jar stubs throw on use.

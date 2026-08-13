@@ -9,11 +9,26 @@ import java.util.Locale
  * [sentenceIndex] identifies the logical sentence within its message: a long
  * sentence split into several engine-safe chunks keeps one shared index, so
  * navigation and progress count sentences, never raw chunks.
+ *
+ * [sourceStart] and [sourceEnd] are half-open UTF-16 offsets into the message's
+ * projected speech text. The queue uses them to retain reversible visible-text
+ * mappings through sentence and engine-length splitting.
  */
 data class TtsChunk(
     val text: String,
     val index: Int,
     val sentenceIndex: Int = 0,
+    val sourceStart: Int = 0,
+    val sourceEnd: Int = text.length,
+    /** Full projected speech text used to validate word and grapheme boundaries across hard splits. */
+    val sourceText: String = text,
+    val messageIdHex: String = "",
+    val projectionId: String = "",
+    val timelineAt: ULong = 0uL,
+    // Offsets are relative to the exact [text] submitted to the engine.
+    val visibleSpans: List<TtsSpokenTextSpan> = emptyList(),
+    val senderPrefix: TtsTextRange? = null,
+    val locale: Locale = Locale.getDefault(),
 )
 
 object TtsChunker {
@@ -42,24 +57,27 @@ object TtsChunker {
         if (text.isBlank()) return emptyList()
 
         val iterator = BreakIterator.getSentenceInstance(locale).apply { setText(text) }
-        val sentences = mutableListOf<String>()
-        var pendingPrefix = ""
+        val sentences = mutableListOf<TextSlice>()
+        var pendingStart: Int? = null
         var start = iterator.first()
         var end = iterator.next()
         while (end != BreakIterator.DONE) {
-            val candidate = text.substring(start, end)
-            if (candidate.isNotBlank()) {
-                if (candidate.endsWithCommonTitleAbbreviation(locale)) {
-                    pendingPrefix += candidate
+            val candidate = text.trimmedSlice(start, end)
+            if (candidate != null) {
+                if (candidate.text.endsWithCommonTitleAbbreviation(locale)) {
+                    if (pendingStart == null) pendingStart = candidate.start
                 } else {
-                    sentences += (pendingPrefix + candidate).trim()
-                    pendingPrefix = ""
+                    val sentenceStart = pendingStart ?: candidate.start
+                    sentences += TextSlice(text, sentenceStart, candidate.end)
+                    pendingStart = null
                 }
             }
             start = end
             end = iterator.next()
         }
-        pendingPrefix.trim().takeIf(String::isNotEmpty)?.let(sentences::add)
+        pendingStart?.let { first ->
+            text.trimmedSlice(first, text.length)?.let(sentences::add)
+        }
 
         // Every sentence-first chunk keeps the reserve, not just the message's
         // opening chunk: any logical sentence can become a navigation target,
@@ -72,9 +90,17 @@ object TtsChunker {
                     maxChunkLength = maxChunkLength,
                     firstChunkMaxLength = firstChunkMaxLength,
                 ).map { piece -> sentenceIndex to piece }
-            }.filter { (_, piece) -> piece.isNotBlank() }
+            }.filter { (_, piece) -> piece.text.isNotBlank() }
             .mapIndexed { index, (sentenceIndex, piece) ->
-                TtsChunk(text = piece, index = index, sentenceIndex = sentenceIndex)
+                TtsChunk(
+                    text = piece.text,
+                    index = index,
+                    sentenceIndex = sentenceIndex,
+                    sourceStart = piece.start,
+                    sourceEnd = piece.end,
+                    sourceText = text,
+                    locale = locale,
+                )
             }
     }
 
@@ -84,29 +110,52 @@ object TtsChunker {
             .lowercase(locale) in commonTitleAbbreviations
 
     private fun splitLongSentence(
-        sentence: String,
+        sentence: TextSlice,
         maxChunkLength: Int,
         firstChunkMaxLength: Int = maxChunkLength,
-    ): List<String> {
-        var remaining = sentence.trim()
-        if (remaining.length <= firstChunkMaxLength) return listOf(remaining)
+    ): List<TextSlice> {
+        var remainingStart = sentence.start
+        if (sentence.length <= firstChunkMaxLength) return listOf(sentence)
 
-        val chunks = mutableListOf<String>()
+        val chunks = mutableListOf<TextSlice>()
         var chunkLimit = firstChunkMaxLength
-        while (remaining.length > chunkLimit) {
+        while (sentence.end - remainingStart > chunkLimit) {
+            val remaining = sentence.source.substring(remainingStart, sentence.end)
             val whitespaceBoundary =
                 (chunkLimit downTo 1).firstOrNull { index -> remaining[index].isWhitespace() }
-            val end = whitespaceBoundary ?: safeHardSplitIndex(remaining, chunkLimit)
-            remaining
-                .substring(0, end)
-                .trimEnd()
-                .takeIf(String::isNotEmpty)
-                ?.let(chunks::add)
-            remaining = remaining.substring(end).trimStart()
+            val split = remainingStart + (whitespaceBoundary ?: safeHardSplitIndex(remaining, chunkLimit))
+            sentence.source.trimmedSlice(remainingStart, split)?.let(chunks::add)
+            remainingStart = split
+            while (remainingStart < sentence.end && sentence.source[remainingStart].isWhitespace()) {
+                remainingStart++
+            }
             chunkLimit = maxChunkLength
         }
-        remaining.takeIf(String::isNotBlank)?.let(chunks::add)
+        sentence.source.trimmedSlice(remainingStart, sentence.end)?.let(chunks::add)
         return chunks
+    }
+
+    private data class TextSlice(
+        val source: String,
+        val start: Int,
+        val end: Int,
+    ) {
+        val text: String
+            get() = source.substring(start, end)
+
+        val length: Int
+            get() = end - start
+    }
+
+    private fun String.trimmedSlice(
+        start: Int,
+        end: Int,
+    ): TextSlice? {
+        var first = start
+        var last = end
+        while (first < last && this[first].isWhitespace()) first++
+        while (last > first && this[last - 1].isWhitespace()) last--
+        return if (first < last) TextSlice(this, first, last) else null
     }
 
     private fun safeHardSplitIndex(

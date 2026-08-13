@@ -259,7 +259,16 @@ internal fun SettingsActionRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
     ) {
-        Icon(icon, contentDescription = null, tint = iconTint)
+        Box(
+            modifier = Modifier.size(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (inProgress) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(icon, contentDescription = null, tint = iconTint)
+            }
+        }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxs)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = titleColor)
             if (value != null) {
@@ -272,9 +281,8 @@ internal fun SettingsActionRow(
                 )
             }
         }
-        when {
-            inProgress -> CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-            comingSoon -> ComingSoonBadge()
+        if (comingSoon && !inProgress) {
+            ComingSoonBadge()
         }
     }
 }
@@ -362,6 +370,7 @@ internal fun FlowQuickActionRow(
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    iconContentDescription: String? = null,
     enabled: Boolean = true,
 ) {
     Row(
@@ -382,7 +391,7 @@ internal fun FlowQuickActionRow(
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Icon(icon, contentDescription = iconContentDescription, tint = MaterialTheme.colorScheme.primary)
         }
         Text(title, style = MaterialTheme.typography.bodyLarge)
     }

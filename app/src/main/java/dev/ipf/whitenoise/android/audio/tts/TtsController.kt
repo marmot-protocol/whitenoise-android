@@ -12,6 +12,8 @@ internal interface TtsSpeechEngine {
     fun setCallbacks(
         onDone: (String?) -> Unit,
         onError: (String?, Int) -> Unit,
+        onRangeStart: (String?, Int, Int, Int) -> Unit,
+        onStop: (String?, Boolean) -> Unit,
     )
 
     fun clearCallbacks()
@@ -71,7 +73,7 @@ class TtsController internal constructor(
             this.engine?.clearCallbacks()
         }
         this.engine = engine
-        engine.setCallbacks(::onDone, ::onError)
+        engine.setCallbacks(::onDone, ::onError, ::onRangeStart, ::onStop)
     }
 
     @Synchronized
@@ -270,6 +272,24 @@ class TtsController internal constructor(
         queue.onError(utteranceId, errorCode)
     }
 
+    @Synchronized
+    private fun onRangeStart(
+        utteranceId: String?,
+        start: Int,
+        end: Int,
+        frame: Int,
+    ) {
+        queue.onRangeStart(utteranceId, start, end, frame)
+    }
+
+    @Synchronized
+    private fun onStop(
+        utteranceId: String?,
+        interrupted: Boolean,
+    ) {
+        queue.onStopped(utteranceId, interrupted)
+    }
+
     private fun stopForEngineReplacement() {
         when (state.value) {
             is TtsState.Speaking -> {
@@ -289,31 +309,64 @@ class TtsController internal constructor(
         boundedSpeakableEntries(this).mapNotNull { it.toQueuedMessage(locale) }
 
     private fun TtsSpeakableEntry.toQueuedMessage(locale: Locale): TtsQueuedMessage? {
-        val trimmed = text.trim()
+        val trimStart = text.indexOfFirst { !it.isWhitespace() }.takeIf { it >= 0 } ?: return null
+        val trimEnd = text.indexOfLast { !it.isWhitespace() } + 1
+        val trimmed = text.substring(trimStart, trimEnd)
         val announcementName = senderDisplayName.trim()
         val sentenceChunks =
-            trimmed
-                .takeIf(String::isNotEmpty)
-                ?.let { messageText ->
-                    TtsChunker.chunk(
-                        text = messageText,
-                        locale = locale,
-                        maxChunkLength = maxChunkLength,
-                        leadingChunkReserve = senderAnnouncementReserve(announcementName),
-                    )
-                }.orEmpty()
+            TtsChunker.chunk(
+                text = trimmed,
+                locale = locale,
+                maxChunkLength = maxChunkLength,
+                leadingChunkReserve = senderAnnouncementReserve(announcementName),
+            )
         return sentenceChunks.takeIf { it.isNotEmpty() }?.let { chunks ->
             TtsQueuedMessage(
                 senderKey = senderKey,
                 senderDisplayName = announcementName,
                 preview = trimmed.take(TTS_PREVIEW_MAX_LENGTH),
                 // The queue reflattens indices itself — sentence identity must survive.
-                chunks = chunks.map { chunk -> chunk.copy(index = 0) },
+                chunks =
+                    chunks.map { chunk ->
+                        val sourceStart = trimStart + chunk.sourceStart
+                        val sourceEnd = trimStart + chunk.sourceEnd
+                        chunk.copy(
+                            index = 0,
+                            messageIdHex = messageIdHex,
+                            projectionId = projectionId,
+                            timelineAt = timelineAt,
+                            visibleSpans = spokenTextSpans.forChunk(sourceStart, sourceEnd),
+                        )
+                    },
                 messageIdHex = messageIdHex,
+                projectionId = projectionId,
                 timelineAt = timelineAt,
             )
         }
     }
+
+    private fun List<TtsSpokenTextSpan>.forChunk(
+        sourceStart: Int,
+        sourceEnd: Int,
+    ): List<TtsSpokenTextSpan> =
+        mapNotNull { span ->
+            val start = maxOf(sourceStart, span.spoken.start)
+            val end = minOf(sourceEnd, span.spoken.end)
+            if (start >= end) {
+                null
+            } else {
+                val visibleStart = span.visible.start + (start - span.spoken.start)
+                TtsSpokenTextSpan(
+                    spoken = TtsTextRange(start - sourceStart, end - sourceStart),
+                    visible =
+                        TtsVisibleTextSpan(
+                            leafId = span.visible.leafId,
+                            start = visibleStart,
+                            end = visibleStart + (end - start),
+                        ),
+                )
+            }
+        }
 
     private fun senderAnnouncementReserve(displayName: String): Int =
         displayName

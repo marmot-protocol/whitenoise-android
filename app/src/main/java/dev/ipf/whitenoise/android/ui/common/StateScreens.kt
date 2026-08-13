@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -67,13 +66,38 @@ fun LoadingScreen() {
 }
 
 @Composable
+fun StartupLoadingScreen() {
+    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            WhiteNoiseLogoLockup(size = 72.dp)
+            Text(
+                text = stringResource(R.string.white_noise),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            CircularProgressIndicator(
+                modifier = Modifier.size(32.dp),
+                strokeWidth = 3.dp,
+            )
+            Text(
+                text = stringResource(R.string.starting_securely),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
+}
+
+@Composable
 internal fun InlineConfirmationNotice(
     notice: TransientNotice,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     Surface(
-        modifier = modifier.fillMaxWidth().statusBarsPadding(),
+        modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {

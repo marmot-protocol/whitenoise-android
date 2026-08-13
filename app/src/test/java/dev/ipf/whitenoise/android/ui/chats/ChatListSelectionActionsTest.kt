@@ -37,5 +37,108 @@ class ChatListSelectionActionsTest {
         assertTrue(chatListBackHandlerEnabled(selectionMode = true, searchOpen = false))
         assertTrue(chatListBackHandlerEnabled(selectionMode = false, searchOpen = true))
         assertTrue(chatListBackHandlerEnabled(selectionMode = true, searchOpen = true))
+        assertTrue(chatListBackHandlerEnabled(selectionMode = false, searchOpen = false, filterSheetOpen = true))
+    }
+
+    @Test
+    fun backDismissalPrioritizesSelectionThenFilterSheetThenSearch() {
+        val searchOpen = GlobalSearchState(isOpen = true, filterSheetOpen = true)
+        assertEquals(ChatListBackDismissal.ClearSelection, chatListBackDismissal(selectionMode = true, searchOpen))
+        assertEquals(
+            ChatListBackDismissal.DismissFilterSheet,
+            chatListBackDismissal(selectionMode = false, searchOpen),
+        )
+        assertEquals(
+            ChatListBackDismissal.CloseSearch,
+            chatListBackDismissal(selectionMode = false, GlobalSearchState(isOpen = true)),
+        )
+        assertEquals(null, chatListBackDismissal(selectionMode = false, GlobalSearchState()))
+    }
+
+    @Test
+    fun filterSheetCannotCoverSelectionOrOpenWithoutInteractiveSections() {
+        val requested = GlobalSearchState(isOpen = true, filterSheetOpen = true)
+
+        assertFalse(
+            shouldPresentGlobalSearchFilterSheet(
+                searchState = requested,
+                interactiveSectionsAvailable = true,
+                selectionMode = true,
+            ),
+        )
+        assertFalse(
+            shouldPresentGlobalSearchFilterSheet(
+                searchState = requested,
+                interactiveSectionsAvailable = false,
+                selectionMode = false,
+            ),
+        )
+        assertTrue(
+            shouldPresentGlobalSearchFilterSheet(
+                searchState = requested,
+                interactiveSectionsAvailable = true,
+                selectionMode = false,
+            ),
+        )
+    }
+
+    @Test
+    fun filterControlsStayHiddenUntilSectionsExistButCanStillExposeRestoredChips() {
+        val emptySearch = GlobalSearchState(isOpen = true)
+        val filteredSearch =
+            emptySearch.copy(chatFilters = setOf(GlobalSearchChatFilter("chat-id", "Alice")))
+
+        assertFalse(
+            shouldShowGlobalSearchFilterControls(
+                searchState = emptySearch,
+                interactiveSectionsAvailable = false,
+                selectionMode = false,
+            ),
+        )
+        assertTrue(
+            shouldShowGlobalSearchFilterControls(
+                searchState = emptySearch,
+                interactiveSectionsAvailable = true,
+                selectionMode = false,
+            ),
+        )
+        assertTrue(
+            shouldShowGlobalSearchFilterControls(
+                searchState = filteredSearch,
+                interactiveSectionsAvailable = false,
+                selectionMode = false,
+            ),
+        )
+        assertFalse(
+            shouldShowGlobalSearchFilterControls(
+                searchState = filteredSearch,
+                interactiveSectionsAvailable = true,
+                selectionMode = true,
+            ),
+        )
+    }
+
+    @Test
+    fun selectionRevokesAnOpenFilterSheetBeforeBackDispatch() {
+        val requested = GlobalSearchState(isOpen = true, filterSheetOpen = true)
+
+        val reconciled =
+            reconcileGlobalSearchFilterSheet(
+                searchState = requested,
+                interactiveSectionsAvailable = true,
+                selectionMode = true,
+            )
+
+        assertFalse(reconciled.filterSheetOpen)
+        assertEquals(ChatListBackDismissal.ClearSelection, chatListBackDismissal(selectionMode = true, reconciled))
+
+        val unavailable =
+            reconcileGlobalSearchFilterSheet(
+                searchState = requested,
+                interactiveSectionsAvailable = false,
+                selectionMode = false,
+            )
+        assertFalse(unavailable.filterSheetOpen)
+        assertEquals(ChatListBackDismissal.CloseSearch, chatListBackDismissal(selectionMode = false, unavailable))
     }
 }

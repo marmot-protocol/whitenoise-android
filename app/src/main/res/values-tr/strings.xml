@@ -3,6 +3,8 @@
     <string name="app_name">White Noise</string>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise başlatılamadı</string>
+    <string name="starting_securely">Güvenli şekilde başlatılıyor…</string>
+    <string name="startup_taking_too_long">Başlatma beklenenden uzun sürüyor. Lütfen tekrar deneyin.</string>
     <string name="error_try_again">Bir sorun oluştu. Tekrar deneyin; sorun devam ederse hata raporunu kopyalayın.</string>
     <string name="error_loaded_content_may_be_out_of_date">Yüklenen içerikleriniz hâlâ kullanılabilir, ancak güncel olmayabilir. Yeniden deneniyor…</string>
     <string name="error_loaded_content_kept">Daha fazla içerik yüklenemedi. Mesajlarınız hâlâ kullanılabilir; hazır olduğunuzda tekrar deneyin.</string>
@@ -29,6 +31,19 @@
     <string name="chat_list_voice_unavailable">Sesli arama bu cihazda kullanılamıyor</string>
     <string name="toast_demoted_but_couldnt_leave">Artık yönetici değilsiniz, ancak gruptan ayrılınamadı</string>
     <string name="chat_list_search_hint">Sohbet ara</string>
+    <string name="chat_list_search_filters">Filtreler</string>
+    <string name="chat_list_search_filters_button">Filtreler (%1$d)</string>
+    <plurals name="chat_list_search_filters_active">
+        <item quantity="one">%1$d aktif filtre</item>
+        <item quantity="other">%1$d aktif filtre</item>
+    </plurals>
+    <string name="chat_list_search_clear_all_filters">Tümünü temizle</string>
+    <string name="chat_list_search_filter_sheet_title">Filtreler</string>
+    <string name="chat_list_search_filter_chat">Sohbet</string>
+    <string name="chat_list_search_filter_sender">Gönderen</string>
+    <string name="chat_list_search_filter_date">Tarih</string>
+    <string name="chat_list_search_filter_content">İçerik</string>
+    <string name="chat_list_search_filter_remove">%1$s kaldır</string>
     <string name="chat_list_filter_all">Tümü</string>
     <string name="chat_list_filter_unread">Okunmamış</string>
     <string name="chat_list_no_unread">Hepsi okundu</string>
@@ -602,6 +617,7 @@
     <string name="toast_couldnt_publish_profile">Profil yayınlanamadı</string>
     <string name="toast_send_failed">Gönderim başarısız oldu</string>
     <string name="toast_send_queue_full">Bu sohbette gönderilmeyi bekleyen çok fazla mesaj var, bu yüzden mesajınız gönderilmedi. Sıra ilerleyince yeniden deneyin.</string>
+    <string name="toast_chat_still_loading">Bu sohbet hâlâ yükleniyor. Birazdan yeniden deneyin.</string>
     <string name="toast_send_membership_verifying">Grup üyeliğin doğrulanıyor — mesajın gönderilmedi. Metin kutusunda saklandı; birazdan tekrar dene.</string>
     <string name="toast_reaction_failed">Tepki başarısız oldu</string>
     <string name="toast_couldnt_delete_message">Mesaj silinemedi. Lütfen tekrar deneyin.</string>
@@ -1299,6 +1315,7 @@
     <string name="tts_bar_next_message">Sonraki mesaj</string>
     <string name="tts_bar_progress">Cümle %1$d/%2$d, mesaj %3$d/%4$d</string>
     <string name="tts_bar_stop">Okumayı durdur</string>
+    <string name="tts_resume_follow">Takibi sürdür</string>
     <string name="tts_bar_error">Sesli okunamadı</string>
     <string name="tts_bar_history_loading">Diğer mesajlar yükleniyor…</string>
     <string name="tts_bar_history_error">Diğer mesajlar yüklenemedi. Yeniden denemek için tekrar dokunun.</string>
@@ -1398,4 +1415,21 @@
     <string name="attachment_type_video">Video</string>
     <string name="attachment_type_image">Görsel</string>
     <string name="attachment_type_file">Dosya</string>
+
+    <string name="global_search_date_filter_title">Tarih</string>
+    <string name="global_search_date_any_time">Her zaman</string>
+    <string name="global_search_date_today">Bugün</string>
+    <string name="global_search_date_last_7_days">Son 7 gün</string>
+    <string name="global_search_date_last_30_days">Son 30 gün</string>
+    <string name="global_search_date_custom">Özel aralık…</string>
+    <string name="global_search_date_custom_from">Başlangıç tarihi</string>
+    <string name="global_search_date_custom_to">Bitiş tarihi</string>
+    <string name="global_search_date_custom_summary">%1$s - %2$s</string>
+    <string name="global_search_date_custom_reversed_error">Bitiş tarihi, başlangıç tarihinden önce olamaz.</string>
+    <string name="global_search_content_text">Metin</string>
+    <string name="global_search_content_links">Bağlantılar</string>
+    <string name="global_search_content_images_video">Görseller ve video</string>
+    <string name="global_search_content_voice_audio">Ses ve sesli mesaj</string>
+    <string name="global_search_content_files_documents">Dosyalar ve belgeler</string>
+    <string name="global_search_content_any_attachment">Herhangi bir ek</string>
 </resources>
