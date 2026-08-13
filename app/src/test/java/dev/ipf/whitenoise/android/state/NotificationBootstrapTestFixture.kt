@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.AuditDataModeFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
@@ -27,6 +28,7 @@ import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 internal class NotificationBootstrapTestFixture(
     context: Context,
@@ -48,6 +50,7 @@ internal class NotificationBootstrapTestFixture(
     private val runtimeStarted = AtomicBoolean(false)
     private val subscriptionFailures = AtomicBoolean(initiallyFailSubscriptions)
     private val consumedUpdates = AtomicInteger(0)
+    private val receiverTimeoutMillisState = AtomicLong(receiverTimeoutMillis)
 
     val runtimeStartCalls = AtomicInteger(0)
     val subscriptionCalls = AtomicInteger(0)
@@ -125,6 +128,13 @@ internal class NotificationBootstrapTestFixture(
                         mutedUntilMs = null,
                         updatedAtMs = 0L,
                     )
+                "notificationSettings" ->
+                    NotificationSettingsFfi(
+                        accountRef = arguments?.get(0) as String,
+                        accountIdHex = "account-a",
+                        localNotificationsEnabled = true,
+                        nativePushEnabled = false,
+                    )
                 "listAccounts", "chatList" -> emptyList<Any>()
                 "displayName" -> "Alice"
                 "toString" -> "NotificationBootstrapMarmotFake"
@@ -143,10 +153,11 @@ internal class NotificationBootstrapTestFixture(
             activeAccountRef = "",
             marmotRuntimeFactory = { AppMarmotRuntime(rootPath = "test", marmot = marmot) },
             notificationSubscriber = { subscribe() },
-            notificationReceiverTimeoutMillis = receiverTimeoutMillis,
+            notificationReceiverTimeoutMillis = receiverTimeoutMillisState::get,
         )
 
-    fun allowSubscriptions() {
+    fun allowSubscriptions(recoveryTimeoutMillis: Long? = null) {
+        recoveryTimeoutMillis?.let(receiverTimeoutMillisState::set)
         subscriptionFailures.set(false)
         synchronousSubscriptionGate.countDown()
         subscriptionGate.complete(Unit)

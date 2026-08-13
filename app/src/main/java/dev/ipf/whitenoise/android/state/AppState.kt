@@ -1460,7 +1460,7 @@ class WhiteNoiseAppState private constructor(
     private val marmotAccessObserver: (() -> Unit)?,
     private val marmotRuntimeFactory: (Context) -> AppMarmotRuntime,
     private val notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription,
-    private val notificationReceiverTimeoutMillis: Long,
+    private val notificationReceiverTimeoutMillis: () -> Long,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
@@ -1477,7 +1477,7 @@ class WhiteNoiseAppState private constructor(
             marmotAccessObserver = null,
             marmotRuntimeFactory = ::openMarmotRuntime,
             notificationSubscriber = ::subscribeToNotifications,
-            notificationReceiverTimeoutMillis = NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS,
+            notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
         )
@@ -1496,7 +1496,7 @@ class WhiteNoiseAppState private constructor(
         marmotAccessObserver: (() -> Unit)? = null,
         marmotRuntimeFactory: (Context) -> AppMarmotRuntime = ::openMarmotRuntime,
         notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription = ::subscribeToNotifications,
-        notificationReceiverTimeoutMillis: Long = NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS,
+        notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
     ) : this(
         context = context,
         draftStore = draftStore,
@@ -1645,6 +1645,7 @@ class WhiteNoiseAppState private constructor(
     private var startupRelayCatchUpRecorded = false
     private var accountListRevision = 0L
     private var pendingStartupUnreadRefresh: StartupUnreadRefresh? = null
+
     @Volatile
     private var bootstrapCompleted = false
     private val nativePushSyncMutex = Mutex()
@@ -3380,7 +3381,9 @@ class WhiteNoiseAppState private constructor(
             traceStartupStage("notification-platform-setup") {
                 // Tray readiness must precede Marmot.start(): the passive MDK
                 // broadcast has no replay once the startup receiver attaches.
-                localNotificationPresenter.ensureChannels()
+                withContext(Dispatchers.Default) {
+                    localNotificationPresenter.ensureChannels()
+                }
                 refreshLocalNotificationPermission()
             }
             startBootstrapRuntime()
@@ -3502,7 +3505,7 @@ class WhiteNoiseAppState private constructor(
             notificationJob = notificationJob,
             receiverActive = notificationReceiverActive,
             receiverRetryWake = notificationReceiverRetryWake,
-            timeoutMillis = notificationReceiverTimeoutMillis,
+            timeoutMillis = notificationReceiverTimeoutMillis(),
             launchListener = ::launchNotificationListenerLoop,
         )
     }
@@ -3533,14 +3536,7 @@ class WhiteNoiseAppState private constructor(
 
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
-        val receiverReady =
-            awaitNotificationReceiverForStartup(
-                notificationJob = notificationJob,
-                receiverActive = notificationReceiverActive,
-                receiverRetryWake = notificationReceiverRetryWake,
-                timeoutMillis = notificationReceiverTimeoutMillis,
-                launchListener = ::launchNotificationListenerLoop,
-            )
+        val receiverReady = awaitNotificationReceiverForStartup()
         if (receiverReady && !networkNotificationRecoverySuppressed) {
             if (accounts.isEmpty()) refreshAccounts()
             if (!networkNotificationRecoverySuppressed && notificationReceiverActive.value) {
@@ -8080,13 +8076,13 @@ class WhiteNoiseAppState private constructor(
         notificationDrainSignals.tryEmit(notificationDrainSequence.incrementAndGet())
     }
 
-    private fun startNotificationListener(start: CoroutineStart = CoroutineStart.DEFAULT) {
+    private fun startNotificationListener() {
         if (networkNotificationRecoverySuppressed) return
-        notificationJob.startIfInactive { launchNotificationListenerLoop(start) }
+        notificationJob.startIfInactive(::launchNotificationListenerLoop)
     }
 
-    private fun launchNotificationListenerLoop(start: CoroutineStart = CoroutineStart.DEFAULT): Job =
-        notificationScope.launch(Dispatchers.IO, start = start) {
+    private fun launchNotificationListenerLoop(): Job =
+        notificationScope.launch(Dispatchers.IO) {
             // Restart the subscription on any failure (or clean end-of-stream)
             // with exponential backoff, so a transient relay/binding error
             // doesn't permanently silence notifications. Backoff resets after

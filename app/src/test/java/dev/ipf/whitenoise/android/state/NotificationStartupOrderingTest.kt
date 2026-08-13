@@ -5,7 +5,9 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -50,7 +52,7 @@ class NotificationStartupOrderingTest {
                 assertEquals(1, fixture.runtimeStartCalls.get())
                 assertTrue(fixture.subscriptionCalls.get() >= 1)
 
-                fixture.allowSubscriptions()
+                fixture.allowSubscriptions(recoveryTimeoutMillis = 2_000L)
                 fixture.ensureNotificationRuntimeStarted()
 
                 assertTrue(fixture.appState.phase is AppPhase.Onboarding)
@@ -85,7 +87,7 @@ class NotificationStartupOrderingTest {
                 assertEquals(1, fixture.runtimeStartCalls.get())
                 assertEquals(1, fixture.subscriptionCalls.get())
 
-                fixture.allowSubscriptions()
+                fixture.allowSubscriptions(recoveryTimeoutMillis = 2_000L)
                 fixture.ensureNotificationRuntimeStarted()
 
                 assertTrue(fixture.appState.phase is AppPhase.Onboarding)
@@ -113,7 +115,9 @@ class NotificationStartupOrderingTest {
                         fixture.bootstrap()
                     }
 
-                while (fixture.subscriptionCalls.get() == 0) kotlinx.coroutines.yield()
+                withTimeout(5_000L) {
+                    while (fixture.subscriptionCalls.get() == 0) yield()
+                }
                 bootstrap.cancelAndJoin()
 
                 assertTrue(fixture.appState.phase is AppPhase.Bootstrapping)
