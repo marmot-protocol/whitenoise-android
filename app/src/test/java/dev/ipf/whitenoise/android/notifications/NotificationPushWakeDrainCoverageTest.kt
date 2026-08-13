@@ -64,7 +64,7 @@ class NotificationPushWakeDrainCoverageTest {
     fun coldPushWakePreWarmsAvatarsBeforePostingTheFirstNotification() =
         runBlocking {
             val calls = mutableListOf<String>()
-            val listener = appStateFunctionBody("launchNotificationListenerLoop")
+            val listener = appStateFunctionBody("runNotificationListenerLoop")
             val updateProcessing = appStateFunctionBody("processNotificationUpdate")
 
             postAfterNotificationAvatarPreWarm(
