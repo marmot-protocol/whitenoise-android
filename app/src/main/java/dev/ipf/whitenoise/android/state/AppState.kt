@@ -3386,10 +3386,8 @@ class WhiteNoiseAppState private constructor(
             startBootstrapRuntime()
             // This is deliberately the first post-start suspension. Do not let
             // logging, privacy, or account work widen the no-replay interval.
-            if (!awaitNotificationReceiverForStartup()) {
-                throw receiverUnavailable()
-            }
-            appStateDebug { "marmot started; notification receiver active" }
+            val receiverReady = awaitNotificationReceiverForStartup()
+            appStateDebug { "marmot started; notification receiver active=$receiverReady" }
             traceStartupStage("notification-privacy-setup") { refreshSecurityPrivacySettings() }
             val refreshedAccounts = traceStartupStage("account-refresh") { refreshAccountSnapshot() }
             prepareStartupUnreadRefresh(refreshedAccounts)
@@ -3490,7 +3488,8 @@ class WhiteNoiseAppState private constructor(
 
     private suspend fun resumeCompletedBootstrap(): Boolean {
         if (!bootstrapCompleted) return false
-        ensureNotificationRuntimeStarted()
+        val receiverReady = awaitNotificationReceiverForStartup()
+        appStateDebug { "bootstrap resumed; notification receiver active=$receiverReady" }
         phase = if (accounts.isEmpty()) AppPhase.Onboarding else AppPhase.Ready
         return true
     }

@@ -24,7 +24,7 @@ class NotificationStartupOrderingTest {
         runBlocking {
             val fixture = NotificationBootstrapTestFixture(context)
             try {
-                fixture.appState.bootstrap()
+                fixture.bootstrap()
                 fixture.awaitUpdateConsumed()
 
                 assertTrue(fixture.receiverWasAttachedAtPostStartEmission)
@@ -44,14 +44,14 @@ class NotificationStartupOrderingTest {
                     receiverTimeoutMillis = 25L,
                 )
             try {
-                fixture.appState.bootstrap()
+                fixture.bootstrap()
 
                 assertTrue(fixture.appState.phase is AppPhase.Onboarding)
                 assertEquals(1, fixture.runtimeStartCalls.get())
                 assertTrue(fixture.subscriptionCalls.get() >= 1)
 
                 fixture.allowSubscriptions()
-                fixture.appState.ensureNotificationRuntimeStarted()
+                fixture.ensureNotificationRuntimeStarted()
 
                 assertTrue(fixture.appState.phase is AppPhase.Onboarding)
                 assertEquals(1, fixture.runtimeStartCalls.get())
@@ -71,7 +71,7 @@ class NotificationStartupOrderingTest {
                 )
             val bootstrap =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    fixture.appState.bootstrap()
+                    fixture.bootstrap()
                 }
             try {
                 val completedWithinBound =
@@ -86,7 +86,7 @@ class NotificationStartupOrderingTest {
                 assertEquals(1, fixture.subscriptionCalls.get())
 
                 fixture.allowSubscriptions()
-                fixture.appState.ensureNotificationRuntimeStarted()
+                fixture.ensureNotificationRuntimeStarted()
 
                 assertTrue(fixture.appState.phase is AppPhase.Onboarding)
                 assertEquals(1, fixture.runtimeStartCalls.get())
@@ -110,17 +110,17 @@ class NotificationStartupOrderingTest {
             try {
                 val bootstrap =
                     async(start = CoroutineStart.UNDISPATCHED) {
-                        fixture.appState.bootstrap()
+                        fixture.bootstrap()
                     }
 
                 while (fixture.subscriptionCalls.get() == 0) kotlinx.coroutines.yield()
                 bootstrap.cancelAndJoin()
 
-                assertTrue(fixture.appState.phase is AppPhase.Failed)
+                assertTrue(fixture.appState.phase is AppPhase.Bootstrapping)
                 assertEquals(1, fixture.runtimeStartCalls.get())
 
                 fixture.allowSubscriptions()
-                fixture.appState.bootstrap()
+                fixture.bootstrap()
 
                 assertTrue(fixture.appState.phase is AppPhase.Onboarding)
                 assertEquals(1, fixture.runtimeStartCalls.get())
@@ -135,9 +135,9 @@ class NotificationStartupOrderingTest {
         runBlocking {
             val fixture = NotificationBootstrapTestFixture(context)
             try {
-                fixture.appState.bootstrap()
-                fixture.appState.bootstrap()
-                fixture.appState.ensureNotificationRuntimeStarted()
+                fixture.bootstrap()
+                fixture.bootstrap()
+                fixture.ensureNotificationRuntimeStarted()
 
                 assertEquals(1, fixture.runtimeStartCalls.get())
                 assertEquals(1, fixture.subscriptionCalls.get())

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.app.NotificationManager
 import android.content.Context
+import android.os.Looper
 import dev.ipf.marmotkit.AuditDataModeFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatNotificationSettingsFfi
@@ -14,10 +15,15 @@ import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
+import org.robolectric.Shadows.shadowOf
 import java.lang.reflect.Proxy
+import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -146,6 +152,14 @@ internal class NotificationBootstrapTestFixture(
         subscriptionGate.complete(Unit)
     }
 
+    suspend fun bootstrap() {
+        runWithMainLooperPumping { appState.bootstrap() }
+    }
+
+    suspend fun ensureNotificationRuntimeStarted() {
+        runWithMainLooperPumping { appState.ensureNotificationRuntimeStarted() }
+    }
+
     suspend fun awaitUpdateConsumed() {
         withTimeout(5_000L) {
             while (consumedUpdates.get() == 0) delay(10L)
@@ -157,6 +171,27 @@ internal class NotificationBootstrapTestFixture(
         subscriptionGate.complete(Unit)
         updates.close(CancellationException("test complete"))
     }
+
+    /**
+     * WhiteNoiseAppState owns bootstrap on Dispatchers.Main so it survives a
+     * caller timeout. Robolectric's paused main looper does not advance while a
+     * runBlocking test awaits that process-owned job, so pump it explicitly
+     * while the real production call runs from a background caller.
+     */
+    private suspend fun <T> runWithMainLooperPumping(block: suspend () -> T): T =
+        coroutineScope {
+            val call = async(Dispatchers.Default) { block() }
+            try {
+                while (!call.isCompleted) {
+                    shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                    delay(1L)
+                }
+                shadowOf(Looper.getMainLooper()).idle()
+                call.await()
+            } finally {
+                call.cancel()
+            }
+        }
 
     private suspend fun subscribe(): AppNotificationSubscription {
         subscriptionCalls.incrementAndGet()

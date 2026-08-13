@@ -30,7 +30,7 @@ class NotificationColdProcessStartupTest {
             manager.activeNotifications.forEach { manager.cancel(it.tag, it.id) }
 
             try {
-                fixture.appState.bootstrap()
+                fixture.bootstrap()
                 fixture.awaitUpdateConsumed()
                 waitForNotification(manager)
 
