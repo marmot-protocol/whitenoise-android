@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.content.Context
 import dev.ipf.marmotkit.AuditDataModeFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
+import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
@@ -17,6 +18,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 import java.lang.reflect.Proxy
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -24,6 +26,7 @@ internal class NotificationBootstrapTestFixture(
     context: Context,
     initiallyFailSubscriptions: Boolean = false,
     initiallyBlockSubscriptions: Boolean = false,
+    initiallyBlockSubscriptionsSynchronously: Boolean = false,
     receiverTimeoutMillis: Long = 100L,
 ) {
     private val appContext = context.applicationContext
@@ -32,6 +35,8 @@ internal class NotificationBootstrapTestFixture(
         CompletableDeferred<Unit>().also { gate ->
             if (!initiallyBlockSubscriptions) gate.complete(Unit)
         }
+    private val synchronousSubscriptionGate =
+        CountDownLatch(if (initiallyBlockSubscriptionsSynchronously) 1 else 0)
     private val subscriberAttached = AtomicBoolean(false)
     private val emittedPostStartUpdate = AtomicBoolean(false)
     private val runtimeStarted = AtomicBoolean(false)
@@ -105,6 +110,15 @@ internal class NotificationBootstrapTestFixture(
                         dataMode = AuditDataModeFfi.OBFUSCATED_SENSITIVE_DATA,
                     )
                 "setAuditLogSettings" -> arguments?.first()
+                "chatNotificationSettings" ->
+                    ChatNotificationSettingsFfi(
+                        accountRef = arguments?.get(0) as String,
+                        accountIdHex = "account-a",
+                        groupIdHex = arguments[1] as String,
+                        muted = false,
+                        mutedUntilMs = null,
+                        updatedAtMs = 0L,
+                    )
                 "listAccounts", "chatList" -> emptyList<Any>()
                 "displayName" -> "Alice"
                 "toString" -> "NotificationBootstrapMarmotFake"
@@ -128,6 +142,7 @@ internal class NotificationBootstrapTestFixture(
 
     fun allowSubscriptions() {
         subscriptionFailures.set(false)
+        synchronousSubscriptionGate.countDown()
         subscriptionGate.complete(Unit)
     }
 
@@ -138,12 +153,14 @@ internal class NotificationBootstrapTestFixture(
     }
 
     fun close() {
+        synchronousSubscriptionGate.countDown()
         subscriptionGate.complete(Unit)
         updates.close(CancellationException("test complete"))
     }
 
     private suspend fun subscribe(): AppNotificationSubscription {
         subscriptionCalls.incrementAndGet()
+        synchronousSubscriptionGate.await()
         if (subscriptionFailures.get()) throw IllegalStateException("subscription unavailable")
         subscriptionGate.await()
         subscriberAttached.set(true)

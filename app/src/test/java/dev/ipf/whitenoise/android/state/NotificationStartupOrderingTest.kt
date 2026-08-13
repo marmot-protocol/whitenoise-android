@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -45,16 +46,54 @@ class NotificationStartupOrderingTest {
             try {
                 fixture.appState.bootstrap()
 
-                assertTrue(fixture.appState.phase is AppPhase.Failed)
+                assertTrue(fixture.appState.phase is AppPhase.Onboarding)
                 assertEquals(1, fixture.runtimeStartCalls.get())
                 assertTrue(fixture.subscriptionCalls.get() >= 1)
 
                 fixture.allowSubscriptions()
-                fixture.appState.bootstrap()
+                fixture.appState.ensureNotificationRuntimeStarted()
 
                 assertTrue(fixture.appState.phase is AppPhase.Onboarding)
                 assertEquals(1, fixture.runtimeStartCalls.get())
             } finally {
+                fixture.close()
+            }
+        }
+
+    @Test
+    fun synchronousSubscriptionSetupCannotEscapeStartupTimeout() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    initiallyBlockSubscriptionsSynchronously = true,
+                    receiverTimeoutMillis = 25L,
+                )
+            val bootstrap =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    fixture.appState.bootstrap()
+                }
+            try {
+                val completedWithinBound =
+                    withTimeoutOrNull(2_000L) {
+                        bootstrap.join()
+                        true
+                    } ?: false
+
+                assertTrue("bootstrap must remain bounded while native subscription setup blocks", completedWithinBound)
+                assertTrue(fixture.appState.phase is AppPhase.Onboarding)
+                assertEquals(1, fixture.runtimeStartCalls.get())
+                assertEquals(1, fixture.subscriptionCalls.get())
+
+                fixture.allowSubscriptions()
+                fixture.appState.ensureNotificationRuntimeStarted()
+
+                assertTrue(fixture.appState.phase is AppPhase.Onboarding)
+                assertEquals(1, fixture.runtimeStartCalls.get())
+                assertEquals(1, fixture.subscriptionCalls.get())
+            } finally {
+                fixture.allowSubscriptions()
+                bootstrap.cancelAndJoin()
                 fixture.close()
             }
         }
