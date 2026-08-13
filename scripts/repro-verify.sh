@@ -325,6 +325,22 @@ repro_verify_clone() {
   git clone --quiet "$1" "$2"
 }
 
+repro_verify_seed_gradle_distribution() {
+  local source_home="$1"
+  local destination_home="$2"
+  local source_dists="$source_home/wrapper/dists"
+
+  if [[ ! -d "$source_dists" ]]; then
+    printf 'error: first build did not cache the Gradle wrapper distribution: %s\n' \
+      "$source_dists" >&2
+    return 1
+  fi
+  mkdir -p "$destination_home/wrapper"
+  # Build state remains isolated per tree. Only copy the immutable wrapper
+  # distribution so the second build cannot fail on a redundant download.
+  cp -a "$source_dists" "$destination_home/wrapper/"
+}
+
 repro_verify_build() {
   local tree="$1"
   local commit_sha="$2"
@@ -462,6 +478,7 @@ repro_verify_main() {
 
   printf 'repro-verify: building tree1\n' >&2
   repro_verify_build "$tree1" "$commit_sha" "$gradle_user_home1" "$jvm_report1" "$jvm_init" "$configured_jvm_report"
+  repro_verify_seed_gradle_distribution "$gradle_user_home1" "$gradle_user_home2"
   printf 'repro-verify: building tree2\n' >&2
   repro_verify_build "$tree2" "$commit_sha" "$gradle_user_home2" "$jvm_report2" "$jvm_init" "$configured_jvm_report"
   if ! cmp -s "$jvm_report1" "$jvm_report2"; then

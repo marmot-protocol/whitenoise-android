@@ -1,8 +1,8 @@
 name: Android Release Runtime Verify
 
-# R8 can successfully package bytecode that ART later rejects. This required
-# This pre-merge check builds the real optimized release type, signs it with a disposable
-# CI-only key, and asks ART on an x86_64 emulator to verify every DEX class.
+# R8 can successfully package bytecode that ART later rejects. These pre-merge
+# checks build the optimized production/API-36 and staging/API-37 paths, sign
+# them with disposable CI-only keys, and ask ART to verify every DEX class.
 
 on:
   pull_request:
@@ -19,8 +19,8 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: Verify minified APK on ART
+  verify-production:
+    name: Verify production APK on API 36 ART
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -113,3 +113,215 @@ jobs:
           path: app/build/reports/release-runtime-verify/
           if-no-files-found: ignore
           retention-days: 7
+
+  verify-staging-android17:
+    name: Verify staging APK on Android 17 ART
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Create disposable staging signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          keystore_path="$RUNNER_TEMP/staging-runtime-verifier.jks"
+          keytool -genkeypair \
+            -keystore "$keystore_path" \
+            -storepass android \
+            -alias staging-runtime-verifier \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 1 \
+            -dname "CN=White Noise Staging Runtime CI"
+          {
+            printf 'WHITENOISE_STAGING_KEYSTORE_PATH=%s\n' "$keystore_path"
+            printf 'WHITENOISE_STAGING_KEYSTORE_PASSWORD=android\n'
+            printf 'WHITENOISE_STAGING_KEY_ALIAS=staging-runtime-verifier\n'
+            printf 'WHITENOISE_STAGING_KEY_PASSWORD=android\n'
+          } >> "$GITHUB_ENV"
+
+      - name: Build optimized staging APKs
+        run: >-
+          ./gradlew :app:assembleStagingZapstoreRelease
+          -Pandroid.injected.testOnly=false
+          --no-daemon --stacktrace
+
+      - name: Locate ARM64 and x86_64 staging APKs
+        id: apks
+        shell: bash
+        run: |
+          set -euo pipefail
+          for abi in arm64-v8a x86_64; do
+            mapfile -t matches < <(
+              for apk_dir in \
+                app/build/outputs/apk/stagingZapstore/release \
+                app/build/intermediates/apk/stagingZapstore/release; do
+                [[ -d "$apk_dir" ]] || continue
+                find "$apk_dir" -maxdepth 1 -type f -name "*$abi*release*.apk"
+              done | sort
+            )
+            if [[ ${#matches[@]} -ne 1 ]]; then
+              printf 'Expected one %s staging APK, found %d\n' \
+                "$abi" "${#matches[@]}" >&2
+              printf '%s\n' "${matches[@]}" >&2
+              exit 1
+            fi
+            output_name="${abi//-/_}_path"
+            printf '%s=%s\n' "$output_name" "${matches[0]}" >> "$GITHUB_OUTPUT"
+          done
+
+      # Native libraries are ABI-specific, but the verifier failure is in DEX
+      # bytecode. Prove the emulator APK carries the exact DEX files shipped in
+      # the ARM64 staging APK before asking x86_64 ART to verify and launch it.
+      - name: Require ARM64 verifier DEX parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          arm64_dir="$(mktemp -d)"
+          x86_64_dir="$(mktemp -d)"
+          trap 'rm -rf "$arm64_dir" "$x86_64_dir"' EXIT
+          unzip -q '${{ steps.apks.outputs.arm64_v8a_path }}' 'classes*.dex' -d "$arm64_dir"
+          unzip -q '${{ steps.apks.outputs.x86_64_path }}' 'classes*.dex' -d "$x86_64_dir"
+          mapfile -t arm64_dex < <(
+            find "$arm64_dir" -maxdepth 1 -type f -name 'classes*.dex' \
+              -exec basename {} \; | sort -V
+          )
+          mapfile -t x86_64_dex < <(
+            find "$x86_64_dir" -maxdepth 1 -type f -name 'classes*.dex' \
+              -exec basename {} \; | sort -V
+          )
+          if [[ ${#arm64_dex[@]} -eq 0 || "${arm64_dex[*]}" != "${x86_64_dex[*]}" ]]; then
+            printf 'ARM64 DEX set: %s\n' "${arm64_dex[*]}" >&2
+            printf 'x86_64 DEX set: %s\n' "${x86_64_dex[*]}" >&2
+            exit 1
+          fi
+          report_dir=app/build/reports/release-runtime-verify
+          mkdir -p "$report_dir"
+          : > "$report_dir/arm64-dex-sha256.txt"
+          for dex in "${arm64_dex[@]}"; do
+            cmp -- "$arm64_dir/$dex" "$x86_64_dir/$dex"
+            digest="$(sha256sum "$arm64_dir/$dex" | cut -d ' ' -f 1)"
+            printf '%s  %s\n' "$digest" "$dex" \
+              | tee -a "$report_dir/arm64-dex-sha256.txt"
+          done
+
+      # GitHub's runner image currently ships an avdmanager that writes
+      # target=android-0 for minor-versioned packages such as android-37.0.
+      - name: Update SDK cmdline-tools for API 37
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?}}"
+          set +o pipefail
+          yes | "$sdk_root/cmdline-tools/latest/bin/sdkmanager" \
+            --install 'cmdline-tools;latest' > /dev/null
+          set -o pipefail
+          mapfile -t cmdline_tools_bins < <(
+            find "$sdk_root/cmdline-tools" \
+              -mindepth 2 -maxdepth 2 -type d -name bin \
+              -path '*/latest*/bin' -print \
+              | sort -V
+          )
+          if [[ ${#cmdline_tools_bins[@]} -eq 0 ]]; then
+            printf 'Updated Android SDK cmdline-tools were not found\n' >&2
+            exit 1
+          fi
+          cmdline_tools_bin="${cmdline_tools_bins[${#cmdline_tools_bins[@]} - 1]}"
+          "$cmdline_tools_bin/avdmanager" list device > /dev/null
+          printf '%s\n' "$cmdline_tools_bin" >> "$GITHUB_PATH"
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # The pinned runner sends an unlock key as soon as sys.boot_completed=1.
+      # API 37 can expose that property before its input service is registered:
+      # https://github.com/ReactiveCircus/android-emulator-runner/issues/432
+      - name: Retry Android 17 input-service readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          real_adb="$sdk_root/platform-tools/adb"
+          test -x "$real_adb"
+          wrapper_dir="$RUNNER_TEMP/android17-adb-wrapper"
+          mkdir -p "$wrapper_dir"
+          ln -s "$GITHUB_WORKSPACE/scripts/android17-adb-wrapper.sh" "$wrapper_dir/adb"
+          printf 'ANDROID17_REAL_ADB=%s\n' "$real_adb" >> "$GITHUB_ENV"
+          printf '%s\n' "$wrapper_dir" >> "$GITHUB_PATH"
+
+      - name: Test Android 17 stabilization handshake
+        run: ./scripts/test-android17-emulator-stabilization.sh
+
+      - name: Verify staging APK on Android 17 ART
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: '37.0'
+          target: google_apis_ps16k
+          arch: x86_64
+          # Keep this to a profile shipped by both the runner image's bundled
+          # avdmanager and current cmdline-tools. Newer Pixel profiles are not
+          # guaranteed to exist in the bundled device catalog.
+          profile: pixel_6
+          ram-size: 4096M
+          disk-size: 8G
+          force-avd-creation: false
+          # Emulator 37.1.11/API 37 can abort SurfaceFlinger's RegionSampling
+          # thread and restart system_server. Disable that emulator-only path
+          # before boot completes so package/activity services remain stable.
+          pre-emulator-launch-script: ./scripts/stabilize-android17-emulator.sh
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -feature GLDirectMem
+          disable-animations: true
+          script: >-
+            REQUIRE_ANDROID17_EMULATOR_STABILIZED=true
+            ./scripts/verify-release-runtime.sh
+            '${{ steps.apks.outputs.x86_64_path }}'
+            dev.ipf.whitenoise.android.staging
+
+      - name: Upload Android 17 staging verifier report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-staging-runtime-report-api37
+          path: app/build/reports/release-runtime-verify/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  verify:
+    name: Verify minified APK on ART
+    if: always()
+    needs:
+      - verify-production
+      - verify-staging-android17
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require both runtime-verifier lanes
+        env:
+          PRODUCTION_RESULT: ${{ needs.verify-production.result }}
+          STAGING_ANDROID17_RESULT: ${{ needs.verify-staging-android17.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$PRODUCTION_RESULT" != success || "$STAGING_ANDROID17_RESULT" != success ]]; then
+            printf 'Production/API-36 result: %s\n' "$PRODUCTION_RESULT" >&2
+            printf 'Staging/API-37 result: %s\n' "$STAGING_ANDROID17_RESULT" >&2
+            exit 1
+          fi
