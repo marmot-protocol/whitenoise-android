@@ -67,7 +67,7 @@ internal fun MessageTextSelectionToolbar(
                 estimatedHeightPx = estimatedHeightPx,
             )
         }
-    var measured by remember(anchorBounds) { mutableStateOf(false) }
+    var measured by remember { mutableStateOf(false) }
     Popup(
         onDismissRequest = onDismissRequest,
         popupPositionProvider = positionProvider,

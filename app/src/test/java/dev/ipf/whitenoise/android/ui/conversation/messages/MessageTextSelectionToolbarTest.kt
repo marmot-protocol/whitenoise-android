@@ -91,6 +91,34 @@ class MessageTextSelectionToolbarTest {
     }
 
     @Test
+    fun selectionToolbarRemainsDisplayedWhenSelectionMovesWithoutResizing() {
+        lateinit var selectionBounds: MutableState<Rect>
+        composeRule.setContent {
+            selectionBounds = remember { mutableStateOf(Rect(0f, 48f, 220f, 96f)) }
+            WhiteNoiseTheme {
+                MessageTextSelectionToolbar(
+                    visible = true,
+                    canSpeak = true,
+                    selectionBoundsInWindow = selectionBounds.value,
+                    onSpeak = {},
+                    onDismissRequest = {},
+                )
+            }
+        }
+        composeRule
+            .onNodeWithTag("message_text_selection_toolbar")
+            .assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            selectionBounds.value = Rect(0f, 148f, 220f, 196f)
+        }
+
+        composeRule
+            .onNodeWithTag("message_text_selection_toolbar")
+            .assertIsDisplayed()
+    }
+
+    @Test
     fun selectionToolbarHidesWhenMappingIsUnavailable() {
         composeRule.setContent {
             WhiteNoiseTheme {
