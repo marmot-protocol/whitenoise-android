@@ -35,12 +35,14 @@ jobs:
     name: Connected Android tests (emulator)
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      WHITENOISE_MARMOTKIT_CACHE_DIR: ${{ runner.temp }}/marmotkit-cache
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17 (matches android-ci.yml).
       - name: Set up JDK 17
@@ -63,7 +65,7 @@ jobs:
       - name: Restore MarmotKit artifact
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ env.WHITENOISE_MARMOTKIT_CACHE_DIR }}
+          path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       # KVM lets the emulator run hardware-accelerated on the GitHub-hosted

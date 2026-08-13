@@ -29,12 +29,14 @@ jobs:
     name: Compile, test, ktlint, detekt, Android lint
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      WHITENOISE_MARMOTKIT_CACHE_DIR: ${{ runner.temp }}/marmotkit-cache
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
 
       - name: Test PR screenshot renderer
         run: node --test .github/scripts/update-pr-screenshots.test.js
@@ -76,7 +78,7 @@ jobs:
       - name: Restore MarmotKit artifact
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ env.WHITENOISE_MARMOTKIT_CACHE_DIR }}
+          path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       - name: Prepare MarmotKit API signature

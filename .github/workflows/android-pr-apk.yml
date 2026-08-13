@@ -41,7 +41,6 @@ jobs:
       PR_PREVIEW_CHANNEL: ${{ matrix.channel }}
       GITHUB_RUN_NUMBER: ${{ github.run_number }}
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
-      WHITENOISE_MARMOTKIT_CACHE_DIR: ${{ runner.temp }}/marmotkit-cache
 
     steps:
       - name: Resolve exact current internal PR head
@@ -86,6 +85,10 @@ jobs:
           ref: ${{ steps.resolve.outputs.head_sha }}
           persist-credentials: false
 
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
+
       - name: Set up JDK 17
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
@@ -108,7 +111,7 @@ jobs:
       - name: Restore MarmotKit artifact read-only
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ env.WHITENOISE_MARMOTKIT_CACHE_DIR }}
+          path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       - name: Test preview workflow contract
