@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -125,9 +126,11 @@ class AttachmentPresentationTest {
 
     @Test
     fun unresolvedCacheStateNeverStartsAnAutomaticDownload() {
-        assertFalse(shouldStartAttachmentDownload(AttachmentCacheState.Resolving, true, 12uL, mine = false))
-        assertFalse(shouldStartAttachmentDownload(AttachmentCacheState.Cached, true, 12uL, mine = false))
-        assertTrue(shouldStartAttachmentDownload(AttachmentCacheState.Missing, true, 12uL, mine = false))
-        assertFalse(shouldStartAttachmentDownload(AttachmentCacheState.Missing, true, 0uL, mine = false))
+        assertFalse(shouldStartAttachmentDownload(AttachmentTransferState.Resolving, true, 12uL, mine = false))
+        assertFalse(shouldStartAttachmentDownload(AttachmentTransferState.Available, true, 12uL, mine = false))
+        assertTrue(shouldStartAttachmentDownload(AttachmentTransferState.Remote, true, 12uL, mine = false))
+        assertFalse(shouldStartAttachmentDownload(AttachmentTransferState.Remote, true, 0uL, mine = false))
+        assertFalse(shouldStartAttachmentDownload(AttachmentTransferState.Failed, true, 12uL, mine = false))
+        assertFalse(shouldStartAttachmentDownload(AttachmentTransferState.NotRetained, true, 12uL, mine = false))
     }
 }
