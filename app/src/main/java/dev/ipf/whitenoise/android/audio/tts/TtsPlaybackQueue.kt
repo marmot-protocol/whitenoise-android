@@ -210,8 +210,8 @@ internal class TtsPlaybackQueue(
             _state.value = TtsState.Idle(sessionId = playbackSessionId)
             return
         }
-        val messageIndex = messageIndexForChunk(currentIndex)
-        announceSenderForCurrentMessage = currentIndex != firstChunkIndexOfMessage(messageIndex)
+        val messageIndex = projection.messageIndexForChunk(currentIndex)
+        announceSenderForCurrentMessage = currentIndex != projection.firstChunkIndexOfMessage(messageIndex)
         senderAnnouncedAtMessageIndex = null
         enqueueFromCurrentIndex()
     }
@@ -466,7 +466,7 @@ internal class TtsPlaybackQueue(
             if (messages.size == 1) {
                 chunks.lastIndex
             } else {
-                firstChunkIndexOfMessage(1) - 1
+                projection.firstChunkIndexOfMessage(1) - 1
             }
         return (0..lastChunk).firstOrNull { chunks[it].sentenceIndex == sentenceIndex } ?: 0
     }

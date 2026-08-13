@@ -486,7 +486,16 @@ class TtsPlaybackQueueTest {
         queue.onDone(staleUtterance)
 
         assertEquals(
-            speakingTts(2, 3, 0, 1, "One. Two. Three.", sentenceIndex = 2, sentenceCount = 3),
+            speakingTts(
+                2,
+                3,
+                0,
+                1,
+                "One. Two. Three.",
+                sentenceIndex = 2,
+                sentenceCount = 3,
+                messageProgressGeneration = 2,
+            ).copy(sessionId = 1),
             queue.state.value,
         )
     }

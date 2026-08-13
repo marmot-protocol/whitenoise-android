@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -15,11 +17,13 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.espresso.Espresso.pressBack
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -96,26 +100,28 @@ class MessageTextSelectionToolbarTest {
         composeRule.setContent {
             selectionBounds = remember { mutableStateOf(Rect(0f, 48f, 220f, 96f)) }
             WhiteNoiseTheme {
-                MessageTextSelectionToolbar(
-                    visible = true,
-                    canSpeak = true,
-                    selectionBoundsInWindow = selectionBounds.value,
-                    onSpeak = {},
-                    onDismissRequest = {},
-                )
+                Surface(Modifier.fillMaxSize()) {
+                    MessageTextSelectionToolbar(
+                        visible = true,
+                        canSpeak = true,
+                        selectionBoundsInWindow = selectionBounds.value,
+                        onSpeak = {},
+                        onDismissRequest = {},
+                    )
+                }
             }
         }
-        composeRule
-            .onNodeWithTag("message_text_selection_toolbar")
-            .assertIsDisplayed()
+        val toolbar = composeRule.onNodeWithTag("message_text_selection_toolbar")
+        toolbar.assertIsDisplayed()
 
         composeRule.runOnIdle {
             selectionBounds.value = Rect(0f, 148f, 220f, 196f)
         }
 
+        toolbar.assertIsDisplayed()
         composeRule
-            .onNodeWithTag("message_text_selection_toolbar")
-            .assertIsDisplayed()
+            .onAllNodes(isRoot())[0]
+            .captureRoboImage("src/test/snapshots/message_text_selection_toolbar_moved_anchor.png")
     }
 
     @Test
