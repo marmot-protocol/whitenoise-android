@@ -15,7 +15,7 @@ set -euo pipefail
 
 usage() {
   cat <<EOF
-Usage: scripts/release.sh [--abi <ABI>] [--help]
+Usage: scripts/release.sh [--abi <ABI>] [--flavor <name>] [--help]
 
   --abi <ABI>       Build only a specific ABI APK, then print its path
                     (arm64-v8a | armeabi-v7a | x86 | x86_64 | universal)
@@ -38,7 +38,8 @@ Staging signing creds:
   WHITENOISE_STAGING_KEY_PASSWORD
 
 Optional env:
-  WHITENOISE_MARMOTKIT_CACHE_DIR  Content-addressed MarmotKit artifact cache
+  WHITENOISE_MARMOTKIT_CACHE_DIR      Content-addressed MarmotKit artifact cache
+  WHITENOISE_MARMOTKIT_ARTIFACT_FILE  Pre-downloaded artifact for offline builds
 EOF
 }
 

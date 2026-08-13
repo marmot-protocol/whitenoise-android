@@ -12,9 +12,10 @@ import shutil
 import struct
 import sys
 import tempfile
-from contextlib import contextmanager
+import urllib.parse
 import urllib.request
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 
 try:
@@ -52,13 +53,27 @@ REQUIRED_PROPERTIES = {
     "manifest-schema",
     "workspace-version",
     "android-api",
+    "api-type-count",
+    "api-checksum-count",
+    "api-helper-declaration-count",
 }
 MAX_FILE_BYTES = 200 * 1024 * 1024
 MAX_ARCHIVE_UNCOMPRESSED_BYTES = 600 * 1024 * 1024
+MAX_ARCHIVE_DOWNLOAD_BYTES = 256 * 1024 * 1024
 
 
 class PreparationError(RuntimeError):
     """The pinned artifact failed a fail-closed preparation check."""
+
+
+class HttpsOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Allow artifact redirects only when the resolved destination stays on HTTPS."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if redirected is not None and urllib.parse.urlsplit(redirected.full_url).scheme != "https":
+            raise PreparationError(f"artifact redirect must use HTTPS: {redirected.full_url}")
+        return redirected
 
 
 def parse_properties(path: Path) -> dict[str, str]:
@@ -87,6 +102,12 @@ def parse_properties(path: Path) -> dict[str, str]:
         raise PreparationError("mdk-sha must be a lowercase full Git SHA")
     if properties["mdk-short-sha"] != source_sha[:8]:
         raise PreparationError("mdk-short-sha does not match mdk-sha")
+    artifact_url = urllib.parse.urlsplit(properties["artifact-url"])
+    if artifact_url.scheme != "https" or not artifact_url.netloc:
+        raise PreparationError("artifact-url must be an absolute HTTPS URL")
+    for key in ("api-type-count", "api-checksum-count", "api-helper-declaration-count"):
+        if not properties[key].isdigit() or int(properties[key]) <= 0:
+            raise PreparationError(f"{key} must be a positive integer")
     root = PurePosixPath(properties["archive-root"])
     if root.is_absolute() or len(root.parts) != 1 or root.name in {"", ".", ".."}:
         raise PreparationError("archive-root must be one safe directory name")
@@ -107,10 +128,27 @@ def download(url: str, destination: Path) -> None:
     temporary = Path(temporary_name)
     try:
         request = urllib.request.Request(url, headers={"User-Agent": "whitenoise-android-marmotkit/1"})
-        with os.fdopen(descriptor, "wb") as output, urllib.request.urlopen(request, timeout=60) as response:
+        opener = urllib.request.build_opener(HttpsOnlyRedirectHandler())
+        with os.fdopen(descriptor, "wb") as output, opener.open(request, timeout=60) as response:
             if response.status != 200:
                 raise PreparationError(f"artifact download returned HTTP {response.status}")
-            shutil.copyfileobj(response, output, length=1024 * 1024)
+            final_url = response.geturl()
+            if urllib.parse.urlsplit(final_url).scheme != "https":
+                raise PreparationError(f"artifact download resolved to a non-HTTPS URL: {final_url}")
+            content_length = response.headers.get("Content-Length")
+            if content_length is not None:
+                try:
+                    declared_size = int(content_length)
+                except ValueError as error:
+                    raise PreparationError("artifact download returned an invalid Content-Length") from error
+                if declared_size < 0 or declared_size > MAX_ARCHIVE_DOWNLOAD_BYTES:
+                    raise PreparationError("artifact download exceeds the compressed size limit")
+            downloaded = 0
+            while chunk := response.read(1024 * 1024):
+                downloaded += len(chunk)
+                if downloaded > MAX_ARCHIVE_DOWNLOAD_BYTES:
+                    raise PreparationError("artifact download exceeds the compressed size limit")
+                output.write(chunk)
             output.flush()
             os.fsync(output.fileno())
         os.replace(temporary, destination)
@@ -232,33 +270,68 @@ def validate_manifest(archive: zipfile.ZipFile, entry: zipfile.ZipInfo, properti
 
 
 def validate_elf(path: Path, abi: str) -> None:
-    data = path.read_bytes()
     expected_class, expected_machine = ABI_MACHINES[abi]
-    if len(data) < 20 or data[:4] != b"\x7fELF" or data[5] != 1:
-        raise PreparationError(f"{abi} library is not a little-endian ELF")
-    if data[4] != expected_class or struct.unpack_from("<H", data, 18)[0] != expected_machine:
-        raise PreparationError(f"{abi} library has the wrong ELF architecture")
-    for symbol in (
+    symbols = (
         b"uniffi_marmot_uniffi_fn_constructor_marmot_new",
         b"Java_io_crates_keyring_Keyring_00024Companion_initializeNdkContext",
-    ):
-        if symbol not in data:
+    )
+    with path.open("rb") as library:
+        header = library.read(20)
+        if len(header) < 20 or header[:4] != b"\x7fELF" or header[5] != 1:
+            raise PreparationError(f"{abi} library is not a little-endian ELF")
+        if header[4] != expected_class or struct.unpack_from("<H", header, 18)[0] != expected_machine:
+            raise PreparationError(f"{abi} library has the wrong ELF architecture")
+
+        found: set[bytes] = set()
+        overlap = b""
+        overlap_size = max(map(len, symbols)) - 1
+        while chunk := library.read(1024 * 1024):
+            window = overlap + chunk
+            found.update(symbol for symbol in symbols if symbol in window)
+            overlap = window[-overlap_size:]
+    for symbol in symbols:
+        if symbol not in found:
             raise PreparationError(f"{abi} library is missing expected export {symbol.decode()}")
 
 
-def api_signature(binding: Path, properties: dict[str, str]) -> str:
+def helper_api_declarations(prepared_root: Path) -> list[str]:
+    declarations: list[str] = []
+    for relative in KOTLIN_FILES[1:]:
+        source = (prepared_root / relative).read_text(encoding="utf-8")
+        for raw_line in source.splitlines():
+            line = raw_line.strip()
+            match = re.match(
+                r"^(?:public\s+)?((?:(?:data|enum|sealed|open|abstract)\s+)?(?:class|interface|object)\s+[A-Za-z0-9_]+)",
+                line,
+            )
+            if match is None and line.startswith("companion object"):
+                declarations.append(f"{relative}:companion object")
+                continue
+            if match is None:
+                match = re.match(
+                    r"^(?:public\s+)?((?:external\s+)?fun\s+[A-Za-z0-9_]+\s*\([^)]*\))",
+                    line,
+                )
+            if match is not None:
+                declarations.append(f"{relative}:{match.group(1)}")
+    return sorted(set(declarations))
+
+
+def api_signature(prepared_root: Path, properties: dict[str, str]) -> str:
+    binding = prepared_root / KOTLIN_FILES[0]
     source = binding.read_text(encoding="utf-8")
     types = sorted(
         {
             f"{kind} {name}"
             for kind, name in re.findall(
-                r"^(public interface|data class|enum class|sealed class)\s+([A-Za-z0-9_]+)",
+                r"^(public interface|open class|data class|enum class|sealed class)\s+([A-Za-z0-9_]+)",
                 source,
                 re.MULTILINE,
             )
             if name not in {"FfiConverter"}
         },
     )
+    helpers = helper_api_declarations(prepared_root)
     checksums = sorted(
         {
             f"{name}={value}"
@@ -270,16 +343,36 @@ def api_signature(binding: Path, properties: dict[str, str]) -> str:
     )
     if not types or not checksums:
         raise PreparationError("generated Kotlin has no inspectable public API signature")
+    expected_type_count = int(properties["api-type-count"])
+    expected_checksum_count = int(properties["api-checksum-count"])
+    expected_helper_count = int(properties["api-helper-declaration-count"])
+    if (
+        len(types) != expected_type_count
+        or len(checksums) != expected_checksum_count
+        or len(helpers) != expected_helper_count
+    ):
+        raise PreparationError(
+            "generated Kotlin API signature count mismatch: "
+            f"expected {expected_type_count} types/{expected_checksum_count} checksums/"
+            f"{expected_helper_count} helper declarations, "
+            f"got {len(types)} types/{len(checksums)} checksums/{len(helpers)} helper declarations",
+        )
+    kotlin_hashes = tuple(f"{relative}={sha256(prepared_root / relative)}" for relative in KOTLIN_FILES)
     return "\n".join(
         (
             "# Generated MarmotKit Android API signature",
             f"artifact-id={properties['artifact-id']}",
             f"source-sha={properties['mdk-sha']}",
             f"artifact-sha256={properties['artifact-sha256']}",
-            f"binding-sha256={sha256(binding)}",
+            "",
+            "[kotlin-files]",
+            *kotlin_hashes,
             "",
             "[types]",
             *types,
+            "",
+            "[helper-public-api]",
+            *helpers,
             "",
             "[uniffi-api-checksums]",
             *checksums,
@@ -288,18 +381,22 @@ def api_signature(binding: Path, properties: dict[str, str]) -> str:
     )
 
 
-def write_api_signature(binding: Path, destination: Path, properties: dict[str, str]) -> None:
-    destination.write_text(api_signature(binding, properties), encoding="utf-8")
+def write_api_signature(prepared_root: Path, destination: Path, properties: dict[str, str]) -> None:
+    destination.write_text(api_signature(prepared_root, properties), encoding="utf-8")
 
 
 def archive_payload_hashes(archive_path: Path, properties: dict[str, str]) -> dict[str, str]:
     with zipfile.ZipFile(archive_path) as archive:
         entries = safe_archive_files(archive, properties["archive-root"])
         validate_manifest(archive, entries["manifest.json"], properties)
-        return {
-            relative: hashlib.sha256(archive.read(info)).hexdigest()
-            for relative, info in entries.items()
-        }
+        hashes: dict[str, str] = {}
+        for relative, info in entries.items():
+            digest = hashlib.sha256()
+            with archive.open(info) as source:
+                for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            hashes[relative] = digest.hexdigest()
+        return hashes
 
 
 def validate_prepared(output: Path, properties: dict[str, str], archive_hashes: dict[str, str]) -> bool:
@@ -323,7 +420,7 @@ def validate_prepared(output: Path, properties: dict[str, str], archive_hashes: 
                 return False
         for abi in ABI_MACHINES:
             validate_elf(output / f"jniLibs/{abi}/libmarmot_uniffi.so", abi)
-        if api_signature(output / KOTLIN_FILES[0], properties) != api_signature_path.read_text(encoding="utf-8"):
+        if api_signature(output, properties) != api_signature_path.read_text(encoding="utf-8"):
             return False
     except PreparationError:
         return False
@@ -345,7 +442,7 @@ def extract_atomically(archive_path: Path, output: Path, properties: dict[str, s
         for abi in ABI_MACHINES:
             validate_elf(temporary / f"jniLibs/{abi}/libmarmot_uniffi.so", abi)
         write_api_signature(
-            temporary / "kotlin/dev/ipf/marmotkit/marmot_uniffi.kt",
+            temporary,
             temporary / "marmotkit-api-signature.txt",
             properties,
         )

@@ -51,7 +51,7 @@ artifact retention); it is not a durable release distribution asset.
   covers the JVM executing Gradle, not separate compiler or worker processes.
   The Gradle wrapper checksum and repository dependency versions are pinned, and CI
   records installed Android SDK packages in `repro-build-environment.txt` before
-  the verifier cleans up its temporary Gradle state. Android SDK packages and Maven
+  the verifier cleans up its temporary Gradle state. Android SDK packages and
   Maven dependencies are not yet pinned by repository-owned content hashes.
   MarmotKit is pinned separately by the repository-owned lock and archive SHA-256.
   The two-build check therefore proves path/build-order determinism on one verifier

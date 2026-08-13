@@ -92,10 +92,10 @@ manages its own Gradle execution. Dependency submission runs only from trusted
 
 Pushes to `master` also run `.github/workflows/android-instrumented.yml`, a
 separate emulator workflow for `:app:connectedDevZapstoreDebugAndroidTest`
-(Zapstore debug, exercising direct-distribution config). It is
-master-only, not a pull-request gate, because emulator boot is slower and more
-flake-prone than the fast JVM checks. It uploads Android test reports when
-available and retains them for seven days.
+(Zapstore debug, exercising direct-distribution config). Master runs the full
+suite; pull requests that change MarmotKit preparation run the focused packaged
+native-library smoke test. It uploads Android test reports when available and
+retains them for seven days.
 
 Pushes to `master` also run `.github/workflows/android-staging-apk.yml`, which
 builds and uploads a signed `arm64-v8a` staging release APK for internal
@@ -265,7 +265,8 @@ printed as the final line for Finder.
 just apk-staging
 ```
 
-Builds the signed staging `arm64-v8a` APK. The output filename is `whitenoise-staging-v8a-release-YYYY-MM-DD.apk`.
+Builds the signed staging `arm64-v8a` APK. The output filename is
+`whitenoise-staging-v8a-release-YYYY-MM-DD-<sha>.apk`.
 
 ```bash
 just release

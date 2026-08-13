@@ -61,20 +61,33 @@ val marmotKitArtifactOverride =
             .environmentVariable("WHITENOISE_MARMOTKIT_ARTIFACT_FILE")
             .orNull
             ?.let(rootProject::file)
-val marmotKitPython =
-    providers.environmentVariable("WHITENOISE_PYTHON").orNull
-        ?: if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) "python" else "python3"
+val marmotKitPreparationLauncher =
+    if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
+        listOf(
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            rootProject.file("scripts/prepare-marmotkit-artifact.ps1").absolutePath,
+        )
+    } else {
+        listOf(rootProject.file("scripts/prepare-marmotkit-artifact.sh").absolutePath)
+    }
+
 val prepareMarmotKitArtifact =
     tasks.register<Exec>("prepareMarmotKitArtifact") {
         group = "build setup"
         description = "Download and verify the immutable MarmotKit Android artifact"
         inputs.file(project.file("src/main/marmotkit/MARMOT_VERSION"))
         inputs.file(rootProject.file("scripts/prepare_marmotkit_artifact.py"))
+        inputs.file(rootProject.file("scripts/prepare-marmotkit-artifact.sh"))
+        inputs.file(rootProject.file("scripts/prepare-marmotkit-artifact.ps1"))
         outputs.dir(marmotKitPreparedDir)
         marmotKitArtifactOverride?.let(inputs::file)
         environment("PYTHONDONTWRITEBYTECODE", "1")
-        commandLine(
-            marmotKitPython,
+        commandLine(*marmotKitPreparationLauncher.toTypedArray())
+        args(
             rootProject.file("scripts/prepare_marmotkit_artifact.py"),
             "--lock",
             project.file("src/main/marmotkit/MARMOT_VERSION"),

@@ -19,6 +19,7 @@ on:
       - 'app/src/main/marmotkit/**'
       - 'scripts/prepare_marmotkit_artifact.py'
       - 'scripts/test_prepare_marmotkit_artifact.py'
+      - 'scripts/run-android-instrumented-tests.sh'
 
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant (and expensive) emulator runs.
@@ -34,6 +35,8 @@ jobs:
     name: Connected Android tests (emulator)
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      WHITENOISE_MARMOTKIT_CACHE_DIR: ${{ runner.temp }}/marmotkit-cache
 
     steps:
       - name: Checkout
@@ -48,6 +51,20 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Read MarmotKit artifact pin
+        id: marmotkit
+        shell: bash
+        run: |
+          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore MarmotKit artifact
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.WHITENOISE_MARMOTKIT_CACHE_DIR }}
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       # KVM lets the emulator run hardware-accelerated on the GitHub-hosted
       # ubuntu runner; without it the AVD boot is far slower or fails.
@@ -67,9 +84,9 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          # android-emulator-runner executes each script line separately with
-          # /bin/sh, so keep this as one POSIX-compatible command.
-          script: ./gradlew :app:connectedDevZapstoreDebugAndroidTest ${{ github.event_name == 'pull_request' && '-Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.ProfileImageDialSafetyIntegrationTest' || '' }} --no-daemon --stacktrace
+          # android-emulator-runner executes this input through /bin/sh. Keep it
+          # to one command and delegate conditional selection to the executable.
+          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}"
 
       - name: Upload instrumented test reports
         if: always()

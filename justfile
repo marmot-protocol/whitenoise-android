@@ -77,10 +77,7 @@ format:
 release:
     ./scripts/release.sh --flavor all
 
-# Build the production arm64-v8a APK using the pinned MarmotKit artifact, then
-# print the release folder as
-
-# the final line so it is easy to open in Finder.
+# Build the production arm64-v8a APK with pinned MarmotKit and print its folder.
 apk: apk-production
 
 # Build the production arm64-v8a APK.
@@ -98,9 +95,7 @@ apk-staging:
 release-fast:
     ./scripts/release.sh --flavor all
 
-# Install the arm64-v8a production APK on the connected device. Useful for
-
-# sanity-checking a release build on your own phone.
+# Install the production arm64-v8a APK on a device for a release sanity check.
 install-production:
     ./scripts/release.sh --flavor production --abi arm64-v8a
     adb install -r "$(ls -t {{ PRODUCTION_APK_DIR }}/whitenoise-production-v8a-release-*.apk | head -1)"

@@ -12,3 +12,6 @@ archive-root=marmotkit-android-0.9.12
 manifest-schema=mdk-android-v1
 workspace-version=0.9.12
 android-api=26
+api-type-count=171
+api-checksum-count=179
+api-helper-declaration-count=5
