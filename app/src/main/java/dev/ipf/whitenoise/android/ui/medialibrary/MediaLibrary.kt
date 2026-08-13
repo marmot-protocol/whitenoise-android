@@ -80,6 +80,7 @@ import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.SectionCardWithAction
@@ -93,6 +94,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.openAttachmentExternally
+import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.saveAttachmentToMediaStore
 import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
@@ -1000,21 +1002,25 @@ private fun FileLibraryRow(
                         onClick = {
                             menuOpen = false
                             scope.launch {
-                                val saved =
-                                    runCatching {
+                                val outcome =
+                                    runCatchingCancellable {
                                         val bytes = fetchBytes()
-                                        withContext(Dispatchers.IO) {
-                                            saveAttachmentToMediaStore(
-                                                context,
-                                                bytes,
-                                                row.reference.fileName,
-                                                row.reference.mediaType,
-                                            )
-                                        }
-                                    }.getOrDefault(false)
-                                appState.present(
-                                    if (saved) R.string.shared_media_saved else R.string.shared_media_save_failed,
-                                    copyable = !saved,
+                                        val saved =
+                                            withContext(Dispatchers.IO) {
+                                                saveAttachmentToMediaStore(
+                                                    context,
+                                                    bytes,
+                                                    row.reference.fileName,
+                                                    row.reference.mediaType,
+                                                )
+                                            }
+                                        check(saved) { "MediaStore save returned false" }
+                                    }
+                                appState.presentMediaSaveOutcome(
+                                    outcome = outcome,
+                                    successTitleRes = R.string.shared_media_saved,
+                                    failureTitleRes = R.string.shared_media_save_failed,
+                                    operationCode = "MEDIA_LIBRARY_FILE_SAVE",
                                 )
                             }
                         },

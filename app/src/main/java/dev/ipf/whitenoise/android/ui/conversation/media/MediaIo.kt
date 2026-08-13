@@ -172,9 +172,9 @@ internal fun saveImageToGallery(
         values.put(android.provider.MediaStore.Images.Media.IS_PENDING, 0)
         resolver.update(uri, values, null, null)
         true
-    } catch (_: Throwable) {
-        resolver.delete(uri, null, null) // don't leave a pending orphan
-        false
+    } catch (failure: Throwable) {
+        runCatching { resolver.delete(uri, null, null) } // don't leave a pending orphan
+        throw failure
     }
 }
 
@@ -237,9 +237,9 @@ private fun saveFileToDownloads(
         values.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
         resolver.update(uri, values, null, null)
         true
-    } catch (_: Throwable) {
-        resolver.delete(uri, null, null)
-        false
+    } catch (failure: Throwable) {
+        runCatching { resolver.delete(uri, null, null) }
+        throw failure
     }
 }
 
@@ -269,9 +269,9 @@ private fun saveVideoToGallery(
         values.put(android.provider.MediaStore.Video.Media.IS_PENDING, 0)
         resolver.update(uri, values, null, null)
         true
-    } catch (_: Throwable) {
-        resolver.delete(uri, null, null)
-        false
+    } catch (failure: Throwable) {
+        runCatching { resolver.delete(uri, null, null) }
+        throw failure
     }
 }
 

@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -19,6 +20,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowContentResolver
 import java.io.File
+import kotlin.coroutines.cancellation.CancellationException
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -69,6 +71,26 @@ class MediaAttachmentSaveTest {
         assertArrayEquals(PAYLOAD, outputFile.readBytes())
     }
 
+    @Test
+    fun mediaStoreWriteFailureIsPreservedForDiagnosticPresentation() {
+        val writeFailure = java.io.IOException("credential-bearing content://secret must not reach UI")
+        provider.outputFailure = writeFailure
+
+        val failure =
+            runCatching {
+                saveAttachmentToMediaStore(context(), PAYLOAD, "private-name.png", "image/png")
+            }.exceptionOrNull()
+
+        assertSame(writeFailure, failure)
+    }
+
+    @Test(expected = CancellationException::class)
+    fun mediaStoreCancellationIsNeverReducedToSaveFailure() {
+        provider.outputFailure = CancellationException("cancelled")
+
+        saveAttachmentToMediaStore(context(), PAYLOAD, "private-name.png", "image/png")
+    }
+
     private fun context() = RuntimeEnvironment.getApplication()
 
     private class RecordingMediaProvider(
@@ -81,6 +103,7 @@ class MediaAttachmentSaveTest {
             private set
         var updatedValues: ContentValues? = null
             private set
+        var outputFailure: Throwable? = null
 
         override fun onCreate(): Boolean = true
 
@@ -102,7 +125,10 @@ class MediaAttachmentSaveTest {
             insertedValues = values?.let(::ContentValues)
             val inserted = uri.buildUpon().appendPath("1").build()
             shadowOf(resolver)
-                .registerOutputStreamSupplier(inserted) { outputFile.outputStream() }
+                .registerOutputStreamSupplier(inserted) {
+                    outputFailure?.let { throw it }
+                    outputFile.outputStream()
+                }
             return inserted
         }
 
