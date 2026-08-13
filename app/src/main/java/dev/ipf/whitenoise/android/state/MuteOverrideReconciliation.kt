@@ -15,12 +15,9 @@ internal fun effectiveMuteOverride(
     return if (expired) override.copy(muted = false, mutedUntilMs = null) else override
 }
 
-/** A non-pending projection supersedes the short-lived command result. */
+/** Only a projection of the command result supersedes its short-lived override. */
 internal fun shouldDropMuteOverride(
     override: ChatNotificationSettingsFfi,
     projectedMuted: Boolean,
     projectedMutedUntilMs: Long?,
-    commandPending: Boolean,
-): Boolean =
-    !commandPending ||
-        (override.muted == projectedMuted && override.mutedUntilMs == projectedMutedUntilMs)
+): Boolean = override.muted == projectedMuted && override.mutedUntilMs == projectedMutedUntilMs
