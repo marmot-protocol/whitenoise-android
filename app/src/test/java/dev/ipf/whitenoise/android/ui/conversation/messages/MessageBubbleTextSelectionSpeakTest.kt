@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import android.app.Application
+import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.ResolveInfo
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -57,6 +60,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -212,6 +216,60 @@ class MessageBubbleTextSelectionSpeakTest {
         )
     }
 
+    @Test
+    @Suppress("LongMethod")
+    fun nativeSelectionMenuReplacesSystemReadAloudAndKeepsOtherProcessTextActions() {
+        registerProcessTextActivity(
+            packageName = "com.google.android.marvin.talkback",
+            className = "com.google.android.accessibility.selecttospeak.popup.SelectToSpeakPopupActivity",
+            label = "Read aloud",
+        )
+        registerProcessTextActivity(
+            packageName = "com.example.translate",
+            className = "com.example.translate.ProcessTextActivity",
+            label = "Translate",
+        )
+        val appState = appStateWithTts()
+        val item = timelineMessage("Selected sentence. Later sentence.")
+        val controller = conversationController(appState)
+        var textSelectionMode by mutableStateOf(false)
+        var actionMenuOpen by mutableStateOf(false)
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(
+                        item = item,
+                        controller = controller,
+                        appState = appState,
+                        textSelectionMode = textSelectionMode,
+                        onTextSelectionModeChange = { textSelectionMode = it },
+                        isActionMenuOpen = actionMenuOpen,
+                        onActionMenuOpenChange = { actionMenuOpen = it },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        longPressOnMessageText("Selected sentence")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(app.getString(R.string.select_text)).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            val labels =
+                checkNotNull(nativeTextMenuProvider.dataProvider)
+                    .data()
+                    .components
+                    .filterIsInstance<TextContextMenuItem>()
+                    .map { it.label }
+            assertFalse(labels.contains("Read aloud"))
+            assertTrue(labels.contains("Translate"))
+            assertTrue(labels.count { it == app.getString(R.string.speak_aloud) } == 1)
+        }
+    }
+
     private fun assertNativeSpeakDisplayed() {
         composeRule.runOnIdle {
             assertTrue(
@@ -242,6 +300,27 @@ class MessageBubbleTextSelectionSpeakTest {
         }
 
     private val nativeTextMenuProvider = CapturingTextContextMenuProvider()
+
+    private fun registerProcessTextActivity(
+        packageName: String,
+        className: String,
+        label: String,
+    ) {
+        val resolveInfo =
+            ResolveInfo().apply {
+                nonLocalizedLabel = label
+                activityInfo =
+                    ActivityInfo().apply {
+                        this.packageName = packageName
+                        name = className
+                        exported = true
+                    }
+            }
+        shadowOf(context.packageManager).addResolveInfoForIntent(
+            Intent(Intent.ACTION_PROCESS_TEXT).setType("text/plain"),
+            resolveInfo,
+        )
+    }
 
     private fun longPressOnMessageText(substring: String) {
         val layoutResults = mutableListOf<TextLayoutResult>()
