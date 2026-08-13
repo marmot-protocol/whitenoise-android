@@ -286,6 +286,10 @@ Python 3 is required for artifact preparation. Gradle selects `python3` on
 Unix-like hosts and `python` on Windows; set `WHITENOISE_PYTHON` to override the
 executable name or path.
 
+Maintainers updating the pinned release should follow
+[docs/updating-marmotkit.md](docs/updating-marmotkit.md). The lock, generated
+API signature, and consumer/native checks must move together.
+
 ```bash
 just release-fast
 ```

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -12,6 +13,8 @@ import shutil
 import struct
 import sys
 import tempfile
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
@@ -60,6 +63,8 @@ REQUIRED_PROPERTIES = {
 MAX_FILE_BYTES = 200 * 1024 * 1024
 MAX_ARCHIVE_UNCOMPRESSED_BYTES = 600 * 1024 * 1024
 MAX_ARCHIVE_DOWNLOAD_BYTES = 256 * 1024 * 1024
+DOWNLOAD_ATTEMPTS = 3
+DOWNLOAD_RETRY_DELAYS_SECONDS = (1, 2)
 
 
 class PreparationError(RuntimeError):
@@ -122,35 +127,67 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def download_once(url: str, temporary: Path, opener) -> None:
+    request = urllib.request.Request(url, headers={"User-Agent": "whitenoise-android-marmotkit/1"})
+    with temporary.open("wb") as output, opener.open(request, timeout=60) as response:
+        if response.status != 200:
+            raise PreparationError(f"artifact download returned HTTP {response.status}")
+        final_url = response.geturl()
+        if urllib.parse.urlsplit(final_url).scheme != "https":
+            raise PreparationError(f"artifact download resolved to a non-HTTPS URL: {final_url}")
+        content_length = response.headers.get("Content-Length")
+        if content_length is not None:
+            try:
+                declared_size = int(content_length)
+            except ValueError as error:
+                raise PreparationError("artifact download returned an invalid Content-Length") from error
+            if declared_size < 0 or declared_size > MAX_ARCHIVE_DOWNLOAD_BYTES:
+                raise PreparationError("artifact download exceeds the compressed size limit")
+        downloaded = 0
+        while chunk := response.read(1024 * 1024):
+            downloaded += len(chunk)
+            if downloaded > MAX_ARCHIVE_DOWNLOAD_BYTES:
+                raise PreparationError("artifact download exceeds the compressed size limit")
+            output.write(chunk)
+        output.flush()
+        os.fsync(output.fileno())
+
+
+def retryable_download_error(error: BaseException) -> bool:
+    if isinstance(error, urllib.error.HTTPError):
+        return error.code in {408, 425, 429} or 500 <= error.code < 600
+    return isinstance(
+        error,
+        (
+            urllib.error.URLError,
+            TimeoutError,
+            ConnectionError,
+            http.client.HTTPException,
+        ),
+    )
+
+
 def download(url: str, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".part", dir=destination.parent)
+    os.close(descriptor)
     temporary = Path(temporary_name)
+    opener = urllib.request.build_opener(HttpsOnlyRedirectHandler())
     try:
-        request = urllib.request.Request(url, headers={"User-Agent": "whitenoise-android-marmotkit/1"})
-        opener = urllib.request.build_opener(HttpsOnlyRedirectHandler())
-        with os.fdopen(descriptor, "wb") as output, opener.open(request, timeout=60) as response:
-            if response.status != 200:
-                raise PreparationError(f"artifact download returned HTTP {response.status}")
-            final_url = response.geturl()
-            if urllib.parse.urlsplit(final_url).scheme != "https":
-                raise PreparationError(f"artifact download resolved to a non-HTTPS URL: {final_url}")
-            content_length = response.headers.get("Content-Length")
-            if content_length is not None:
-                try:
-                    declared_size = int(content_length)
-                except ValueError as error:
-                    raise PreparationError("artifact download returned an invalid Content-Length") from error
-                if declared_size < 0 or declared_size > MAX_ARCHIVE_DOWNLOAD_BYTES:
-                    raise PreparationError("artifact download exceeds the compressed size limit")
-            downloaded = 0
-            while chunk := response.read(1024 * 1024):
-                downloaded += len(chunk)
-                if downloaded > MAX_ARCHIVE_DOWNLOAD_BYTES:
-                    raise PreparationError("artifact download exceeds the compressed size limit")
-                output.write(chunk)
-            output.flush()
-            os.fsync(output.fileno())
+        for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+            try:
+                download_once(url, temporary, opener)
+                break
+            except Exception as error:
+                if attempt == DOWNLOAD_ATTEMPTS or not retryable_download_error(error):
+                    raise
+                delay = DOWNLOAD_RETRY_DELAYS_SECONDS[attempt - 1]
+                print(
+                    f"warning: MarmotKit artifact download attempt {attempt}/{DOWNLOAD_ATTEMPTS} failed; "
+                    f"retrying in {delay}s: {error}",
+                    file=sys.stderr,
+                )
+                time.sleep(delay)
         os.replace(temporary, destination)
     except Exception:
         temporary.unlink(missing_ok=True)

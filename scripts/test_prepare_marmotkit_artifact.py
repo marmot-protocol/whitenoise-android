@@ -390,6 +390,75 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
 
         self.assertFalse(destination.exists())
 
+    def test_transient_download_failure_retries_then_succeeds(self) -> None:
+        class FakeResponse(io.BytesIO):
+            status = 200
+            headers: dict[str, str] = {}
+
+            def geturl(self) -> str:
+                return "https://invalid.example/artifact.zip"
+
+        opener = mock.Mock()
+        opener.open.side_effect = [
+            PREPARE.urllib.error.URLError("temporary failure"),
+            FakeResponse(b"verified bytes"),
+        ]
+        destination = self.root / "download.zip"
+
+        with (
+            mock.patch.object(PREPARE.urllib.request, "build_opener", return_value=opener),
+            mock.patch.object(PREPARE.time, "sleep") as sleep,
+        ):
+            PREPARE.download("https://invalid.example/artifact.zip", destination)
+
+        self.assertEqual(destination.read_bytes(), b"verified bytes")
+        self.assertEqual(opener.open.call_count, 2)
+        sleep.assert_called_once_with(1)
+
+    def test_non_retryable_http_failure_is_not_retried(self) -> None:
+        opener = mock.Mock()
+        opener.open.side_effect = PREPARE.urllib.error.HTTPError(
+            "https://invalid.example/artifact.zip",
+            404,
+            "Not Found",
+            {},
+            None,
+        )
+        destination = self.root / "download.zip"
+
+        with (
+            mock.patch.object(PREPARE.urllib.request, "build_opener", return_value=opener),
+            mock.patch.object(PREPARE.time, "sleep") as sleep,
+        ):
+            with self.assertRaises(PREPARE.urllib.error.HTTPError):
+                PREPARE.download("https://invalid.example/artifact.zip", destination)
+
+        self.assertEqual(opener.open.call_count, 1)
+        sleep.assert_not_called()
+        self.assertFalse(destination.exists())
+
+    def test_transient_download_failure_stops_after_three_attempts(self) -> None:
+        opener = mock.Mock()
+        opener.open.side_effect = PREPARE.urllib.error.HTTPError(
+            "https://invalid.example/artifact.zip",
+            503,
+            "Unavailable",
+            {},
+            None,
+        )
+        destination = self.root / "download.zip"
+
+        with (
+            mock.patch.object(PREPARE.urllib.request, "build_opener", return_value=opener),
+            mock.patch.object(PREPARE.time, "sleep") as sleep,
+        ):
+            with self.assertRaises(PREPARE.urllib.error.HTTPError):
+                PREPARE.download("https://invalid.example/artifact.zip", destination)
+
+        self.assertEqual(opener.open.call_count, 3)
+        self.assertEqual(sleep.call_args_list, [mock.call(1), mock.call(2)])
+        self.assertFalse(destination.exists())
+
     def test_api_signature_count_drift_fails_closed(self) -> None:
         self.write_archive()
         self.write_lock()
