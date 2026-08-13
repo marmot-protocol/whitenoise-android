@@ -133,13 +133,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p signed-check/stable signed-check/isolated
-          for channel in stable isolated; do
-            cp "signed/$channel/whitenoise-pr-${PR_NUMBER}-${channel}.apk" \
-              "signed-check/$channel/whitenoise-pr-${PR_NUMBER}-${channel}.apk"
-            sha256sum "signed-check/$channel/"*.apk > "signed-check/$channel/SHA256SUMS"
-            cp "candidates/$channel/provenance.env" "signed-check/$channel/provenance.env"
-          done
+          .github/scripts/stage-signed-pr-preview-candidates.sh signed candidates signed-check
           .github/scripts/verify-pr-preview-candidates.sh signed-check
 
       - name: Recheck PR head before upload
