@@ -16786,13 +16786,6 @@ sealed class GroupEventKindFfi {
         companion object
     }
     
-    data class ForkRecovered(
-        val `sourceEpoch`: kotlin.ULong, 
-        val `recoveredEpoch`: kotlin.ULong, 
-        val `invalidatedCommitIdHex`: kotlin.String) : GroupEventKindFfi() {
-        companion object
-    }
-    
     data class CommitRolledBack(
         val `invalidatedCommitIdHex`: kotlin.String) : GroupEventKindFfi() {
         companion object
@@ -16868,24 +16861,19 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
                 FfiConverterULong.read(buf),
                 FfiConverterULong.read(buf),
                 )
-            9 -> GroupEventKindFfi.ForkRecovered(
-                FfiConverterULong.read(buf),
-                FfiConverterULong.read(buf),
+            9 -> GroupEventKindFfi.CommitRolledBack(
                 FfiConverterString.read(buf),
                 )
-            10 -> GroupEventKindFfi.CommitRolledBack(
-                FfiConverterString.read(buf),
-                )
-            11 -> GroupEventKindFfi.GroupStateInvalidated(
+            10 -> GroupEventKindFfi.GroupStateInvalidated(
                 FfiConverterULong.read(buf),
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            12 -> GroupEventKindFfi.GroupUnrecoverable
-            13 -> GroupEventKindFfi.PendingCommitRecovered(
+            11 -> GroupEventKindFfi.GroupUnrecoverable
+            12 -> GroupEventKindFfi.PendingCommitRecovered(
                 FfiConverterULong.read(buf),
                 )
-            14 -> GroupEventKindFfi.GroupHydrationRecovered(
+            13 -> GroupEventKindFfi.GroupHydrationRecovered(
                 FfiConverterULong.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
@@ -16956,15 +16944,6 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
                 4UL
                 + FfiConverterULong.allocationSize(value.`from`)
                 + FfiConverterULong.allocationSize(value.`to`)
-            )
-        }
-        is GroupEventKindFfi.ForkRecovered -> {
-            // Add the size for the Int that specifies the variant plus the size needed for all fields
-            (
-                4UL
-                + FfiConverterULong.allocationSize(value.`sourceEpoch`)
-                + FfiConverterULong.allocationSize(value.`recoveredEpoch`)
-                + FfiConverterString.allocationSize(value.`invalidatedCommitIdHex`)
             )
         }
         is GroupEventKindFfi.CommitRolledBack -> {
@@ -17056,36 +17035,29 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
                 FfiConverterULong.write(value.`to`, buf)
                 Unit
             }
-            is GroupEventKindFfi.ForkRecovered -> {
-                buf.putInt(9)
-                FfiConverterULong.write(value.`sourceEpoch`, buf)
-                FfiConverterULong.write(value.`recoveredEpoch`, buf)
-                FfiConverterString.write(value.`invalidatedCommitIdHex`, buf)
-                Unit
-            }
             is GroupEventKindFfi.CommitRolledBack -> {
-                buf.putInt(10)
+                buf.putInt(9)
                 FfiConverterString.write(value.`invalidatedCommitIdHex`, buf)
                 Unit
             }
             is GroupEventKindFfi.GroupStateInvalidated -> {
-                buf.putInt(11)
+                buf.putInt(10)
                 FfiConverterULong.write(value.`epoch`, buf)
                 FfiConverterString.write(value.`invalidatedCommitIdHex`, buf)
                 FfiConverterString.write(value.`reason`, buf)
                 Unit
             }
             is GroupEventKindFfi.GroupUnrecoverable -> {
-                buf.putInt(12)
+                buf.putInt(11)
                 Unit
             }
             is GroupEventKindFfi.PendingCommitRecovered -> {
-                buf.putInt(13)
+                buf.putInt(12)
                 FfiConverterULong.write(value.`recoveredEpoch`, buf)
                 Unit
             }
             is GroupEventKindFfi.GroupHydrationRecovered -> {
-                buf.putInt(14)
+                buf.putInt(13)
                 FfiConverterULong.write(value.`recoveredEpoch`, buf)
                 Unit
             }
