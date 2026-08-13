@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.AgentStreamSubscription
 import dev.ipf.marmotkit.AgentStreamUpdateFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
+import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -874,6 +875,48 @@ data class GroupMemberSnapshot(
         return members.any { it.memberIdHex.equals(normalized, ignoreCase = true) }
     }
 }
+
+internal suspend fun loadGroupMemberIdsPages(
+    groupIds: Iterable<String>,
+    loadPage: suspend (List<String>) -> List<AppGroupMemberIdsFfi>,
+): List<AppGroupMemberIdsFfi> {
+    val requested =
+        groupIds
+            .asSequence()
+            .filter { it.isNotBlank() }
+            .distinctBy { it.lowercase() }
+            .toList()
+    val loaded = ArrayList<AppGroupMemberIdsFfi>(requested.size)
+    requested.chunked(GROUP_MEMBER_IDS_PAGE_SIZE).forEach { page ->
+        val projections = loadPage(page)
+        check(projections.size == page.size) {
+            "member-id page returned ${projections.size} rows for ${page.size} groups"
+        }
+        page.zip(projections).forEach { (requestedGroupId, projection) ->
+            check(projection.groupIdHex.equals(requestedGroupId, ignoreCase = true)) {
+                "member-id page returned a different group than requested"
+            }
+            loaded += projection.copy(groupIdHex = requestedGroupId)
+        }
+    }
+    return loaded
+}
+
+internal fun memberRecordsFromIds(
+    memberIdsHex: Iterable<String>,
+    activeAccountIdHex: String?,
+): List<AppGroupMemberRecordFfi> =
+    memberIdsHex
+        .asSequence()
+        .filter { it.isNotBlank() }
+        .distinctBy { it.lowercase() }
+        .map { memberIdHex ->
+            AppGroupMemberRecordFfi(
+                memberIdHex = memberIdHex,
+                account = null,
+                local = memberIdHex.equals(activeAccountIdHex, ignoreCase = true),
+            )
+        }.toList()
 
 internal fun sharedChatListItemsWith(
     items: Iterable<ChatListItem>,
@@ -3317,11 +3360,12 @@ class ChatsController private constructor(
     private var chatListVisible = true
     private var pendingRecompute = false
 
-    // Per-group member snapshots fetched via the `groupMembers` FFI.
-    // The chat-list FFI doesn't include member rosters on each row, so
-    // these snapshots drive both unnamed-group title fallback and local
-    // shared-groups derivation for the profile sheet. Filled lazily on first
-    // `recompute()` per group; re-fetched on bind.
+    // Lifecycle-scoped member snapshots for the current chat rows. Initial
+    // bind seeds identifier-only rows in bounded `groupMemberIdsPage` calls;
+    // later group invalidations and a failed initial page fall back to the
+    // enriched per-group `groupMembers` reader. These snapshots drive unnamed
+    // titles, folder rules, shared groups, and profile actions without becoming
+    // a second persistent source of protocol truth.
     private var memberCacheByGroup: Map<String, List<AppGroupMemberRecordFfi>> = emptyMap()
 
     // A live group-record update invalidates the authoritative roster, but its
@@ -3489,6 +3533,7 @@ class ChatsController private constructor(
                             chatStream.snapshot()
                         }.associateBy { it.groupIdHex }
                     groupRecordsById.values.forEach(::requestGroupProfiles)
+                    seedInitialMemberIdProjection(accountRef, bindEpoch)
                     chatsDebug {
                         "snapshot account=${accountRef.take(8)} rows=${chatRows.size} groups=${groupRecordsById.size} " +
                             "${chatRows.map { it.debugSummary() }}"
@@ -3687,6 +3732,71 @@ class ChatsController private constructor(
     }
 
     private fun memberSnapshotNeedsFetch(groupIdHex: String): Boolean = !memberCacheByGroup.containsKey(groupIdHex)
+
+    /**
+     * Seed every current chat row's identifier-only roster before publishing
+     * the first local frame. MDK answers each page from its command-ready local
+     * projection without profile enrichment or relay work, so member-derived
+     * folders, shared groups, and existing-DM detection do not wait for an
+     * N-call `groupMembers` fan-out (#1534).
+     *
+     * The page contract is all-or-nothing. If any requested group is unknown
+     * or quarantined, retain Unknown here and let the existing bounded,
+     * retrying per-group loader resolve it after the usable chat rows render.
+     */
+    private suspend fun seedInitialMemberIdProjection(
+        account: String,
+        epoch: Long,
+    ) {
+        val groupIds = chatRows.map { it.groupIdHex }
+        if (groupIds.isEmpty()) return
+        val expectedCacheEpoch = memberCacheEpoch
+        val projections =
+            runCatchingCancellable {
+                loadGroupMemberIdsPages(groupIds) { page ->
+                    appState.marmotIo { groupMemberIdsPage(account, page) }
+                }
+            }.onFailure { error ->
+                chatsDebug(error) {
+                    "initial member-id projection failed account=${account.take(8)}: " +
+                        (error.message ?: error.javaClass.simpleName)
+                }
+            }.getOrNull() ?: return
+        if (
+            !isActiveBindEpoch(epoch) ||
+            accountRef != account ||
+            memberCacheEpoch != expectedCacheEpoch
+        ) {
+            return
+        }
+
+        val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
+        val updatedCache = memberCacheByGroup.toMutableMap()
+        var updatedRemovedGroupIds = removedGroupIds
+        projections.forEach { projection ->
+            val groupIdHex = projection.groupIdHex
+            val members = memberRecordsFromIds(projection.memberIdsHex, activeAccountIdHex)
+            updatedCache[groupIdHex] = members
+            updatedRemovedGroupIds =
+                if (
+                    activeAccountIdHex != null &&
+                    members.none { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+                ) {
+                    updatedRemovedGroupIds + groupIdHex
+                } else {
+                    updatedRemovedGroupIds - groupIdHex
+                }
+            members.map { it.memberIdHex }.forEach(appState::requestProfile)
+            presentationMembersByGroup = presentationMembersByGroup - groupIdHex
+            cancelMemberSnapshotRetry(groupIdHex)
+            memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
+            failedMemberFetches.remove(groupIdHex)
+            selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
+        }
+        memberCacheByGroup = updatedCache
+        removedGroupIds = updatedRemovedGroupIds
+        memberSnapshotsRevision += 1L
+    }
 
     // Marmot's `set_group_archived` writes local state + saves but emits no
     // ProjectionUpdated event, so the chat-list snapshot stays stale until the
@@ -5599,6 +5709,7 @@ private const val SEARCH_MAX_PAGES = 20
 // chat-list projection. Keeps large accounts from flooding IO at startup while
 // still letting shared-group snapshots materialize in the background.
 private const val MEMBER_FETCH_FANOUT = 4
+private const val GROUP_MEMBER_IDS_PAGE_SIZE = 100
 private const val MEMBER_FETCH_INITIAL_RETRY_DELAY_MS = 250L
 private const val MEMBER_FETCH_MAX_RETRY_DELAY_MS = 300_000L
 private const val MEMBER_FETCH_MAX_BACKOFF_TIER = 11

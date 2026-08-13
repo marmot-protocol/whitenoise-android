@@ -13,13 +13,15 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val body = controllersSource().readText().kotlinFunctionBody("bind")
         val firstSnapshot = body.indexOf("chatListStream.snapshot()")
         val secondSnapshot = body.indexOf("chatStream.snapshot()")
+        val memberProjection = body.indexOf("seedInitialMemberIdProjection(accountRef, bindEpoch)")
         val publishReady = body.indexOf("isLoading = false", startIndex = secondSnapshot)
         val renderFrame = body.indexOf("awaitRenderedChatListFrame()", startIndex = publishReady)
         val catchUp = body.indexOf("appState.launchCatchUpAccounts()")
 
         assertTrue("chat-list snapshot must be read", firstSnapshot >= 0)
         assertTrue("chats snapshot must follow the chat-list snapshot", secondSnapshot > firstSnapshot)
-        assertTrue("local rows must be published before waiting for a frame", publishReady > secondSnapshot)
+        assertTrue("the local member projection must follow both row snapshots", memberProjection > secondSnapshot)
+        assertTrue("member-derived UI must be ready before the first visible frame", publishReady > memberProjection)
         assertTrue("the local snapshot must get a rendered frame before catch-up", renderFrame > publishReady)
         assertTrue("relay catch-up must start only after the rendered local frame", catchUp > renderFrame)
         assertTrue("one bind must start catch-up only once", "if (!catchUpStarted)" in body)
@@ -27,6 +29,20 @@ class AccountSwitchLocalSnapshotOrderingTest {
             "live consumers must start after catch-up is launched",
             body.indexOf("runUntilFirstLiveSubscriptionEnds(") > catchUp,
         )
+    }
+
+    @Test
+    fun initialMemberProjectionDropsResultsInvalidatedWhileTheBatchReadWasInFlight() {
+        val body = controllersSource().readText().kotlinFunctionBody("seedInitialMemberIdProjection")
+        val capturedEpoch = body.indexOf("expectedCacheEpoch = memberCacheEpoch")
+        val ffiRead = body.indexOf("loadGroupMemberIdsPages", startIndex = capturedEpoch)
+        val staleCheck = body.indexOf("memberCacheEpoch != expectedCacheEpoch", startIndex = ffiRead)
+        val publish = body.indexOf("memberCacheByGroup = updatedCache", startIndex = staleCheck)
+
+        assertTrue("the current cache generation must be captured before suspension", capturedEpoch >= 0)
+        assertTrue("the batch FFI read must follow the generation snapshot", ffiRead > capturedEpoch)
+        assertTrue("live invalidation must be checked after the FFI read", staleCheck > ffiRead)
+        assertTrue("stale batch results must be rejected before cache publication", publish > staleCheck)
     }
 
     @Test
