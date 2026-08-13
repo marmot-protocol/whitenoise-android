@@ -85,6 +85,7 @@ import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -927,7 +928,7 @@ internal fun MessageBubble(
                     attachmentSaveInFlight = true
                     appState.launchMutation {
                         try {
-                            val savedCount =
+                            val summary =
                                 saveMessageMediaAttachments(
                                     context = context,
                                     controller = controller,
@@ -935,7 +936,14 @@ internal fun MessageBubble(
                                     mediaReferences = mediaReferences,
                                     mine = mine,
                                 )
-                            appState.presentAttachmentSaveOutcome(context, savedCount, mediaReferences.size)
+                            appState.presentAttachmentSaveOutcome(
+                                context = context,
+                                summary = summary,
+                                conversation =
+                                    controller.boundAccountRef?.let { accountRef ->
+                                        ConversationNoticeDestination(accountRef, controller.group.groupIdHex)
+                                    },
+                            )
                         } finally {
                             attachmentSaveInFlight = false
                         }

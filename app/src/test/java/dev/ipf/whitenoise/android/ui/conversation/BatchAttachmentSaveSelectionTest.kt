@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.aggregateMessageAttachme
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageAttachmentSaveOutcome
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -52,17 +53,19 @@ class BatchAttachmentSaveSelectionTest {
 
     @Test
     fun batchSaveAggregatesPartialSuccessAcrossTwoMessages() {
+        val failure = java.io.IOException("first failure")
         val summary =
             aggregateMessageAttachmentSaveSummaries(
                 listOf(
                     MessageAttachmentSaveSummary(savedCount = 2, totalCount = 2),
-                    MessageAttachmentSaveSummary(savedCount = 0, totalCount = 1),
+                    MessageAttachmentSaveSummary(savedCount = 0, totalCount = 1, firstFailure = failure),
                 ),
             )
 
         assertEquals(2, summary.savedCount)
         assertEquals(3, summary.totalCount)
         assertEquals(MessageAttachmentSaveOutcome.Partial, summary.outcome)
+        assertSame(failure, summary.firstFailure)
     }
 
     private fun conversationScreenSource(): String =

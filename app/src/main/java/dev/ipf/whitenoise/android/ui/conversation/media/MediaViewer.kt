@@ -69,6 +69,7 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
 import dev.ipf.whitenoise.android.ui.common.ViewerTransform
 import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
@@ -166,8 +167,7 @@ internal fun FullScreenMediaViewer(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val savedMessage = stringResource(R.string.media_saved)
-    val saveFailedMessage = stringResource(R.string.media_save_failed)
+
     val pagerState =
         rememberPagerState(
             initialPage = clampViewerPageIndex(startIndex, pages.size),
@@ -216,25 +216,31 @@ internal fun FullScreenMediaViewer(
                 val msgId = currentMessageIdHex
                 val owned = currentMine
                 scope.launch {
-                    val ok =
-                        if (MediaReferenceSupport.isVideoMedia(ref)) {
-                            runCatching {
-                                val file = materializeVideoAttachment(context, controller, msgId, attachmentIndex, ref, owned)
-                                withContext(Dispatchers.IO) {
-                                    saveVideoToGallery(context, file, ref.fileName, ref.mediaType)
+                    val outcome =
+                        runCatchingCancellable {
+                            val saved =
+                                if (MediaReferenceSupport.isVideoMedia(ref)) {
+                                    val file = materializeVideoAttachment(context, controller, msgId, attachmentIndex, ref, owned)
+                                    withContext(Dispatchers.IO) {
+                                        saveVideoToGallery(context, file, ref.fileName, ref.mediaType)
+                                    }
+                                } else {
+                                    val data = attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
+                                    withContext(Dispatchers.IO) {
+                                        saveImageToGallery(context, data, ref.fileName, ref.mediaType)
+                                    }
                                 }
-                            }.getOrDefault(false)
-                        } else {
-                            val data =
-                                runCatching {
-                                    attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
-                                }.getOrNull()
-                            data != null &&
-                                withContext(Dispatchers.IO) {
-                                    saveImageToGallery(context, data, ref.fileName, ref.mediaType)
-                                }
+                            check(saved) { "MediaStore save returned false" }
                         }
-                    snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
+                    snackbarHostState.showSnackbar(
+                        mediaSaveSnackbarVisuals(
+                            context = context,
+                            outcome = outcome,
+                            successTitleRes = R.string.media_saved,
+                            failureTitleRes = R.string.media_save_failed,
+                            operationCode = "MEDIA_VIEWER_SAVE",
+                        ),
+                    )
                 }
             },
             onShare = {
