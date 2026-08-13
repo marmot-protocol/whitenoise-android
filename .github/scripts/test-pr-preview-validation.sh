@@ -4,6 +4,7 @@ set -euo pipefail
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 verifier="$script_dir/verify-pr-preview-candidates.sh"
 signer="$script_dir/sign-pr-preview-candidates.sh"
+stager="$script_dir/stage-signed-pr-preview-candidates.sh"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
@@ -139,6 +140,13 @@ export PR_PREVIEW_KEY_PASSWORD=test
 expected_cert_digest=aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd
 export PR_PREVIEW_CERT_SHA256=$expected_cert_digest
 "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
+"$stager" "$tmp/signed" "$candidates" "$tmp/signed-check"
+for channel in stable isolated; do
+  checksum_path=$(awk '{print $2}' "$tmp/signed-check/$channel/SHA256SUMS")
+  [[ "$checksum_path" == "whitenoise-pr-${PR_NUMBER}-${channel}.apk" ]]
+done
+PATH="$fake_bin:$PATH" "$verifier" "$tmp/signed-check" >/dev/null
+rm -rf "$tmp/signed-check"
 rm -rf "$tmp/signed"
 
 FAKE_LEGACY_CERT_OUTPUT=true "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"

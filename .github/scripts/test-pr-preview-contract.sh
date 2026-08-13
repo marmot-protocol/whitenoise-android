@@ -30,5 +30,6 @@ grep -Fq 'workflow_run.head_repository.full_name' "$workflow"
 grep -Fq -- '--min-sdk-version 34' .github/scripts/sign-pr-preview-candidates.sh
 grep -Fq 'cancel-in-progress: true' "$workflow"
 grep -Fq 'Verify signed previews' "$workflow"
+grep -Fq '.github/scripts/stage-signed-pr-preview-candidates.sh signed candidates signed-check' "$workflow"
 grep -Fq 'PR_PREVIEW_CERT_SHA256: ${{ secrets.PR_PREVIEW_CERT_SHA256 }}' "$workflow"
 ! grep -Fq 'pull_request_target:' "$build"
