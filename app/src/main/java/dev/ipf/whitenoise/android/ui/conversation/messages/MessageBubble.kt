@@ -501,6 +501,15 @@ internal fun MessageBubble(
                 else -> MessageProjector.displayBody(record, messageTextCopy)
             }
         }
+    val canSpeakAloud =
+        messageBubbleCanSpeak(
+            record = record,
+            editedText = editState?.latestText,
+            deleted = deleted,
+            invalidated = invalidated,
+            ttsHasUsableEngine = appState.ttsHasUsableEngine,
+        )
+    val speakAloudLabel = stringResource(R.string.speak_aloud)
     // Issue #390 v1 forwards text only. Forward must be hidden for any record
     // whose displayed body is a synthetic surrogate (media filename/placeholder,
     // "Reacted …", delete/system summaries, agent-stream copy) — forwarding
@@ -1243,7 +1252,20 @@ internal fun MessageBubble(
                 val selectionWrapper: @Composable (@Composable () -> Unit) -> Unit = { content ->
                     if (textSelectionMode) {
                         CompositionLocalProvider(LocalClipboard provides textSelectionClipboard) {
-                            SelectionContainer(state = messageTextSelectionState) { content() }
+                            SelectionContainer(
+                                state = messageTextSelectionState,
+                                modifier =
+                                    Modifier.appendSpeakAloudTextContextMenuAction(
+                                        enabled = canSpeakAloud && !deleted,
+                                        label = speakAloudLabel,
+                                        onSpeak = {
+                                            speakFromHere()
+                                            onTextSelectionModeChange(false)
+                                        },
+                                    ),
+                            ) {
+                                content()
+                            }
                         }
                     } else {
                         content()
@@ -1448,27 +1470,6 @@ internal fun MessageBubble(
                         )
                     }
                 }
-                val canSpeakAloud =
-                    messageBubbleCanSpeak(
-                        record = record,
-                        editedText = editState?.latestText,
-                        deleted = deleted,
-                        invalidated = invalidated,
-                        ttsHasUsableEngine = appState.ttsHasUsableEngine,
-                    )
-                MessageTextSelectionToolbar(
-                    visible =
-                        textSelectionMode &&
-                            messageTextSelectionState.selectedTexts.isNotEmpty() &&
-                            !deleted,
-                    canSpeak = canSpeakAloud,
-                    selectionBoundsInWindow = textSelectionBoundsInWindow,
-                    onSpeak = {
-                        speakFromHere()
-                        onTextSelectionModeChange(false)
-                    },
-                    onDismissRequest = { onTextSelectionModeChange(false) },
-                )
                 MessageActionMenu(
                     // Never render the menu for a deleted message or while batch
                     // or partial text selection owns the row interaction.

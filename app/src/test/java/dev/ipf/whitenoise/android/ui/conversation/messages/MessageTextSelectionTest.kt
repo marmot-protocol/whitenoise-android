@@ -114,6 +114,13 @@ class MessageTextSelectionTest {
         composeRule.onNodeWithTag("selected-bubble").performTouchInput { click() }
         composeRule.runOnIdle { assertEquals(0, dismissals) }
 
+        composeRule.onNodeWithTag("outside-chrome").performTouchInput {
+            down(Offset(8f, 8f))
+            moveBy(Offset(viewConfiguration.touchSlop + 24f, 0f))
+            up()
+        }
+        composeRule.runOnIdle { assertEquals(0, dismissals) }
+
         composeRule.onNodeWithTag("outside-chrome").performTouchInput { click(Offset(8f, 8f)) }
         composeRule.runOnIdle { assertEquals(1, dismissals) }
     }

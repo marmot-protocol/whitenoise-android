@@ -3,8 +3,11 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import android.app.Application
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.contextmenu.data.TextContextMenuItem
+import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMenuToolbarProvider
+import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuDataProvider
+import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -12,15 +15,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -28,11 +26,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.espresso.Espresso.pressBack
-import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -56,6 +50,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -74,35 +69,6 @@ class MessageBubbleTextSelectionSpeakTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val app = ApplicationProvider.getApplicationContext<Application>()
-
-    @Test
-    @Suppress("LongMethod")
-    fun textSelectionToolbarBackClearsSelectionModeInMessageBubbleHost() {
-        var textSelectionMode by mutableStateOf(true)
-        val appState = appStateWithTts()
-        val item = timelineMessage("Alpha sentence. Beta sentence.")
-        val controller = conversationController(appState)
-
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                Box(Modifier.fillMaxSize().testTag(MESSAGE_HOST_TAG)) {
-                    messageBubbleHost(
-                        item = item,
-                        controller = controller,
-                        appState = appState,
-                        textSelectionMode = textSelectionMode,
-                        onTextSelectionModeChange = { textSelectionMode = it },
-                    )
-                }
-            }
-        }
-        composeRule.waitForIdle()
-        assertNativeSpeakDisplayed()
-
-        pressBack()
-
-        composeRule.runOnIdle { assertFalse(textSelectionMode) }
-    }
 
     @Test
     fun longPressActionMenuSpeakQueuesThroughAppStateAtPressedSentence() {
@@ -204,7 +170,7 @@ class MessageBubbleTextSelectionSpeakTest {
 
     @Test
     @Suppress("LongMethod")
-    fun selectionToolbarSemanticSpeakUsesSameSpeakPath() {
+    fun nativeSelectionMenuSpeakUsesSameSpeakPath() {
         val engine = FakeSessionEngine()
         val appState = appStateWithTts(engine)
         val item = timelineMessage("Accessibility sentence. Later sentence.")
@@ -235,9 +201,7 @@ class MessageBubbleTextSelectionSpeakTest {
         composeRule.waitForIdle()
         assertNativeSpeakDisplayed()
 
-        composeRule
-            .onNodeWithContentDescription(app.getString(R.string.speak_aloud))
-            .performClick()
+        clickNativeSpeak()
         waitForTts(engine)
 
         assertTrue(
@@ -248,72 +212,36 @@ class MessageBubbleTextSelectionSpeakTest {
         )
     }
 
-    @Test
-    @Suppress("LongMethod")
-    fun messageTextSelectionToolbarHostLightScreenshot() {
-        captureHostScreenshot(darkTheme = false, rtl = false, largeText = false)
-    }
-
-    @Test
-    @Suppress("LongMethod")
-    fun messageTextSelectionToolbarHostDarkScreenshot() {
-        captureHostScreenshot(darkTheme = true, rtl = false, largeText = false)
-    }
-
-    @Test
-    @Suppress("LongMethod")
-    fun messageTextSelectionToolbarHostRtlLargeTextScreenshot() {
-        captureHostScreenshot(darkTheme = true, rtl = true, largeText = true)
-    }
-
-    private fun captureHostScreenshot(
-        darkTheme: Boolean,
-        rtl: Boolean,
-        largeText: Boolean,
-    ) {
-        val appState = appStateWithTts()
-        val item = timelineMessage("Selected sentence. Next sentence.")
-        val controller = conversationController(appState)
-        var textSelectionMode by mutableStateOf(true)
-        val snapshot =
-            when {
-                rtl && largeText -> "src/test/snapshots/message_text_selection_toolbar_rtl_large_text.png"
-                darkTheme -> "src/test/snapshots/message_text_selection_toolbar_dark.png"
-                else -> "src/test/snapshots/message_text_selection_toolbar_light.png"
-            }
-
-        composeRule.setContent {
-            val density = LocalDensity.current
-            CompositionLocalProvider(
-                LocalDensity provides Density(density.density, fontScale = if (largeText) 1.5f else 1f),
-                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
-            ) {
-                WhiteNoiseTheme(darkTheme = darkTheme) {
-                    Box(Modifier.fillMaxSize().testTag(MESSAGE_HOST_TAG)) {
-                        messageBubbleHost(
-                            item = item,
-                            controller = controller,
-                            appState = appState,
-                            textSelectionMode = textSelectionMode,
-                            onTextSelectionModeChange = { textSelectionMode = it },
-                        )
-                    }
-                }
-            }
-        }
-        composeRule.waitForIdle()
-        assertTrue(textSelectionMode)
-        assertNativeSpeakDisplayed()
-        composeRule.onAllNodes(isRoot())[0].captureRoboImage(snapshot)
-    }
-
     private fun assertNativeSpeakDisplayed() {
-        composeRule.onNodeWithTag("message_text_selection_speak").assertIsDisplayed()
+        composeRule.runOnIdle {
+            assertTrue(
+                checkNotNull(nativeTextMenuProvider.dataProvider)
+                    .data()
+                    .components
+                    .filterIsInstance<TextContextMenuItem>()
+                    .any { it.label == app.getString(R.string.speak_aloud) },
+            )
+        }
     }
 
     private fun clickNativeSpeak() {
-        composeRule.onNodeWithTag("message_text_selection_speak").performClick()
+        composeRule.runOnIdle {
+            val speakItem =
+                checkNotNull(nativeTextMenuProvider.dataProvider)
+                    .data()
+                    .components
+                    .filterIsInstance<TextContextMenuItem>()
+                    .single { it.label == app.getString(R.string.speak_aloud) }
+            speakItem.onClick(nativeTextMenuSession)
+        }
     }
+
+    private val nativeTextMenuSession =
+        object : androidx.compose.foundation.text.contextmenu.data.TextContextMenuSession {
+            override fun close() = Unit
+        }
+
+    private val nativeTextMenuProvider = CapturingTextContextMenuProvider()
 
     private fun longPressOnMessageText(substring: String) {
         val layoutResults = mutableListOf<TextLayoutResult>()
@@ -371,39 +299,50 @@ class MessageBubbleTextSelectionSpeakTest {
         onActionMenuOpenChange: (Boolean) -> Unit = {},
     ) {
         val composerTextState = ComposerTextState(TextFieldValue(""))
-        MessageBubble(
-            item = item,
-            controller = controller,
-            appState = appState,
-            composerTextState = composerTextState,
-            highlighted = false,
-            selectionMode = false,
-            textSelectionMode = textSelectionMode,
-            onTextSelectionModeChange = onTextSelectionModeChange,
-            onTextSelectionBoundsChange = {},
-            batchSelectable = true,
-            selected = false,
-            onToggleSelection = {},
-            rangeDragActive = false,
-            onDragSelectionStart = {},
-            onDragSelection = { false },
-            onDragSelectionEnd = {},
-            onDragSelectionCancel = {},
-            quickReactionEmojis = emptyList(),
-            recentEmojis = emptyList(),
-            onEmojiUsed = {},
-            isActionMenuOpen = isActionMenuOpen,
-            onActionMenuOpenChange = onActionMenuOpenChange,
-            onQuickReactionsSave = {},
-            onQuickReactionsReset = {},
-            onReplyPreviewClick = {},
-            composerGate = ComposerGate.COMPOSER,
-            inviteMutationInFlight = false,
-            onJoinInvite = {},
-            onDeclineInvite = {},
-            mentionCandidates = emptyList(),
-            mentionPickerEnabled = false,
-        )
+        CompositionLocalProvider(LocalTextContextMenuToolbarProvider provides nativeTextMenuProvider) {
+            MessageBubble(
+                item = item,
+                controller = controller,
+                appState = appState,
+                composerTextState = composerTextState,
+                highlighted = false,
+                selectionMode = false,
+                textSelectionMode = textSelectionMode,
+                onTextSelectionModeChange = onTextSelectionModeChange,
+                onTextSelectionBoundsChange = {},
+                batchSelectable = true,
+                selected = false,
+                onToggleSelection = {},
+                rangeDragActive = false,
+                onDragSelectionStart = {},
+                onDragSelection = { false },
+                onDragSelectionEnd = {},
+                onDragSelectionCancel = {},
+                quickReactionEmojis = emptyList(),
+                recentEmojis = emptyList(),
+                onEmojiUsed = {},
+                isActionMenuOpen = isActionMenuOpen,
+                onActionMenuOpenChange = onActionMenuOpenChange,
+                onQuickReactionsSave = {},
+                onQuickReactionsReset = {},
+                onReplyPreviewClick = {},
+                composerGate = ComposerGate.COMPOSER,
+                inviteMutationInFlight = false,
+                onJoinInvite = {},
+                onDeclineInvite = {},
+                mentionCandidates = emptyList(),
+                mentionPickerEnabled = false,
+            )
+        }
+    }
+
+    private class CapturingTextContextMenuProvider : TextContextMenuProvider {
+        var dataProvider: TextContextMenuDataProvider? = null
+
+        override suspend fun showTextContextMenu(dataProvider: TextContextMenuDataProvider): Nothing {
+            this.dataProvider = dataProvider
+            awaitCancellation()
+        }
     }
 
     private fun appStateWithTts(engine: FakeSessionEngine = FakeSessionEngine()): WhiteNoiseAppState {
