@@ -901,6 +901,34 @@ class OptimisticSentPreviewMetadataTest {
     }
 }
 
+/** Android-side projection contract for the MDK local-delete frontier in #1646. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
+class LocalDeletedGroupProjectionTest {
+    @Test
+    fun restartSnapshotKeepsDeletedGroupAbsentUntilMdkRepublishesThatRow() {
+        val deleted = row("deleted-group", "Deleted", 10uL)
+        val untouched = row("untouched-group", "Untouched", 20uL)
+        controllerWithRows(deleted, untouched).onCleared()
+
+        // A fresh controller has no Android-owned deletion cache. The packaged
+        // MDK's post-restart snapshot is authoritative and omits the row while
+        // historical replay remains behind its durable delete frontier.
+        val restarted = controllerWithRows(untouched)
+        assertEquals(listOf("untouched-group"), restarted.items.map { it.id })
+
+        // A genuinely newer authenticated delivery makes MDK publish only that
+        // group's row again; Android folds it back without reviving any other
+        // absent group as a side effect.
+        restarted.setChatListVisible(false)
+        replaceRows(restarted, listOf(untouched, deleted.copy(activitySortAt = 30uL, updatedAt = 30uL)))
+        restarted.setChatListVisible(true)
+
+        assertEquals(listOf("deleted-group", "untouched-group"), restarted.items.map { it.id })
+        restarted.onCleared()
+    }
+}
+
 private fun controllerWithRows(vararg rows: ChatListRowFfi): ChatsController {
     val controller = ChatsController(appState())
     ChatsController::class.java
