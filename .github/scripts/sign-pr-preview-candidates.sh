@@ -38,16 +38,19 @@ for channel in stable isolated; do
     --out "$output" \
     "$input"
   verification=$("$apksigner" verify --verbose --print-certs --min-sdk-version 34 "$output")
-  mapfile -t cert_digests < <(
-    printf '%s\n' "$verification" |
-      sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest: //p'
-  )
-  if (( ${#cert_digests[@]} != 1 )); then
+  # Build Tools through 36.x label this "Signer #1 certificate...".
+  # Build Tools 37.x labels it "V3.0 Signer: certificate...". Keep the
+  # security check independent of the scheme/version prefix.
+  cert_digests=$(printf '%s\n' "$verification" |
+    sed -nE 's/^.*Signer[^:]*:? certificate SHA-256 digest: //p')
+  cert_count=$(printf '%s\n' "$cert_digests" |
+    awk 'NF { count++ } END { print count + 0 }')
+  if (( cert_count != 1 )); then
     printf 'Expected exactly one signing certificate for %s, found %d.\n' \
-      "$channel" "${#cert_digests[@]}" >&2
+      "$channel" "$cert_count" >&2
     exit 1
   fi
-  cert_digest=$(normalize_sha256_fingerprint "${cert_digests[0]}")
+  cert_digest=$(normalize_sha256_fingerprint "$cert_digests")
   if [[ "$cert_digest" != "$expected_digest" ]]; then
     printf 'The %s APK signing certificate does not match PR_PREVIEW_CERT_SHA256.\n' \
       "$channel" >&2
