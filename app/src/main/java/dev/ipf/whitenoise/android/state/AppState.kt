@@ -5273,7 +5273,7 @@ class WhiteNoiseAppState private constructor(
         accountRef ?: return
         val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
         val override = authoritativeMuteOverrides[key] ?: return
-        val effectiveOverride = effectiveMuteOverride(override, System.currentTimeMillis()) ?: return
+        val effectiveOverride = effectiveMuteOverride(override, System.currentTimeMillis()) ?: override
         if (shouldDropMuteOverride(effectiveOverride, muted, mutedUntilMs)) {
             authoritativeMuteOverrides.remove(key)
         }
