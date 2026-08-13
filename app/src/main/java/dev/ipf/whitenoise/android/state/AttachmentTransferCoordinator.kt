@@ -41,26 +41,32 @@ internal class AttachmentTransferCoordinator(
     private val states = mutableMapOf<String, MutableStateFlow<AttachmentTransferState>>()
     private val active = mutableMapOf<String, Deferred<ByteArray>>()
     private val terminalGenerations = mutableMapOf<String, Long>()
+    private val observerCounts = mutableMapOf<String, Int>()
+
+    fun acquireState(
+        key: String,
+        initiallyAvailable: Boolean,
+    ): StateFlow<AttachmentTransferState> =
+        synchronized(lock) {
+            observerCounts[key] = (observerCounts[key] ?: 0) + 1
+            stateFlow(key, initiallyAvailable).asStateFlow()
+        }
+
+    fun releaseState(key: String) {
+        synchronized(lock) {
+            observerCounts[key]?.let { observers ->
+                observerCounts[key] = (observers - 1).coerceAtLeast(0)
+                retireStateIfUnused(key)
+            }
+        }
+    }
 
     fun state(
         key: String,
         initiallyAvailable: Boolean,
     ): StateFlow<AttachmentTransferState> =
         synchronized(lock) {
-            states
-                .getOrPut(key) {
-                    MutableStateFlow(
-                        if (initiallyAvailable) {
-                            AttachmentTransferState.Available
-                        } else {
-                            AttachmentTransferState.Resolving
-                        },
-                    )
-                }.also { state ->
-                    if (initiallyAvailable && state.value == AttachmentTransferState.Resolving) {
-                        state.value = AttachmentTransferState.Available
-                    }
-                }.asStateFlow()
+            stateFlow(key, initiallyAvailable).asStateFlow()
         }
 
     /** Refreshes availability without disturbing a download already in flight. */
@@ -69,32 +75,13 @@ internal class AttachmentTransferCoordinator(
         probe: suspend () -> Boolean,
     ) {
         val generation = synchronized(lock) { terminalGenerations[key] ?: 0L }
-        val available =
-            try {
-                probe()
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                return
-            }
+        val available = probeForRefresh(probe)
         synchronized(lock) {
             // The cache probe runs outside the lock. A transfer may finish and
             // publish a newer terminal state while the probe is suspended, so
             // never let that stale result overwrite the completion state.
-            if (
-                active[key]?.isCompleted == false ||
-                (terminalGenerations[key] ?: 0L) != generation
-            ) {
-                return
-            }
-            val state = stateFlow(key)
-            state.value =
-                when {
-                    available -> AttachmentTransferState.Available
-                    state.value == AttachmentTransferState.NotRetained -> AttachmentTransferState.NotRetained
-                    state.value == AttachmentTransferState.Failed -> AttachmentTransferState.Failed
-                    else -> AttachmentTransferState.Remote
-                }
+            val state = currentStateForRefresh(key, generation) ?: return
+            state.value = refreshedState(state.value, available)
         }
     }
 
@@ -122,34 +109,29 @@ internal class AttachmentTransferCoordinator(
                     .async(start = CoroutineStart.LAZY) {
                         try {
                             val bytes = load()
+                            // MDK rejects empty plaintext when creating media;
+                            // receiving an empty result violates that contract.
                             check(bytes.isNotEmpty()) { "attachment download returned empty plaintext" }
                             val retained = probeAvailability(availableAfterLoad)
-                            synchronized(lock) {
-                                state.value =
-                                    if (retained) {
-                                        AttachmentTransferState.Available
-                                    } else {
-                                        AttachmentTransferState.NotRetained
-                                    }
-                                advanceTerminalGeneration(key)
-                            }
+                            publishTerminalState(
+                                key,
+                                state,
+                                attachmentStateAfterRetention(retained),
+                            )
                             bytes
                         } catch (cancellation: CancellationException) {
-                            synchronized(lock) {
-                                state.value =
-                                    if (stateBeforeDownload == AttachmentTransferState.Available) {
-                                        AttachmentTransferState.Available
-                                    } else {
-                                        AttachmentTransferState.Remote
-                                    }
-                                advanceTerminalGeneration(key)
-                            }
+                            publishTerminalState(
+                                key,
+                                state,
+                                if (stateBeforeDownload == AttachmentTransferState.Available) {
+                                    AttachmentTransferState.Available
+                                } else {
+                                    AttachmentTransferState.Remote
+                                },
+                            )
                             throw cancellation
                         } catch (exception: Exception) {
-                            synchronized(lock) {
-                                state.value = AttachmentTransferState.Failed
-                                advanceTerminalGeneration(key)
-                            }
+                            publishTerminalState(key, state, AttachmentTransferState.Failed)
                             throw exception
                         }
                     }.also {
@@ -160,12 +142,35 @@ internal class AttachmentTransferCoordinator(
         if (created) {
             deferred.invokeOnCompletion {
                 synchronized(lock) {
-                    if (active[key] === deferred) active.remove(key)
+                    if (active[key] === deferred) {
+                        active.remove(key)
+                        retireStateIfUnused(key)
+                    }
                 }
             }
             deferred.start()
         }
         return deferred
+    }
+
+    private fun currentStateForRefresh(
+        key: String,
+        generation: Long,
+    ): MutableStateFlow<AttachmentTransferState>? =
+        states[key]?.takeUnless {
+            active[key]?.isCompleted == false ||
+                (terminalGenerations[key] ?: 0L) != generation
+        }
+
+    private fun publishTerminalState(
+        key: String,
+        state: MutableStateFlow<AttachmentTransferState>,
+        value: AttachmentTransferState,
+    ) {
+        synchronized(lock) {
+            state.value = value
+            advanceTerminalGeneration(key)
+        }
     }
 
     private suspend fun probeAvailability(probe: suspend () -> Boolean): Boolean =
@@ -181,6 +186,55 @@ internal class AttachmentTransferCoordinator(
         terminalGenerations[key] = (terminalGenerations[key] ?: 0L) + 1L
     }
 
-    @Suppress("MaxLineLength")
-    private fun stateFlow(key: String): MutableStateFlow<AttachmentTransferState> = states.getOrPut(key) { MutableStateFlow(AttachmentTransferState.Resolving) }
+    private fun retireStateIfUnused(key: String) {
+        if (observerCounts[key] == 0 && active[key]?.isCompleted != false) {
+            observerCounts.remove(key)
+            terminalGenerations.remove(key)
+            states.remove(key)
+        }
+    }
+
+    private fun stateFlow(
+        key: String,
+        initiallyAvailable: Boolean = false,
+    ): MutableStateFlow<AttachmentTransferState> =
+        states
+            .getOrPut(key) {
+                MutableStateFlow(
+                    if (initiallyAvailable) {
+                        AttachmentTransferState.Available
+                    } else {
+                        AttachmentTransferState.Resolving
+                    },
+                )
+            }.also { state ->
+                if (initiallyAvailable && state.value == AttachmentTransferState.Resolving) {
+                    state.value = AttachmentTransferState.Available
+                }
+            }
 }
+
+private suspend fun probeForRefresh(probe: suspend () -> Boolean): Boolean? =
+    try {
+        probe()
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (_: Exception) {
+        null
+    }
+
+private fun refreshedState(
+    previous: AttachmentTransferState,
+    available: Boolean?,
+): AttachmentTransferState =
+    when {
+        available == true -> AttachmentTransferState.Available
+        available == null && previous == AttachmentTransferState.Resolving -> AttachmentTransferState.Remote
+        available == null -> previous
+        previous == AttachmentTransferState.NotRetained -> AttachmentTransferState.NotRetained
+        previous == AttachmentTransferState.Failed -> AttachmentTransferState.Failed
+        else -> AttachmentTransferState.Remote
+    }
+
+private fun attachmentStateAfterRetention(retained: Boolean): AttachmentTransferState =
+    if (retained) AttachmentTransferState.Available else AttachmentTransferState.NotRetained

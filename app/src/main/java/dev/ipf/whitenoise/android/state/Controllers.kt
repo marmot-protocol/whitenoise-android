@@ -8077,10 +8077,18 @@ class ConversationController(
         attachmentIndex: Int,
         initiallyAvailable: Boolean,
     ): StateFlow<AttachmentTransferState> =
-        attachmentTransfers.state(
+        attachmentTransfers.acquireState(
             key = attachmentTransferKey(messageIdHex, attachmentIndex),
             initiallyAvailable = initiallyAvailable,
         )
+
+    /** Release presentation state when its attachment composable leaves composition. */
+    internal fun releaseAttachmentTransferState(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ) {
+        attachmentTransfers.releaseState(attachmentTransferKey(messageIdHex, attachmentIndex))
+    }
 
     /** Reconcile presentation state with the encrypted L1/L2 cache. */
     internal suspend fun refreshAttachmentTransferState(

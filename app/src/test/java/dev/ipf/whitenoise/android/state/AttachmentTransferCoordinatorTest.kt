@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -97,6 +98,87 @@ class AttachmentTransferCoordinatorTest {
                 } finally {
                     scope.cancel()
                 }
+            }
+        }
+
+    @Test
+    fun failedInitialCacheProbeFallsBackToRemoteWithoutDemotingAvailableState() =
+        runBlocking {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+            try {
+                val coordinator = AttachmentTransferCoordinator(scope)
+                coordinator.state("new", false)
+                coordinator.refresh("new") { error("cache unavailable") }
+                assertEquals(AttachmentTransferState.Remote, coordinator.state("new", false).value)
+
+                coordinator.request("cached", load = { byteArrayOf(6) }) { true }.await()
+                coordinator.refresh("cached") { error("cache unavailable") }
+                assertEquals(AttachmentTransferState.Available, coordinator.state("cached", false).value)
+            } finally {
+                scope.cancel()
+            }
+        }
+
+    @Test
+    fun releasedObserverStateIsRetiredWhenNoTransferIsActive() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val coordinator = AttachmentTransferCoordinator(scope)
+            coordinator.acquireState("file", false)
+            runBlocking { coordinator.refresh("file") { false } }
+            assertEquals(AttachmentTransferState.Remote, coordinator.state("file", false).value)
+
+            coordinator.releaseState("file")
+
+            assertEquals(AttachmentTransferState.Resolving, coordinator.acquireState("file", false).value)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun releasedObserverStateSurvivesUntilItsActiveTransferCompletes() =
+        runBlocking {
+            withTimeout(5_000) {
+                val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+                try {
+                    val coordinator = AttachmentTransferCoordinator(scope)
+                    coordinator.acquireState("file", false)
+                    val releaseTransfer = CompletableDeferred<Unit>()
+                    val transfer =
+                        coordinator.request("file", load = {
+                            releaseTransfer.await()
+                            byteArrayOf(7)
+                        }) { true }
+
+                    coordinator.releaseState("file")
+                    assertEquals(AttachmentTransferState.Downloading, coordinator.state("file", false).value)
+
+                    releaseTransfer.complete(Unit)
+                    transfer.await()
+                    assertEquals(AttachmentTransferState.Resolving, coordinator.state("file", false).value)
+                } finally {
+                    scope.cancel()
+                }
+            }
+        }
+
+    @Test
+    fun emptyMediaResultFailsTheMdkContract() =
+        runBlocking {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+            try {
+                val coordinator = AttachmentTransferCoordinator(scope)
+
+                val failure =
+                    runCatching {
+                        coordinator.request("file", load = { byteArrayOf() }) { false }.await()
+                    }.exceptionOrNull()
+
+                assertTrue(failure is IllegalStateException)
+                assertEquals(AttachmentTransferState.Failed, coordinator.state("file", false).value)
+            } finally {
+                scope.cancel()
             }
         }
 
