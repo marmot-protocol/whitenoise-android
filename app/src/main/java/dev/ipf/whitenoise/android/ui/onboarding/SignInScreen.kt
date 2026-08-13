@@ -68,6 +68,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ClipboardPasteAffordance
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLogoLockup
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste

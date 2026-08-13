@@ -7,6 +7,8 @@
          "White Noise". Kept identical across locales (see LocalizationResourceTest). -->
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise couldn\'t start</string>
+    <string name="starting_securely">Starting securely…</string>
+    <string name="startup_taking_too_long">Startup is taking longer than expected. Please try again.</string>
     <string name="refresh">Refresh</string>
     <string name="retry">Retry</string>
     <string name="error_try_again">Something went wrong. Try again; if it keeps happening, copy the error report.</string>
