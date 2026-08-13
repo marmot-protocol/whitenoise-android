@@ -988,7 +988,7 @@ internal fun notificationAvatarPreWarmTarget(
             update.sender.accountIdHex
                 .trim()
                 .takeIf { it.isNotEmpty() },
-        senderAvatarUrl = ProfileSanitizer.imageUrl(update.sender.pictureUrl),
+        senderAvatarUrl = ProfileSanitizer.protocolImageUrl(update.sender.pictureUrl),
         resolveGroupAvatar = !update.isDm,
         preWarmRemoteImages = !appLockScreenVisible,
     )
@@ -3277,6 +3277,11 @@ class WhiteNoiseAppState private constructor(
                 withContext(Dispatchers.IO) {
                     client ?: MarmotClient(appContext).also { client = it }
                 }
+            // Attach while the client exists but before start can expose any
+            // notification/avatar work. The lambda resolves marmot lazily.
+            AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
+                marmotIo { downloadProfileImage(url, maxBytes) }
+            }
             appStateDebug { "bootstrap root=${opened.rootPath}" }
             withContext(Dispatchers.IO) {
                 opened.marmot.configurePrivacyRuntime()
@@ -6980,7 +6985,7 @@ class WhiteNoiseAppState private constructor(
             val presentation =
                 ProfilePresentation(
                     displayName = displayName,
-                    avatarUrl = ProfileSanitizer.imageUrl(profile.picture),
+                    avatarUrl = ProfileSanitizer.protocolImageUrl(profile.picture),
                 )
             // Drop the result if an account switch / sign-out cleared the caches
             // while this refresh was in flight, so we don't repopulate them with
@@ -7590,8 +7595,8 @@ class WhiteNoiseAppState private constructor(
     // asynchronously. Fall back to the payload picture when the local profile
     // has none. Sanitize every URL before fetching it.
     private suspend fun notificationSenderAvatarUrl(update: NotificationUpdateFfi): String? =
-        ProfileSanitizer.imageUrl(loadUserProfile(update.sender.accountIdHex)?.picture)
-            ?: ProfileSanitizer.imageUrl(update.sender.pictureUrl)
+        ProfileSanitizer.protocolImageUrl(loadUserProfile(update.sender.accountIdHex)?.picture)
+            ?: ProfileSanitizer.protocolImageUrl(update.sender.pictureUrl)
 
     private fun shouldPostNotification(
         update: NotificationUpdateFfi,
@@ -7666,7 +7671,7 @@ class WhiteNoiseAppState private constructor(
             if (target.resolveGroupAvatar) {
                 bestEffortNotificationAvatarLookup {
                     marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group.avatarUrl
-                }?.let { ProfileSanitizer.imageUrl(it) }
+                }?.let { ProfileSanitizer.protocolImageUrl(it) }
             } else {
                 null
             }
@@ -7700,7 +7705,7 @@ class WhiteNoiseAppState private constructor(
             preWarmedGroupAvatarUrl
                 ?: bestEffortNotificationAvatarLookup {
                     marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group.avatarUrl
-                }?.let { ProfileSanitizer.imageUrl(it) }
+                }?.let { ProfileSanitizer.protocolImageUrl(it) }
         }
 
     private fun notificationGroupTitleCopy(): GroupTitleCopy =
@@ -8109,7 +8114,7 @@ class WhiteNoiseAppState private constructor(
         val presentation =
             ProfilePresentation(
                 displayName = displayName,
-                avatarUrl = ProfileSanitizer.imageUrl(profile?.picture),
+                avatarUrl = ProfileSanitizer.protocolImageUrl(profile?.picture),
             )
         withContext(Dispatchers.Main.immediate) {
             if (profileCacheEpoch.get() == epoch) {

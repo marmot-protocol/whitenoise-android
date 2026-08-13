@@ -81,9 +81,9 @@ fun SettingsAccountHeader(
     onEditProfilePicture: () -> Unit = {},
 ) {
     val switchAccountDescription = stringResource(R.string.switch_account)
-    val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
-    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
-    var viewerOpen by remember(safePictureUrl) { mutableStateOf(false) }
+    val protocolPictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
+    val avatarImageAvailable = rememberAvatarImageAvailable(protocolPictureUrl)
+    var viewerOpen by remember(protocolPictureUrl) { mutableStateOf(false) }
     ListItem(
         modifier =
             Modifier
@@ -106,7 +106,7 @@ fun SettingsAccountHeader(
                     title = title,
                     seed = seed,
                     size = 52.dp,
-                    pictureUrl = safePictureUrl,
+                    pictureUrl = protocolPictureUrl,
                 )
             }
         },
@@ -121,11 +121,11 @@ fun SettingsAccountHeader(
             }
         },
     )
-    if (viewerOpen && safePictureUrl != null && avatarImageAvailable) {
+    if (viewerOpen && protocolPictureUrl != null && avatarImageAvailable) {
         AvatarFullScreenViewer(
             title = title,
             seed = seed,
-            pictureUrl = safePictureUrl,
+            pictureUrl = protocolPictureUrl,
             onDismiss = { viewerOpen = false },
             editActionLabel = stringResource(R.string.profile_picture_edit),
             onEditPicture = {

@@ -490,8 +490,8 @@ internal fun ProfileEditScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    val safePictureUrl = ProfileSanitizer.imageUrl(picture)
-    val safeBannerUrl = ProfileSanitizer.imageUrl(banner)
+    val safePictureUrl = ProfileSanitizer.protocolImageUrl(picture)
+    val safeBannerUrl = ProfileSanitizer.protocolImageUrl(banner)
     val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
     val pictureValid = ProfileFieldValidation.isAcceptablePictureUrl(picture)
     val bannerValid = ProfileFieldValidation.isAcceptablePictureUrl(banner)
@@ -596,7 +596,7 @@ internal fun ProfileEditScreen(
                             )
                         }
                     val safeUploaded =
-                        ProfileSanitizer.imageUrl(uploaded)
+                        ProfileSanitizer.androidOwnedHttpsImageUrl(uploaded)
                             ?: throw IllegalStateException("profile image upload returned an unsafe URL")
                     val activeAccountRef = appState.activeAccountRef
                     imageDrafts =

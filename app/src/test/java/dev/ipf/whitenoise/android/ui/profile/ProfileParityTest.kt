@@ -45,7 +45,9 @@ class ProfileParityTest {
 
         assertEquals("Discovered Name", resolved.displayName)
         assertEquals("Cached about", resolved.about)
-        assertEquals("https://example.com/discovered.png", resolved.pictureUrl)
+        // Protocol image URLs stay field-authoritative here; MDK owns their
+        // scheme/host classification at the network boundary.
+        assertEquals("http://unsafe.example/cached.png", resolved.pictureUrl)
         assertEquals("https://example.com/banner.png", resolved.bannerUrl)
         assertEquals("person@example.com", resolved.nip05)
         assertEquals("person@example.com", resolved.lightningAddress)

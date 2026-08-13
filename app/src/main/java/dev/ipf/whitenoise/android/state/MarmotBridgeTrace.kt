@@ -6,8 +6,7 @@ import java.util.concurrent.atomic.AtomicInteger
 internal object MarmotTraceSection {
     const val CREATE_GROUP = "WhiteNoise.marmot.createGroup"
     const val ACCEPT_GROUP_INVITE = "WhiteNoise.marmot.acceptGroupInvite"
-    const val REFRESH_GROUP_MLS_STATE = "WhiteNoise.marmot.refreshMembers.mlsState"
-    const val REFRESH_GROUP_DETAILS = "WhiteNoise.marmot.refreshMembers.details"
+    const val REFRESH_GROUP_ROSTER = "WhiteNoise.marmot.refreshMembers.roster"
     const val INVITE_MEMBERS = "WhiteNoise.marmot.inviteMembers"
     const val REMOVE_MEMBERS = "WhiteNoise.marmot.removeMembers"
     const val PROMOTE_ADMIN = "WhiteNoise.marmot.promoteAdmin"
