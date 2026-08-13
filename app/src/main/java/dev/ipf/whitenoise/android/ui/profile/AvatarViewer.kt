@@ -78,6 +78,7 @@ import dev.ipf.whitenoise.android.ui.common.applyAvatarDownwardDrag
 import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
 import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
 import dev.ipf.whitenoise.android.ui.common.viewerOneToOneScale
+import dev.ipf.whitenoise.android.ui.conversation.media.mediaSaveSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -117,8 +118,7 @@ internal fun AvatarFullScreenViewer(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val savedMessage = stringResource(R.string.media_saved)
-    val saveFailedMessage = stringResource(R.string.media_save_failed)
+
     val fileName = remember(safePictureUrl) { safePictureUrl?.let(::avatarViewerFileName) ?: "avatar.jpg" }
     var menuOpen by remember { mutableStateOf(false) }
     var scale by remember(safePictureUrl, picture) { mutableStateOf(1f) }
@@ -156,11 +156,23 @@ internal fun AvatarFullScreenViewer(
             onSave = {
                 val bytes = remote?.bytes ?: return@AvatarViewerFrame
                 scope.launch {
-                    val ok =
-                        withContext(Dispatchers.IO) {
-                            saveImageToGallery(context, bytes, fileName, avatarViewerMimeType(bytes, fileName))
+                    val outcome =
+                        runCatchingCancellable {
+                            val saved =
+                                withContext(Dispatchers.IO) {
+                                    saveImageToGallery(context, bytes, fileName, avatarViewerMimeType(bytes, fileName))
+                                }
+                            check(saved) { "MediaStore save returned false" }
                         }
-                    snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
+                    snackbarHostState.showSnackbar(
+                        mediaSaveSnackbarVisuals(
+                            context = context,
+                            outcome = outcome,
+                            successTitleRes = R.string.media_saved,
+                            failureTitleRes = R.string.media_save_failed,
+                            operationCode = "AVATAR_VIEWER_SAVE",
+                        ),
+                    )
                 }
             },
             snackbarHostState = snackbarHostState,

@@ -5,6 +5,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MessageAttachmentSave
 internal data class MessageAttachmentSaveSummary(
     val savedCount: Int,
     val totalCount: Int,
+    val firstFailure: Throwable? = null,
 ) {
     val outcome: MessageAttachmentSaveOutcome
         get() = MessageAttachmentSaveOutcome.from(savedCount, totalCount)
@@ -19,5 +20,6 @@ internal fun aggregateMessageAttachmentSaveSummaries(summaries: Iterable<Message
         MessageAttachmentSaveSummary(
             savedCount = aggregate.savedCount + summary.savedCount,
             totalCount = aggregate.totalCount + summary.totalCount,
+            firstFailure = aggregate.firstFailure ?: summary.firstFailure,
         )
     }

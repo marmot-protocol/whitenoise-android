@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -19,6 +20,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowContentResolver
 import java.io.File
+import kotlin.coroutines.cancellation.CancellationException
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -69,6 +71,46 @@ class MediaAttachmentSaveTest {
         assertArrayEquals(PAYLOAD, outputFile.readBytes())
     }
 
+    @Test
+    fun mediaStoreWriteFailureIsPreservedForDiagnosticPresentation() {
+        val writeFailure = java.io.IOException("credential-bearing content://secret must not reach UI")
+        provider.outputFailure = writeFailure
+
+        val failure =
+            runCatching {
+                saveAttachmentToMediaStore(context(), PAYLOAD, "private-name.png", "image/png")
+            }.exceptionOrNull()
+
+        assertSame(writeFailure, failure)
+    }
+
+    @Test
+    fun mediaStoreZeroRowFinalizationFailsAndDeletesPendingEntry() {
+        provider.updateResult = 0
+
+        listOf(
+            Triple("photo.png", "image/png", MediaStore.Images.Media.EXTERNAL_CONTENT_URI),
+            Triple("clip.mp4", "video/mp4", MediaStore.Video.Media.EXTERNAL_CONTENT_URI),
+            Triple("report.pdf", "application/pdf", MediaStore.Downloads.EXTERNAL_CONTENT_URI),
+        ).forEachIndexed { index, (fileName, mediaType, collection) ->
+            val failure =
+                runCatching {
+                    saveAttachmentToMediaStore(context(), PAYLOAD, fileName, mediaType)
+                }.exceptionOrNull()
+
+            assertTrue(failure is java.io.IOException)
+            assertEquals(collection, provider.insertedCollection)
+            assertEquals(index + 1, provider.deleteCount)
+        }
+    }
+
+    @Test(expected = CancellationException::class)
+    fun mediaStoreCancellationIsNeverReducedToSaveFailure() {
+        provider.outputFailure = CancellationException("cancelled")
+
+        saveAttachmentToMediaStore(context(), PAYLOAD, "private-name.png", "image/png")
+    }
+
     private fun context() = RuntimeEnvironment.getApplication()
 
     private class RecordingMediaProvider(
@@ -80,6 +122,10 @@ class MediaAttachmentSaveTest {
         var insertedValues: ContentValues? = null
             private set
         var updatedValues: ContentValues? = null
+            private set
+        var outputFailure: Throwable? = null
+        var updateResult: Int = 1
+        var deleteCount: Int = 0
             private set
 
         override fun onCreate(): Boolean = true
@@ -102,7 +148,10 @@ class MediaAttachmentSaveTest {
             insertedValues = values?.let(::ContentValues)
             val inserted = uri.buildUpon().appendPath("1").build()
             shadowOf(resolver)
-                .registerOutputStreamSupplier(inserted) { outputFile.outputStream() }
+                .registerOutputStreamSupplier(inserted) {
+                    outputFailure?.let { throw it }
+                    outputFile.outputStream()
+                }
             return inserted
         }
 
@@ -110,7 +159,10 @@ class MediaAttachmentSaveTest {
             uri: Uri,
             selection: String?,
             selectionArgs: Array<out String>?,
-        ): Int = 1
+        ): Int {
+            deleteCount += 1
+            return 1
+        }
 
         override fun update(
             uri: Uri,
@@ -119,7 +171,7 @@ class MediaAttachmentSaveTest {
             selectionArgs: Array<out String>?,
         ): Int {
             updatedValues = values?.let(::ContentValues)
-            return 1
+            return updateResult
         }
     }
 

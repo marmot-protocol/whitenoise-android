@@ -2,11 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.Context
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageAttachmentSaveOutcome
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -16,11 +13,12 @@ internal suspend fun saveMessageMediaAttachments(
     messageIdHex: String,
     mediaReferences: List<MediaAttachmentReferenceFfi>,
     mine: Boolean,
-): Int {
+): MessageAttachmentSaveSummary {
     var savedCount = 0
+    var firstFailure: Throwable? = null
     mediaReferences.forEachIndexed { attachmentIndex, reference ->
-        val saved =
-            runCatching {
+        val result =
+            runCatching<Boolean> {
                 if (MediaReferenceSupport.isVideoMedia(reference)) {
                     val file =
                         materializeVideoAttachment(
@@ -57,39 +55,19 @@ internal suspend fun saveMessageMediaAttachments(
                         )
                     }
                 }
+            }.mapCatching { saved ->
+                check(saved) { "MediaStore save returned false" }
+                true
             }.onFailure {
                 if (it is kotlinx.coroutines.CancellationException) throw it
-            }.getOrDefault(false)
+            }
+        val saved = result.getOrDefault(false)
         if (saved) savedCount += 1
+        if (!saved && firstFailure == null) firstFailure = result.exceptionOrNull()
     }
-    return savedCount
-}
-
-internal fun WhiteNoiseAppState.presentAttachmentSaveOutcome(
-    context: Context,
-    savedCount: Int,
-    totalCount: Int,
-) = presentAttachmentSaveOutcome(
-    context = context,
-    summary = MessageAttachmentSaveSummary(savedCount, totalCount),
-)
-
-internal fun WhiteNoiseAppState.presentAttachmentSaveOutcome(
-    context: Context,
-    summary: MessageAttachmentSaveSummary,
-) {
-    when (summary.outcome) {
-        MessageAttachmentSaveOutcome.Complete -> present(R.string.shared_media_saved)
-        MessageAttachmentSaveOutcome.Partial ->
-            present(
-                title = context.getString(R.string.shared_media_saved),
-                detail =
-                    context.getString(
-                        R.string.conversation_search_match_count,
-                        summary.savedCount,
-                        summary.totalCount,
-                    ),
-            )
-        MessageAttachmentSaveOutcome.Failed -> present(R.string.shared_media_save_failed, copyable = true)
-    }
+    return MessageAttachmentSaveSummary(
+        savedCount = savedCount,
+        totalCount = mediaReferences.size,
+        firstFailure = firstFailure,
+    )
 }

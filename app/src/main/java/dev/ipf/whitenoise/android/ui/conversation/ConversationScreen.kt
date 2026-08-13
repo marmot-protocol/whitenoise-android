@@ -103,6 +103,7 @@ import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingState
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
+import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
@@ -142,7 +143,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttac
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationMentionPickerState
-import dev.ipf.whitenoise.android.ui.conversation.media.MessageAttachmentSaveSummary
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableFileSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableUriSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
@@ -2441,20 +2441,23 @@ internal fun ConversationScreen(
                                         selections.map { selection ->
                                             val record = selection.record
                                             val mediaReferences = controller.mediaReferencesFor(record)
-                                            MessageAttachmentSaveSummary(
-                                                savedCount =
-                                                    saveMessageMediaAttachments(
-                                                        context = context,
-                                                        controller = controller,
-                                                        messageIdHex = record.messageIdHex,
-                                                        mediaReferences = mediaReferences,
-                                                        mine = controller.isMessageMine(record),
-                                                    ),
-                                                totalCount = mediaReferences.size,
+                                            saveMessageMediaAttachments(
+                                                context = context,
+                                                controller = controller,
+                                                messageIdHex = record.messageIdHex,
+                                                mediaReferences = mediaReferences,
+                                                mine = controller.isMessageMine(record),
                                             )
                                         },
                                     )
-                                appState.presentAttachmentSaveOutcome(context, summary)
+                                appState.presentAttachmentSaveOutcome(
+                                    context = context,
+                                    summary = summary,
+                                    conversation =
+                                        controller.boundAccountRef?.let { accountRef ->
+                                            ConversationNoticeDestination(accountRef, controller.group.groupIdHex)
+                                        },
+                                )
                             } finally {
                                 batchAttachmentSaveInFlight = false
                             }
