@@ -3495,6 +3495,7 @@ class WhiteNoiseAppState private constructor(
      * block its lock; once start returns, no second dispatcher hop can widen
      * the no-replay boundary before the subscription call begins.
      */
+    @Suppress("TooGenericExceptionCaught") // The startup boundary reports every non-cancellation runtime failure.
     private suspend fun startMarmotWithNotificationListener(runtime: AppMarmotRuntime) {
         val runtimeStartResult = CompletableDeferred<Result<Unit>>()
         var installedStartupListener = false

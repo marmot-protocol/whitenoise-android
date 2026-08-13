@@ -78,7 +78,10 @@ class AppStartupReadinessTest {
             runtime.indexOf("privacy-runtime-configuration") in 0 until
                 runtime.indexOf("startMarmotWithNotificationListener"),
         )
-        assertTrue("Engine start must retain its dedicated timing", "traceStartupStage(\"marmot-start\")" in runtimeStart)
+        assertTrue(
+            "Engine start must retain its dedicated timing",
+            "traceStartupStage(\"marmot-start\")" in runtimeStart,
+        )
     }
 
     @Test
