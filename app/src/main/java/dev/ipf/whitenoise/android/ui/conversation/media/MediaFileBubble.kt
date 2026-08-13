@@ -103,15 +103,13 @@ internal fun MediaFileBubble(
     // hydration/eviction. This probe never owns or cancels a running transfer.
     val cacheRevision by appState.mediaCacheRevision.collectAsState()
     LaunchedEffect(pillKey, mine, cacheRevision) {
-        if (!mine) {
-            controller.refreshAttachmentTransferState(messageIdHex, attachmentIndex)
-        }
+        controller.refreshAttachmentTransferState(messageIdHex, attachmentIndex)
     }
     // Auto-download gate (#407): own sends are already cached; incoming
     // documents honor the Documents matrix row for the active connection.
-    // Re-keyed on the matrix so flipping a toggle re-gates an un-fetched
-    // file. A tap flips this to true so manual fetch/open is always
-    // available regardless of the policy.
+    // Recomposition re-reads the matrix, so flipping a toggle re-gates an
+    // un-fetched file. A tap bypasses this gate entirely, so manual fetch/open
+    // stays available regardless of the policy.
     val autoDownloadAllowed = mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Document)
 
     // When the Documents policy allows auto-download, prefetch the bytes into

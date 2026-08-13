@@ -4,6 +4,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -61,6 +62,37 @@ class AttachmentTransferCoordinatorTest {
                     assertEquals(AttachmentTransferState.Downloading, coordinator.state("file", false).value)
                     release.complete(Unit)
                     transfer.await()
+                    assertEquals(AttachmentTransferState.Available, coordinator.state("file", false).value)
+                } finally {
+                    scope.cancel()
+                }
+            }
+        }
+
+    @Test
+    fun staleCacheMissCannotDemoteACompletedDownload() =
+        runBlocking {
+            withTimeout(5_000) {
+                val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+                try {
+                    val coordinator = AttachmentTransferCoordinator(scope)
+                    val probeStarted = CompletableDeferred<Unit>()
+                    val releaseProbe = CompletableDeferred<Unit>()
+                    val refresh =
+                        async {
+                            coordinator.refresh("file") {
+                                probeStarted.complete(Unit)
+                                releaseProbe.await()
+                                false
+                            }
+                        }
+
+                    probeStarted.await()
+                    coordinator.request("file", load = { byteArrayOf(5) }) { true }.await()
+                    assertEquals(AttachmentTransferState.Available, coordinator.state("file", false).value)
+
+                    releaseProbe.complete(Unit)
+                    refresh.await()
                     assertEquals(AttachmentTransferState.Available, coordinator.state("file", false).value)
                 } finally {
                     scope.cancel()

@@ -40,6 +40,7 @@ internal class AttachmentTransferCoordinator(
     private val lock = Any()
     private val states = mutableMapOf<String, MutableStateFlow<AttachmentTransferState>>()
     private val active = mutableMapOf<String, Deferred<ByteArray>>()
+    private val terminalGenerations = mutableMapOf<String, Long>()
 
     fun state(
         key: String,
@@ -67,6 +68,7 @@ internal class AttachmentTransferCoordinator(
         key: String,
         probe: suspend () -> Boolean,
     ) {
+        val generation = synchronized(lock) { terminalGenerations[key] ?: 0L }
         val available =
             try {
                 probe()
@@ -76,7 +78,15 @@ internal class AttachmentTransferCoordinator(
                 return
             }
         synchronized(lock) {
-            if (active[key]?.isCompleted == false) return
+            // The cache probe runs outside the lock. A transfer may finish and
+            // publish a newer terminal state while the probe is suspended, so
+            // never let that stale result overwrite the completion state.
+            if (
+                active[key]?.isCompleted == false ||
+                (terminalGenerations[key] ?: 0L) != generation
+            ) {
+                return
+            }
             val state = stateFlow(key)
             state.value =
                 when {
@@ -114,23 +124,32 @@ internal class AttachmentTransferCoordinator(
                             val bytes = load()
                             check(bytes.isNotEmpty()) { "attachment download returned empty plaintext" }
                             val retained = probeAvailability(availableAfterLoad)
-                            state.value =
-                                if (retained) {
-                                    AttachmentTransferState.Available
-                                } else {
-                                    AttachmentTransferState.NotRetained
-                                }
+                            synchronized(lock) {
+                                state.value =
+                                    if (retained) {
+                                        AttachmentTransferState.Available
+                                    } else {
+                                        AttachmentTransferState.NotRetained
+                                    }
+                                advanceTerminalGeneration(key)
+                            }
                             bytes
                         } catch (cancellation: CancellationException) {
-                            state.value =
-                                if (stateBeforeDownload == AttachmentTransferState.Available) {
-                                    AttachmentTransferState.Available
-                                } else {
-                                    AttachmentTransferState.Remote
-                                }
+                            synchronized(lock) {
+                                state.value =
+                                    if (stateBeforeDownload == AttachmentTransferState.Available) {
+                                        AttachmentTransferState.Available
+                                    } else {
+                                        AttachmentTransferState.Remote
+                                    }
+                                advanceTerminalGeneration(key)
+                            }
                             throw cancellation
                         } catch (exception: Exception) {
-                            state.value = AttachmentTransferState.Failed
+                            synchronized(lock) {
+                                state.value = AttachmentTransferState.Failed
+                                advanceTerminalGeneration(key)
+                            }
                             throw exception
                         }
                     }.also {
@@ -157,6 +176,10 @@ internal class AttachmentTransferCoordinator(
         } catch (_: Exception) {
             false
         }
+
+    private fun advanceTerminalGeneration(key: String) {
+        terminalGenerations[key] = (terminalGenerations[key] ?: 0L) + 1L
+    }
 
     @Suppress("MaxLineLength")
     private fun stateFlow(key: String): MutableStateFlow<AttachmentTransferState> = states.getOrPut(key) { MutableStateFlow(AttachmentTransferState.Resolving) }
