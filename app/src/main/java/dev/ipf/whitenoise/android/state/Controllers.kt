@@ -3762,40 +3762,38 @@ class ChatsController private constructor(
                         (error.message ?: error.javaClass.simpleName)
                 }
             }.getOrNull() ?: return
-        if (
+        val projectionIsStale =
             !isActiveBindEpoch(epoch) ||
-            accountRef != account ||
-            memberCacheEpoch != expectedCacheEpoch
-        ) {
-            return
+                accountRef != account ||
+                memberCacheEpoch != expectedCacheEpoch
+        if (!projectionIsStale) {
+            val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
+            val updatedCache = memberCacheByGroup.toMutableMap()
+            var updatedRemovedGroupIds = removedGroupIds
+            projections.forEach { projection ->
+                val groupIdHex = projection.groupIdHex
+                val members = memberRecordsFromIds(projection.memberIdsHex, activeAccountIdHex)
+                updatedCache[groupIdHex] = members
+                updatedRemovedGroupIds =
+                    if (
+                        activeAccountIdHex != null &&
+                        members.none { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+                    ) {
+                        updatedRemovedGroupIds + groupIdHex
+                    } else {
+                        updatedRemovedGroupIds - groupIdHex
+                    }
+                members.map { it.memberIdHex }.forEach(appState::requestProfile)
+                presentationMembersByGroup = presentationMembersByGroup - groupIdHex
+                cancelMemberSnapshotRetry(groupIdHex)
+                memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
+                failedMemberFetches.remove(groupIdHex)
+                selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
+            }
+            memberCacheByGroup = updatedCache
+            removedGroupIds = updatedRemovedGroupIds
+            memberSnapshotsRevision += 1L
         }
-
-        val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
-        val updatedCache = memberCacheByGroup.toMutableMap()
-        var updatedRemovedGroupIds = removedGroupIds
-        projections.forEach { projection ->
-            val groupIdHex = projection.groupIdHex
-            val members = memberRecordsFromIds(projection.memberIdsHex, activeAccountIdHex)
-            updatedCache[groupIdHex] = members
-            updatedRemovedGroupIds =
-                if (
-                    activeAccountIdHex != null &&
-                    members.none { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-                ) {
-                    updatedRemovedGroupIds + groupIdHex
-                } else {
-                    updatedRemovedGroupIds - groupIdHex
-                }
-            members.map { it.memberIdHex }.forEach(appState::requestProfile)
-            presentationMembersByGroup = presentationMembersByGroup - groupIdHex
-            cancelMemberSnapshotRetry(groupIdHex)
-            memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
-            failedMemberFetches.remove(groupIdHex)
-            selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
-        }
-        memberCacheByGroup = updatedCache
-        removedGroupIds = updatedRemovedGroupIds
-        memberSnapshotsRevision += 1L
     }
 
     // Marmot's `set_group_archived` writes local state + saves but emits no
