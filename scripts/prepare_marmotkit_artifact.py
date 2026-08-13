@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import http.client
 import json
+import mmap
 import os
 import re
 import shutil
@@ -40,6 +41,10 @@ ABI_MACHINES = {
     "x86_64": (2, 62),
 }
 JNI_FILES = tuple(f"jniLibs/{abi}/libmarmot_uniffi.so" for abi in ABI_MACHINES)
+REQUIRED_ELF_EXPORTS = (
+    b"uniffi_marmot_uniffi_fn_constructor_marmot_new",
+    b"Java_io_crates_keyring_Keyring_00024Companion_initializeNdkContext",
+)
 PAYLOAD_FILES = (*KOTLIN_FILES, *JNI_FILES, "manifest.json")
 MANIFEST_CONTENTS = (KOTLIN_FILES[0], *JNI_FILES)
 REQUIRED_PROPERTIES = {
@@ -308,25 +313,103 @@ def validate_manifest(archive: zipfile.ZipFile, entry: zipfile.ZipInfo, properti
 
 def validate_elf(path: Path, abi: str) -> None:
     expected_class, expected_machine = ABI_MACHINES[abi]
-    symbols = (
-        b"uniffi_marmot_uniffi_fn_constructor_marmot_new",
-        b"Java_io_crates_keyring_Keyring_00024Companion_initializeNdkContext",
-    )
     with path.open("rb") as library:
-        header = library.read(20)
-        if len(header) < 20 or header[:4] != b"\x7fELF" or header[5] != 1:
+        if os.fstat(library.fileno()).st_size < 20:
             raise PreparationError(f"{abi} library is not a little-endian ELF")
-        if header[4] != expected_class or struct.unpack_from("<H", header, 18)[0] != expected_machine:
+        image = mmap.mmap(library.fileno(), 0, access=mmap.ACCESS_READ)
+    with image:
+        if len(image) < 20 or image[:4] != b"\x7fELF" or image[5] != 1:
+            raise PreparationError(f"{abi} library is not a little-endian ELF")
+        if image[4] != expected_class or struct.unpack_from("<H", image, 18)[0] != expected_machine:
             raise PreparationError(f"{abi} library has the wrong ELF architecture")
 
+        if expected_class == 1:
+            header_format = "<16sHHIIIIIHHHHHH"
+            section_format = "<IIIIIIIIII"
+            symbol_format = "<IIIBBH"
+            symbol_info_index = 3
+            symbol_other_index = 4
+            symbol_section_index = 5
+        else:
+            header_format = "<16sHHIQQQIHHHHHH"
+            section_format = "<IIQQQQIIQQ"
+            symbol_format = "<IBBHQQ"
+            symbol_info_index = 1
+            symbol_other_index = 2
+            symbol_section_index = 3
+
+        header_size = struct.calcsize(header_format)
+        if len(image) < header_size:
+            raise PreparationError(f"{abi} library has a truncated ELF header")
+        header = struct.unpack_from(header_format, image)
+        elf_type = header[1]
+        section_offset = header[6]
+        section_entry_size = header[11]
+        section_count = header[12]
+        section_struct_size = struct.calcsize(section_format)
+        if elf_type != 3:
+            raise PreparationError(f"{abi} library is not an ELF shared object")
+        if section_offset == 0 or section_entry_size < section_struct_size:
+            raise PreparationError(f"{abi} library has no readable ELF section table")
+
+        def section(index: int) -> tuple[int, ...]:
+            offset = section_offset + index * section_entry_size
+            if offset < section_offset or offset + section_struct_size > len(image):
+                raise PreparationError(f"{abi} library has a truncated ELF section table")
+            return struct.unpack_from(section_format, image, offset)
+
+        if section_count == 0:
+            section_count = section(0)[5]
+        if section_count <= 0 or section_offset + section_count * section_entry_size > len(image):
+            raise PreparationError(f"{abi} library has a truncated ELF section table")
+
+        dynamic_symbol_sections = []
+        for index in range(section_count):
+            entry = section(index)
+            if entry[1] == 11:
+                dynamic_symbol_sections.append(entry)
+        if not dynamic_symbol_sections:
+            raise PreparationError(f"{abi} library has no dynamic symbol table")
+
         found: set[bytes] = set()
-        overlap = b""
-        overlap_size = max(map(len, symbols)) - 1
-        while chunk := library.read(1024 * 1024):
-            window = overlap + chunk
-            found.update(symbol for symbol in symbols if symbol in window)
-            overlap = window[-overlap_size:]
-    for symbol in symbols:
+        symbol_struct_size = struct.calcsize(symbol_format)
+        for symbol_section in dynamic_symbol_sections:
+            symbol_offset = symbol_section[4]
+            symbol_size = symbol_section[5]
+            string_section_index = symbol_section[6]
+            symbol_entry_size = symbol_section[9]
+            if string_section_index >= section_count or symbol_entry_size < symbol_struct_size:
+                raise PreparationError(f"{abi} library has a malformed dynamic symbol table")
+            if symbol_size % symbol_entry_size != 0 or symbol_offset + symbol_size > len(image):
+                raise PreparationError(f"{abi} library has a truncated dynamic symbol table")
+
+            string_section = section(string_section_index)
+            if string_section[1] != 3:
+                raise PreparationError(f"{abi} dynamic symbols do not reference a string table")
+            string_offset = string_section[4]
+            string_size = string_section[5]
+            if string_offset + string_size > len(image):
+                raise PreparationError(f"{abi} library has a truncated dynamic string table")
+
+            for entry_offset in range(symbol_offset, symbol_offset + symbol_size, symbol_entry_size):
+                symbol = struct.unpack_from(symbol_format, image, entry_offset)
+                name_offset = symbol[0]
+                binding = symbol[symbol_info_index] >> 4
+                visibility = symbol[symbol_other_index] & 0x03
+                defined_section = symbol[symbol_section_index]
+                if binding not in {1, 2} or visibility not in {0, 3} or defined_section == 0:
+                    continue
+                if name_offset >= string_size:
+                    raise PreparationError(f"{abi} dynamic symbol has an invalid name offset")
+                name_start = string_offset + name_offset
+                name_end = image.find(b"\0", name_start, string_offset + string_size)
+                if name_end < 0:
+                    raise PreparationError(f"{abi} dynamic symbol has an unterminated name")
+                name = image[name_start:name_end]
+                if name in REQUIRED_ELF_EXPORTS:
+                    found.add(name)
+
+    for symbol in REQUIRED_ELF_EXPORTS:
         if symbol not in found:
             raise PreparationError(f"{abi} library is missing expected export {symbol.decode()}")
 

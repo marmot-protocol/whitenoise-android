@@ -8,6 +8,7 @@ import importlib.util
 import io
 import json
 import stat
+import struct
 import tempfile
 import unittest
 import warnings
@@ -27,13 +28,80 @@ SOURCE_SHA = "3fc4eb83974eb64ecb298856b0db70cc3055af57"
 ROOT = "marmotkit-android-0.9.12"
 
 
-def fake_elf(elf_class: int, machine: int, *, include_exports: bool = True) -> bytes:
-    data = bytearray(64)
-    data[:6] = b"\x7fELF" + bytes((elf_class, 1))
-    data[18:20] = machine.to_bytes(2, "little")
-    if include_exports:
-        data.extend(b"uniffi_marmot_uniffi_fn_constructor_marmot_new\0")
-        data.extend(b"Java_io_crates_keyring_Keyring_00024Companion_initializeNdkContext\0")
+def fake_elf(
+    elf_class: int,
+    machine: int,
+    *,
+    include_exports: bool = True,
+    export_binding: int = 1,
+    export_section: int = 3,
+    trailing_data: bytes = b"",
+) -> bytes:
+    symbols = PREPARE.REQUIRED_ELF_EXPORTS if include_exports else ()
+    strings = bytearray(b"\0")
+    name_offsets = []
+    for symbol in symbols:
+        name_offsets.append(len(strings))
+        strings.extend(symbol + b"\0")
+
+    if elf_class == 1:
+        header_format = "<16sHHIIIIIHHHHHH"
+        section_format = "<IIIIIIIIII"
+        symbol_format = "<IIIBBH"
+    else:
+        header_format = "<16sHHIQQQIHHHHHH"
+        section_format = "<IIQQQQIIQQ"
+        symbol_format = "<IBBHQQ"
+    header_size = struct.calcsize(header_format)
+    section_size = struct.calcsize(section_format)
+    symbol_size = struct.calcsize(symbol_format)
+
+    data = bytearray(header_size)
+    string_offset = len(data)
+    data.extend(strings)
+    while len(data) % 8:
+        data.append(0)
+    symbol_offset = len(data)
+    data.extend(b"\0" * symbol_size)
+    for name_offset in name_offsets:
+        if elf_class == 1:
+            data.extend(struct.pack(symbol_format, name_offset, 0, 0, export_binding << 4, 0, export_section))
+        else:
+            data.extend(struct.pack(symbol_format, name_offset, export_binding << 4, 0, export_section, 0, 0))
+    text_offset = len(data)
+    data.append(0xC3)
+    while len(data) % 8:
+        data.append(0)
+    section_offset = len(data)
+
+    sections = [
+        (0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        (0, 3, 0, 0, string_offset, len(strings), 0, 0, 1, 0),
+        (0, 11, 0, 0, symbol_offset, symbol_size * (len(symbols) + 1), 1, 1, 8, symbol_size),
+        (0, 1, 0x6, 0, text_offset, 1, 0, 0, 1, 0),
+    ]
+    for section in sections:
+        data.extend(struct.pack(section_format, *section))
+    data.extend(trailing_data)
+
+    ident = b"\x7fELF" + bytes((elf_class, 1, 1)) + b"\0" * 9
+    header = (
+        ident,
+        3,
+        machine,
+        1,
+        0,
+        0,
+        section_offset,
+        0,
+        header_size,
+        0,
+        0,
+        section_size,
+        len(sections),
+        0,
+    )
+    data[:header_size] = struct.pack(header_format, *header)
     return bytes(data)
 
 
@@ -290,18 +358,28 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
         self.write_lock()
         self.assert_rejected("missing expected export")
 
-    def test_elf_export_spanning_stream_chunks_is_detected(self) -> None:
-        symbol = b"uniffi_marmot_uniffi_fn_constructor_marmot_new"
-        data = bytearray(fake_elf(2, 62))
-        symbol_start = data.index(symbol)
-        del data[symbol_start : symbol_start + len(symbol) + 1]
-        padding = 20 + 1024 * 1024 - len(data) - len(symbol) // 2
-        data.extend(b"x" * padding)
-        data.extend(symbol + b"\0")
+    def test_elf_names_outside_dynamic_symbol_table_are_rejected(self) -> None:
+        decoy_names = b"\0".join(PREPARE.REQUIRED_ELF_EXPORTS) + b"\0"
+        data = fake_elf(2, 62, include_exports=False, trailing_data=decoy_names)
         library = self.root / "libmarmot_uniffi.so"
         library.write_bytes(data)
 
-        PREPARE.validate_elf(library, "x86_64")
+        with self.assertRaisesRegex(PREPARE.PreparationError, "missing expected export"):
+            PREPARE.validate_elf(library, "x86_64")
+
+    def test_undefined_dynamic_symbols_are_rejected(self) -> None:
+        library = self.root / "libmarmot_uniffi.so"
+        library.write_bytes(fake_elf(2, 62, export_section=0))
+
+        with self.assertRaisesRegex(PREPARE.PreparationError, "missing expected export"):
+            PREPARE.validate_elf(library, "x86_64")
+
+    def test_local_dynamic_symbols_are_rejected(self) -> None:
+        library = self.root / "libmarmot_uniffi.so"
+        library.write_bytes(fake_elf(2, 62, export_binding=0))
+
+        with self.assertRaisesRegex(PREPARE.PreparationError, "missing expected export"):
+            PREPARE.validate_elf(library, "x86_64")
 
     def test_malformed_manifest_fails_closed(self) -> None:
         self.write_archive(manifest_bytes=b"{")
