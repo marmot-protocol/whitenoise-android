@@ -3399,6 +3399,11 @@ class WhiteNoiseAppState private constructor(
                     }
                     appStateDebug { "marmot started" }
                 },
+                closeAfterFailure = { runtime ->
+                    traceStartupStage("failed-runtime-close") {
+                        withContext(Dispatchers.IO) { runtime.marmot.shutdownAndClose() }
+                    }
+                },
             )
         client = opened
         return opened
