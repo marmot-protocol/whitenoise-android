@@ -92,6 +92,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -103,6 +104,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -6179,6 +6181,8 @@ class ConversationController(
     // is not an Android-owned cache of White Noise data (AGENTS.md).
     private val sendTraceByTempId = linkedMapOf<String, SendTraceEntry>()
     private val inviteStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val attachmentTransferScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val attachmentTransfers = AttachmentTransferCoordinator(attachmentTransferScope)
 
     // Cached at start() so `loadOlderPage` / `loadNewerPage` can drive
     // `paginate_backwards` / `paginate_forwards` on the subscription. Per
@@ -6816,6 +6820,7 @@ class ConversationController(
     fun onCleared() {
         controllerCleared = true
         inviteStreamScope.cancel()
+        attachmentTransferScope.cancel()
     }
 
     internal fun matchesConversation(
@@ -8065,6 +8070,63 @@ class ConversationController(
                 appState.cachedMediaPlaintext(cacheKey) != null
             }
     }
+
+    /** Observable presentation state owned outside the attachment composable. */
+    internal fun attachmentTransferState(
+        messageIdHex: String,
+        attachmentIndex: Int,
+        initiallyAvailable: Boolean,
+    ): StateFlow<AttachmentTransferState> =
+        attachmentTransfers.acquireState(
+            key = attachmentTransferKey(messageIdHex, attachmentIndex),
+            initiallyAvailable = initiallyAvailable,
+        )
+
+    /** Release presentation state when its attachment composable leaves composition. */
+    internal fun releaseAttachmentTransferState(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ) {
+        attachmentTransfers.releaseState(attachmentTransferKey(messageIdHex, attachmentIndex))
+    }
+
+    /** Reconcile presentation state with the encrypted L1/L2 cache. */
+    internal suspend fun refreshAttachmentTransferState(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ) {
+        attachmentTransfers.refresh(attachmentTransferKey(messageIdHex, attachmentIndex)) {
+            hasCachedAttachmentAfterHydration(messageIdHex, attachmentIndex)
+        }
+    }
+
+    /**
+     * Request one controller-owned transfer. Auto-download and tap-to-open
+     * callers receive the same [Deferred], while truthful post-load probing
+     * decides whether the result survived in either local cache tier.
+     */
+    internal fun requestAttachmentTransfer(
+        messageIdHex: String,
+        attachmentIndex: Int,
+        reference: MediaAttachmentReferenceFfi,
+        retainedPlaintext: ByteArray? = null,
+    ): Deferred<ByteArray> =
+        attachmentTransfers.request(
+            key = attachmentTransferKey(messageIdHex, attachmentIndex),
+            load = {
+                retainedPlaintext
+                    ?: downloadAttachment(messageIdHex, attachmentIndex, reference)
+            },
+            availableAfterLoad = {
+                retainedPlaintext != null ||
+                    hasCachedAttachmentAfterHydration(messageIdHex, attachmentIndex)
+            },
+        )
+
+    private fun attachmentTransferKey(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): String = "$messageIdHex#$attachmentIndex"
 
     /**
      * Drop decrypted bytes for one attachment after a decoder/playback failure.
