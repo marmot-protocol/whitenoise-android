@@ -504,7 +504,7 @@ class MarkdownSpeakableTextTest {
             )
         val blocks =
             object : AbstractList<MarkdownBlockFfi>() {
-                override val size = 2
+                override val size = MARKDOWN_MAX_CONTAINER_SIBLINGS + 1
 
                 override fun get(index: Int): MarkdownBlockFfi {
                     if (index == 0) return oversized
@@ -516,6 +516,38 @@ class MarkdownSpeakableTextTest {
                 truncated = true,
                 blankLinesBefore = byteArrayOf(),
                 blocks = blocks,
+            )
+
+        assertEquals(
+            "a".repeat(MARKDOWN_SPEAKABLE_MAX_LENGTH),
+            markdownDocumentToSpeakableText(document),
+        )
+    }
+
+    @Test
+    fun tableTraversalDoesNotReadRowsAfterHeaderExhaustsCharacterBudget() {
+        val oversizedHeader =
+            MarkdownTableCellFfi(
+                listOf(MarkdownInlineFfi.Text("a".repeat(MARKDOWN_SPEAKABLE_MAX_LENGTH))),
+            )
+        val rows =
+            object : AbstractList<List<MarkdownTableCellFfi>>() {
+                override val size = 1
+
+                override fun get(index: Int): List<MarkdownTableCellFfi> = error("read a table row after the traversal budget")
+            }
+        val document =
+            MarkdownDocumentFfi(
+                truncated = true,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Table(
+                            alignments = listOf(MarkdownAlignmentFfi.NONE),
+                            header = listOf(oversizedHeader),
+                            rows = rows,
+                        ),
+                    ),
             )
 
         assertEquals(

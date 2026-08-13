@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
+import dev.ipf.marmotkit.MarkdownTableCellFfi
 import java.security.MessageDigest
 
 internal const val MARKDOWN_SPEAKABLE_MAX_LENGTH = 32_000
@@ -93,10 +94,10 @@ internal fun markdownDocumentToSpeakableProjection(
     isGroupMember: ((String) -> Boolean)? = null,
 ): SpeakableTextProjection {
     val collector = SpeakableCollector()
-    val blocks = markdownVisibleSiblings(document.blocks)
-    for (blockIndex in blocks.indices) {
+    val blockLimit = minOf(document.blocks.size, MARKDOWN_MAX_CONTAINER_SIBLINGS)
+    for (blockIndex in 0 until blockLimit) {
         if (collector.exhausted) break
-        val block = blocks[blockIndex]
+        val block = document.blocks[blockIndex]
         collectSpeakableBlock(
             block = block,
             collector = collector,
@@ -156,10 +157,10 @@ private fun collectSpeakableBlocks(
     depth: Int,
     path: String,
 ) {
-    val visibleBlocks = markdownVisibleSiblings(blocks)
-    for (blockIndex in visibleBlocks.indices) {
+    val blockLimit = minOf(blocks.size, MARKDOWN_MAX_CONTAINER_SIBLINGS)
+    for (blockIndex in 0 until blockLimit) {
         if (collector.exhausted) break
-        val block = visibleBlocks[blockIndex]
+        val block = blocks[blockIndex]
         collectSpeakableBlock(
             block,
             collector,
@@ -179,10 +180,10 @@ private fun collectSpeakableList(
     depth: Int,
     path: String,
 ) {
-    val items = markdownVisibleSiblings(list.items)
-    for (itemIndex in items.indices) {
+    val itemLimit = minOf(list.items.size, MARKDOWN_MAX_CONTAINER_SIBLINGS)
+    for (itemIndex in 0 until itemLimit) {
         if (!collector.visitNode()) break
-        val item = items[itemIndex]
+        val item = list.items[itemIndex]
         collectSpeakableBlocks(
             item.blocks,
             collector,
@@ -201,26 +202,32 @@ private fun collectSpeakableTable(
     isGroupMember: ((String) -> Boolean)?,
     path: String,
 ) {
-    val visibleTable = markdownVisibleTable(table.header, table.rows)
-    for (cellIndex in visibleTable.header.cells.indices) {
-        if (!collector.visitNode()) break
-        val cell = visibleTable.header.cells[cellIndex]
-        collectSpeakableInlineSegment(cell.inlines, collector, mentionDisplayName, isGroupMember, "$path/h$cellIndex")
-    }
-    for (rowIndex in visibleTable.rows.indices) {
-        if (collector.exhausted) break
-        val row = visibleTable.rows[rowIndex]
-        for (cellIndex in row.cells.indices) {
-            if (!collector.visitNode()) break
-            val cell = row.cells[cellIndex]
+    var remainingCells = MARKDOWN_MAX_TABLE_CELLS
+
+    fun collectRow(
+        cells: List<MarkdownTableCellFfi>,
+        rowPath: String,
+    ) {
+        val cellLimit = minOf(cells.size, MARKDOWN_MAX_TABLE_COLUMNS, remainingCells)
+        for (cellIndex in 0 until cellLimit) {
+            if (!collector.visitNode()) return
+            remainingCells--
+            val cell = cells[cellIndex]
             collectSpeakableInlineSegment(
                 cell.inlines,
                 collector,
                 mentionDisplayName,
                 isGroupMember,
-                "$path/r$rowIndex/c$cellIndex",
+                "$rowPath$cellIndex",
             )
         }
+    }
+
+    collectRow(table.header, "$path/h")
+    val rowLimit = minOf(table.rows.size, MARKDOWN_MAX_CONTAINER_SIBLINGS)
+    for (rowIndex in 0 until rowLimit) {
+        if (collector.exhausted || remainingCells <= 0) break
+        collectRow(table.rows[rowIndex], "$path/r$rowIndex/c")
     }
 }
 
@@ -263,10 +270,10 @@ private fun MappedTextBuilder.appendSpeakableInlines(
     path: String,
 ) {
     if (markdownInlineDepthExceeded(depth)) return
-    val visibleInlines = markdownVisibleSiblings(inlines)
-    for (inlineIndex in visibleInlines.indices) {
+    val inlineLimit = minOf(inlines.size, MARKDOWN_MAX_CONTAINER_SIBLINGS)
+    for (inlineIndex in 0 until inlineLimit) {
         if (length >= maxChars || !collector.visitNode()) break
-        val inline = visibleInlines[inlineIndex]
+        val inline = inlines[inlineIndex]
         val inlinePath = "$path/n$inlineIndex"
         when (inline) {
             is MarkdownInlineFfi.Text ->

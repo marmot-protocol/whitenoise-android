@@ -6,8 +6,6 @@ import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import androidx.compose.foundation.text.contextmenu.builder.item
 import androidx.compose.foundation.text.contextmenu.data.ProcessTextKey
-import androidx.compose.foundation.text.contextmenu.data.TextContextMenuComponent
-import androidx.compose.foundation.text.contextmenu.data.TextContextMenuItem
 import androidx.compose.foundation.text.contextmenu.modifier.appendTextContextMenuComponents
 import androidx.compose.foundation.text.contextmenu.modifier.filterTextContextMenuComponents
 import androidx.compose.ui.Modifier
@@ -19,52 +17,54 @@ private data object SpeakAloudTextContextMenuKey
 internal fun Modifier.appendSpeakAloudTextContextMenuAction(
     enabled: Boolean,
     label: String,
-    systemReadAloudLabels: Set<String>,
+    systemReadAloudKeyIds: Set<Int>,
     onSpeak: () -> Unit,
 ): Modifier =
     if (!enabled) {
         this
     } else {
-        filterTextContextMenuComponents { component -> !component.isSystemReadAloud(systemReadAloudLabels) }
-            .appendTextContextMenuComponents {
-                separator()
-                item(
-                    key = SpeakAloudTextContextMenuKey,
-                    label = label,
-                ) {
-                    onSpeak()
-                    close()
-                }
+        filterTextContextMenuComponents { component ->
+            val processTextKey = component.key as? ProcessTextKey
+            processTextKey == null || processTextKey.id !in systemReadAloudKeyIds
+        }.appendTextContextMenuComponents {
+            separator()
+            item(
+                key = SpeakAloudTextContextMenuKey,
+                label = label,
+            ) {
+                onSpeak()
+                close()
             }
+        }
     }
 
 /**
  * Finds external Process Text actions that only read the selected text aloud.
  *
- * The provider's localized label is matched only on Process Text actions, preserving Copy, Select
- * all, Translate, Search, and other integrations.
+ * Compose assigns [ProcessTextKey.id] after applying the same availability filter below. Matching
+ * that identity removes only the redundant provider even when another Process Text action has the
+ * same localized label.
  */
-internal fun systemReadAloudActionLabels(context: Context): Set<String> {
+internal fun systemReadAloudProcessTextKeyIds(context: Context): Set<Int> {
     val intent = Intent(Intent.ACTION_PROCESS_TEXT).setType("text/plain")
-    val packageManager = context.packageManager
-    return packageManager
-        .queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
-        .filter { it.isReadAloudActivity() }
-        .mapNotNull { resolveInfo ->
-            resolveInfo
-                .loadLabel(packageManager)
-                .toString()
-                .takeIf(String::isNotBlank)
-        }.toSet()
+    val availableActivities =
+        context.packageManager
+            .queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
+            .filter { it.isAvailableTo(context) }
+    return availableActivities
+        .mapIndexedNotNull { index, resolveInfo -> index.takeIf { resolveInfo.isReadAloudActivity() } }
+        .toSet()
+}
+
+private fun ResolveInfo.isAvailableTo(context: Context): Boolean {
+    val info = activityInfo ?: return false
+    if (info.packageName == context.packageName) return true
+    if (!info.exported) return false
+    val requiredPermission = info.permission ?: return true
+    return context.checkSelfPermission(requiredPermission) == PackageManager.PERMISSION_GRANTED
 }
 
 private fun ResolveInfo.isReadAloudActivity(): Boolean {
     val className = activityInfo?.name?.lowercase(Locale.ROOT).orEmpty()
     return className.contains("selecttospeak") || className.contains("readaloud")
 }
-
-private fun TextContextMenuComponent.isSystemReadAloud(labels: Set<String>): Boolean =
-    when (this) {
-        is TextContextMenuItem -> key is ProcessTextKey && label in labels
-        else -> false
-    }

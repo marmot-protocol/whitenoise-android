@@ -225,6 +225,11 @@ class MessageBubbleTextSelectionSpeakTest {
             label = "Read aloud",
         )
         registerProcessTextActivity(
+            packageName = "com.example.reader",
+            className = "com.example.reader.ProcessTextActivity",
+            label = "Read aloud",
+        )
+        registerProcessTextActivity(
             packageName = "com.example.translate",
             className = "com.example.translate.ProcessTextActivity",
             label = "Translate",
@@ -264,7 +269,7 @@ class MessageBubbleTextSelectionSpeakTest {
                     .components
                     .filterIsInstance<TextContextMenuItem>()
                     .map { it.label }
-            assertFalse(labels.contains("Read aloud"))
+            assertTrue(labels.count { it == "Read aloud" } == 1)
             assertTrue(labels.contains("Translate"))
             assertTrue(labels.count { it == app.getString(R.string.speak_aloud) } == 1)
         }

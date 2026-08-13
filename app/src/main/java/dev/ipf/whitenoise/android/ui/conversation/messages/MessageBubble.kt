@@ -1251,8 +1251,8 @@ internal fun MessageBubble(
                 }
                 val selectionWrapper: @Composable (@Composable () -> Unit) -> Unit = { content ->
                     if (textSelectionMode) {
-                        val systemReadAloudLabels =
-                            remember(context) { systemReadAloudActionLabels(context) }
+                        val systemReadAloudKeyIds =
+                            remember(context) { systemReadAloudProcessTextKeyIds(context) }
                         CompositionLocalProvider(LocalClipboard provides textSelectionClipboard) {
                             SelectionContainer(
                                 state = messageTextSelectionState,
@@ -1260,7 +1260,7 @@ internal fun MessageBubble(
                                     Modifier.appendSpeakAloudTextContextMenuAction(
                                         enabled = canSpeakAloud && !deleted,
                                         label = speakAloudLabel,
-                                        systemReadAloudLabels = systemReadAloudLabels,
+                                        systemReadAloudKeyIds = systemReadAloudKeyIds,
                                         onSpeak = {
                                             speakFromHere()
                                             onTextSelectionModeChange(false)
