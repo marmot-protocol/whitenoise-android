@@ -24,15 +24,15 @@ class MarmotBridgeTracerTest {
         runBlocking {
             val backend = RecordingTraceBackend(enabled = true)
 
-            MarmotBridgeTracer(backend).trace(MarmotTraceSection.REFRESH_GROUP_DETAILS) {
+            MarmotBridgeTracer(backend).trace(MarmotTraceSection.REFRESH_GROUP_ROSTER) {
                 backend.events += "call"
             }
 
             assertEquals(
                 listOf(
-                    "begin:${MarmotTraceSection.REFRESH_GROUP_DETAILS}:1",
+                    "begin:${MarmotTraceSection.REFRESH_GROUP_ROSTER}:1",
                     "call",
-                    "end:${MarmotTraceSection.REFRESH_GROUP_DETAILS}:1",
+                    "end:${MarmotTraceSection.REFRESH_GROUP_ROSTER}:1",
                 ),
                 backend.events,
             )

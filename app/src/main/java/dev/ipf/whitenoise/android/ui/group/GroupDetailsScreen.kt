@@ -1783,7 +1783,7 @@ internal fun GroupDetailsHeader(
     descriptionCopyValue: String? = null,
 ) {
     val clipboard = LocalClipboardManager.current
-    val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
+    val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
     val remoteImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
     val avatarImageAvailable = picture != null || remoteImageAvailable
     var viewerOpen by remember(safePictureUrl, picture) { mutableStateOf(false) }

@@ -79,7 +79,7 @@ internal fun selectedMemberDisplayName(
 internal fun selectedMemberAvatarUrl(
     member: RecipientSearch.Candidate,
     localAvatarUrl: String?,
-): String? = localAvatarUrl ?: ProfileSanitizer.imageUrl(member.searchProfile?.picture)
+): String? = localAvatarUrl ?: ProfileSanitizer.protocolImageUrl(member.searchProfile?.picture)
 
 @Composable
 @Suppress("FunctionNaming")

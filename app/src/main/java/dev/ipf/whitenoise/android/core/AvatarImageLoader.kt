@@ -13,9 +13,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import java.util.LinkedHashMap
 
+@Suppress("TooManyFunctions") // Cohesive process-wide avatar cache, fetch, and lifecycle boundary.
 object AvatarImageLoader {
-    private const val CONNECT_TIMEOUT_MS = 5_000
-    private const val READ_TIMEOUT_MS = 10_000
     private const val MAX_AVATAR_BYTES = 2 * 1024 * 1024
     private const val MAX_AVATAR_DIMENSION = 512
 
@@ -42,11 +41,31 @@ object AvatarImageLoader {
     private val inFlight = mutableMapOf<String, AvatarInFlightRequest>()
     private val preWarmQueuedGeneration = mutableMapOf<String, Long>()
     private val failureExpiresAt = AvatarFailureExpiryCache(FAILURE_CACHE_MAX_ENTRIES)
+    private var profileImageFetcher: (suspend (String, ULong) -> ByteArray)? = null
 
     // Bumped by clear(); fetches launched under an older generation discard
     // their results so a logout/account-switch can't be re-polluted by an
     // in-flight request that was already on the network.
     private var generation = 0L
+
+    /**
+     * Attach the process-owned Marmot profile-image fetch. MDK owns URL
+     * validation, DNS pinning, redirect validation, timeouts, and byte bounds;
+     * this loader owns only request deduplication, decoding, and the memory
+     * cache used by Android presentation surfaces.
+     */
+    internal fun attachProfileImageFetcher(fetcher: suspend (String, ULong) -> ByteArray) {
+        synchronized(lock) {
+            profileImageFetcher = fetcher
+        }
+    }
+
+    /** Test-only lifecycle boundary for the process-global MDK fetch adapter. */
+    internal fun resetProfileImageFetcherForTests() {
+        synchronized(lock) {
+            profileImageFetcher = null
+        }
+    }
 
     suspend fun load(url: String): ImageBitmap? =
         load(
@@ -101,6 +120,7 @@ object AvatarImageLoader {
         }
     }
 
+    @Suppress("LongMethod") // Request deduplication and generation-safe completion form one atomic lifecycle.
     private suspend fun load(
         url: String,
         expectedGeneration: Long?,
@@ -136,12 +156,17 @@ object AvatarImageLoader {
                         // its result. clear() completes result waiters immediately
                         // but cannot end a blocking socket read; the fetch permit
                         // remains held until the socket returns.
-                        val image =
+                        val fetchResult =
                             runCatching {
                                 fetchGate.withPermit(fetchLane) {
-                                    if (synchronized(lock) { launchedGeneration != generation }) null else fetch(url)
+                                    if (synchronized(lock) { launchedGeneration != generation }) {
+                                        AvatarImageFetchResult.Unavailable
+                                    } else {
+                                        fetch(url)
+                                    }
                                 }
-                            }.getOrNull()
+                            }.getOrElse { AvatarImageFetchResult.Failed }
+                        val image = (fetchResult as? AvatarImageFetchResult.Success)?.image
                         synchronized(lock) {
                             if (launchedGeneration != generation) {
                                 // clear() ran while we were in flight; drop the result.
@@ -149,16 +174,20 @@ object AvatarImageLoader {
                                 deferred.complete(null)
                                 return@launch
                             }
-                            if (image != null) {
-                                cache.put(url, image)
-                                failureExpiresAt.remove(url)
-                            } else {
-                                val nowMillis = System.currentTimeMillis()
-                                failureExpiresAt.recordFailure(
-                                    url = url,
-                                    expiresAtMillis = nowMillis + FAILURE_TTL_MS,
-                                    nowMillis = nowMillis,
-                                )
+                            when (fetchResult) {
+                                is AvatarImageFetchResult.Success -> {
+                                    cache.put(url, fetchResult.image)
+                                    failureExpiresAt.remove(url)
+                                }
+                                AvatarImageFetchResult.Failed -> {
+                                    val nowMillis = System.currentTimeMillis()
+                                    failureExpiresAt.recordFailure(
+                                        url = url,
+                                        expiresAtMillis = nowMillis + FAILURE_TTL_MS,
+                                        nowMillis = nowMillis,
+                                    )
+                                }
+                                AvatarImageFetchResult.Unavailable -> Unit
                             }
                             inFlight.remove(url, inFlightRequest)
                             // Complete INSIDE the lock so any concurrent `load(url)`
@@ -222,20 +251,27 @@ object AvatarImageLoader {
         nowMillis: Long,
     ): Boolean = failureExpiresAt.isFresh(url, nowMillis)
 
-    private fun fetch(url: String): ImageBitmap? {
-        // Avatar URLs come from remote profile records, so a malicious peer can
-        // publish an https URL that 30x-redirects to http or a private host.
-        // SafeHttpsGet re-validates scheme/host/port at every hop and bounds the
-        // body; we only have to decode the result.
-        val bytes =
-            SafeHttpsGet.get(
-                url = url,
-                maxBodyBytes = MAX_AVATAR_BYTES,
-                connectTimeoutMillis = CONNECT_TIMEOUT_MS,
-                readTimeoutMillis = READ_TIMEOUT_MS,
-            ) ?: return null
-        return decode(bytes)?.asImageBitmap()
+    @Suppress("ReturnCount") // Fail-closed guards keep invalid limits and an unattached MDK adapter explicit.
+    internal suspend fun fetchBytes(
+        url: String,
+        maxBytes: Int,
+    ): AvatarByteFetchResult {
+        if (maxBytes <= 0) return AvatarByteFetchResult.Failed
+        val fetcher = synchronized(lock) { profileImageFetcher } ?: return AvatarByteFetchResult.Unavailable
+        val bytes = fetcher(url, maxBytes.toULong())
+        return if (bytes.size <= maxBytes) AvatarByteFetchResult.Success(bytes) else AvatarByteFetchResult.Failed
     }
+
+    private suspend fun fetch(url: String): AvatarImageFetchResult =
+        when (val result = fetchBytes(url, MAX_AVATAR_BYTES)) {
+            is AvatarByteFetchResult.Success ->
+                decode(result.bytes)
+                    ?.asImageBitmap()
+                    ?.let(AvatarImageFetchResult::Success)
+                    ?: AvatarImageFetchResult.Failed
+            AvatarByteFetchResult.Failed -> AvatarImageFetchResult.Failed
+            AvatarByteFetchResult.Unavailable -> AvatarImageFetchResult.Unavailable
+        }
 
     private fun decode(bytes: ByteArray): android.graphics.Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -248,6 +284,26 @@ object AvatarImageLoader {
         val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
         return scaleAvatarBitmapToMaxDimension(decoded, MAX_AVATAR_DIMENSION)
     }
+}
+
+internal sealed interface AvatarByteFetchResult {
+    data class Success(
+        val bytes: ByteArray,
+    ) : AvatarByteFetchResult
+
+    data object Failed : AvatarByteFetchResult
+
+    data object Unavailable : AvatarByteFetchResult
+}
+
+private sealed interface AvatarImageFetchResult {
+    data class Success(
+        val image: ImageBitmap,
+    ) : AvatarImageFetchResult
+
+    data object Failed : AvatarImageFetchResult
+
+    data object Unavailable : AvatarImageFetchResult
 }
 
 internal enum class AvatarFetchLane {

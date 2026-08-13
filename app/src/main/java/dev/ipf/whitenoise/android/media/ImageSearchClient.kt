@@ -23,9 +23,9 @@ internal const val MAX_IMAGE_SEARCH_RESULTS = 200
 /**
  * Avatar-safe HTTPS URL check for the media layer (filtering decoded search
  * results, the sheet's preview avatar). Delegates to the single canonical
- * implementation [ProfileSanitizer.imageUrl] so the two cannot drift on policy.
+ * implementation [ProfileSanitizer.androidOwnedHttpsImageUrl] so the two cannot drift on policy.
  */
-fun sanitizeHttpsAvatarUrl(raw: String?): String? = ProfileSanitizer.imageUrl(raw)
+fun sanitizeHttpsAvatarUrl(raw: String?): String? = ProfileSanitizer.androidOwnedHttpsImageUrl(raw)
 
 private fun isDuckDuckGoFetchHost(host: String?): Boolean {
     val normalized =

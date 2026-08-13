@@ -286,13 +286,13 @@ internal fun resolveProfileSheetMetadata(
                 cachedAvatarUrl,
                 cached?.picture,
                 discovered?.picture,
-                sanitize = ProfileSanitizer::imageUrl,
+                sanitize = ProfileSanitizer::protocolImageUrl,
             ),
         bannerUrl =
             firstSanitizedProfileField(
                 cached?.banner,
                 discovered?.banner,
-                sanitize = ProfileSanitizer::imageUrl,
+                sanitize = ProfileSanitizer::protocolImageUrl,
             ),
         about =
             firstSanitizedProfileField(
