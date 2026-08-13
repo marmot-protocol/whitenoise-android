@@ -314,7 +314,9 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "same-group account switches must reset anchoring state and cancel effects that capture the old controller",
             "remember(controller, notificationOpenRequestId) { mutableStateOf(false) }" in source &&
-                "var lastFollowedLatestId by remember(controller)" in source &&
+                "val state = remember(controller) { ConversationNavigationState() }" in source &&
+                "onDispose(state::cancelJobs)" in source &&
+                "var lastFollowedLatestId by mutableStateOf<String?>(null)" in source &&
                 "LaunchedEffect(controller, latestTimelineItemId, notificationOpenRequestId)" in source &&
                 "LaunchedEffect(listState, controller)" in source,
         )

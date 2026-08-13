@@ -37,10 +37,10 @@ class TtsAutoReadWiringCoverageTest {
     }
 
     @Test
-    fun conversationScreenOpenIdleTriggerUsesAnchoredBacklogAndAutoReadOwnership() {
-        val body = source("ui/conversation/ConversationScreen.kt")
-        val openEffectStart = body.indexOf("LaunchedEffect(controller, chat.id, initialTimelineAnchored)")
-        val openEffectEnd = body.indexOf("// Live continuation:", openEffectStart)
+    fun conversationTtsEffectsOpenIdleTriggerUsesAnchoredBacklogAndAutoReadOwnership() {
+        val body = source("ui/conversation/ConversationTtsEffects.kt")
+        val openEffectStart = body.indexOf("LaunchedEffect(controller, chatId, initialTimelineAnchored)")
+        val openEffectEnd = body.indexOf("// Live continuation", openEffectStart)
         val openEffect = body.substring(openEffectStart, openEffectEnd)
 
         assertTrue(
@@ -71,10 +71,10 @@ class TtsAutoReadWiringCoverageTest {
     }
 
     @Test
-    fun conversationScreenLiveContinuationSkipsSeedAndRequiresOwnedSession() {
-        val body = source("ui/conversation/ConversationScreen.kt")
-        val liveEffectStart = body.indexOf("LaunchedEffect(controller, chat.id) {")
-        val liveEffectEnd = body.indexOf("// Auto-read return-from-background:", liveEffectStart)
+    fun conversationTtsEffectsLiveContinuationSkipsSeedAndRequiresOwnedSession() {
+        val body = source("ui/conversation/ConversationTtsEffects.kt")
+        val liveEffectStart = body.indexOf("LaunchedEffect(controller, chatId) {")
+        val liveEffectEnd = body.indexOf("// On a real foreground return", liveEffectStart)
         val liveEffect = body.substring(liveEffectStart, liveEffectEnd)
 
         assertTrue(
@@ -92,6 +92,19 @@ class TtsAutoReadWiringCoverageTest {
         assertTrue(
             "live continuation must append rather than replace",
             "appendSpeech(entry" in liveEffect,
+        )
+    }
+
+    @Test
+    fun conversationScreenDelegatesTtsOrchestrationOutOfItsGeneratedMethod() {
+        val body = source("ui/conversation/ConversationScreen.kt")
+
+        assertTrue("screen must delegate auto-read orchestration", "ConversationTtsAutoReadEffects(" in body)
+        assertTrue("screen must delegate follow orchestration", "ConversationTtsFollowEffects(" in body)
+        assertFalse("screen must not inline auto-read backlog work", "autoReadBacklogEntries" in body)
+        assertFalse(
+            "screen must not inline the TTS StateFlow collector",
+            "ttsController.state.collectAsState" in body,
         )
     }
 
