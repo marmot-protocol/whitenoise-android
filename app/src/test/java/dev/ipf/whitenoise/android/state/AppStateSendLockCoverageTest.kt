@@ -270,12 +270,12 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
-    fun appStateClientReferenceIsVolatile() {
+    fun appStateRuntimeReferenceIsVolatile() {
         val source = appStateSource().readText()
 
         assertTrue(
-            "Marmot client is written on IO and read off-mutex, so visibility must be explicit",
-            Regex("""@Volatile\s+private\s+var\s+client:\s*MarmotClient\?""").containsMatchIn(source),
+            "Marmot runtime is written on IO and read off-mutex, so visibility must be explicit",
+            Regex("""@Volatile\s+private\s+var\s+marmotRuntime:\s*AppMarmotRuntime\?""").containsMatchIn(source),
         )
     }
 
