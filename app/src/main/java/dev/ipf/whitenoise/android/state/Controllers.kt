@@ -2422,6 +2422,7 @@ internal class GroupRosterRefreshGeneration {
 }
 
 internal enum class GroupRosterInvariant {
+    GROUP_ID_MISMATCH,
     EMPTY_JOINED_ROSTER,
     LOCAL_MEMBER_MISSING,
     MEMBER_COUNT_MISMATCH,
@@ -2516,6 +2517,8 @@ internal fun resolveAuthoritativeGroupRoster(
 ): GroupRosterResolution {
     val applied = applyAuthoritativeGroupRoster(currentGroup, roster)
     val uniqueMemberCount = GroupProjector.uniqueMemberCount(applied.members)
+    val matchesCurrentGroup =
+        currentGroup.groupIdHex.trim().equals(roster.groupIdHex.trim(), ignoreCase = true)
     val containsLocalMember =
         roster.members.any { member ->
             member.isSelf ||
@@ -2528,10 +2531,11 @@ internal fun resolveAuthoritativeGroupRoster(
             !applied.group.pendingConfirmation
     val invariant =
         when {
+            !matchesCurrentGroup -> GroupRosterInvariant.GROUP_ID_MISMATCH
             !activeJoinedGroup -> null
             uniqueMemberCount == 0 -> GroupRosterInvariant.EMPTY_JOINED_ROSTER
             !containsLocalMember -> GroupRosterInvariant.LOCAL_MEMBER_MISSING
-            roster.members.size.toLong() != roster.memberCount.toLong() ->
+            uniqueMemberCount.toLong() != roster.memberCount.toLong() ->
                 GroupRosterInvariant.MEMBER_COUNT_MISMATCH
             else -> null
         }

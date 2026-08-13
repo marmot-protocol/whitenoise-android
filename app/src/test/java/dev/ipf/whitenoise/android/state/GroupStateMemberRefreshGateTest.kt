@@ -87,6 +87,53 @@ class GroupStateMemberRefreshGateTest {
     }
 
     @Test
+    fun lightweightRosterComparesAuthoritativeCountAfterIdentityDeduplication() {
+        val resolution =
+            resolveAuthoritativeGroupRoster(
+                currentGroup = group(),
+                roster =
+                    roster(
+                        member("alice", isAdmin = true, isSelf = true, local = true),
+                        member("ALICE", isAdmin = true, isSelf = true, local = true),
+                        member("bob", isAdmin = false),
+                        memberCount = 2u,
+                    ),
+                activeAccountIdHex = "alice",
+            )
+
+        assertEquals(null, resolution.invariant)
+        assertEquals(2, resolution.uniqueMemberCount)
+        assertEquals(listOf("alice", "bob"), resolution.applied.members.map { it.memberIdHex.lowercase() })
+    }
+
+    @Test
+    fun mismatchedRosterGroupIdAppliesNoConversationState() =
+        runBlocking {
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    groupRosterReader = { _, _ ->
+                        roster(
+                            member("bob", isAdmin = true),
+                            groupIdHex = "other-group",
+                            selfMembership = SelfMembershipFfi.REMOVED,
+                            lifecycle = GroupLifecycleStateFfi.UNRECOVERABLE,
+                        )
+                    },
+                )
+
+            controller.retryMembers()
+
+            assertEquals("group", controller.group.groupIdHex)
+            assertEquals(listOf("alice"), controller.group.admins)
+            assertEquals(SelfMembershipFfi.MEMBER, controller.group.selfMembership)
+            assertFalse(controller.group.unrecoverable)
+            assertTrue(controller.members.isEmpty())
+            assertEquals(GroupRosterLoadState.INCONSISTENT, controller.memberRosterState)
+        }
+
+    @Test
     fun selfRemovalTransitionIsDetectedImmediately() {
         val previous = group(selfMembership = SelfMembershipFfi.MEMBER)
         val removed = previous.copy(selfMembership = SelfMembershipFfi.REMOVED)
@@ -119,11 +166,12 @@ class GroupStateMemberRefreshGateTest {
 
     private fun roster(
         vararg members: GroupMemberDetailsFfi,
+        groupIdHex: String = "group",
         selfMembership: SelfMembershipFfi = SelfMembershipFfi.MEMBER,
         lifecycle: GroupLifecycleStateFfi = GroupLifecycleStateFfi.STABLE,
         memberCount: UInt = members.size.toUInt(),
     ) = GroupRosterFfi(
-        groupIdHex = "group",
+        groupIdHex = groupIdHex,
         members = members.toList(),
         epoch = 7uL,
         rosterRevision = 11uL,
