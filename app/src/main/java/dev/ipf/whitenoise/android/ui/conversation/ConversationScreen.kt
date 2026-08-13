@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -48,7 +47,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -85,15 +83,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
-import dev.ipf.whitenoise.android.audio.tts.TTS_AUTO_READ_MAX_MESSAGES
-import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
-import dev.ipf.whitenoise.android.audio.tts.TtsState
-import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.GroupProjector
@@ -120,7 +111,6 @@ import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
-import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.shouldFocusComposerOnDraftRestore
@@ -189,17 +179,49 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
-import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
 private data class ConversationSearchScrollAnchor(
     val bookmark: ConversationScrollBookmark,
     val match: ConversationSearchMatch?,
 )
+
+/**
+ * UI-only navigation state kept behind one remembered reference so the already
+ * large [ConversationScreen] method does not keep every independent snapshot
+ * state and job in its verifier register set for the full composition.
+ */
+private class ConversationNavigationState {
+    var lastFollowedLatestId by mutableStateOf<String?>(null)
+    var initialTimelineLoadStarted by mutableStateOf(false)
+    var highlightedMessageId by mutableStateOf<String?>(null)
+    var transientHighlightOwner by mutableStateOf<Any?>(null)
+    var navigateReplyJob by mutableStateOf<Job?>(null)
+    var searchOpen by mutableStateOf(false)
+    var searchQuery by mutableStateOf("")
+    var searchPinnedMatchId by mutableStateOf<String?>(null)
+    var searchJob by mutableStateOf<Job?>(null)
+    var preSearchScrollAnchor by mutableStateOf<ConversationSearchScrollAnchor?>(null)
+    var historySearchMatches by mutableStateOf<List<ConversationSearchMatch>?>(null)
+    val timelineItemHeightsPx = mutableStateMapOf<String, Int>()
+    val searchFocusRequester = FocusRequester()
+
+    fun cancelJobs() {
+        searchJob?.cancel()
+        navigateReplyJob?.cancel()
+    }
+}
+
+@Composable
+private fun rememberConversationNavigationState(controller: ConversationController): ConversationNavigationState {
+    val state = remember(controller) { ConversationNavigationState() }
+    DisposableEffect(state) {
+        onDispose(state::cancelJobs)
+    }
+    return state
+}
 
 // Maximum images per multi-pick. The Android Photo Picker enforces this
 // cap on the system dialog side; 10 keeps the album payload bounded
@@ -215,11 +237,6 @@ private data class ConversationSearchScrollAnchor(
 private val COMPOSER_SNACKBAR_INSET = 72.dp
 
 private const val MEDIA_PICKER_MAX_ITEMS = 10
-
-// Foreground catch-up normally materializes almost immediately. Keep the
-// background-arrival listener bounded so a later, genuinely foreground
-// message does not unexpectedly start an otherwise idle auto-reader.
-private const val TTS_AUTO_READ_RESUME_SYNC_TIMEOUT_MS = 10_000L
 
 private fun presentVoiceRecordingFailure(
     appState: WhiteNoiseAppState,
@@ -533,30 +550,7 @@ internal fun ConversationScreen(
             )
         }
 
-    // Reading the source value here supplies the mapped StateFlow's real current
-    // projection; subsequent updates are observed by collectAsState.
-    @SuppressLint("StateFlowValueCalledInComposition")
-    val ttsFollowSignal by
-        remember(appState.ttsController) {
-            appState.ttsController.state
-                .map(TtsState::conversationFollowSignal)
-                .distinctUntilChanged()
-        }.collectAsState(
-            initial =
-                appState.ttsController.state.value
-                    .conversationFollowSignal(),
-        )
-    val ownsTtsFollowSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
-    val ttsFollowPolicy = rememberConversationTtsFollowPolicy(controller.group.groupIdHex)
-    var ttsFollowResumeGeneration by remember(controller, listState) { mutableStateOf(0L) }
-
-    fun suspendTtsFollowForDirectDrag() {
-        ttsFollowPolicy.observe(
-            state = appState.ttsController.state.value,
-            ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
-        )
-        ttsFollowPolicy.onUserDrag()
-    }
+    val ttsFollowHandle = rememberConversationTtsFollowHandle(controller.group.groupIdHex)
     val postInitialReanchorGate =
         remember(controller, listState) {
             ConversationPostInitialReanchorGate()
@@ -608,184 +602,27 @@ internal fun ConversationScreen(
     var initialTimelineAnchored by
         remember(controller, notificationOpenRequestId) { mutableStateOf(false) }
 
-    suspend fun ttsEntry(record: AppMessageRecordFfi): TtsSpeakableEntry? =
-        projectTtsSpeakableEntry(
-            message = record,
-            editedText = controller.editsByTarget[record.messageIdHex]?.latestText,
-            senderDisplayName = appState.displayName(record.sender),
-            parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
-            mentionDisplayName = appState::mentionDisplayName,
-            isGroupMember =
-                if (controller.membersLoaded) {
-                    { bech32 -> appState.isRosterMember(bech32, controller.members) }
-                } else {
-                    null
-                },
-        )
-
-    // The current unread backlog as speakable entries, oldest-first and bounded
-    // so an inflated unread count can't narrate ancient history. Anchored on
-    // the unread cursor — the last-read position — so it never skips
-    // loaded-but-unspoken messages; shared by the open-time and
-    // return-from-background paths.
-    suspend fun autoReadBacklogEntries(): List<TtsSpeakableEntry> {
-        val ready =
-            appState.ttsHasUsableEngine &&
-                appState.isConversationAutoRead(controller.group.groupIdHex) &&
-                entryUnreadCount > 0
-        val start = if (ready) controller.firstUnreadTimelineIndex(entryUnreadCount) else -1
-        return if (start < 0) {
-            emptyList()
-        } else {
-            controller.timeline
-                .drop(start)
-                // Bound BEFORE mapping so the cost scales with the speak cap,
-                // not the unread count; 2x slack absorbs filtered-out entries.
-                .take(TTS_AUTO_READ_MAX_MESSAGES * 2)
-                .mapNotNull { message -> ttsEntry(message.record) }
-        }
-    }
-    // Auto-read (#1483): once the timeline is anchored, read the unread backlog.
-    LaunchedEffect(controller, chat.id, initialTimelineAnchored) {
-        if (!initialTimelineAnchored) return@LaunchedEffect
-        val entries = autoReadBacklogEntries()
-        if (entries.isNotEmpty()) {
-            appState.speakAloudAutoRead(
-                controller.group.groupIdHex,
-                entries,
-                Locale.getDefault(),
-            )
-        }
-    }
-    // Live continuation: a speakable message arriving while speech is active
-    // appends to the queue; while speech sits idle it stays quiet, so
-    // auto-read never becomes an always-on announcer for an open chat.
-    // Keyed on the controller too: an account switch swaps it under the
-    // same chat id, and the stale collector must not keep appending.
-    LaunchedEffect(controller, chat.id) {
-        var seededLastId = false
-        snapshotFlow {
-            controller.timeline
-                .lastOrNull()
-                ?.record
-                ?.messageIdHex
-        }.distinctUntilChanged()
-            .collect { lastId ->
-                if (lastId == null) return@collect
-                if (!seededLastId) {
-                    seededLastId = true
-                    return@collect
-                }
-                // Only the conversation that owns the active auto-read
-                // session may extend it: manual speech and other chats'
-                // sessions must never be appended to by this chat's arrivals.
-                if (!appState.ownsTtsAutoReadSession(controller.group.groupIdHex)) return@collect
-                val ttsState = appState.ttsController.state.value
-                if (ttsState !is TtsState.Speaking && ttsState !is TtsState.Paused) return@collect
-                val record = controller.timeline.lastOrNull()?.record ?: return@collect
-                if (record.messageIdHex != lastId) return@collect
-                val entry = ttsEntry(record) ?: return@collect
-                appState.appendSpeech(entry, Locale.getDefault())
-            }
-    }
-    // Auto-read return-from-background: capture the actual timeline tail when
-    // foreground-only speech is stopped, then narrate rows that materialize
-    // after that cursor. Do not use unread state here: an open conversation can
-    // advance its read watermark before delayed background arrivals sync.
-    var autoReadResumeCursor by
-        remember(controller, chat.id) {
-            mutableStateOf(conversationAutoReadCursor(controller.timeline))
-        }
-    var autoReadResumeGeneration by remember(controller, chat.id) { mutableStateOf(0L) }
-    val autoReadLifecycleOwner = LocalContext.current.lifecycleOwner()
-    DisposableEffect(controller, chat.id, autoReadLifecycleOwner) {
-        if (autoReadLifecycleOwner == null) {
-            onDispose { }
-        } else {
-            // Arm only on a real return — a preceding pause — so a cold open's
-            // ON_RESUME does not double-fire alongside the open-time backlog.
-            var hadPaused = false
-            val observer =
-                LifecycleEventObserver { _, event ->
-                    when (event) {
-                        Lifecycle.Event.ON_PAUSE -> {
-                            autoReadResumeCursor = conversationAutoReadCursor(controller.timeline)
-                            hadPaused = true
-                        }
-                        Lifecycle.Event.ON_RESUME ->
-                            if (hadPaused) {
-                                hadPaused = false
-                                autoReadResumeGeneration += 1L
-                            }
-                        else -> Unit
-                    }
-                }
-            autoReadLifecycleOwner.lifecycle.addObserver(observer)
-            onDispose { autoReadLifecycleOwner.lifecycle.removeObserver(observer) }
-        }
-    }
-    LaunchedEffect(controller, chat.id, autoReadResumeGeneration) {
-        if (autoReadResumeGeneration == 0L) return@LaunchedEffect
-        if (!appState.ttsHasUsableEngine) return@LaunchedEffect
-        if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
-        val cursor = autoReadResumeCursor
-        val entries =
-            withTimeoutOrNull(TTS_AUTO_READ_RESUME_SYNC_TIMEOUT_MS) {
-                snapshotFlow {
-                    conversationMessagesAfterAutoReadCursor(controller.timeline, cursor)
-                        // Bound before projecting so a delayed bulk sync cannot
-                        // make the resume pass scale with the whole timeline.
-                        .take(TTS_AUTO_READ_MAX_MESSAGES * 2)
-                }.map { messages ->
-                    messages.mapNotNull { message -> ttsEntry(message.record) }
-                }.first { it.isNotEmpty() }
-            } ?: return@LaunchedEffect
-        // A newly started/manual session owns the transport; never replace it
-        // with delayed foreground catch-up speech.
-        val ttsState = appState.ttsController.state.value
-        if (ttsState is TtsState.Speaking || ttsState is TtsState.Paused) return@LaunchedEffect
-        if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
-        appState.speakAloudAutoRead(
-            controller.group.groupIdHex,
-            entries,
-            Locale.getDefault(),
-        )
-    }
+    ConversationTtsAutoReadEffects(
+        appState = appState,
+        controller = controller,
+        chatId = chat.id,
+        entryUnreadCount = entryUnreadCount,
+        initialTimelineAnchored = initialTimelineAnchored,
+    )
+    val navigationState = rememberConversationNavigationState(controller)
     // Id of the newest row the bottom-follow has reacted to. A real append
     // gives a new last id while the previous one stays in the list; an
     // older-page load trims the newest rows, so the previous id is gone and
     // no follow fires. Keyed on id (not recordedAt) to survive same-second tails.
-    var lastFollowedLatestId by remember(controller) { mutableStateOf<String?>(null) }
-    var initialTimelineLoadStarted by remember(controller) { mutableStateOf(false) }
-    var highlightedMessageId by remember(controller) { mutableStateOf<String?>(null) }
-    var transientHighlightOwner by remember(controller) { mutableStateOf<Any?>(null) }
-    var navigateReplyJob by remember(controller) { mutableStateOf<Job?>(null) }
-    // UI-only row-height cache for exact centered scrolls. LazyColumn can only
-    // measure a target after it has been composed; keeping the measured height
-    // by message id lets future off-screen jumps animate straight to the exact
-    // centered offset, while never becoming protocol/data source-of-truth state.
-    val timelineItemHeightsPx = remember(controller) { mutableStateMapOf<String, Int>() }
     // In-chat search (#292). Opening from the overflow menu swaps the top
     // bar into an inline search field; closing it restores the normal bar.
     // `searchPinnedMatchId` keeps the active match anchored to a concrete
     // message id so the N/M cursor follows that message as older pages load
     // and the match set grows. `searchJob` serializes scroll-jump coroutines
     // the same way `navigateReplyJob` does for reply navigation.
-    var searchOpen by remember(controller) { mutableStateOf(false) }
-    var searchQuery by remember(controller) { mutableStateOf("") }
-    var searchPinnedMatchId by remember(controller) { mutableStateOf<String?>(null) }
-    var searchJob by remember(controller) { mutableStateOf<Job?>(null) }
     // The durable local message position lets close-search move the bounded
     // subscription window back before the coordinator restores the exact
     // logical bookmark and viewport offset.
-    var preSearchScrollAnchor by remember(controller) { mutableStateOf<ConversationSearchScrollAnchor?>(null) }
-    DisposableEffect(controller) {
-        onDispose {
-            searchJob?.cancel()
-            navigateReplyJob?.cancel()
-        }
-    }
-    val searchFocusRequester = remember { FocusRequester() }
     // Jump-to-newest plumbing.
     //
     // Badge = incoming messages newer than the highest-index timeline row the
@@ -1071,7 +908,10 @@ internal fun ConversationScreen(
     LaunchedEffect(listState, scrollCoordinator) {
         listState.interactionSource.interactions.collectConversationDragInteractions(
             onStarted = {
-                suspendTtsFollowForDirectDrag()
+                ttsFollowHandle.suspendForDirectDrag(
+                    state = appState.ttsController.state.value,
+                    ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                )
                 scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
             },
             awaitScrollSettled = {
@@ -1531,114 +1371,18 @@ internal fun ConversationScreen(
         return 1 + olderMessagesHeaderCount + timelineIndex
     }
 
-    fun isCurrentTtsFollowTarget(target: ConversationTtsFollowTarget): Boolean =
-        ttsFollowPolicy.isCurrentTarget(target) &&
-            appState.ownsTtsAutoReadSession(controller.group.groupIdHex) &&
-            appState.ttsController.state.value is TtsState.Speaking &&
-            appState.ttsController.state.value
-                .conversationFollowTargetOrNull() == target
-
-    val observedTtsFollowTarget = ttsFollowSignal.target
-    val ttsFollowIsSpeaking = ttsFollowSignal.isSpeaking
-    val ttsFollowMessageId = observedTtsFollowTarget?.messageIdHex
-    val ttsFollowEdit = ttsFollowMessageId?.let(controller.editsByTarget::get)
-    val ttsFollowDeleted = ttsFollowMessageId != null && ttsFollowMessageId in controller.deletedMessageIds
-    LaunchedEffect(
-        observedTtsFollowTarget,
-        ttsFollowIsSpeaking,
-        ownsTtsFollowSession,
-        ttsFollowResumeGeneration,
-        initialTimelineAnchored,
-        ttsFollowEdit,
-        ttsFollowDeleted,
-    ) {
-        ttsFollowPolicy.observe(appState.ttsController.state.value, ownsTtsFollowSession)
-        if (!initialTimelineAnchored) return@LaunchedEffect
-        val target = ttsFollowPolicy.claimPendingTarget() ?: return@LaunchedEffect
-        var followSucceeded = false
-        try {
-            if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
-
-            var row = renderedTimeline.firstOrNull { it.record.messageIdHex == target.messageIdHex }
-            if (row == null) {
-                if (target.timelineAt == 0uL ||
-                    !controller.loadTimelineMessageAvailable(target.messageIdHex, target.timelineAt)
-                ) {
-                    return@LaunchedEffect
-                }
-                if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
-                // Give the LazyColumn one bounded remount opportunity after paging.
-                // The follow effect deliberately does not key itself on timeline
-                // mutations, because its own page load would otherwise cancel it.
-                withFrameNanos { }
-                if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
-                row =
-                    controller.timeline
-                        .filterNot { MessageProjector.isEdit(it.record) }
-                        .firstOrNull { it.record.messageIdHex == target.messageIdHex }
-                        ?: return@LaunchedEffect
-            }
-            if (
-                target.messageIdHex in controller.deletedMessageIds ||
-                row.projected?.deleted == true ||
-                row.projected?.invalidationStatus != null
-            ) {
-                return@LaunchedEffect
-            }
-            val currentProjection = ttsEntry(row.record) ?: return@LaunchedEffect
-            if (!isCurrentTtsFollowTarget(target)) return@LaunchedEffect
-            if (target.projectionId.isBlank() || currentProjection.projectionId != target.projectionId) {
-                return@LaunchedEffect
-            }
-
-            val targetIndex = currentTimelineListIndex(target.messageIdHex) ?: return@LaunchedEffect
-            val layoutInfo = listState.layoutInfo
-            val visibleTarget = layoutInfo.visibleItemsInfo.firstOrNull { it.key == row.id }
-            val renderedForHeightSample = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-            val visibleTimelineHeights =
-                layoutInfo.visibleItemsInfo.mapNotNull { visible ->
-                    val liveOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-                    val timelineIndex = visible.index - 1 - liveOlderHeaderCount
-                    renderedForHeightSample
-                        .getOrNull(timelineIndex)
-                        ?.takeIf {
-                            timelineRowKind(it.record, appState.streamingDebugEnabled) ==
-                                TimelineRowKind.Bubble
-                        }?.let { visible.size }
-                }
-            val itemHeight =
-                ReplyNavigation.itemHeightForScrollPx(
-                    targetMessageId = target.messageIdHex,
-                    measuredItemHeightsByMessageId = timelineItemHeightsPx,
-                    visibleTargetHeightPx = visibleTarget?.size,
-                    visibleTimelineItemHeightsPx = visibleTimelineHeights,
-                )
-            if (scrollCoordinator.isFollowingTail) {
-                // Read-aloud now owns vertical intent; incoming messages must not
-                // race it back to the tail between sentence transitions.
-                scrollCoordinator.settleReadingAt(currentScrollAnchor())
-            }
-            followSucceeded =
-                followTtsTargetInViewport(
-                    target = target,
-                    itemKey = row.id,
-                    targetIndex = targetIndex,
-                    estimatedItemHeightPx = itemHeight,
-                    listState = listState,
-                    scrollCoordinator = scrollCoordinator,
-                    resolveTargetIndex = { currentTimelineListIndex(target.messageIdHex) },
-                    isCurrentTarget = { isCurrentTtsFollowTarget(target) },
-                    currentScrollAnchor = ::currentScrollAnchor,
-                )
-        } finally {
-            if (!followSucceeded &&
-                isCurrentTtsFollowTarget(target) &&
-                ttsFollowPolicy.retryFailedFollowAttempt(target)
-            ) {
-                ttsFollowResumeGeneration++
-            }
-        }
-    }
+    ConversationTtsFollowEffects(
+        appState = appState,
+        controller = controller,
+        listState = listState,
+        scrollCoordinator = scrollCoordinator,
+        handle = ttsFollowHandle,
+        initialTimelineAnchored = initialTimelineAnchored,
+        renderedTimeline = renderedTimeline,
+        timelineItemHeightsPx = navigationState.timelineItemHeightsPx,
+        currentTimelineListIndex = ::currentTimelineListIndex,
+        currentScrollAnchor = ::currentScrollAnchor,
+    )
 
     // Scroll the lazy list so the item at [targetMessageId] sits roughly in the
     // vertical center of the message-list viewport, leaving context above and
@@ -1681,7 +1425,7 @@ internal fun ConversationScreen(
                 val itemHeight =
                     ReplyNavigation.itemHeightForScrollPx(
                         targetMessageId = targetMessageId,
-                        measuredItemHeightsByMessageId = timelineItemHeightsPx,
+                        measuredItemHeightsByMessageId = navigationState.timelineItemHeightsPx,
                         visibleTargetHeightPx = visibleTargetHeight,
                         visibleTimelineItemHeightsPx = visibleTimelineHeights,
                     )
@@ -1697,7 +1441,7 @@ internal fun ConversationScreen(
                 val postScrollLayoutInfo = listState.layoutInfo
                 val measuredItemHeight =
                     postScrollLayoutInfo.visibleItemsInfo.firstOrNull { it.index == resolvedTargetIndex }?.size
-                        ?: timelineItemHeightsPx[targetMessageId]
+                        ?: navigationState.timelineItemHeightsPx[targetMessageId]
                 val measuredViewportHeight = postScrollLayoutInfo.viewportSize.height
                 if (measuredViewportHeight > 0 && measuredItemHeight != null) {
                     val measuredOffset =
@@ -1713,14 +1457,14 @@ internal fun ConversationScreen(
 
     suspend fun showTransientMessageHighlight(messageId: String) {
         val owner = Any()
-        transientHighlightOwner = owner
-        highlightedMessageId = messageId
+        navigationState.transientHighlightOwner = owner
+        navigationState.highlightedMessageId = messageId
         try {
             delay(1_500L)
         } finally {
-            if (transientHighlightOwner === owner) {
-                transientHighlightOwner = null
-                highlightedMessageId = null
+            if (navigationState.transientHighlightOwner === owner) {
+                navigationState.transientHighlightOwner = null
+                navigationState.highlightedMessageId = null
             }
         }
     }
@@ -1740,9 +1484,9 @@ internal fun ConversationScreen(
     }
 
     fun navigateToReplyTarget(item: TimelineMessage) {
-        highlightedMessageId = null
-        navigateReplyJob?.cancel()
-        navigateReplyJob =
+        navigationState.highlightedMessageId = null
+        navigationState.navigateReplyJob?.cancel()
+        navigationState.navigateReplyJob =
             scope.launch {
                 val targetMessageId = controller.replyTargetMessageId(item)
                 if (targetMessageId == null || !controller.loadUntilMessageAvailable(targetMessageId)) {
@@ -1773,9 +1517,9 @@ internal fun ConversationScreen(
 
     fun jumpToNextUnreadMention() {
         val targetMessageId = unreadMentionMessageIds.firstOrNull() ?: return
-        highlightedMessageId = null
-        navigateReplyJob?.cancel()
-        navigateReplyJob =
+        navigationState.highlightedMessageId = null
+        navigationState.navigateReplyJob?.cancel()
+        navigationState.navigateReplyJob =
             scope.launch {
                 if (!controller.loadUntilMessageAvailable(targetMessageId)) {
                     appState.present(R.string.toast_original_message_unavailable)
@@ -1807,7 +1551,7 @@ internal fun ConversationScreen(
     }
 
     LaunchedEffect(controller) {
-        initialTimelineLoadStarted = true
+        navigationState.initialTimelineLoadStarted = true
     }
     LaunchedEffect(controller.group.pendingConfirmation, controller.group.groupIdHex) {
         if (controller.group.pendingConfirmation) {
@@ -1853,8 +1597,8 @@ internal fun ConversationScreen(
     // `controller.displayedText(...)` without altering the rendered timeline's
     // first/last id or size — re-runs the derivation and keeps matches fresh.
     val searchWindowMatches =
-        remember(searchQuery, controller.timeline, renderedTimeline) {
-            if (searchQuery.isBlank()) {
+        remember(navigationState.searchQuery, controller.timeline, renderedTimeline) {
+            if (navigationState.searchQuery.isBlank()) {
                 emptyList()
             } else {
                 // Restrict to rows that carry a user-typed body, then run the
@@ -1876,7 +1620,7 @@ internal fun ConversationScreen(
                     }
                 val bodies = searchable.map { it.second }
                 MessageSearch
-                    .matchIndices(bodies, searchQuery)
+                    .matchIndices(bodies, navigationState.searchQuery)
                     .map { searchable[it].first }
             }
         }
@@ -1885,21 +1629,20 @@ internal fun ConversationScreen(
     // it lands, so a result cannot depend on incidental scroll history. The
     // effect restarting on each keystroke cancels a superseded scan, and the
     // debounce keeps typing from firing one scan per character.
-    var historySearchMatches by remember(controller) { mutableStateOf<List<ConversationSearchMatch>?>(null) }
-    LaunchedEffect(searchQuery, chat.id, controller) {
-        historySearchMatches = null
-        if (searchQuery.isBlank()) return@LaunchedEffect
+    LaunchedEffect(navigationState.searchQuery, chat.id, controller) {
+        navigationState.historySearchMatches = null
+        if (navigationState.searchQuery.isBlank()) return@LaunchedEffect
         delay(HISTORY_SEARCH_DEBOUNCE_MILLIS)
-        val launchedForQuery = searchQuery
+        val launchedForQuery = navigationState.searchQuery
         val scan = searchConversationHistoryMatches(appState, controller.group.groupIdHex, launchedForQuery)
         // Only publish if this is still the current query. Cancellation already
         // propagates from the scan, so this only guards a scan that completed
         // in the gap before the effect restarted for a newer keystroke.
-        if (searchQuery == launchedForQuery) historySearchMatches = scan
+        if (navigationState.searchQuery == launchedForQuery) navigationState.historySearchMatches = scan
     }
     val effectiveSearchMatches =
-        remember(searchWindowMatches, historySearchMatches, renderedTimeline) {
-            val scan = historySearchMatches
+        remember(searchWindowMatches, navigationState.historySearchMatches, renderedTimeline) {
+            val scan = navigationState.historySearchMatches
             if (scan == null) {
                 searchWindowMatches
             } else {
@@ -1914,14 +1657,14 @@ internal fun ConversationScreen(
     val effectiveSearchMatchIds = effectiveSearchMatches.map { it.messageIdHex }
     // The active match ordinal, re-anchored to the pinned message id so it
     // tracks that message as the set grows. -1 when there are no matches.
-    val searchActiveIndex = MessageSearch.resolveCursor(effectiveSearchMatchIds, searchPinnedMatchId)
+    val searchActiveIndex = MessageSearch.resolveCursor(effectiveSearchMatchIds, navigationState.searchPinnedMatchId)
     // Keep the pin valid: if the resolved cursor fell back to the first match
     // (pin gone / unset) adopt that match id as the new pin so subsequent
     // steps move relative to a real anchor.
     LaunchedEffect(effectiveSearchMatchIds, searchActiveIndex) {
         if (searchActiveIndex >= 0) {
             val resolvedId = effectiveSearchMatchIds[searchActiveIndex]
-            if (searchPinnedMatchId != resolvedId) searchPinnedMatchId = resolvedId
+            if (navigationState.searchPinnedMatchId != resolvedId) navigationState.searchPinnedMatchId = resolvedId
         }
     }
 
@@ -1943,10 +1686,10 @@ internal fun ConversationScreen(
     }
 
     fun scrollToSearchMatch(match: ConversationSearchMatch) {
-        val previousSearchJob = searchJob
+        val previousSearchJob = navigationState.searchJob
         previousSearchJob?.cancel()
-        highlightedMessageId = null
-        searchJob =
+        navigationState.highlightedMessageId = null
+        navigationState.searchJob =
             scope.launch {
                 previousSearchJob?.join()
                 if (!controller.loadSearchResultMessageAvailable(match)) return@launch
@@ -1957,10 +1700,10 @@ internal fun ConversationScreen(
     // Group-details search can jump to a known id without exhaustive-search
     // timestamp metadata, so retain the bounded reply-navigation path.
     fun scrollToSearchMatch(messageIdHex: String) {
-        val previousSearchJob = searchJob
+        val previousSearchJob = navigationState.searchJob
         previousSearchJob?.cancel()
-        highlightedMessageId = null
-        searchJob =
+        navigationState.highlightedMessageId = null
+        navigationState.searchJob =
             scope.launch {
                 previousSearchJob?.join()
                 if (!controller.loadUntilMessageAvailable(messageIdHex)) return@launch
@@ -1975,23 +1718,23 @@ internal fun ConversationScreen(
         val next = MessageSearch.step(searchActiveIndex, effectiveSearchMatchIds.size, forward)
         if (next < 0) return
         val target = effectiveSearchMatches[next]
-        searchPinnedMatchId = target.messageIdHex
+        navigationState.searchPinnedMatchId = target.messageIdHex
         scrollToSearchMatch(target)
     }
 
     fun closeSearch() {
-        searchOpen = false
-        searchQuery = ""
-        searchPinnedMatchId = null
-        val previousSearchJob = searchJob
+        navigationState.searchOpen = false
+        navigationState.searchQuery = ""
+        navigationState.searchPinnedMatchId = null
+        val previousSearchJob = navigationState.searchJob
         previousSearchJob?.cancel()
         val expectedRestoreIntent = scrollCoordinator.intentToken
-        highlightedMessageId = null
+        navigationState.highlightedMessageId = null
         // A deep search jump can evict the original viewport from the capped
         // window. Page back to its durable local message before asking the
         // coordinator to restore the logical anchor and exact offset.
-        preSearchScrollAnchor?.let { anchor ->
-            searchJob =
+        navigationState.preSearchScrollAnchor?.let { anchor ->
+            navigationState.searchJob =
                 scope.launch {
                     previousSearchJob?.join()
                     val match = anchor.match
@@ -2011,7 +1754,7 @@ internal fun ConversationScreen(
                     )
                 }
         }
-        preSearchScrollAnchor = null
+        navigationState.preSearchScrollAnchor = null
     }
 
     // Back exits partial text selection, then batch selection, then search,
@@ -2021,7 +1764,7 @@ internal fun ConversationScreen(
             conversationBackAction(
                 textSelectionActive = textSelectionMessageId != null,
                 messageSelectionActive = selectionMode,
-                searchOpen = searchOpen,
+                searchOpen = navigationState.searchOpen,
                 composerFocused = composerFocused,
                 imeIsOpen = imeIsOpen,
                 composerDismissInProgress = composerDismissInProgress,
@@ -2055,16 +1798,16 @@ internal fun ConversationScreen(
     }
 
     // Auto-focus the field on open; clear transient highlight on close.
-    LaunchedEffect(searchOpen) {
-        if (searchOpen) {
-            searchFocusRequester.requestFocus()
+    LaunchedEffect(navigationState.searchOpen) {
+        if (navigationState.searchOpen) {
+            navigationState.searchFocusRequester.requestFocus()
         }
     }
     // Jump to the first match as soon as one exists for the current query, so
     // typing immediately scrolls to (and highlights) the newest match without
     // requiring the user to tap an arrow first.
-    LaunchedEffect(effectiveSearchMatches.firstOrNull(), searchOpen) {
-        if (searchOpen && effectiveSearchMatches.isNotEmpty()) {
+    LaunchedEffect(effectiveSearchMatches.firstOrNull(), navigationState.searchOpen) {
+        if (navigationState.searchOpen && effectiveSearchMatches.isNotEmpty()) {
             val first = effectiveSearchMatches[searchActiveIndex.coerceAtLeast(0)]
             scrollToSearchMatch(first)
         }
@@ -2144,7 +1887,7 @@ internal fun ConversationScreen(
         listState = listState,
         bottomChromeHeightObserver = bottomChromeHeightObserver,
         composerFocused = composerFocused,
-        searchOpen = searchOpen,
+        searchOpen = navigationState.searchOpen,
         hasActiveEditOrReplySession =
             controller.editingMessageId != null ||
                 controller.replyingTo != null,
@@ -2252,7 +1995,7 @@ internal fun ConversationScreen(
             viewportHeight = listState.layoutInfo.viewportSize.height,
         )
         initialTimelineAnchored = true
-        lastFollowedLatestId = restoredRendered.lastOrNull()?.id
+        navigationState.lastFollowedLatestId = restoredRendered.lastOrNull()?.id
     }
     LaunchedEffect(controller, latestTimelineItemId, notificationOpenRequestId) {
         if (renderedTimeline.isNotEmpty()) {
@@ -2330,10 +2073,10 @@ internal fun ConversationScreen(
                     viewportHeight = listState.layoutInfo.viewportSize.height,
                 )
                 initialTimelineAnchored = true
-                lastFollowedLatestId = renderedTimeline.lastOrNull()?.id
+                navigationState.lastFollowedLatestId = renderedTimeline.lastOrNull()?.id
             } else {
                 val latestId = renderedTimeline.lastOrNull()?.id
-                val previousId = lastFollowedLatestId
+                val previousId = navigationState.lastFollowedLatestId
                 // A genuine append: the last id changed and the row we last
                 // followed is still present (an older-page trim drops it, so
                 // that path is excluded). Id-based, so same-second tails count.
@@ -2342,7 +2085,7 @@ internal fun ConversationScreen(
                         latestId != null &&
                         latestId != previousId &&
                         renderedTimeline.any { it.id == previousId }
-                lastFollowedLatestId = latestId ?: previousId
+                navigationState.lastFollowedLatestId = latestId ?: previousId
                 if (isAppend) {
                     scrollCoordinator.followTailIfAllowed(
                         resolveTailIndex = { currentTailIndex },
@@ -2497,7 +2240,7 @@ internal fun ConversationScreen(
             onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
             onOpenSearch = {
                 showDetails = false
-                searchOpen = true
+                navigationState.searchOpen = true
             },
             onOpenConversation = { item, created ->
                 showDetails = false
@@ -2605,25 +2348,25 @@ internal fun ConversationScreen(
                 selectionMode = selectionMode,
                 selectedCount = batchSelectionUi.actionItems.size,
                 onCloseSelection = { selectedMessages.clear() },
-                searchOpen = searchOpen,
-                searchQuery = searchQuery,
+                searchOpen = navigationState.searchOpen,
+                searchQuery = navigationState.searchQuery,
                 onSearchQueryChange = {
-                    searchJob?.cancel()
-                    searchJob = null
-                    highlightedMessageId = null
-                    searchQuery = it
-                    searchPinnedMatchId = null
+                    navigationState.searchJob?.cancel()
+                    navigationState.searchJob = null
+                    navigationState.highlightedMessageId = null
+                    navigationState.searchQuery = it
+                    navigationState.searchPinnedMatchId = null
                 },
                 onClearSearch = {
-                    searchJob?.cancel()
-                    searchJob = null
-                    highlightedMessageId = null
-                    searchQuery = ""
-                    searchPinnedMatchId = null
+                    navigationState.searchJob?.cancel()
+                    navigationState.searchJob = null
+                    navigationState.highlightedMessageId = null
+                    navigationState.searchQuery = ""
+                    navigationState.searchPinnedMatchId = null
                 },
                 onCloseSearch = ::closeSearch,
                 onSearchAction = { navigateToSearchMatch(forward = true) },
-                searchFocusRequester = searchFocusRequester,
+                searchFocusRequester = navigationState.searchFocusRequester,
                 appState = appState,
                 controller = controller,
                 groupTitleCopy = groupTitleCopy,
@@ -2640,7 +2383,7 @@ internal fun ConversationScreen(
                         bookmark.anchor.messageId?.let { messageId ->
                             renderedTimeline.firstOrNull { it.record.messageIdHex == messageId }
                         }
-                    preSearchScrollAnchor =
+                    navigationState.preSearchScrollAnchor =
                         ConversationSearchScrollAnchor(
                             bookmark = bookmark,
                             match =
@@ -2651,7 +2394,7 @@ internal fun ConversationScreen(
                                     )
                                 },
                         )
-                    searchOpen = true
+                    navigationState.searchOpen = true
                 },
                 onToggleArchived = {
                     menuOpen = false
@@ -2728,10 +2471,10 @@ internal fun ConversationScreen(
                     batchInfoSelection = batchSelectionUi.selections.singleOrNull()
                 },
                 onDeleteSelection = { showBatchDeleteConfirm = true },
-                searchOpen = searchOpen,
+                searchOpen = navigationState.searchOpen,
                 searchMatchCount = effectiveSearchMatchIds.size,
                 searchActiveIndex = searchActiveIndex,
-                hasSearchQuery = searchQuery.isNotBlank(),
+                hasSearchQuery = navigationState.searchQuery.isNotBlank(),
                 onPreviousSearchMatch = { navigateToSearchMatch(forward = false) },
                 onNextSearchMatch = { navigateToSearchMatch(forward = true) },
                 hasError = loadFailurePlacement == LoadFailurePlacement.FullScreen,
@@ -2855,12 +2598,17 @@ internal fun ConversationScreen(
                         error = requireNotNull(controller.error),
                         onRetry = { scope.launch { controller.retryLoadFailure() } },
                     )
-                controller.group.pendingConfirmation && renderedTimeline.isEmpty() && !controller.isLoading && initialTimelineLoadStarted ->
+                controller.group.pendingConfirmation &&
+                    renderedTimeline.isEmpty() &&
+                    !controller.isLoading &&
+                    navigationState.initialTimelineLoadStarted ->
                     InvitePreviewPlaceholder(
                         inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
                     )
                 controller.group.pendingConfirmation && renderedTimeline.isEmpty() -> LoadingScreen()
-                controller.timeline.isEmpty() && !controller.isLoading && initialTimelineLoadStarted -> {
+                controller.timeline.isEmpty() &&
+                    !controller.isLoading &&
+                    navigationState.initialTimelineLoadStarted -> {
                     if (
                         canInviteFromEmptyGroup(
                             isSelfMember = controller.isSelfMember,
@@ -2953,12 +2701,14 @@ internal fun ConversationScreen(
                                     entryUnreadDividerRetired = entryUnreadDividerRetired,
                                     entryFirstUnreadMessageId = entryFirstUnreadMessageId,
                                     onMeasured = { id, height ->
-                                        if (timelineItemHeightsPx[id] != height) timelineItemHeightsPx[id] = height
+                                        if (navigationState.timelineItemHeightsPx[id] != height) {
+                                            navigationState.timelineItemHeightsPx[id] = height
+                                        }
                                     },
                                     appState = appState,
                                     controller = controller,
                                     composerTextState = composerTextState,
-                                    highlighted = messageId == highlightedMessageId,
+                                    highlighted = messageId == navigationState.highlightedMessageId,
                                     selectionMode = selectionMode,
                                     textSelectionMode = textSelectionMessageId == messageId,
                                     onTextSelectionModeChange = { enabled ->
@@ -2986,7 +2736,11 @@ internal fun ConversationScreen(
                                     onDragSelectionStart = { pointerWindowY ->
                                         openActionMenuId = null
                                         clearTextSelection()
-                                        suspendTtsFollowForDirectDrag()
+                                        ttsFollowHandle.suspendForDirectDrag(
+                                            state = appState.ttsController.state.value,
+                                            ownsSession =
+                                                appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                        )
                                         scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
                                         dragAnchorTimelineId = item.id
                                         dragPointerWindowY = pointerWindowY
@@ -3058,12 +2812,9 @@ internal fun ConversationScreen(
                                 horizontalAlignment = Alignment.End,
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                if (ttsFollowPolicy.showResumeAction) {
+                                if (ttsFollowHandle.showResumeAction) {
                                     TtsResumeFollowButton(
-                                        onClick = {
-                                            ttsFollowPolicy.resumeFollow()
-                                            ttsFollowResumeGeneration += 1L
-                                        },
+                                        onClick = ttsFollowHandle::resumeFollow,
                                     )
                                 }
                                 // Jump-to-mention chip: tap visits the oldest unread
