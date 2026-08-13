@@ -35,11 +35,12 @@ import dev.ipf.marmotkit.AuditLogUploadSourceFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.marmotkit.Marmot
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
+import dev.ipf.marmotkit.NotificationsSubscription
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
 import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
@@ -146,6 +147,7 @@ import dev.ipf.whitenoise.android.updates.shouldPostAppUpdateNotification
 import dev.ipf.whitenoise.android.updates.shouldStartInAppSelfUpdate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -664,6 +666,30 @@ internal suspend fun awaitActiveNotificationReceiver(
     }
 }
 
+/**
+ * Establish the process-owned notification receiver at cold startup and wait
+ * only for the bounded bootstrap budget. The listener itself outlives this
+ * caller: timeout or bootstrap cancellation leaves its existing retry loop in
+ * [notificationJob], while repeated startup callers reuse the same job.
+ */
+internal suspend fun awaitNotificationReceiverForStartup(
+    notificationJob: NotificationJobSlot,
+    receiverActive: StateFlow<Boolean>,
+    receiverRetryWake: MutableStateFlow<Long>,
+    timeoutMillis: Long,
+    launchListener: () -> Job,
+): Boolean {
+    val listenerJob = notificationJob.currentOrStart(launchListener) ?: return false
+    if (!receiverActive.value) receiverRetryWake.update { it + 1L }
+    return withTimeoutOrNull(timeoutMillis) {
+        awaitActiveNotificationReceiver(
+            isReceiverActive = { receiverActive.value },
+            listenerJob = listenerJob,
+            awaitReceiverActive = { receiverActive.first { it } },
+        )
+    } ?: false
+}
+
 internal suspend fun awaitNotificationRetryWindow(
     retryWake: StateFlow<Long>,
     capturedGeneration: Long,
@@ -673,6 +699,30 @@ internal suspend fun awaitNotificationRetryWindow(
         retryWake.first { it != capturedGeneration }
     }
 }
+
+internal interface AppNotificationSubscription {
+    suspend fun next(): NotificationUpdateFfi?
+
+    fun close()
+}
+
+internal data class AppMarmotRuntime(
+    val rootPath: String,
+    val marmot: MarmotInterface,
+)
+
+private fun openMarmotRuntime(context: Context) = MarmotClient(context).let { AppMarmotRuntime(it.rootPath, it.marmot) }
+
+private class NativeNotificationSubscription(
+    private val delegate: NotificationsSubscription,
+) : AppNotificationSubscription {
+    override suspend fun next(): NotificationUpdateFfi? = delegate.next()
+
+    override fun close() = delegate.close()
+}
+
+private suspend fun subscribeToNotifications(marmot: MarmotInterface): AppNotificationSubscription =
+    NativeNotificationSubscription(marmot.subscribeNotifications())
 
 internal class NotificationJobSlot {
     private val lock = Any()
@@ -1409,6 +1459,10 @@ class WhiteNoiseAppState private constructor(
     private val profileRefreshRequest: (suspend (String) -> Unit)?,
     private val identityLoginCalls: IdentityLoginCalls?,
     private val marmotAccessObserver: (() -> Unit)?,
+    private val marmotRuntimeFactory: (Context) -> AppMarmotRuntime,
+    private val notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription,
+    private val notificationDispatcher: CoroutineDispatcher,
+    private val notificationReceiverTimeoutMillis: () -> Long,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
@@ -1423,6 +1477,10 @@ class WhiteNoiseAppState private constructor(
             profileRefreshRequest = null,
             identityLoginCalls = null,
             marmotAccessObserver = null,
+            marmotRuntimeFactory = ::openMarmotRuntime,
+            notificationSubscriber = ::subscribeToNotifications,
+            notificationDispatcher = Dispatchers.IO,
+            notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
         )
@@ -1439,6 +1497,10 @@ class WhiteNoiseAppState private constructor(
         profileRefreshRequest: (suspend (String) -> Unit)? = null,
         identityLoginCalls: IdentityLoginCalls? = null,
         marmotAccessObserver: (() -> Unit)? = null,
+        marmotRuntimeFactory: (Context) -> AppMarmotRuntime = ::openMarmotRuntime,
+        notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription = ::subscribeToNotifications,
+        notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
     ) : this(
         context = context,
         draftStore = draftStore,
@@ -1449,6 +1511,10 @@ class WhiteNoiseAppState private constructor(
         profileRefreshRequest = profileRefreshRequest,
         identityLoginCalls = identityLoginCalls,
         marmotAccessObserver = marmotAccessObserver,
+        marmotRuntimeFactory = marmotRuntimeFactory,
+        notificationSubscriber = notificationSubscriber,
+        notificationDispatcher = notificationDispatcher,
+        notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
     )
@@ -1581,15 +1647,18 @@ class WhiteNoiseAppState private constructor(
         )
 
     @Volatile
-    private var client: MarmotClient? = null
+    private var marmotRuntime: AppMarmotRuntime? = null
 
     private val bootstrapAttempts = BootstrapAttemptCoordinator()
-    private val bootstrapRuntime = BootstrapRuntimeCoordinator<MarmotClient>()
+    private val bootstrapRuntime = BootstrapRuntimeCoordinator<AppMarmotRuntime>()
     private val startupTraceStartedAtMs = SystemClock.elapsedRealtime()
     private var startupFirstLocalFrameRecorded = false
     private var startupRelayCatchUpRecorded = false
     private var accountListRevision = 0L
     private var pendingStartupUnreadRefresh: StartupUnreadRefresh? = null
+
+    @Volatile
+    private var bootstrapCompleted = false
     private val nativePushSyncMutex = Mutex()
     private val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
@@ -2436,9 +2505,9 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    fun marmot(): Marmot {
+    fun marmot(): MarmotInterface {
         marmotAccessObserver?.invoke()
-        return requireNotNull(client) { "Marmot is not initialized" }.marmot
+        return requireNotNull(marmotRuntime) { "Marmot is not initialized" }.marmot
     }
 
     /**
@@ -3157,14 +3226,14 @@ class WhiteNoiseAppState private constructor(
 
     private val marmotBridgeTracer = MarmotBridgeTracer()
 
-    suspend fun <T> marmotIo(block: suspend Marmot.() -> T): T =
+    suspend fun <T> marmotIo(block: suspend MarmotInterface.() -> T): T =
         withContext(Dispatchers.IO) {
             marmot().block()
         }
 
     suspend fun <T> marmotIo(
         traceSection: String,
-        block: suspend Marmot.() -> T,
+        block: suspend MarmotInterface.() -> T,
     ): T =
         withContext(Dispatchers.IO) {
             marmotBridgeTracer.trace(traceSection) { marmot().block() }
@@ -3319,20 +3388,23 @@ class WhiteNoiseAppState private constructor(
     }
 
     private suspend fun bootstrapLocked() {
-        if (client != null && phase != AppPhase.Bootstrapping) {
-            ensureNotificationRuntimeStarted()
-            phase = if (accounts.isEmpty()) AppPhase.Onboarding else AppPhase.Ready
-            return
-        }
         phase = AppPhase.Bootstrapping
         try {
-            startBootstrapRuntime()
-            traceStartupStage("notification-privacy-setup") {
-                localNotificationPresenter.ensureChannels()
+            if (resumeCompletedBootstrap()) return
+            traceStartupStage("notification-platform-setup") {
+                // Tray readiness must precede Marmot.start(): the passive MDK
+                // broadcast has no replay once the startup receiver attaches.
+                withContext(Dispatchers.Default) {
+                    localNotificationPresenter.ensureChannels()
+                }
                 refreshLocalNotificationPermission()
-                startNotificationListener()
-                refreshSecurityPrivacySettings()
             }
+            startBootstrapRuntime()
+            // This is deliberately the first post-start suspension. Do not let
+            // logging, privacy, or account work widen the no-replay interval.
+            val receiverReady = awaitNotificationReceiverForStartup()
+            appStateDebug { "marmot started; notification receiver active=$receiverReady" }
+            traceStartupStage("notification-privacy-setup") { refreshSecurityPrivacySettings() }
             val refreshedAccounts = traceStartupStage("account-refresh") { refreshAccountSnapshot() }
             prepareStartupUnreadRefresh(refreshedAccounts)
             migrateLegacyDrafts()
@@ -3374,20 +3446,29 @@ class WhiteNoiseAppState private constructor(
                 // before reaching setActiveAccount's activation callback.
                 if (phase == AppPhase.Bootstrapping) phase = AppPhase.Ready
             }
+            bootstrapCompleted = true
         } catch (error: Throwable) {
-            if (error is CancellationException) throw error
+            if (error is CancellationException) {
+                // The process-owned listener keeps retrying independently, but
+                // a cancelled UI bootstrap must not strand the splash forever.
+                phase = AppPhase.Failed(privacySafeErrorPresentation("APP_BOOTSTRAP", error))
+                throw error
+            }
             appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
             phase = AppPhase.Failed(privacySafeErrorPresentation("APP_BOOTSTRAP", error))
         }
     }
 
-    private suspend fun startBootstrapRuntime(): MarmotClient {
+    private suspend fun startBootstrapRuntime(): AppMarmotRuntime {
         val opened =
             bootstrapRuntime.open(
                 construct = {
                     traceStartupStage("client-construction") {
                         withContext(Dispatchers.IO) {
-                            MarmotClient(appContext).also { runtime ->
+                            marmotRuntimeFactory(appContext).also { runtime ->
+                                // Publish before start so lifecycle consumers
+                                // and later listener retries can resolve Marmot.
+                                marmotRuntime = runtime
                                 AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
                                     runtime.marmot.downloadProfileImage(url, maxBytes)
                                 }
@@ -3402,33 +3483,87 @@ class WhiteNoiseAppState private constructor(
                     }
                 },
                 start = { runtime ->
-                    traceStartupStage("marmot-start") {
-                        withContext(Dispatchers.IO) { runtime.marmot.start() }
-                    }
+                    startMarmotWithNotificationListener(runtime)
                     appStateDebug { "marmot started" }
                 },
                 closeAfterFailure = { runtime ->
                     traceStartupStage("failed-runtime-close") {
                         withContext(Dispatchers.IO) { runtime.marmot.shutdownAndClose() }
                     }
+                    if (marmotRuntime === runtime) marmotRuntime = null
                 },
             )
-        client = opened
+        marmotRuntime = opened
         return opened
     }
 
+    /**
+     * Start MDK and enter its passive subscription from one IO coroutine. The
+     * slot only sees an enqueued job, so a synchronous native subscribe cannot
+     * block its lock; once start returns, no second dispatcher hop can widen
+     * the no-replay boundary before the subscription call begins.
+     */
+    @Suppress("TooGenericExceptionCaught") // The startup boundary reports every non-cancellation runtime failure.
+    private suspend fun startMarmotWithNotificationListener(runtime: AppMarmotRuntime) {
+        val runtimeStartResult = CompletableDeferred<Result<Unit>>()
+        var installedStartupListener = false
+        val listenerJob =
+            notificationJob.currentOrStart {
+                installedStartupListener = true
+                notificationScope.launch(notificationDispatcher) {
+                    try {
+                        traceStartupStage("marmot-start") { runtime.marmot.start() }
+                        runtimeStartResult.complete(Result.success(Unit))
+                        runNotificationListenerLoop(runtime.marmot)
+                    } catch (cancel: CancellationException) {
+                        runtimeStartResult.complete(Result.failure(cancel))
+                        throw cancel
+                    } catch (failure: Throwable) {
+                        runtimeStartResult.complete(Result.failure(failure))
+                    }
+                }
+            }
+        check(listenerJob != null && installedStartupListener) {
+            "notification listener unavailable before Marmot startup"
+        }
+        runtimeStartResult.await().getOrThrow()
+    }
+
+    private suspend fun resumeCompletedBootstrap(): Boolean {
+        if (!bootstrapCompleted) return false
+        val receiverReady = awaitNotificationReceiverForStartup()
+        appStateDebug { "bootstrap resumed; notification receiver active=$receiverReady" }
+        phase = if (accounts.isEmpty()) AppPhase.Onboarding else AppPhase.Ready
+        return true
+    }
+
+    private fun receiverUnavailable() = IllegalStateException("notification receiver unavailable during bootstrap")
+
+    private suspend fun awaitNotificationReceiverForStartup(): Boolean {
+        if (networkNotificationRecoverySuppressed) return false
+        return awaitNotificationReceiverForStartup(
+            notificationJob = notificationJob,
+            receiverActive = notificationReceiverActive,
+            receiverRetryWake = notificationReceiverRetryWake,
+            timeoutMillis = notificationReceiverTimeoutMillis(),
+            launchListener = ::launchNotificationListenerLoop,
+        )
+    }
+
     suspend fun ensureNotificationRuntimeStarted() {
-        if (client == null) {
+        if (!bootstrapCompleted) {
             bootstrap()
-            if (client != null) {
+            val receiverReady = bootstrapCompleted && notificationReceiverActive.value
+            if (receiverReady) {
                 drainPendingNativePushRegistrationSyncIfNeeded()
                 drainPendingPushWakeCatchUpIfNeeded()
             }
+            if (!receiverReady) throw receiverUnavailable()
             return
         }
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
-        startNotificationListener()
+        if (!awaitNotificationReceiverForStartup()) throw receiverUnavailable()
         if (accounts.isEmpty()) refreshAccounts()
         refreshLocalNotificationSettings()
         drainPendingNativePushRegistrationSyncIfNeeded()
@@ -3436,27 +3571,12 @@ class WhiteNoiseAppState private constructor(
     }
 
     private suspend fun ensureNotificationReceiverForNetworkReconnect(): Boolean {
-        if (client == null) bootstrap()
-        var listenerJob: Job? = null
-        var receiverReady = false
-        if (client != null) {
-            localNotificationPresenter.ensureChannels()
-            refreshLocalNotificationPermission()
-            if (!networkNotificationRecoverySuppressed) {
-                listenerJob = notificationJob.currentOrStart { launchNotificationListenerLoop() }
-                if (listenerJob != null) {
-                    if (!notificationReceiverActive.value) {
-                        notificationReceiverRetryWake.update { it + 1L }
-                    }
-                    receiverReady =
-                        awaitActiveNotificationReceiver(
-                            isReceiverActive = { notificationReceiverActive.value },
-                            listenerJob = listenerJob,
-                            awaitReceiverActive = { notificationReceiverActive.first { it } },
-                        )
-                }
-            }
-        }
+        if (!bootstrapCompleted) bootstrap()
+        if (!bootstrapCompleted || networkNotificationRecoverySuppressed) return false
+
+        localNotificationPresenter.ensureChannels()
+        refreshLocalNotificationPermission()
+        val receiverReady = awaitNotificationReceiverForStartup()
         if (receiverReady && !networkNotificationRecoverySuppressed) {
             if (accounts.isEmpty()) refreshAccounts()
             if (!networkNotificationRecoverySuppressed && notificationReceiverActive.value) {
@@ -3467,7 +3587,7 @@ class WhiteNoiseAppState private constructor(
         return receiverReady &&
             !networkNotificationRecoverySuppressed &&
             notificationReceiverActive.value &&
-            listenerJob?.isActive == true
+            notificationJob.isActive()
     }
 
     suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMs: Long = NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS): Boolean =
@@ -5924,7 +6044,7 @@ class WhiteNoiseAppState private constructor(
      */
     suspend fun sweepExpiredDisappearingMessages() {
         ensureNotificationRuntimeStarted()
-        if (client == null) return
+        if (marmotRuntime == null) return
         val signedInAccounts = accounts.filter { it.isSignedInSigningAccount() }
         for (account in signedInAccounts) {
             currentCoroutineContext().ensureActive()
@@ -6467,7 +6587,7 @@ class WhiteNoiseAppState private constructor(
             // authoritative. setAppInForeground() can trigger this before
             // bootstrap/refreshAccounts() has loaded accounts; clearing then
             // would strand a signed-in device on a stale push token.
-            if (client == null) return false
+            if (marmotRuntime == null) return false
             refreshAccounts()
             accountRefs = accounts.map { it.label }
             if (accountRefs.isEmpty()) {
@@ -7488,7 +7608,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private suspend fun Marmot.configurePrivacyRuntime() {
+    private suspend fun MarmotInterface.configurePrivacyRuntime() {
         val installId = runCatchingCancellable { telemetryInstallId() }.getOrNull().orEmpty()
         setRelayTelemetryRuntimeConfig(
             RelayTelemetryRuntimeConfigFfi(
@@ -7998,48 +8118,54 @@ class WhiteNoiseAppState private constructor(
 
     private fun startNotificationListener() {
         if (networkNotificationRecoverySuppressed) return
-        notificationJob.startIfInactive { launchNotificationListenerLoop() }
+        notificationJob.startIfInactive(::launchNotificationListenerLoop)
     }
 
     private fun launchNotificationListenerLoop(): Job =
-        notificationScope.launch {
-            // Restart the subscription on any failure (or clean end-of-stream)
-            // with exponential backoff, so a transient relay/binding error
-            // doesn't permanently silence notifications. Backoff resets after
-            // each received update; cancellation propagates and stops the loop.
-            // See #56.
-            var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
-            while (isActive) {
-                val retryWakeGeneration = notificationReceiverRetryWake.value
+        notificationScope.launch(notificationDispatcher) {
+            runNotificationListenerLoop(marmot())
+        }
+
+    private suspend fun runNotificationListenerLoop(marmot: MarmotInterface) {
+        // Restart the subscription on any failure (or clean end-of-stream)
+        // with exponential backoff, so a transient relay/binding error
+        // doesn't permanently silence notifications. Backoff resets after
+        // each received update; cancellation propagates and stops the loop.
+        // See #56.
+        var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+        while (currentCoroutineContext().isActive) {
+            val retryWakeGeneration = notificationReceiverRetryWake.value
+            try {
+                val subscription = notificationSubscriber(marmot)
+                notificationReceiverActive.value = true
                 try {
-                    val subscription = marmotIo { subscribeNotifications() }
-                    notificationReceiverActive.value = true
-                    try {
-                        while (isActive) {
-                            val update = marmotIo { subscription.next() } ?: break
-                            backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                    while (currentCoroutineContext().isActive) {
+                        val update = subscription.next() ?: break
+                        backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                        withContext(Dispatchers.Main.immediate) {
                             processNotificationUpdate(update)
                         }
-                    } finally {
-                        notificationReceiverActive.value = false
-                        runCatching {
-                            withContext(NonCancellable + Dispatchers.IO) {
-                                subscription.close()
-                            }
+                    }
+                } finally {
+                    notificationReceiverActive.value = false
+                    runCatching {
+                        withContext(NonCancellable + Dispatchers.IO) {
+                            subscription.close()
                         }
                     }
-                } catch (cancel: CancellationException) {
-                    throw cancel
-                } catch (throwable: Throwable) {
-                    appStateDebug(throwable) {
-                        "notification listener error; retrying in ${backoffMillis}ms: ${throwable.readableMessage()}"
-                    }
                 }
-                if (!isActive) break
-                awaitNotificationRetryWindow(notificationReceiverRetryWake, retryWakeGeneration, backoffMillis)
-                backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (throwable: Throwable) {
+                appStateDebug(throwable) {
+                    "notification listener error; retrying in ${backoffMillis}ms: ${throwable.readableMessage()}"
+                }
             }
+            if (!currentCoroutineContext().isActive) break
+            awaitNotificationRetryWindow(notificationReceiverRetryWake, retryWakeGeneration, backoffMillis)
+            backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
         }
+    }
 
     private suspend fun processNotificationUpdate(update: NotificationUpdateFfi) {
         applyNotificationDisplayNameHint(update)
@@ -8417,6 +8543,7 @@ class WhiteNoiseAppState private constructor(
         private const val MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES = 4096
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
         private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
+        private const val NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS = 5_000L
 
         private const val NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS = 10_000L
         private const val MAX_RETAINED_CONVERSATION_STATES = 32

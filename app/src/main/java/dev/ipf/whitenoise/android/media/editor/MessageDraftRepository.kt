@@ -1,6 +1,6 @@
 package dev.ipf.whitenoise.android.media.editor
 
-import dev.ipf.marmotkit.Marmot
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
@@ -34,7 +34,7 @@ internal interface MessageDraftGateway {
 }
 
 internal class MarmotMessageDraftGateway(
-    private val marmot: () -> Marmot,
+    private val marmot: () -> MarmotInterface,
 ) : MessageDraftGateway {
     override fun read(
         accountRef: String,

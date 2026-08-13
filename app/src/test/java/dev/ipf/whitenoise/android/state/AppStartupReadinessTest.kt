@@ -58,6 +58,7 @@ class AppStartupReadinessTest {
     fun bootstrapTimesRequiredStagesSeparately() {
         val source = appStateSource()
         val runtime = source.functionBody("startBootstrapRuntime")
+        val runtimeStart = source.functionBody("startMarmotWithNotificationListener")
         val expectedStages =
             listOf(
                 "client-construction",
@@ -74,7 +75,12 @@ class AppStartupReadinessTest {
         }
         assertTrue(
             "Privacy configuration must be distinguishable from engine start",
-            runtime.indexOf("privacy-runtime-configuration") < runtime.indexOf("marmot-start"),
+            runtime.indexOf("privacy-runtime-configuration") in 0 until
+                runtime.indexOf("startMarmotWithNotificationListener"),
+        )
+        assertTrue(
+            "Engine start must retain its dedicated timing",
+            "traceStartupStage(\"marmot-start\")" in runtimeStart,
         )
     }
 
