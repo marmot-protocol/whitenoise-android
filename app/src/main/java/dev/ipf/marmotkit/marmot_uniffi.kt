@@ -2575,7 +2575,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_unfollow_user() != 7605.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_unreact_from_message() != 11846.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_unreact_from_message() != 52209.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_update_group_avatar_url() != 57913.toShort()) {
@@ -5978,7 +5978,7 @@ public interface MarmotInterface {
     suspend fun `unfollowUser`(`accountRef`: kotlin.String, `userRef`: kotlin.String): List<kotlin.String>
     
     /**
-     * Remove this account's reaction from `target_message_id`.
+     * Remove all of this account's active reactions from `target_message_id`.
      */
     suspend fun `unreactFromMessage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `targetMessageId`: kotlin.String): SendSummaryFfi
     
@@ -9406,7 +9406,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface
 
     
     /**
-     * Remove this account's reaction from `target_message_id`.
+     * Remove all of this account's active reactions from `target_message_id`.
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
