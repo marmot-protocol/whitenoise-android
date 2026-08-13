@@ -16,21 +16,18 @@ internal data class MediaSavePresentation(
     val detail: AppText? = null,
 )
 
-internal fun MessageAttachmentSaveSummary.presentation(context: Context): MediaSavePresentation =
-    when (outcome) {
-        MessageAttachmentSaveOutcome.Complete ->
-            MediaSavePresentation(titleRes = R.string.shared_media_saved)
-        MessageAttachmentSaveOutcome.Partial ->
-            MediaSavePresentation(
-                titleRes = R.string.shared_media_saved,
-                detail =
-                    AppText.Plain(
-                        context.getString(R.string.conversation_search_match_count, savedCount, totalCount),
-                    ),
-            )
-        MessageAttachmentSaveOutcome.Failed ->
-            MediaSavePresentation(titleRes = R.string.shared_media_save_failed)
-    }
+internal fun MessageAttachmentSaveSummary.confirmationPresentation(context: Context): MediaSavePresentation =
+    MediaSavePresentation(
+        titleRes = R.string.shared_media_saved,
+        detail =
+            if (savedCount < totalCount) {
+                AppText.Plain(
+                    context.getString(R.string.conversation_search_match_count, savedCount, totalCount),
+                )
+            } else {
+                null
+            },
+    )
 
 internal fun WhiteNoiseAppState.presentAttachmentSaveOutcome(
     context: Context,
@@ -41,7 +38,7 @@ internal fun WhiteNoiseAppState.presentAttachmentSaveOutcome(
         MessageAttachmentSaveOutcome.Complete,
         MessageAttachmentSaveOutcome.Partial,
         -> {
-            val presentation = summary.presentation(context)
+            val presentation = summary.confirmationPresentation(context)
             if (conversation == null) {
                 presentTransient(presentation.titleRes, presentation.detail)
             } else {
@@ -60,19 +57,6 @@ internal fun WhiteNoiseAppState.presentAttachmentSaveOutcome(
                 throwable = summary.firstFailure ?: IllegalStateException("Attachment save failed"),
             )
     }
-}
-
-internal fun WhiteNoiseAppState.presentAttachmentSaveOutcome(
-    context: Context,
-    savedCount: Int,
-    totalCount: Int,
-    conversation: ConversationNoticeDestination? = null,
-) {
-    presentAttachmentSaveOutcome(
-        context = context,
-        summary = MessageAttachmentSaveSummary(savedCount = savedCount, totalCount = totalCount),
-        conversation = conversation,
-    )
 }
 
 /** Presents a single MediaStore save without exposing exception text or attachment names. */

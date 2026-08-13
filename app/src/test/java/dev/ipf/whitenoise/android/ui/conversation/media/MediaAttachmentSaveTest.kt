@@ -84,6 +84,26 @@ class MediaAttachmentSaveTest {
         assertSame(writeFailure, failure)
     }
 
+    @Test
+    fun mediaStoreZeroRowFinalizationFailsAndDeletesPendingEntry() {
+        provider.updateResult = 0
+
+        listOf(
+            Triple("photo.png", "image/png", MediaStore.Images.Media.EXTERNAL_CONTENT_URI),
+            Triple("clip.mp4", "video/mp4", MediaStore.Video.Media.EXTERNAL_CONTENT_URI),
+            Triple("report.pdf", "application/pdf", MediaStore.Downloads.EXTERNAL_CONTENT_URI),
+        ).forEachIndexed { index, (fileName, mediaType, collection) ->
+            val failure =
+                runCatching {
+                    saveAttachmentToMediaStore(context(), PAYLOAD, fileName, mediaType)
+                }.exceptionOrNull()
+
+            assertTrue(failure is java.io.IOException)
+            assertEquals(collection, provider.insertedCollection)
+            assertEquals(index + 1, provider.deleteCount)
+        }
+    }
+
     @Test(expected = CancellationException::class)
     fun mediaStoreCancellationIsNeverReducedToSaveFailure() {
         provider.outputFailure = CancellationException("cancelled")
@@ -104,6 +124,9 @@ class MediaAttachmentSaveTest {
         var updatedValues: ContentValues? = null
             private set
         var outputFailure: Throwable? = null
+        var updateResult: Int = 1
+        var deleteCount: Int = 0
+            private set
 
         override fun onCreate(): Boolean = true
 
@@ -136,7 +159,10 @@ class MediaAttachmentSaveTest {
             uri: Uri,
             selection: String?,
             selectionArgs: Array<out String>?,
-        ): Int = 1
+        ): Int {
+            deleteCount += 1
+            return 1
+        }
 
         override fun update(
             uri: Uri,
@@ -145,7 +171,7 @@ class MediaAttachmentSaveTest {
             selectionArgs: Array<out String>?,
         ): Int {
             updatedValues = values?.let(::ContentValues)
-            return 1
+            return updateResult
         }
     }
 

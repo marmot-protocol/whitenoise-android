@@ -17,6 +17,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.TransientNotice
@@ -42,7 +43,7 @@ class MediaSaveConfirmationScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 ShellTransientNoticeLayout(
-                    notice = TransientNotice(id = 1L, title = AppText.Plain("Media saved")),
+                    notice = TransientNotice(id = 1L, title = AppText.Resource(R.string.shared_media_saved)),
                     modifier = Modifier.testTag(GLOBAL_TAG),
                 ) {
                     Surface(modifier = Modifier.fillMaxSize()) {
@@ -89,7 +90,7 @@ class MediaSaveConfirmationScreenshotTest {
                                 notice =
                                     TransientNotice(
                                         id = 1L,
-                                        title = AppText.Plain("Media saved"),
+                                        title = AppText.Resource(R.string.shared_media_saved),
                                         conversation = ConversationNoticeDestination("account-a", "group-a"),
                                     ),
                                 accountRef = "account-a",
