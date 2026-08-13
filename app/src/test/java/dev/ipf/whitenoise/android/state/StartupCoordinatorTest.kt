@@ -75,6 +75,33 @@ class StartupCoordinatorTest {
         }
 
     @Test
+    fun retryAfterStartFailureReconstructsBeforeConfiguringAgain() =
+        runTest {
+            val coordinator = BootstrapRuntimeCoordinator<Any>()
+            val constructed = mutableListOf<Any>()
+            val configured = mutableListOf<Any>()
+            var starts = 0
+            val construct = {
+                Any().also { constructed += it }
+            }
+            val configure: suspend (Any) -> Unit = { configured += it }
+            val start: suspend (Any) -> Unit = {
+                starts += 1
+                if (starts == 1) error("start failed")
+            }
+
+            val firstAttempt = runCatching { coordinator.open(construct, configure, start) }
+            val retry = coordinator.open(construct, configure, start)
+
+            assertTrue(firstAttempt.isFailure)
+            assertEquals(2, constructed.size)
+            assertSame(constructed[1], retry)
+            assertEquals(1, configured.count { it === constructed[0] })
+            assertEquals(1, configured.count { it === retry })
+            assertEquals(2, starts)
+        }
+
+    @Test
     fun accountRevisionChangeDuringUnreadFoldPreventsStalePublication() =
         runTest {
             var currentRevision = 4L

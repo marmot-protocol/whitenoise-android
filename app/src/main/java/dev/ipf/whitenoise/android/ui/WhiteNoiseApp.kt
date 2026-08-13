@@ -34,9 +34,9 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineConfirmationNotice
-import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
+import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
@@ -210,7 +210,7 @@ fun WhiteNoiseApp(
                         AppSelfUpdateDialog(appState = appState)
                     }
                     when (val phase = appState.phase) {
-                        AppPhase.Bootstrapping -> LoadingScreen()
+                        AppPhase.Bootstrapping -> StartupLoadingScreen()
                         AppPhase.Onboarding -> OnboardingScreen(appState)
                         AppPhase.Ready ->
                             ShellTransientNoticeLayout(notice = transientNotice) {

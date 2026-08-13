@@ -21,6 +21,7 @@ internal class BootstrapRuntimeCoordinator<T : Any> {
     private var runtime: T? = null
     private var started = false
 
+    @Suppress("TooGenericExceptionCaught") // Every configure/start throwable invalidates the cached runtime.
     suspend fun open(
         construct: suspend () -> T,
         configure: suspend (T) -> Unit,
@@ -29,9 +30,14 @@ internal class BootstrapRuntimeCoordinator<T : Any> {
         lock.withLock {
             val opened = runtime ?: construct().also { runtime = it }
             if (!started) {
-                configure(opened)
-                start(opened)
-                started = true
+                try {
+                    configure(opened)
+                    start(opened)
+                    started = true
+                } catch (failure: Throwable) {
+                    runtime = null
+                    throw failure
+                }
             }
             opened
         }

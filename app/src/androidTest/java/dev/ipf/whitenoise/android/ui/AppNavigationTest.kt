@@ -28,6 +28,7 @@ import dev.ipf.whitenoise.android.state.isForConversation
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.account.SettingsAccountHeader
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TOP_BAR_TAG
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.settings.SettingsTopBar
@@ -126,10 +127,28 @@ class AppNavigationTest {
     }
 
     @Test
-    fun loadingScreenShowsBrandedProgress() {
+    fun loadingScreenHasNoBrandingText() {
+        // LoadingScreen is a bare centered spinner — no branding text. Its visual
+        // rendering is covered by the Roborazzi screenshot pilot; this just guards
+        // that stray branding copy doesn't creep back onto it.
         composeRule.setContent {
             WhiteNoiseTheme {
                 LoadingScreen()
+            }
+        }
+
+        composeRule.onNodeWithText("Loading White Noise").assertDoesNotExist()
+        composeRule.onNodeWithText("Starting Marmot").assertDoesNotExist()
+        composeRule.onNodeWithText("White Noise").assertDoesNotExist()
+        composeRule.onNodeWithText("Starting securely…").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("White Noise logo").assertDoesNotExist()
+    }
+
+    @Test
+    fun startupLoadingScreenShowsBrandedProgress() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                StartupLoadingScreen()
             }
         }
 

@@ -6,7 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
-import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -35,7 +35,7 @@ class LoadingScreenScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    LoadingScreen()
+                    StartupLoadingScreen()
                 }
             }
         }
