@@ -3,6 +3,8 @@
     <string name="app_name">White Noise</string>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise başlatılamadı</string>
+    <string name="starting_securely">Güvenli şekilde başlatılıyor…</string>
+    <string name="startup_taking_too_long">Başlatma beklenenden uzun sürüyor. Lütfen tekrar deneyin.</string>
     <string name="error_try_again">Bir sorun oluştu. Tekrar deneyin; sorun devam ederse hata raporunu kopyalayın.</string>
     <string name="error_loaded_content_may_be_out_of_date">Yüklenen içerikleriniz hâlâ kullanılabilir, ancak güncel olmayabilir. Yeniden deneniyor…</string>
     <string name="error_loaded_content_kept">Daha fazla içerik yüklenemedi. Mesajlarınız hâlâ kullanılabilir; hazır olduğunuzda tekrar deneyin.</string>

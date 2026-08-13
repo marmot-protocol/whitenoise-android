@@ -28,6 +28,7 @@ import dev.ipf.whitenoise.android.state.isForConversation
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.account.SettingsAccountHeader
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TOP_BAR_TAG
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.settings.SettingsTopBar
@@ -138,6 +139,22 @@ class AppNavigationTest {
 
         composeRule.onNodeWithText("Loading White Noise").assertDoesNotExist()
         composeRule.onNodeWithText("Starting Marmot").assertDoesNotExist()
+        composeRule.onNodeWithText("White Noise").assertDoesNotExist()
+        composeRule.onNodeWithText("Starting securely…").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("White Noise logo").assertDoesNotExist()
+    }
+
+    @Test
+    fun startupLoadingScreenShowsBrandedProgress() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                StartupLoadingScreen()
+            }
+        }
+
+        composeRule.onNodeWithText("White Noise").assertIsDisplayed()
+        composeRule.onNodeWithText("Starting securely…").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("White Noise logo").assertIsDisplayed()
     }
 
     @Test

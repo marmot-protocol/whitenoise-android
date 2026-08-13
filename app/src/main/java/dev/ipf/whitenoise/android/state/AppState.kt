@@ -1388,6 +1388,17 @@ private data class PendingAccountSwitchTrace(
     val startedAtMs: Long,
 )
 
+private data class StartupUnreadRefresh(
+    val accounts: List<AccountSummaryFfi>,
+    val accountListRevision: Long,
+)
+
+private data class AccountUnreadFoldResult(
+    val accountRef: String,
+    val unreadCount: ULong,
+    val hasManualUnread: Boolean?,
+)
+
 class WhiteNoiseAppState private constructor(
     context: Context,
     val draftStore: DraftStore,
@@ -1566,9 +1577,13 @@ class WhiteNoiseAppState private constructor(
     @Volatile
     private var client: MarmotClient? = null
 
-    // Serializes bootstrap so two concurrent callers can't both pass the
-    // null-client check and each construct a MarmotClient (TOCTOU). See #33.
-    private val bootstrapMutex = Mutex()
+    private val bootstrapAttempts = BootstrapAttemptCoordinator()
+    private val bootstrapRuntime = BootstrapRuntimeCoordinator<MarmotClient>()
+    private val startupTraceStartedAtMs = SystemClock.elapsedRealtime()
+    private var startupFirstLocalFrameRecorded = false
+    private var startupRelayCatchUpRecorded = false
+    private var accountListRevision = 0L
+    private var pendingStartupUnreadRefresh: StartupUnreadRefresh? = null
     private val nativePushSyncMutex = Mutex()
     private val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
@@ -2262,8 +2277,6 @@ class WhiteNoiseAppState private constructor(
     private val notificationScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private var accountCatchUpJob: Job? = null
-    private var startupUnreadReconciliationPending = false
-    private var startupUnreadReconciliationJob: Job? = null
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
 
     // Bumped whenever cross-account caches are cleared (switch / sign-out). An
@@ -3183,7 +3196,10 @@ class WhiteNoiseAppState private constructor(
      */
     internal fun launchCatchUpAccounts() {
         if (accountCatchUpJob?.isActive == true) return
-        accountCatchUpJob = notificationScope.launch { catchUpAccounts() }
+        accountCatchUpJob =
+            notificationScope.launch {
+                if (catchUpAccountsBestEffort()) recordStartupRelayCatchUpReady()
+            }
     }
 
     private suspend fun catchUpAccountsBestEffort(): Boolean =
@@ -3263,7 +3279,36 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    suspend fun bootstrap() = bootstrapMutex.withLock { bootstrapLocked() }
+    /**
+     * Bootstrap belongs to the process, not the first composition that awaited
+     * it. A caller gets an actionable timeout while the single underlying
+     * attempt remains alive; retry re-awaits that attempt instead of starting a
+     * second Marmot runtime beside a blocked native call.
+     */
+    suspend fun bootstrap() {
+        val attempt =
+            withContext(Dispatchers.Main.immediate) {
+                if (phase is AppPhase.Failed) phase = AppPhase.Bootstrapping
+                bootstrapAttempts.currentOrStart {
+                    mutationsScope.async { bootstrapLocked() }
+                }
+            }
+        val completed = awaitBootstrapAttempt(attempt, BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS)
+        if (!completed) {
+            withContext(Dispatchers.Main.immediate) {
+                if (attempt.isActive && phase == AppPhase.Bootstrapping) {
+                    phase =
+                        AppPhase.Failed(
+                            privacySafeErrorPresentation(
+                                operationCode = "APP_BOOTSTRAP_TIMEOUT",
+                                throwable = IllegalStateException("bootstrap stage exceeded deadline"),
+                                message = AppText.Resource(R.string.startup_taking_too_long),
+                            ),
+                        )
+                }
+            }
+        }
+    }
 
     private suspend fun bootstrapLocked() {
         if (client != null && phase != AppPhase.Bootstrapping) {
@@ -3273,32 +3318,23 @@ class WhiteNoiseAppState private constructor(
         }
         phase = AppPhase.Bootstrapping
         try {
-            val opened =
-                withContext(Dispatchers.IO) {
-                    client ?: MarmotClient(appContext).also { client = it }
-                }
-            // Attach while the client exists but before start can expose any
-            // notification/avatar work. The lambda resolves marmot lazily.
-            AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
-                marmotIo { downloadProfileImage(url, maxBytes) }
+            startBootstrapRuntime()
+            traceStartupStage("notification-privacy-setup") {
+                localNotificationPresenter.ensureChannels()
+                refreshLocalNotificationPermission()
+                startNotificationListener()
+                refreshSecurityPrivacySettings()
             }
-            appStateDebug { "bootstrap root=${opened.rootPath}" }
-            withContext(Dispatchers.IO) {
-                opened.marmot.configurePrivacyRuntime()
-                opened.marmot.start()
-            }
-            appStateDebug { "marmot started" }
-            localNotificationPresenter.ensureChannels()
-            refreshLocalNotificationPermission()
-            startNotificationListener()
-            refreshSecurityPrivacySettings()
-            refreshAccountsForBootstrap()
+            val refreshedAccounts = traceStartupStage("account-refresh") { refreshAccountSnapshot() }
+            prepareStartupUnreadRefresh(refreshedAccounts)
             migrateLegacyDrafts()
             migrateLegacyMutePreferences()
             // Resolve interrupted editor commits against MDK before any draft
             // is reopened, and reclaim encrypted sources with no live session.
-            messageDraftRepository.reconcileEditorState(editorSourceStore).onFailure {
-                appStateDebug(it) { "photo editor reconciliation deferred: ${it.readableMessage()}" }
+            traceStartupStage("draft-reconciliation") {
+                messageDraftRepository.reconcileEditorState(editorSourceStore).onFailure {
+                    appStateDebug(it) { "photo editor reconciliation deferred: ${it.readableMessage()}" }
+                }
             }
             appStateDebug {
                 "accounts loaded count=${accounts.size} active=$activeAccountRef labels=${accounts.map { it.label.take(8) to it.running }}"
@@ -3307,22 +3343,24 @@ class WhiteNoiseAppState private constructor(
             // BEFORE the reconciliation below (setActiveAccount can sign in a
             // signed-out account / re-key media, warmProfile publishes) drives any
             // signing for an external-signing account.
-            reregisterExternalSigners()
+            traceStartupStage("external-signer-registration") { reregisterExternalSigners() }
             if (accounts.isEmpty()) {
                 localNotificationSettings = null
+                pendingStartupUnreadRefresh = null
                 phase = AppPhase.Onboarding
             } else {
-                val targetAccountRef =
-                    activeAccountRef
-                        ?.takeIf { persisted -> accounts.any { it.label == persisted } }
-                        ?: accounts.first().label
-                // Reconcile the persisted active ref with the engine — e.g. sign
-                // in if it was non-destructively signed out. The callback is the
-                // existing local-ready boundary: rendering the local chat snapshot
-                // must not wait for profile, privacy, notification, push, or MDK's
-                // deferred group hydration work below it.
-                setActiveAccount(targetAccountRef) {
-                    phase = AppPhase.Ready
+                traceStartupStage("account-activation") {
+                    val target =
+                        activeAccountRef?.takeIf { ref -> accounts.any { it.label == ref } }
+                            ?: accounts.first().label
+                    // The callback is the local-ready boundary. The shell mounts
+                    // before profile/notification/push warmup and before the
+                    // cross-account unread roster fold.
+                    setActiveAccount(
+                        label = target,
+                        deferUnreadRefresh = true,
+                        onActivated = { phase = AppPhase.Ready },
+                    )
                 }
                 // Preserve the old behavior when an attempted sign-in returns
                 // before reaching setActiveAccount's activation callback.
@@ -3333,6 +3371,42 @@ class WhiteNoiseAppState private constructor(
             appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
             phase = AppPhase.Failed(privacySafeErrorPresentation("APP_BOOTSTRAP", error))
         }
+    }
+
+    private suspend fun startBootstrapRuntime(): MarmotClient {
+        val opened =
+            bootstrapRuntime.open(
+                construct = {
+                    traceStartupStage("client-construction") {
+                        withContext(Dispatchers.IO) {
+                            MarmotClient(appContext).also { runtime ->
+                                AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
+                                    runtime.marmot.downloadProfileImage(url, maxBytes)
+                                }
+                            }
+                        }
+                    }
+                },
+                configure = { runtime ->
+                    appStateDebug { "bootstrap root=${runtime.rootPath}" }
+                    traceStartupStage("privacy-runtime-configuration") {
+                        withContext(Dispatchers.IO) { runtime.marmot.configurePrivacyRuntime() }
+                    }
+                },
+                start = { runtime ->
+                    traceStartupStage("marmot-start") {
+                        withContext(Dispatchers.IO) { runtime.marmot.start() }
+                    }
+                    appStateDebug { "marmot started" }
+                },
+                closeAfterFailure = { runtime ->
+                    traceStartupStage("failed-runtime-close") {
+                        withContext(Dispatchers.IO) { runtime.marmot.shutdownAndClose() }
+                    }
+                },
+            )
+        client = opened
+        return opened
     }
 
     suspend fun ensureNotificationRuntimeStarted() {
@@ -3445,6 +3519,7 @@ class WhiteNoiseAppState private constructor(
             clearCrossAccountCaches()
         }
         accounts = accountSummariesWithCreatedIdentity(accounts, summary)
+        accountListRevision += 1L
         activeAccountRef = summary.label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, summary.label).apply()
         localNotificationSettings = null
@@ -3651,16 +3726,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    suspend fun refreshAccounts() {
-        refreshAccounts(loadMemberRosters = true)
-    }
-
-    private suspend fun refreshAccountsForBootstrap() {
-        refreshAccounts(loadMemberRosters = false)
-        startupUnreadReconciliationPending = accounts.any { it.isSignedInSigningAccount() }
-    }
-
-    private suspend fun refreshAccounts(loadMemberRosters: Boolean) {
+    private suspend fun refreshAccountSnapshot(): List<AccountSummaryFfi> {
         val refreshedAccounts = marmotIo { listAccounts() }
         val bubbleColorMigrationSucceeded =
             withContext(Dispatchers.IO) {
@@ -3676,8 +3742,14 @@ class WhiteNoiseAppState private constructor(
             globalBubbleColors.clear()
         }
         accounts = refreshedAccounts
+        accountListRevision += 1L
         releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
-        refreshAccountUnreadCounts(refreshedAccounts, loadMemberRosters)
+        return refreshedAccounts
+    }
+
+    suspend fun refreshAccounts() {
+        val refreshedAccounts = refreshAccountSnapshot()
+        refreshAccountUnreadCounts(refreshedAccounts)
     }
 
     fun unreadCountForAccount(accountRef: String): ULong = accountUnreadCounts[accountRef] ?: 0uL
@@ -3739,12 +3811,18 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    @Suppress(
+        "ReturnCount", // Empty, stale-empty, and stale-in-flight snapshots each stop before publishing.
+        "CyclomaticComplexMethod", // Raw and roster-aware paths deliberately share one guarded publication point.
+    )
     private suspend fun refreshAccountUnreadCounts(
         accountSummaries: List<AccountSummaryFfi> = accounts,
         loadMemberRosters: Boolean = true,
+        stillCurrent: () -> Boolean = { true },
     ) {
         val signingAccounts = accountSummaries.filter { it.isSignedInSigningAccount() }
         if (signingAccounts.isEmpty()) {
+            if (!stillCurrent()) return
             accountUnreadCounts = emptyMap()
             retainManualUnreadRefs(emptySet())
             return
@@ -3758,6 +3836,7 @@ class WhiteNoiseAppState private constructor(
                 appStateDebug(it) { "account unread summary refresh failed: ${it.readableMessage()}" }
             }.getOrNull()
         if (!loadMemberRosters) {
+            if (!stillCurrent()) return
             accountUnreadCounts = rawAccountUnreadCounts(signingAccounts, rawCountsByHex, previous)
             retainManualUnreadRefs(signingAccounts.mapTo(mutableSetOf(), AccountSummaryFfi::label))
             return
@@ -3772,30 +3851,26 @@ class WhiteNoiseAppState private constructor(
                     .map { summary ->
                         async {
                             accountGate.withPermit {
-                                val rawCount = rawCountsByHex?.get(summary.accountIdHex)
-                                val cheapZero =
-                                    rawCount == 0uL &&
-                                        manualUnreadFolded(summary.label) &&
-                                        summary.label !in accountManualUnreadRefs
-                                // The cheap engine total can't see the client's
-                                // manual-unread flag, so an account we believe is
-                                // manually flagged always takes the row fold —
-                                // which also refreshes that flag from the rows.
-                                summary.label to
-                                    if (cheapZero) {
-                                        0uL
-                                    } else {
-                                        refreshEffectiveAccountUnreadCount(summary, memberGate)
-                                            ?: rawCount
-                                            ?: previous[summary.label]
-                                            ?: 0uL
-                                    }
+                                refreshAccountUnreadFold(
+                                    summary = summary,
+                                    rawCount = rawCountsByHex?.get(summary.accountIdHex),
+                                    previousCount = previous[summary.label],
+                                    memberGate = memberGate,
+                                )
                             }
                         }
                     }.awaitAll()
             }
         val refreshedCounts = linkedMapOf<String, ULong>()
-        refreshedPairs.forEach { (label, count) -> refreshedCounts[label] = count }
+        refreshedPairs.forEach { refreshedCounts[it.accountRef] = it.unreadCount }
+        // A sign-out/account refresh may have completed while the cold-start
+        // fold was suspended. Discard that obsolete result rather than
+        // resurrecting counts for an account no longer in the authoritative
+        // list; the newer lifecycle operation owns convergence.
+        if (!stillCurrent()) return
+        refreshedPairs.forEach { result ->
+            result.hasManualUnread?.let { updateAccountManualUnread(result.accountRef, it) }
+        }
         // Re-read after the FFI suspension: a single-key merge
         // (updateAccountUnreadCount / refreshAccountUnreadCount) may have landed
         // while we were suspended. Those values are fresher than our snapshot, so
@@ -3810,6 +3885,28 @@ class WhiteNoiseAppState private constructor(
         retainManualUnreadRefs(refreshedCounts.keys)
     }
 
+    private suspend fun refreshAccountUnreadFold(
+        summary: AccountSummaryFfi,
+        rawCount: ULong?,
+        previousCount: ULong?,
+        memberGate: Semaphore,
+    ): AccountUnreadFoldResult {
+        val cheapZero =
+            rawCount == 0uL &&
+                manualUnreadFolded(summary.label) &&
+                summary.label !in accountManualUnreadRefs
+        // The cheap engine total can't see the client's manual-unread flag, so
+        // an account believed to be manually flagged still takes the row fold.
+        if (!cheapZero) {
+            refreshEffectiveAccountUnreadCount(summary, memberGate)?.let { return it }
+        }
+        return AccountUnreadFoldResult(
+            accountRef = summary.label,
+            unreadCount = if (cheapZero) 0uL else rawCount ?: previousCount ?: 0uL,
+            hasManualUnread = null,
+        )
+    }
+
     /**
      * Reads one account's durable chat-list rows and folds them with loaded
      * member rosters so removed/left groups no longer contribute frozen unread
@@ -3821,7 +3918,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun refreshEffectiveAccountUnreadCount(
         summary: AccountSummaryFfi,
         memberGate: Semaphore = Semaphore(ACCOUNT_UNREAD_MEMBER_FANOUT),
-    ): ULong? {
+    ): AccountUnreadFoldResult? {
         val ref = summary.label.takeIf { it.isNotBlank() } ?: return null
         return runCatchingCancellable {
             marmotIo {
@@ -3840,11 +3937,11 @@ class WhiteNoiseAppState private constructor(
                     ) { groupIdHex ->
                         groupMembers(ref, groupIdHex)
                     }
-                updateAccountManualUnread(
-                    ref,
-                    accountHasManualUnread(rows, summary.accountIdHex, membersByGroupId),
+                AccountUnreadFoldResult(
+                    accountRef = ref,
+                    unreadCount = accountUnreadCount(rows, summary.accountIdHex, membersByGroupId),
+                    hasManualUnread = accountHasManualUnread(rows, summary.accountIdHex, membersByGroupId),
                 )
-                accountUnreadCount(rows, summary.accountIdHex, membersByGroupId)
             }
         }.onFailure {
             appStateDebug(it) { "account unread refresh failed for ${ref.take(8)}: ${it.readableMessage()}" }
@@ -3868,12 +3965,14 @@ class WhiteNoiseAppState private constructor(
         // skip refs we don't know about (matches refreshAccountUnreadCounts'
         // filter).
         val summary = accounts.firstOrNull { it.isSignedInSigningAccount() && it.label == ref } ?: return
-        val unreadCount = refreshEffectiveAccountUnreadCount(summary) ?: return
-        accountUnreadCounts = accountUnreadCounts + (ref to unreadCount)
+        val result = refreshEffectiveAccountUnreadCount(summary) ?: return
+        result.hasManualUnread?.let { updateAccountManualUnread(result.accountRef, it) }
+        accountUnreadCounts = accountUnreadCounts + (ref to result.unreadCount)
     }
 
     suspend fun setActiveAccount(
         label: String,
+        deferUnreadRefresh: Boolean = false,
         onActivated: () -> Unit = {},
     ) {
         val switchingAccounts = label != activeAccountRef
@@ -3906,7 +4005,12 @@ class WhiteNoiseAppState private constructor(
                 presentFailure(R.string.toast_couldnt_sign_in_account, "ACCOUNT_SIGN_IN", it)
                 return
             }
-            refreshAccounts()
+            val refreshedAccounts = refreshAccountSnapshot()
+            if (deferUnreadRefresh) {
+                prepareStartupUnreadRefresh(refreshedAccounts)
+            } else {
+                refreshAccountUnreadCounts(refreshedAccounts)
+            }
         }
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
@@ -3925,32 +4029,74 @@ class WhiteNoiseAppState private constructor(
      * Records switch-to-first-local-frame latency without logging an account id.
      * A stale controller cannot finish a newer switch's trace.
      */
+    @Suppress("ReturnCount") // Stale controllers and absent/superseded traces are independent terminal states.
     internal fun recordAccountSwitchLocalSnapshotRendered(
         accountRef: String,
         rowCount: Int,
     ) {
-        launchPendingStartupUnreadReconciliation()
+        // A controller that was superseded during startup can still finish its
+        // already-awaited draw. It must not publish the process-wide local-ready
+        // boundary or start the deferred unread fold for the new account.
+        if (activeAccountRef != accountRef) return
+        recordStartupLocalSnapshotRendered()
         val trace = pendingAccountSwitchTrace ?: return
-        if (trace.accountRef != accountRef || activeAccountRef != accountRef) return
+        if (trace.accountRef != accountRef) return
         pendingAccountSwitchTrace = null
         val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
         appStateDebug { "account-switch first-local-frame +${elapsedMs}ms rows=$rowCount" }
     }
 
-    /**
-     * Restore exact removed-group suppression only after MainShell has rendered
-     * its first local chat-list snapshot. Until then the cheap Marmot aggregate
-     * keeps badges useful without competing with MDK's deferred group hydration.
-     */
-    private fun launchPendingStartupUnreadReconciliation() {
-        if (!startupUnreadReconciliationPending || startupUnreadReconciliationJob?.isActive == true) return
-        startupUnreadReconciliationPending = false
-        startupUnreadReconciliationJob =
-            notificationScope.launch {
-                runCatchingCancellable { refreshAccountUnreadCounts() }.onFailure {
-                    appStateDebug(it) { "post-startup unread reconciliation failed: ${it.readableMessage()}" }
-                }
+    private fun prepareStartupUnreadRefresh(accountSummaries: List<AccountSummaryFfi>) {
+        pendingStartupUnreadRefresh =
+            StartupUnreadRefresh(
+                accounts = accountSummaries,
+                accountListRevision = accountListRevision,
+            )
+    }
+
+    /** Called only after the controller's authoritative SQLite snapshot drew. */
+    private fun recordStartupLocalSnapshotRendered() {
+        if (!startupFirstLocalFrameRecorded) {
+            startupFirstLocalFrameRecorded = true
+            startupTiming("first-local-frame", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+        }
+        val pending = pendingStartupUnreadRefresh ?: return
+        pendingStartupUnreadRefresh = null
+        val revisionGuard =
+            StartupUnreadRevisionGuard(pending.accountListRevision) {
+                accountListRevision
             }
+        mutationsScope.launch {
+            traceStartupStage("unread-aggregate-refresh") {
+                refreshAccountUnreadCounts(pending.accounts, stillCurrent = revisionGuard::isCurrent)
+            }
+            if (revisionGuard.isCurrent()) {
+                startupTiming("unread-aggregate-ready", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+            }
+        }
+    }
+
+    private fun recordStartupRelayCatchUpReady() {
+        if (startupRelayCatchUpRecorded) return
+        startupRelayCatchUpRecorded = true
+        startupTiming("relay-catch-up-ready", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+    }
+
+    private suspend fun <T> traceStartupStage(
+        stage: String,
+        block: suspend () -> T,
+    ): T {
+        val startedAtMs = SystemClock.elapsedRealtime()
+        return try {
+            block()
+        } finally {
+            val nowMs = SystemClock.elapsedRealtime()
+            startupTiming(
+                stage = stage,
+                elapsedMs = nowMs - startupTraceStartedAtMs,
+                durationMs = nowMs - startedAtMs,
+            )
+        }
     }
 
     /**
@@ -4262,6 +4408,7 @@ class WhiteNoiseAppState private constructor(
             }
             val refreshedAccounts = runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())
             accounts = refreshedAccounts
+            accountListRevision += 1L
             releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
             refreshAccountUnreadCounts(refreshedAccounts)
             val next = refreshedAccounts.firstOrNull()?.label
@@ -8279,6 +8426,33 @@ private inline fun appStateDebug(
         Log.e("DMAppState", "operation failed: ${error.javaClass.simpleName}")
     }
 }
+
+internal suspend fun awaitBootstrapAttempt(
+    attempt: Deferred<Unit>,
+    timeoutMillis: Long,
+): Boolean =
+    withTimeoutOrNull(timeoutMillis) {
+        attempt.await()
+        true
+    } ?: false
+
+internal fun startupUnreadRefreshIsCurrent(
+    expectedRevision: Long,
+    currentRevision: Long,
+): Boolean = expectedRevision == currentRevision
+
+private fun startupTiming(
+    stage: String,
+    elapsedMs: Long,
+    durationMs: Long? = null,
+) {
+    if (BuildConfig.DEBUG || BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT == "staging") {
+        val duration = durationMs?.let { " duration_ms=${it.coerceAtLeast(0L)}" }.orEmpty()
+        Log.i("WNStartup", "stage=$stage elapsed_ms=${elapsedMs.coerceAtLeast(0L)}$duration")
+    }
+}
+
+private const val BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS = 15_000L
 
 private fun String?.nonBlankOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
 
