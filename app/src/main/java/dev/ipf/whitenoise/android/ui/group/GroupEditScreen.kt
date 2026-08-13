@@ -68,6 +68,7 @@ import kotlinx.coroutines.CancellationException
  * back, so a host that answers with anything but a safe HTTPS URL can never
  * become the group's public avatar.
  */
+@Suppress("MaxLineLength")
 internal fun safeAvatarUploadUrl(url: String): String = ProfileSanitizer.androidOwnedHttpsImageUrl(url) ?: error("unsafe upload URL")
 
 @OptIn(ExperimentalMaterial3Api::class)

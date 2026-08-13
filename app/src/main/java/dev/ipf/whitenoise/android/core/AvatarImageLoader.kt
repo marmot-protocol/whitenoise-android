@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import java.util.LinkedHashMap
 
+@Suppress("TooManyFunctions") // Cohesive process-wide avatar cache, fetch, and lifecycle boundary.
 object AvatarImageLoader {
     private const val MAX_AVATAR_BYTES = 2 * 1024 * 1024
     private const val MAX_AVATAR_DIMENSION = 512
@@ -119,6 +120,7 @@ object AvatarImageLoader {
         }
     }
 
+    @Suppress("LongMethod") // Request deduplication and generation-safe completion form one atomic lifecycle.
     private suspend fun load(
         url: String,
         expectedGeneration: Long?,
@@ -249,6 +251,7 @@ object AvatarImageLoader {
         nowMillis: Long,
     ): Boolean = failureExpiresAt.isFresh(url, nowMillis)
 
+    @Suppress("ReturnCount") // Fail-closed guards keep invalid limits and an unattached MDK adapter explicit.
     internal suspend fun fetchBytes(
         url: String,
         maxBytes: Int,

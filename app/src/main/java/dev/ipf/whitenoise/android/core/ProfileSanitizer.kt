@@ -36,6 +36,7 @@ object ProfileSanitizer {
      * MDK. [dev.ipf.whitenoise.android.media.sanitizeHttpsAvatarUrl] delegates
      * here for image search and paste-link flows.
      */
+    @Suppress("ReturnCount") // Each URL trust-boundary violation fails closed before Android fetches it.
     fun androidOwnedHttpsImageUrl(raw: String?): String? {
         if (raw.isNullOrBlank()) return null
         var candidate = raw.trim()
