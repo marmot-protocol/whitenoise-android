@@ -93,8 +93,10 @@ internal fun markdownDocumentToSpeakableProjection(
     isGroupMember: ((String) -> Boolean)? = null,
 ): SpeakableTextProjection {
     val collector = SpeakableCollector()
-    markdownVisibleSiblings(document.blocks).forEachIndexed { blockIndex, block ->
-        if (collector.exhausted) return@forEachIndexed
+    val blocks = markdownVisibleSiblings(document.blocks)
+    for (blockIndex in blocks.indices) {
+        if (collector.exhausted) break
+        val block = blocks[blockIndex]
         collectSpeakableBlock(
             block = block,
             collector = collector,
@@ -154,8 +156,10 @@ private fun collectSpeakableBlocks(
     depth: Int,
     path: String,
 ) {
-    markdownVisibleSiblings(blocks).forEachIndexed { blockIndex, block ->
-        if (collector.exhausted) return@forEachIndexed
+    val visibleBlocks = markdownVisibleSiblings(blocks)
+    for (blockIndex in visibleBlocks.indices) {
+        if (collector.exhausted) break
+        val block = visibleBlocks[blockIndex]
         collectSpeakableBlock(
             block,
             collector,
@@ -175,8 +179,10 @@ private fun collectSpeakableList(
     depth: Int,
     path: String,
 ) {
-    markdownVisibleSiblings(list.items).forEachIndexed { itemIndex, item ->
-        if (!collector.visitNode()) return@forEachIndexed
+    val items = markdownVisibleSiblings(list.items)
+    for (itemIndex in items.indices) {
+        if (!collector.visitNode()) break
+        val item = items[itemIndex]
         collectSpeakableBlocks(
             item.blocks,
             collector,
@@ -196,14 +202,17 @@ private fun collectSpeakableTable(
     path: String,
 ) {
     val visibleTable = markdownVisibleTable(table.header, table.rows)
-    visibleTable.header.cells.forEachIndexed { cellIndex, cell ->
-        if (!collector.visitNode()) return@forEachIndexed
+    for (cellIndex in visibleTable.header.cells.indices) {
+        if (!collector.visitNode()) break
+        val cell = visibleTable.header.cells[cellIndex]
         collectSpeakableInlineSegment(cell.inlines, collector, mentionDisplayName, isGroupMember, "$path/h$cellIndex")
     }
-    visibleTable.rows.forEachIndexed { rowIndex, row ->
-        if (collector.exhausted) return@forEachIndexed
-        row.cells.forEachIndexed { cellIndex, cell ->
-            if (!collector.visitNode()) return@forEachIndexed
+    for (rowIndex in visibleTable.rows.indices) {
+        if (collector.exhausted) break
+        val row = visibleTable.rows[rowIndex]
+        for (cellIndex in row.cells.indices) {
+            if (!collector.visitNode()) break
+            val cell = row.cells[cellIndex]
             collectSpeakableInlineSegment(
                 cell.inlines,
                 collector,
@@ -254,8 +263,10 @@ private fun MappedTextBuilder.appendSpeakableInlines(
     path: String,
 ) {
     if (markdownInlineDepthExceeded(depth)) return
-    markdownVisibleSiblings(inlines).forEachIndexed { inlineIndex, inline ->
-        if (length >= maxChars || !collector.visitNode()) return@forEachIndexed
+    val visibleInlines = markdownVisibleSiblings(inlines)
+    for (inlineIndex in visibleInlines.indices) {
+        if (length >= maxChars || !collector.visitNode()) break
+        val inline = visibleInlines[inlineIndex]
         val inlinePath = "$path/n$inlineIndex"
         when (inline) {
             is MarkdownInlineFfi.Text ->

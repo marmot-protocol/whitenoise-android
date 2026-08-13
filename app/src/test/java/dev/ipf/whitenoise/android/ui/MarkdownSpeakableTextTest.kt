@@ -497,6 +497,34 @@ class MarkdownSpeakableTextTest {
     }
 
     @Test
+    fun traversalDoesNotReadSiblingsAfterCharacterBudgetIsExhausted() {
+        val oversized =
+            MarkdownBlockFfi.Paragraph(
+                listOf(MarkdownInlineFfi.Text("a".repeat(MARKDOWN_SPEAKABLE_MAX_LENGTH))),
+            )
+        val blocks =
+            object : AbstractList<MarkdownBlockFfi>() {
+                override val size = 2
+
+                override fun get(index: Int): MarkdownBlockFfi {
+                    if (index == 0) return oversized
+                    error("read a sibling after the traversal budget")
+                }
+            }
+        val document =
+            MarkdownDocumentFfi(
+                truncated = true,
+                blankLinesBefore = byteArrayOf(),
+                blocks = blocks,
+            )
+
+        assertEquals(
+            "a".repeat(MARKDOWN_SPEAKABLE_MAX_LENGTH),
+            markdownDocumentToSpeakableText(document),
+        )
+    }
+
+    @Test
     fun malformedDepthAndLargeLeafStayBoundedWithoutSplittingSurrogates() {
         var inline: MarkdownInlineFfi = MarkdownInlineFfi.Text("should not escape depth limit")
         repeat(MARKDOWN_MAX_INLINE_DEPTH + 1) {
