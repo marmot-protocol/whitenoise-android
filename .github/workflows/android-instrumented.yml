@@ -67,14 +67,9 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: |
-            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
-                -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.ProfileImageDialSafetyIntegrationTest \
-                --no-daemon --stacktrace
-            else
-              ./gradlew :app:connectedDevZapstoreDebugAndroidTest --no-daemon --stacktrace
-            fi
+          # android-emulator-runner executes each script line separately with
+          # /bin/sh, so keep this as one POSIX-compatible command.
+          script: ./gradlew :app:connectedDevZapstoreDebugAndroidTest ${{ github.event_name == 'pull_request' && '-Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.ProfileImageDialSafetyIntegrationTest' || '' }} --no-daemon --stacktrace
 
       - name: Upload instrumented test reports
         if: always()
