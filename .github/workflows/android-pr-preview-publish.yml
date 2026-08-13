@@ -9,11 +9,10 @@ on:
     types: [completed]
 
 concurrency:
-  # One publisher per PR: a new push cancels a superseded signer/publisher so
-  # an older build cannot finish after the latest build and replace its link.
-  # Internal PR branch names are stable across pushes, including when GitHub's
-  # optional workflow_run.pull_requests association is empty.
-  group: android-pr-preview-publish-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  # Pull-request builds keep one publisher per branch so a new push cancels a
+  # superseded run. Manual backfills use the source run ID because their branch
+  # is the dispatch ref, not the PR recovered from candidate provenance.
+  group: android-pr-preview-publish-${{ github.event.workflow_run.event == 'workflow_dispatch' && format('dispatch-{0}', github.event.workflow_run.id) || format('pull-request-{0}-{1}', github.event.workflow_run.head_repository.full_name, github.event.workflow_run.head_branch) }}
   cancel-in-progress: true
 
 permissions:

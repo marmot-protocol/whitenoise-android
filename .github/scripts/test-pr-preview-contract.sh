@@ -56,6 +56,8 @@ grep -Fq 'ref: ${{ steps.resolve.outputs.head_sha }}' "$build"
 grep -Fq 'restore a missing comment' "$build"
 grep -Fq -- '--min-sdk-version 34' .github/scripts/sign-pr-preview-candidates.sh
 grep -Fq 'cancel-in-progress: true' "$workflow"
+grep -Fq "workflow_run.event == 'workflow_dispatch' && format('dispatch-{0}', github.event.workflow_run.id)" "$workflow"
+grep -Fq "format('pull-request-{0}-{1}', github.event.workflow_run.head_repository.full_name, github.event.workflow_run.head_branch)" "$workflow"
 grep -Fq 'Verify signed previews' "$workflow"
 grep -Fq '.github/scripts/stage-signed-pr-preview-candidates.sh signed candidates signed-check' "$workflow"
 grep -Fq 'PR_PREVIEW_CERT_SHA256: ${{ secrets.PR_PREVIEW_CERT_SHA256 }}' "$workflow"
