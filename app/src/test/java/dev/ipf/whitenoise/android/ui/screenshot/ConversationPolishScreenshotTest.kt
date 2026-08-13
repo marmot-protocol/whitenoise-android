@@ -23,6 +23,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.state.AttachmentTransferState
+import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTransferIndicator
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeDescription
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
@@ -70,6 +72,16 @@ class ConversationPolishScreenshotTest {
 
     @Test
     fun attachmentTypesAmoled() = captureAttachmentTypes("attachment_type_gallery_amoled", dark = true, amoled = true)
+
+    @Test
+    fun attachmentTransferStatesLight() {
+        captureAttachmentTransferStates("attachment_transfer_states_light", dark = false, amoled = false)
+    }
+
+    @Test
+    fun attachmentTransferStatesAmoled() {
+        captureAttachmentTransferStates("attachment_transfer_states_amoled", dark = true, amoled = true)
+    }
 
     private fun captureActionMenu(
         name: String,
@@ -134,6 +146,47 @@ class ConversationPolishScreenshotTest {
         composeRule.onNodeWithTag(ATTACHMENT_GALLERY_TAG).captureRoboImage("src/test/snapshots/$name.png")
     }
 
+    private fun captureAttachmentTransferStates(
+        name: String,
+        dark: Boolean,
+        amoled: Boolean,
+    ) {
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
+                Surface(modifier = Modifier.width(240.dp).testTag(ATTACHMENT_TRANSFER_GALLERY_TAG)) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        listOf(
+                            AttachmentTransferState.Remote,
+                            AttachmentTransferState.Downloading,
+                            AttachmentTransferState.Failed,
+                            AttachmentTransferState.Available,
+                        ).forEach { state ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Text(
+                                    text = state.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                attachmentTransferIndicator(state)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        composeRule.mainClock.advanceTimeBy(500L)
+        composeRule
+            .onNodeWithTag(ATTACHMENT_TRANSFER_GALLERY_TAG)
+            .captureRoboImage("src/test/snapshots/$name.png")
+    }
+
     @Composable
     private fun AttachmentTypeGallery() {
         val rows =
@@ -184,5 +237,6 @@ class ConversationPolishScreenshotTest {
 
     private companion object {
         const val ATTACHMENT_GALLERY_TAG = "attachment-type-gallery"
+        const val ATTACHMENT_TRANSFER_GALLERY_TAG = "attachment-transfer-gallery"
     }
 }

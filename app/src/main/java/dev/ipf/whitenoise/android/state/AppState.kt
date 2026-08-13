@@ -1521,10 +1521,15 @@ class WhiteNoiseAppState private constructor(
     internal fun cacheMediaPlaintext(
         cacheKey: String,
         plaintext: ByteArray,
-    ) {
+    ): Boolean {
         assertMainThread { "cacheMediaPlaintext" }
-        mediaPlaintextCache.put(cacheKey, plaintext)
-        bumpMediaCacheRevision()
+        val previous = mediaPlaintextCache.put(cacheKey, plaintext)
+        val retained = mediaPlaintextCache.get(cacheKey) === plaintext
+        // Rejected oversized entries can still remove a previous value. Only
+        // publish when cache membership actually changed; a no-op rejection
+        // must not restart every visible attachment's availability probe.
+        if (retained || previous != null) bumpMediaCacheRevision()
+        return retained
     }
 
     internal fun cachedMediaThumbnail(cacheKey: String): android.graphics.Bitmap? {
@@ -1570,6 +1575,7 @@ class WhiteNoiseAppState private constructor(
         DiskByteCache(
             cacheDir = java.io.File(appContext.cacheDir, "decrypted-media"),
             maxBytes = DISK_MEDIA_CACHE_MAX_BYTES,
+            maxEntryBytes = DISK_MEDIA_CACHE_MAX_ENTRY_BYTES,
             keyProvider = AndroidKeystoreDiskByteCacheKeyProvider(),
             onMutation = ::bumpMediaCacheRevision,
         )
@@ -3257,7 +3263,9 @@ class WhiteNoiseAppState private constructor(
                     // surfacing a manual retry state. The gate is acquired
                     // inside the Deferred so callers only suspend at `await()`.
                     val downloadScope = this
-                    attachmentDownloadGate.withRetryingPermit { downloadScope.block() }
+                    attachmentDownloadGate.withRetryingPermit(
+                        shouldRetry = ::isTransientAttachmentDownloadFailure,
+                    ) { downloadScope.block() }
                 }
             inFlightDownloads[cacheKey] = deferred
             // Drop the map entry via `invokeOnCompletion` (fires AFTER the
@@ -8387,6 +8395,11 @@ class WhiteNoiseAppState private constructor(
         // typical chat history through OS cache reaps; OS may still trim
         // earlier if device-wide cache pressure hits.
         private const val DISK_MEDIA_CACHE_MAX_BYTES: Long = 256L * 1024L * 1024L
+
+        // Match MDK's current encrypted receive ceiling. L1 remains capped at
+        // 24 MiB so large documents are durable without being retained on the
+        // JVM heap after the active open/download operation finishes.
+        private const val DISK_MEDIA_CACHE_MAX_ENTRY_BYTES: Long = 64L * 1024L * 1024L
         private const val LANGUAGE_TAG_KEY = "language_tag"
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
         private const val PROFILE_PRESENTATION_WARM_FANOUT = 6

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -8,6 +9,8 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
@@ -157,6 +160,42 @@ class AttachmentDownloadGateTest {
                 assertEquals(1, attempts)
             }
         }
+    }
+
+    @Test
+    fun permanentFailureIsNotRetried() {
+        runBlocking {
+            val gate = AttachmentDownloadGate(parallelism = 1)
+            var attempts = 0
+            try {
+                gate.withRetryingPermit(
+                    shouldRetry = { false },
+                    sleep = { fail("permanent failure must not back off") },
+                ) {
+                    attempts += 1
+                    error("invalid hash")
+                }
+                fail("expected failure")
+            } catch (_: IllegalStateException) {
+                assertEquals(1, attempts)
+            }
+        }
+    }
+
+    @Test
+    fun attachmentRetryClassifierOnlyAcceptsClearTransientFailures() {
+        assertTrue(isTransientAttachmentDownloadFailure(MarmotKitException.Runtime("request timed out")))
+        assertTrue(isTransientAttachmentDownloadFailure(MarmotKitException.Runtime("download returned HTTP 503")))
+        assertTrue(isTransientAttachmentDownloadFailure(MarmotKitException.Runtime("media host DNS lookup failed")))
+        assertTrue(isTransientAttachmentDownloadFailure(MarmotKitException.StorageBusy("database is locked")))
+
+        assertFalse(
+            isTransientAttachmentDownloadFailure(
+                MarmotKitException.InvalidMediaReference("media decryption failed"),
+            ),
+        )
+        assertFalse(isTransientAttachmentDownloadFailure(MarmotKitException.Runtime("download returned HTTP 404")))
+        assertFalse(isTransientAttachmentDownloadFailure(IllegalStateException("unexpected failure")))
     }
 
     @Test
