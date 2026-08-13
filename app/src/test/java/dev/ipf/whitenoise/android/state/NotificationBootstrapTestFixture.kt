@@ -16,6 +16,7 @@ import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
@@ -29,12 +30,15 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.coroutines.CoroutineContext
 
 internal class NotificationBootstrapTestFixture(
     context: Context,
     initiallyFailSubscriptions: Boolean = false,
     initiallyBlockSubscriptions: Boolean = false,
     initiallyBlockSubscriptionsSynchronously: Boolean = false,
+    delayFirstNotificationDispatchAfterRuntimeStart: Boolean = false,
     receiverTimeoutMillis: Long = 100L,
 ) {
     private val appContext = context.applicationContext
@@ -48,6 +52,10 @@ internal class NotificationBootstrapTestFixture(
     private val subscriberAttached = AtomicBoolean(false)
     private val emittedPostStartUpdate = AtomicBoolean(false)
     private val runtimeStarted = AtomicBoolean(false)
+    private val notificationDispatchGate =
+        PostStartNotificationDispatchGate(runtimeStarted).takeIf {
+            delayFirstNotificationDispatchAfterRuntimeStart
+        }
     private val subscriptionFailures = AtomicBoolean(initiallyFailSubscriptions)
     private val consumedUpdates = AtomicInteger(0)
     private val receiverTimeoutMillisState = AtomicLong(receiverTimeoutMillis)
@@ -153,6 +161,7 @@ internal class NotificationBootstrapTestFixture(
             activeAccountRef = "",
             marmotRuntimeFactory = { AppMarmotRuntime(rootPath = "test", marmot = marmot) },
             notificationSubscriber = { subscribe() },
+            notificationDispatcher = notificationDispatchGate ?: Dispatchers.IO,
             notificationReceiverTimeoutMillis = receiverTimeoutMillisState::get,
         )
 
@@ -178,6 +187,7 @@ internal class NotificationBootstrapTestFixture(
     }
 
     fun close() {
+        notificationDispatchGate?.release()
         synchronousSubscriptionGate.countDown()
         subscriptionGate.complete(Unit)
         updates.close(CancellationException("test complete"))
@@ -238,5 +248,34 @@ internal class NotificationBootstrapTestFixture(
             key: String,
             value: String?,
         ) = Unit
+    }
+
+    private class PostStartNotificationDispatchGate(
+        private val runtimeStarted: AtomicBoolean,
+    ) : CoroutineDispatcher() {
+        private data class PendingDispatch(
+            val context: CoroutineContext,
+            val block: Runnable,
+        )
+
+        private val intercepted = AtomicBoolean(false)
+        private val pending = AtomicReference<PendingDispatch?>()
+
+        override fun dispatch(
+            context: CoroutineContext,
+            block: Runnable,
+        ) {
+            if (runtimeStarted.get() && intercepted.compareAndSet(false, true)) {
+                pending.set(PendingDispatch(context, block))
+                return
+            }
+            Dispatchers.IO.dispatch(context, block)
+        }
+
+        fun release() {
+            pending.getAndSet(null)?.let { dispatch ->
+                Dispatchers.IO.dispatch(dispatch.context, dispatch.block)
+            }
+        }
     }
 }

@@ -147,6 +147,7 @@ import dev.ipf.whitenoise.android.updates.shouldPostAppUpdateNotification
 import dev.ipf.whitenoise.android.updates.shouldStartInAppSelfUpdate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -1460,6 +1461,7 @@ class WhiteNoiseAppState private constructor(
     private val marmotAccessObserver: (() -> Unit)?,
     private val marmotRuntimeFactory: (Context) -> AppMarmotRuntime,
     private val notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription,
+    private val notificationDispatcher: CoroutineDispatcher,
     private val notificationReceiverTimeoutMillis: () -> Long,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
@@ -1477,6 +1479,7 @@ class WhiteNoiseAppState private constructor(
             marmotAccessObserver = null,
             marmotRuntimeFactory = ::openMarmotRuntime,
             notificationSubscriber = ::subscribeToNotifications,
+            notificationDispatcher = Dispatchers.IO,
             notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
@@ -1496,6 +1499,7 @@ class WhiteNoiseAppState private constructor(
         marmotAccessObserver: (() -> Unit)? = null,
         marmotRuntimeFactory: (Context) -> AppMarmotRuntime = ::openMarmotRuntime,
         notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription = ::subscribeToNotifications,
+        notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
     ) : this(
         context = context,
@@ -1509,6 +1513,7 @@ class WhiteNoiseAppState private constructor(
         marmotAccessObserver = marmotAccessObserver,
         marmotRuntimeFactory = marmotRuntimeFactory,
         notificationSubscriber = notificationSubscriber,
+        notificationDispatcher = notificationDispatcher,
         notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
@@ -3453,8 +3458,8 @@ class WhiteNoiseAppState private constructor(
                     traceStartupStage("client-construction") {
                         withContext(Dispatchers.IO) {
                             marmotRuntimeFactory(appContext).also { runtime ->
-                                // Publish before start so the listener queued at
-                                // the post-start boundary can resolve Marmot.
+                                // Publish before start so lifecycle consumers
+                                // and later listener retries can resolve Marmot.
                                 marmotRuntime = runtime
                                 AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
                                     runtime.marmot.downloadProfileImage(url, maxBytes)
@@ -3470,12 +3475,7 @@ class WhiteNoiseAppState private constructor(
                     }
                 },
                 start = { runtime ->
-                    traceStartupStage("marmot-start") {
-                        withContext(Dispatchers.IO) { runtime.marmot.start() }
-                    }
-                    // Enqueue at the first boundary where MDK exposes its
-                    // passive notification subscription.
-                    startNotificationListener()
+                    startMarmotWithNotificationListener(runtime)
                     appStateDebug { "marmot started" }
                 },
                 closeAfterFailure = { runtime ->
@@ -3487,6 +3487,37 @@ class WhiteNoiseAppState private constructor(
             )
         marmotRuntime = opened
         return opened
+    }
+
+    /**
+     * Start MDK and enter its passive subscription from one IO coroutine. The
+     * slot only sees an enqueued job, so a synchronous native subscribe cannot
+     * block its lock; once start returns, no second dispatcher hop can widen
+     * the no-replay boundary before the subscription call begins.
+     */
+    private suspend fun startMarmotWithNotificationListener(runtime: AppMarmotRuntime) {
+        val runtimeStartResult = CompletableDeferred<Result<Unit>>()
+        var installedStartupListener = false
+        val listenerJob =
+            notificationJob.currentOrStart {
+                installedStartupListener = true
+                notificationScope.launch(notificationDispatcher) {
+                    try {
+                        traceStartupStage("marmot-start") { runtime.marmot.start() }
+                        runtimeStartResult.complete(Result.success(Unit))
+                        runNotificationListenerLoop(runtime.marmot)
+                    } catch (cancel: CancellationException) {
+                        runtimeStartResult.complete(Result.failure(cancel))
+                        throw cancel
+                    } catch (failure: Throwable) {
+                        runtimeStartResult.complete(Result.failure(failure))
+                    }
+                }
+            }
+        check(listenerJob != null && installedStartupListener) {
+            "notification listener unavailable before Marmot startup"
+        }
+        runtimeStartResult.await().getOrThrow()
     }
 
     private suspend fun resumeCompletedBootstrap(): Boolean {
@@ -8082,46 +8113,50 @@ class WhiteNoiseAppState private constructor(
     }
 
     private fun launchNotificationListenerLoop(): Job =
-        notificationScope.launch(Dispatchers.IO) {
-            // Restart the subscription on any failure (or clean end-of-stream)
-            // with exponential backoff, so a transient relay/binding error
-            // doesn't permanently silence notifications. Backoff resets after
-            // each received update; cancellation propagates and stops the loop.
-            // See #56.
-            var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
-            while (isActive) {
-                val retryWakeGeneration = notificationReceiverRetryWake.value
+        notificationScope.launch(notificationDispatcher) {
+            runNotificationListenerLoop(marmot())
+        }
+
+    private suspend fun runNotificationListenerLoop(marmot: MarmotInterface) {
+        // Restart the subscription on any failure (or clean end-of-stream)
+        // with exponential backoff, so a transient relay/binding error
+        // doesn't permanently silence notifications. Backoff resets after
+        // each received update; cancellation propagates and stops the loop.
+        // See #56.
+        var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+        while (currentCoroutineContext().isActive) {
+            val retryWakeGeneration = notificationReceiverRetryWake.value
+            try {
+                val subscription = notificationSubscriber(marmot)
+                notificationReceiverActive.value = true
                 try {
-                    val subscription = notificationSubscriber(marmot())
-                    notificationReceiverActive.value = true
-                    try {
-                        while (isActive) {
-                            val update = subscription.next() ?: break
-                            backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
-                            withContext(Dispatchers.Main.immediate) {
-                                processNotificationUpdate(update)
-                            }
-                        }
-                    } finally {
-                        notificationReceiverActive.value = false
-                        runCatching {
-                            withContext(NonCancellable + Dispatchers.IO) {
-                                subscription.close()
-                            }
+                    while (currentCoroutineContext().isActive) {
+                        val update = subscription.next() ?: break
+                        backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                        withContext(Dispatchers.Main.immediate) {
+                            processNotificationUpdate(update)
                         }
                     }
-                } catch (cancel: CancellationException) {
-                    throw cancel
-                } catch (throwable: Throwable) {
-                    appStateDebug(throwable) {
-                        "notification listener error; retrying in ${backoffMillis}ms: ${throwable.readableMessage()}"
+                } finally {
+                    notificationReceiverActive.value = false
+                    runCatching {
+                        withContext(NonCancellable + Dispatchers.IO) {
+                            subscription.close()
+                        }
                     }
                 }
-                if (!isActive) break
-                awaitNotificationRetryWindow(notificationReceiverRetryWake, retryWakeGeneration, backoffMillis)
-                backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (throwable: Throwable) {
+                appStateDebug(throwable) {
+                    "notification listener error; retrying in ${backoffMillis}ms: ${throwable.readableMessage()}"
+                }
             }
+            if (!currentCoroutineContext().isActive) break
+            awaitNotificationRetryWindow(notificationReceiverRetryWake, retryWakeGeneration, backoffMillis)
+            backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
         }
+    }
 
     private suspend fun processNotificationUpdate(update: NotificationUpdateFfi) {
         applyNotificationDisplayNameHint(update)

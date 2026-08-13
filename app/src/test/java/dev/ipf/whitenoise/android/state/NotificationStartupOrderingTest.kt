@@ -37,6 +37,26 @@ class NotificationStartupOrderingTest {
         }
 
     @Test
+    fun coldBootstrapHasNoPostStartListenerDispatchGap() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    delayFirstNotificationDispatchAfterRuntimeStart = true,
+                )
+            try {
+                fixture.bootstrap()
+
+                assertTrue(
+                    "the first subscription attempt must begin without a post-start dispatcher hop",
+                    fixture.receiverWasAttachedAtPostStartEmission,
+                )
+            } finally {
+                fixture.close()
+            }
+        }
+
+    @Test
     fun subscriptionFailureIsBoundedAndTheSameRuntimeCanRecover() =
         runBlocking {
             val fixture =

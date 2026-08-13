@@ -100,7 +100,7 @@ class NotificationNetworkReconnectCoverageTest {
         val networkSnapshot = appState.functionBody("noteActiveNetworkSnapshot")
         val reconnect = appState.functionBody("scheduleNotificationReconnectOnNetworkRestore")
         val receiver = appState.functionBody("ensureNotificationReceiverForNetworkReconnect")
-        val listenerLoop = appState.functionBody("launchNotificationListenerLoop")
+        val listenerLoop = appState.functionBody("runNotificationListenerLoop")
 
         assertTrue(
             "connectivity callbacks must funnel through the shared snapshot helper",
@@ -119,7 +119,7 @@ class NotificationNetworkReconnectCoverageTest {
         assertTrue(
             "a reconnect wake during subscribe failure or cleanup must skip the pending backoff",
             listenerLoop.indexOf("val retryWakeGeneration") in 0 until
-                listenerLoop.indexOf("notificationSubscriber(marmot())") &&
+                listenerLoop.indexOf("notificationSubscriber(marmot)") &&
                 "awaitNotificationRetryWindow(notificationReceiverRetryWake, retryWakeGeneration" in listenerLoop,
         )
         assertTrue(
