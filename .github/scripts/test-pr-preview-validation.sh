@@ -116,9 +116,10 @@ case "$1" in
     cp "$input" "$output"
     ;;
   verify)
-    printf 'Signer #1 certificate SHA-256 digest: %s\n' "${FAKE_CERT_DIGEST:-aabbccdd}"
+    printf 'Signer #1 certificate SHA-256 digest: %s\n' \
+      "${FAKE_CERT_DIGEST:-aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd}"
     if [[ "${FAKE_SECOND_SIGNER:-false}" == true ]]; then
-      printf 'Signer #2 certificate SHA-256 digest: aabbccdd\n'
+      printf 'Signer #2 certificate SHA-256 digest: aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd\n'
     fi
     ;;
   *) exit 64 ;;
@@ -131,11 +132,23 @@ export ANDROID_HOME="$android_home"
 export PR_PREVIEW_KEYSTORE_PASSWORD=test
 export PR_PREVIEW_KEY_ALIAS=test
 export PR_PREVIEW_KEY_PASSWORD=test
-export PR_PREVIEW_CERT_SHA256=aabbccdd
+expected_cert_digest=aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd
+export PR_PREVIEW_CERT_SHA256=$expected_cert_digest
 "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
 rm -rf "$tmp/signed"
-expect_rejection 'wrong signing certificate' env FAKE_CERT_DIGEST=deadbeef "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
+
+keytool_fingerprint=$(printf '%s' "$expected_cert_digest" |
+  sed -E 's/(..)/\1:/g; s/:$//; y/abcdef/ABCDEF/')
+export PR_PREVIEW_CERT_SHA256="SHA256: $keytool_fingerprint"
+"$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
+rm -rf "$tmp/signed"
+
+export PR_PREVIEW_CERT_SHA256=$expected_cert_digest
+wrong_cert_digest=deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef
+expect_rejection 'wrong signing certificate' env FAKE_CERT_DIGEST="$wrong_cert_digest" "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
 rm -rf "$tmp/signed"
 expect_rejection 'multiple signing certificates' env FAKE_SECOND_SIGNER=true "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
+rm -rf "$tmp/signed"
+expect_rejection 'malformed expected fingerprint' env PR_PREVIEW_CERT_SHA256=not-a-fingerprint "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
 
 printf 'preview validation fixtures: passed\n'

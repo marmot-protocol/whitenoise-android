@@ -17,7 +17,8 @@ Configure a dedicated preview-only PKCS#12 key through these Actions secrets:
 - `PR_PREVIEW_KEYSTORE_PASSWORD`
 - `PR_PREVIEW_KEY_ALIAS`
 - `PR_PREVIEW_KEY_PASSWORD`
-- `PR_PREVIEW_CERT_SHA256` (certificate SHA-256 fingerprint)
+- `PR_PREVIEW_CERT_SHA256` (certificate SHA-256 fingerprint, either raw hex or
+  the `SHA256: AA:BB:...` format printed by `keytool`)
 - `BLOSSOM_UPLOAD_NSEC`
 
 Never reuse a production, staging, or developer debug key. Back up the preview key securely: replacement requires uninstalling the persistent preview and loses its local data.

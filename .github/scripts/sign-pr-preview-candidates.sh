@@ -9,8 +9,22 @@ keystore=${3:?keystore path is required}
 : "${PR_PREVIEW_KEY_PASSWORD:?PR_PREVIEW_KEY_PASSWORD is required}"
 : "${PR_PREVIEW_CERT_SHA256:?PR_PREVIEW_CERT_SHA256 is required}"
 
+normalize_sha256_fingerprint() {
+  local value=${1//$'\r'/}
+  value=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
+  value=$(printf '%s' "$value" |
+    sed -E 's/^[[:space:]]*sha-?256([[:space:]]+fingerprint)?[[:space:]]*[:=][[:space:]]*//')
+  printf '%s' "$value" | tr -d '[:space:]:'
+}
+
 apksigner=$(find "${ANDROID_HOME:?ANDROID_HOME is required}/build-tools" -type f -name apksigner -print | sort -V | tail -1)
 test -x "$apksigner"
+
+expected_digest=$(normalize_sha256_fingerprint "$PR_PREVIEW_CERT_SHA256")
+if [[ ! "$expected_digest" =~ ^[[:xdigit:]]{64}$ ]]; then
+  printf 'PR_PREVIEW_CERT_SHA256 must be a 64-digit SHA-256 fingerprint.\n' >&2
+  exit 1
+fi
 
 for channel in stable isolated; do
   input=$(find "$candidate_root/$channel" -maxdepth 1 -type f -name '*.apk' -print -quit)
@@ -28,8 +42,15 @@ for channel in stable isolated; do
     printf '%s\n' "$verification" |
       sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest: //p'
   )
-  (( ${#cert_digests[@]} == 1 ))
-  cert_digest=${cert_digests[0]}
-  expected_digest=$(printf '%s' "$PR_PREVIEW_CERT_SHA256" | tr -d ':' | tr '[:upper:]' '[:lower:]')
-  [[ "${cert_digest,,}" == "$expected_digest" ]]
+  if (( ${#cert_digests[@]} != 1 )); then
+    printf 'Expected exactly one signing certificate for %s, found %d.\n' \
+      "$channel" "${#cert_digests[@]}" >&2
+    exit 1
+  fi
+  cert_digest=$(normalize_sha256_fingerprint "${cert_digests[0]}")
+  if [[ "$cert_digest" != "$expected_digest" ]]; then
+    printf 'The %s APK signing certificate does not match PR_PREVIEW_CERT_SHA256.\n' \
+      "$channel" >&2
+    exit 1
+  fi
 done
