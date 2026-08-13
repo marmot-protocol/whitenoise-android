@@ -116,8 +116,12 @@ case "$1" in
     cp "$input" "$output"
     ;;
   verify)
-    printf 'Signer #1 certificate SHA-256 digest: %s\n' \
-      "${FAKE_CERT_DIGEST:-aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd}"
+    cert_digest=${FAKE_CERT_DIGEST:-aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd}
+    if [[ "${FAKE_LEGACY_CERT_OUTPUT:-false}" == true ]]; then
+      printf 'Signer #1 certificate SHA-256 digest: %s\n' "$cert_digest"
+    else
+      printf 'V3.0 Signer: certificate SHA-256 digest: %s\n' "$cert_digest"
+    fi
     if [[ "${FAKE_SECOND_SIGNER:-false}" == true ]]; then
       printf 'Signer #2 certificate SHA-256 digest: aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd\n'
     fi
@@ -135,6 +139,9 @@ export PR_PREVIEW_KEY_PASSWORD=test
 expected_cert_digest=aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd
 export PR_PREVIEW_CERT_SHA256=$expected_cert_digest
 "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
+rm -rf "$tmp/signed"
+
+FAKE_LEGACY_CERT_OUTPUT=true "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
 rm -rf "$tmp/signed"
 
 keytool_fingerprint=$(printf '%s' "$expected_cert_digest" |
