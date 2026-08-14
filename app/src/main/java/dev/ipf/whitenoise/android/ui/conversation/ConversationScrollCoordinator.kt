@@ -580,6 +580,7 @@ internal suspend fun ConversationScrollCoordinator.jumpToNewest(targetIndex: Int
  * mode. A missing/consumed target falls through to the physical tail in the
  * same tap. Cancellation deliberately preserves the caller's pending target.
  */
+@Suppress("ReturnCount") // Guard clauses preserve the ordered fallback/cancellation contract.
 internal suspend fun ConversationScrollCoordinator.jumpToUnreadOrNewest(
     pendingUnreadMessageId: String?,
     resolveUnreadIndex: () -> Int?,

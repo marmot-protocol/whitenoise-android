@@ -23,6 +23,7 @@ internal data class ConversationUnreadJumpState(
  * begins. Once consumed or invalidated, that stack cannot capture a new target
  * until its unread count returns to zero.
  */
+@Suppress("ReturnCount") // Guard clauses make each state-machine terminal condition explicit.
 internal fun reconcileConversationUnreadJump(
     current: ConversationUnreadJumpState,
     timeline: List<TimelineMessage>,

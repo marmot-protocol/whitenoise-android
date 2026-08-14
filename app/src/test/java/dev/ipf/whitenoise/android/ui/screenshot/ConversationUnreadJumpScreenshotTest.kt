@@ -57,6 +57,7 @@ class ConversationUnreadJumpScreenshotTest {
     val composeRule = createComposeRule()
 
     @Test
+    @Suppress("LongMethod") // One vertical harness verifies both taps against the same real list state.
     fun oversizedVisibleUnreadTopAlignsBeforeSecondTapReachesTail() {
         lateinit var coordinator: ConversationScrollCoordinator
         val messages = (1..10).map { "Message $it" }
