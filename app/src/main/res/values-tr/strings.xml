@@ -1437,4 +1437,12 @@
     <string name="global_search_content_voice_audio">Ses ve sesli mesaj</string>
     <string name="global_search_content_files_documents">Dosyalar ve belgeler</string>
     <string name="global_search_content_any_attachment">Herhangi bir ek</string>
+    <string name="text_attachment_open_external">Başka bir uygulamada aç</string>
+    <string name="text_attachment_loading">Önizleme yükleniyor…</string>
+    <string name="text_attachment_preview_truncated">Bu Markdown önizlemesi güvenlik için kısaltıldı. Kalanını görmek için dosyayı başka bir uygulamada açın.</string>
+    <string name="text_attachment_empty">Bu metin dosyası boş.</string>
+    <string name="text_attachment_download_failed">Bu dosya indirilemedi. Tekrar deneyin veya başka bir uygulamada açın.</string>
+    <string name="text_attachment_preview_too_large">Bu dosya güvenle önizlemek için çok büyük. Başka bir uygulamada açın.</string>
+    <string name="text_attachment_preview_invalid_encoding">Bu dosya desteklenen bir metin kodlaması kullanmıyor. Başka bir uygulamada açın.</string>
+    <string name="text_attachment_preview_binary">Bu dosya güvenli metin içermiyor gibi görünüyor. Başka bir uygulamada açın.</string>
 </resources>

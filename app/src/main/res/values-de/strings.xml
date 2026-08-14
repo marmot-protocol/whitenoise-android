@@ -1437,4 +1437,12 @@
     <string name="global_search_content_voice_audio">Sprache &amp; Audio</string>
     <string name="global_search_content_files_documents">Dateien &amp; Dokumente</string>
     <string name="global_search_content_any_attachment">Jeder Anhang</string>
+    <string name="text_attachment_open_external">In einer anderen App öffnen</string>
+    <string name="text_attachment_loading">Vorschau wird geladen…</string>
+    <string name="text_attachment_preview_truncated">Diese Markdown-Vorschau wurde aus Sicherheitsgründen gekürzt. Öffne die Datei in einer anderen App, um den Rest zu sehen.</string>
+    <string name="text_attachment_empty">Diese Textdatei ist leer.</string>
+    <string name="text_attachment_download_failed">Die Datei konnte nicht heruntergeladen werden. Versuche es erneut oder öffne sie in einer anderen App.</string>
+    <string name="text_attachment_preview_too_large">Diese Datei ist zu groß für eine sichere Vorschau. Öffne sie in einer anderen App.</string>
+    <string name="text_attachment_preview_invalid_encoding">Diese Datei verwendet keine unterstützte Textkodierung. Öffne sie in einer anderen App.</string>
+    <string name="text_attachment_preview_binary">Diese Datei scheint keinen sicheren Text zu enthalten. Öffne sie in einer anderen App.</string>
 </resources>

@@ -1439,4 +1439,12 @@
     <string name="global_search_content_voice_audio">Voz e áudio</string>
     <string name="global_search_content_files_documents">Arquivos e documentos</string>
     <string name="global_search_content_any_attachment">Qualquer anexo</string>
+    <string name="text_attachment_open_external">Abrir em outro aplicativo</string>
+    <string name="text_attachment_loading">Carregando prévia…</string>
+    <string name="text_attachment_preview_truncated">Esta prévia em Markdown foi truncada por segurança. Abra o arquivo em outro aplicativo para ver o restante.</string>
+    <string name="text_attachment_empty">Este arquivo de texto está vazio.</string>
+    <string name="text_attachment_download_failed">Não foi possível baixar este arquivo. Tente novamente ou abra-o em outro aplicativo.</string>
+    <string name="text_attachment_preview_too_large">Este arquivo é grande demais para uma prévia segura. Abra-o em outro aplicativo.</string>
+    <string name="text_attachment_preview_invalid_encoding">Este arquivo não usa uma codificação de texto compatível. Abra-o em outro aplicativo.</string>
+    <string name="text_attachment_preview_binary">Este arquivo não parece conter texto seguro. Abra-o em outro aplicativo.</string>
 </resources>

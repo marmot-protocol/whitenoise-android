@@ -1412,4 +1412,12 @@
     <string name="global_search_content_voice_audio">語音和音訊</string>
     <string name="global_search_content_files_documents">檔案和文件</string>
     <string name="global_search_content_any_attachment">任意附件</string>
+    <string name="text_attachment_open_external">在其他應用程式中開啟</string>
+    <string name="text_attachment_loading">正在載入預覽…</string>
+    <string name="text_attachment_preview_truncated">為確保安全，此 Markdown 預覽已截斷。請在其他應用程式中開啟檔案以查看其餘內容。</string>
+    <string name="text_attachment_empty">此文字檔案為空。</string>
+    <string name="text_attachment_download_failed">無法下載此檔案。請重試或在其他應用程式中開啟。</string>
+    <string name="text_attachment_preview_too_large">此檔案過大，無法安全預覽。請在其他應用程式中開啟。</string>
+    <string name="text_attachment_preview_invalid_encoding">此檔案使用了不支援的文字編碼。請在其他應用程式中開啟。</string>
+    <string name="text_attachment_preview_binary">此檔案似乎不包含可安全顯示的文字。請在其他應用程式中開啟。</string>
 </resources>
