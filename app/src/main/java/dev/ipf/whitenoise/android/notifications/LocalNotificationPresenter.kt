@@ -33,10 +33,14 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
@@ -86,6 +90,13 @@ class LocalNotificationPresenter(
     private val nowMillis: () -> Long = System::currentTimeMillis,
     private val notificationPoster: (NotificationManagerCompat, String, Int, Notification) -> Unit =
         ::postLocalNotification,
+    private val cachedAvatarBitmap: (String?) -> Bitmap? = { url ->
+        url?.let(AvatarImageLoader::peekBitmap)
+    },
+    private val avatarBitmapResolver: suspend (String?) -> Bitmap? = ::resolveNotificationAvatarBitmap,
+    private val enrichmentLauncher: (suspend () -> Unit) -> Unit = { block ->
+        notificationEnrichmentScope.launch { block() }
+    },
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
     },
@@ -399,35 +410,27 @@ class LocalNotificationPresenter(
                         if (redactContent) {
                             null to null
                         } else {
-                            withContext(Dispatchers.Default) {
-                                coroutineScope {
-                                    val conversationAvatar = async { resolveAvatarBitmap(conversationAvatarUrl) }
-                                    val senderAvatar = async { resolveAvatarBitmap(senderAvatarUrl) }
-                                    conversationAvatar.await() to senderAvatar.await()
-                                }
-                            }
+                            cachedAvatarBitmap(conversationAvatarUrl) to cachedAvatarBitmap(senderAvatarUrl)
                         }
-                    val sender = notificationSenderPerson(notificationContent, senderAvatarBitmap)
+                    val sender =
+                        notificationSenderPerson(
+                            notificationContent,
+                            senderAvatarBitmap
+                                ?: if (redactContent) {
+                                    null
+                                } else {
+                                    notificationMonogramBitmap(
+                                        notificationContent.senderName,
+                                        notificationContent.senderKey,
+                                    )
+                                },
+                        )
                     if (!redactContent && messagingShortcutId != null) {
                         val locusId = LocusIdCompat(messagingShortcutId)
                         builder
                             .setShortcutId(messagingShortcutId)
                             .setLocusId(locusId)
                             .addPerson(sender)
-                        withContext(Dispatchers.Default) {
-                            publishConversationShortcut(
-                                update,
-                                notificationContent,
-                                messagingShortcutId,
-                                locusId,
-                                conversationAvatarUrl,
-                                conversationAvatarBitmap,
-                                senderAvatarUrl,
-                                senderAvatarBitmap,
-                                sender,
-                                directShareEligible = directShareEligible,
-                            )
-                        }
                     }
                     update.messageIdHex?.takeIf { it.isNotBlank() }?.let { messageIdHex ->
                         builder.addExtras(
@@ -465,6 +468,11 @@ class LocalNotificationPresenter(
                         MessagingPostContext(
                             sender = sender,
                             conversationTitleOverride = if (redactContent) null else conversationTitleOverride,
+                            shortcutId = messagingShortcutId,
+                            conversationAvatarUrl = conversationAvatarUrl,
+                            conversationAvatarBitmap = conversationAvatarBitmap,
+                            senderAvatarUrl = senderAvatarUrl,
+                            senderAvatarBitmap = senderAvatarBitmap,
                         )
                 }
 
@@ -495,7 +503,7 @@ class LocalNotificationPresenter(
                             notificationContent.notificationId,
                             ConversationCardOp.SHOW_NOTIFY,
                         ) {
-                            if (!isPostStillAllowed() || !ConversationCardPostSynchronizer.isShowCurrent(showToken)) {
+                            if (!isPostStillAllowed() || !ConversationCardPostSynchronizer.isShowNotDismissed(showToken)) {
                                 return@withLock false
                             }
                             val carried =
@@ -600,7 +608,7 @@ class LocalNotificationPresenter(
                             notificationContent.notificationId,
                             ConversationCardOp.SHOW_NOTIFY,
                         ) {
-                            if (!isPostStillAllowed() || !ConversationCardPostSynchronizer.isShowCurrent(showToken)) {
+                            if (!isPostStillAllowed() || !ConversationCardPostSynchronizer.isShowNotDismissed(showToken)) {
                                 return@withLock false
                             }
                             val presentationTimestampMs = nowMillis()
@@ -621,12 +629,164 @@ class LocalNotificationPresenter(
                     }
                 }
             if (!posted) return@withRegisteredShow false
+            messagingPost
+                ?.takeUnless { redactContent }
+                ?.let { messaging ->
+                    val enrich: suspend () -> Unit = {
+                        enrichMessagingNotification(
+                            update = update,
+                            content = notificationContent,
+                            messaging = messaging,
+                            showToken = showToken,
+                            directShareEligible = directShareEligible,
+                            isPostStillAllowed = isPostStillAllowed,
+                        )
+                    }
+                    if (messaging.requiresRemoteAvatarResolution) {
+                        if (ConversationCardPostSynchronizer.retainShow(showToken)) {
+                            try {
+                                enrichmentLauncher {
+                                    try {
+                                        enrich()
+                                    } catch (cancellation: CancellationException) {
+                                        throw cancellation
+                                    } catch (throwable: Throwable) {
+                                        notificationDebug {
+                                            "enrichment failed tag=${notificationContent.notificationTag.take(16)} " +
+                                                "type=${throwable.javaClass.simpleName}"
+                                        }
+                                    } finally {
+                                        ConversationCardPostSynchronizer.releaseShow(showToken)
+                                    }
+                                }
+                            } catch (throwable: RuntimeException) {
+                                ConversationCardPostSynchronizer.releaseShow(showToken)
+                                notificationDebug {
+                                    "enrichment launch failed tag=${notificationContent.notificationTag.take(16)} " +
+                                        "type=${throwable.javaClass.simpleName}"
+                                }
+                            }
+                        }
+                    } else {
+                        enrich()
+                    }
+                }
             notificationDebug {
                 // Never log the title/body — they carry sender / group names (PII).
                 "posted tag=${notificationContent.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
             }
             true
         }
+    }
+
+    private suspend fun enrichMessagingNotification(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+        messaging: MessagingPostContext,
+        showToken: ConversationCardShowToken,
+        directShareEligible: Boolean,
+        isPostStillAllowed: () -> Boolean,
+    ) {
+        val (conversationAvatarBitmap, senderAvatarBitmap) =
+            withContext(Dispatchers.Default) {
+                coroutineScope {
+                    val conversationAvatar =
+                        async {
+                            messaging.conversationAvatarBitmap
+                                ?: avatarBitmapResolver(messaging.conversationAvatarUrl)
+                        }
+                    val senderAvatar =
+                        async {
+                            messaging.senderAvatarBitmap
+                                ?: avatarBitmapResolver(messaging.senderAvatarUrl)
+                        }
+                    conversationAvatar.await() to senderAvatar.await()
+                }
+            }
+        if (!isPostStillAllowed() || !ConversationCardPostSynchronizer.isShowCurrent(showToken)) return
+
+        val enrichedSender =
+            notificationSenderPerson(
+                content,
+                senderAvatarBitmap ?: notificationMonogramBitmap(content.senderName, content.senderKey),
+            )
+        val avatarChanged =
+            conversationAvatarBitmap !== messaging.conversationAvatarBitmap ||
+                senderAvatarBitmap !== messaging.senderAvatarBitmap
+        ConversationCardPostSynchronizer.withLock(
+            content.notificationTag,
+            content.notificationId,
+            ConversationCardOp.SHOW_ENRICH,
+        ) {
+            if (!isPostStillAllowed() || !ConversationCardPostSynchronizer.isShowCurrent(showToken)) {
+                return@withLock
+            }
+            val active = activeConversationCard(content.notificationTag, content.notificationId) ?: return@withLock
+            val expectedMessageId = update.messageIdHex?.takeIf(String::isNotBlank)
+            if (
+                expectedMessageId != null &&
+                conversationCardMessageIdHex(active) != expectedMessageId
+            ) {
+                return@withLock
+            }
+            messaging.shortcutId?.let { shortcutId ->
+                publishConversationShortcut(
+                    update = update,
+                    content = content,
+                    shortcutId = shortcutId,
+                    locusId = LocusIdCompat(shortcutId),
+                    conversationAvatarUrl = messaging.conversationAvatarUrl,
+                    conversationAvatarBitmap = conversationAvatarBitmap,
+                    senderAvatarUrl = messaging.senderAvatarUrl,
+                    senderAvatarBitmap = senderAvatarBitmap,
+                    sender = enrichedSender,
+                    directShareEligible = directShareEligible,
+                )
+            }
+            if (!avatarChanged) return@withLock
+            val enriched =
+                NotificationCompat
+                    .Builder(context, active)
+                    .setSilent(true)
+                    .setOnlyAlertOnce(true)
+                    .apply {
+                        enrichedMessagingStyle(active, enrichedSender)?.let(::setStyle)
+                    }.build()
+            postNotificationSafely(
+                NotificationManagerCompat.from(context),
+                content.notificationTag,
+                content.notificationId,
+                enriched,
+            )
+        }
+    }
+
+    private fun enrichedMessagingStyle(
+        notification: Notification,
+        enrichedSender: Person,
+    ): NotificationCompat.MessagingStyle? {
+        val existing =
+            NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
+                ?: return null
+        val enriched = NotificationCompat.MessagingStyle(existing.user)
+        enriched.isGroupConversation = existing.isGroupConversation
+        existing.conversationTitle?.let { enriched.conversationTitle = it }
+        existing.messages.forEach { message ->
+            val person =
+                message.person
+                    ?.takeIf { it.key == enrichedSender.key }
+                    ?.let { enrichedSender }
+                    ?: message.person
+            enriched.addMessage(
+                NotificationCompat.MessagingStyle.Message(message.text, message.timestamp, person).also { copy ->
+                    val mimeType = message.dataMimeType
+                    val dataUri = message.dataUri
+                    if (mimeType != null && dataUri != null) copy.setData(mimeType, dataUri)
+                },
+            )
+        }
+        existing.historicMessages.forEach { message -> enriched.addHistoricMessage(message) }
+        return enriched
     }
 
     private fun postNotificationSafely(
@@ -738,7 +898,7 @@ class LocalNotificationPresenter(
         notificationTag: String,
         notificationId: Int,
     ) {
-        NotificationManagerCompat.from(context).cancel(notificationTag, notificationId)
+        cancelSynchronized(NotificationManagerCompat.from(context), notificationTag, notificationId)
         notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
     }
 
@@ -1069,15 +1229,6 @@ class LocalNotificationPresenter(
         return builder.build()
     }
 
-    private suspend fun resolveAvatarBitmap(url: String?): android.graphics.Bitmap? {
-        if (url.isNullOrBlank()) return null
-        AvatarImageLoader.peekBitmap(url)?.let { return it }
-        // Bounded so a slow avatar host can't delay notification delivery. The
-        // loader owns its fetch scope, so the request continues to fill the cache
-        // after this await times out.
-        return withTimeoutOrNull(AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS) { AvatarImageLoader.loadBitmap(url) }
-    }
-
     private fun ensureConversationChannel(
         parentChannelId: String,
         conversationShortcutId: String,
@@ -1219,7 +1370,17 @@ class LocalNotificationPresenter(
 private data class MessagingPostContext(
     val sender: Person,
     val conversationTitleOverride: String?,
-)
+    val shortcutId: String?,
+    val conversationAvatarUrl: String?,
+    val conversationAvatarBitmap: Bitmap?,
+    val senderAvatarUrl: String?,
+    val senderAvatarBitmap: Bitmap?,
+) {
+    val requiresRemoteAvatarResolution: Boolean
+        get() =
+            (!conversationAvatarUrl.isNullOrBlank() && conversationAvatarBitmap == null) ||
+                (!senderAvatarUrl.isNullOrBlank() && senderAvatarBitmap == null)
+}
 
 private data class ConversationShortcutSnapshot(
     val shortcutId: String,
@@ -1315,6 +1476,22 @@ internal fun notificationSenderPerson(
 private const val NOTIFICATION_MONOGRAM_SIZE_PX = 128
 private const val AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS = 2_500L
 private const val EXTRA_CONTENT_REDACTED = "dev.ipf.whitenoise.android.notify.content_redacted"
+
+private val notificationEnrichmentScope =
+    CoroutineScope(
+        SupervisorJob() +
+            Dispatchers.Default +
+            CoroutineName("notification-card-enrichment"),
+    )
+
+private suspend fun resolveNotificationAvatarBitmap(url: String?): Bitmap? {
+    if (url.isNullOrBlank()) return null
+    AvatarImageLoader.peekBitmap(url)?.let { return it }
+    // Enrichment is detached from the first alert. This bound now limits only
+    // how long the optional rich-card update waits; a slow image host can no
+    // longer postpone the channel-owned sound/vibration or first visible card.
+    return withTimeoutOrNull(AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS) { AvatarImageLoader.loadBitmap(url) }
+}
 
 private inline fun notificationDebug(message: () -> String) {
     if (BuildConfig.DEBUG) Log.i("DMLocalNotify", message())

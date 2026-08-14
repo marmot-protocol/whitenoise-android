@@ -232,6 +232,200 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
+    fun coldAvatarsPostUsefulCardBeforeSilentSameKeyEnrichment() {
+        val posts = mutableListOf<Triple<String, Int, Notification>>()
+        var pendingEnrichment: (suspend () -> Unit)? = null
+        val resolvedAvatar = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        val twoStagePresenter =
+            LocalNotificationPresenter(
+                context = context,
+                shortcutPublisher = { shortcut -> publishedShortcut = shortcut },
+                notificationPoster = { notificationManager, tag, id, notification ->
+                    posts += Triple(tag, id, notification)
+                    notificationManager.notify(tag, id, notification)
+                },
+                cachedAvatarBitmap = { null },
+                avatarBitmapResolver = { resolvedAvatar },
+                enrichmentLauncher = { pendingEnrichment = it },
+            )
+        twoStagePresenter.ensureChannels()
+
+        assertTrue(
+            runBlocking {
+                twoStagePresenter.show(
+                    update(isMention = false),
+                    previewTextOverride = "hi",
+                    conversationAvatarUrl = "https://example.com/group.png",
+                    senderAvatarUrl = "https://example.com/alice.png",
+                    shortNpub = { "npub1test" },
+                )
+            },
+        )
+
+        assertEquals(1, posts.size)
+        assertNull(publishedShortcut)
+        assertEquals(
+            "hi",
+            posts
+                .single()
+                .third.extras
+                .getCharSequence(Notification.EXTRA_TEXT)
+                ?.toString(),
+        )
+        assertEquals(0, posts.single().third.flags and Notification.FLAG_ONLY_ALERT_ONCE)
+        assertNotNull(
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(posts.single().third)
+                ?.messages
+                ?.single()
+                ?.person
+                ?.icon,
+        )
+
+        runBlocking { checkNotNull(pendingEnrichment).invoke() }
+
+        assertEquals(2, posts.size)
+        assertEquals(posts[0].first, posts[1].first)
+        assertEquals(posts[0].second, posts[1].second)
+        assertTrue(posts[1].third.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        assertEquals(0, posts[1].third.defaults)
+        assertNull(posts[1].third.sound)
+        assertNotNull(publishedShortcut)
+        val messages =
+            checkNotNull(
+                NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posts[1].third),
+            ).messages
+        assertEquals(listOf("hi"), messages.map { it.text.toString() })
+        assertNotNull(messages.single().person?.icon)
+    }
+
+    @Test
+    fun cachedAvatarsKeepTheAlertToOnePost() {
+        val posts = mutableListOf<Notification>()
+        val cachedAvatar = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        val cachedPresenter =
+            LocalNotificationPresenter(
+                context = context,
+                shortcutPublisher = { shortcut -> publishedShortcut = shortcut },
+                notificationPoster = { notificationManager, tag, id, notification ->
+                    posts += notification
+                    notificationManager.notify(tag, id, notification)
+                },
+                cachedAvatarBitmap = { cachedAvatar },
+                avatarBitmapResolver = { error("cached avatars must not be fetched") },
+                enrichmentLauncher = { error("cached avatars must not launch detached work") },
+            )
+        cachedPresenter.ensureChannels()
+
+        assertTrue(
+            runBlocking {
+                cachedPresenter.show(
+                    update(isMention = false),
+                    conversationAvatarUrl = "https://example.com/group.png",
+                    senderAvatarUrl = "https://example.com/alice.png",
+                    shortNpub = { "npub1test" },
+                )
+            },
+        )
+
+        assertEquals(1, posts.size)
+        assertNotNull(publishedShortcut)
+        assertNotNull(
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(posts.single())
+                ?.messages
+                ?.single()
+                ?.person
+                ?.icon,
+        )
+    }
+
+    @Test
+    fun olderAvatarEnrichmentCannotOverwriteANewerMessageGeneration() {
+        val posts = mutableListOf<Notification>()
+        val pendingEnrichments = mutableListOf<suspend () -> Unit>()
+        val twoStagePresenter =
+            LocalNotificationPresenter(
+                context = context,
+                shortcutPublisher = { },
+                notificationPoster = { notificationManager, tag, id, notification ->
+                    posts += notification
+                    notificationManager.notify(tag, id, notification)
+                },
+                cachedAvatarBitmap = { null },
+                avatarBitmapResolver = { Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888) },
+                enrichmentLauncher = { pendingEnrichments += it },
+            )
+        twoStagePresenter.ensureChannels()
+
+        runBlocking {
+            twoStagePresenter.show(
+                update(isMention = false, messageIdHex = "first"),
+                previewTextOverride = "first",
+                senderAvatarUrl = "https://example.com/first.png",
+                shortNpub = { "npub1test" },
+            )
+            twoStagePresenter.show(
+                update(isMention = false, messageIdHex = "second"),
+                previewTextOverride = "second",
+                senderAvatarUrl = "https://example.com/second.png",
+                shortNpub = { "npub1test" },
+            )
+        }
+        assertEquals(2, pendingEnrichments.size)
+
+        runBlocking {
+            pendingEnrichments[1].invoke()
+            pendingEnrichments[0].invoke()
+        }
+
+        assertEquals(3, posts.size)
+        val active = manager.activeNotifications.single().notification
+        assertEquals(
+            "second",
+            active.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX),
+        )
+        assertEquals(
+            listOf("first", "second"),
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(active)
+                ?.messages
+                ?.map { it.text.toString() },
+        )
+    }
+
+    @Test
+    fun dismissalWhileAvatarLoadsPreventsCardResurrection() {
+        val posts = mutableListOf<Notification>()
+        var pendingEnrichment: (suspend () -> Unit)? = null
+        val twoStagePresenter =
+            LocalNotificationPresenter(
+                context = context,
+                shortcutPublisher = { },
+                notificationPoster = { notificationManager, tag, id, notification ->
+                    posts += notification
+                    notificationManager.notify(tag, id, notification)
+                },
+                cachedAvatarBitmap = { null },
+                avatarBitmapResolver = { Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888) },
+                enrichmentLauncher = { pendingEnrichment = it },
+            )
+        twoStagePresenter.ensureChannels()
+        runBlocking {
+            twoStagePresenter.show(
+                update(isMention = false),
+                senderAvatarUrl = "https://example.com/alice.png",
+                shortNpub = { "npub1test" },
+            )
+            twoStagePresenter.dismissConversationMessages("account-a", "group-a")
+            checkNotNull(pendingEnrichment).invoke()
+        }
+
+        assertEquals(1, posts.size)
+        assertTrue(manager.activeNotifications.isEmpty())
+    }
+
+    @Test
     fun activeInviteIdentityRefreshUpdatesInPlaceWithoutAlertingAgain() {
         presenter.ensureChannels()
         val invite = update(isMention = false, trigger = NotificationTriggerFfi.GROUP_INVITE)
