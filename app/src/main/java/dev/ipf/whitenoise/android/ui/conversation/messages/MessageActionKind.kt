@@ -32,6 +32,7 @@ internal fun messageActionKinds(
     canSpeak: Boolean,
     canForward: Boolean,
     canSave: Boolean,
+    canInfo: Boolean = true,
 ): List<MessageActionKind> =
     buildList {
         if (canReply) add(MessageActionKind.Reply)
@@ -42,7 +43,7 @@ internal fun messageActionKinds(
         if (canSpeak) add(MessageActionKind.Speak)
         if (canForward) add(MessageActionKind.Forward)
         if (canSave) add(MessageActionKind.Save)
-        add(MessageActionKind.Info)
+        if (canInfo) add(MessageActionKind.Info)
     }
 
 internal fun messageActionColumnCount(

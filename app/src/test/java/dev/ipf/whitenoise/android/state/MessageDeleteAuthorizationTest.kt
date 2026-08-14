@@ -85,12 +85,12 @@ class MessageDeleteAuthorizationTest {
                 expectForEveryone = false,
             ),
             Row(
-                name = "already deleted message offers nothing",
+                name = "already deleted message offers local cleanup only",
                 isDirectConversation = false,
                 mine = true,
                 selfIsAdmin = true,
                 alreadyDeleted = true,
-                expectForMe = false,
+                expectForMe = true,
                 expectForEveryone = false,
             ),
             Row(

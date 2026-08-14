@@ -155,8 +155,9 @@ private fun AgentOperationDeleteDialog(
             }
         },
         onDeleteForMe = {
-            onDismiss()
-            controller.hideMessageForMe(record.messageIdHex)
+            appState.launchMutation {
+                if (controller.hideMessageForMe(record.messageIdHex)) onDismiss()
+            }
         },
         onDismissRequest = onDismiss,
     )

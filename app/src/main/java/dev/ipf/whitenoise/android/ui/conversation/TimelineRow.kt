@@ -112,7 +112,11 @@ internal fun TimelineRow(
                             if (controller.group.pendingConfirmation) {
                                 null
                             } else {
-                                { controller.hideMessageForMe(item.record.messageIdHex) }
+                                {
+                                    appState.launchMutation {
+                                        controller.hideMessageForMe(item.record.messageIdHex)
+                                    }
+                                }
                             },
                     )
                     return@Column
