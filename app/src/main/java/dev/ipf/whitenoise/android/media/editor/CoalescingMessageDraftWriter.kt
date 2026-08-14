@@ -15,6 +15,7 @@ internal data class MessageDraftMergeCompletion(
 )
 
 /** Coalesces composer keystrokes while the repository serializes them with attachment edits. */
+@Suppress("TooManyFunctions")
 internal class CoalescingMessageDraftWriter(
     private val scope: CoroutineScope,
     private val drafts: MessageDraftRepository,
@@ -34,10 +35,30 @@ internal class CoalescingMessageDraftWriter(
         val key = Key(accountRef, groupIdHex)
         return synchronized(lock) {
             val generation = drafts.coordinated.acceptMutation(accountRef, groupIdHex)
-            val state = pending.getOrPut(key) { Pending() }
-            state.content = activeMerges[key]?.let { merge -> mergeDraftText(content, merge.incoming) } ?: content
-            state.generation = generation.value
-            if (state.job == null) state.job = scope.launch { drain(key, state) }
+            enqueueAccepted(key, content, generation)
+            generation
+        }
+    }
+
+    /**
+     * Accepts [content] only while [expected] is still the authoritative
+     * generation for this account/group. This is the compare-and-set boundary
+     * used by delayed producers such as speech recognition: a draft edit or an
+     * attachment mutation that lands after their read makes the write fail
+     * closed instead of overwriting newer state.
+     */
+    fun submitIfCurrent(
+        accountRef: String,
+        groupIdHex: String,
+        expected: MessageDraftGeneration,
+        content: String,
+    ): MessageDraftGeneration? {
+        val key = Key(accountRef, groupIdHex)
+        return synchronized(lock) {
+            val generation =
+                drafts.coordinated.acceptMutationIfCurrent(accountRef, groupIdHex, expected)
+                    ?: return@synchronized null
+            enqueueAccepted(key, content, generation)
             generation
         }
     }
@@ -184,6 +205,17 @@ internal class CoalescingMessageDraftWriter(
                 }
             if (caughtUp) return
         }
+    }
+
+    private fun enqueueAccepted(
+        key: Key,
+        content: String,
+        generation: MessageDraftGeneration,
+    ) {
+        val state = pending.getOrPut(key) { Pending() }
+        state.content = activeMerges[key]?.let { merge -> mergeDraftText(content, merge.incoming) } ?: content
+        state.generation = generation.value
+        if (state.job == null) state.job = scope.launch { drain(key, state) }
     }
 
     private data class Key(

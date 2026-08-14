@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -14,6 +15,8 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAttachmentPaneBottomCorners
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAttachmentSheetPane
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -188,5 +191,38 @@ class ComposerAttachmentSheetBehaviorTest {
                 .fetchSemanticsNodes()
                 .size,
         )
+    }
+
+    @Test
+    fun labelledDictationActionUsesTheSharedComposerFlow() {
+        var dictationClicks = 0
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface(modifier = Modifier.width(360.dp)) {
+                    ComposerAttachmentSheetPane(
+                        alpha = 1f,
+                        minimumHeight = 0.dp,
+                        onPickRecentMedia = null,
+                        onPickFromGallery = null,
+                        onCaptureFromCamera = null,
+                        onPickDocument = null,
+                        onShareLocation = null,
+                        onShareUser = null,
+                        onShareContact = null,
+                        onComingSoon = {},
+                        onDictation = { dictationClicks++ },
+                        bottomCornersOverride = ComposerAttachmentPaneBottomCorners(0.dp, 0.dp),
+                    )
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithContentDescription(string(R.string.dictate_text))
+            .assertIsDisplayed()
+            .assertHasClickAction()
+            .performClick()
+        assertEquals(1, dictationClicks)
+        composeRule.onNodeWithContentDescription(string(R.string.voice_message_record)).assertDoesNotExist()
     }
 }

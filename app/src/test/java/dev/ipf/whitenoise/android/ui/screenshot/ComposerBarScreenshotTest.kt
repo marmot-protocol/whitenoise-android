@@ -24,6 +24,12 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
+import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
+import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
@@ -102,6 +108,46 @@ class ComposerBarScreenshotTest {
     }
 
     @Test
+    fun composerDictationAvailabilityKeepsEmojiStableCompactLight() {
+        render(
+            darkTheme = false,
+            draft = "Draft message text",
+            width = 320,
+            dictationPreview = DictationPreview.Idle,
+        )
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_dictation_idle_compact_light.png")
+    }
+
+    @Test
+    fun composerDictationListeningCompactLargeFont() {
+        render(
+            darkTheme = false,
+            draft = "Draft message text",
+            width = 320,
+            fontScale = 1.6f,
+            dictationPreview = DictationPreview.Listening,
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/composer_dictation_listening_compact_large_font.png")
+    }
+
+    @Test
+    fun composerDictationProcessingCompactLargeFontRtl() {
+        render(
+            darkTheme = true,
+            draft = "Draft message text",
+            width = 320,
+            fontScale = 1.6f,
+            rtl = true,
+            dictationPreview = DictationPreview.Processing,
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/composer_dictation_processing_compact_large_font_rtl.png")
+    }
+
+    @Test
     fun composerReplyShowsConvergenceWarning() {
         val warning = "May not be visible to everyone"
 
@@ -129,17 +175,31 @@ class ComposerBarScreenshotTest {
         darkTheme: Boolean,
         amoled: Boolean = false,
         draft: String,
+        width: Int = 360,
+        fontScale: Float = 1f,
+        rtl: Boolean = false,
+        dictationPreview: DictationPreview? = null,
     ) {
+        val dictation = dictationPreview?.let { createDictationPreview(it, TextFieldValue(draft)) }
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
-                Surface(modifier = Modifier.width(360.dp).testTag(TAG)) {
-                    ComposerBar(
-                        replyingTo = null,
-                        messageTextCopy = MessageTextCopy.Default,
-                        onCancelReply = {},
-                        onSend = { _, _ -> },
-                        initialDraft = TextFieldValue(draft),
-                    )
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale),
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
+                    Surface(modifier = Modifier.width(width.dp).testTag(TAG)) {
+                        ComposerBar(
+                            replyingTo = null,
+                            messageTextCopy = MessageTextCopy.Default,
+                            onCancelReply = {},
+                            onSend = { _, _ -> },
+                            initialDraft = TextFieldValue(draft),
+                            dictationController = dictation,
+                            dictationAccountRef = dictation?.let { ACCOUNT },
+                            dictationGroupIdHex = dictation?.let { GROUP },
+                        )
+                    }
                 }
             }
         }
@@ -183,6 +243,36 @@ class ComposerBarScreenshotTest {
         composeRule.waitForIdle()
     }
 
+    private fun createDictationPreview(
+        preview: DictationPreview,
+        draft: TextFieldValue,
+    ): ConversationDictationController {
+        val platform = FakeDictationPlatform()
+        val controller =
+            ConversationDictationController(
+                platform = platform,
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, 0L) },
+                writeDraft = { _, _, _, _ -> true },
+                disclosureAccepted = { true },
+                markDisclosureAccepted = {},
+                scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
+                elapsedRealtime = { 0L },
+            )
+        when (preview) {
+            DictationPreview.Idle -> Unit
+            DictationPreview.Listening -> {
+                controller.requestStart(ACCOUNT, GROUP, draft)
+                platform.listener.onReady()
+            }
+            DictationPreview.Processing -> {
+                controller.requestStart(ACCOUNT, GROUP, draft)
+                platform.listener.onReady()
+                platform.listener.onEndOfSpeech()
+            }
+        }
+        return controller
+    }
+
     private fun replyRecord() =
         AppMessageRecordFfi(
             messageIdHex = "parent",
@@ -208,5 +298,35 @@ class ComposerBarScreenshotTest {
     private companion object {
         const val TAG = "composer-bar"
         const val LONG_TAG = "long-composer-bar"
+        const val ACCOUNT = "account"
+        const val GROUP = "group"
+    }
+
+    private enum class DictationPreview {
+        Idle,
+        Listening,
+        Processing,
+    }
+
+    @Suppress("MaxLineLength")
+    private class FakeDictationPlatform : ConversationDictationPlatform {
+        lateinit var listener: ConversationDictationRecognitionListener
+
+        override fun hasRecordAudioPermission() = true
+
+        override fun recognitionAvailable() = true
+
+        override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
+            this.listener = listener
+            return object : ConversationDictationRecognitionSession {
+                override fun start() = Unit
+
+                override fun stop() = Unit
+
+                override fun cancel() = Unit
+
+                override fun destroy() = Unit
+            }
+        }
     }
 }

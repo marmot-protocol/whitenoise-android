@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.ui
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -28,13 +31,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineConfirmationNotice
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
@@ -146,7 +152,20 @@ fun WhiteNoiseApp(
     val toast = appState.toast
     val transientNotice = appState.transientNotice
     val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
     val scope = rememberCoroutineScope()
+    val dictation = appState.conversationDictation
+    val dictationState = dictation.state
+    val dictationPermissionRequestId = dictation.permissionRequestId
+    val dictationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            val permanentlyDenied =
+                !granted &&
+                    activity?.let {
+                        !ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.RECORD_AUDIO)
+                    } == true
+            dictation.onPermissionResult(granted, permanentlyDenied)
+        }
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             appState.refreshLocalNotificationPermission()
@@ -214,6 +233,18 @@ fun WhiteNoiseApp(
         // While the unlock-timestamp evaluation is pending, the scrim secures
         // the UI but the biometric sheet waits for the real decision.
         if (appState.appLockScreenVisible && !appState.appUnlockEvaluationPending) onRequestAppUnlock()
+    }
+    LaunchedEffect(dictationPermissionRequestId) {
+        if (dictationPermissionRequestId > 0L && dictation.state is ConversationDictationState.PermissionRequired) {
+            dictationPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+    LaunchedEffect(appState.activeAccountRef, appState.appLockScreenVisible) {
+        if (appState.appLockScreenVisible) {
+            dictation.cancel()
+        } else {
+            dictation.onActiveAccountChanged(appState.activeAccountRef)
+        }
     }
 
     // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the
@@ -286,4 +317,20 @@ fun WhiteNoiseApp(
             }
         }
     }
+    if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
+        ConfirmDialog(
+            title = stringResource(R.string.dictation_disclosure_title),
+            message = stringResource(R.string.dictation_disclosure_message),
+            confirmLabel = stringResource(R.string.dictation_continue),
+            onConfirm = dictation::acceptDisclosure,
+            onDismiss = dictation::cancel,
+        )
+    }
 }
+
+private tailrec fun Context.findActivity(): Activity? =
+    when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
+    }

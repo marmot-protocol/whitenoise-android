@@ -1850,6 +1850,7 @@ private suspend fun WhiteNoiseAppState.deleteGroupLocalWithClientCleanup(
     account: String,
     groupIdHex: String,
 ) {
+    conversationDictation.onTargetRemoved(account, groupIdHex)
     evictGroupMediaCaches(account, groupIdHex)
     deleteDraftBeforeGroupRemoval(account, groupIdHex)
     marmotIo { deleteGroupLocal(account, groupIdHex) }

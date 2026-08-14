@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -15,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.KeyboardVoice
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -40,6 +42,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -139,6 +144,7 @@ internal fun ComposerAttachmentSheetPane(
     onShareUser: (() -> Unit)?,
     onShareContact: (() -> Unit)?,
     onComingSoon: () -> Unit,
+    onDictation: (() -> Unit)? = null,
     bottomCornersOverride: ComposerAttachmentPaneBottomCorners? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -177,6 +183,27 @@ internal fun ComposerAttachmentSheetPane(
                     .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
         ) {
+            // Dictation remains discoverable while the text field owns focus,
+            // without permanently adding another control to the compact input
+            // pill. It enters the same conversation-owned recognition flow as
+            // the idle composer icon, so both paths share disclosure, cancel,
+            // microphone exclusion, and draft-conflict behavior.
+            if (onDictation != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Spacer(Modifier.weight(1f))
+                    AttachmentActionTile(
+                        icon = Icons.Default.KeyboardVoice,
+                        label = stringResource(R.string.dictate_text),
+                        available = true,
+                        onClick = onDictation,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.weight(1f))
+                }
+            }
             // Recent-media strip fills the space the pane reserves; it owns its
             // own opt-in permission and stays absent until the gallery action is
             // wired (same availability as the Gallery tile).
@@ -258,7 +285,8 @@ private fun AttachmentActionTile(
         modifier =
             modifier
                 .clip(RoundedCornerShape(Radii.lg))
-                .clickable(onClick = onClick)
+                .semantics(mergeDescendants = true) { contentDescription = label }
+                .clickable(role = Role.Button, onClick = onClick)
                 .padding(vertical = Dimens.spaceXs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),

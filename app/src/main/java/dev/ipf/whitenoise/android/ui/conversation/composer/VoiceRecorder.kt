@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -53,7 +54,10 @@ import dev.ipf.whitenoise.android.R
  * Compose doesn't fight us for the up event.
  */
 @Composable
-internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController) {
+internal fun MicHoldButton(
+    controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController,
+    enabled: Boolean = true,
+) {
     val haptics = LocalHapticFeedback.current
     val cancelThresholdDp = 120.dp
     val lockThresholdDp = 80.dp
@@ -66,16 +70,20 @@ internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRec
         // Enter, switch access) toggles record-and-lock so users who can't
         // perform the press-and-hold gesture can still send voice notes.
         onClick = {
-            if (controller.isRecording) {
-                controller.stop()
-            } else if (controller.start()) {
-                controller.lock()
+            if (enabled) {
+                if (controller.isRecording) {
+                    controller.stop()
+                } else if (controller.start()) {
+                    controller.lock()
+                }
             }
         },
         modifier =
             Modifier
                 .size(44.dp)
-                .pointerInput(controller) {
+                .alpha(if (enabled) 1f else VOICE_RECORD_DISABLED_ALPHA)
+                .pointerInput(controller, enabled) {
+                    if (!enabled) return@pointerInput
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val started = controller.start()
@@ -146,10 +154,15 @@ internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRec
     ) {
         Icon(
             Icons.Default.Mic,
-            contentDescription = stringResource(R.string.voice_message_record),
+            contentDescription =
+                stringResource(
+                    if (enabled) R.string.voice_message_record else R.string.dictation_in_use_other_chat,
+                ),
         )
     }
 }
+
+private const val VOICE_RECORD_DISABLED_ALPHA = 0.38f
 
 @Composable
 internal fun RecordingStripLeading(
@@ -179,8 +192,11 @@ internal fun RecordingStripLeading(
         Box(
             modifier =
                 Modifier
-                    .size((10 * pulseScale).dp)
-                    .clip(CircleShape)
+                    .size(10.dp)
+                    .graphicsLayer {
+                        scaleX = pulseScale
+                        scaleY = pulseScale
+                    }.clip(CircleShape)
                     .background(MaterialTheme.colorScheme.error),
         )
         Text(
@@ -264,7 +280,7 @@ internal fun LockHintAbove(
 }
 
 @Composable
-private fun rememberInfiniteRecordingPulse(): State<Float> {
+internal fun rememberInfiniteRecordingPulse(): State<Float> {
     val transition = rememberInfiniteTransition(label = "rec-pulse")
     return transition.animateFloat(
         initialValue = 1f,
@@ -278,7 +294,7 @@ private fun rememberInfiniteRecordingPulse(): State<Float> {
     )
 }
 
-private fun formatRecordingDuration(elapsedMs: Long): String {
+internal fun formatRecordingDuration(elapsedMs: Long): String {
     val totalSeconds = (elapsedMs / 1000L).coerceAtLeast(0L)
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60

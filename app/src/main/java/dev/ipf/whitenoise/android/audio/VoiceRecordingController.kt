@@ -37,6 +37,7 @@ class VoiceRecordingController(
     // Read lazily at record-start so a media-quality change mid-session takes
     // effect on the next recording without re-creating this controller.
     private val bitrateProvider: () -> Int = { VoiceRecorder.DEFAULT_BITRATE_BPS },
+    private val microphoneCaptures: MicrophoneCaptureCoordinator? = null,
 ) {
     companion object {
         // Safety cap to prevent runaway recordings if the hold gesture leaks
@@ -97,6 +98,8 @@ class VoiceRecordingController(
     private val recorderScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     private var focusRequest: AudioFocusRequest? = null
+    private val microphoneLeaseLock = Any()
+    private var microphoneLeaseHeld = false
 
     init {
         // Best-effort startup cleanup: a filesystem hiccup (e.g. a
@@ -121,11 +124,16 @@ class VoiceRecordingController(
     private var tailCut: CompletableDeferred<Unit>? = null
     private var restarting = false
     private var restartJob: Job? = null
+    private var startJob: Job? = null
     private var startGeneration = 0L
 
     fun start(): Boolean {
         if (isRecording) return true
         if (!onPermissionRequest()) return false
+        if (!acquireMicrophoneLease()) {
+            onError(IllegalStateException("Microphone is already in use"))
+            return false
+        }
 
         val pending = finalizeJob?.takeIf { it.isActive }
         if (pending != null) {
@@ -142,10 +150,13 @@ class VoiceRecordingController(
             val generation = nextStartGeneration()
             restartJob =
                 scope.launch(Dispatchers.Main) {
-                    pending.join()
-                    restarting = false
-                    restartJob = null
-                    if (isRecording && generation == startGeneration) beginRecording(generation)
+                    try {
+                        pending.join()
+                        restarting = false
+                        if (isRecording && generation == startGeneration) beginRecording(generation)
+                    } finally {
+                        restartJob = null
+                    }
                 }
             return true
         }
@@ -156,6 +167,7 @@ class VoiceRecordingController(
         // stop/cancel. A denied grant means the mic is unavailable (e.g. an
         // active call) — surface it rather than capture competing audio.
         if (!requestRecordingFocus()) {
+            releaseMicrophoneLease()
             onError(IllegalStateException("Couldn't start recording — audio is in use"))
             return false
         }
@@ -163,7 +175,16 @@ class VoiceRecordingController(
         isRecording = true
         resetRecordingUiState()
         val generation = nextStartGeneration()
-        scope.launch(Dispatchers.Main) { beginRecording(generation) }
+        val launched = scope.launch(Dispatchers.Main) { beginRecording(generation) }
+        startJob = launched
+        launched.invokeOnCompletion {
+            if (startJob === launched) startJob = null
+            val captureStopped = !isRecording && recorder == null
+            val noPendingFinalize = finalizeJob?.isActive != true && restartJob?.isActive != true
+            if (captureStopped && noPendingFinalize) {
+                releaseMicrophoneLease()
+            }
+        }
         return true
     }
 
@@ -199,15 +220,24 @@ class VoiceRecordingController(
             true
         } catch (c: CancellationException) {
             releaseRecorderAfterStartFailure(r)
+            recorder = null
+            if (isRecording) {
+                isRecording = false
+                resetRecordingUiState()
+                abandonRecordingFocus()
+            }
+            releaseMicrophoneLease()
             throw c
         } catch (t: Throwable) {
             releaseRecorderAfterStartFailure(r)
             recorder = null
+            val reportError = isRecording
             if (isRecording) {
                 abandonRecordingFocus()
                 isRecording = false
-                onError(t)
             }
+            releaseMicrophoneLease()
+            if (reportError) onError(t)
             false
         }
     }
@@ -262,6 +292,8 @@ class VoiceRecordingController(
                     isRecording = false
                     resetRecordingUiState()
                     abandonRecordingFocus()
+                    val pendingStart = startJob
+                    if (pendingStart == null) releaseMicrophoneLease() else pendingStart.cancel()
                 }
                 return
             }
@@ -306,7 +338,10 @@ class VoiceRecordingController(
                 } finally {
                     // A restart reuses this take's focus for the next recording;
                     // only abandon it when no restart took over.
-                    if (!restarting) abandonRecordingFocus()
+                    if (!restarting) {
+                        abandonRecordingFocus()
+                        releaseMicrophoneLease()
+                    }
                 }
             }
         // Guarantee the recorder is released even if the finalize coroutine is
@@ -315,7 +350,12 @@ class VoiceRecordingController(
         // too, unlike the body's finally. cancel()/release() can't recover this
         // because `recorder` is already null. r.cancel() is idempotent, so this
         // is a no-op once stop() has finalized the take.
-        finalizeJob?.invokeOnCompletion { recorderScope.launch { r.cancel() } }
+        finalizeJob?.invokeOnCompletion {
+            recorderScope.launch {
+                r.cancel()
+                if (restartJob?.isActive != true && !isRecording) releaseMicrophoneLease()
+            }
+        }
     }
 
     fun cancel() {
@@ -326,6 +366,8 @@ class VoiceRecordingController(
             isRecording = false
             resetRecordingUiState()
             abandonRecordingFocus()
+            val pendingStart = startJob
+            if (pendingStart == null) releaseMicrophoneLease() else pendingStart.cancel()
             return
         }
         recorder = null
@@ -346,7 +388,14 @@ class VoiceRecordingController(
         // deliver, so just release the recorder in the background. No tail delay
         // — the take was discarded. Released on the lifecycle-independent scope
         // so a teardown that races composition disposal still frees the mic.
-        if (r != null) recorderScope.launch { r.cancel() }
+        if (r != null) {
+            recorderScope.launch {
+                r.cancel()
+                releaseMicrophoneLease()
+            }
+        } else {
+            releaseMicrophoneLease()
+        }
     }
 
     private fun requestRecordingFocus(): Boolean {
@@ -370,6 +419,23 @@ class VoiceRecordingController(
         val am = audioManager ?: return
         focusRequest?.let { am.abandonAudioFocusRequest(it) }
         focusRequest = null
+    }
+
+    private fun acquireMicrophoneLease(): Boolean {
+        return synchronized(microphoneLeaseLock) {
+            if (microphoneLeaseHeld) return@synchronized true
+            val acquired = microphoneCaptures?.tryAcquire(this) ?: true
+            microphoneLeaseHeld = acquired
+            acquired
+        }
+    }
+
+    private fun releaseMicrophoneLease() {
+        synchronized(microphoneLeaseLock) {
+            if (!microphoneLeaseHeld) return
+            microphoneLeaseHeld = false
+            microphoneCaptures?.release(this)
+        }
     }
 
     fun lock() {
