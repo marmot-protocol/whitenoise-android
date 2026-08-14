@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.notifications.NotificationReactionSendOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationReplySendOutcome
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -34,6 +36,67 @@ import org.junit.Test
  * are not.
  */
 class TransientRelaySendErrorTest {
+    @Test
+    fun sharedSendPolicyRetriesAConnectGapThenReturnsSuccess() =
+        runTest {
+            var attempts = 0
+
+            val result =
+                retryTransientRelaySend { attempt ->
+                    attempts = attempt
+                    if (attempt == 1) throw MarmotKitException.Publish("connect relay timed out")
+                    "sent"
+                }
+
+            assertEquals("sent", result)
+            assertEquals(2, attempts)
+        }
+
+    @Test
+    fun sharedSendPolicyExhaustsTheBoundedConnectRetryBudget() =
+        runTest {
+            var attempts = 0
+
+            val failure =
+                runCatching {
+                    retryTransientRelaySend { attempt ->
+                        attempts = attempt
+                        throw MarmotKitException.Publish("connection refused")
+                    }
+                }.exceptionOrNull()
+
+            assertTrue(failure is MarmotKitException.Publish)
+            assertEquals(SEND_RETRY_ATTEMPTS, attempts)
+        }
+
+    @Test
+    fun sharedSendPolicyNeverRetriesAmbiguousOrCancelledSends() =
+        runTest {
+            var ambiguousAttempts = 0
+            val ambiguous =
+                runCatching {
+                    retryTransientRelaySend {
+                        ambiguousAttempts += 1
+                        throw MarmotKitException.Publish("send event timed out")
+                    }
+                }.exceptionOrNull()
+
+            assertTrue(ambiguous is MarmotKitException.Publish)
+            assertEquals(1, ambiguousAttempts)
+
+            var cancelledAttempts = 0
+            val cancellation =
+                runCatching {
+                    retryTransientRelaySend {
+                        cancelledAttempts += 1
+                        throw CancellationException("conversation closed")
+                    }
+                }.exceptionOrNull()
+
+            assertTrue(cancellation is CancellationException)
+            assertEquals(1, cancelledAttempts)
+        }
+
     // ---- Retryable: connect-phase, event provably never sent -------------
 
     @Test

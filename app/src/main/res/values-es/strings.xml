@@ -618,6 +618,7 @@
     <string name="toast_profile_published_detail">Sus metadatos kind:0 están activos en los relés %1$d.</string>
     <string name="toast_couldnt_publish_profile">No se pudo publicar el perfil</string>
     <string name="toast_send_failed">Envío fallido</string>
+    <string name="toast_send_connection_failed">No se pudo conectar con el relé. Comprueba tu conexión e inténtalo de nuevo.</string>
     <string name="toast_send_queue_full">Este chat tiene demasiados mensajes esperando para enviarse, así que el tuyo no se envió. Inténtalo de nuevo cuando se ponga al día.</string>
     <string name="toast_chat_still_loading">Este chat todavía se está cargando. Inténtalo de nuevo en un momento.</string>
     <string name="toast_send_membership_verifying">Verificando tu pertenencia al grupo — tu mensaje no se envió. Se conservó en el cuadro de texto; inténtalo de nuevo en un momento.</string>

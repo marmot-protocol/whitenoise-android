@@ -22,6 +22,13 @@ class SendFailureMessageTest {
     }
 
     @Test
+    fun anExhaustedConnectPhaseFailureExplainsTheConnectivityProblem() {
+        val connectFailure = MarmotKitException.Publish("connect relay timed out")
+
+        assertEquals(R.string.toast_send_connection_failed, sendFailureMessageRes(connectFailure))
+    }
+
+    @Test
     fun everyOtherFailureKeepsTheGenericMessage() {
         listOf(
             MarmotKitException.Publish("relay refused"),

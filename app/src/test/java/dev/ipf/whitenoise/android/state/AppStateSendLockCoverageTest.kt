@@ -260,6 +260,23 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
+    fun manualFailedSendRetryUsesTheSharedBoundedConnectivityPolicy() {
+        val body = controllerFunctionBody("retryFailedSend")
+        val lock = body.indexOf("appState.withGroupCommitLock(account, group.groupIdHex)")
+        val sharedRetry = body.indexOf("publishTextWithRetry(replyTarget, account, text", startIndex = lock)
+
+        assertTrue(
+            "manual text/reply retry must reuse the bounded connect-phase policy inside the group commit lock",
+            lock >= 0 && sharedRetry > lock,
+        )
+        assertFalse(
+            "manual text/reply retry must not bypass the shared policy with direct FFI publish calls",
+            "replyToMessage(account, group.groupIdHex, replyTarget, text)" in body ||
+                "sendText(account, group.groupIdHex, text)" in body,
+        )
+    }
+
+    @Test
     fun markLatestVisibleReadDeadPathStaysDeleted() {
         val source = controllersSource().readText()
 

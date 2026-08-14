@@ -43,6 +43,7 @@ import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -1565,6 +1566,32 @@ internal fun isTransientRelaySendError(throwable: Throwable): Boolean {
         ("no relay endpoints" in text)
 }
 
+/**
+ * Runs one text/reply publish through the shared bounded connect-phase retry
+ * policy. Both initial sends and user-triggered retries use this helper so a
+ * failed bubble does not become single-shot while the relay pool reconnects.
+ */
+internal suspend fun <T> retryTransientRelaySend(
+    onTransientFailure: suspend (attempt: Int, throwable: Throwable) -> Unit = { _, _ -> },
+    sendAttempt: suspend (attempt: Int) -> T,
+): T {
+    var lastTransient: Throwable? = null
+    for (attempt in 1..SEND_RETRY_ATTEMPTS) {
+        try {
+            return sendAttempt(attempt)
+        } catch (throwable: Throwable) {
+            rethrowIfCancellation(throwable)
+            if (!isTransientRelaySendError(throwable)) throw throwable
+            lastTransient = throwable
+            onTransientFailure(attempt, throwable)
+            if (attempt < SEND_RETRY_ATTEMPTS) {
+                kotlinx.coroutines.delay(SEND_RETRY_BACKOFF_MS)
+            }
+        }
+    }
+    throw lastTransient ?: IllegalStateException("send retry budget exhausted")
+}
+
 internal fun mediaCacheKey(
     account: String,
     groupIdHex: String,
@@ -2206,10 +2233,12 @@ internal fun presentSendFailure(
         "DMSend",
         "send failed type=${throwable.javaClass.simpleName} detail=${throwable.message}",
     )
-    if (throwable is MarmotKitException.GroupSendQueueFull) {
-        appState.present(R.string.toast_send_queue_full)
-    } else {
-        appState.presentFailure(R.string.toast_send_failed, "MESSAGE_SEND", throwable)
+    val message = sendFailureMessageRes(throwable)
+    when (throwable) {
+        is MarmotKitException.GroupSendQueueFull,
+        is MarmotKitException.GroupHydrationPending,
+        -> appState.present(message)
+        else -> appState.presentFailure(message, "MESSAGE_SEND", throwable)
     }
 }
 
@@ -2228,7 +2257,12 @@ internal fun sendFailureMessageRes(throwable: Throwable): Int =
     when (throwable) {
         is MarmotKitException.GroupSendQueueFull -> R.string.toast_send_queue_full
         is MarmotKitException.GroupHydrationPending -> R.string.toast_chat_still_loading
-        else -> R.string.toast_send_failed
+        else ->
+            if (isTransientRelaySendError(throwable)) {
+                R.string.toast_send_connection_failed
+            } else {
+                R.string.toast_send_failed
+            }
     }
 
 internal fun logUnreadCountDivergence(
@@ -5882,6 +5916,14 @@ class ConversationController(
             groupRoster(account, groupIdHex)
         }
     },
+    private val textPublisher: suspend (String?, String, String, String) -> SendSummaryFfi =
+        { replyTarget, account, groupIdHex, text ->
+            if (replyTarget != null) {
+                appState.marmotIo { replyToMessage(account, groupIdHex, replyTarget, text) }
+            } else {
+                appState.marmotIo { sendText(account, groupIdHex, text) }
+            }
+        },
 ) {
     var group by mutableStateOf(initialGroup)
         private set
@@ -7210,9 +7252,10 @@ class ConversationController(
         trimmed: String,
         trace: String,
         traceStartMs: Long,
-    ): dev.ipf.marmotkit.SendSummaryFfi {
-        var lastTransient: Throwable? = null
-        for (attempt in 1..SEND_RETRY_ATTEMPTS) {
+    ): dev.ipf.marmotkit.SendSummaryFfi =
+        retryTransientRelaySend(
+            onTransientFailure = { attempt, throwable -> logSendRetry(attempt, throwable) },
+        ) { attempt ->
             // Time the FFI hop itself (App → engine `send_message`: MLS commit +
             // encrypt + publish + relay ack round-trip, all synchronous inside
             // this call). This is the primary "long pole" candidate the issue
@@ -7221,12 +7264,7 @@ class ConversationController(
             val ffiStartMs = traceNowMs()
             sendTrace(trace, "ffi-start", ffiStartMs - traceStartMs, context = arrayOf("attempt" to attempt))
             try {
-                val summary =
-                    if (replyTarget != null) {
-                        appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, trimmed) }
-                    } else {
-                        appState.marmotIo { sendText(account, group.groupIdHex, trimmed) }
-                    }
+                val summary = textPublisher(replyTarget, account, group.groupIdHex, trimmed)
                 sendTrace(
                     trace,
                     "ffi-return",
@@ -7235,9 +7273,8 @@ class ConversationController(
                     "attempt" to attempt,
                     "msgIds" to summary.messageIds.size,
                 )
-                return summary
+                summary
             } catch (throwable: Throwable) {
-                throwable.rethrowIfCancellation()
                 sendTrace(
                     trace,
                     "ffi-error",
@@ -7246,17 +7283,9 @@ class ConversationController(
                     "attempt" to attempt,
                     "error" to throwable.javaClass.simpleName,
                 )
-                if (!isTransientRelaySendError(throwable)) throw throwable
-                lastTransient = throwable
-                logSendRetry(attempt, throwable)
-                if (attempt < SEND_RETRY_ATTEMPTS) {
-                    kotlinx.coroutines.delay(SEND_RETRY_BACKOFF_MS)
-                }
+                throw throwable
             }
         }
-        // Budget exhausted on a sustained connectivity gap: surface the failure.
-        throw lastTransient ?: IllegalStateException("send retry budget exhausted")
-    }
 
     /**
      * Trace a transient send retry with the current relay-health snapshot.
@@ -8394,11 +8423,10 @@ class ConversationController(
             }
             val summary =
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    if (replyTarget != null) {
-                        appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, text) }
-                    } else {
-                        appState.marmotIo { sendText(account, group.groupIdHex, text) }
-                    }
+                    val retryTrace = SendTrace.nextSequence()
+                    val retryTraceStartMs = traceNowMs()
+                    sendTrace(retryTrace, "manual-retry", 0L, context = arrayOf("reply" to (replyTarget != null)))
+                    publishTextWithRetry(replyTarget, account, text, retryTrace, retryTraceStartMs)
                 }
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; drop the result entirely.
