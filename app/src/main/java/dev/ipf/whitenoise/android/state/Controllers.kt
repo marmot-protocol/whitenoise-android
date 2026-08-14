@@ -43,6 +43,7 @@ import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -5915,6 +5916,14 @@ class ConversationController(
             groupRoster(account, groupIdHex)
         }
     },
+    private val textPublisher: suspend (String?, String, String, String) -> SendSummaryFfi =
+        { replyTarget, account, groupIdHex, text ->
+            if (replyTarget != null) {
+                appState.marmotIo { replyToMessage(account, groupIdHex, replyTarget, text) }
+            } else {
+                appState.marmotIo { sendText(account, groupIdHex, text) }
+            }
+        },
 ) {
     var group by mutableStateOf(initialGroup)
         private set
@@ -7255,12 +7264,7 @@ class ConversationController(
             val ffiStartMs = traceNowMs()
             sendTrace(trace, "ffi-start", ffiStartMs - traceStartMs, context = arrayOf("attempt" to attempt))
             try {
-                val summary =
-                    if (replyTarget != null) {
-                        appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, trimmed) }
-                    } else {
-                        appState.marmotIo { sendText(account, group.groupIdHex, trimmed) }
-                    }
+                val summary = textPublisher(replyTarget, account, group.groupIdHex, trimmed)
                 sendTrace(
                     trace,
                     "ffi-return",
