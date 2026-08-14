@@ -61,7 +61,8 @@ class MessageAttachmentSaveTest {
             "document saves must join the transfer and stream its reusable artifact",
             "materializeDocumentAttachment(" in saveBody &&
                 "requestAttachmentTransfer(" in saveBody &&
-                "saveDocumentToDownloads(" in saveBody,
+                "saveDocumentWithFallback(" in saveBody &&
+                "documentSaveFallback" in saveBody,
         )
     }
 

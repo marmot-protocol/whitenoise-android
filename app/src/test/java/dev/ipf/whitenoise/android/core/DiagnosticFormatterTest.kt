@@ -204,6 +204,26 @@ class DiagnosticFormatterTest {
     }
 
     @Test
+    fun errorReportUsesTypedInternalMetadataBeforeGenericCauseCategory() {
+        val failure =
+            object : java.io.IOException("private provider failure"), DiagnosticErrorMetadata {
+                override val diagnosticErrorCode: String = "IO"
+                override val diagnosticTechnicalDetail: String = "stage=MEDIASTORE_INSERT"
+            }
+
+        val report =
+            DiagnosticFormatter.errorReport(
+                operationCode = "message attachment save",
+                throwable = failure,
+                context = DiagnosticFormatter.ErrorReportContext("dev", "test", "now"),
+            )
+
+        assertTrue(report.contains("error=IO"))
+        assertTrue(report.contains("detail=stage=MEDIASTORE_INSERT"))
+        assertFalse(report.contains("private provider failure"))
+    }
+
+    @Test
     fun errorReportTruncatesUnboundedDetails() {
         val report =
             DiagnosticFormatter.errorReport(

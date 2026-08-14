@@ -125,6 +125,42 @@ class AttachmentPresentationTest {
     }
 
     @Test
+    fun zapstoreApkOpenRequestsMissingInstallerPermissionOnlyWhenRequired() {
+        assertTrue(
+            requiresAndroidPackageInstallPermission(
+                mediaType = ANDROID_PACKAGE_MIME,
+                selfUpdateEnabled = true,
+                sdkInt = 37,
+                canRequestPackageInstalls = { false },
+            ),
+        )
+        assertFalse(
+            requiresAndroidPackageInstallPermission(
+                mediaType = ANDROID_PACKAGE_MIME,
+                selfUpdateEnabled = true,
+                sdkInt = 37,
+                canRequestPackageInstalls = { true },
+            ),
+        )
+        assertFalse(
+            requiresAndroidPackageInstallPermission(
+                mediaType = "application/pdf",
+                selfUpdateEnabled = true,
+                sdkInt = 37,
+                canRequestPackageInstalls = { false },
+            ),
+        )
+        assertFalse(
+            requiresAndroidPackageInstallPermission(
+                mediaType = ANDROID_PACKAGE_MIME,
+                selfUpdateEnabled = false,
+                sdkInt = 37,
+                canRequestPackageInstalls = { false },
+            ),
+        )
+    }
+
+    @Test
     fun unresolvedCacheStateNeverStartsAnAutomaticDownload() {
         assertFalse(shouldStartAttachmentDownload(AttachmentTransferState.Resolving, true, 12uL, mine = false))
         assertFalse(shouldStartAttachmentDownload(AttachmentTransferState.Available, true, 12uL, mine = false))

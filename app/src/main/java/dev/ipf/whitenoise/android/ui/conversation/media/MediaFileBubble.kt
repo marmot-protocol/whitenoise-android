@@ -88,6 +88,7 @@ internal fun MediaFileBubble(
     attachedToCaption: Boolean = false,
 ) {
     val context = LocalContext.current
+    val openAttachment = rememberAttachmentOpener()
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val pillKey = "$messageIdHex#$attachmentIndex"
@@ -175,17 +176,15 @@ internal fun MediaFileBubble(
                                 // the durable worker; the next tap then reuses L2.
                                 if (!lifecycleOwner.lifecycle.awaitResumedOrDestroyed()) return@launch
                                 val outcome =
-                                    openAttachmentExternally(
-                                        context,
-                                        file,
-                                        reference.mediaType,
-                                    )
+                                    openAttachment(file, reference.mediaType)
                                 when (outcome) {
                                     OpenAttachmentResult.Opened -> Unit
                                     OpenAttachmentResult.NoHandler -> {
                                         appState.present(noOpenAppMessage)
                                     }
-                                    OpenAttachmentResult.Error -> {
+                                    OpenAttachmentResult.InstallPermissionRequired,
+                                    OpenAttachmentResult.Error,
+                                    -> {
                                         appState.present(couldntOpenMessage, copyable = true)
                                     }
                                 }

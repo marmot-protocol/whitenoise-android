@@ -3,9 +3,12 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.content.ContentProvider
 import android.content.ContentResolver
 import android.content.ContentValues
+import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
 import android.provider.MediaStore
+import android.provider.Settings
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -20,6 +23,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowContentResolver
 import java.io.File
+import java.io.FilterOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 
 @RunWith(RobolectricTestRunner::class)
@@ -95,16 +99,79 @@ class MediaAttachmentSaveTest {
     }
 
     @Test
-    fun mediaStoreWriteFailureIsPreservedForDiagnosticPresentation() {
-        val writeFailure = java.io.IOException("credential-bearing content://secret must not reach UI")
-        provider.outputFailure = writeFailure
+    fun documentFallbackIntentUsesSafeNameAndOriginalMime() {
+        val intent = createDocumentIntent("../agent-build.apk", ANDROID_PACKAGE_MIME)
+
+        assertEquals(Intent.ACTION_CREATE_DOCUMENT, intent.action)
+        assertTrue(intent.categories?.contains(Intent.CATEGORY_OPENABLE) == true)
+        assertEquals(ANDROID_PACKAGE_MIME, intent.type)
+        assertEquals("agent-build.apk", intent.getStringExtra(Intent.EXTRA_TITLE))
+    }
+
+    @Test
+    fun packageInstallPermissionIntentReturnsThroughActivityResult() {
+        val context = context()
+        val intent = androidPackageInstallPermissionIntent(context)
+
+        assertEquals(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, intent.action)
+        assertEquals("package:${context.packageName}", intent.data.toString())
+        assertEquals(0, intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    @Test
+    fun documentSaveUsesSelectedDestinationAfterMediaStoreFailure() =
+        runTest {
+            val source = File.createTempFile("materialized-attachment", ".apk")
+            provider.outputFailure = java.io.IOException("provider unavailable")
+            var selectedSource: File? = null
+            try {
+                source.writeBytes(PAYLOAD)
+
+                val saved =
+                    saveDocumentWithFallback(
+                        context = context(),
+                        source = source,
+                        fileName = "agent-build.apk",
+                        mediaType = ANDROID_PACKAGE_MIME,
+                        fallback = { fallbackSource, _, _ -> selectedSource = fallbackSource },
+                    )
+
+                assertTrue(saved)
+                assertSame(source, selectedSource)
+                assertEquals(1, provider.deleteCount)
+            } finally {
+                source.delete()
+            }
+        }
+
+    @Test
+    fun mediaStoreOpenFailureIsPreservedForDiagnosticPresentation() {
+        val openFailure = java.io.IOException("credential-bearing content://secret must not reach UI")
+        provider.outputFailure = openFailure
 
         val failure =
             runCatching {
                 saveAttachmentToMediaStore(context(), PAYLOAD, "private-name.png", "image/png")
             }.exceptionOrNull()
 
-        assertSame(writeFailure, failure)
+        assertTrue(failure is AttachmentSaveException)
+        assertEquals(AttachmentSaveStage.MEDIASTORE_OPEN, (failure as AttachmentSaveException).stage)
+        assertSame(openFailure, failure.cause)
+    }
+
+    @Test
+    fun mediaStoreWriteFailureReportsWriteStage() {
+        val writeFailure = java.io.IOException("local write failed")
+        provider.writeFailure = writeFailure
+
+        val failure =
+            runCatching {
+                saveAttachmentToMediaStore(context(), PAYLOAD, "private-name.png", "image/png")
+            }.exceptionOrNull()
+
+        assertTrue(failure is AttachmentSaveException)
+        assertEquals(AttachmentSaveStage.MEDIASTORE_WRITE, (failure as AttachmentSaveException).stage)
+        assertSame(writeFailure, failure.cause)
     }
 
     @Test
@@ -121,10 +188,40 @@ class MediaAttachmentSaveTest {
                     saveAttachmentToMediaStore(context(), PAYLOAD, fileName, mediaType)
                 }.exceptionOrNull()
 
-            assertTrue(failure is java.io.IOException)
+            assertTrue(failure is AttachmentSaveException)
+            assertEquals(AttachmentSaveStage.MEDIASTORE_FINALIZE, (failure as AttachmentSaveException).stage)
             assertEquals(collection, provider.insertedCollection)
             assertEquals(index + 1, provider.deleteCount)
         }
+    }
+
+    @Test
+    fun mediaStoreInsertRetriesOneNullProviderResult() {
+        var attempt = 0
+        var retries = 0
+
+        val inserted =
+            retryNullableMediaStoreInsert(onRetry = { retries++ }) {
+                attempt += 1
+                if (attempt == 1) null else "content://media/downloads/1"
+            }
+
+        assertEquals("content://media/downloads/1", inserted)
+        assertEquals(2, attempt)
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun exhaustedNullMediaStoreInsertReportsStableStage() {
+        val failure =
+            runCatching {
+                retryNullableMediaStoreInsert<String>(attempts = 2, onRetry = {}) { null }
+            }.exceptionOrNull()
+
+        assertTrue(failure is AttachmentSaveException)
+        assertEquals(AttachmentSaveStage.MEDIASTORE_INSERT, (failure as AttachmentSaveException).stage)
+        assertEquals("IO", failure.diagnosticErrorCode)
+        assertEquals("stage=MEDIASTORE_INSERT", failure.diagnosticTechnicalDetail)
     }
 
     @Test(expected = CancellationException::class)
@@ -147,6 +244,7 @@ class MediaAttachmentSaveTest {
         var updatedValues: ContentValues? = null
             private set
         var outputFailure: Throwable? = null
+        var writeFailure: Throwable? = null
         var updateResult: Int = 1
         var deleteCount: Int = 0
             private set
@@ -173,7 +271,16 @@ class MediaAttachmentSaveTest {
             shadowOf(resolver)
                 .registerOutputStreamSupplier(inserted) {
                     outputFailure?.let { throw it }
-                    outputFile.outputStream()
+                    object : FilterOutputStream(outputFile.outputStream()) {
+                        override fun write(
+                            buffer: ByteArray,
+                            offset: Int,
+                            length: Int,
+                        ) {
+                            writeFailure?.let { throw it }
+                            super.write(buffer, offset, length)
+                        }
+                    }
                 }
             return inserted
         }

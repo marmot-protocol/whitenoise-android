@@ -13,10 +13,18 @@ internal suspend fun saveMessageMediaAttachments(
     messageIdHex: String,
     mediaReferences: List<MediaAttachmentReferenceFfi>,
     mine: Boolean,
+    documentSaveFallback: DocumentSaveFallback? = null,
 ): MessageAttachmentSaveSummary {
     var savedCount = 0
     var firstFailure: Throwable? = null
-    val saveContext = MessageAttachmentSaveContext(context, controller, messageIdHex, mine)
+    val saveContext =
+        MessageAttachmentSaveContext(
+            androidContext = context,
+            controller = controller,
+            messageIdHex = messageIdHex,
+            mine = mine,
+            documentSaveFallback = documentSaveFallback,
+        )
     mediaReferences.forEachIndexed { attachmentIndex, reference ->
         val result =
             runCatching<Boolean> {
@@ -43,6 +51,7 @@ private data class MessageAttachmentSaveContext(
     val controller: ConversationController,
     val messageIdHex: String,
     val mine: Boolean,
+    val documentSaveFallback: DocumentSaveFallback?,
 )
 
 private suspend fun saveMessageMediaAttachment(
@@ -146,12 +155,11 @@ private suspend fun saveMessageDocumentAttachment(
                     ).await()
             },
         )
-    return withContext(Dispatchers.IO) {
-        saveDocumentToDownloads(
-            context = context.androidContext,
-            source = file,
-            fileName = reference.fileName,
-            mediaType = reference.mediaType,
-        )
-    }
+    return saveDocumentWithFallback(
+        context = context.androidContext,
+        source = file,
+        fileName = reference.fileName,
+        mediaType = reference.mediaType,
+        fallback = context.documentSaveFallback,
+    )
 }
