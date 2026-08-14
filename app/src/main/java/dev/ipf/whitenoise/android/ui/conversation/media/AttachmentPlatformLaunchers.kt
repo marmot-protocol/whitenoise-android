@@ -27,6 +27,9 @@ import kotlin.coroutines.resumeWithException
 
 internal typealias DocumentSaveFallback = suspend (source: File, fileName: String, mediaType: String) -> Unit
 
+/** User dismissed the destination picker; unlike parent cancellation, a batch may continue. */
+internal class DocumentDestinationCancelledException : CancellationException("document destination cancelled")
+
 /**
  * Opens an attachment and, for Zapstore APKs, resumes the same tap after the
  * per-source package-install permission screen returns.
@@ -83,7 +86,7 @@ internal fun rememberDocumentSaveFallback(): DocumentSaveFallback {
                 val result = launchCreateDocument(createDocumentIntent(fileName, mediaType))
                 val destination =
                     result.data?.data?.takeIf { result.resultCode == Activity.RESULT_OK }
-                        ?: throw CancellationException("document destination cancelled")
+                        ?: throw DocumentDestinationCancelledException()
                 withContext(Dispatchers.IO) {
                     copyDocumentToDestination(context, source, destination)
                 }

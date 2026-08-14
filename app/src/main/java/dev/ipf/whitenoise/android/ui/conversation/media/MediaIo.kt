@@ -476,8 +476,8 @@ internal fun copyDocumentToDestination(
                 ?: throw java.io.IOException("document provider returned no output stream")
         }
     attachmentSaveStage(AttachmentSaveStage.DOCUMENT_DESTINATION_WRITE) {
-        source.inputStream().use { input ->
-            output.use { destinationStream -> input.copyTo(destinationStream, DEFAULT_BUFFER_SIZE) }
+        output.use { destinationStream ->
+            source.inputStream().use { input -> input.copyTo(destinationStream, DEFAULT_BUFFER_SIZE) }
         }
     }
 }

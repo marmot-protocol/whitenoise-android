@@ -158,6 +158,14 @@ class AttachmentPresentationTest {
                 canRequestPackageInstalls = { false },
             ),
         )
+        assertFalse(
+            requiresAndroidPackageInstallPermission(
+                mediaType = ANDROID_PACKAGE_MIME,
+                selfUpdateEnabled = true,
+                sdkInt = 25,
+                canRequestPackageInstalls = { false },
+            ),
+        )
     }
 
     @Test

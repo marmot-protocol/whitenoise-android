@@ -175,6 +175,25 @@ class MediaAttachmentSaveTest {
     }
 
     @Test
+    fun documentDestinationClosesWhenSourceCannotOpen() {
+        val destination =
+            context().contentResolver.insert(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                ContentValues(),
+            ) ?: error("test provider did not return a destination")
+        val missingSource = File(outputFile.parentFile, "missing-source-${System.nanoTime()}")
+
+        val failure =
+            runCatching {
+                copyDocumentToDestination(context(), missingSource, destination)
+            }.exceptionOrNull()
+
+        assertTrue(failure is AttachmentSaveException)
+        assertEquals(AttachmentSaveStage.DOCUMENT_DESTINATION_WRITE, (failure as AttachmentSaveException).stage)
+        assertEquals(1, provider.outputCloseCount)
+    }
+
+    @Test
     fun mediaStoreZeroRowFinalizationFailsAndDeletesPendingEntry() {
         provider.updateResult = 0
 
@@ -248,6 +267,8 @@ class MediaAttachmentSaveTest {
         var updateResult: Int = 1
         var deleteCount: Int = 0
             private set
+        var outputCloseCount: Int = 0
+            private set
 
         override fun onCreate(): Boolean = true
 
@@ -279,6 +300,14 @@ class MediaAttachmentSaveTest {
                         ) {
                             writeFailure?.let { throw it }
                             super.write(buffer, offset, length)
+                        }
+
+                        override fun close() {
+                            try {
+                                super.close()
+                            } finally {
+                                outputCloseCount += 1
+                            }
                         }
                     }
                 }

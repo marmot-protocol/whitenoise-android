@@ -8,7 +8,10 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.ui.conversation.media.DocumentDestinationCancelledException
+import dev.ipf.whitenoise.android.ui.conversation.media.rethrowParentCancellation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -64,6 +67,16 @@ class MessageAttachmentSaveTest {
                 "saveDocumentWithFallback(" in saveBody &&
                 "documentSaveFallback" in saveBody,
         )
+    }
+
+    @Test
+    fun pickerDismissalDoesNotCancelAttachmentBatch() {
+        DocumentDestinationCancelledException().rethrowParentCancellation()
+    }
+
+    @Test(expected = CancellationException::class)
+    fun parentCancellationStillEscapesAttachmentBatch() {
+        CancellationException("parent cancelled").rethrowParentCancellation()
     }
 
     @Test

@@ -33,7 +33,7 @@ internal suspend fun saveMessageMediaAttachments(
                 check(saved) { "MediaStore save returned false" }
                 true
             }.onFailure {
-                if (it is kotlinx.coroutines.CancellationException) throw it
+                it.rethrowParentCancellation()
             }
         val saved = result.getOrDefault(false)
         if (saved) savedCount += 1
@@ -44,6 +44,13 @@ internal suspend fun saveMessageMediaAttachments(
         totalCount = mediaReferences.size,
         firstFailure = firstFailure,
     )
+}
+
+internal fun Throwable.rethrowParentCancellation() {
+    when (this) {
+        is DocumentDestinationCancelledException -> Unit
+        is kotlinx.coroutines.CancellationException -> throw this
+    }
 }
 
 private data class MessageAttachmentSaveContext(
