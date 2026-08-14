@@ -6,7 +6,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -58,16 +57,15 @@ class AccountSwitcherUnreadDotLayoutTest {
                 },
         )
 
-        val laterAvatarBounds = avatarBounds("account-3")
-        assertDotRemainsVisibleAndAttached(
+        assertUnreadDotFullyOwnedByAvatar(
             dotTag = otherAccountUnreadDotTag("account-2"),
-            avatarTag = otherAccountAvatarTag("account-2"),
-            occluderBounds = laterAvatarBounds,
+            ownerAvatarTag = otherAccountAvatarTag("account-2"),
+            rightNeighborAvatarTag = otherAccountAvatarTag("account-3"),
         )
-        assertDotRemainsVisibleAndAttached(
+        assertUnreadDotFullyOwnedByAvatar(
             dotTag = otherAccountUnreadDotTag("account-3"),
-            avatarTag = otherAccountAvatarTag("account-3"),
-            occluderBounds = null,
+            ownerAvatarTag = otherAccountAvatarTag("account-3"),
+            leftNeighborAvatarTag = otherAccountAvatarTag("account-2"),
         )
     }
 
@@ -82,16 +80,15 @@ class AccountSwitcherUnreadDotLayoutTest {
             rtl = true,
         )
 
-        val laterAvatarBounds = avatarBounds("account-3")
-        assertDotRemainsVisibleAndAttached(
+        assertUnreadDotFullyOwnedByAvatar(
             dotTag = otherAccountUnreadDotTag("account-2"),
-            avatarTag = otherAccountAvatarTag("account-2"),
-            occluderBounds = laterAvatarBounds,
+            ownerAvatarTag = otherAccountAvatarTag("account-2"),
+            rightNeighborAvatarTag = otherAccountAvatarTag("account-3"),
         )
-        assertDotRemainsVisibleAndAttached(
+        assertUnreadDotFullyOwnedByAvatar(
             dotTag = otherAccountUnreadDotTag("account-3"),
-            avatarTag = otherAccountAvatarTag("account-3"),
-            occluderBounds = null,
+            ownerAvatarTag = otherAccountAvatarTag("account-3"),
+            leftNeighborAvatarTag = otherAccountAvatarTag("account-2"),
         )
     }
 
@@ -105,11 +102,13 @@ class AccountSwitcherUnreadDotLayoutTest {
         )
 
         composeRule
-            .onNodeWithContentDescription(unreadDescription, substring = true, useUnmergedTree = true)
-            .assertIsDisplayed()
-        composeRule
-            .onNodeWithContentDescription(context.getString(R.string.open_settings), substring = true)
-            .assertIsDisplayed()
+            .onNode(
+                hasContentDescription(context.getString(R.string.open_settings), substring = true) and
+                    hasContentDescription(unreadDescription, substring = true) and
+                    hasClickAction(),
+                useUnmergedTree = true,
+            ).assertIsDisplayed()
+            .assertHasClickAction()
         composeRule.onNodeWithTag(otherAccountUnreadDotTag("account-2")).assertDoesNotExist()
     }
 
@@ -127,10 +126,9 @@ class AccountSwitcherUnreadDotLayoutTest {
                 hasContentDescription(unreadDescription, substring = true) and hasClickAction(),
             ).assertIsDisplayed()
             .assertHasClickAction()
-        assertDotRemainsVisibleAndAttached(
+        assertUnreadDotFullyOwnedByAvatar(
             dotTag = otherAccountUnreadDotTag("account-2"),
-            avatarTag = otherAccountAvatarTag("account-2"),
-            occluderBounds = null,
+            ownerAvatarTag = otherAccountAvatarTag("account-2"),
         )
     }
 
@@ -178,15 +176,15 @@ class AccountSwitcherUnreadDotLayoutTest {
         }
         composeRule.waitForIdle()
 
-        assertDotRemainsVisibleAndAttached(
+        assertUnreadDotFullyOwnedByAvatar(
             dotTag = otherAccountUnreadDotTag("account-2"),
-            avatarTag = otherAccountAvatarTag("account-2"),
-            occluderBounds = null,
+            ownerAvatarTag = otherAccountAvatarTag("account-2"),
         )
         composeRule
-            .onNodeWithContentDescription(
-                "${context.getString(R.string.open_settings)}, $unreadDescription",
-                substring = true,
+            .onNode(
+                hasContentDescription(context.getString(R.string.open_settings), substring = true) and
+                    hasContentDescription(unreadDescription, substring = true) and
+                    hasClickAction(),
             ).assertDoesNotExist()
 
         composeRule.runOnUiThread {
@@ -200,11 +198,12 @@ class AccountSwitcherUnreadDotLayoutTest {
         composeRule.onNodeWithTag(otherAccountUnreadDotTag("account-2")).assertDoesNotExist()
         composeRule.onNodeWithTag(otherAccountUnreadDotTag("personal")).assertDoesNotExist()
         composeRule
-            .onNodeWithContentDescription(context.getString(R.string.open_settings), substring = true)
-            .assertIsDisplayed()
-        composeRule
-            .onNodeWithContentDescription(unreadDescription, substring = true)
-            .assertIsDisplayed()
+            .onNode(
+                hasContentDescription(context.getString(R.string.open_settings), substring = true) and
+                    hasContentDescription(unreadDescription, substring = true) and
+                    hasClickAction(),
+            ).assertIsDisplayed()
+            .assertHasClickAction()
     }
 
     @Test
@@ -216,16 +215,15 @@ class AccountSwitcherUnreadDotLayoutTest {
                 },
         )
 
-        val overflowBounds =
-            composeRule
-                .onNodeWithContentDescription(context.getString(R.string.switch_account))
-                .fetchSemanticsNode()
-                .boundsInRoot
-
-        assertDotRemainsVisibleAndAttached(
+        assertUnreadDotFullyOwnedByAvatar(
             dotTag = otherAccountUnreadDotTag("account-4"),
-            avatarTag = otherAccountAvatarTag("account-4"),
-            occluderBounds = overflowBounds,
+            ownerAvatarTag = otherAccountAvatarTag("account-4"),
+            leftNeighborAvatarTag = otherAccountAvatarTag("account-3"),
+            rightNeighborBounds =
+                composeRule
+                    .onNodeWithContentDescription(context.getString(R.string.switch_account))
+                    .fetchSemanticsNode()
+                    .boundsInRoot,
         )
     }
 
@@ -274,48 +272,57 @@ class AccountSwitcherUnreadDotLayoutTest {
         composeRule.waitForIdle()
     }
 
-    private fun avatarBounds(accountLabel: String): Rect =
+    private fun boundsForTag(tag: String): Rect =
         composeRule
-            .onNodeWithTag(otherAccountAvatarTag(accountLabel))
+            .onNodeWithTag(tag)
             .fetchSemanticsNode()
             .boundsInRoot
 
-    private fun assertDotRemainsVisibleAndAttached(
+    private fun assertUnreadDotFullyOwnedByAvatar(
         dotTag: String,
-        avatarTag: String,
-        occluderBounds: Rect?,
+        ownerAvatarTag: String,
+        leftNeighborAvatarTag: String? = null,
+        rightNeighborAvatarTag: String? = null,
+        rightNeighborBounds: Rect? = null,
     ) {
         val dotBounds =
             composeRule
                 .onNodeWithTag(dotTag)
                 .fetchSemanticsNode()
                 .boundsInRoot
-        val avatarBounds =
-            composeRule
-                .onNodeWithTag(avatarTag)
-                .fetchSemanticsNode()
-                .boundsInRoot
+        val ownerBounds = boundsForTag(ownerAvatarTag)
 
         val minimumVisibleExtent = with(composeRule.density) { 6.dp.toPx() }
         assertTrue(
             "$dotTag must keep a visible extent",
             dotBounds.width >= minimumVisibleExtent && dotBounds.height >= minimumVisibleExtent,
         )
-
-        val dotCenter =
-            Offset(
-                dotBounds.left + dotBounds.width / 2f,
-                dotBounds.top + dotBounds.height / 2f,
-            )
         assertTrue(
-            "$dotTag must stay anchored to $avatarTag",
-            avatarBounds.contains(dotCenter),
+            "$dotTag must lie wholly inside $ownerAvatarTag",
+            ownerBounds.left <= dotBounds.left &&
+                ownerBounds.top <= dotBounds.top &&
+                ownerBounds.right >= dotBounds.right &&
+                ownerBounds.bottom >= dotBounds.bottom,
         )
 
-        occluderBounds?.let { occluder ->
+        leftNeighborAvatarTag?.let { neighborTag ->
+            val neighborBounds = boundsForTag(neighborTag)
             assertFalse(
-                "$dotTag must not be centered under a later stacked avatar or overflow chip",
-                occluder.contains(dotCenter),
+                "$dotTag must not intersect left neighbor $neighborTag",
+                dotBounds.overlaps(neighborBounds),
+            )
+        }
+        rightNeighborAvatarTag?.let { neighborTag ->
+            val neighborBounds = boundsForTag(neighborTag)
+            assertFalse(
+                "$dotTag must not intersect right neighbor $neighborTag",
+                dotBounds.overlaps(neighborBounds),
+            )
+        }
+        rightNeighborBounds?.let { neighborBounds ->
+            assertFalse(
+                "$dotTag must not intersect right overflow chip",
+                dotBounds.overlaps(neighborBounds),
             )
         }
     }
