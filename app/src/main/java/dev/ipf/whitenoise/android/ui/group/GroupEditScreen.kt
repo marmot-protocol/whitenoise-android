@@ -303,7 +303,7 @@ internal fun GroupEditScreen(
                 }
             }
             item {
-                SectionCard(title = stringResource(R.string.edit)) {
+                SectionCard(title = stringResource(R.string.edit_group_info_title)) {
                     val profileFieldColors =
                         TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
@@ -375,6 +375,7 @@ internal fun GroupEditScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 internal fun GroupEditTopBar(onBack: () -> Unit) {
     TopAppBar(
         title = { Text(stringResource(R.string.edit_group_info_title)) },

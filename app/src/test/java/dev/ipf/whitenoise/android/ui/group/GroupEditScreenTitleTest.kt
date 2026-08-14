@@ -19,6 +19,12 @@ class GroupEditScreenTitleTest {
 
     private fun stringsFile(dirName: String): File = File(resDir, "$dirName/strings.xml")
 
+    private val sourceFile =
+        listOf(
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt"),
+        ).firstOrNull(File::isFile) ?: error("Missing GroupEditScreen source")
+
     private fun stringValue(
         file: File,
         name: String,
@@ -75,31 +81,65 @@ class GroupEditScreenTitleTest {
     }
 
     @Test
-    fun editScreenTopAppBarUsesTheDedicatedTitle() {
-        val source =
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt")
-                .let { if (it.isFile) it else File("src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt") }
-        val text = source.readText()
+    fun editScreenDelegatesToGroupEditTopBar() {
+        val screenBody = functionBody("GroupEditScreen")
+
+        assertTrue(
+            "GroupEditScreen must delegate its top bar to GroupEditTopBar",
+            Regex("""topBar\s*=\s*\{\s*GroupEditTopBar\s*\(\s*onBack\s*=\s*onBack\s*\)\s*}""")
+                .containsMatchIn(screenBody),
+        )
+    }
+
+    @Test
+    fun groupEditTopBarUsesDedicatedTitle() {
+        val topBarBody = functionBody("GroupEditTopBar")
+
+        assertTrue(
+            "GroupEditTopBar title must use edit_group_info_title",
+            Regex("""title\s*=\s*\{\s*Text\s*\(\s*stringResource\s*\(\s*R\.string\.edit_group_info_title""")
+                .containsMatchIn(topBarBody),
+        )
+        assertTrue(
+            "GroupEditTopBar title must not use the bare generic edit resource",
+            !Regex("""title\s*=\s*\{\s*Text\s*\(\s*stringResource\s*\(\s*R\.string\.edit\s*\)""")
+                .containsMatchIn(topBarBody),
+        )
+    }
+
+    @Test
+    fun editDetailsSectionUsesDedicatedTitle() {
+        val screenBody = functionBody("GroupEditScreen")
+
+        assertTrue(
+            "GroupEditScreen details card must use edit_group_info_title",
+            Regex("""SectionCard\s*\(\s*title\s*=\s*stringResource\s*\(\s*R\.string\.edit_group_info_title""")
+                .containsMatchIn(screenBody),
+        )
+    }
+
+    private fun functionBody(functionName: String): String {
+        val text = sourceFile.readText()
         // Strip comments so a commented-out reference cannot satisfy the check.
         val noComments =
             text
                 .replace(Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL), "")
                 .replace(Regex("""//[^\n]*"""), "")
-        val topBarBlock =
-            Regex("""TopAppBar\s*\((.*?)\n\s*\)\s*\n""", RegexOption.DOT_MATCHES_ALL)
-                .find(noComments)
-                ?.groupValues
-                ?.get(1)
-        assertTrue("GroupEditScreen must contain a TopAppBar call", topBarBlock != null)
-        assertTrue(
-            "TopAppBar title argument must be the dedicated edit_group_info_title resource",
-            Regex("""title\s*=\s*\{\s*Text\s*\(\s*stringResource\s*\(\s*R\.string\.edit_group_info_title""")
-                .containsMatchIn(topBarBlock!!),
-        )
-        assertTrue(
-            "TopAppBar title argument must not be the bare generic edit resource",
-            !Regex("""title\s*=\s*\{\s*Text\s*\(\s*stringResource\s*\(\s*R\.string\.edit\s*\)""")
-                .containsMatchIn(topBarBlock),
-        )
+        val signature =
+            Regex("""(?:internal\s+)?fun\s+${Regex.escape(functionName)}\s*\(""").find(noComments)
+                ?: error("Missing $functionName function")
+        val openingBrace = noComments.indexOf('{', signature.range.last)
+        require(openingBrace >= 0) { "Missing $functionName body" }
+        var depth = 0
+        for (index in openingBrace until noComments.length) {
+            when (noComments[index]) {
+                '{' -> depth++
+                '}' -> {
+                    depth--
+                    if (depth == 0) return noComments.substring(openingBrace + 1, index)
+                }
+            }
+        }
+        error("Unclosed $functionName body")
     }
 }
