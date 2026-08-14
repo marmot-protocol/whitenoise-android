@@ -2,13 +2,13 @@ package dev.ipf.whitenoise.android.audio.tts
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
 import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableProjection
-import kotlinx.coroutines.CancellationException
+import dev.ipf.whitenoise.android.ui.parseMarkdownOrEmptyDocument
 
 /** Builds the single active message projection consumed by every TTS entry point. */
+@Suppress("ReturnCount")
 internal suspend fun projectTtsSpeakableEntry(
     message: AppMessageRecordFfi,
     editedText: String?,
@@ -17,34 +17,20 @@ internal suspend fun projectTtsSpeakableEntry(
     mentionDisplayName: ((String) -> String?)? = null,
     isGroupMember: ((String) -> Boolean)? = null,
 ): TtsSpeakableEntry? {
-    val source = MessageProjector.copyableText(message, editedText) ?: return null
-    val hasActiveEdit = message.kind == 9uL && !editedText.isNullOrBlank()
+    val source = resolveTtsSpeakableSource(message, editedText) ?: return null
     val document =
-        if (!hasActiveEdit && message.contentTokens.blocks.isNotEmpty()) {
-            message.contentTokens
-        } else {
-            try {
-                parseMarkdown(source)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                MarkdownDocumentFfi(
-                    truncated = false,
-                    blocks = emptyList(),
-                    blankLinesBefore = byteArrayOf(),
-                )
-            }
-        }
+        resolveTtsSpeakableDocument(
+            message = message,
+            source = source,
+            parseMarkdown = parseMarkdown,
+        )
     val projection =
-        if (document.blocks.isEmpty()) {
-            legacyTextToSpeakableProjection(source)
-        } else {
-            markdownDocumentToSpeakableProjection(
-                document = document,
-                mentionDisplayName = mentionDisplayName,
-                isGroupMember = isGroupMember,
-            )
-        }
+        speakableProjectionFromDocument(
+            source = source.text,
+            document = document,
+            mentionDisplayName = mentionDisplayName,
+            isGroupMember = isGroupMember,
+        ) ?: return null
     return projection.text
         .takeIf(String::isNotBlank)
         ?.let {
@@ -58,6 +44,33 @@ internal suspend fun projectTtsSpeakableEntry(
                 projectionId = projection.projectionId,
             )
         }
+}
+
+internal suspend fun resolveTtsSpeakableDocument(
+    message: AppMessageRecordFfi,
+    source: TtsSpeakableSource,
+    parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
+): MarkdownDocumentFfi {
+    if (source.useStoredContentTokens) return message.contentTokens
+    return parseMarkdownOrEmptyDocument(source.text, parseMarkdown)
+}
+
+internal fun speakableProjectionFromDocument(
+    source: String,
+    document: MarkdownDocumentFfi,
+    mentionDisplayName: ((String) -> String?)? = null,
+    isGroupMember: ((String) -> Boolean)? = null,
+): SpeakableTextProjection? {
+    if (source.isBlank()) return null
+    return if (document.blocks.isEmpty()) {
+        legacyTextToSpeakableProjection(source)
+    } else {
+        markdownDocumentToSpeakableProjection(
+            document = document,
+            mentionDisplayName = mentionDisplayName,
+            isGroupMember = isGroupMember,
+        )
+    }
 }
 
 private fun SpeakableTextProjection.toTtsSpans(): List<TtsSpokenTextSpan> =
