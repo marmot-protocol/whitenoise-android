@@ -202,6 +202,7 @@
     <string name="profile_contact_editor_private_hint">Vous seul voyez le surnom et les notes sur cet appareil. Effacer le surnom rétablit son nom de profil. Les surnoms enregistrés sont nettoyés et limités à 80 caractères.</string>
     <string name="dismiss">Fermer</string>
     <string name="edit">Modifier</string>
+    <string name="edit_group_info_title">Modifier les infos du groupe</string>
     <string name="save_group">Enregistrer le groupe</string>
     <string name="saving_group">Enregistrement du groupe...</string>
     <string name="no_description">Pas de description</string>

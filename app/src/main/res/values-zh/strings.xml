@@ -194,6 +194,7 @@
     <string name="profile_contact_editor_private_hint">只有你会在此设备上看到昵称和备注。清除昵称后将恢复对方的个人资料名称。保存的昵称会被清理并限制为 80 个字符。</string>
     <string name="dismiss">关闭</string>
     <string name="edit">编辑</string>
+    <string name="edit_group_info_title">编辑群组信息</string>
     <string name="save_group">保存组</string>
     <string name="saving_group">正在保存群组...</string>
     <string name="no_description">无描述</string>

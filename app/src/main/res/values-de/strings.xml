@@ -202,6 +202,7 @@
     <string name="profile_contact_editor_private_hint">Nur du siehst Spitzname und Notizen auf diesem Gerät. Wenn du den Spitznamen leerst, wird wieder der Profilname angezeigt. Gespeicherte Spitznamen werden bereinigt und auf 80 Zeichen begrenzt.</string>
     <string name="dismiss">Schließen</string>
     <string name="edit">Bearbeiten</string>
+    <string name="edit_group_info_title">Gruppeninfo bearbeiten</string>
     <string name="save_group">Gruppe speichern</string>
     <string name="saving_group">Gruppe wird gespeichert...</string>
     <string name="no_description">Keine Beschreibung</string>

@@ -194,6 +194,7 @@
     <string name="profile_contact_editor_private_hint">只有你會在此裝置上看到暱稱與備註。清除暱稱後會恢復對方的個人檔案名稱。儲存的暱稱會被清理並限制為 80 個字元。</string>
     <string name="dismiss">關閉</string>
     <string name="edit">編輯</string>
+    <string name="edit_group_info_title">編輯群組資訊</string>
     <string name="save_group">保存群組</string>
     <string name="saving_group">正在儲存群組...</string>
     <string name="no_description">無描述</string>

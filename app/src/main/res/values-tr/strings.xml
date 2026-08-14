@@ -202,6 +202,7 @@
     <string name="profile_contact_editor_private_hint">Takma adı ve notları yalnızca siz bu cihazda görürsünüz. Takma adı temizlemek profil adını geri getirir. Kaydedilen takma adlar temizlenir ve 80 karakterle sınırlanır.</string>
     <string name="dismiss">Kapat</string>
     <string name="edit">Düzenle</string>
+    <string name="edit_group_info_title">Grup bilgisini düzenle</string>
     <string name="save_group">Grubu Kaydet</string>
     <string name="saving_group">Grup kaydediliyor...</string>
     <string name="no_description">Açıklama yok</string>

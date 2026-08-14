@@ -202,6 +202,7 @@
     <string name="profile_contact_editor_private_hint">Solo tú ves el apodo y las notas en este dispositivo. Al borrar el apodo, se restaura su nombre de perfil. Los apodos guardados se limpian y se limitan a 80 caracteres.</string>
     <string name="dismiss">Cerrar</string>
     <string name="edit">Editar</string>
+    <string name="edit_group_info_title">Editar información del grupo</string>
     <string name="save_group">Guardar grupo</string>
     <string name="saving_group">Guardando grupo...</string>
     <string name="no_description">Sin descripción</string>
