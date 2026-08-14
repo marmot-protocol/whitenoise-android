@@ -22,7 +22,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Schedule
@@ -35,8 +34,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,6 +63,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
 import dev.ipf.whitenoise.android.ui.common.rememberImageUploadPreview
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
@@ -462,35 +460,17 @@ internal fun NewGroupSetupScreen(
                             )
                         }
                     }
-                    TextField(
+                    GroupNameEmojiField(
                         value = groupName,
                         onValueChange = { groupName = it },
-                        label = { Text(stringResource(R.string.group_name)) },
-                        singleLine = true,
-                        enabled = detailsEditable,
-                        trailingIcon = {
-                            IconButton(
-                                onClick = {
-                                    if (detailsEditableNow()) {
-                                        showEmojiPicker = true
-                                    }
-                                },
-                                enabled = detailsEditable,
-                                modifier = Modifier.size(48.dp),
-                            ) {
-                                Icon(
-                                    Icons.Default.EmojiEmotions,
-                                    contentDescription = stringResource(R.string.open_emoji_picker),
-                                )
+                        label = stringResource(R.string.group_name),
+                        emojiPickerOpen = showEmojiPicker,
+                        onEmojiPickerClick = {
+                            if (detailsEditableNow()) {
+                                showEmojiPicker = true
                             }
                         },
-                        colors =
-                            TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                errorContainerColor = Color.Transparent,
-                            ),
+                        enabled = detailsEditable,
                         modifier = Modifier.weight(1f),
                     )
                 }
