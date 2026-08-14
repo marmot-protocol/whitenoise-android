@@ -129,6 +129,10 @@ class ConversationImeCollapseFocusTest {
 
         dispatchImeBottom(view, 0)
 
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composer.fetchSemanticsNode().boundsInRoot.bottom > openImeComposerBottom
+        }
+
         val closedImeComposerBottom = composer.fetchSemanticsNode().boundsInRoot.bottom
         val draftAfterDismissal =
             composer

@@ -29,8 +29,6 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -78,6 +76,7 @@ import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
+import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
@@ -248,24 +247,12 @@ internal fun ComposerPill(
                     .heightIn(min = 44.dp)
                     .padding(start = 4.dp, end = 4.dp),
         ) {
-            IconButton(
+            TextEntryEmojiAction(
+                pickerOpen = emojiPickerOpen,
+                enabled = true,
                 onClick = onEmojiPickerToggle,
-                modifier = Modifier.size(36.dp),
-            ) {
-                Icon(
-                    if (emojiPickerOpen) Icons.Default.Keyboard else Icons.Outlined.EmojiEmotions,
-                    contentDescription =
-                        stringResource(
-                            if (emojiPickerOpen) {
-                                R.string.show_keyboard
-                            } else {
-                                R.string.open_emoji_picker
-                            },
-                        ),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
+                togglesKeyboard = true,
+            )
             Box(
                 modifier =
                     Modifier
