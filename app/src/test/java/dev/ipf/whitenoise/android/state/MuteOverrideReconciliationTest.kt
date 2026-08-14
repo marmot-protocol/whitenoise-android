@@ -8,21 +8,23 @@ import org.junit.Test
 
 class MuteOverrideReconciliationTest {
     @Test
-    fun staleProjectionDoesNotDropOverrideAfterCommandFinishes() {
-        assertFalse(
+    fun authoritativeProjectionDropsOverrideWhenNoCommandIsPending() {
+        assertTrue(
             shouldDropMuteOverride(
                 override = settings(muted = true),
                 projectedMuted = false,
                 projectedMutedUntilMs = null,
+                commandPending = false,
             ),
         )
     }
 
     @Test
-    fun matchingProjectionDropsOverride() {
+    fun pendingCommandKeepsOverrideUntilMatchingProjectionArrives() {
         val override = settings(muted = true, mutedUntilMs = 2_000)
 
-        assertTrue(shouldDropMuteOverride(override, true, 2_000))
+        assertFalse(shouldDropMuteOverride(override, false, null, commandPending = true))
+        assertTrue(shouldDropMuteOverride(override, true, 2_000, commandPending = true))
     }
 
     @Test
