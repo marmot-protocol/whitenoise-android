@@ -3,10 +3,12 @@ package dev.ipf.whitenoise.android.ui
 import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -62,8 +64,15 @@ class NewGroupNameEmojiPickerTest {
         val action = composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker))
         action.assertIsDisplayed().assertHasClickAction()
         val bounds = action.getUnclippedBoundsInRoot()
+        val fieldBounds = composeRule.onNode(hasSetTextAction()).getUnclippedBoundsInRoot()
+        assertTrue(
+            "Emoji action must use the leading half of the field",
+            bounds.left + bounds.right < fieldBounds.left + fieldBounds.right,
+        )
         assertTrue("Emoji action width must be at least 48dp", bounds.right - bounds.left >= 48.dp)
         assertTrue("Emoji action height must be at least 48dp", bounds.bottom - bounds.top >= 48.dp)
+        action.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        action.assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, false))
 
         action.performClick()
 

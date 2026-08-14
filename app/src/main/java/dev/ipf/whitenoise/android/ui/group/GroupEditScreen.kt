@@ -32,9 +32,11 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +47,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
@@ -53,12 +56,16 @@ import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
+import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
+import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
+import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
@@ -70,6 +77,12 @@ import kotlinx.coroutines.CancellationException
  */
 @Suppress("MaxLineLength")
 internal fun safeAvatarUploadUrl(url: String): String = ProfileSanitizer.androidOwnedHttpsImageUrl(url) ?: error("unsafe upload URL")
+
+internal fun groupNameEmojiEditable(
+    canEdit: Boolean,
+    saving: Boolean,
+    mutationInFlight: Boolean,
+): Boolean = canEdit && !saving && !mutationInFlight
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,14 +97,25 @@ internal fun GroupEditScreen(
     // kind-1210 row) while this screen is open, and re-keying on those values
     // would re-init the fields and discard the user's in-progress edit. State
     // resets only when navigating to a different group. (CodeRabbit, #512.)
-    var name by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.name) }
+    var name by
+        rememberSaveable(controller.group.groupIdHex, stateSaver = TextFieldValue.Saver) {
+            mutableStateOf(TextFieldValue(controller.group.name))
+        }
     var description by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.description) }
+    var showEmojiPicker by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
     var showImageSearch by remember { mutableStateOf(false) }
     var avatarViewerOpen by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var imageSaving by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val recentEmojiRecentsOwner = rememberRecentEmojiRecentsOwner(context)
     val canEdit = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
+    val nameEditable =
+        groupNameEmojiEditable(
+            canEdit = canEdit,
+            saving = saving,
+            mutationInFlight = controller.mutationInFlight,
+        )
     val groupAvatarUrl = ProfileSanitizer.protocolImageUrl(controller.group.avatarUrl)
     val encryptedGroupAvatar = rememberEncryptedGroupAvatar(appState, controller.group)
     val legacyGroupAvatarAvailable = rememberAvatarImageAvailable(groupAvatarUrl)
@@ -100,7 +124,11 @@ internal fun GroupEditScreen(
     val saveEnabled =
         !saving &&
             !controller.mutationInFlight &&
-            (name != controller.group.name || description != controller.group.description)
+            (name.text != controller.group.name || description != controller.group.description)
+
+    LaunchedEffect(nameEditable) {
+        if (!nameEditable) showEmojiPicker = false
+    }
 
     fun saveGroupProfile() {
         if (!saveEnabled) return
@@ -108,7 +136,7 @@ internal fun GroupEditScreen(
         controller.clearLastMutationError()
         appState.launchMutation {
             try {
-                if (controller.updateGroupProfile(name, description)) onBack()
+                if (controller.updateGroupProfile(name.text, description)) onBack()
             } finally {
                 saving = false
             }
@@ -318,13 +346,15 @@ internal fun GroupEditScreen(
                             disabledContainerColor = Color.Transparent,
                             errorContainerColor = Color.Transparent,
                         )
-                    TextField(
-                        colors = profileFieldColors,
+                    GroupNameEmojiField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text(stringResource(R.string.group_name)) },
-                        singleLine = true,
-                        enabled = canEdit,
+                        label = stringResource(R.string.group_name),
+                        emojiPickerOpen = showEmojiPicker,
+                        onEmojiPickerClick = {
+                            if (nameEditable) showEmojiPicker = true
+                        },
+                        enabled = nameEditable,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     TextField(
@@ -376,6 +406,19 @@ internal fun GroupEditScreen(
             },
             onPickPhoto = { uri -> uploadPublicAvatar(uri) },
             onDismiss = { showImageSearch = false },
+        )
+    }
+
+    if (showEmojiPicker && nameEditable) {
+        EmojiPickerSheet(
+            onDismissRequest = { showEmojiPicker = false },
+            onEmojiPicked = { emoji ->
+                if (nameEditable) name = insertEmojiAtSelection(name, emoji)
+            },
+            recentEmojis = recentEmojiRecentsOwner.recents,
+            onEmojiUsed = { emoji ->
+                if (nameEditable) recentEmojiRecentsOwner.onEmojiUsed(emoji)
+            },
         )
     }
 }
