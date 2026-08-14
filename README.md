@@ -71,19 +71,17 @@ frozen in `config/detekt/detekt-baseline.xml`. The workflow runs both the
 `zapstore` and `play` dev debug variants and requires no signing secrets or
 `google-services.json`.
 
-Two security gates run separately from the main Gradle validation so their
+Two security workflows run separately from the main Gradle validation so their
 permissions and results stay explicit:
 
 - `.github/workflows/codeql.yml` compiles a credential-free Android variant
   and scans their Java and Kotlin with CodeQL's extended security query suite.
   It runs for pull requests, `master` pushes, a weekly full scan, and manual
   dispatch. Only its SARIF upload receives `security-events: write`.
-- `.github/workflows/dependency-review.yml` rejects pull requests that introduce
-  a known moderate-or-higher vulnerability in a runtime or development
-  dependency. It has read-only repository access and never comments on the PR.
-  `.github/workflows/dependency-submission.yml` supplies GitHub's dependency
-  graph with the resolved Gradle graph after each `master` update; only that
-  submission workflow receives `contents: write`.
+- `.github/workflows/dependency-submission.yml` supplies GitHub's dependency
+  graph with the resolved Gradle graph after each `master` update so repository
+  vulnerability alerts can evaluate direct and transitive Gradle dependencies.
+  Only this submission workflow receives `contents: write`.
 
 Both workflows pin every third-party action to a full commit SHA, cancel
 superseded work, and have bounded job timeouts. Gradle's setup action reuses the
