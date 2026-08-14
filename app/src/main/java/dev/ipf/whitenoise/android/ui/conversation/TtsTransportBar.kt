@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,14 +24,17 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -40,6 +44,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsHistoryEdgeState
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+
+internal const val TTS_TRANSPORT_BODY_TAG = "tts-transport-body"
 
 /**
  * Read-aloud transport strip rendered beneath the conversation's top bar in
@@ -54,6 +60,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 internal fun TtsTransportBar(
     appState: WhiteNoiseAppState,
     modifier: Modifier = Modifier,
+    onBodyClick: (() -> Unit)? = null,
 ) {
     val state by appState.ttsController.state.collectAsState()
     val displayState = rememberTtsTransportDisplayState(state) ?: return
@@ -77,6 +84,7 @@ internal fun TtsTransportBar(
         onStop = { appState.stopSpeaking() },
         modifier = modifier,
         historyEdge = historyEdge,
+        onBodyClick = onBodyClick,
     )
 }
 
@@ -96,8 +104,10 @@ internal fun TtsTransportBarContent(
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
     historyEdge: TtsHistoryEdgeState? = null,
+    onBodyClick: (() -> Unit)? = null,
 ) {
     val isError = state is TtsState.Error
+    val actionableBodyClick = onBodyClick.takeUnless { isError }
     val navigationEnabled = ttsNavigationEnabled(state, historyEdge)
     Surface(modifier = modifier.fillMaxWidth(), tonalElevation = 3.dp) {
         Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
@@ -105,66 +115,88 @@ internal fun TtsTransportBarContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.VolumeUp,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    val preview = if (isError) stringResource(R.string.tts_bar_error) else state.messagePreview
-                    if (preview.isNotBlank()) {
-                        Text(
-                            text = preview,
-                            style = MaterialTheme.typography.bodySmall,
-                            color =
-                                if (isError) {
-                                    MaterialTheme.colorScheme.error
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                val bodyModifier =
+                    if (actionableBodyClick == null) {
+                        Modifier
+                    } else {
+                        Modifier.clickable(
+                            role = Role.Button,
+                            onClickLabel = stringResource(R.string.tts_bar_return_to_source),
+                            onClick = actionableBodyClick,
                         )
                     }
-                    if (!isError && ttsSentenceCount(state) > 0 && ttsMessageCount(state) > 0) {
-                        Text(
-                            text =
-                                stringResource(
-                                    R.string.tts_bar_progress,
-                                    ttsSentenceIndex(state) + 1,
-                                    ttsSentenceCount(state),
-                                    ttsMessageIndex(state) + 1,
-                                    ttsMessageCount(state),
-                                ),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                Row(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .minimumInteractiveComponentSize()
+                            .testTag(TTS_TRANSPORT_BODY_TAG)
+                            .then(bodyModifier)
+                            .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        val preview = if (isError) stringResource(R.string.tts_bar_error) else state.messagePreview
+                        if (preview.isNotBlank()) {
+                            Text(
+                                text = preview,
+                                style = MaterialTheme.typography.bodySmall,
+                                color =
+                                    if (isError) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        if (!isError && ttsSentenceCount(state) > 0 && ttsMessageCount(state) > 0) {
+                            Text(
+                                text =
+                                    stringResource(
+                                        R.string.tts_bar_progress,
+                                        ttsSentenceIndex(state) + 1,
+                                        ttsSentenceCount(state),
+                                        ttsMessageIndex(state) + 1,
+                                        ttsMessageCount(state),
+                                    ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        if (!isError && ttsMessageCount(state) > 0) {
+                            val targetProgress = ttsMessageProgressFraction(state)
+                            val animatedProgress =
+                                key(ttsProgressAnimationKey(state)) {
+                                    val progress by animateFloatAsState(
+                                        targetValue = targetProgress,
+                                        animationSpec = tween(durationMillis = 200),
+                                        label = "ttsMessageProgress",
+                                    )
+                                    progress
+                                }
+                            // The progress text above already narrates the position.
+                            LinearProgressIndicator(
+                                progress = { animatedProgress },
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 4.dp)
+                                        .clearAndSetSemantics {},
+                            )
+                        }
+                        HistoryEdgeStatus(historyEdge)
                     }
-                    if (!isError && ttsMessageCount(state) > 0) {
-                        val targetProgress = ttsMessageProgressFraction(state)
-                        val animatedProgress =
-                            key(ttsProgressAnimationKey(state)) {
-                                val progress by animateFloatAsState(
-                                    targetValue = targetProgress,
-                                    animationSpec = tween(durationMillis = 200),
-                                    label = "ttsMessageProgress",
-                                )
-                                progress
-                            }
-                        // The progress text above already narrates the position.
-                        LinearProgressIndicator(
-                            progress = { animatedProgress },
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 4.dp)
-                                    .clearAndSetSemantics {},
-                        )
-                    }
-                    HistoryEdgeStatus(historyEdge)
                 }
                 if (!isError) {
                     TtsTransportRatePicker(

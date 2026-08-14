@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -62,6 +63,8 @@ import kotlinx.coroutines.withContext
 
 internal data class ConversationOpenContext(
     val focusMessageId: String? = null,
+    val focusMessageRequestId: Long = 0L,
+    val ttsFocusSessionId: Long? = null,
     val notificationOpenRequestId: Long = 0L,
 )
 
@@ -266,6 +269,25 @@ internal fun MainShell(
     // and invalidates a captured pending generation (issue #1953).
     var shellNavState by rememberSaveable(stateSaver = ShellNavigationStateSaver) {
         mutableStateOf(ShellNavigationState())
+    }
+    var pendingTtsDestinationNavigation by remember {
+        mutableStateOf<TtsDestinationNavigationRequest?>(null)
+    }
+    var nextTtsDestinationRequestId by remember { mutableLongStateOf(0L) }
+    val requestTtsDestinationOpen: () -> Unit = {
+        val destination = appState.currentTtsConversationDestination()
+        if (destination == null) {
+            appState.present(R.string.tts_source_unavailable)
+        } else {
+            nextTtsDestinationRequestId += 1L
+            pendingTtsDestinationNavigation =
+                TtsDestinationNavigationRequest(
+                    requestId = nextTtsDestinationRequestId,
+                    accountRef = destination.accountRef,
+                    groupIdHex = destination.groupIdHex,
+                    sessionId = destination.sessionId,
+                )
+        }
     }
     val profileGroupForegroundState =
         remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
@@ -833,6 +855,119 @@ internal fun MainShell(
         previousActiveAccountRef = nextNavAccountRef(previousActiveAccountRef, current)
     }
 
+    // Return the UI to the active spoken passage without touching playback.
+    // Re-resolve the passage at every routing boundary so a sentence/message
+    // advance during an account switch or local read cannot open a stale row.
+    LaunchedEffect(
+        pendingTtsDestinationNavigation,
+        appState.activeAccountRef,
+        appState.accounts,
+        chatsController,
+        chatsController.boundAccountRef,
+        chatsController.isLoading,
+        chatsController.items,
+        chatsController.archivedItems,
+        chatsController.materializedGroupsRevision,
+    ) {
+        val request = pendingTtsDestinationNavigation ?: return@LaunchedEffect
+        val currentDestination = appState.currentTtsConversationDestination()
+        val allChats = chatsController.items + chatsController.archivedItems
+        val chatListReady =
+            chatsController.boundAccountRef == request.accountRef &&
+                !chatsController.isLoading
+        val step =
+            resolveTtsDestinationNavigation(
+                request = request,
+                currentDestination = currentDestination,
+                knownAccountRefs = appState.accounts.mapTo(mutableSetOf()) { it.label },
+                activeAccountRef = appState.activeAccountRef,
+                availableGroupIds = allChats.mapTo(mutableSetOf()) { it.group.groupIdHex },
+            )
+
+        fun clearPendingRequest() {
+            if (pendingTtsDestinationNavigation?.requestId != request.requestId) return
+            pendingTtsDestinationNavigation = null
+        }
+
+        fun failUnavailable() {
+            clearPendingRequest()
+            appState.present(R.string.tts_source_unavailable)
+        }
+
+        fun openDestination(item: ChatListItem) {
+            val latest = appState.currentTtsConversationDestination()
+            val valid =
+                latest?.takeIf {
+                    it.sessionId == request.sessionId &&
+                        it.accountRef == request.accountRef &&
+                        it.groupIdHex.equals(request.groupIdHex, ignoreCase = true)
+                } ?: run {
+                    failUnavailable()
+                    return
+                }
+            sectionName = MainSection.Chats.name
+            settingsDetailName = null
+            supersedePendingGroupCreateOpen()
+            chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+            selectedChatOpenContext =
+                ConversationOpenContext(
+                    focusMessageId = valid.passage.messageIdHex,
+                    focusMessageRequestId = request.requestId,
+                    ttsFocusSessionId = valid.sessionId,
+                )
+            selectedChatJustCreated = false
+            selectedChatOpenedAsDmHint = false
+            selectedChat = item
+            pendingTtsDestinationNavigation = null
+        }
+
+        when (step) {
+            TtsDestinationNavigationStep.Cancelled,
+            TtsDestinationNavigationStep.MissingAccount,
+            -> failUnavailable()
+
+            is TtsDestinationNavigationStep.SwitchAccount -> {
+                if (!request.accountSwitchRequested) {
+                    pendingTtsDestinationNavigation = request.copy(accountSwitchRequested = true)
+                    selectedChat = null
+                    selectedChatOpenContext = ConversationOpenContext()
+                    selectedChatJustCreated = false
+                    selectedChatOpenedAsDmHint = false
+                    chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+                    appState.launchMutation {
+                        appState.setActiveAccount(step.accountRef)
+                        // setActiveAccount already presents its specific failure;
+                        // do not stack a second generic unavailable message.
+                        if (appState.activeAccountRef != step.accountRef) clearPendingRequest()
+                    }
+                }
+            }
+
+            is TtsDestinationNavigationStep.OpenConversation -> {
+                allChats
+                    .firstOrNull { it.group.groupIdHex.equals(step.groupIdHex, ignoreCase = true) }
+                    ?.let(::openDestination)
+                    ?: chatsController.chatItemForGroup(step.groupIdHex)?.let(::openDestination)
+                    ?: failUnavailable()
+            }
+
+            is TtsDestinationNavigationStep.LoadConversationDirectly -> {
+                runCatchingCancellable {
+                    appState.loadNotificationChatListItem(
+                        accountRef = step.accountRef,
+                        groupIdHex = step.groupIdHex,
+                    )
+                }.onSuccess(::openDestination)
+                    .onFailure {
+                        // A transient targeted-read failure can race the new
+                        // account's list bind. Keep the request until that local
+                        // readiness boundary; once ready, failure is authoritative.
+                        if (chatListReady) failUnavailable()
+                    }
+            }
+        }
+    }
+
     // Navigate the shell to a (possibly different) group when a profile sheet's
     // shared-group / Message action fires. The shell-owned profile coordinator
     // uses this for both shell and in-conversation sheets (#635).
@@ -942,6 +1077,8 @@ internal fun MainShell(
                     chat = chat,
                     controller = requireNotNull(conversationController),
                     focusMessageId = selectedChatOpenContext.focusMessageId,
+                    focusMessageRequestId = selectedChatOpenContext.focusMessageRequestId,
+                    ttsFocusSessionId = selectedChatOpenContext.ttsFocusSessionId,
                     notificationOpenRequestId = selectedChatOpenContext.notificationOpenRequestId,
                     justCreated = selectedChatJustCreated,
                     openedAsDmHint = selectedChatOpenedAsDmHint,
@@ -950,6 +1087,7 @@ internal fun MainShell(
                     onGroupCreateSubmitted = onGroupCreateSubmitted,
                     onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
                     onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
+                    onTtsTransportBodyClick = requestTtsDestinationOpen,
                     onSaveScrollSnapshot = { snapshot ->
                         if (snapshot == null) {
                             conversationScrollSnapshots.remove(scrollKey)
@@ -991,6 +1129,7 @@ internal fun MainShell(
                             onGlobalSearchStateChange = globalSearch.update,
                             selectedFolderId = selectedChatListFolderId,
                             onSelectFolder = { selectedChatListFolderId = it },
+                            onTtsTransportBodyClick = requestTtsDestinationOpen,
                             onGroupCreateSubmitted = onGroupCreateSubmitted,
                             onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
                             onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,

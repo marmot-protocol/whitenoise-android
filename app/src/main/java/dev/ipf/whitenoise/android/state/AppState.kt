@@ -1837,6 +1837,15 @@ class WhiteNoiseAppState private constructor(
         ttsHistorySession.onSessionCleared()
     }
 
+    /** Account removal detaches navigation ownership without moving playback. */
+    private fun detachOwnedTtsAutoReadSessionForAccount(accountRef: String) {
+        val owner = ttsAutoReadSessionKey ?: return
+        val separator = owner.indexOf('|')
+        if (separator <= 0 || owner.substring(0, separator) != accountRef) return
+        ttsAutoReadSessionKey = null
+        ttsHistorySession.onSessionCleared()
+    }
+
     /** Live continuation for auto-read: extends an active read-aloud queue. */
     fun appendSpeech(
         entry: TtsSpeakableEntry,
@@ -4423,6 +4432,7 @@ class WhiteNoiseAppState private constructor(
         // In-memory plaintext is dropped synchronously here; the on-disk wipe
         // is awaited in this suspend path so it isn't an orphaned background task.
         val signedOutRef = activeAccountRef ?: return null
+        detachOwnedTtsAutoReadSessionForAccount(signedOutRef)
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
@@ -4522,6 +4532,7 @@ class WhiteNoiseAppState private constructor(
                     restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                     return null
                 }
+            detachOwnedTtsAutoReadSessionForAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
             wipeDecryptedMediaFromDisk()
             clearHiddenMessagesForAccount(wipedRef)

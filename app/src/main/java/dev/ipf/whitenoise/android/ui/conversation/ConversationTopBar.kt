@@ -78,6 +78,7 @@ internal fun ConversationTopBar(
     onOpenSearch: () -> Unit,
     onToggleArchived: () -> Unit,
     onRequestLeave: () -> Unit,
+    onTtsTransportBodyClick: (() -> Unit)? = null,
     performanceSelectorsEnabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS,
 ) {
     Column {
@@ -267,6 +268,9 @@ internal fun ConversationTopBar(
                 },
             )
         }
-        TtsTransportBar(appState)
+        TtsTransportBar(
+            appState = appState,
+            onBodyClick = onTtsTransportBodyClick,
+        )
     }
 }

@@ -138,6 +138,25 @@ class ConversationTtsFollowPolicyTest {
     }
 
     @Test
+    fun explicitTransportReturnCanRevealAPausedPassageExactlyOnce() {
+        val policy = ConversationTtsFollowPolicy()
+        val speaking = speaking(sessionId = 6, sentenceIndex = 3)
+        val paused = paused(speaking)
+        policy.observe(speaking, ownsSession = true)
+        policy.claimPendingTarget()
+        policy.observe(paused, ownsSession = true)
+
+        assertTrue(policy.requestExplicitReveal())
+        val target = paused.followTarget()
+        assertEquals(target, policy.claimPendingTarget())
+        assertTrue(policy.isCurrentTarget(target))
+
+        policy.onFollowSucceeded(target)
+        assertFalse(policy.isCurrentTarget(target))
+        assertNull(policy.claimPendingTarget())
+    }
+
+    @Test
     fun terminalStateAndOwnerLossClearSessionLocalFollowState() {
         val policy = ConversationTtsFollowPolicy()
         val speaking = speaking(sessionId = 5, sentenceIndex = 0)

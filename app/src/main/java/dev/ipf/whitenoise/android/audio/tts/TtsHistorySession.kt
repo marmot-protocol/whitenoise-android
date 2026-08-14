@@ -22,6 +22,13 @@ sealed interface TtsHistoryEdgeState {
     ) : TtsHistoryEdgeState
 }
 
+/** Stable protocol-free owner for one conversation-backed playback session. */
+internal data class TtsConversationSource(
+    val accountRef: String,
+    val groupIdHex: String,
+    val sessionId: Long,
+)
+
 /**
  * Canonical-timeline paging surface a read-aloud session drives. Backed by the
  * conversation's live subscription window — never by an Android-side cache.
@@ -56,15 +63,13 @@ class TtsHistorySession internal constructor(
     private val scope: CoroutineScope,
     private val resolvePager: (accountRef: String?, groupIdHex: String) -> TtsHistoryPager?,
 ) {
-    private data class SessionConversation(
-        val accountRef: String?,
-        val groupIdHex: String,
-    )
-
     private val _edgeState = MutableStateFlow<TtsHistoryEdgeState?>(null)
     val edgeState: StateFlow<TtsHistoryEdgeState?> = _edgeState.asStateFlow()
 
-    private var conversation: SessionConversation? = null
+    private val mutableConversationSource = MutableStateFlow<TtsConversationSource?>(null)
+    internal val conversationSource: StateFlow<TtsConversationSource?> = mutableConversationSource.asStateFlow()
+
+    private var conversation: TtsConversationSource? = null
     private var generation = 0L
     private var pendingLoad: Job? = null
     private var liveTailAttached = true
@@ -88,10 +93,22 @@ class TtsHistorySession internal constructor(
         accountRef: String?,
         groupIdHex: String,
     ) {
+        val sourceAccount = accountRef?.takeIf { it.isNotBlank() }
+        val sourceGroup = groupIdHex.takeIf { it.isNotBlank() }
+        val sessionId = controller.state.value.sessionId
+        if (sourceAccount == null || sourceGroup == null) {
+            onSessionCleared()
+            return
+        }
         invalidatePending()
-        conversation = SessionConversation(accountRef, groupIdHex)
+        conversation =
+            TtsConversationSource(
+                accountRef = sourceAccount,
+                groupIdHex = sourceGroup,
+                sessionId = sessionId,
+            ).also { mutableConversationSource.value = it }
         val timelineTailId =
-            resolvePager(accountRef, groupIdHex)
+            resolvePager(sourceAccount, sourceGroup)
                 ?.timelineRecords()
                 ?.lastOrNull()
                 ?.messageIdHex
@@ -108,6 +125,7 @@ class TtsHistorySession internal constructor(
     fun onSessionCleared() {
         invalidatePending()
         conversation = null
+        mutableConversationSource.value = null
         liveTailAttached = true
         lastKnownTimelineTailId = null
     }
@@ -177,7 +195,7 @@ class TtsHistorySession internal constructor(
     }
 
     private fun startEdgeLoad(
-        convo: SessionConversation,
+        convo: TtsConversationSource,
         direction: TtsHistoryDirection,
         targetSentence: TtsWindowSentenceTarget,
     ) {
