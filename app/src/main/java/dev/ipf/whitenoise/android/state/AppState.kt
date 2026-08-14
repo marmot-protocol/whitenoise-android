@@ -1655,6 +1655,8 @@ class WhiteNoiseAppState private constructor(
     private val bootstrapRuntime = BootstrapRuntimeCoordinator<AppMarmotRuntime>()
     private val startupTraceStartedAtMs = SystemClock.elapsedRealtime()
     private var startupSystemSplashHandoffRecorded = false
+    private var startupLocalRowsRecorded = false
+    private var startupMemberDerivedLocalRecorded = false
     private var startupFirstLocalFrameRecorded = false
     private var startupRelayCatchUpRecorded = false
     private var accountListRevision = 0L
@@ -4286,6 +4288,46 @@ class WhiteNoiseAppState private constructor(
         configurePrivacyRuntime()
         refreshLocalNotificationSettings()
         syncNativePushRegistrationIfEnabled()
+    }
+
+    /**
+     * Records the local SQLite chat-row boundary independently from roster and
+     * profile projection. Logs timing and a small count only—never account ids.
+     */
+    internal fun recordAccountSwitchLocalRowsReady(
+        accountRef: String,
+        rowCount: Int,
+    ) {
+        if (activeAccountRef != accountRef) return
+        if (!startupLocalRowsRecorded) {
+            startupLocalRowsRecorded = true
+            startupTiming("cached-chat-rows-ready", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+        }
+        recordPendingAccountSwitchStage(accountRef, "cached-chat-rows-ready", rowCount)
+    }
+
+    /** Records the point where every cached row has a local member projection. */
+    internal fun recordAccountSwitchMemberDerivedLocalReady(
+        accountRef: String,
+        rowCount: Int,
+    ) {
+        if (activeAccountRef != accountRef) return
+        if (!startupMemberDerivedLocalRecorded) {
+            startupMemberDerivedLocalRecorded = true
+            startupTiming("member-derived-local-ready", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+        }
+        recordPendingAccountSwitchStage(accountRef, "member-derived-local-ready", rowCount)
+    }
+
+    private fun recordPendingAccountSwitchStage(
+        accountRef: String,
+        stage: String,
+        rowCount: Int,
+    ) {
+        val trace = pendingAccountSwitchTrace ?: return
+        if (trace.accountRef != accountRef) return
+        val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
+        appStateDebug { "account-switch $stage +${elapsedMs}ms rows=$rowCount" }
     }
 
     /**

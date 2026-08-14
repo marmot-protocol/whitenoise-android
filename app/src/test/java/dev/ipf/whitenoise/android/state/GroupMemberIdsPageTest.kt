@@ -48,6 +48,35 @@ class GroupMemberIdsPageTest {
         assertTrue(records.all { it.account == null })
     }
 
+    @Test
+    fun firstFrameProfileWarmSelectsOnlyDistinctDirectConversationPeers() {
+        val directGroup = groupId(1)
+        val duplicatePeerGroup = groupId(2)
+        val namedGroup = groupId(3)
+        val selfOnlyGroup = groupId(4)
+        val projections =
+            listOf(
+                AppGroupMemberIdsFfi(directGroup, listOf(SELF.uppercase(), PEER)),
+                AppGroupMemberIdsFfi(duplicatePeerGroup, listOf(SELF, PEER.uppercase(), PEER)),
+                AppGroupMemberIdsFfi(namedGroup, listOf(SELF, OTHER)),
+                AppGroupMemberIdsFfi(selfOnlyGroup, listOf(SELF)),
+            )
+
+        val peers =
+            initialDirectPeerProfileIds(projections, SELF) { groupIdHex, _ ->
+                groupIdHex != namedGroup
+            }
+
+        assertEquals(listOf(PEER), peers.map(String::lowercase))
+    }
+
+    @Test
+    fun firstFrameProfileWarmRequiresAnActiveAccount() {
+        val projections = listOf(AppGroupMemberIdsFfi(groupId(1), listOf(SELF, PEER)))
+
+        assertTrue(initialDirectPeerProfileIds(projections, null) { _, _ -> true }.isEmpty())
+    }
+
     @Test(expected = IllegalStateException::class)
     fun mismatchedProjectionOrderFailsTheWholePage() =
         runTest {
@@ -61,5 +90,6 @@ class GroupMemberIdsPageTest {
     private companion object {
         const val SELF = "11aa"
         const val PEER = "22bb"
+        const val OTHER = "33cc"
     }
 }

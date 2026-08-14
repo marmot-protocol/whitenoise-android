@@ -905,6 +905,33 @@ internal suspend fun loadGroupMemberIdsPages(
     return loaded
 }
 
+/**
+ * Return the projected counterparty ids whose locally persisted presentation
+ * must be materialized before the first cached chat-list frame. The caller
+ * supplies the direct-conversation classifier so this stays independent from
+ * the heavier chat-list row model and remains straightforward to test.
+ */
+internal fun initialDirectPeerProfileIds(
+    projections: Iterable<AppGroupMemberIdsFfi>,
+    activeAccountIdHex: String?,
+    isDirectConversation: (groupIdHex: String, memberCount: Int) -> Boolean,
+): List<String> {
+    val active = activeAccountIdHex?.trim()?.takeIf { it.isNotEmpty() } ?: return emptyList()
+    return projections
+        .asSequence()
+        .mapNotNull { projection ->
+            val memberIds =
+                projection.memberIdsHex
+                    .asSequence()
+                    .filter { it.isNotBlank() }
+                    .distinctBy { it.lowercase() }
+                    .toList()
+            if (!isDirectConversation(projection.groupIdHex, memberIds.size)) return@mapNotNull null
+            memberIds.singleOrNull { !it.equals(active, ignoreCase = true) }
+        }.distinctBy { it.lowercase() }
+        .toList()
+}
+
 internal fun memberRecordsFromIds(
     memberIdsHex: Iterable<String>,
     activeAccountIdHex: String?,
@@ -3563,6 +3590,7 @@ class ChatsController private constructor(
                             chatListStream.snapshot()
                         },
                     )
+                    appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     chatRows.forEach(::requestChatRowProfiles)
                     groupRecordsById =
                         withContext(Dispatchers.IO) {
@@ -3570,6 +3598,7 @@ class ChatsController private constructor(
                         }.associateBy { it.groupIdHex }
                     groupRecordsById.values.forEach(::requestGroupProfiles)
                     seedInitialMemberIdProjection(accountRef, bindEpoch)
+                    recordMemberDerivedLocalReadyIfComplete()
                     chatsDebug {
                         "snapshot account=${accountRef.take(8)} rows=${chatRows.size} groups=${groupRecordsById.size} " +
                             "${chatRows.map { it.debugSummary() }}"
@@ -3787,48 +3816,95 @@ class ChatsController private constructor(
         val groupIds = chatRows.map { it.groupIdHex }
         if (groupIds.isEmpty()) return
         val expectedCacheEpoch = memberCacheEpoch
-        val projections =
-            runCatchingCancellable {
-                loadGroupMemberIdsPages(groupIds) { page ->
-                    appState.marmotIo { groupMemberIdsPage(account, page) }
+        loadInitialMemberIdProjections(account, groupIds)
+            ?.takeIf { initialMemberProjectionIsCurrent(account, epoch, expectedCacheEpoch) }
+            ?.let { projections ->
+                val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
+                // Await only on-device DM peer presentation so the first row
+                // cannot flash a short identity or empty avatar. Relay
+                // freshness remains in requestProfile below.
+                appState.warmProfilePresentationsBlocking(
+                    initialDirectPeerProfileIds(projections, activeAccountIdHex),
+                )
+                if (initialMemberProjectionIsCurrent(account, epoch, expectedCacheEpoch)) {
+                    applyInitialMemberIdProjections(projections, activeAccountIdHex)
                 }
-            }.onFailure { error ->
-                chatsDebug(error) {
-                    "initial member-id projection failed account=${account.take(8)}: " +
-                        (error.message ?: error.javaClass.simpleName)
-                }
-            }.getOrNull() ?: return
-        val projectionIsStale =
-            !isActiveBindEpoch(epoch) ||
-                accountRef != account ||
-                memberCacheEpoch != expectedCacheEpoch
-        if (!projectionIsStale) {
-            val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
-            val updatedCache = memberCacheByGroup.toMutableMap()
-            var updatedRemovedGroupIds = removedGroupIds
-            projections.forEach { projection ->
-                val groupIdHex = projection.groupIdHex
-                val members = memberRecordsFromIds(projection.memberIdsHex, activeAccountIdHex)
-                updatedCache[groupIdHex] = members
-                updatedRemovedGroupIds =
-                    if (
-                        activeAccountIdHex != null &&
-                        members.none { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-                    ) {
-                        updatedRemovedGroupIds + groupIdHex
-                    } else {
-                        updatedRemovedGroupIds - groupIdHex
-                    }
-                members.map { it.memberIdHex }.forEach(appState::requestProfile)
-                presentationMembersByGroup = presentationMembersByGroup - groupIdHex
-                cancelMemberSnapshotRetry(groupIdHex)
-                memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
-                failedMemberFetches.remove(groupIdHex)
-                selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
             }
-            memberCacheByGroup = updatedCache
-            removedGroupIds = updatedRemovedGroupIds
-            memberSnapshotsRevision += 1L
+    }
+
+    private suspend fun loadInitialMemberIdProjections(
+        account: String,
+        groupIds: List<String>,
+    ): List<AppGroupMemberIdsFfi>? =
+        runCatchingCancellable {
+            loadGroupMemberIdsPages(groupIds) { page ->
+                appState.marmotIo { groupMemberIdsPage(account, page) }
+            }
+        }.onFailure { error ->
+            chatsDebug(error) {
+                "initial member-id projection failed account=${account.take(8)}: " +
+                    (error.message ?: error.javaClass.simpleName)
+            }
+        }.getOrNull()
+
+    private fun initialMemberProjectionIsCurrent(
+        account: String,
+        epoch: Long,
+        expectedCacheEpoch: Long,
+    ): Boolean =
+        isActiveBindEpoch(epoch) &&
+            accountRef == account &&
+            memberCacheEpoch == expectedCacheEpoch
+
+    private fun initialDirectPeerProfileIds(
+        projections: List<AppGroupMemberIdsFfi>,
+        activeAccountIdHex: String?,
+    ): List<String> {
+        val rowsByGroup = chatRows.associateBy { chatRowKey(it.groupIdHex) }
+        return initialDirectPeerProfileIds(
+            projections = projections,
+            activeAccountIdHex = activeAccountIdHex,
+        ) { groupIdHex, memberCount ->
+            val row = rowsByGroup[chatRowKey(groupIdHex)]
+            row != null && GroupProjector.isDm(row.conversationKind, memberCount, row.groupName)
+        }
+    }
+
+    private fun applyInitialMemberIdProjections(
+        projections: List<AppGroupMemberIdsFfi>,
+        activeAccountIdHex: String?,
+    ) {
+        val updatedCache = memberCacheByGroup.toMutableMap()
+        var updatedRemovedGroupIds = removedGroupIds
+        projections.forEach { projection ->
+            val groupIdHex = projection.groupIdHex
+            val members = memberRecordsFromIds(projection.memberIdsHex, activeAccountIdHex)
+            updatedCache[groupIdHex] = members
+            updatedRemovedGroupIds =
+                if (
+                    activeAccountIdHex != null &&
+                    members.none { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+                ) {
+                    updatedRemovedGroupIds + groupIdHex
+                } else {
+                    updatedRemovedGroupIds - groupIdHex
+                }
+            members.map { it.memberIdHex }.forEach(appState::requestProfile)
+            presentationMembersByGroup = presentationMembersByGroup - groupIdHex
+            cancelMemberSnapshotRetry(groupIdHex)
+            memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
+            failedMemberFetches.remove(groupIdHex)
+            selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
+        }
+        memberCacheByGroup = updatedCache
+        removedGroupIds = updatedRemovedGroupIds
+        memberSnapshotsRevision += 1L
+    }
+
+    private fun recordMemberDerivedLocalReadyIfComplete() {
+        val account = accountRef ?: return
+        if (chatRows.all { memberCacheByGroup.containsKey(it.groupIdHex) }) {
+            appState.recordAccountSwitchMemberDerivedLocalReady(account, chatRows.size)
         }
     }
 
@@ -5372,6 +5448,7 @@ class ChatsController private constructor(
         memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
         selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
         memberSnapshotsRevision += 1L
+        recordMemberDerivedLocalReadyIfComplete()
         // A loaded roster that omits self is known removal evidence (admin
         // eviction / self-leave the engine has already applied). Marking it
         // makes an empty self-only roster suppress the badge too, where the
