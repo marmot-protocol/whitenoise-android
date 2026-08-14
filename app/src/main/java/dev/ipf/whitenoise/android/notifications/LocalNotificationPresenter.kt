@@ -45,6 +45,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
@@ -685,6 +686,12 @@ class LocalNotificationPresenter(
         enrich: suspend () -> Unit,
     ) {
         if (!ConversationCardPostSynchronizer.retainShow(showToken)) return
+        val released = AtomicBoolean(false)
+        val releaseShow = {
+            if (released.compareAndSet(false, true)) {
+                ConversationCardPostSynchronizer.releaseShow(showToken)
+            }
+        }
         try {
             enrichmentLauncher {
                 try {
@@ -697,11 +704,14 @@ class LocalNotificationPresenter(
                             "type=${failure.javaClass.simpleName}"
                     }
                 } finally {
-                    ConversationCardPostSynchronizer.releaseShow(showToken)
+                    releaseShow()
                 }
             }
+        } catch (cancellation: CancellationException) {
+            releaseShow()
+            throw cancellation
         } catch (failure: RuntimeException) {
-            ConversationCardPostSynchronizer.releaseShow(showToken)
+            releaseShow()
             notificationDebug {
                 "enrichment launch failed tag=${notificationTag.take(16)} " +
                     "type=${failure.javaClass.simpleName}"
