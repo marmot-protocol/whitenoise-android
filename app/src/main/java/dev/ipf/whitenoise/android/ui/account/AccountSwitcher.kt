@@ -21,12 +21,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -102,6 +104,16 @@ private val TOP_BAR_OTHER_ACCOUNT_RING = 2.dp
 // How far each avatar overlaps the previous one to read as a single stacked group.
 private val TOP_BAR_OTHER_ACCOUNT_OVERLAP = 12.dp
 
+private val TOP_BAR_OTHER_ACCOUNT_UNREAD_DOT_SIZE = 10.dp
+
+internal const val OTHER_ACCOUNT_AVATAR_TAG_PREFIX = "other-account-avatar-"
+
+internal const val OTHER_ACCOUNT_UNREAD_DOT_TAG_PREFIX = "other-account-unread-dot-"
+
+internal fun otherAccountAvatarTag(accountLabel: String): String = "$OTHER_ACCOUNT_AVATAR_TAG_PREFIX$accountLabel"
+
+internal fun otherAccountUnreadDotTag(accountLabel: String): String = OTHER_ACCOUNT_UNREAD_DOT_TAG_PREFIX + accountLabel
+
 // Other signed-in accounts, stacked beside the active-account avatar (#343): tap
 // to switch (lands on that account's chat list), long-press for the full
 // switcher, each carrying its own unread dot. Hidden when the active account is
@@ -119,27 +131,40 @@ internal fun OtherAccountAvatarsRow(
     if (others.isEmpty()) return
     val shown = others.take(MAX_TOP_BAR_OTHER_ACCOUNTS)
     val overflow = others.size - shown.size
-    // Natural draw order stacks each avatar on top of the previous, so the "+N"
-    // (drawn last) sits fully on top and stays legible. Each avatar's left edge —
-    // and its unread dot — stays visible under the one in front.
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(-TOP_BAR_OTHER_ACCOUNT_OVERLAP),
-    ) {
-        shown.forEach { account ->
-            val actionColors = accountActionColors(appState, account.label)
-            OtherAccountAvatar(
-                title = appState.displayName(account.accountIdHex),
-                seed = account.accountIdHex,
-                pictureUrl = appState.avatarUrl(account.accountIdHex),
-                showUnreadDot = appState.accountShowsUnreadDot(account.label),
-                unreadDotColor = actionColors.container,
-                onClick = { onSwitchAccount(account.label) },
-                onLongClick = onOpenSwitcher,
-            )
+    // Avatars stack in draw order; unread dots render in a second row above them
+    // so later avatars and the "+N" chip cannot paint over another account's dot.
+    Box {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(-TOP_BAR_OTHER_ACCOUNT_OVERLAP),
+        ) {
+            shown.forEach { account ->
+                OtherAccountAvatar(
+                    accountLabel = account.label,
+                    title = appState.displayName(account.accountIdHex),
+                    seed = account.accountIdHex,
+                    pictureUrl = appState.avatarUrl(account.accountIdHex),
+                    showUnreadDot = appState.accountShowsUnreadDot(account.label),
+                    onClick = { onSwitchAccount(account.label) },
+                    onLongClick = onOpenSwitcher,
+                )
+            }
+            if (overflow > 0) {
+                OverflowAccountChip(count = overflow, onClick = onOpenSwitcher)
+            }
         }
-        if (overflow > 0) {
-            OverflowAccountChip(count = overflow, onClick = onOpenSwitcher)
+        Row(
+            modifier = Modifier.zIndex(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(-TOP_BAR_OTHER_ACCOUNT_OVERLAP),
+        ) {
+            shown.forEach { account ->
+                OtherAccountUnreadDotSlot(
+                    accountLabel = account.label,
+                    visible = appState.accountShowsUnreadDot(account.label),
+                    unreadDotColor = accountActionColors(appState, account.label).container,
+                )
+            }
         }
     }
 }
@@ -147,24 +172,32 @@ internal fun OtherAccountAvatarsRow(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun OtherAccountAvatar(
+    accountLabel: String,
     title: String,
     seed: String,
     pictureUrl: String?,
     showUnreadDot: Boolean,
-    unreadDotColor: Color,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
     val switchDescription = "${stringResource(R.string.switch_account)}: $title"
+    val accountUnreadDescription = stringResource(R.string.account_unread_indicator)
+    val avatarContentDescription =
+        if (showUnreadDot) {
+            "$switchDescription, $accountUnreadDescription"
+        } else {
+            switchDescription
+        }
     Box(
         modifier =
             Modifier
-                // Ring in the bar background so stacked avatars read as separate.
+                .testTag(otherAccountAvatarTag(accountLabel))
                 .size(TOP_BAR_OTHER_ACCOUNT_SIZE)
+                // Ring in the bar background so stacked avatars read as separate.
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surface)
                 .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-                .semantics { contentDescription = switchDescription },
+                .semantics { contentDescription = avatarContentDescription },
         contentAlignment = Alignment.Center,
     ) {
         Avatar(
@@ -173,14 +206,26 @@ private fun OtherAccountAvatar(
             size = TOP_BAR_OTHER_ACCOUNT_SIZE - TOP_BAR_OTHER_ACCOUNT_RING * 2,
             pictureUrl = pictureUrl,
         )
-        if (showUnreadDot) {
-            // Bottom-start: the left edge stays exposed when the next avatar
-            // stacks on top, so the dot isn't hidden under it.
+    }
+}
+
+@Composable
+private fun OtherAccountUnreadDotSlot(
+    accountLabel: String,
+    visible: Boolean,
+    unreadDotColor: Color,
+) {
+    Box(modifier = Modifier.size(TOP_BAR_OTHER_ACCOUNT_SIZE)) {
+        if (visible) {
+            // Bottom-start: the exposed edge of each stacked avatar in LTR; mirrors to
+            // the exposed edge in RTL. Slight outward offset matches the active avatar.
             Box(
                 modifier =
                     Modifier
+                        .testTag(otherAccountUnreadDotTag(accountLabel))
                         .align(Alignment.BottomStart)
-                        .size(10.dp)
+                        .offset(x = (-1).dp, y = 1.dp)
+                        .size(TOP_BAR_OTHER_ACCOUNT_UNREAD_DOT_SIZE)
                         .border(TOP_BAR_OTHER_ACCOUNT_RING, MaterialTheme.colorScheme.surface, CircleShape)
                         .clip(CircleShape)
                         .background(unreadDotColor),
