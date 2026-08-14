@@ -13,6 +13,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -56,13 +57,96 @@ class MessageBubbleLongPressDragTest {
 
     @Test
     @Suppress("LongMethod") // The real MessageBubble host requires its full interaction contract.
-    fun longPressDragEntersRangeWithoutOpeningMessageActions() {
+    fun stationaryLongPressOpensActionsAtThresholdBeforePointerUp() {
+        val appState = appState()
+        val controller = ConversationController(appState = appState, initialGroup = group())
+        val item = timelineMessage()
+        val composerTextState = ComposerTextState(TextFieldValue(""))
+        var bubbleVisible by mutableStateOf(true)
+        var actionMenuOpen by mutableStateOf(false)
+        var actionOpens = 0
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                if (bubbleVisible) {
+                    Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOLD_HOST_TAG)) {
+                        MessageBubble(
+                            item = item,
+                            controller = controller,
+                            appState = appState,
+                            composerTextState = composerTextState,
+                            highlighted = false,
+                            selectionMode = false,
+                            textSelectionMode = false,
+                            onTextSelectionModeChange = {},
+                            onTextSelectionBoundsChange = {},
+                            batchSelectable = true,
+                            selected = false,
+                            onToggleSelection = {},
+                            rangeDragActive = false,
+                            onDragSelectionStart = {},
+                            onDragSelection = { false },
+                            onDragSelectionEnd = {},
+                            onDragSelectionCancel = {},
+                            quickReactionEmojis = emptyList(),
+                            recentEmojis = emptyList(),
+                            onEmojiUsed = {},
+                            isActionMenuOpen = actionMenuOpen,
+                            onActionMenuOpenChange = { open ->
+                                if (open && !actionMenuOpen) actionOpens++
+                                actionMenuOpen = open
+                            },
+                            onQuickReactionsSave = {},
+                            onQuickReactionsReset = {},
+                            onReplyPreviewClick = {},
+                            composerGate = ComposerGate.COMPOSER,
+                            inviteMutationInFlight = false,
+                            onJoinInvite = {},
+                            onDeclineInvite = {},
+                            mentionCandidates = emptyList(),
+                            mentionPickerEnabled = false,
+                        )
+                    }
+                }
+            }
+        }
+
+        val messageBubble = composeRule.onNodeWithTag(MESSAGE_HOLD_HOST_TAG)
+        messageBubble.performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveTo(center)
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertIsDisplayed()
+        composeRule.runOnIdle {
+            assertTrue(actionMenuOpen)
+            assertEquals(1, actionOpens)
+        }
+
+        messageBubble.performTouchInput { up() }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertTrue(actionMenuOpen)
+            assertEquals(1, actionOpens)
+        }
+
+        composeRule.runOnIdle { bubbleVisible = false }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals(false, actionMenuOpen) }
+    }
+
+    @Test
+    @Suppress("LongMethod") // The real MessageBubble host requires its full interaction contract.
+    fun longPressDragDismissesThresholdActionsAndEntersRange() {
         val appState = appState()
         val controller = ConversationController(appState = appState, initialGroup = group())
         val item = timelineMessage()
         val composerTextState = ComposerTextState(TextFieldValue(""))
         var selectionMode by mutableStateOf(false)
         var rangeDragActive by mutableStateOf(false)
+        var actionMenuOpen by mutableStateOf(false)
         var actionOpens = 0
         var dragStarts = 0
         var dragMoves = 0
@@ -102,8 +186,11 @@ class MessageBubbleLongPressDragTest {
                         quickReactionEmojis = emptyList(),
                         recentEmojis = emptyList(),
                         onEmojiUsed = {},
-                        isActionMenuOpen = false,
-                        onActionMenuOpenChange = { if (it) actionOpens++ },
+                        isActionMenuOpen = actionMenuOpen,
+                        onActionMenuOpenChange = { open ->
+                            if (open && !actionMenuOpen) actionOpens++
+                            actionMenuOpen = open
+                        },
                         onQuickReactionsSave = {},
                         onQuickReactionsReset = {},
                         onReplyPreviewClick = {},
@@ -135,7 +222,8 @@ class MessageBubbleLongPressDragTest {
         }
         composeRule.waitForIdle()
 
-        assertEquals(0, actionOpens)
+        assertEquals(1, actionOpens)
+        assertEquals(false, actionMenuOpen)
         assertEquals(1, dragStarts)
         assertTrue(dragMoves >= 2)
         assertEquals(1, dragEnds)
@@ -365,6 +453,7 @@ class MessageBubbleLongPressDragTest {
         val SENDER_ID = "02" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
         const val MESSAGE_BODY = "Message drag host"
+        const val MESSAGE_HOLD_HOST_TAG = "message-hold-host"
         const val MESSAGE_DRAG_HOST_TAG = "message-drag-host"
         const val MESSAGE_RANGE_HOST_TAG = "message-range-host"
     }
