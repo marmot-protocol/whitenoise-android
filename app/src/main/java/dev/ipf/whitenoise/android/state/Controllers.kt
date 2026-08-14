@@ -3816,46 +3816,64 @@ class ChatsController private constructor(
         val groupIds = chatRows.map { it.groupIdHex }
         if (groupIds.isEmpty()) return
         val expectedCacheEpoch = memberCacheEpoch
-        val projections =
-            runCatchingCancellable {
-                loadGroupMemberIdsPages(groupIds) { page ->
-                    appState.marmotIo { groupMemberIdsPage(account, page) }
+        loadInitialMemberIdProjections(account, groupIds)
+            ?.takeIf { initialMemberProjectionIsCurrent(account, epoch, expectedCacheEpoch) }
+            ?.let { projections ->
+                val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
+                // Await only on-device DM peer presentation so the first row
+                // cannot flash a short identity or empty avatar. Relay
+                // freshness remains in requestProfile below.
+                appState.warmProfilePresentationsBlocking(
+                    initialDirectPeerProfileIds(projections, activeAccountIdHex),
+                )
+                if (initialMemberProjectionIsCurrent(account, epoch, expectedCacheEpoch)) {
+                    applyInitialMemberIdProjections(projections, activeAccountIdHex)
                 }
-            }.onFailure { error ->
-                chatsDebug(error) {
-                    "initial member-id projection failed account=${account.take(8)}: " +
-                        (error.message ?: error.javaClass.simpleName)
-                }
-            }.getOrNull() ?: return
-        val projectionIsStale =
-            !isActiveBindEpoch(epoch) ||
-                accountRef != account ||
-                memberCacheEpoch != expectedCacheEpoch
-        if (projectionIsStale) return
-
-        val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
-        val rowsByGroup = chatRows.associateBy { chatRowKey(it.groupIdHex) }
-        val directPeerIds =
-            initialDirectPeerProfileIds(
-                projections = projections,
-                activeAccountIdHex = activeAccountIdHex,
-            ) { groupIdHex, memberCount ->
-                val row = rowsByGroup[chatRowKey(groupIdHex)] ?: return@initialDirectPeerProfileIds false
-                GroupProjector.isDm(row.conversationKind, memberCount, row.groupName)
             }
-        // The batched roster makes the DM peer addressable; await only that
-        // peer's on-device name/avatar materialization so the first published
-        // row cannot flash a short identity or empty avatar. Relay freshness
-        // remains the asynchronous requestProfile work below.
-        appState.warmProfilePresentationsBlocking(directPeerIds)
-        if (
-            !isActiveBindEpoch(epoch) ||
-            accountRef != account ||
-            memberCacheEpoch != expectedCacheEpoch
-        ) {
-            return
-        }
+    }
 
+    private suspend fun loadInitialMemberIdProjections(
+        account: String,
+        groupIds: List<String>,
+    ): List<AppGroupMemberIdsFfi>? =
+        runCatchingCancellable {
+            loadGroupMemberIdsPages(groupIds) { page ->
+                appState.marmotIo { groupMemberIdsPage(account, page) }
+            }
+        }.onFailure { error ->
+            chatsDebug(error) {
+                "initial member-id projection failed account=${account.take(8)}: " +
+                    (error.message ?: error.javaClass.simpleName)
+            }
+        }.getOrNull()
+
+    private fun initialMemberProjectionIsCurrent(
+        account: String,
+        epoch: Long,
+        expectedCacheEpoch: Long,
+    ): Boolean =
+        isActiveBindEpoch(epoch) &&
+            accountRef == account &&
+            memberCacheEpoch == expectedCacheEpoch
+
+    private fun initialDirectPeerProfileIds(
+        projections: List<AppGroupMemberIdsFfi>,
+        activeAccountIdHex: String?,
+    ): List<String> {
+        val rowsByGroup = chatRows.associateBy { chatRowKey(it.groupIdHex) }
+        return initialDirectPeerProfileIds(
+            projections = projections,
+            activeAccountIdHex = activeAccountIdHex,
+        ) { groupIdHex, memberCount ->
+            val row = rowsByGroup[chatRowKey(groupIdHex)]
+            row != null && GroupProjector.isDm(row.conversationKind, memberCount, row.groupName)
+        }
+    }
+
+    private fun applyInitialMemberIdProjections(
+        projections: List<AppGroupMemberIdsFfi>,
+        activeAccountIdHex: String?,
+    ) {
         val updatedCache = memberCacheByGroup.toMutableMap()
         var updatedRemovedGroupIds = removedGroupIds
         projections.forEach { projection ->

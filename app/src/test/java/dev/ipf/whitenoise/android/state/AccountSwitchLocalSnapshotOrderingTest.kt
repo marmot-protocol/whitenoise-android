@@ -35,13 +35,22 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
     @Test
     fun initialMemberProjectionDropsResultsInvalidatedWhileTheBatchReadWasInFlight() {
-        val body = controllersSource().readText().kotlinFunctionBody("seedInitialMemberIdProjection")
+        val source = controllersSource().readText()
+        val body = source.kotlinFunctionBody("seedInitialMemberIdProjection")
+        val currentCheck =
+            source
+                .substringAfter("private fun initialMemberProjectionIsCurrent(")
+                .substringBefore("private fun initialDirectPeerProfileIds(")
+        val loader = source.kotlinFunctionBody("loadInitialMemberIdProjections")
+        val publisher = source.kotlinFunctionBody("applyInitialMemberIdProjections")
         val capturedEpoch = body.indexOf("expectedCacheEpoch = memberCacheEpoch")
-        val ffiRead = body.indexOf("loadGroupMemberIdsPages", startIndex = capturedEpoch)
-        val staleCheck = body.indexOf("memberCacheEpoch != expectedCacheEpoch", startIndex = ffiRead)
+        val ffiRead = body.indexOf("loadInitialMemberIdProjections", startIndex = capturedEpoch)
+        val staleCheck = body.indexOf("initialMemberProjectionIsCurrent", startIndex = ffiRead)
         val profileWarm = body.indexOf("warmProfilePresentationsBlocking", startIndex = staleCheck)
-        val secondStaleCheck = body.indexOf("memberCacheEpoch != expectedCacheEpoch", startIndex = profileWarm)
-        val publish = body.indexOf("memberCacheByGroup = updatedCache", startIndex = secondStaleCheck)
+        val secondStaleCheck = body.indexOf("initialMemberProjectionIsCurrent", startIndex = profileWarm)
+        val publish = body.indexOf("applyInitialMemberIdProjections", startIndex = secondStaleCheck)
+        val guardCapturesGeneration = "memberCacheEpoch == expectedCacheEpoch" in currentCheck
+        val publisherReplacesCache = "memberCacheByGroup = updatedCache" in publisher
 
         assertTrue("the current cache generation must be captured before suspension", capturedEpoch >= 0)
         assertTrue("the batch FFI read must follow the generation snapshot", ffiRead > capturedEpoch)
@@ -49,6 +58,9 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue("DM local profiles must be awaited before cache publication", profileWarm > staleCheck)
         assertTrue("profile warming must be followed by another generation check", secondStaleCheck > profileWarm)
         assertTrue("stale batch results must be rejected before cache publication", publish > secondStaleCheck)
+        assertTrue("the loader must use the batched local projection", "loadGroupMemberIdsPages" in loader)
+        assertTrue("the guard must compare the captured cache generation", guardCapturesGeneration)
+        assertTrue("the publisher must replace the cache only after validation", publisherReplacesCache)
     }
 
     @Test
@@ -168,10 +180,19 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
         listOf(localRows, memberDerived).forEach { recorder ->
             assertTrue("stale account stages must be rejected", "activeAccountRef != accountRef" in recorder)
-            assertTrue("stage records must use the monotonic startup clock", "SystemClock.elapsedRealtime()" in recorder)
+            assertTrue(
+                "stage records must use the monotonic startup clock",
+                "SystemClock.elapsedRealtime()" in recorder,
+            )
         }
-        assertTrue("switch stages must reject a superseded trace", "trace.accountRef != accountRef" in stageRecorder)
-        assertTrue("stage output may contain only stage, elapsed time, and row count", "rows=\$rowCount" in stageRecorder)
+        assertTrue(
+            "switch stages must reject a superseded trace",
+            "trace.accountRef != accountRef" in stageRecorder,
+        )
+        assertTrue(
+            "stage output may contain only stage, elapsed time, and row count",
+            "rows=\$rowCount" in stageRecorder,
+        )
         assertFalse("stage output must not interpolate an account identifier", "accountRef}" in stageRecorder)
     }
 
