@@ -66,3 +66,8 @@ grep -Fq 'Verify signed previews' "$workflow"
 grep -Fq '.github/scripts/stage-signed-pr-preview-candidates.sh signed candidates signed-check' "$workflow"
 grep -Fq 'PR_PREVIEW_CERT_SHA256: ${{ secrets.PR_PREVIEW_CERT_SHA256 }}' "$workflow"
 reject 'pull_request_target:' "$build"
+# Both the pre-checkout prepare job and the post-checkout publish job must bind
+# artifact downloads explicitly to this repository. Without --repo, gh fails
+# before checkout with "not a git repository" and no sticky preview is posted.
+[[ $(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-stable' "$workflow") -eq 2 ]]
+[[ $(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-isolated' "$workflow") -eq 2 ]]
