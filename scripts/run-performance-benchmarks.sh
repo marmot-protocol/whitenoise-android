@@ -16,6 +16,17 @@ require_command() {
 require_command jq
 require_command rg
 
+sha256_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  else
+    echo "Missing required host command: sha256sum or shasum" >&2
+    return 1
+  fi
+}
+
 if [[ -n "${ANDROID_HOME:-}" && -x "$ANDROID_HOME/platform-tools/adb" ]]; then
   adb_bin="$ANDROID_HOME/platform-tools/adb"
 else
@@ -30,6 +41,27 @@ fi
 
 adb_cmd() {
   "$adb_bin" "${adb_args[@]}" "$@"
+}
+
+wait_for_package_update_ui_to_settle() {
+  local resumed_activity stable_samples=0
+  for _ in {1..50}; do
+    resumed_activity="$(
+      adb_cmd shell dumpsys activity activities |
+        awk '/topResumedActivity=|mResumedActivity:/{print; exit}' | tr -d '\r'
+    )"
+    if [[ -n "$resumed_activity" &&
+      "$resumed_activity" != *".packageupdate.PackageUpdateActivity"* ]]; then
+      stable_samples=$((stable_samples + 1))
+      if ((stable_samples >= 5)); then return 0; fi
+    else
+      stable_samples=0
+    fi
+    sleep 0.1
+  done
+
+  echo "Android's package-update UI did not settle before the measured launch." >&2
+  return 1
 }
 
 # adb joins arguments following `shell` into a command string interpreted by
@@ -129,15 +161,17 @@ mkdir -p "$local_output"
 device_output_pulled=false
 heads_up_setting_captured=false
 original_heads_up_notifications_enabled=""
+target_replaced=false
 
 capture_device_state() {
   local destination="$1"
-  local battery thermal
+  local battery serial thermal
   battery="$(adb_cmd shell dumpsys battery)"
+  serial="$(adb_cmd get-serialno | tr -d '\r')"
   thermal="$(adb_cmd shell dumpsys thermalservice)"
   {
     printf 'captured_at_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    printf 'serial=%s\n' "${ANDROID_SERIAL:-default}"
+    printf 'serial=%s\n' "$serial"
     printf 'model=%s\n' "$(adb_cmd shell getprop ro.product.model | tr -d '\r')"
     printf 'android_release=%s\n' "$(adb_cmd shell getprop ro.build.version.release | tr -d '\r')"
     printf 'api_level=%s\n' "$(adb_cmd shell getprop ro.build.version.sdk | tr -d '\r')"
@@ -187,9 +221,11 @@ cleanup() {
   if [[ "$device_output_pulled" == true ]]; then
     adb_cmd shell rm -rf "$device_output" || true
   fi
-  if ! adb_cmd install -r -d -t "$dev_app_apk"; then
-    echo "Failed to restore the normal dev app: $dev_app_apk" >&2
-    if ((status == 0)); then status=1; fi
+  if [[ "$target_replaced" == true ]]; then
+    if ! adb_cmd install -r -d -t "$dev_app_apk"; then
+      echo "Failed to restore the normal dev app: $dev_app_apk" >&2
+      if ((status == 0)); then status=1; fi
+    fi
   fi
   rm -f "$result_file"
   exit "$status"
@@ -209,11 +245,19 @@ adb_cmd shell settings put global heads_up_notifications_enabled 0
 adb_cmd shell cmd statusbar collapse
 
 # Replacing the target APK with the same application ID and debug certificate
-# preserves its authenticated data. The exit trap restores the normal dev debug
-# APK even when the run fails. The benchmark package is also updated in place
-# and left installed so this workflow never performs an uninstall on a personal
-# physical device.
-adb_cmd install -r -d -t "$app_apk"
+# preserves its authenticated data. Capture this exact package-replacement
+# launch before Macrobenchmark resets compilation, then let the normal startup
+# benchmarks measure their controlled iterations. The exit trap restores the
+# normal dev debug APK even when either journey fails.
+capture_device_state "$local_output/package-replacement-device.txt"
+package_replacement_install_log="$local_output/package-replacement-install.log"
+if adb_cmd install -r -d -t "$app_apk" >"$package_replacement_install_log" 2>&1; then
+  target_replaced=true
+  cat "$package_replacement_install_log"
+else
+  cat "$package_replacement_install_log" >&2
+  exit 1
+fi
 adb_cmd install -r -d -t "$test_apk"
 
 # Isolate this run from stale device output. Supplying the directory explicitly
@@ -223,14 +267,69 @@ adb_cmd shell mkdir -p "$device_output"
 
 # Exercise the first launch after the in-place APK swap before Macrobenchmark
 # starts resetting compilation. This catches a broken fixture early and keeps
-# one-time package initialization out of the first measured iteration.
+# one-time package initialization out of the first measured iteration. A
+# package-replaced/background receiver may recreate the process without opening
+# an Activity, so force-stop immediately before the explicit launch to make the
+# journey cold without clearing authenticated data.
 main_activity="$target_package/dev.ipf.whitenoise.android.MainActivity"
+adb_cmd shell am force-stop "$target_package"
+wait_for_package_update_ui_to_settle
+# The transient package-update Activity may have forwarded the launch intent as
+# it closed. Force-stop once more after it is gone so the measured process is
+# unambiguously created by the following command.
+adb_cmd shell am force-stop "$target_package"
+launch_started_uptime_ms="$(
+  adb_cmd shell cat /proc/uptime | awk '{printf "%.0f\n", $1 * 1000}' | tr -d '\r'
+)"
+if [[ ! "$launch_started_uptime_ms" =~ ^[0-9]+$ ]]; then
+  echo "Could not capture device uptime before the package-replacement launch." >&2
+  exit 1
+fi
 preflight_output="$(adb_cmd shell am start -W -n "$main_activity")"
+{
+  printf 'DeviceUptimeBeforeLaunchMs: %s\n' "$launch_started_uptime_ms"
+  printf '%s\n' "$preflight_output"
+} >"$local_output/package-replacement-launch.txt"
 if ! rg -q '^Status: ok\r?$' <<<"$preflight_output"; then
   echo "Benchmark target preflight launch failed:" >&2
   echo "$preflight_output" >&2
   exit 1
 fi
+
+preflight_pid=""
+for _ in {1..20}; do
+  preflight_pid="$(adb_cmd shell pidof "$target_package" | tr -d '\r')"
+  if [[ "$preflight_pid" =~ ^[0-9]+$ ]]; then break; fi
+  sleep 0.1
+done
+if [[ ! "$preflight_pid" =~ ^[0-9]+$ ]]; then
+  echo "Could not resolve the package-replacement app process." >&2
+  exit 1
+fi
+
+startup_log="$local_output/package-replacement-startup.log"
+startup_markers_ready=false
+for _ in {1..120}; do
+  adb_cmd logcat -d --pid="$preflight_pid" -v brief WNStartup:I '*:S' >"$startup_log"
+  if rg -q 'stage=system-splash-handoff elapsed_ms=[0-9]+' "$startup_log" &&
+    rg -q 'stage=first-local-frame elapsed_ms=[0-9]+' "$startup_log"; then
+    startup_markers_ready=true
+    break
+  fi
+  sleep 0.25
+done
+if [[ "$startup_markers_ready" != true ]]; then
+  echo "Package-replacement launch did not emit both startup milestones." >&2
+  echo "Captured log: $startup_log" >&2
+  exit 1
+fi
+
+bash scripts/package-replacement-startup-report.sh \
+  "$local_output/package-replacement-launch.txt" \
+  "$startup_log" \
+  "$local_output/package-replacement-device.txt" \
+  "$(sha256_file "$app_apk")" \
+  "$local_output/package-replacement-startup.json"
 
 preflight_dump="$device_output/preflight.xml"
 preflight_ready=false

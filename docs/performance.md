@@ -63,6 +63,24 @@ restores the normal dev debug APK even when a benchmark fails. Both target and
 benchmark APKs are installed or updated in place; the runner never uninstalls a
 package, so authenticated app data remains intact on a personal physical device.
 
+Before the controlled Macrobenchmark iterations, the runner also records the
+first cold launch after that in-place replacement. The release-like build emits
+identifier-free startup milestones for the system-splash handoff and the first
+authoritative local chat-list frame. The host runner requires a cold Activity
+launch, requires both milestones, and rejects a Compose handoff at or beyond two
+seconds. It writes the exact APK SHA-256, named device/API/build fingerprint,
+Activity launch timing, splash handoff timing, time to first app-owned Compose
+UI, and time to local Ready state to:
+
+```text
+benchmark/build/outputs/manual/<UTC timestamp>/package-replacement-startup.json
+```
+
+The accompanying install, Activity launch, startup-log, and device-state files
+are retained beside the JSON so a published result is auditable. This journey
+measures an actual `adb install -r` package replacement and never clears app
+data; a normal dev debug APK is restored in place on every exit path.
+
 For a focused rerun, set AndroidJUnitRunner's comma-separated class filter via
 `BENCHMARK_CLASS_FILTER`; the script still uses the same state-preserving path.
 The group title argument is optional when the selected method does not use the
@@ -100,6 +118,15 @@ compilation and with the packaged Baseline Profile. `GroupFlowsBenchmark`
 reports `journeyDurationMs`, frame timing, and a Perfetto trace for group open →
 members visible, group creation → conversation ready, and invite acceptance →
 conversation ready.
+
+`package-replacement-startup.json` is a separate one-shot device journey. Its
+`timeToFirstComposeUiMs` is the conservative later value of Android's Activity
+launch time and the monotonic system-splash handoff; this prevents Application
+startup before the app trace exists from disappearing from the result.
+`timeToReadyMs` is the first locally authoritative chat-list frame measured
+from the device-uptime sample taken immediately before launch. Do not
+substitute emulator output for the named physical-device evidence required by
+the startup issue.
 
 The same traces include async `WhiteNoise.marmot.*` slices for the awaited MDK
 calls in create, invite, accept, member-roster refresh, and admin flows. In
