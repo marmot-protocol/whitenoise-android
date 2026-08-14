@@ -129,6 +129,21 @@ class MessageMultiSelectCoverageTest {
         )
     }
 
+    @Test
+    fun messageBubbleUsesOneGuardForBothDeleteMutations() {
+        val source =
+            source("messages/MessageBubble.kt")
+                .substringAfter("var deleteDialogOpen")
+                .substringBefore("fun reactWithEmoji")
+
+        assertFalse(source.contains("deleteForMeInFlight"))
+        assertFalse(source.contains("deleteForEveryoneInFlight"))
+        assertTrue(source.contains("var deleteInFlight by remember"))
+        assertTrue(source.split("if (deleteInFlight) return").size - 1 == 2)
+        assertTrue(source.split("deleteInFlight = true").size - 1 == 2)
+        assertTrue(source.split("deleteInFlight = false").size - 1 == 2)
+    }
+
     private fun source(relativePath: String): String =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/$relativePath"),

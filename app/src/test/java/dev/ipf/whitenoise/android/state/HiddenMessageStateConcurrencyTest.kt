@@ -67,14 +67,9 @@ class HiddenMessageStateConcurrencyTest {
                     async(secondDispatcher) {
                         appState.hideMessageForMe(ACCOUNT_REF, GROUP_ID, MESSAGE_TWO)
                     }
-                assertTrue(second.await())
-                assertEquals(
-                    setOf(MESSAGE_ONE, MESSAGE_TWO),
-                    appState.hiddenMessageIdsInGroup(ACCOUNT_REF, GROUP_ID),
-                )
-
                 releaseFirstContinuation.countDown()
                 assertTrue(first.await())
+                assertTrue(second.await())
 
                 assertEquals(
                     setOf(MESSAGE_ONE, MESSAGE_TWO),

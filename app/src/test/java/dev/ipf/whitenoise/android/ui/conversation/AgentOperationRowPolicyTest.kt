@@ -51,10 +51,16 @@ class AgentOperationRowPolicyTest {
     }
 
     @Test
-    fun localAndRemoteDeleteShareOneInFlightGuard() {
+    fun deleteDialogUsesOneGuardForBothMutationPaths() {
+        val sourceText =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt"),
+            ).firstOrNull { it.exists() }
+                ?.readText()
+                ?: error("Missing source: AgentOperationRow.kt")
         val source =
-            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt")
-                .readText()
+            sourceText
                 .substringAfter("private fun AgentOperationDeleteDialog(")
                 .substringBefore("internal fun AgentOperationRow(")
 

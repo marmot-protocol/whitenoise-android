@@ -89,6 +89,9 @@ class DeletedMessageLocalRemovalTest {
         composeRule.waitUntil(timeoutMillis = ASYNC_TIMEOUT_MILLIS) {
             MESSAGE_ID in surface.hiddenMessageIds()
         }
+        composeRule.waitUntil(timeoutMillis = ASYNC_TIMEOUT_MILLIS) {
+            runCatching { placeholder().assertDoesNotExist() }.isSuccess
+        }
         composeRule.waitForIdle()
 
         placeholder().assertDoesNotExist()
@@ -296,6 +299,9 @@ class DeletedMessageLocalRemovalTest {
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,
+            profileReader = { null },
+            profileDisplayNameReader = { null },
+            profileRefreshRequest = {},
             preferences = preferences,
         )
 
@@ -329,15 +335,20 @@ class DeletedMessageLocalRemovalTest {
         preferences = backingPreferences,
     )
 
-    @Suppress("UNCHECKED_CAST")
     private fun seedTimeline(
         controller: ConversationController,
         item: TimelineMessage,
     ) {
-        val field = ConversationController::class.java.getDeclaredField("timeline\$delegate")
-        field.isAccessible = true
-        val state = field.get(controller) as androidx.compose.runtime.MutableState<List<TimelineMessage>>
-        state.value = listOf(item)
+        val projected = checkNotNull(item.projected)
+        runBlocking {
+            controller.testRefreshCurrentTimeline(ACCOUNT_REF) {
+                TimelinePageFfi(
+                    messages = listOf(projected),
+                    hasMoreBefore = false,
+                    hasMoreAfter = false,
+                )
+            }
+        }
     }
 
     private fun deletedRecord() =

@@ -65,6 +65,20 @@ class MessageHidePreferencesTest {
     }
 
     @Test
+    fun failedCommitRestoresPreviouslyHiddenMessages() {
+        MessageHidePreferences.hideMessage(preferences, "account-a", "group-a", "msg-1")
+        val failingPreferences = CommitFailingPreferences(preferences)
+
+        val updated = MessageHidePreferences.hideMessage(failingPreferences, "account-a", "group-a", "msg-2")
+
+        assertNull(updated)
+        assertEquals(
+            setOf("msg-1"),
+            MessageHidePreferences.readHiddenMessageIds(preferences, "account-a", "group-a"),
+        )
+    }
+
+    @Test
     fun hideMessageNormalizesIds() {
         MessageHidePreferences.hideMessage(preferences, " account-a ", " GROUP-A ", " MSG-1 ")
 

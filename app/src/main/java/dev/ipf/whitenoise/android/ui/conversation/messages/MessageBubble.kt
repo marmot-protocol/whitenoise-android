@@ -669,8 +669,7 @@ internal fun MessageBubble(
     var customizeReactionsOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var restoreReactionPickerExpanded by remember(record.messageIdHex) { mutableStateOf(false) }
     var deleteDialogOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    var deleteForMeInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
-    var deleteForEveryoneInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
+    var deleteInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     var attachmentSaveInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     key(record.messageIdHex) {
         val currentActionMenuOpen by rememberUpdatedState(isActionMenuOpen)
@@ -728,14 +727,14 @@ internal fun MessageBubble(
     }
 
     fun performDeleteForMe() {
-        if (deleteForMeInFlight) return
-        deleteForMeInFlight = true
+        if (deleteInFlight) return
+        deleteInFlight = true
         appState.launchMutation {
             try {
                 val removed = controller.hideMessageForMe(record.messageIdHex)
                 if (removed) deleteDialogOpen = false
             } finally {
-                deleteForMeInFlight = false
+                deleteInFlight = false
             }
         }
     }
@@ -744,8 +743,8 @@ internal fun MessageBubble(
         // The in-flight flag is the repeated-tap guard on top of the
         // controller's own idempotency (a second deleteMessage on an already
         // tombstoned id is a no-op).
-        if (deleteForEveryoneInFlight) return
-        deleteForEveryoneInFlight = true
+        if (deleteInFlight) return
+        deleteInFlight = true
         // launchMutation so the MLS commit + Nostr publish survive navigating
         // away from the conversation. The dialog stays open with its options
         // disabled until the outcome is known, and stays open on failure so
@@ -757,8 +756,8 @@ internal fun MessageBubble(
                 if (removed) deleteDialogOpen = false
             } finally {
                 // Cancellation must not leave the flag stuck true, which would
-                // disable delete-for-everyone for this bubble's remember scope.
-                deleteForEveryoneInFlight = false
+                // disable deletion for this bubble's remember scope.
+                deleteInFlight = false
             }
         }
     }
@@ -1882,7 +1881,7 @@ internal fun MessageBubble(
                         capability = deleteCapability,
                         mine = mine,
                         senderDisplayName = appState.displayName(record.sender),
-                        deleteInFlight = deleteForMeInFlight || deleteForEveryoneInFlight,
+                        deleteInFlight = deleteInFlight,
                         onDeleteForEveryone = ::performDeleteForEveryone,
                         onDeleteForMe = ::performDeleteForMe,
                         onDismissRequest = { deleteDialogOpen = false },
