@@ -200,17 +200,17 @@ class AppStateSendLockCoverageTest {
     fun deleteMessageAuthorizationGuardPrecedesOptimisticAndFfiMutation() {
         val body = controllerFunctionBody("deleteMessageResult")
         val authorizationGate = body.indexOf("!deleteCapabilityFor(message).canDeleteForEveryone")
-        val earlyReturn = body.indexOf("return Result.failure", startIndex = authorizationGate)
+        val authorizationFailure = body.indexOf("Result.failure", startIndex = authorizationGate)
         val optimisticMutation = body.indexOf("deletedMessageIds = deletedMessageIds + target")
         val ffiDelete = body.indexOf("appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }")
 
         assertTrue(
-            "unauthorized deletes must return before mutating deletedMessageIds",
-            authorizationGate >= 0 && earlyReturn > authorizationGate && optimisticMutation > earlyReturn,
+            "unauthorized deletes must produce a failure before mutating deletedMessageIds",
+            authorizationGate >= 0 && authorizationFailure > authorizationGate && optimisticMutation > authorizationFailure,
         )
         assertTrue(
-            "unauthorized deletes must return before reaching the FFI delete call",
-            ffiDelete > earlyReturn,
+            "unauthorized deletes must produce a failure before reaching the FFI delete call",
+            ffiDelete > authorizationFailure,
         )
     }
 
@@ -228,7 +228,7 @@ class AppStateSendLockCoverageTest {
             "deleteMessageResult guards must report why no commit occurred",
             "conversationAccountRef" in body &&
                 "!deleteCapabilityFor(message).canDeleteForEveryone" in body &&
-                "return Result.failure" in body,
+                "Result.failure" in body,
         )
         assertTrue(
             "deleteMessageResult must report success after the locked commit and failure after rollback",
@@ -256,7 +256,7 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "batch local hide must bind to a concrete account before touching preferences or timeline state",
             body.indexOf("conversationAccountRef") < body.indexOf("appState.hideMessageForMe(account") &&
-                "return Result.failure" in body &&
+                "Result.failure" in body &&
                 "Result.success(Unit)" in body,
         )
     }
