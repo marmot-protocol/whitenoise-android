@@ -4693,8 +4693,6 @@ class WhiteNoiseAppState private constructor(
     suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
         val wipedRef = activeAccountRef ?: return null
         clearInMemoryMediaCaches()
-        AvatarImageLoader.clear()
-        clearCrossAccountCaches()
         clearConversationShortcutSurfaces()
         try {
             val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
@@ -4723,6 +4721,8 @@ class WhiteNoiseAppState private constructor(
                     restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                     return null
                 }
+            AvatarImageLoader.clear()
+            clearCrossAccountCaches()
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
             wipeDecryptedMediaFromDisk()

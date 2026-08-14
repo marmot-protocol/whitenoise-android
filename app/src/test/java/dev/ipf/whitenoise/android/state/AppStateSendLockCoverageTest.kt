@@ -114,6 +114,24 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
+    fun failedDestructiveWipePreservesProcessGlobalProfileCaches() {
+        val body = appStateFunctionBody("signOutAndWipeActiveAccount")
+        val committedOutcomeIndex = body.indexOf("wipeResult.getOrNull() ?: run")
+        val avatarClearIndex = body.indexOf("AvatarImageLoader.clear()")
+        val scopedCacheClearIndex = body.indexOf("clearCrossAccountCaches()")
+
+        assertTrue("destructive wipe must establish a non-null committed outcome", committedOutcomeIndex >= 0)
+        assertTrue(
+            "avatar cache eviction must happen only after the engine commits the destructive wipe",
+            avatarClearIndex > committedOutcomeIndex,
+        )
+        assertTrue(
+            "cross-account cache eviction must happen only after the engine commits the destructive wipe",
+            scopedCacheClearIndex > committedOutcomeIndex,
+        )
+    }
+
+    @Test
     fun retentionSweepRoutesThroughEngineAccountWorker() {
         val body = appStateFunctionBody("runRetentionSweep")
 
