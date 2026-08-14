@@ -1532,4 +1532,12 @@
     <string name="global_search_content_voice_audio">Voice &amp; audio</string>
     <string name="global_search_content_files_documents">Files &amp; documents</string>
     <string name="global_search_content_any_attachment">Any attachment</string>
+    <string name="text_attachment_open_external">Open in another app</string>
+    <string name="text_attachment_loading">Loading preview…</string>
+    <string name="text_attachment_preview_truncated">This Markdown preview was truncated for safety. Open the file in another app to see the rest.</string>
+    <string name="text_attachment_empty">This text file is empty.</string>
+    <string name="text_attachment_download_failed">Couldn’t download this file. Try again or open it in another app.</string>
+    <string name="text_attachment_preview_too_large">This file is too large to preview safely. Open it in another app.</string>
+    <string name="text_attachment_preview_invalid_encoding">This file doesn’t use a supported text encoding. Open it in another app.</string>
+    <string name="text_attachment_preview_binary">This file doesn’t appear to contain safe text. Open it in another app.</string>
 </resources>

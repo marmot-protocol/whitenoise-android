@@ -189,6 +189,8 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 mine = mine,
                 controller = controller,
                 appState = appState,
+                senderKey = record.sender,
+                senderDisplayName = appState.displayName(record.sender),
                 onLongPress = onMediaLongPress,
                 attachedToCaption = attachedToCaption,
             )

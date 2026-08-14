@@ -1439,4 +1439,12 @@
     <string name="global_search_content_voice_audio">Voce e audio</string>
     <string name="global_search_content_files_documents">File e documenti</string>
     <string name="global_search_content_any_attachment">Qualsiasi allegato</string>
+    <string name="text_attachment_open_external">Apri in un’altra app</string>
+    <string name="text_attachment_loading">Caricamento anteprima…</string>
+    <string name="text_attachment_preview_truncated">Questa anteprima Markdown è stata troncata per sicurezza. Apri il file in un’altra app per vedere il resto.</string>
+    <string name="text_attachment_empty">Questo file di testo è vuoto.</string>
+    <string name="text_attachment_download_failed">Impossibile scaricare questo file. Riprova o aprilo in un’altra app.</string>
+    <string name="text_attachment_preview_too_large">Questo file è troppo grande per un’anteprima sicura. Aprilo in un’altra app.</string>
+    <string name="text_attachment_preview_invalid_encoding">Questo file non usa una codifica di testo supportata. Aprilo in un’altra app.</string>
+    <string name="text_attachment_preview_binary">Questo file non sembra contenere testo sicuro. Aprilo in un’altra app.</string>
 </resources>
