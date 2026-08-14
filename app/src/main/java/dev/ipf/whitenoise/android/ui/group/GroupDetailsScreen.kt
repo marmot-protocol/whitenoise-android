@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
@@ -260,7 +261,7 @@ internal fun GroupDetailsScreen(
     onGroupCreateFlowSuperseded: () -> Unit = {},
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    var showEditGroup by remember { mutableStateOf(false) }
+    var showEditGroup by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showGroupInfo by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showMuteDurationDialog by remember { mutableStateOf(false) }
@@ -352,6 +353,9 @@ internal fun GroupDetailsScreen(
         }
     val dmPeerNpub = dmPeerAccountIdHex?.let(appState::npub)
     val canShowEditAction = !isDm && canEdit
+    LaunchedEffect(canShowEditAction) {
+        if (!canShowEditAction) showEditGroup = false
+    }
     val dmSharedGroups =
         remember(dmPeerAccountIdHex, appState.chatListItems, controller.group.groupIdHex) {
             dmPeerAccountIdHex
@@ -930,6 +934,13 @@ internal fun GroupDetailsScreen(
                 pictureUrl = controller.avatarUrl,
                 picture = encryptedGroupAvatar,
                 archived = controller.group.archived,
+                onEdit =
+                    if (canShowEditAction) {
+                        { showEditGroup = true }
+                    } else {
+                        null
+                    },
+                editEnabled = activeMutation == null && !controller.mutationInFlight,
                 onAddDescription =
                     if (!isDm && canEdit && controller.group.description.isBlank()) {
                         { showEditGroup = true }
@@ -1779,6 +1790,8 @@ internal fun GroupDetailsHeader(
     pictureUrl: String?,
     picture: ImageBitmap? = null,
     archived: Boolean,
+    onEdit: (() -> Unit)? = null,
+    editEnabled: Boolean = true,
     onAddDescription: (() -> Unit)? = null,
     descriptionCopyValue: String? = null,
 ) {
@@ -1811,13 +1824,45 @@ internal fun GroupDetailsHeader(
                     picture = picture,
                 )
             }
-            Text(
-                title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (onEdit == null) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else {
+                Row(
+                    modifier =
+                        Modifier
+                            .widthIn(max = 320.dp)
+                            .heightIn(min = 48.dp)
+                            .clickable(
+                                enabled = editEnabled,
+                                onClickLabel = stringResource(R.string.edit_group_name_and_description),
+                                role = Role.Button,
+                                onClick = onEdit,
+                            ),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        title,
+                        modifier = Modifier.weight(1f, fill = false),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
             if (subtitle.isNotBlank()) {
                 Text(
                     subtitle,

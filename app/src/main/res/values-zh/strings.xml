@@ -134,6 +134,7 @@
     <string name="scan_recipient_qr_code">扫描收件人QR码</string>
     <string name="add_recipient">添加收件人</string>
     <string name="group_name">群组名称</string>
+    <string name="edit_group_name_and_description">编辑群组名称和描述</string>
     <string name="description">描述</string>
     <string name="create">创建</string>
     <string name="chat_actions">聊天动作</string>

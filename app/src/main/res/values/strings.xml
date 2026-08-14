@@ -179,6 +179,7 @@
     <string name="scan_recipient_qr_code">Scan recipient QR code</string>
     <string name="add_recipient">Add recipient</string>
     <string name="group_name">Group name</string>
+    <string name="edit_group_name_and_description">Edit group name and description</string>
     <string name="group_avatar_url">Avatar URL</string>
     <string name="description">Description</string>
     <string name="create">Create</string>
