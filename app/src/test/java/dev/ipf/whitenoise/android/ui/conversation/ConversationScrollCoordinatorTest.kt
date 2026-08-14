@@ -822,6 +822,37 @@ class ConversationScrollCoordinatorTest {
         }
 
     @Test
+    fun jumpToUnreadOrNewest_completedButUnalignedTargetFallsThroughToTail() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 14),
+                )
+
+            val outcome =
+                coordinator.jumpToUnreadOrNewest(
+                    pendingUnreadMessageId = "unread",
+                    resolveUnreadIndex = { 40 },
+                    isUnreadTopAligned = { false },
+                    resolveTailIndex = { 88 },
+                )
+
+            assertEquals(ConversationJumpToNewestOutcome.Tail, outcome)
+            assertEquals(
+                listOf(
+                    ScrollWrite.Snap(30, 0),
+                    ScrollWrite.Animate(40, 0),
+                    ScrollWrite.Snap(78, 0),
+                    ScrollWrite.Animate(88, 0),
+                ),
+                writer.writes,
+            )
+            assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+        }
+
+    @Test
     fun explicitNavigationRetiresUnreadStackButLayoutReanchorsDoNot() =
         runTest {
             var retireCount = 0

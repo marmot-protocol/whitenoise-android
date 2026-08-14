@@ -623,7 +623,10 @@ internal suspend fun ConversationScrollCoordinator.jumpToUnreadOrNewest(
     return if (isUnreadTopAligned()) {
         ConversationJumpToNewestOutcome.UnreadStart
     } else {
-        ConversationJumpToNewestOutcome.Cancelled
+        // A completed but clamped first-stage scroll is not cancellation. The
+        // target cannot be represented as the top-aligned destination, so
+        // finish this tap at the tail instead of arming a repeat scroll.
+        jumpToTail()
     }
 }
 

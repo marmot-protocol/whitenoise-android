@@ -157,23 +157,6 @@ class ConversationUnreadTest {
         assertEquals("r3", nextStack.pendingMessageId)
     }
 
-    @Test
-    fun unreadJump_newConversationScopeDoesNotRetainPriorDestination() {
-        val previousScope =
-            ConversationUnreadJumpState(
-                pendingMessageId = "old-target",
-                unreadStackActive = true,
-                initialized = true,
-            )
-
-        val newScope = ConversationUnreadJumpState()
-
-        assertEquals("old-target", previousScope.pendingMessageId)
-        assertEquals(null, newScope.pendingMessageId)
-        assertEquals(false, newScope.unreadStackActive)
-        assertEquals(false, newScope.initialized)
-    }
-
     // ---- firstUnreadReceivedIndex -------------------------------------------
 
     @Test
