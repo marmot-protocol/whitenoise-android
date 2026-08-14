@@ -42,6 +42,10 @@ grep -Fq 'github.event.pull_request.head.repo.full_name == github.repository' "$
 grep -Fq 'Resolve exact candidate provenance and current PR' "$workflow"
 grep -Fq 'stable_pr=$(provenance_value "$stable" pr_number)' "$workflow"
 grep -Fq '[[ "$stable_pr" == "$isolated_pr"' "$workflow"
+if [[ $(grep -Fc -- '--repo "$GITHUB_REPOSITORY"' "$workflow") -lt 2 ]]; then
+  printf 'Preview provenance downloads must select the repository explicitly.\n' >&2
+  exit 1
+fi
 reject 'branches: [master]' "$build"
 grep -Fq 'stable app identity; keeps app data when switching PRs' "$workflow"
 grep -Fq 'github.event.repository.default_branch' "$workflow"

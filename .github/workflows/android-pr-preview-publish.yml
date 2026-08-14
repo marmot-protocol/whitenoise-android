@@ -35,8 +35,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p candidates/stable candidates/isolated
-          gh run download "$BUILD_RUN_ID" --name pr-preview-stable --dir candidates/stable
-          gh run download "$BUILD_RUN_ID" --name pr-preview-isolated --dir candidates/isolated
+          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-stable --dir candidates/stable
+          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-isolated --dir candidates/isolated
 
       # Resolve the validated PR number before the publisher starts so job-level
       # concurrency cannot couple distinct PRs that happen to share a branch.
