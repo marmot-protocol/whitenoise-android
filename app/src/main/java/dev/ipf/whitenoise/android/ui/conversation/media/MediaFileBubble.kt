@@ -259,10 +259,12 @@ internal fun MediaFileBubble(
                         mine = mine,
                     ) ?: return@openExternal
                 if (!lifecycleOwner.lifecycle.awaitResumedOrDestroyed()) return@openExternal
-                when (openAttachmentExternally(context, file, reference.mediaType)) {
+                when (openAttachment(file, reference.mediaType)) {
                     OpenAttachmentResult.Opened -> Unit
                     OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
-                    OpenAttachmentResult.Error -> appState.present(couldntOpenMessage, copyable = true)
+                    OpenAttachmentResult.InstallPermissionRequired,
+                    OpenAttachmentResult.Error,
+                    -> appState.present(couldntOpenMessage, copyable = true)
                 }
             },
             onDismiss = { readerOpen = false },

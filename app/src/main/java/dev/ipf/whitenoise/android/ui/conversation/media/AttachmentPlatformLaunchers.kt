@@ -43,26 +43,38 @@ internal fun rememberAttachmentOpener(): suspend (source: File, mediaType: Strin
         }
     return remember(context, requestInstallPermission) {
         { source, mediaType ->
-            val initial = openAttachmentExternally(context, source, mediaType)
-            if (initial != OpenAttachmentResult.InstallPermissionRequired) {
-                initial
-            } else {
-                val granted =
-                    try {
-                        requestInstallPermission(androidPackageInstallPermissionIntent(context))
-                    } catch (cancel: CancellationException) {
-                        throw cancel
-                    } catch (_: Throwable) {
-                        false
-                    }
-                if (granted) {
-                    openAttachmentExternally(context, source, mediaType)
-                } else {
-                    OpenAttachmentResult.Error
-                }
-            }
+            openAttachmentWithInstallerPermission(
+                source = source,
+                mediaType = mediaType,
+                open = { requestedSource, requestedMediaType ->
+                    openAttachmentExternally(context, requestedSource, requestedMediaType)
+                },
+                requestInstallPermission = {
+                    requestInstallPermission(androidPackageInstallPermissionIntent(context))
+                },
+            )
         }
     }
+}
+
+internal suspend fun openAttachmentWithInstallerPermission(
+    source: File,
+    mediaType: String,
+    open: suspend (File, String) -> OpenAttachmentResult,
+    requestInstallPermission: suspend () -> Boolean,
+): OpenAttachmentResult {
+    val initial = open(source, mediaType)
+    if (initial != OpenAttachmentResult.InstallPermissionRequired) return initial
+
+    val granted =
+        try {
+            requestInstallPermission()
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Throwable) {
+            false
+        }
+    return if (granted) open(source, mediaType) else OpenAttachmentResult.Error
 }
 
 internal fun androidPackageInstallPermissionIntent(context: Context): Intent =

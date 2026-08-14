@@ -242,13 +242,7 @@ private fun launchAttachmentViewIntent(
     uri: Uri,
     mediaType: String,
 ): OpenAttachmentResult {
-    val intent =
-        Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, mediaType)
-            clipData = ClipData.newRawUri("attachment", uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+    val intent = attachmentViewIntent(uri, mediaType)
     return try {
         context.startActivity(intent)
         OpenAttachmentResult.Opened
@@ -261,6 +255,17 @@ private fun launchAttachmentViewIntent(
         OpenAttachmentResult.Error
     }
 }
+
+internal fun attachmentViewIntent(
+    uri: Uri,
+    mediaType: String,
+): Intent =
+    Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, mediaType)
+        clipData = ClipData.newRawUri("attachment", uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
 
 /** Presentation classification must never rewrite the MIME used to open a file. */
 internal fun attachmentOpenMime(mediaType: String): String = mediaType.ifBlank { "application/octet-stream" }

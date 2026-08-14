@@ -1,11 +1,13 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class AttachmentPresentationTest {
     @Test
@@ -167,6 +169,39 @@ class AttachmentPresentationTest {
             ),
         )
     }
+
+    @Test
+    fun installerPermissionReturnRetriesTheOriginalAttachmentOpen() =
+        runTest {
+            val source = File("agent-build.apk")
+            val openRequests = mutableListOf<Pair<File, String>>()
+            var permissionRequests = 0
+
+            val result =
+                openAttachmentWithInstallerPermission(
+                    source = source,
+                    mediaType = ANDROID_PACKAGE_MIME,
+                    open = { requestedSource, requestedMediaType ->
+                        openRequests += requestedSource to requestedMediaType
+                        if (openRequests.size == 1) {
+                            OpenAttachmentResult.InstallPermissionRequired
+                        } else {
+                            OpenAttachmentResult.Opened
+                        }
+                    },
+                    requestInstallPermission = {
+                        permissionRequests += 1
+                        true
+                    },
+                )
+
+            assertEquals(OpenAttachmentResult.Opened, result)
+            assertEquals(
+                listOf(source to ANDROID_PACKAGE_MIME, source to ANDROID_PACKAGE_MIME),
+                openRequests,
+            )
+            assertEquals(1, permissionRequests)
+        }
 
     @Test
     fun unresolvedCacheStateNeverStartsAnAutomaticDownload() {
