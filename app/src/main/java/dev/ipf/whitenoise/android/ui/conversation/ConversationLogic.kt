@@ -10,6 +10,7 @@ import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.firstUnreadReceivedIndex
 import dev.ipf.whitenoise.android.state.reconciledConversationEntryUnreadCount
+import kotlin.math.abs
 
 /**
  * Whether the conversation top bar should render a members-count subtitle.
@@ -193,6 +194,17 @@ internal fun isNearBottom(
         lastVisible.offset + lastVisible.size - layoutInfo.viewportEndOffset
     val oversizedTailThreshold = viewportHeight / 4
     return tailDistanceFromViewport <= oversizedTailThreshold
+}
+
+/** True when the target row has settled at the usable transcript top. */
+internal fun isConversationItemTopAligned(
+    listState: LazyListState,
+    targetIndex: Int,
+    tolerancePx: Int = 1,
+): Boolean {
+    val layoutInfo = listState.layoutInfo
+    val target = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex } ?: return false
+    return abs(target.offset - layoutInfo.viewportStartOffset) <= tolerancePx.coerceAtLeast(0)
 }
 
 /**

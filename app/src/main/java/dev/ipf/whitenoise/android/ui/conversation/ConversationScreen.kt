@@ -104,6 +104,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
+import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
@@ -113,6 +114,7 @@ import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.presentFailure
+import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.shouldFocusComposerOnDraftRestore
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
@@ -534,8 +536,18 @@ internal fun ConversationScreen(
                 initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
             )
         }
+    var unreadJumpState by
+        remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateOf(ConversationUnreadJumpState())
+        }
     val scrollCoordinator =
-        remember(controller, listState) {
+        remember(
+            controller,
+            listState,
+            chat.id,
+            appState.activeAccountRef,
+            appState.runtimeGeneration,
+        ) {
             ConversationScrollCoordinator(
                 writer = LazyListConversationScrollWriter(listState),
                 initialMode =
@@ -547,6 +559,9 @@ internal fun ConversationScreen(
                     } else {
                         ConversationScrollMode.FollowingTail
                     },
+                onExplicitNavigation = {
+                    unreadJumpState = unreadJumpState.suppressCurrentStack()
+                },
             )
         }
 
@@ -960,6 +975,25 @@ internal fun ConversationScreen(
                 countUnreadIncoming(controller.timeline, readAnchorMessageId)
             }
         }
+    }
+    LaunchedEffect(
+        controller,
+        initialTimelineAnchored,
+        renderedTimeline,
+        readAnchorMessageId,
+        unreadIncomingCount,
+        nearBottom,
+        unreadJumpState,
+    ) {
+        if (!initialTimelineAnchored) return@LaunchedEffect
+        unreadJumpState =
+            reconcileConversationUnreadJump(
+                current = unreadJumpState,
+                timeline = renderedTimeline,
+                readAnchorMessageId = readAnchorMessageId,
+                unreadCount = unreadIncomingCount,
+                nearBottom = nearBottom,
+            )
     }
     // Unread messages (after the read anchor) that mention the active account,
     // oldest first — drives the in-conversation jump-to-mention chip. Mirrors
@@ -2854,7 +2888,31 @@ internal fun ConversationScreen(
                                         unreadIncomingCount = unreadIncomingCount,
                                         onClick = {
                                             scope.launch {
-                                                scrollCoordinator.jumpToNewest(bottomTimelineIndex)
+                                                val pendingMessageId = unreadJumpState.pendingMessageId
+                                                val outcome =
+                                                    scrollCoordinator.jumpToUnreadOrNewest(
+                                                        pendingUnreadMessageId = pendingMessageId,
+                                                        resolveUnreadIndex = {
+                                                            pendingMessageId?.let(::currentTimelineListIndex)
+                                                        },
+                                                        isUnreadTopAligned = {
+                                                            val targetIndex =
+                                                                pendingMessageId?.let(::currentTimelineListIndex)
+                                                            targetIndex != null &&
+                                                                isConversationItemTopAligned(listState, targetIndex)
+                                                        },
+                                                        resolveTailIndex = { currentTailIndex },
+                                                    )
+                                                when (outcome) {
+                                                    ConversationJumpToNewestOutcome.UnreadStart -> {
+                                                        scrollCoordinator.settleReadingAt(currentScrollAnchor())
+                                                        unreadJumpState = unreadJumpState.suppressCurrentStack()
+                                                    }
+                                                    ConversationJumpToNewestOutcome.Tail -> {
+                                                        unreadJumpState = unreadJumpState.suppressCurrentStack()
+                                                    }
+                                                    ConversationJumpToNewestOutcome.Cancelled -> Unit
+                                                }
                                             }
                                         },
                                     )

@@ -739,6 +739,208 @@ class ConversationScrollCoordinatorTest {
         }
 
     @Test
+    fun jumpToUnreadOrNewest_topAlignsUnreadThenSecondTapFollowsTail() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 14),
+                )
+
+            val firstOutcome =
+                coordinator.jumpToUnreadOrNewest(
+                    pendingUnreadMessageId = "unread",
+                    resolveUnreadIndex = { 40 },
+                    isUnreadTopAligned = { writer.firstVisibleItemIndex == 40 },
+                    resolveTailIndex = { 88 },
+                )
+
+            assertEquals(ConversationJumpToNewestOutcome.UnreadStart, firstOutcome)
+            assertEquals(
+                listOf(
+                    ScrollWrite.Snap(30, 0),
+                    ScrollWrite.Animate(40, 0),
+                ),
+                writer.writes,
+            )
+            assertEquals(ConversationScrollMode.ReadingHistory("unread", 0), coordinator.mode)
+            val followedNewArrival =
+                coordinator.followTailIfAllowed(
+                    resolveTailIndex = { 89 },
+                    reason = ConversationScrollReason.NewMessage,
+                    awaitFrame = {},
+                )
+            assertFalse(followedNewArrival)
+
+            val secondOutcome =
+                coordinator.jumpToUnreadOrNewest(
+                    pendingUnreadMessageId = null,
+                    resolveUnreadIndex = { null },
+                    isUnreadTopAligned = { false },
+                    resolveTailIndex = { 88 },
+                )
+
+            assertEquals(ConversationJumpToNewestOutcome.Tail, secondOutcome)
+            assertEquals(
+                listOf(
+                    ScrollWrite.Snap(30, 0),
+                    ScrollWrite.Animate(40, 0),
+                    ScrollWrite.Snap(78, 0),
+                    ScrollWrite.Animate(88, 0),
+                ),
+                writer.writes,
+            )
+            assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+        }
+
+    @Test
+    fun jumpToUnreadOrNewest_alreadyAlignedOrMissingTargetFallsThroughToTail() =
+        runTest {
+            listOf(true, false).forEach { targetIsAligned ->
+                val writer = RecordingScrollWriter()
+                val coordinator = ConversationScrollCoordinator(writer)
+
+                val outcome =
+                    coordinator.jumpToUnreadOrNewest(
+                        pendingUnreadMessageId = "unread",
+                        resolveUnreadIndex = { if (targetIsAligned) 40 else null },
+                        isUnreadTopAligned = { targetIsAligned },
+                        resolveTailIndex = { 88 },
+                    )
+
+                assertEquals(ConversationJumpToNewestOutcome.Tail, outcome)
+                assertEquals(
+                    listOf(
+                        ScrollWrite.Snap(78, 0),
+                        ScrollWrite.Animate(88, 0),
+                    ),
+                    writer.writes,
+                )
+                assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+            }
+        }
+
+    @Test
+    fun explicitNavigationRetiresUnreadStackButLayoutReanchorsDoNot() =
+        runTest {
+            var retireCount = 0
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = RecordingScrollWriter(),
+                    onExplicitNavigation = { retireCount++ },
+                )
+
+            coordinator.programmaticJump(targetMessageId = null, reason = ConversationScrollReason.ViewportChange) {
+                animateScrollToItem(1)
+            }
+            coordinator.programmaticJump(targetMessageId = null, reason = ConversationScrollReason.Search) {
+                animateScrollToItem(2)
+            }
+            coordinator.programmaticJump(targetMessageId = null, reason = ConversationScrollReason.Send) {
+                animateScrollToItem(3)
+            }
+
+            assertEquals(2, retireCount)
+        }
+
+    @Test
+    fun userDragCancelsUnreadJumpWithoutReportingItConsumed() =
+        runTest {
+            val writer = BlockingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            var outcome: ConversationJumpToNewestOutcome? = null
+            val jump =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    outcome =
+                        coordinator.jumpToUnreadOrNewest(
+                            pendingUnreadMessageId = "unread",
+                            resolveUnreadIndex = { 40 },
+                            isUnreadTopAligned = { false },
+                            resolveTailIndex = { 88 },
+                        )
+                }
+            writer.writeStarted.await()
+
+            coordinator.onUserGestureStarted(anchor(messageId = "reader", listIndex = 12, pixelOffset = 24))
+            jump.join()
+
+            assertFalse(jump.isCancelled)
+            assertEquals(ConversationJumpToNewestOutcome.Cancelled, outcome)
+            assertEquals(ConversationScrollMode.ReadingHistory("reader", 24), coordinator.mode)
+        }
+
+    @Test
+    fun userDragCancelsAlignedUnreadTailJumpWithoutReportingItConsumed() =
+        runTest {
+            val writer = BlockingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            var outcome: ConversationJumpToNewestOutcome? = null
+            val jump =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    outcome =
+                        coordinator.jumpToUnreadOrNewest(
+                            pendingUnreadMessageId = "unread",
+                            resolveUnreadIndex = { 40 },
+                            isUnreadTopAligned = { true },
+                            resolveTailIndex = { 88 },
+                        )
+                }
+            writer.writeStarted.await()
+
+            coordinator.onUserGestureStarted(anchor(messageId = "unread", listIndex = 40))
+            jump.join()
+
+            assertFalse(jump.isCancelled)
+            assertEquals(ConversationJumpToNewestOutcome.Cancelled, outcome)
+            assertEquals(ConversationScrollMode.ReadingHistory("unread", 0), coordinator.mode)
+        }
+
+    @Test
+    fun newerExplicitCommandCancelsUnreadJumpAndRetiresItsIntent() =
+        runTest {
+            val writer = BlockingScrollWriter()
+            var retireCount = 0
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 14),
+                    onExplicitNavigation = { retireCount++ },
+                )
+            var unreadOutcome: ConversationJumpToNewestOutcome? = null
+            val unreadJump =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    unreadOutcome =
+                        coordinator.jumpToUnreadOrNewest(
+                            pendingUnreadMessageId = "unread",
+                            resolveUnreadIndex = { 40 },
+                            isUnreadTopAligned = { false },
+                            resolveTailIndex = { 88 },
+                        )
+                }
+            writer.writeStarted.await()
+
+            var searchCompleted = false
+            val searchJump =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    searchCompleted =
+                        coordinator.programmaticJump(
+                            targetMessageId = "search-result",
+                            reason = ConversationScrollReason.Search,
+                        ) {
+                            scrollToItem(12)
+                        }
+                }
+            writer.releaseWrite.complete(Unit)
+            unreadJump.join()
+            searchJump.join()
+
+            assertEquals(ConversationJumpToNewestOutcome.Cancelled, unreadOutcome)
+            assertTrue(searchCompleted)
+            assertEquals(1, retireCount)
+        }
+
+    @Test
     fun delayedSearchRestoreCannotOverrideANewerUserGesture() =
         runTest {
             val writer = RecordingScrollWriter()
