@@ -473,6 +473,33 @@ class TtsPlaybackQueueTest {
         assertThrows(IllegalArgumentException::class.java) { appendHarness.queue.append(listOf(empty)) }
     }
 
+    @Test
+    fun staleCallbacksAreIgnoredAfterRestartingAtLaterSentence() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        val message = ttsMessage("alice", "Alice", "One.", "Two.", "Three.")
+        queue.start(listOf(message))
+        val staleUtterance = harness.utteranceId(0)
+
+        queue.start(listOf(message), startSentenceIndex = 2)
+
+        queue.onDone(staleUtterance)
+
+        assertEquals(
+            speakingTts(
+                2,
+                3,
+                0,
+                1,
+                "One. Two. Three.",
+                sentenceIndex = 2,
+                sentenceCount = 3,
+                messageProgressGeneration = 2,
+            ).copy(sessionId = 1),
+            queue.state.value,
+        )
+    }
+
     private fun mappedMessage(
         id: String,
         sender: String,

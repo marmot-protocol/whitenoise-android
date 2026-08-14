@@ -373,8 +373,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                                 { bech32: String -> appState.presentNostrProfile(bech32) }
                             },
                         onLastTextLayout = { lastLineLayout = it },
-                        onSelectableTextLayoutChanged =
-                            if (textSelectionMode) selectableTextLayoutReporter else null,
+                        onSelectableTextLayoutChanged = selectableTextLayoutReporter,
                         onLinkTextLayoutChanged = markdownLinkLayoutReporter,
                         onCopyLink = onCopyMarkdownLink,
                     )

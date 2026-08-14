@@ -32,6 +32,27 @@ data class TtsChunk(
 )
 
 object TtsChunker {
+    /** Logical sentences in [text], using the same boundaries as chunking. */
+    internal fun sentences(
+        text: String,
+        locale: Locale,
+    ): List<String> = logicalSentences(text, locale).map(TextSlice::text)
+
+    /** Index of the logical sentence containing [offset] in UTF-16 code units. */
+    internal fun sentenceIndexAtOffset(
+        text: String,
+        offset: Int,
+        locale: Locale,
+    ): Int? {
+        val sentences = logicalSentences(text, locale)
+        val clamped = offset.coerceIn(0, text.length)
+        return when {
+            sentences.isEmpty() -> null
+            clamped == text.length -> sentences.lastIndex
+            else -> sentences.indexOfFirst { clamped >= it.start && clamped < it.end }.takeIf { it >= 0 }
+        }
+    }
+
     private val commonTitleAbbreviations =
         setOf(
             "dr.",
@@ -56,28 +77,7 @@ object TtsChunker {
         val boundedReserve = leadingChunkReserve.coerceAtMost(maxChunkLength - 1)
         if (text.isBlank()) return emptyList()
 
-        val iterator = BreakIterator.getSentenceInstance(locale).apply { setText(text) }
-        val sentences = mutableListOf<TextSlice>()
-        var pendingStart: Int? = null
-        var start = iterator.first()
-        var end = iterator.next()
-        while (end != BreakIterator.DONE) {
-            val candidate = text.trimmedSlice(start, end)
-            if (candidate != null) {
-                if (candidate.text.endsWithCommonTitleAbbreviation(locale)) {
-                    if (pendingStart == null) pendingStart = candidate.start
-                } else {
-                    val sentenceStart = pendingStart ?: candidate.start
-                    sentences += TextSlice(text, sentenceStart, candidate.end)
-                    pendingStart = null
-                }
-            }
-            start = end
-            end = iterator.next()
-        }
-        pendingStart?.let { first ->
-            text.trimmedSlice(first, text.length)?.let(sentences::add)
-        }
+        val sentences = logicalSentences(text, locale)
 
         // Every sentence-first chunk keeps the reserve, not just the message's
         // opening chunk: any logical sentence can become a navigation target,
@@ -102,6 +102,36 @@ object TtsChunker {
                     locale = locale,
                 )
             }
+    }
+
+    private fun logicalSentences(
+        text: String,
+        locale: Locale,
+    ): List<TextSlice> {
+        if (text.isBlank()) return emptyList()
+        val iterator = BreakIterator.getSentenceInstance(locale).apply { setText(text) }
+        val sentences = mutableListOf<TextSlice>()
+        var pendingStart: Int? = null
+        var start = iterator.first()
+        var end = iterator.next()
+        while (end != BreakIterator.DONE) {
+            val candidate = text.trimmedSlice(start, end)
+            if (candidate != null) {
+                if (candidate.text.endsWithCommonTitleAbbreviation(locale)) {
+                    if (pendingStart == null) pendingStart = candidate.start
+                } else {
+                    val sentenceStart = pendingStart ?: candidate.start
+                    sentences += TextSlice(text, sentenceStart, candidate.end)
+                    pendingStart = null
+                }
+            }
+            start = end
+            end = iterator.next()
+        }
+        pendingStart?.let { first ->
+            text.trimmedSlice(first, text.length)?.let(sentences::add)
+        }
+        return sentences
     }
 
     private fun String.endsWithCommonTitleAbbreviation(locale: Locale): Boolean =

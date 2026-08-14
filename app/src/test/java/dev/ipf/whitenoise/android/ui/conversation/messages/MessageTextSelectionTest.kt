@@ -30,6 +30,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -42,6 +43,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -112,6 +114,13 @@ class MessageTextSelectionTest {
         composeRule.onNodeWithTag("selected-bubble").performTouchInput { click() }
         composeRule.runOnIdle { assertEquals(0, dismissals) }
 
+        composeRule.onNodeWithTag("outside-chrome").performTouchInput {
+            down(Offset(8f, 8f))
+            moveBy(Offset(viewConfiguration.touchSlop + 24f, 0f))
+            up()
+        }
+        composeRule.runOnIdle { assertEquals(0, dismissals) }
+
         composeRule.onNodeWithTag("outside-chrome").performTouchInput { click(Offset(8f, 8f)) }
         composeRule.runOnIdle { assertEquals(1, dismissals) }
     }
@@ -168,6 +177,101 @@ class MessageTextSelectionTest {
         val press = second.coordinates.localToWindow(gammaBounds.center)
 
         assertEquals(TextRange(10, 15), textSelectionSeedRange(layouts.values, press))
+    }
+
+    @Test
+    fun actionMenuPressMapsToGlobalOffsetAcrossTextNodes() {
+        val firstKey = Any()
+        val secondKey = Any()
+        val layouts = mutableMapOf<Any, SelectableTextLayout>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Row {
+                    CaptureSelectableText(firstKey, "First item") { layouts[firstKey] = it }
+                    CaptureSelectableText(secondKey, "Second item") { layouts[secondKey] = it }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val second = checkNotNull(layouts[secondKey])
+        val press = second.coordinates.localToWindow(second.layoutResult.getBoundingBox(1).center)
+
+        val offset = textOffsetAtWindowPosition(layouts.values, press)
+        val visibleText = concatenatedVisibleText(layouts.values)
+        assertEquals(
+            1,
+            speakableSentenceIndexAtVisibleOffset(
+                visibleText = visibleText,
+                speakableText = "First item. Second item.",
+                visibleOffset = offset,
+                locale = Locale.US,
+            ),
+        )
+        assertEquals(null, textOffsetAtWindowPosition(layouts.values, null))
+        assertEquals(null, textOffsetAtWindowPosition(layouts.values, Offset(-20f, -20f)))
+    }
+
+    @Test
+    fun selectedTextOffsetRequiresAnUnambiguousMatch() {
+        val key = Any()
+        val text = "Unique. Repeat. Repeat."
+        val layouts = mutableMapOf<Any, SelectableTextLayout>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                CaptureSelectableText(key, text) { layouts[key] = it }
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(
+            0,
+            visibleOffsetFromSelection(layouts.values, listOf(AnnotatedString("Unique"))),
+        )
+        assertEquals(
+            null,
+            visibleOffsetFromSelection(layouts.values, listOf(AnnotatedString("Repeat"))),
+        )
+        assertEquals(
+            text.lastIndexOf("Repeat"),
+            visibleOffsetFromSelection(
+                layouts = layouts.values,
+                selectedTexts = listOf(AnnotatedString("Repeat")),
+                preferredVisibleOffset = text.lastIndexOf("Repeat") + 1,
+            ),
+        )
+    }
+
+    @Test
+    fun selectedTextOffsetMapsAcrossRenderedMarkdownLeaves() {
+        val introKey = Any()
+        val targetKey = Any()
+        val continuationKey = Any()
+        val layouts = mutableMapOf<Any, SelectableTextLayout>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Row {
+                    CaptureSelectableText(introKey, "Intro.") { layouts[introKey] = it }
+                    Spacer(Modifier.width(12.dp))
+                    CaptureSelectableText(targetKey, "Target starts") { layouts[targetKey] = it }
+                    Spacer(Modifier.width(12.dp))
+                    CaptureSelectableText(continuationKey, "continues") { layouts[continuationKey] = it }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(
+            "Intro. ".length,
+            visibleOffsetFromSelection(
+                layouts = layouts.values,
+                selectedTexts =
+                    listOf(
+                        AnnotatedString("Target"),
+                        AnnotatedString("continues"),
+                    ),
+            ),
+        )
     }
 
     @Composable

@@ -94,6 +94,7 @@ class TtsController internal constructor(
     fun speak(
         entries: List<TtsSpeakableEntry>,
         locale: Locale,
+        startSentenceIndex: Int = 0,
     ): Boolean {
         val activeEngine = engine ?: return false
         val messages = entries.toQueuedMessages(locale)
@@ -112,7 +113,7 @@ class TtsController internal constructor(
             )
             return false
         }
-        queue.start(messages)
+        queue.start(messages, startSentenceIndex = startSentenceIndex.coerceAtLeast(0))
         return state.value !is TtsState.Error
     }
 
