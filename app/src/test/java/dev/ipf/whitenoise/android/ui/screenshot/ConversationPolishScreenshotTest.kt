@@ -15,12 +15,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
@@ -65,16 +67,38 @@ class ConversationPolishScreenshotTest {
         )
 
     @Test
-    fun deletedMessageDeleteOnlyActionLight() {
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false, amoled = false) {
-                DeletedMessageActionMenu()
-            }
-        }
-        composeRule
-            .onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG)
-            .captureRoboImage("src/test/snapshots/deleted_message_delete_only_action_light.png")
-    }
+    fun deletedMessageDeleteOnlyActionLight() =
+        captureDeletedMessageActionMenu(
+            "deleted_message_delete_only_action_light",
+            dark = false,
+            amoled = false,
+        )
+
+    @Test
+    fun deletedMessageDeleteOnlyActionDark() =
+        captureDeletedMessageActionMenu(
+            "deleted_message_delete_only_action_dark",
+            dark = true,
+            amoled = false,
+        )
+
+    @Test
+    fun deletedMessageDeleteOnlyActionAmoled() =
+        captureDeletedMessageActionMenu(
+            "deleted_message_delete_only_action_amoled",
+            dark = true,
+            amoled = true,
+        )
+
+    @Test
+    fun deletedMessageDeleteOnlyActionLargeFontRtl() =
+        captureDeletedMessageActionMenu(
+            "deleted_message_delete_only_action_font_scale_2x_rtl",
+            dark = false,
+            amoled = false,
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+        )
 
     @Test
     fun attachmentTypesLight() = captureAttachmentTypes("attachment_type_gallery_light", dark = false, amoled = false)
@@ -106,6 +130,27 @@ class ConversationPolishScreenshotTest {
                 val density = LocalDensity.current
                 CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
                     MaximumActionMenu()
+                }
+            }
+        }
+        composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    private fun captureDeletedMessageActionMenu(
+        name: String,
+        dark: Boolean,
+        amoled: Boolean,
+        fontScale: Float = 1f,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
+                val density = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalDensity provides Density(density.density, fontScale),
+                    LocalLayoutDirection provides layoutDirection,
+                ) {
+                    DeletedMessageActionMenu()
                 }
             }
         }

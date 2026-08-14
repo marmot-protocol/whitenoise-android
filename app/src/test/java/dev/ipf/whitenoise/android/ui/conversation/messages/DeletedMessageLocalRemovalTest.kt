@@ -30,6 +30,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.TimelineProjector
@@ -44,6 +45,7 @@ import dev.ipf.whitenoise.android.ui.conversation.TimelineRowMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -156,6 +158,36 @@ class DeletedMessageLocalRemovalTest {
         assertEquals(1, surface.preferences.successfulCommits.get())
     }
 
+    @Test
+    fun controllerReloadAndRecreationKeepTheTombstoneLocallyHiddenWithoutOpeningMarmot() =
+        runBlocking {
+            val runtimeOpens = AtomicInteger()
+            val page = TimelinePageFfi(messages = listOf(deletedRecord()), hasMoreBefore = true, hasMoreAfter = true)
+            val firstState = integrationAppState(ACCOUNT_REF, ACCOUNT_ID, runtimeOpens)
+            val firstController = ConversationController(appState = firstState, initialGroup = group())
+
+            firstController.testRefreshCurrentTimeline(ACCOUNT_REF) { page }
+            assertEquals(listOf(MESSAGE_ID), firstController.timeline.map { it.record.messageIdHex })
+
+            assertTrue(firstController.hideMessageForMe(MESSAGE_ID))
+            assertTrue(firstController.timeline.isEmpty())
+            assertTrue(page.messages.single().deleted)
+
+            firstController.testRefreshCurrentTimeline(ACCOUNT_REF) { page }
+            assertTrue(firstController.timeline.isEmpty())
+
+            val recreatedState = integrationAppState(ACCOUNT_REF, ACCOUNT_ID, runtimeOpens)
+            val recreatedController = ConversationController(appState = recreatedState, initialGroup = group())
+            recreatedController.testRefreshCurrentTimeline(ACCOUNT_REF) { page }
+            assertTrue(recreatedController.timeline.isEmpty())
+
+            val otherState = integrationAppState(OTHER_ACCOUNT_REF, OTHER_ACCOUNT_ID, runtimeOpens)
+            val otherController = ConversationController(appState = otherState, initialGroup = group())
+            otherController.testRefreshCurrentTimeline(OTHER_ACCOUNT_REF) { page }
+            assertEquals(listOf(MESSAGE_ID), otherController.timeline.map { it.record.messageIdHex })
+            assertEquals(0, runtimeOpens.get())
+        }
+
     private fun assertDeleteOnlyMenu() {
         deleteAction().assertIsDisplayed()
         listOf(
@@ -266,6 +298,36 @@ class DeletedMessageLocalRemovalTest {
             activeAccountRef = ACCOUNT_REF,
             preferences = preferences,
         )
+
+    private fun integrationAppState(
+        accountRef: String,
+        accountId: String,
+        runtimeOpens: AtomicInteger,
+    ) = WhiteNoiseAppState(
+        context = context,
+        draftStore = DraftStore(EmptyDraftPersistence()),
+        accountIdHexResolver = { accountId },
+        accounts =
+            listOf(
+                AccountSummaryFfi(
+                    label = accountRef,
+                    accountIdHex = accountId,
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
+                ),
+            ),
+        activeAccountRef = accountRef,
+        profileReader = { null },
+        profileDisplayNameReader = { null },
+        profileRefreshRequest = {},
+        marmotRuntimeFactory = {
+            runtimeOpens.incrementAndGet()
+            error("Local tombstone removal must not open the Marmot runtime")
+        },
+        preferences = backingPreferences,
+    )
 
     @Suppress("UNCHECKED_CAST")
     private fun seedTimeline(
@@ -415,6 +477,8 @@ class DeletedMessageLocalRemovalTest {
     private companion object {
         const val ACCOUNT_REF = "personal"
         val ACCOUNT_ID = "01" + "00".repeat(31)
+        const val OTHER_ACCOUNT_REF = "work"
+        val OTHER_ACCOUNT_ID = "07" + "00".repeat(31)
         val SENDER_ID = "02" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
         val MESSAGE_ID = "05" + "00".repeat(31)

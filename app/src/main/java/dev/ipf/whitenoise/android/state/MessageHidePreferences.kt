@@ -109,6 +109,7 @@ internal object MessageHidePreferences {
         return edit.commit()
     }
 
+    @Synchronized
     fun clearAccount(
         preferences: SharedPreferences,
         accountRef: String?,
@@ -118,7 +119,7 @@ internal object MessageHidePreferences {
         preferences.all.keys
             .filter { it.startsWith(prefix) }
             .forEach(edit::remove)
-        edit.apply()
+        edit.commit()
     }
 }
 

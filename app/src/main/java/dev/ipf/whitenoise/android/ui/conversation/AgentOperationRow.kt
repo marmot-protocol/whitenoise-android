@@ -136,27 +136,34 @@ private fun AgentOperationDeleteDialog(
     senderDisplayName: String,
     onDismiss: () -> Unit,
 ) {
-    var deleteForEveryoneInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
+    var deleteInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     MessageDeleteDialog(
         capability = capability,
         mine = mine,
         senderDisplayName = senderDisplayName,
-        deleteInFlight = deleteForEveryoneInFlight,
+        deleteInFlight = deleteInFlight,
         onDeleteForEveryone = {
-            if (!deleteForEveryoneInFlight) {
-                deleteForEveryoneInFlight = true
+            if (!deleteInFlight) {
+                deleteInFlight = true
                 appState.launchMutation {
                     try {
                         if (controller.deleteMessage(record)) onDismiss()
                     } finally {
-                        deleteForEveryoneInFlight = false
+                        deleteInFlight = false
                     }
                 }
             }
         },
         onDeleteForMe = {
-            appState.launchMutation {
-                if (controller.hideMessageForMe(record.messageIdHex)) onDismiss()
+            if (!deleteInFlight) {
+                deleteInFlight = true
+                appState.launchMutation {
+                    try {
+                        if (controller.hideMessageForMe(record.messageIdHex)) onDismiss()
+                    } finally {
+                        deleteInFlight = false
+                    }
+                }
             }
         },
         onDismissRequest = onDismiss,
