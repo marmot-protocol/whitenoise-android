@@ -282,10 +282,12 @@ class AppStateSendLockCoverageTest {
                 "batchDeleteSubmissionGuard.finish()" in conversation,
         )
         assertTrue(
-            "cancellation must reconcile completed work and propagate without publishing an error",
+            "cancellation must preserve first-attempt failures, reconcile completed work, and propagate without publishing an error",
             cancellationStart >= 0 &&
                 cancellationEnd > cancellationStart &&
                 "completedOutcomes" in conversation.substring(cancellationStart, cancellationEnd) &&
+                "BatchDeleteRetryState.from(completedResult)" in
+                conversation.substring(cancellationStart, cancellationEnd) &&
                 "throw cancellation" in conversation.substring(cancellationStart, cancellationEnd) &&
                 "appState.present" !in conversation.substring(cancellationStart, cancellationEnd),
         )

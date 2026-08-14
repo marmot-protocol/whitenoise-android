@@ -2448,9 +2448,10 @@ internal fun ConversationScreen(
                 completedOutcomes
                     .filter(BatchDeleteOperationOutcome::succeeded)
                     .forEach { selectedMessages.remove(it.attempt.selection.action.messageId) }
-                priorRetryState?.afterRetry(completedResult)?.let { updatedRetryState ->
-                    batchDeleteRetryState = updatedRetryState.takeIf { it.failures.isNotEmpty() }
-                }
+                val updatedRetryState =
+                    priorRetryState?.afterRetry(completedResult)
+                        ?: BatchDeleteRetryState.from(completedResult)
+                batchDeleteRetryState = updatedRetryState.takeIf { it.failures.isNotEmpty() }
                 throw cancellation
             } finally {
                 batchDeleteSubmissionGuard.finish()
