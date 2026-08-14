@@ -7920,31 +7920,33 @@ class ConversationController(
         message: AppMessageRecordFfi,
         presentFailure: Boolean = true,
     ): Result<Unit> {
-        val account =
-            conversationAccountRef
-                ?: return Result.failure(IllegalStateException("Conversation account unavailable"))
-        // Same capability model the delete surface renders from; re-checked
-        // here so the mutation path stays authoritative even if a stale or
-        // forged UI state requests an unauthorized scope. Also makes repeat
-        // requests idempotent: once the optimistic tombstone is set, the
-        // capability reads alreadyDeleted and the second call is a no-op.
-        if (!deleteCapabilityFor(message).canDeleteForEveryone) {
-            return Result.failure(SecurityException("Delete capability unavailable"))
-        }
-        val target = message.messageIdHex
-        deletedMessageIds = deletedMessageIds + target
-        return try {
-            appState.withGroupCommitLock(account, group.groupIdHex) {
-                appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
+        val account = conversationAccountRef
+        return when {
+            account == null -> Result.failure(IllegalStateException("Conversation account unavailable"))
+            // Same capability model the delete surface renders from; re-checked
+            // here so the mutation path stays authoritative even if a stale or
+            // forged UI state requests an unauthorized scope. Also makes repeat
+            // requests idempotent: once the optimistic tombstone is set, the
+            // capability reads alreadyDeleted and the second call is a no-op.
+            !deleteCapabilityFor(message).canDeleteForEveryone ->
+                Result.failure(SecurityException("Delete capability unavailable"))
+            else -> {
+                val target = message.messageIdHex
+                deletedMessageIds = deletedMessageIds + target
+                try {
+                    appState.withGroupCommitLock(account, group.groupIdHex) {
+                        appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
+                    }
+                    Result.success(Unit)
+                } catch (throwable: Throwable) {
+                    deletedMessageIds = deletedMessageIds - target
+                    throwable.rethrowIfCancellation()
+                    if (presentFailure) {
+                        appState.presentFailure(R.string.toast_couldnt_delete_message, "MESSAGE_DELETE", throwable)
+                    }
+                    Result.failure(throwable)
+                }
             }
-            Result.success(Unit)
-        } catch (throwable: Throwable) {
-            deletedMessageIds = deletedMessageIds - target
-            throwable.rethrowIfCancellation()
-            if (presentFailure) {
-                appState.presentFailure(R.string.toast_couldnt_delete_message, "MESSAGE_DELETE", throwable)
-            }
-            Result.failure(throwable)
         }
     }
 
@@ -7956,19 +7958,20 @@ class ConversationController(
 
     /** Account-bound local-hide variant used by batch retry accounting. */
     internal fun hideMessageForMeResult(messageIdHex: String): Result<Unit> {
-        val account =
-            conversationAccountRef
-                ?: return Result.failure(IllegalStateException("Conversation account unavailable"))
-        val target =
-            messageIdHex.takeIf { it.isNotBlank() }
-                ?: return Result.failure(IllegalArgumentException("Message id unavailable"))
-        return try {
-            appState.hideMessageForMe(account, group.groupIdHex, target)
-            publishTimelineFromIndexes()
-            Result.success(Unit)
-        } catch (throwable: Throwable) {
-            throwable.rethrowIfCancellation()
-            Result.failure(throwable)
+        val account = conversationAccountRef
+        val target = messageIdHex.takeIf { it.isNotBlank() }
+        return when {
+            account == null -> Result.failure(IllegalStateException("Conversation account unavailable"))
+            target == null -> Result.failure(IllegalArgumentException("Message id unavailable"))
+            else ->
+                try {
+                    appState.hideMessageForMe(account, group.groupIdHex, target)
+                    publishTimelineFromIndexes()
+                    Result.success(Unit)
+                } catch (throwable: Throwable) {
+                    throwable.rethrowIfCancellation()
+                    Result.failure(throwable)
+                }
         }
     }
 
