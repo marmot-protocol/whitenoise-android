@@ -8,31 +8,86 @@ on:
     workflows: [Android PR APK]
     types: [completed]
 
-concurrency:
-  # One publisher per PR: a new push cancels a superseded signer/publisher so
-  # an older build cannot finish after the latest build and replace its link.
-  # Internal PR branch names are stable across pushes, including when GitHub's
-  # optional workflow_run.pull_requests association is empty.
-  group: android-pr-preview-publish-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
-  cancel-in-progress: true
-
 permissions:
   actions: read
   contents: read
   pull-requests: write
 
 jobs:
-  publish:
+  prepare:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'pull_request' &&
+      (github.event.workflow_run.event == 'pull_request' || github.event.workflow_run.event == 'workflow_dispatch') &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    outputs:
+      pr_number: ${{ steps.provenance.outputs.pr_number }}
+      head_sha: ${{ steps.provenance.outputs.head_sha }}
     env:
-      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       BUILD_RUN_ID: ${{ github.event.workflow_run.id }}
       BUILD_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+
+    steps:
+      - name: Download candidate provenance from completed run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p candidates/stable candidates/isolated
+          gh run download "$BUILD_RUN_ID" --name pr-preview-stable --dir candidates/stable
+          gh run download "$BUILD_RUN_ID" --name pr-preview-isolated --dir candidates/isolated
+
+      # Resolve the validated PR number before the publisher starts so job-level
+      # concurrency cannot couple distinct PRs that happen to share a branch.
+      - name: Resolve exact candidate provenance and current PR
+        id: provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
+          WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          provenance_value() {
+            local file=$1 key=$2
+            local value
+            value=$(sed -nE "s/^${key}=//p" "$file")
+            [[ $(grep -c "^${key}=" "$file") -eq 1 ]]
+            printf '%s' "$value"
+          }
+          stable=candidates/stable/provenance.env
+          isolated=candidates/isolated/provenance.env
+          stable_pr=$(provenance_value "$stable" pr_number)
+          isolated_pr=$(provenance_value "$isolated" pr_number)
+          stable_sha=$(provenance_value "$stable" head_sha)
+          isolated_sha=$(provenance_value "$isolated" head_sha)
+          stable_run=$(provenance_value "$stable" run_number)
+          isolated_run=$(provenance_value "$isolated" run_number)
+          [[ "$stable_pr" == "$isolated_pr" && "$stable_sha" == "$isolated_sha" && "$stable_run" == "$isolated_run" ]]
+          [[ "$stable_pr" =~ ^[1-9][0-9]*$ && "$stable_sha" =~ ^[0-9a-f]{40}$ && "$stable_run" =~ ^[1-9][0-9]*$ ]]
+          [[ "$stable_run" == "$BUILD_RUN_NUMBER" ]]
+          if [[ "$WORKFLOW_EVENT" == pull_request ]]; then
+            [[ "$stable_sha" == "$WORKFLOW_HEAD_SHA" ]]
+          fi
+          current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${stable_pr}" \
+            --jq '[.state, .head.sha, .head.repo.full_name] | @tsv')
+          expected=$(printf 'open\t%s\t%s' "$stable_sha" "$GITHUB_REPOSITORY")
+          [[ "$current" == "$expected" ]]
+          printf 'pr_number=%s\nhead_sha=%s\n' "$stable_pr" "$stable_sha" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: android-pr-preview-publish-pr-${{ needs.prepare.outputs.pr_number }}
+      cancel-in-progress: true
+    env:
+      BUILD_RUN_ID: ${{ github.event.workflow_run.id }}
+      BUILD_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+      PR_NUMBER: ${{ needs.prepare.outputs.pr_number }}
+      HEAD_SHA: ${{ needs.prepare.outputs.head_sha }}
 
     steps:
       - name: Checkout trusted publisher only
@@ -59,27 +114,42 @@ jobs:
           gh run download "$BUILD_RUN_ID" --name pr-preview-stable --dir candidates/stable
           gh run download "$BUILD_RUN_ID" --name pr-preview-isolated --dir candidates/isolated
 
-      # workflow_run.pull_requests is optional and can be empty. Resolve the PR
-      # from the immutable head SHA through GitHub, fail closed on ambiguity,
-      # then use that trusted number for provenance and publication checks.
-      - name: Resolve the single current PR
+      # Recheck the freshly downloaded untrusted artifacts against the values
+      # that selected this PR's concurrency group before exposing any secret.
+      - name: Verify candidate provenance and current PR
         env:
           GH_TOKEN: ${{ github.token }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
+          WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t matches < <(
-            gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/pulls" --paginate |
-              jq -r --arg head_sha "$HEAD_SHA" --arg repo "$GITHUB_REPOSITORY" --arg default_branch "$DEFAULT_BRANCH" \
-                '.[] | select(.state == "open" and .head.sha == $head_sha and .head.repo.full_name == $repo and .base.ref == $default_branch) | .number'
-          )
-          if (( ${#matches[@]} != 1 )); then
-            printf 'Expected exactly one open internal PR for %s, found %d.\n' \
-              "$HEAD_SHA" "${#matches[@]}" >&2
-            exit 1
+          provenance_value() {
+            local file=$1 key=$2
+            local value
+            value=$(sed -nE "s/^${key}=//p" "$file")
+            [[ $(grep -c "^${key}=" "$file") -eq 1 ]]
+            printf '%s' "$value"
+          }
+          stable=candidates/stable/provenance.env
+          isolated=candidates/isolated/provenance.env
+          stable_pr=$(provenance_value "$stable" pr_number)
+          isolated_pr=$(provenance_value "$isolated" pr_number)
+          stable_sha=$(provenance_value "$stable" head_sha)
+          isolated_sha=$(provenance_value "$isolated" head_sha)
+          stable_run=$(provenance_value "$stable" run_number)
+          isolated_run=$(provenance_value "$isolated" run_number)
+          [[ "$stable_pr" == "$isolated_pr" && "$stable_sha" == "$isolated_sha" && "$stable_run" == "$isolated_run" ]]
+          [[ "$stable_pr" =~ ^[1-9][0-9]*$ && "$stable_sha" =~ ^[0-9a-f]{40}$ && "$stable_run" =~ ^[1-9][0-9]*$ ]]
+          [[ "$stable_run" == "$BUILD_RUN_NUMBER" ]]
+          if [[ "$WORKFLOW_EVENT" == pull_request ]]; then
+            [[ "$stable_sha" == "$WORKFLOW_HEAD_SHA" ]]
           fi
-          printf 'PR_NUMBER=%s\n' "${matches[0]}" >> "$GITHUB_ENV"
+          current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${stable_pr}" \
+            --jq '[.state, .head.sha, .head.repo.full_name] | @tsv')
+          expected=$(printf 'open\t%s\t%s' "$stable_sha" "$GITHUB_REPOSITORY")
+          [[ "$current" == "$expected" ]]
+          [[ "$stable_pr" == "$PR_NUMBER" && "$stable_sha" == "$HEAD_SHA" ]]
 
       - name: Verify current PR head
         env:
@@ -89,9 +159,8 @@ jobs:
         run: |
           set -euo pipefail
           current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
-            --jq '[.state, .head.sha, .head.repo.full_name, .base.ref] | @tsv')
-          expected=$(printf 'open\t%s\t%s\t%s' "$HEAD_SHA" "$GITHUB_REPOSITORY" \
-            "$DEFAULT_BRANCH")
+            --jq '[.state, .head.sha, .head.repo.full_name] | @tsv')
+          expected=$(printf 'open\t%s\t%s' "$HEAD_SHA" "$GITHUB_REPOSITORY")
           [[ "$current" == "$expected" ]] || {
             printf 'Refusing stale or mismatched preview build.\n' >&2
             exit 1
@@ -198,11 +267,11 @@ jobs:
             const pr = Number(process.env.PR_NUMBER);
             const body = [
               marker,
-              '### PR Preview APK',
+              '### White Noise PR APK',
               '',
-              `**[Install/update Preview White Noise](${process.env.STABLE_URL})** — keeps app data when switching PRs.`,
+              `**[Install/update White Noise PR](${process.env.STABLE_URL})** — stable app identity; keeps app data when switching PRs.`,
               '',
-              `This replaces the current PR Preview and retains its accounts and history.`,
+              `Built from PR #${pr} at \`${process.env.HEAD_SHA.slice(0, 12)}\`. This replaces the installed White Noise PR app and retains its accounts and history.`,
               '',
               `[Isolated PR #${pr}](${process.env.ISOLATED_URL}) — use for storage/auth changes or side-by-side testing.`,
             ].join('\n');
