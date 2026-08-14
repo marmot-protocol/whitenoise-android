@@ -858,6 +858,7 @@
     <string name="toast_profile_published_detail">Your kind:0 metadata is live on %1$d relays.</string>
     <string name="toast_couldnt_publish_profile">Couldn\'t publish profile</string>
     <string name="toast_send_failed">Send failed</string>
+    <string name="toast_send_connection_failed">Couldn’t reach the relay. Check your connection and try again.</string>
     <string name="toast_send_queue_full">This chat has too many messages waiting to send, so yours wasn\'t sent. Try again once it catches up.</string>
     <string name="toast_chat_still_loading">This chat is still loading. Try again in a moment.</string>
     <string name="toast_send_membership_verifying">Checking your group membership — your message wasn\'t sent. It\'s kept in the box; try again in a moment.</string>

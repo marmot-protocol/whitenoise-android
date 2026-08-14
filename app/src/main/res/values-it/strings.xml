@@ -618,6 +618,7 @@
     <string name="toast_profile_published_detail">I tuoi metadati kind:0 sono attivi sui relè %1$d.</string>
     <string name="toast_couldnt_publish_profile">Impossibile pubblicare il profilo</string>
     <string name="toast_send_failed">Invio non riuscito</string>
+    <string name="toast_send_connection_failed">Impossibile raggiungere il relay. Controlla la connessione e riprova.</string>
     <string name="toast_send_queue_full">Questa chat ha troppi messaggi in attesa di invio, quindi il tuo non è stato inviato. Riprova quando sarà in pari.</string>
     <string name="toast_chat_still_loading">Questa chat si sta ancora caricando. Riprova tra un attimo.</string>
     <string name="toast_send_membership_verifying">Verifica dell’appartenenza al gruppo — il messaggio non è stato inviato. È rimasto nella casella; riprova tra un istante.</string>
