@@ -72,6 +72,23 @@ class MediaAttachmentSaveTest {
     }
 
     @Test
+    fun materializedFileStreamsToDownloadsCollection() {
+        val source = File.createTempFile("materialized-attachment", ".apk")
+        try {
+            source.writeBytes(PAYLOAD)
+
+            val saved = saveDocumentToDownloads(context(), source, "agent-build.apk", "application/vnd.android.package-archive")
+
+            assertTrue(saved)
+            assertEquals(MediaStore.Downloads.EXTERNAL_CONTENT_URI, provider.insertedCollection)
+            assertEquals("agent-build.apk", provider.insertedValues?.getAsString(MediaStore.Downloads.DISPLAY_NAME))
+            assertArrayEquals(PAYLOAD, outputFile.readBytes())
+        } finally {
+            source.delete()
+        }
+    }
+
+    @Test
     fun mediaStoreWriteFailureIsPreservedForDiagnosticPresentation() {
         val writeFailure = java.io.IOException("credential-bearing content://secret must not reach UI")
         provider.outputFailure = writeFailure

@@ -92,11 +92,12 @@ import dev.ipf.whitenoise.android.ui.conversation.media.OpenAttachmentResult
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeDescription
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
+import dev.ipf.whitenoise.android.ui.conversation.media.materializeDocumentAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.openAttachmentExternally
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
-import dev.ipf.whitenoise.android.ui.conversation.media.saveAttachmentToMediaStore
+import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentToDownloads
 import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
@@ -912,9 +913,23 @@ private fun FileLibraryRow(
             } else {
                 null
             }
-        return retained
-            ?: controller.downloadAttachment(row.messageIdHex, row.attachmentIndex, row.reference)
+        return controller
+            .requestAttachmentTransfer(
+                messageIdHex = row.messageIdHex,
+                attachmentIndex = row.attachmentIndex,
+                reference = row.reference,
+                retainedPlaintext = retained,
+            ).await()
     }
+
+    suspend fun fetchFile() =
+        materializeDocumentAttachment(
+            context = context,
+            messageIdHex = row.messageIdHex,
+            attachmentIndex = row.attachmentIndex,
+            reference = row.reference,
+            resolveBytes = { fetchBytes() },
+        )
 
     Row(
         modifier =
@@ -929,8 +944,7 @@ private fun FileLibraryRow(
                             runCatching {
                                 openAttachmentExternally(
                                     context,
-                                    fetchBytes(),
-                                    row.reference.fileName,
+                                    fetchFile(),
                                     row.reference.mediaType,
                                 )
                             }.onFailure {
@@ -1004,12 +1018,12 @@ private fun FileLibraryRow(
                             scope.launch {
                                 val outcome =
                                     runCatchingCancellable {
-                                        val bytes = fetchBytes()
+                                        val file = fetchFile()
                                         val saved =
                                             withContext(Dispatchers.IO) {
-                                                saveAttachmentToMediaStore(
+                                                saveDocumentToDownloads(
                                                     context,
-                                                    bytes,
+                                                    file,
                                                     row.reference.fileName,
                                                     row.reference.mediaType,
                                                 )

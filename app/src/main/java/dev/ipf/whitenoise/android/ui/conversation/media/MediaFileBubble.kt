@@ -38,8 +38,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
@@ -51,6 +53,7 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
@@ -62,13 +65,15 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 /**
  * Receive-side bubble for any attachment whose MIME isn't an image. Renders
  * as a tappable pill: icon (chosen by MIME family), filename, size + status.
- * Tapping fetches the bytes (cached after first tap), writes a temp file
- * routed through the app's FileProvider, and fires `ACTION_VIEW` so the
- * system picks an external app (PDF reader, etc.) to open it.
+ * Tapping joins any automatic/durable fetch already in flight, materializes a
+ * reusable FileProvider artifact, and fires `ACTION_VIEW` so the system picks
+ * an external app (PDF reader, package installer, etc.) to open it.
  */
 @Composable
 internal fun MediaFileBubble(
@@ -85,6 +90,7 @@ internal fun MediaFileBubble(
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val pillKey = "$messageIdHex#$attachmentIndex"
+    var openRequested by remember(pillKey) { mutableStateOf(false) }
     val transferStateFlow =
         remember(controller, pillKey, mine) {
             controller.attachmentTransferState(
@@ -118,10 +124,9 @@ internal fun MediaFileBubble(
     // stays available regardless of the policy.
     val autoDownloadAllowed = mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Document)
 
-    // When the Documents policy allows auto-download, prefetch the bytes into
-    // the attachment cache so the file is ready to open without a tap. We
-    // only materialize (warm the L1/L2 cache); opening still happens on tap
-    // via openAttachmentExternally below. Mirrors the audio/video bubbles.
+    // When the Documents policy allows auto-download, prefetch into encrypted
+    // L2. Notification receipt now schedules the same durable work; this
+    // composition trigger is kept as an immediate foreground fast path.
     LaunchedEffect(pillKey, reference.sourceEpoch, autoDownloadAllowed, transferState) {
         if (!shouldStartAttachmentDownload(transferState, autoDownloadAllowed, reference.sourceEpoch, mine)) {
             return@LaunchedEffect
@@ -138,58 +143,69 @@ internal fun MediaFileBubble(
                 .widthIn(max = 360.dp)
                 .combinedClickable(
                     enabled =
-                        transferState != AttachmentTransferState.Downloading &&
-                            (mine || reference.sourceEpoch != 0uL),
+                        !openRequested &&
+                            canRequestAttachmentOpen(transferState, reference.sourceEpoch, mine),
                     onLongClick = onLongPress,
                     onClick = {
+                        openRequested = true
                         scope.launch {
-                            val retained =
-                                if (mine) {
-                                    controller
-                                        .pendingAttachmentsList(messageIdHex)
-                                        .getOrNull(attachmentIndex)
-                                        ?.plaintextBytes
-                                } else {
-                                    null
-                                }
-                            val data =
-                                runCatching {
-                                    controller
-                                        .requestAttachmentTransfer(
+                            try {
+                                val retained =
+                                    if (mine) {
+                                        controller
+                                            .pendingAttachmentsList(messageIdHex)
+                                            .getOrNull(attachmentIndex)
+                                            ?.plaintextBytes
+                                    } else {
+                                        null
+                                    }
+                                val file =
+                                    runCatching {
+                                        materializeDocumentAttachment(
+                                            context = context,
                                             messageIdHex = messageIdHex,
                                             attachmentIndex = attachmentIndex,
                                             reference = reference,
-                                            retainedPlaintext = retained,
-                                        ).await()
-                                }.onFailure {
-                                    if (it is CancellationException) throw it
-                                    Log.w(
-                                        "MediaFileBubble",
-                                        "download failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
-                                        it,
+                                            resolveBytes = {
+                                                controller
+                                                    .requestAttachmentTransfer(
+                                                        messageIdHex = messageIdHex,
+                                                        attachmentIndex = attachmentIndex,
+                                                        reference = reference,
+                                                        retainedPlaintext = retained,
+                                                    ).await()
+                                            },
+                                        )
+                                    }.onFailure {
+                                        if (it is CancellationException) throw it
+                                        Log.w(
+                                            "MediaFileBubble",
+                                            "download failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
+                                            it,
+                                        )
+                                    }.getOrNull() ?: return@launch
+                                // If the download finishes while the app is in the
+                                // background, keep this tap pending and open as soon
+                                // as the Activity resumes. Process death is covered by
+                                // the durable worker; the next tap then reuses L2.
+                                if (!lifecycleOwner.lifecycle.awaitResumedOrDestroyed()) return@launch
+                                val outcome =
+                                    openAttachmentExternally(
+                                        context,
+                                        file,
+                                        reference.mediaType,
                                     )
-                                }.getOrNull() ?: return@launch
-                            // A user tap may outlive the visible/resumed Activity.
-                            // Keep the completed bytes cached but never launch an
-                            // external viewer from background state.
-                            if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                                return@launch
-                            }
-                            val outcome =
-                                openAttachmentExternally(
-                                    context,
-                                    data,
-                                    reference.fileName,
-                                    reference.mediaType,
-                                )
-                            when (outcome) {
-                                OpenAttachmentResult.Opened -> Unit
-                                OpenAttachmentResult.NoHandler -> {
-                                    appState.present(noOpenAppMessage)
+                                when (outcome) {
+                                    OpenAttachmentResult.Opened -> Unit
+                                    OpenAttachmentResult.NoHandler -> {
+                                        appState.present(noOpenAppMessage)
+                                    }
+                                    OpenAttachmentResult.Error -> {
+                                        appState.present(couldntOpenMessage, copyable = true)
+                                    }
                                 }
-                                OpenAttachmentResult.Error -> {
-                                    appState.present(couldntOpenMessage, copyable = true)
-                                }
+                            } finally {
+                                openRequested = false
                             }
                         }
                     },
@@ -227,6 +243,48 @@ internal fun MediaFileBubble(
                 )
             }
             attachmentTransferIndicator(transferState)
+        }
+    }
+}
+
+/** A tap during auto-download joins the existing transfer instead of being ignored. */
+internal fun canRequestAttachmentOpen(
+    transferState: AttachmentTransferState,
+    sourceEpoch: ULong,
+    mine: Boolean,
+): Boolean =
+    when (transferState) {
+        AttachmentTransferState.Resolving,
+        AttachmentTransferState.Remote,
+        AttachmentTransferState.Downloading,
+        AttachmentTransferState.Available,
+        AttachmentTransferState.NotRetained,
+        AttachmentTransferState.Failed,
+        -> mine || sourceEpoch != 0uL
+    }
+
+private suspend fun Lifecycle.awaitResumedOrDestroyed(): Boolean {
+    if (currentState == Lifecycle.State.DESTROYED) return false
+    if (currentState.isAtLeast(Lifecycle.State.RESUMED)) return true
+    return suspendCancellableCoroutine { continuation ->
+        lateinit var observer: LifecycleEventObserver
+
+        fun complete(resumed: Boolean) {
+            removeObserver(observer)
+            if (continuation.isActive) continuation.resume(resumed)
+        }
+        observer =
+            LifecycleEventObserver { _, _ ->
+                when {
+                    currentState == Lifecycle.State.DESTROYED -> complete(false)
+                    currentState.isAtLeast(Lifecycle.State.RESUMED) -> complete(true)
+                }
+            }
+        addObserver(observer)
+        continuation.invokeOnCancellation { removeObserver(observer) }
+        when {
+            currentState == Lifecycle.State.DESTROYED -> complete(false)
+            currentState.isAtLeast(Lifecycle.State.RESUMED) -> complete(true)
         }
     }
 }

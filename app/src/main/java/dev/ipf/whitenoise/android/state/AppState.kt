@@ -37,6 +37,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
@@ -93,6 +94,7 @@ import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
+import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
@@ -3328,13 +3330,14 @@ class WhiteNoiseAppState private constructor(
                 mutationsScope.async {
                     // Cap concurrent attachment fetches so an N-tile album
                     // doesn't saturate the underlying network or Blossom
-                    // stack, and retry short-lived per-tile failures before
-                    // surfacing a manual retry state. The gate is acquired
-                    // inside the Deferred so callers only suspend at `await()`.
+                    // stack. MDK already walks every eligible locator with its
+                    // own timeout; repeating that complete operation here made
+                    // one bad endpoint look like a multi-minute spinner. A
+                    // durable worker may perform one later, backed-off attempt.
+                    // The gate is acquired inside the Deferred so callers only
+                    // suspend at `await()`.
                     val downloadScope = this
-                    attachmentDownloadGate.withRetryingPermit(
-                        shouldRetry = ::isTransientAttachmentDownloadFailure,
-                    ) { downloadScope.block() }
+                    attachmentDownloadGate.withPermit { downloadScope.block() }
                 }
             inFlightDownloads[cacheKey] = deferred
             // Drop the map entry via `invokeOnCompletion` (fires AFTER the
@@ -3354,6 +3357,118 @@ class WhiteNoiseAppState private constructor(
             }
             return deferred
         }
+    }
+
+    /**
+     * Resolve one attachment from MDK's authoritative media projection. This is
+     * intentionally the only recovery path used by durable Android work: the
+     * WorkManager request stores identity, never a duplicate media reference.
+     */
+    internal suspend fun resolveAttachmentReference(request: AttachmentTransferRequest): MediaAttachmentReferenceFfi? =
+        marmotIo { listMedia(request.accountRef, request.groupIdHex, null) }
+            .firstOrNull { record ->
+                record.messageIdHex.equals(request.messageIdHex, ignoreCase = true) &&
+                    record.attachmentIndex.toInt() == request.attachmentIndex
+            }?.reference
+
+    internal fun enqueueAttachmentDownload(request: AttachmentTransferRequest) {
+        AttachmentDownloadWorker.enqueue(appContext, request)
+    }
+
+    /** True only when plaintext is retained in L1 or the encrypted L2 cache. */
+    internal suspend fun hasCachedAttachmentAfterHydration(request: AttachmentTransferRequest): Boolean {
+        val cacheKey =
+            mediaCacheKey(
+                request.accountRef,
+                request.groupIdHex,
+                request.messageIdHex,
+                request.attachmentIndex,
+            )
+        val initialMemoryHit =
+            withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) != null }
+        val diskHit =
+            initialMemoryHit ||
+                withContext(Dispatchers.IO) {
+                    diskMediaCache.containsAfterHydration(cacheKey)
+                }
+        return diskHit ||
+            withContext(Dispatchers.Main.immediate) {
+                cachedMediaPlaintext(cacheKey) != null
+            }
+    }
+
+    /**
+     * Shared download/cache implementation for UI controllers and durable work.
+     * MDK owns locator failover, validation and decryption; Android owns the
+     * bounded L1 plus Keystore-encrypted L2 publication.
+     */
+    internal suspend fun downloadAttachmentPlaintext(
+        request: AttachmentTransferRequest,
+        reference: MediaAttachmentReferenceFfi,
+    ): ByteArray {
+        val cacheKey =
+            mediaCacheKey(
+                request.accountRef,
+                request.groupIdHex,
+                request.messageIdHex,
+                request.attachmentIndex,
+            )
+        withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }
+            ?.let { return it }
+        val onDisk = withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
+        if (onDisk != null) {
+            withContext(Dispatchers.Main.immediate) {
+                cacheMediaPlaintext(cacheKey, onDisk)
+            }
+            return onDisk
+        }
+
+        val deferred =
+            memoizedDownload(cacheKey) {
+                val publicationToken = diskMediaCache.capturePublicationToken()
+                val result =
+                    runCatchingCancellable {
+                        marmotIo { downloadMedia(request.accountRef, request.groupIdHex, reference) }
+                    }.onFailure {
+                        val host =
+                            reference.locators
+                                .firstOrNull()
+                                ?.value
+                                ?.let { url ->
+                                    url
+                                        .substringAfter("://", "")
+                                        .substringBefore('/')
+                                        .substringBefore('?')
+                                        .substringBefore('#')
+                                }.orEmpty()
+                        Log.w(
+                            "DMAttachmentDownload",
+                            "download failed group=${request.groupIdHex.take(8)} " +
+                                "message=${request.messageIdHex.take(8)} host=$host",
+                            it,
+                        )
+                    }.getOrThrow()
+                if (result.plaintext.isNotEmpty()) {
+                    cacheMediaPlaintext(cacheKey, result.plaintext)
+                    val plaintext = result.plaintext
+                    withContext(Dispatchers.IO) {
+                        diskMediaCache.put(
+                            cacheKey,
+                            plaintext,
+                            publicationToken,
+                            reference.ciphertextSha256,
+                        )
+                    }
+                }
+                result.plaintext
+            }
+        return deferred.await()
+    }
+
+    internal suspend fun downloadAttachmentForDurableWork(request: AttachmentTransferRequest): Boolean {
+        val reference = resolveAttachmentReference(request) ?: throw AttachmentReferenceNotReadyException()
+        downloadAttachmentPlaintext(request, reference)
+        return hasCachedAttachmentAfterHydration(request)
     }
 
     /**
@@ -7723,6 +7838,41 @@ class WhiteNoiseAppState private constructor(
                 ?.firstOrNull { it.messageIdHex.equals(messageId, ignoreCase = true) }
         }
 
+    /**
+     * Start document policy downloads from the receipt pipeline rather than
+     * waiting for a Compose bubble to become visible. The worker persists only
+     * the lookup identity and resolves the authoritative reference from MDK.
+     */
+    private suspend fun scheduleIncomingDocumentDownloads(update: NotificationUpdateFfi) {
+        if (update.trigger != NotificationTriggerFfi.NEW_MESSAGE || update.isFromSelf) return
+        val messageIdHex = update.messageIdHex ?: return
+        val matrix = loadMediaAutoDownloadMatrix(update.accountRef)
+        if (!matrix.shouldAutoDownload(MediaAutoDownloadType.Document, activeNetworkTypes())) return
+        val records =
+            runCatchingCancellable { marmotIo { listMedia(update.accountRef, update.groupIdHex, null) } }
+                .getOrNull()
+                .orEmpty()
+        records
+            .asSequence()
+            .filter { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
+            .filter { record ->
+                val reference = record.reference
+                reference.sourceEpoch != 0uL &&
+                    !MediaReferenceSupport.isImageMedia(reference) &&
+                    !MediaReferenceSupport.isVideoMedia(reference) &&
+                    !MediaReferenceSupport.isAudioMedia(reference)
+            }.forEach { record ->
+                enqueueAttachmentDownload(
+                    AttachmentTransferRequest(
+                        accountRef = update.accountRef,
+                        groupIdHex = update.groupIdHex,
+                        messageIdHex = record.messageIdHex,
+                        attachmentIndex = record.attachmentIndex.toInt(),
+                    ),
+                )
+            }
+    }
+
     private suspend fun notificationTimelineRecord(update: NotificationUpdateFfi) =
         update.messageIdHex?.let { messageId ->
             runCatchingCancellable {
@@ -8169,6 +8319,7 @@ class WhiteNoiseAppState private constructor(
 
     private suspend fun processNotificationUpdate(update: NotificationUpdateFfi) {
         applyNotificationDisplayNameHint(update)
+        scheduleIncomingDocumentDownloads(update)
         val postEpoch = notificationPostEpoch.capture()
         // One durable-mute read per update: pre-warm, the post decision, and
         // the presenter's post-time re-check all reuse it, so a burst costs

@@ -53,7 +53,6 @@ class MainThreadConfinementCoverageTest {
             "evictExpiredMediaCaches" to listOf("removeMediaMemoryCacheEntry"),
             "hasCachedAttachment" to listOf("cachedMediaPlaintext"),
             "evictCachedAttachment" to listOf("removeMediaMemoryCacheEntry"),
-            "downloadAttachment" to listOf("cachedMediaPlaintext", "cacheMediaPlaintext"),
             "thumbnailFor" to listOf("cachedMediaThumbnail"),
             "cacheThumbnail" to listOf("cacheMediaThumbnail"),
             "handoffOwnMediaCacheOnReconcile" to listOf("cacheMediaPlaintext", "cacheMediaThumbnail"),
@@ -63,6 +62,10 @@ class MainThreadConfinementCoverageTest {
                 assertTrue("$functionName must route through $guardedCall", guardedCall in body)
             }
         }
+        assertTrue(
+            "downloadAttachment must use the shared guarded AppState boundary",
+            "downloadAttachmentPlaintext" in source.functionSection("downloadAttachment"),
+        )
 
         val eviction = source.functionSection("removeMediaMemoryCacheKeys")
         assertTrue("L1 eviction must dispatch before touching the caches", "withContext(dispatcher)" in eviction)
@@ -84,12 +87,17 @@ class MainThreadConfinementCoverageTest {
             assertTrue("$functionName must keep L2 removal on IO", "Dispatchers.IO" in body)
         }
 
-        val download = source.functionSection("downloadAttachment")
+        val appState = appStateSource().readText()
+        val download = appState.functionSection("downloadAttachmentPlaintext")
         assertTrue(
-            "downloadAttachment must dispatch both caller-context L1 operations to Main",
+            "downloadAttachmentPlaintext must dispatch caller-context L1 operations to Main",
             Regex("""withContext\(Dispatchers\.Main\.immediate\)""").findAll(download).count() >= 2,
         )
-        assertTrue("downloadAttachment must keep disk access on IO", "withContext(Dispatchers.IO)" in download)
+        assertTrue("downloadAttachmentPlaintext must keep disk access on IO", "withContext(Dispatchers.IO)" in download)
+        assertTrue(
+            "memoized download publication must run on the main-confined mutation scope",
+            "mutationsScope.async" in appState.functionSection("memoizedDownload"),
+        )
 
         val decode = source.functionSection("decodeMediaThumbnailOffMain")
         assertTrue("thumbnail decoding must stay on Default", "withContext(Dispatchers.Default)" in decode)

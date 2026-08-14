@@ -19,39 +19,79 @@ internal suspend fun saveMessageMediaAttachments(
     mediaReferences.forEachIndexed { attachmentIndex, reference ->
         val result =
             runCatching<Boolean> {
-                if (MediaReferenceSupport.isVideoMedia(reference)) {
+                val resolvedReference =
+                    if (mine) {
+                        reference
+                    } else {
+                        controller.authoritativeAttachmentReference(messageIdHex, attachmentIndex, reference)
+                    }
+                if (MediaReferenceSupport.isVideoMedia(resolvedReference)) {
                     val file =
                         materializeVideoAttachment(
                             context = context,
                             controller = controller,
                             messageIdHex = messageIdHex,
                             attachmentIndex = attachmentIndex,
-                            reference = reference,
+                            reference = resolvedReference,
                             mine = mine,
                         )
                     withContext(Dispatchers.IO) {
                         saveVideoToGallery(
                             context = context,
                             source = file,
-                            fileName = reference.fileName,
-                            mediaType = reference.mediaType,
+                            fileName = resolvedReference.fileName,
+                            mediaType = resolvedReference.mediaType,
                         )
                     }
-                } else {
+                } else if (MediaReferenceSupport.isImageMedia(resolvedReference)) {
                     val bytes =
                         attachmentBytes(
                             controller = controller,
                             messageIdHex = messageIdHex,
                             attachmentIndex = attachmentIndex,
-                            reference = reference,
+                            reference = resolvedReference,
                             mine = mine,
                         )
                     withContext(Dispatchers.IO) {
                         saveAttachmentToMediaStore(
                             context = context,
                             bytes = bytes,
-                            fileName = reference.fileName,
-                            mediaType = reference.mediaType,
+                            fileName = resolvedReference.fileName,
+                            mediaType = resolvedReference.mediaType,
+                        )
+                    }
+                } else {
+                    val retained =
+                        if (mine) {
+                            controller
+                                .pendingAttachmentsList(messageIdHex)
+                                .getOrNull(attachmentIndex)
+                                ?.plaintextBytes
+                        } else {
+                            null
+                        }
+                    val file =
+                        materializeDocumentAttachment(
+                            context = context,
+                            messageIdHex = messageIdHex,
+                            attachmentIndex = attachmentIndex,
+                            reference = resolvedReference,
+                            resolveBytes = {
+                                controller
+                                    .requestAttachmentTransfer(
+                                        messageIdHex = messageIdHex,
+                                        attachmentIndex = attachmentIndex,
+                                        reference = resolvedReference,
+                                        retainedPlaintext = retained,
+                                    ).await()
+                            },
+                        )
+                    withContext(Dispatchers.IO) {
+                        saveDocumentToDownloads(
+                            context = context,
+                            source = file,
+                            fileName = resolvedReference.fileName,
+                            mediaType = resolvedReference.mediaType,
                         )
                     }
                 }

@@ -47,9 +47,21 @@ class MessageAttachmentSaveTest {
 
         assertTrue(
             "video saves must stream the materialized file instead of resolving another ByteArray",
-            "MediaReferenceSupport.isVideoMedia(reference)" in saveBody &&
+            "MediaReferenceSupport.isVideoMedia(resolvedReference)" in saveBody &&
                 "materializeVideoAttachment(" in saveBody &&
                 "saveVideoToGallery(" in saveBody,
+        )
+    }
+
+    @Test
+    fun documentSaveReusesTheMaterializedFile() {
+        val saveBody = saveMediaBody()
+
+        assertTrue(
+            "document saves must join the transfer and stream its reusable artifact",
+            "materializeDocumentAttachment(" in saveBody &&
+                "requestAttachmentTransfer(" in saveBody &&
+                "saveDocumentToDownloads(" in saveBody,
         )
     }
 

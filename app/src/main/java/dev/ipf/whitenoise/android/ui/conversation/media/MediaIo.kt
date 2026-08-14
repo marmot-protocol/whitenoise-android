@@ -6,11 +6,13 @@ import android.content.ClipDescription
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.type
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
+import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
@@ -74,10 +76,93 @@ internal fun validatedAttachmentCacheFile(file: java.io.File?): java.io.File? =
         ?.takeIf { it.isFile && it.length() > 0L }
         ?.also(AttachmentPlaintextCache::touch)
 
+private val documentMaterializations = SingleFlight<String, java.io.File>()
+
 /**
- * Write [bytes] to a temp file in the cache directory and fire `ACTION_VIEW`
- * for it via the app's FileProvider so an external app (PDF reader, etc.)
- * can open it.
+ * Materialize a general document once into the bounded shared-media cache.
+ * Opening and saving both reuse this complete artifact, avoiding a second
+ * multi-megabyte byte-array-to-file copy after an attachment was downloaded.
+ */
+@VisibleForTesting
+internal suspend fun materializeDocumentAttachment(
+    context: Context,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: dev.ipf.marmotkit.MediaAttachmentReferenceFfi,
+    resolveBytes: suspend () -> ByteArray,
+): java.io.File {
+    val file = documentAttachmentCacheFile(context, messageIdHex, attachmentIndex, reference)
+    val attachmentKey =
+        AttachmentCachePublication.attachmentKey(
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            sourceEpoch = reference.sourceEpoch,
+        )
+    return documentMaterializations.run(file.absolutePath) {
+        withContext(Dispatchers.IO) {
+            validatedAttachmentCacheFile(file)
+        } ?: run {
+            val published =
+                AttachmentCachePublication.publishAfterLoad(
+                    attachmentKey = attachmentKey,
+                    finalFile = file,
+                    loadBytes = resolveBytes,
+                )
+            if (!published) {
+                throw java.io.IOException("attachment cache publication aborted for ${file.name}")
+            }
+            file
+        }
+    }
+}
+
+private fun documentAttachmentCacheFile(
+    context: Context,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: dev.ipf.marmotkit.MediaAttachmentReferenceFfi,
+): java.io.File {
+    val digestInput =
+        (
+            "$messageIdHex\u0000$attachmentIndex\u0000${reference.plaintextSha256}\u0000" +
+                "${reference.ciphertextSha256}\u0000${reference.sourceEpoch}"
+        ).toByteArray()
+    val digest =
+        java.security.MessageDigest
+            .getInstance("SHA-256")
+            .digest(digestInput)
+            .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+    val extension = documentAttachmentExtension(reference.fileName, reference.mediaType)
+    return java.io.File(
+        java.io.File(context.cacheDir, MediaCacheDirs.SHARED),
+        "document_$digest.$extension",
+    )
+}
+
+private fun documentAttachmentExtension(
+    fileName: String,
+    mediaType: String,
+): String {
+    val fromName =
+        MediaPipeline
+            .safeDisplayName(fileName)
+            .substringAfterLast('.', "")
+            .lowercase()
+            .takeIf { candidate ->
+                candidate.length in 1..12 && candidate.all { it.isLetterOrDigit() }
+            }
+    if (fromName != null) return fromName
+    return android.webkit.MimeTypeMap
+        .getSingleton()
+        .getExtensionFromMimeType(mediaType.lowercase())
+        ?.takeIf { it.length in 1..12 && it.all(Char::isLetterOrDigit) }
+        ?: "bin"
+}
+
+/**
+ * Fire `ACTION_VIEW` for an already materialized [source] via the app's
+ * FileProvider so an external app (PDF reader, package installer, etc.) can
+ * open it. The stable source is also reused by Save and later taps.
  *
  * Distinguishes "no app claims this MIME" ([OpenAttachmentResult.NoHandler])
  * from "we couldn't even try" ([OpenAttachmentResult.Error]) so the caller
@@ -90,30 +175,20 @@ internal fun validatedAttachmentCacheFile(file: java.io.File?): java.io.File? =
  * `ActivityNotFoundException` from `startActivity` is the authoritative
  * "nothing handles this MIME" signal.
  *
- * Suspends because the temp-file write can be a multi-megabyte hop —
- * documents and videos picked from the document bubble are read whole
- * into a `ByteArray` and need to land on disk before the intent fires.
- * Doing that on the main dispatcher would jank the UI for the whole
- * write; the `Dispatchers.IO` jump moves it off the main thread.
- *
  * Shared plaintext is trimmed oldest-first to a byte cap after every
  * publication and by the age-based startup janitor. It is not deleted on
  * screen exit because the external reader may still hold the FileProvider URI.
  */
 internal suspend fun openAttachmentExternally(
     context: android.content.Context,
-    bytes: ByteArray,
-    fileName: String,
+    source: java.io.File,
     mediaType: String,
 ): OpenAttachmentResult {
     val uri =
         withContext(Dispatchers.IO) {
             runCatching {
-                val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
-                val name = MediaPipeline.safeDisplayName(fileName)
-                val file = java.io.File.createTempFile("open_", "_$name", dir)
-                writeSharedMediaFile(file, bytes)
-                fileProviderUri(context, file)
+                val completeSource = validatedAttachmentCacheFile(source) ?: error("missing attachment artifact")
+                fileProviderUri(context, completeSource)
             }.getOrNull()
         } ?: return OpenAttachmentResult.Error
     val mime = attachmentOpenMime(mediaType)
@@ -210,10 +285,25 @@ internal fun saveAttachmentToMediaStore(
         else -> saveFileToDownloads(context, bytes, fileName, mediaType)
     }
 
+/** Stream a reusable general-file artifact into public Downloads. */
+internal fun saveDocumentToDownloads(
+    context: Context,
+    source: java.io.File,
+    fileName: String,
+    mediaType: String,
+): Boolean = source.inputStream().use { saveFileToDownloads(context, it, fileName, mediaType) }
+
 /** Persist an arbitrary attachment to Download/White Noise via MediaStore. */
 private fun saveFileToDownloads(
     context: Context,
     bytes: ByteArray,
+    fileName: String,
+    mediaType: String,
+): Boolean = saveFileToDownloads(context, bytes.inputStream(), fileName, mediaType)
+
+private fun saveFileToDownloads(
+    context: Context,
+    source: java.io.InputStream,
     fileName: String,
     mediaType: String,
 ): Boolean {
@@ -227,11 +317,11 @@ private fun saveFileToDownloads(
         }
     val uri =
         resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-            ?: return false
+            ?: throw java.io.IOException("MediaStore insert failed")
     return try {
         resolver.openOutputStream(uri).use { out ->
             if (out == null) throw java.io.IOException("null output stream")
-            out.write(bytes)
+            source.copyTo(out, DEFAULT_BUFFER_SIZE)
         }
         values.clear()
         values.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
