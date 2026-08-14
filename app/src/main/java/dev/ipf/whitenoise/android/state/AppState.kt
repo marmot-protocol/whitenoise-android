@@ -1837,11 +1837,12 @@ class WhiteNoiseAppState private constructor(
         ttsHistorySession.onSessionCleared()
     }
 
-    /** Account removal detaches navigation ownership without moving playback. */
+    /** Account removal ends the owned session so its decrypted text stops being spoken. */
     private fun detachOwnedTtsAutoReadSessionForAccount(accountRef: String) {
         val owner = ttsAutoReadSessionKey ?: return
         val separator = owner.indexOf('|')
         if (separator <= 0 || owner.substring(0, separator) != accountRef) return
+        ttsController.stop()
         ttsAutoReadSessionKey = null
         ttsHistorySession.onSessionCleared()
     }

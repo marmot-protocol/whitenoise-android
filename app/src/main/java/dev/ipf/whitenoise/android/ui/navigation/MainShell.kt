@@ -922,24 +922,23 @@ internal fun MainShell(
         }
 
         when (step) {
+            TtsDestinationNavigationStep.AccountSwitchSuperseded,
             TtsDestinationNavigationStep.Cancelled,
             TtsDestinationNavigationStep.MissingAccount,
             -> failUnavailable()
 
             is TtsDestinationNavigationStep.SwitchAccount -> {
-                if (!request.accountSwitchRequested) {
-                    pendingTtsDestinationNavigation = request.copy(accountSwitchRequested = true)
-                    selectedChat = null
-                    selectedChatOpenContext = ConversationOpenContext()
-                    selectedChatJustCreated = false
-                    selectedChatOpenedAsDmHint = false
-                    chatListReturnHeadSnap = resetChatListReturnHeadSnap()
-                    appState.launchMutation {
-                        appState.setActiveAccount(step.accountRef)
-                        // setActiveAccount already presents its specific failure;
-                        // do not stack a second generic unavailable message.
-                        if (appState.activeAccountRef != step.accountRef) clearPendingRequest()
-                    }
+                pendingTtsDestinationNavigation = request.copy(accountSwitchRequested = true)
+                selectedChat = null
+                selectedChatOpenContext = ConversationOpenContext()
+                selectedChatJustCreated = false
+                selectedChatOpenedAsDmHint = false
+                chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+                appState.launchMutation {
+                    appState.setActiveAccount(step.accountRef)
+                    // setActiveAccount already presents its specific failure;
+                    // do not stack a second generic unavailable message.
+                    if (appState.activeAccountRef != step.accountRef) clearPendingRequest()
                 }
             }
 

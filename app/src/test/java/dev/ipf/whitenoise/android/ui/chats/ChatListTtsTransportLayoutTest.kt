@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -25,7 +27,12 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.speakingTts
+import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.ErrorPresentation
+import dev.ipf.whitenoise.android.ui.common.ErrorContent
+import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBarContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -80,7 +87,33 @@ class ChatListTtsTransportLayoutTest {
             .captureRoboImage("src/test/snapshots/chat_list_tts_transport_large_rtl_light.png")
     }
 
+    @Test
+    fun activeTransportRemainsInFlowWhileChatsLoad() {
+        render(state = ChatListFixtureState.Loading)
+
+        capture("chat_list_tts_transport_loading_light.png")
+    }
+
+    @Test
+    fun activeTransportRemainsInFlowAboveEmptyStateAtLargeTextInRtl() {
+        render(
+            state = ChatListFixtureState.Empty,
+            fontScale = 1.5f,
+            layoutDirection = LayoutDirection.Rtl,
+        )
+
+        capture("chat_list_tts_transport_empty_large_rtl.png")
+    }
+
+    @Test
+    fun activeTransportRemainsInFlowAboveLoadErrorInDarkTheme() {
+        render(state = ChatListFixtureState.Error, darkTheme = true)
+
+        capture("chat_list_tts_transport_error_dark.png")
+    }
+
     private fun render(
+        state: ChatListFixtureState = ChatListFixtureState.Loaded,
         darkTheme: Boolean = false,
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
@@ -93,15 +126,26 @@ class ChatListTtsTransportLayoutTest {
                 LocalLayoutDirection provides layoutDirection,
             ) {
                 WhiteNoiseTheme(darkTheme = darkTheme) {
-                    ChatListFixture(onFirstRowClick)
+                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
+                        ChatListFixture(state, onFirstRowClick)
+                    }
                 }
             }
         }
     }
+
+    private fun capture(fileName: String) {
+        composeRule
+            .onNodeWithTag(ROOT_TAG)
+            .captureRoboImage("src/test/snapshots/$fileName")
+    }
 }
 
 @Composable
-private fun ChatListFixture(onFirstRowClick: () -> Unit) {
+private fun ChatListFixture(
+    state: ChatListFixtureState,
+    onFirstRowClick: () -> Unit,
+) {
     ChatListBodyFrame(
         modifier =
             Modifier
@@ -112,33 +156,59 @@ private fun ChatListFixture(onFirstRowClick: () -> Unit) {
             TtsFixtureTransport()
         },
     ) {
-        LazyColumn(Modifier.fillMaxSize()) {
-            items(
-                items = listOf("Design team", "Family", "Weekend plans"),
-                key = { it },
-            ) { title ->
-                ListItem(
-                    headlineContent = { Text(title) },
-                    supportingContent = { Text("A recent message preview") },
-                    leadingContent = {
-                        Box(
-                            Modifier
-                                .size(40.dp)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                        )
-                    },
-                    modifier =
-                        if (title == "Design team") {
-                            Modifier
-                                .testTag(FIRST_ROW_TAG)
-                                .clickable(onClick = onFirstRowClick)
-                        } else {
-                            Modifier
-                        },
+        when (state) {
+            ChatListFixtureState.Loading -> LoadingScreen()
+            ChatListFixtureState.Empty -> EmptyChats(onCreate = {})
+            ChatListFixtureState.Error ->
+                ErrorContent(
+                    title = stringResource(R.string.couldnt_load_chats),
+                    error =
+                        ErrorPresentation(
+                            message = AppText.Resource(R.string.error_try_again),
+                            report = "CHAT_LIST_LOAD\ncategory=connectivity",
+                        ),
+                    onRetry = {},
                 )
-            }
+            ChatListFixtureState.Loaded -> LoadedChatList(onFirstRowClick)
         }
     }
+}
+
+@Composable
+private fun LoadedChatList(onFirstRowClick: () -> Unit) {
+    LazyColumn(Modifier.fillMaxSize()) {
+        items(
+            items = listOf("Design team", "Family", "Weekend plans"),
+            key = { it },
+        ) { title ->
+            ListItem(
+                headlineContent = { Text(title) },
+                supportingContent = { Text("A recent message preview") },
+                leadingContent = {
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                    )
+                },
+                modifier =
+                    if (title == "Design team") {
+                        Modifier
+                            .testTag(FIRST_ROW_TAG)
+                            .clickable(onClick = onFirstRowClick)
+                    } else {
+                        Modifier
+                    },
+            )
+        }
+    }
+}
+
+private enum class ChatListFixtureState {
+    Loaded,
+    Loading,
+    Empty,
+    Error,
 }
 
 @Composable

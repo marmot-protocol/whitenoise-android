@@ -38,6 +38,13 @@ class TtsDestinationNavigationTest {
             TtsDestinationNavigationStep.SwitchAccount("account-a"),
             resolve(activeAccount = "account-b"),
         )
+        assertEquals(
+            TtsDestinationNavigationStep.AccountSwitchSuperseded,
+            resolve(
+                activeAccount = "account-b",
+                navigationRequest = request.copy(accountSwitchRequested = true),
+            ),
+        )
     }
 
     @Test
@@ -68,9 +75,10 @@ class TtsDestinationNavigationTest {
         knownAccounts: Set<String> = setOf("account-a"),
         activeAccount: String? = "account-a",
         availableGroups: Set<String> = setOf("group-a"),
+        navigationRequest: TtsDestinationNavigationRequest = request,
     ): TtsDestinationNavigationStep =
         resolveTtsDestinationNavigation(
-            request = request,
+            request = navigationRequest,
             currentDestination = current,
             knownAccountRefs = knownAccounts,
             activeAccountRef = activeAccount,

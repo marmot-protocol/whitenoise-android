@@ -15,6 +15,8 @@ internal sealed interface TtsDestinationNavigationStep {
 
     data object MissingAccount : TtsDestinationNavigationStep
 
+    data object AccountSwitchSuperseded : TtsDestinationNavigationStep
+
     data class SwitchAccount(
         val accountRef: String,
     ) : TtsDestinationNavigationStep
@@ -53,6 +55,8 @@ internal fun resolveTtsDestinationNavigation(
     return when {
         destination == null -> TtsDestinationNavigationStep.Cancelled
         request.accountRef !in knownAccountRefs -> TtsDestinationNavigationStep.MissingAccount
+        activeAccountRef != request.accountRef && request.accountSwitchRequested ->
+            TtsDestinationNavigationStep.AccountSwitchSuperseded
         activeAccountRef != request.accountRef ->
             TtsDestinationNavigationStep.SwitchAccount(request.accountRef)
         groupAvailable ->
