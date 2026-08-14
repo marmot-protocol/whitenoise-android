@@ -4,6 +4,7 @@ import androidx.annotation.VisibleForTesting
 
 internal enum class ConversationCardOp {
     SHOW_NOTIFY,
+    SHOW_ENRICH,
     DISMISS_CANCEL,
     MARK_REPLY_HANDLED,
     MARK_REPLY_FAILED,
@@ -20,6 +21,7 @@ internal data class ConversationCardShowToken(
     val notificationTag: String,
     val notificationId: Int,
     val dismissalGeneration: Long,
+    val showGeneration: Long,
 )
 
 @VisibleForTesting
@@ -57,8 +59,9 @@ internal object ConversationCardPostSynchronizer {
     private const val STRIPE_COUNT = 64
     private val stripes = Array(STRIPE_COUNT) { Any() }
 
-    // This registry contains only currently preparing posts. Completion always
-    // removes the final registration, so dismissal ordering adds no durable cache.
+    // This registry contains only currently preparing posts and their bounded
+    // detached enrichment. Completion always removes the final registration,
+    // so dismissal ordering adds no durable cache.
     private val inFlightShowsLock = Any()
     private val inFlightShows = mutableMapOf<ConversationCardKey, InFlightShowState>()
 
@@ -76,20 +79,57 @@ internal object ConversationCardPostSynchronizer {
             synchronized(inFlightShowsLock) {
                 val state = inFlightShows.getOrPut(key) { InFlightShowState() }
                 state.activeShows += 1
-                ConversationCardShowToken(notificationTag, notificationId, state.dismissalGeneration)
+                state.latestShowGeneration += 1
+                ConversationCardShowToken(
+                    notificationTag = notificationTag,
+                    notificationId = notificationId,
+                    dismissalGeneration = state.dismissalGeneration,
+                    showGeneration = state.latestShowGeneration,
+                )
             }
         return try {
             block(token)
         } finally {
-            synchronized(inFlightShowsLock) {
-                val state = inFlightShows[key] ?: return@synchronized
-                state.activeShows -= 1
-                if (state.activeShows == 0) inFlightShows.remove(key)
+            releaseShow(token)
+        }
+    }
+
+    /** Keeps a generation registered while its detached rich-card update runs. */
+    fun retainShow(token: ConversationCardShowToken): Boolean =
+        synchronized(inFlightShowsLock) {
+            val state = inFlightShows[ConversationCardKey(token.notificationTag, token.notificationId)]
+            if (
+                state == null ||
+                state.dismissalGeneration != token.dismissalGeneration ||
+                state.latestShowGeneration != token.showGeneration
+            ) {
+                false
+            } else {
+                state.activeShows += 1
+                true
             }
+        }
+
+    fun releaseShow(token: ConversationCardShowToken) {
+        val key = ConversationCardKey(token.notificationTag, token.notificationId)
+        synchronized(inFlightShowsLock) {
+            val state = inFlightShows[key] ?: return
+            state.activeShows -= 1
+            if (state.activeShows == 0) inFlightShows.remove(key)
         }
     }
 
     fun isShowCurrent(token: ConversationCardShowToken): Boolean =
+        synchronized(inFlightShowsLock) {
+            inFlightShows[ConversationCardKey(token.notificationTag, token.notificationId)]
+                ?.let { state ->
+                    state.dismissalGeneration == token.dismissalGeneration &&
+                        state.latestShowGeneration == token.showGeneration
+                } == true
+        }
+
+    /** Initial posts preserve every message; only a dismissal may invalidate them. */
+    fun isShowNotDismissed(token: ConversationCardShowToken): Boolean =
         synchronized(inFlightShowsLock) {
             inFlightShows[ConversationCardKey(token.notificationTag, token.notificationId)]
                 ?.dismissalGeneration == token.dismissalGeneration
@@ -148,5 +188,6 @@ internal object ConversationCardPostSynchronizer {
     private data class InFlightShowState(
         var activeShows: Int = 0,
         var dismissalGeneration: Long = 0,
+        var latestShowGeneration: Long = 0,
     )
 }
