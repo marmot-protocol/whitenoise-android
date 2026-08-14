@@ -6,15 +6,25 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsHeader
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -46,6 +56,47 @@ class GroupDetailsHeaderScreenshotTest {
     }
 
     @Test
+    fun editableGroupDetailsHeaderLight() {
+        render(darkTheme = false, editable = true)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/group_details_header_editable_light.png")
+    }
+
+    @Test
+    fun editableGroupDetailsHeaderDark() {
+        render(darkTheme = true, editable = true)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/group_details_header_editable_dark.png")
+    }
+
+    @Test
+    fun editableNameIsAnAccessibleMinimumTouchTarget() {
+        var editRequested = false
+        render(darkTheme = false, editable = true, onEdit = { editRequested = true })
+
+        composeRule
+            .onNode(hasText("Weekend hikers") and hasClickAction())
+            .assertHasClickAction()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+
+        assertTrue(editRequested)
+    }
+
+    @Test
+    fun readOnlyNameHasNoEditAction() {
+        render(darkTheme = false)
+
+        composeRule.onNodeWithText("Weekend hikers").assert(hasClickAction().not())
+    }
+
+    @Test
+    fun mutationInFlightKeepsTheEditTargetDisabled() {
+        render(darkTheme = false, editable = true, editEnabled = false)
+
+        composeRule.onNodeWithText("Weekend hikers").assertIsNotEnabled()
+    }
+
+    @Test
     fun encryptedOnlyAvatarOpensTheViewer() {
         val picture = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888).asImageBitmap()
         composeRule.setContent {
@@ -67,7 +118,12 @@ class GroupDetailsHeaderScreenshotTest {
         composeRule.onNodeWithContentDescription("Close").assertExists()
     }
 
-    private fun render(darkTheme: Boolean) {
+    private fun render(
+        darkTheme: Boolean,
+        editable: Boolean = false,
+        editEnabled: Boolean = true,
+        onEdit: () -> Unit = {},
+    ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme) {
                 Surface(modifier = Modifier.width(360.dp).testTag(TAG)) {
@@ -78,6 +134,8 @@ class GroupDetailsHeaderScreenshotTest {
                         seed = "stable-screenshot-seed",
                         pictureUrl = null,
                         archived = false,
+                        onEdit = onEdit.takeIf { editable },
+                        editEnabled = editEnabled,
                     )
                 }
             }
