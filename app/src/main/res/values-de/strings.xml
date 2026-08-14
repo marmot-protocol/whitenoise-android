@@ -1315,6 +1315,8 @@
     <string name="tts_bar_next_message">Nächste Nachricht</string>
     <string name="tts_bar_progress">Satz %1$d von %2$d, Nachricht %3$d von %4$d</string>
     <string name="tts_bar_stop">Vorlesen beenden</string>
+    <string name="tts_bar_return_to_source">Zur gesprochenen Nachricht zurückkehren</string>
+    <string name="tts_source_unavailable">Die gesprochene Nachricht ist nicht mehr verfügbar</string>
     <string name="tts_resume_follow">Folgen fortsetzen</string>
     <string name="tts_bar_error">Vorlesen fehlgeschlagen</string>
     <string name="tts_bar_history_loading">Weitere Nachrichten werden geladen…</string>

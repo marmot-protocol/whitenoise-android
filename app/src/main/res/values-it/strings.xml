@@ -1317,6 +1317,8 @@
     <string name="tts_bar_next_message">Messaggio successivo</string>
     <string name="tts_bar_progress">Frase %1$d di %2$d, messaggio %3$d di %4$d</string>
     <string name="tts_bar_stop">Interrompi lettura</string>
+    <string name="tts_bar_return_to_source">Torna al messaggio letto</string>
+    <string name="tts_source_unavailable">Il messaggio letto non è più disponibile</string>
     <string name="tts_resume_follow">Riprendi scorrimento</string>
     <string name="tts_bar_error">Impossibile leggere ad alta voce</string>
     <string name="tts_bar_history_loading">Caricamento di altri messaggi…</string>

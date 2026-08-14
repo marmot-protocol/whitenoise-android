@@ -1315,6 +1315,8 @@
     <string name="tts_bar_next_message">Sonraki mesaj</string>
     <string name="tts_bar_progress">Cümle %1$d/%2$d, mesaj %3$d/%4$d</string>
     <string name="tts_bar_stop">Okumayı durdur</string>
+    <string name="tts_bar_return_to_source">Okunan mesaja dön</string>
+    <string name="tts_source_unavailable">Okunan mesaj artık kullanılamıyor</string>
     <string name="tts_resume_follow">Takibi sürdür</string>
     <string name="tts_bar_error">Sesli okunamadı</string>
     <string name="tts_bar_history_loading">Diğer mesajlar yükleniyor…</string>
