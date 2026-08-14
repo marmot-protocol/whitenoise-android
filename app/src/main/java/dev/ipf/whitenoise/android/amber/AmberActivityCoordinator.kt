@@ -5,60 +5,43 @@ import android.os.Handler
 import android.os.Looper
 import androidx.activity.result.ActivityResultLauncher
 import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 /**
- * App-scoped bridge between the engine's synchronous signer callbacks and the
- * foreground Activity's [ActivityResultLauncher].
+ * App-scoped bridge between synchronous MDK signer callbacks and Android's
+ * foreground activity-result launcher.
  *
- * The engine invokes [ExternalAccountSignerFfi][dev.ipf.marmotkit.ExternalAccountSignerFfi]
- * methods synchronously on background tokio/JNI worker threads. ContentResolver
- * operations run directly on those threads; only the Intent-approval fallback
- * comes here, and it must launch on the main thread while blocking ONLY the
- * calling worker thread until Amber answers.
- *
- * Lifecycle: [MainActivity][dev.ipf.whitenoise.android.MainActivity] registers a
- * launcher in `onCreate` and [attach]es it; `onDestroy` [detach]es it. The
- * pending-approval handoff lives on this object (a process-scoped singleton),
- * NOT on the Activity — so a launcher swap across a configuration change
- * (Activity recreation) never loses an in-flight result: the recreated
- * Activity's launcher delivers into the same waiting queue. Process death tears
- * down the blocked worker and the engine together, so nothing leaks.
- *
- * A [ReentrantLock] serializes prompts, so Amber is only ever asked one thing at
- * a time and no two workers race for the single launcher.
+ * Login and older/unknown signers retain the app-private relay's serialized,
+ * cancellation-safe path. Recognized Amber versions with grouped local-intent
+ * support may instead have a bounded set of explicit-package requests in
+ * flight. Amber returns those as ID-addressed entries, which are dispatched to
+ * the matching worker only. The two modes never overlap, so signer-controlled
+ * extras cannot cross-complete a relay request.
  */
+@Suppress("TooManyFunctions") // One process-wide state machine owns prompt admission, launch, and exact-once delivery.
 object AmberActivityCoordinator {
-    // Lazy so loading this object (e.g. for the pure result-correlation check)
-    // never touches the main Looper — that call only makes sense on-device.
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
-    private val promptLock = ReentrantLock()
+    private val serializedPending = AtomicReference<SerializedPending?>(null)
+    private val groupedPending = ConcurrentHashMap<String, GroupedPending>()
+    private val groupedSlots = Semaphore(Nip55.MAX_GROUPED_APPROVALS, true)
+    private val approvalGate = ApprovalModeGate()
 
     @Volatile
     private var launcher: ActivityResultLauncher<Intent>? = null
 
-    // The single-slot rendezvous for the one prompt allowed at a time. Set under
-    // [promptLock] before launching; read (without the lock) by [deliverResult]
-    // on the main thread.
-    // The single in-flight prompt: its rendezvous queue plus the request id we
-    // expect the relay result to carry. Set under [promptLock] before launching;
-    // read (without the lock) by [deliverResult] on the main thread.
-    private val pending = AtomicReference<Pending?>(null)
-
-    /** Outcome of an Intent approval, as seen by the (worker-thread) caller. */
     sealed interface Outcome {
         data class Completed(
             val resultOk: Boolean,
             val data: Intent?,
         ) : Outcome
 
-        /** No foreground Activity/launcher was available to show the prompt. */
         data object NoForegroundActivity : Outcome
 
-        /** RESULT never arrived within the timeout. */
         data object TimedOut : Outcome
     }
 
@@ -71,9 +54,23 @@ object AmberActivityCoordinator {
         data object LauncherGone : Delivery
     }
 
-    private data class Pending(
+    private class SerializedPending(
         val queue: ArrayBlockingQueue<Delivery>,
         val requestId: String,
+    ) {
+        var acceptsLaunch = true
+    }
+
+    private class GroupedPending(
+        val queue: ArrayBlockingQueue<Delivery>,
+        val signerPackage: String,
+    ) {
+        var acceptsLaunch = true
+    }
+
+    private data class GroupKey(
+        val signerPackage: String,
+        val currentUser: String,
     )
 
     fun attach(launcher: ActivityResultLauncher<Intent>) {
@@ -81,9 +78,6 @@ object AmberActivityCoordinator {
     }
 
     fun detach(launcher: ActivityResultLauncher<Intent>) {
-        // Only clear if this exact launcher is still current: a fast recreate may
-        // already have attached the new Activity's launcher before the old one's
-        // onDestroy runs.
         if (this.launcher === launcher) this.launcher = null
     }
 
@@ -92,20 +86,145 @@ object AmberActivityCoordinator {
         resultOk: Boolean,
         data: Intent?,
     ) {
-        val active = pending.get() ?: return
-        // Correlate by relay request id: each prompt runs through
-        // [AmberSignerRelayActivity], which stamps [AmberSignerRelay.EXTRA_REQUEST_ID]
-        // even when the external signer returns RESULT_CANCELED with null data.
-        val resultId = data?.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID)
-        if (!shouldAcceptResult(active.requestId, resultId)) {
-            // A dropped result means the waiting caller will burn the full
-            // approval timeout — loud enough to find in a field logcat.
-            android.util.Log.w(
-                "AmberSigner",
-                "dropped signer result: expectedId=${active.requestId} resultId=$resultId ok=$resultOk",
-            )
+        val relayRequestId = data?.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID)
+        val serialized = serializedPending.get()
+        if (serialized != null && shouldAcceptResult(serialized.requestId, relayRequestId)) {
+            deliverSerializedResult(serialized, resultOk, data)
             return
         }
+        deliverGroupedResult(resultOk, data)
+    }
+
+    internal fun shouldAcceptResult(
+        expectedId: String,
+        resultId: String?,
+    ): Boolean = expectedId == resultId
+
+    /**
+     * Show [intent] and block only the calling MDK worker thread. When
+     * [allowGrouping] is true, the intent must already target one explicit
+     * signer package and is correlated through its opaque NIP-55 request ID.
+     */
+    fun awaitApproval(
+        intent: Intent,
+        timeoutMs: Long,
+        requestId: String,
+        allowGrouping: Boolean = false,
+    ): Outcome {
+        require(requestId.isNotBlank() && requestId.length <= Nip55.MAX_REQUEST_ID_CHARS) {
+            "NIP-55 request id is outside the supported bounds"
+        }
+        val signerPackage = (intent.component?.packageName ?: intent.`package`).orEmpty()
+        return if (allowGrouping && signerPackage.isNotBlank()) {
+            awaitGroupedApproval(intent, timeoutMs, requestId, signerPackage)
+        } else {
+            awaitSerializedApproval(intent, timeoutMs, requestId)
+        }
+    }
+
+    @Suppress("ReturnCount")
+    // Admission and foreground-loss guards release the gate through the enclosing finally.
+    private fun awaitSerializedApproval(
+        intent: Intent,
+        timeoutMs: Long,
+        requestId: String,
+    ): Outcome {
+        val deadline = Deadline(timeoutMs)
+        if (!approvalGate.enterSerialized(deadline)) return Outcome.TimedOut
+        try {
+            if (launcher == null) return Outcome.NoForegroundActivity
+            val queue = ArrayBlockingQueue<Delivery>(1)
+            val slot = SerializedPending(queue, requestId)
+            check(serializedPending.compareAndSet(null, slot)) { "serialized Amber approval already active" }
+            try {
+                mainHandler.post {
+                    synchronized(slot) {
+                        if (!slot.acceptsLaunch || deadline.isExpired() || serializedPending.get() !== slot) {
+                            return@synchronized
+                        }
+                        val active = launcher
+                        if (active == null) {
+                            queue.offer(Delivery.LauncherGone)
+                        } else {
+                            try {
+                                active.launch(AmberSignerRelay.buildLaunchIntent(requestId, intent))
+                            } catch (_: Exception) {
+                                queue.offer(Delivery.LauncherGone)
+                            }
+                        }
+                    }
+                }
+                return awaitDelivery(queue, deadline)
+            } finally {
+                synchronized(slot) {
+                    slot.acceptsLaunch = false
+                    serializedPending.compareAndSet(slot, null)
+                }
+                AmberSignerRelay.consumeHandledSignerPackage(requestId)
+            }
+        } finally {
+            approvalGate.leaveSerialized()
+        }
+    }
+
+    @Suppress("ReturnCount") // Each bounded-admission failure is a distinct terminal outcome with scoped cleanup.
+    private fun awaitGroupedApproval(
+        intent: Intent,
+        timeoutMs: Long,
+        requestId: String,
+        signerPackage: String,
+    ): Outcome {
+        val deadline = Deadline(timeoutMs)
+        val key = GroupKey(signerPackage, intent.getStringExtra(Nip55.EXTRA_CURRENT_USER).orEmpty())
+        if (!approvalGate.enterGrouped(key, deadline)) return Outcome.TimedOut
+        try {
+            if (!deadline.tryAcquire(groupedSlots)) return Outcome.TimedOut
+            try {
+                if (launcher == null) return Outcome.NoForegroundActivity
+                val queue = ArrayBlockingQueue<Delivery>(1)
+                val slot = GroupedPending(queue, signerPackage)
+                check(groupedPending.putIfAbsent(requestId, slot) == null) { "duplicate grouped Amber request id" }
+                try {
+                    mainHandler.post {
+                        synchronized(slot) {
+                            if (!slot.acceptsLaunch || deadline.isExpired() || groupedPending[requestId] !== slot) {
+                                return@synchronized
+                            }
+                            val active = launcher
+                            if (active == null) {
+                                completeGrouped(requestId, Delivery.LauncherGone)
+                            } else {
+                                try {
+                                    // Amber's single-task signer activity merges a
+                                    // bounded burst of these explicit launches.
+                                    active.launch(intent)
+                                } catch (_: Exception) {
+                                    completeGrouped(requestId, Delivery.LauncherGone)
+                                }
+                            }
+                        }
+                    }
+                    val outcome = awaitDelivery(queue, deadline)
+                    return outcome
+                } finally {
+                    synchronized(slot) {
+                        slot.acceptsLaunch = false
+                        groupedPending.remove(requestId, slot)
+                    }
+                }
+            } finally {
+                groupedSlots.release()
+            }
+        } finally {
+            approvalGate.leaveGrouped()
+        }
+    }
+
+    private fun deliverSerializedResult(
+        active: SerializedPending,
+        resultOk: Boolean,
+        data: Intent?,
+    ) {
         if (data?.getBooleanExtra(AmberSignerRelay.EXTRA_LAUNCH_FAILED, false) == true) {
             active.queue.offer(Delivery.LauncherGone)
         } else {
@@ -113,57 +232,171 @@ object AmberActivityCoordinator {
         }
     }
 
-    /**
-     * Whether a delivered result should satisfy the active request. Accepts
-     * only when the relay result echoes the same client-chosen request id sent
-     * with the prompt, so a prior, timed-out request's late result can never
-     * satisfy the next caller.
-     */
-    internal fun shouldAcceptResult(
-        expectedId: String,
-        resultId: String?,
-    ): Boolean = expectedId == resultId
+    @Suppress("ReturnCount") // Mutually exclusive wire shapes stop after their own fail-closed correlation path.
+    private fun deliverGroupedResult(
+        resultOk: Boolean,
+        data: Intent?,
+    ) {
+        val aggregateJson = data?.getStringExtra(Nip55.EXTRA_RESULTS)
+        if (aggregateJson != null) {
+            val parsed = parseAmberAggregateResults(aggregateJson)
+            if (parsed is AmberAggregateParseOutcome.Parsed) {
+                parsed.entries.forEach { entry ->
+                    val active = groupedPending[entry.id] ?: return@forEach
+                    completeGrouped(
+                        entry.id,
+                        Delivery.Result(resultOk, entry.toIntent(active.signerPackage)),
+                    )
+                }
+            }
+            return
+        }
 
-    /**
-     * Show [intent] via the foreground launcher and block the CALLING (worker)
-     * thread until the result arrives or [timeoutMs] elapses. Never blocks the
-     * main thread. Prompts are serialized: a second caller waits here until the
-     * first resolves.
-     */
-    fun awaitApproval(
-        intent: Intent,
-        timeoutMs: Long,
-        requestId: String,
-    ): Outcome =
-        promptLock.withLock {
-            if (launcher == null) return Outcome.NoForegroundActivity
-            val queue = ArrayBlockingQueue<Delivery>(1)
-            val slot = Pending(queue, requestId)
-            pending.set(slot)
-            try {
-                mainHandler.post {
-                    val active = launcher
-                    if (active == null) {
-                        queue.offer(Delivery.LauncherGone)
-                    } else {
-                        try {
-                            active.launch(AmberSignerRelay.buildLaunchIntent(requestId, intent))
-                        } catch (_: Exception) {
-                            // The app-private relay Activity could not be launched.
-                            queue.offer(Delivery.LauncherGone)
-                        }
-                    }
-                }
-                when (val delivery = queue.poll(timeoutMs, TimeUnit.MILLISECONDS)) {
-                    is Delivery.Result -> Outcome.Completed(delivery.resultOk, delivery.data)
-                    Delivery.LauncherGone -> Outcome.NoForegroundActivity
-                    null -> Outcome.TimedOut
-                }
-            } finally {
-                pending.compareAndSet(slot, null)
-                // A timed-out or abandoned relay may never return to consume
-                // its chooser identity. Drop the process-local correlation now.
-                AmberSignerRelay.consumeHandledSignerPackage(requestId)
+        val requestId = data?.getStringExtra(Nip55.EXTRA_ID)
+        if (!requestId.isNullOrBlank()) {
+            val active = groupedPending[requestId]
+            if (active == null) {
+                return
+            }
+            completeGrouped(
+                requestId,
+                Delivery.Result(resultOk, trustedDirectResult(requestId, data, active.signerPackage)),
+            )
+            return
+        }
+
+        // A null-data cancellation addresses the visible signer session, not an
+        // arbitrary request. The gate guarantees every active grouped request
+        // belongs to the same package/account session.
+        if (!resultOk) {
+            groupedPending.keys.toList().forEach { id ->
+                completeGrouped(id, Delivery.Result(resultOk = false, data = null))
             }
         }
+    }
+
+    private fun completeGrouped(
+        requestId: String,
+        delivery: Delivery,
+    ) {
+        groupedPending.remove(requestId)?.queue?.offer(delivery)
+    }
+
+    private fun trustedDirectResult(
+        requestId: String,
+        signerData: Intent,
+        signerPackage: String,
+    ): Intent =
+        Intent().apply {
+            signerData.extras?.let(::putExtras)
+            removeExtra(AmberSignerRelay.EXTRA_REQUEST_ID)
+            removeExtra(AmberSignerRelay.EXTRA_LAUNCH_FAILED)
+            putExtra(Nip55.EXTRA_ID, requestId)
+            putExtra(AmberSignerRelay.EXTRA_HANDLED_SIGNER_PACKAGE, signerPackage)
+        }
+
+    private fun awaitDelivery(
+        queue: ArrayBlockingQueue<Delivery>,
+        deadline: Deadline,
+    ): Outcome {
+        val delivery =
+            try {
+                queue.poll(deadline.remainingNanos(), TimeUnit.NANOSECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                null
+            }
+        return when (delivery) {
+            is Delivery.Result -> Outcome.Completed(delivery.resultOk, delivery.data)
+            Delivery.LauncherGone -> Outcome.NoForegroundActivity
+            null -> Outcome.TimedOut
+        }
+    }
+
+    private class Deadline(
+        timeoutMs: Long,
+    ) {
+        private val expiresAtNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs.coerceAtLeast(0))
+
+        fun remainingNanos(): Long = (expiresAtNanos - System.nanoTime()).coerceAtLeast(0)
+
+        fun isExpired(): Boolean = remainingNanos() == 0L
+
+        fun tryAcquire(semaphore: Semaphore): Boolean =
+            try {
+                semaphore.tryAcquire(remainingNanos(), TimeUnit.NANOSECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                false
+            }
+    }
+
+    /** Fair admission gate: one serialized prompt or one same-account group. */
+    private class ApprovalModeGate {
+        private val lock = ReentrantLock(true)
+        private val changed = lock.newCondition()
+        private var serializedActive = false
+        private var serializedWaiters = 0
+        private var groupedKey: GroupKey? = null
+        private var groupedCallers = 0
+
+        fun enterSerialized(deadline: Deadline): Boolean =
+            lock.withLock {
+                serializedWaiters += 1
+                try {
+                    while (serializedActive || groupedCallers > 0) {
+                        if (!changed.awaitUntil(deadline)) return false
+                    }
+                    serializedActive = true
+                    true
+                } finally {
+                    serializedWaiters -= 1
+                    changed.signalAll()
+                }
+            }
+
+        fun leaveSerialized() {
+            lock.withLock {
+                serializedActive = false
+                changed.signalAll()
+            }
+        }
+
+        fun enterGrouped(
+            key: GroupKey,
+            deadline: Deadline,
+        ): Boolean =
+            lock.withLock {
+                while (cannotEnterGrouped(key)) {
+                    if (!changed.awaitUntil(deadline)) return false
+                }
+                groupedKey = key
+                groupedCallers += 1
+                true
+            }
+
+        private fun cannotEnterGrouped(key: GroupKey): Boolean =
+            serializedActive ||
+                serializedWaiters > 0 ||
+                groupedKey?.let { it != key } == true
+
+        fun leaveGrouped() {
+            lock.withLock {
+                groupedCallers -= 1
+                if (groupedCallers == 0) groupedKey = null
+                changed.signalAll()
+            }
+        }
+
+        private fun java.util.concurrent.locks.Condition.awaitUntil(deadline: Deadline): Boolean {
+            val remaining = deadline.remainingNanos()
+            if (remaining <= 0) return false
+            return try {
+                awaitNanos(remaining) > 0
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                false
+            }
+        }
+    }
 }
