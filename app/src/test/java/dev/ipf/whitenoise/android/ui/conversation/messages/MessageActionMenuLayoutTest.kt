@@ -60,6 +60,24 @@ class MessageActionMenuLayoutTest {
     }
 
     @Test
+    fun actionModelCanSuppressInfoForDeleteOnlyTombstoneMenu() {
+        assertEquals(
+            emptyList<MessageActionKind>(),
+            messageActionKinds(
+                canReply = false,
+                canEdit = false,
+                canSelect = false,
+                canSelectText = false,
+                canCopyText = false,
+                canSpeak = false,
+                canForward = false,
+                canSave = false,
+                canInfo = false,
+            ),
+        )
+    }
+
+    @Test
     fun columnAndHeightEstimatesTrackGridRowsWithIntegratedDelete() {
         assertEquals(2, messageActionColumnCount(312.dp, 136.dp))
         assertEquals(1, messageActionColumnCount(260.dp, 136.dp))

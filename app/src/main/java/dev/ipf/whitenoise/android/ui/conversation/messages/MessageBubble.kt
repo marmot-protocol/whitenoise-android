@@ -315,6 +315,7 @@ internal fun MessageBubble(
         } else {
             controller.deleteCapabilityFor(record, alreadyDeleted = deleted)
         }
+    val tombstoneCleanupUnavailable = deleted && !deleteCapability.canDeleteForMe
     // Convergence reasons and local publish failures keep their content and
     // add a warning; only unknown reasons still take the error-styled
     // tombstone. Explicit deletion always wins.
@@ -668,6 +669,7 @@ internal fun MessageBubble(
     var customizeReactionsOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var restoreReactionPickerExpanded by remember(record.messageIdHex) { mutableStateOf(false) }
     var deleteDialogOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    var deleteForMeInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     var deleteForEveryoneInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     var attachmentSaveInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     key(record.messageIdHex) {
@@ -726,8 +728,16 @@ internal fun MessageBubble(
     }
 
     fun performDeleteForMe() {
-        deleteDialogOpen = false
-        controller.hideMessageForMe(record.messageIdHex)
+        if (deleteForMeInFlight) return
+        deleteForMeInFlight = true
+        appState.launchMutation {
+            try {
+                val removed = controller.hideMessageForMe(record.messageIdHex)
+                if (removed) deleteDialogOpen = false
+            } finally {
+                deleteForMeInFlight = false
+            }
+        }
     }
 
     fun performDeleteForEveryone() {
@@ -954,9 +964,9 @@ internal fun MessageBubble(
                         // switches to anchored batch selection. Markdown links
                         // keep their copy-on-release routing. Horizontal motion
                         // remains available to swipe-to-reply above.
-                        if (deleted || longPressBlockedBySelection || textSelectionMode) {
-                            // A deleted message has no actions menu; batch selection
-                            // and text selection route the row through their own UI.
+                        if (tombstoneCleanupUnavailable || longPressBlockedBySelection || textSelectionMode) {
+                            // Batch/text selection own the row. A tombstone remains
+                            // actionable only when its local cleanup path is usable.
                             Modifier
                         } else {
                             Modifier.longPressOrVerticalDrag(
@@ -970,7 +980,11 @@ internal fun MessageBubble(
                                             messageBubbleLongPressPositionInWindow(it, position)
                                         } ?: return@longPressOrVerticalDrag
                                     val linkDestination =
-                                        markdownLinkDestinationAt(markdownLinkLayouts.values, windowPosition)
+                                        if (deleted) {
+                                            null
+                                        } else {
+                                            markdownLinkDestinationAt(markdownLinkLayouts.values, windowPosition)
+                                        }
                                     pendingLongPressLinkDestination[0] = linkDestination
                                     if (linkDestination == null) {
                                         // Capture the press in window space before
@@ -993,6 +1007,7 @@ internal fun MessageBubble(
                                     if (linkDestination != null) copyMarkdownLink(linkDestination)
                                 },
                                 onDragStart = { position ->
+                                    if (deleted) return@longPressOrVerticalDrag
                                     // A range gesture begins after the threshold
                                     // action was shown. Hand ownership over without
                                     // leaving a stale popup above selection mode.
@@ -1003,16 +1018,19 @@ internal fun MessageBubble(
                                         ?.let(onDragSelectionStart)
                                 },
                                 onDrag = { position ->
+                                    if (deleted) return@longPressOrVerticalDrag false
                                     rowCoordinates[0]
                                         ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
                                         ?.let(onDragSelection)
                                         ?: false
                                 },
-                                onDragEnd = onDragSelectionEnd,
+                                onDragEnd = {
+                                    if (!deleted) onDragSelectionEnd()
+                                },
                                 onGestureCancel = {
                                     pendingLongPressLinkDestination[0] = null
                                     onActionMenuOpenChange(false)
-                                    onDragSelectionCancel()
+                                    if (!deleted) onDragSelectionCancel()
                                 },
                             )
                         },
@@ -1025,9 +1043,10 @@ internal fun MessageBubble(
                         // onLongClick semantic action for the whole row (#262).
                         // Re-publish that action via Modifier.semantics so the
                         // reply/copy/delete/reaction entry point stays reachable
-                        // without a hold gesture. Guarded by `!deleted` and
-                        // disabled while batch/text selection owns the row.
-                        if (deleted || selectionMode || textSelectionMode) {
+                        // without a hold gesture. Tombstones expose this only for
+                        // their focused local cleanup; batch/text selection still
+                        // owns all other row interaction.
+                        if (tombstoneCleanupUnavailable || selectionMode || textSelectionMode) {
                             Modifier
                         } else {
                             Modifier.semantics {
@@ -1630,29 +1649,30 @@ internal fun MessageBubble(
                     }
                 }
                 MessageActionMenu(
-                    // Never render the menu for a deleted message or while batch
-                    // or partial text selection owns the row interaction.
-                    expanded = isActionMenuOpen && !deleted && !selectionMode && !textSelectionMode,
+                    // A tombstone gets a focused delete-only menu. Batch or partial
+                    // text selection still owns the row interaction completely.
+                    expanded = isActionMenuOpen && !selectionMode && !textSelectionMode,
                     anchorBoundsInWindow = actionMenuAnchorBounds,
                     anchorWindowYPx = longPressWindowY,
                     centerOverAnchor = hasMedia,
-                    canReply = !readOnly,
-                    canReact = !readOnly,
+                    canReply = !deleted && !readOnly,
+                    canReact = !deleted && !readOnly,
                     canDelete = deleteCapability.canDeleteAtAll,
                     canEdit = !readOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
-                    canForward = !readOnly && forwardBody != null,
-                    canSelect = !readOnly && batchSelectable,
+                    canForward = !deleted && !readOnly && forwardBody != null,
+                    canSelect = !deleted && !readOnly && batchSelectable,
                     // Whole-message Copy keeps using its actual clipboard payload,
                     // including card-style bubbles whose body is rendered by the
                     // card rather than the text renderer. Partial selection is only
                     // available when this bubble has selectable rendered text.
-                    canCopyText = displayedBody.isNotBlank(),
+                    canCopyText = !deleted && displayedBody.isNotBlank(),
                     // Speak aloud uses the same edit-aware user-authored text as TTS
                     // projection, not the display fallback (filenames, placeholders,
                     // reactions, system copy).
-                    canSpeak = canSpeakAloud,
-                    canSelectText = !bodyTextToRender.isNullOrBlank(),
-                    canSave = mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
+                    canSpeak = !deleted && canSpeakAloud,
+                    canSelectText = !deleted && !bodyTextToRender.isNullOrBlank(),
+                    canSave = !deleted && mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
+                    canInfo = !deleted,
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->
@@ -1862,7 +1882,7 @@ internal fun MessageBubble(
                         capability = deleteCapability,
                         mine = mine,
                         senderDisplayName = appState.displayName(record.sender),
-                        deleteInFlight = deleteForEveryoneInFlight,
+                        deleteInFlight = deleteForMeInFlight || deleteForEveryoneInFlight,
                         onDeleteForEveryone = ::performDeleteForEveryone,
                         onDeleteForMe = ::performDeleteForMe,
                         onDismissRequest = { deleteDialogOpen = false },

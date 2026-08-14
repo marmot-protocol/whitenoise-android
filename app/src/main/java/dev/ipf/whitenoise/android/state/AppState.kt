@@ -1466,6 +1466,7 @@ class WhiteNoiseAppState private constructor(
     private val notificationDispatcher: CoroutineDispatcher,
     private val notificationReceiverTimeoutMillis: () -> Long,
     private val inboundShareTextStager: ((String, String, String) -> Unit)?,
+    preferencesOverride: SharedPreferences?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
@@ -1485,6 +1486,7 @@ class WhiteNoiseAppState private constructor(
             notificationDispatcher = Dispatchers.IO,
             notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
             inboundShareTextStager = null,
+            preferencesOverride = null,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
         )
@@ -1506,6 +1508,7 @@ class WhiteNoiseAppState private constructor(
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
         inboundShareTextStager: ((String, String, String) -> Unit)? = null,
+        preferences: SharedPreferences? = null,
     ) : this(
         context = context,
         draftStore = draftStore,
@@ -1521,12 +1524,13 @@ class WhiteNoiseAppState private constructor(
         notificationDispatcher = notificationDispatcher,
         notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
         inboundShareTextStager = inboundShareTextStager,
+        preferencesOverride = preferences,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
     )
 
     private val appContext = context.applicationContext
-    private val preferences = appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
     private val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
     internal val editorSessionStore: EditorSessionStore = EditorSessionStore.create(appContext)
@@ -5803,17 +5807,25 @@ class WhiteNoiseAppState private constructor(
             ?: MessageHidePreferences.readHiddenMessageIdsByKey(preferences, key)
     }
 
-    fun hideMessageForMe(
+    suspend fun hideMessageForMe(
         accountRef: String?,
         groupIdHex: String,
         messageIdHex: String,
-    ): Set<String> {
-        val key = MessageHidePreferences.preferenceKey(accountRef, groupIdHex) ?: return emptySet()
-        val updated = MessageHidePreferences.hideMessage(preferences, accountRef, groupIdHex, messageIdHex)
-        hiddenMessageIdsByAccountGroup
-            .getOrPut(key) { mutableStateOf(updated) }
-            .value = updated
-        return updated
+    ): Boolean {
+        val key = MessageHidePreferences.preferenceKey(accountRef, groupIdHex)
+        val updated =
+            key?.let {
+                withContext(Dispatchers.IO) {
+                    MessageHidePreferences.hideMessage(preferences, accountRef, groupIdHex, messageIdHex)
+                }
+            }
+        return if (key == null || updated == null) {
+            false
+        } else {
+            val state = hiddenMessageIdsByAccountGroup.getOrPut(key) { mutableStateOf(updated) }
+            state.value = updated
+            true
+        }
     }
 
     fun clearHiddenMessagesForAccount(accountRef: String) {

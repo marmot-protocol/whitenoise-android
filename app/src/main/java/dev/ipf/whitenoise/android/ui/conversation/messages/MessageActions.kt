@@ -123,6 +123,7 @@ internal fun MessageActionMenu(
     canSpeak: Boolean,
     canSelectText: Boolean,
     canSave: Boolean,
+    canInfo: Boolean = true,
     quickReactionEmojis: List<String>,
     onDismissRequest: () -> Unit,
     onReact: (String) -> Unit,
@@ -142,7 +143,7 @@ internal fun MessageActionMenu(
 
     val density = LocalDensity.current
     val actionKinds =
-        remember(canReply, canEdit, canSelect, canSelectText, canCopyText, canSpeak, canForward, canSave) {
+        remember(canReply, canEdit, canSelect, canSelectText, canCopyText, canSpeak, canForward, canSave, canInfo) {
             messageActionKinds(
                 canReply = canReply,
                 canEdit = canEdit,
@@ -152,6 +153,7 @@ internal fun MessageActionMenu(
                 canSpeak = canSpeak,
                 canForward = canForward,
                 canSave = canSave,
+                canInfo = canInfo,
             )
         }
     val labeledActions: List<Pair<MessageActionKind?, String>> =

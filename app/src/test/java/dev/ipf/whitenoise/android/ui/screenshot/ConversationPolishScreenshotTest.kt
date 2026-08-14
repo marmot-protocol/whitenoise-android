@@ -65,6 +65,18 @@ class ConversationPolishScreenshotTest {
         )
 
     @Test
+    fun deletedMessageDeleteOnlyActionLight() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false, amoled = false) {
+                DeletedMessageActionMenu()
+            }
+        }
+        composeRule
+            .onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/deleted_message_delete_only_action_light.png")
+    }
+
+    @Test
     fun attachmentTypesLight() = captureAttachmentTypes("attachment_type_gallery_light", dark = false, amoled = false)
 
     @Test
@@ -117,6 +129,40 @@ class ConversationPolishScreenshotTest {
             canSelectText = true,
             canSave = true,
             quickReactionEmojis = listOf("👍", "❤️", "😂", "😮", "😢"),
+            onDismissRequest = {},
+            onReact = {},
+            onOpenEmojiPicker = {},
+            onReply = {},
+            onEdit = {},
+            onForward = {},
+            onSelect = {},
+            onSelectText = {},
+            onCopyText = {},
+            onSpeak = {},
+            onSave = {},
+            onInfo = {},
+            onDelete = {},
+        )
+    }
+
+    @Composable
+    private fun DeletedMessageActionMenu() {
+        MessageActionMenu(
+            expanded = true,
+            anchorBoundsInWindow = null,
+            anchorWindowYPx = 8f,
+            canReply = false,
+            canReact = false,
+            canDelete = true,
+            canEdit = false,
+            canForward = false,
+            canSelect = false,
+            canCopyText = false,
+            canSpeak = false,
+            canSelectText = false,
+            canSave = false,
+            canInfo = false,
+            quickReactionEmojis = emptyList(),
             onDismissRequest = {},
             onReact = {},
             onOpenEmojiPicker = {},
