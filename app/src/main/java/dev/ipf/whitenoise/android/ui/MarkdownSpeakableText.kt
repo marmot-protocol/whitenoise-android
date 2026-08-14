@@ -550,48 +550,10 @@ private data class MappedText(
 }
 
 /** True when a speakable segment already ends with authored punctuation or an emoji. */
-internal fun String.endsWithSpeakableSentenceTerminal(): Boolean =
-    hasAuthoredSpeakableTerminalPunctuation() ||
-        codePointBefore(length).isSpeakableEmojiTerminalCodePoint()
+@Suppress("MaxLineLength")
+internal fun String.endsWithSpeakableSentenceTerminal(): Boolean = hasAuthoredSpeakableTerminalPunctuation() || endsWithSpeakableEmojiSequence()
 
 private fun String.hasAuthoredSpeakableTerminalPunctuation(): Boolean = isEmpty() || last() in ".!?;:,"
-
-private fun Int.isSpeakableEmojiTerminalCodePoint(): Boolean =
-    when {
-        isSpeakableVariationSelector() -> true
-        isSpeakableEmojiModifier() -> true
-        this == SPEAKABLE_COMBINING_ENCLOSING_KEYCAP -> true
-        this == SPEAKABLE_ZERO_WIDTH_JOINER -> true
-        this in SPEAKABLE_EMOJI_BLOCK_START..SPEAKABLE_EMOJI_BLOCK_END -> true
-        this in SPEAKABLE_SYMBOLS_BLOCK_START..SPEAKABLE_SYMBOLS_BLOCK_END -> true
-        this in SPEAKABLE_TECHNICAL_BLOCK_START..SPEAKABLE_TECHNICAL_BLOCK_END -> true
-        this in SPEAKABLE_STAR_BLOCK_START..SPEAKABLE_STAR_BLOCK_END -> true
-        else -> false
-    }
-
-private fun Int.isSpeakableVariationSelector(): Boolean =
-    this in SPEAKABLE_VARIATION_SELECTOR_START..SPEAKABLE_VARIATION_SELECTOR_END ||
-        this in SPEAKABLE_SUPPLEMENTARY_VARIATION_SELECTOR_START..SPEAKABLE_SUPPLEMENTARY_VARIATION_SELECTOR_END
-
-@Suppress("MaxLineLength")
-private fun Int.isSpeakableEmojiModifier(): Boolean = this in SPEAKABLE_EMOJI_MODIFIER_START..SPEAKABLE_EMOJI_MODIFIER_END
-
-private const val SPEAKABLE_ZERO_WIDTH_JOINER = 0x200D
-private const val SPEAKABLE_VARIATION_SELECTOR_START = 0xFE00
-private const val SPEAKABLE_VARIATION_SELECTOR_END = 0xFE0F
-private const val SPEAKABLE_SUPPLEMENTARY_VARIATION_SELECTOR_START = 0xE0100
-private const val SPEAKABLE_SUPPLEMENTARY_VARIATION_SELECTOR_END = 0xE01EF
-private const val SPEAKABLE_EMOJI_MODIFIER_START = 0x1F3FB
-private const val SPEAKABLE_EMOJI_MODIFIER_END = 0x1F3FF
-private const val SPEAKABLE_COMBINING_ENCLOSING_KEYCAP = 0x20E3
-private const val SPEAKABLE_EMOJI_BLOCK_START = 0x1F000
-private const val SPEAKABLE_EMOJI_BLOCK_END = 0x1FAFF
-private const val SPEAKABLE_SYMBOLS_BLOCK_START = 0x2600
-private const val SPEAKABLE_SYMBOLS_BLOCK_END = 0x27BF
-private const val SPEAKABLE_TECHNICAL_BLOCK_START = 0x2300
-private const val SPEAKABLE_TECHNICAL_BLOCK_END = 0x23FF
-private const val SPEAKABLE_STAR_BLOCK_START = 0x2B50
-private const val SPEAKABLE_STAR_BLOCK_END = 0x2B55
 
 private fun MappedText.asSpeakableSentence(): MappedText {
     var normalized = trimWhitespace()
