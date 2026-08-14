@@ -77,7 +77,13 @@ class MediaAttachmentSaveTest {
         try {
             source.writeBytes(PAYLOAD)
 
-            val saved = saveDocumentToDownloads(context(), source, "agent-build.apk", "application/vnd.android.package-archive")
+            val saved =
+                saveDocumentToDownloads(
+                    context(),
+                    source,
+                    "agent-build.apk",
+                    "application/vnd.android.package-archive",
+                )
 
             assertTrue(saved)
             assertEquals(MediaStore.Downloads.EXTERNAL_CONTENT_URI, provider.insertedCollection)

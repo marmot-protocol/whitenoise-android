@@ -77,6 +77,7 @@ internal fun validatedAttachmentCacheFile(file: java.io.File?): java.io.File? =
         ?.also(AttachmentPlaintextCache::touch)
 
 private val documentMaterializations = SingleFlight<String, java.io.File>()
+private const val MAX_DOCUMENT_EXTENSION_LENGTH = 12
 
 /**
  * Materialize a general document once into the bounded shared-media cache.
@@ -149,13 +150,13 @@ private fun documentAttachmentExtension(
             .substringAfterLast('.', "")
             .lowercase()
             .takeIf { candidate ->
-                candidate.length in 1..12 && candidate.all { it.isLetterOrDigit() }
+                candidate.length in 1..MAX_DOCUMENT_EXTENSION_LENGTH && candidate.all { it.isLetterOrDigit() }
             }
     if (fromName != null) return fromName
     return android.webkit.MimeTypeMap
         .getSingleton()
         .getExtensionFromMimeType(mediaType.lowercase())
-        ?.takeIf { it.length in 1..12 && it.all(Char::isLetterOrDigit) }
+        ?.takeIf { it.length in 1..MAX_DOCUMENT_EXTENSION_LENGTH && it.all(Char::isLetterOrDigit) }
         ?: "bin"
 }
 
@@ -316,12 +317,15 @@ private fun saveFileToDownloads(
             put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
         }
     val uri =
-        resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-            ?: throw java.io.IOException("MediaStore insert failed")
+        requireMediaStoreValue(
+            resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values),
+            "MediaStore insert failed",
+        )
     return try {
         resolver.openOutputStream(uri).use { out ->
-            if (out == null) throw java.io.IOException("null output stream")
-            source.copyTo(out, DEFAULT_BUFFER_SIZE)
+            requireMediaStoreValue(out, "null output stream").let { output ->
+                source.copyTo(output, DEFAULT_BUFFER_SIZE)
+            }
         }
         values.clear()
         values.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
@@ -332,6 +336,11 @@ private fun saveFileToDownloads(
         throw failure
     }
 }
+
+private fun <T> requireMediaStoreValue(
+    value: T?,
+    message: String,
+): T = value ?: throw java.io.IOException(message)
 
 private fun saveVideoToGallery(
     context: android.content.Context,

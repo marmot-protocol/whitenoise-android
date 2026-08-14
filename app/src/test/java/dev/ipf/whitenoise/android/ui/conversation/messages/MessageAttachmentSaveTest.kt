@@ -150,5 +150,12 @@ class MessageAttachmentSaveTest {
 
     private fun saveAttachmentsBody(): String = messageBubbleSource().functionBody("saveAttachments")
 
-    private fun saveMediaBody(): String = messageAttachmentSaveSource().functionBody("saveMessageMediaAttachments")
+    private fun saveMediaBody(): String {
+        val source = messageAttachmentSaveSource()
+        return listOf(
+            "saveMessageMediaAttachment",
+            "saveMessageVideoAttachment",
+            "saveMessageDocumentAttachment",
+        ).joinToString(separator = "\n") { functionName -> source.functionBody(functionName) }
+    }
 }

@@ -263,31 +263,33 @@ internal fun canRequestAttachmentOpen(
         -> mine || sourceEpoch != 0uL
     }
 
-private suspend fun Lifecycle.awaitResumedOrDestroyed(): Boolean {
-    if (currentState == Lifecycle.State.DESTROYED) return false
-    if (currentState.isAtLeast(Lifecycle.State.RESUMED)) return true
-    return suspendCancellableCoroutine { continuation ->
-        lateinit var observer: LifecycleEventObserver
+private suspend fun Lifecycle.awaitResumedOrDestroyed(): Boolean =
+    when {
+        currentState == Lifecycle.State.DESTROYED -> false
+        currentState.isAtLeast(Lifecycle.State.RESUMED) -> true
+        else ->
+            suspendCancellableCoroutine { continuation ->
+                lateinit var observer: LifecycleEventObserver
 
-        fun complete(resumed: Boolean) {
-            removeObserver(observer)
-            if (continuation.isActive) continuation.resume(resumed)
-        }
-        observer =
-            LifecycleEventObserver { _, _ ->
+                fun complete(resumed: Boolean) {
+                    removeObserver(observer)
+                    if (continuation.isActive) continuation.resume(resumed)
+                }
+                observer =
+                    LifecycleEventObserver { _, _ ->
+                        when {
+                            currentState == Lifecycle.State.DESTROYED -> complete(false)
+                            currentState.isAtLeast(Lifecycle.State.RESUMED) -> complete(true)
+                        }
+                    }
+                addObserver(observer)
+                continuation.invokeOnCancellation { removeObserver(observer) }
                 when {
                     currentState == Lifecycle.State.DESTROYED -> complete(false)
                     currentState.isAtLeast(Lifecycle.State.RESUMED) -> complete(true)
                 }
             }
-        addObserver(observer)
-        continuation.invokeOnCancellation { removeObserver(observer) }
-        when {
-            currentState == Lifecycle.State.DESTROYED -> complete(false)
-            currentState.isAtLeast(Lifecycle.State.RESUMED) -> complete(true)
-        }
     }
-}
 
 /** Stable-width trailing status avoids a pill-size jump when loading finishes. */
 @Composable

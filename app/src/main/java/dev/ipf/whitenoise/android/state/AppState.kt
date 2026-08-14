@@ -3413,15 +3413,15 @@ class WhiteNoiseAppState private constructor(
                 request.messageIdHex,
                 request.attachmentIndex,
             )
-        withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }
-            ?.let { return it }
-        val onDisk = withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
-        if (onDisk != null) {
-            withContext(Dispatchers.Main.immediate) {
-                cacheMediaPlaintext(cacheKey, onDisk)
-            }
-            return onDisk
-        }
+        val cached =
+            withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }
+                ?: withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
+                    ?.also { onDisk ->
+                        withContext(Dispatchers.Main.immediate) {
+                            cacheMediaPlaintext(cacheKey, onDisk)
+                        }
+                    }
+        if (cached != null) return cached
 
         val deferred =
             memoizedDownload(cacheKey) {
@@ -7844,33 +7844,36 @@ class WhiteNoiseAppState private constructor(
      * the lookup identity and resolves the authoritative reference from MDK.
      */
     private suspend fun scheduleIncomingDocumentDownloads(update: NotificationUpdateFfi) {
-        if (update.trigger != NotificationTriggerFfi.NEW_MESSAGE || update.isFromSelf) return
-        val messageIdHex = update.messageIdHex ?: return
-        val matrix = loadMediaAutoDownloadMatrix(update.accountRef)
-        if (!matrix.shouldAutoDownload(MediaAutoDownloadType.Document, activeNetworkTypes())) return
-        val records =
-            runCatchingCancellable { marmotIo { listMedia(update.accountRef, update.groupIdHex, null) } }
-                .getOrNull()
-                .orEmpty()
-        records
-            .asSequence()
-            .filter { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
-            .filter { record ->
-                val reference = record.reference
-                reference.sourceEpoch != 0uL &&
-                    !MediaReferenceSupport.isImageMedia(reference) &&
-                    !MediaReferenceSupport.isVideoMedia(reference) &&
-                    !MediaReferenceSupport.isAudioMedia(reference)
-            }.forEach { record ->
-                enqueueAttachmentDownload(
-                    AttachmentTransferRequest(
-                        accountRef = update.accountRef,
-                        groupIdHex = update.groupIdHex,
-                        messageIdHex = record.messageIdHex,
-                        attachmentIndex = record.attachmentIndex.toInt(),
-                    ),
-                )
+        val messageIdHex = update.messageIdHex
+        val isIncomingMessage = update.trigger == NotificationTriggerFfi.NEW_MESSAGE && !update.isFromSelf
+        if (isIncomingMessage && messageIdHex != null) {
+            val matrix = loadMediaAutoDownloadMatrix(update.accountRef)
+            if (matrix.shouldAutoDownload(MediaAutoDownloadType.Document, activeNetworkTypes())) {
+                val records =
+                    runCatchingCancellable { marmotIo { listMedia(update.accountRef, update.groupIdHex, null) } }
+                        .getOrNull()
+                        .orEmpty()
+                records
+                    .asSequence()
+                    .filter { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
+                    .filter { record ->
+                        val reference = record.reference
+                        reference.sourceEpoch != 0uL &&
+                            !MediaReferenceSupport.isImageMedia(reference) &&
+                            !MediaReferenceSupport.isVideoMedia(reference) &&
+                            !MediaReferenceSupport.isAudioMedia(reference)
+                    }.forEach { record ->
+                        enqueueAttachmentDownload(
+                            AttachmentTransferRequest(
+                                accountRef = update.accountRef,
+                                groupIdHex = update.groupIdHex,
+                                messageIdHex = record.messageIdHex,
+                                attachmentIndex = record.attachmentIndex.toInt(),
+                            ),
+                        )
+                    }
             }
+        }
     }
 
     private suspend fun notificationTimelineRecord(update: NotificationUpdateFfi) =

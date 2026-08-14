@@ -47,11 +47,20 @@ internal object AttachmentDownloadWorkData {
         )
 
     fun decode(data: Data): AttachmentTransferRequest? {
-        val accountRef = data.getString(KEY_ACCOUNT_REF)?.takeIf { it.isNotBlank() } ?: return null
-        val groupIdHex = data.getString(KEY_GROUP_ID_HEX)?.takeIf(HEX_ID::matches) ?: return null
-        val messageIdHex = data.getString(KEY_MESSAGE_ID_HEX)?.takeIf(HEX_ID::matches) ?: return null
-        val attachmentIndex = data.getInt(KEY_ATTACHMENT_INDEX, -1).takeIf { it >= 0 } ?: return null
-        return AttachmentTransferRequest(accountRef, groupIdHex, messageIdHex, attachmentIndex)
+        val accountRef = data.getString(KEY_ACCOUNT_REF).orEmpty()
+        val groupIdHex = data.getString(KEY_GROUP_ID_HEX).orEmpty()
+        val messageIdHex = data.getString(KEY_MESSAGE_ID_HEX).orEmpty()
+        val attachmentIndex = data.getInt(KEY_ATTACHMENT_INDEX, -1)
+        val valid =
+            accountRef.isNotBlank() &&
+                HEX_ID.matches(groupIdHex) &&
+                HEX_ID.matches(messageIdHex) &&
+                attachmentIndex >= 0
+        return if (valid) {
+            AttachmentTransferRequest(accountRef, groupIdHex, messageIdHex, attachmentIndex)
+        } else {
+            null
+        }
     }
 
     private val HEX_ID = Regex("^[0-9a-fA-F]{64}$")
@@ -66,7 +75,8 @@ internal fun attachmentDownloadWorkName(request: AttachmentTransferRequest): Str
             request.attachmentIndex.toString(),
         ).joinToString("\u0000")
     val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray())
-    return "attachment_download_" + digest.joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+    return "attachment_download_" +
+        digest.joinToString("") { byte -> "%02x".format(byte.toInt() and BYTE_MASK) }
 }
 
 internal fun shouldRetryAttachmentDownloadWork(
@@ -89,8 +99,9 @@ class AttachmentDownloadWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
-        val request = AttachmentDownloadWorkData.decode(inputData) ?: return Result.failure()
-        val application = applicationContext as? WhiteNoiseApplication ?: return Result.failure()
+        val request = AttachmentDownloadWorkData.decode(inputData)
+        val application = applicationContext as? WhiteNoiseApplication
+        if (request == null || application == null) return Result.failure()
         return try {
             withContext(Dispatchers.Main.immediate) {
                 application.appState.ensureNotificationRuntimeStarted()
@@ -101,13 +112,18 @@ class AttachmentDownloadWorker(
             Result.success()
         } catch (cancel: CancellationException) {
             throw cancel
-        } catch (failure: Throwable) {
+        } catch (expectedFailure: Throwable) {
             Log.w(
                 TAG,
-                "durable attachment download failed msg=${request.messageIdHex.take(8)}#${request.attachmentIndex}",
-                failure,
+                "durable attachment download failed " +
+                    "msg=${request.messageIdHex.take(LOG_ID_PREFIX_LENGTH)}#${request.attachmentIndex}",
+                expectedFailure,
             )
-            if (shouldRetryAttachmentDownloadWork(runAttemptCount, failure)) Result.retry() else Result.failure()
+            if (shouldRetryAttachmentDownloadWork(runAttemptCount, expectedFailure)) {
+                Result.retry()
+            } else {
+                Result.failure()
+            }
         }
     }
 
@@ -115,6 +131,7 @@ class AttachmentDownloadWorker(
         internal const val MAX_RETRY_ATTEMPTS = 1
         private const val TAG = "DMAttachmentWorker"
         private const val BACKOFF_SECONDS = 30L
+        private const val LOG_ID_PREFIX_LENGTH = 8
 
         internal fun enqueue(
             context: Context,
@@ -141,3 +158,5 @@ class AttachmentDownloadWorker(
         }
     }
 }
+
+private const val BYTE_MASK = 0xFF
