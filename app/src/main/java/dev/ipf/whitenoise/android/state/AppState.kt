@@ -1672,6 +1672,10 @@ class WhiteNoiseAppState private constructor(
     private val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
     private val conversationVibrationChannelMutex = Mutex()
+
+    // Treat preference I/O plus observable-state publication as one transaction;
+    // otherwise an older successful hide can publish after a newer hide or wipe.
+    private val hiddenMessageMutationMutex = Mutex()
     internal val conversationVibrationPreferences = ConversationVibrationPreferences(appContext)
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
     private val inviteNotificationIdentityRefreshStore = GroupInviteNotificationIdentityRefreshStore()
@@ -5764,28 +5768,29 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
         messageIdHex: String,
-    ): Boolean {
-        val key = MessageHidePreferences.preferenceKey(accountRef, groupIdHex)
-        val updated =
-            key?.let {
+    ): Boolean =
+        hiddenMessageMutationMutex.withLock {
+            val key = MessageHidePreferences.preferenceKey(accountRef, groupIdHex) ?: return@withLock false
+            val updated =
                 withContext(Dispatchers.IO) {
                     MessageHidePreferences.hideMessage(preferences, accountRef, groupIdHex, messageIdHex)
                 }
-            }
-        return if (key == null || updated == null) {
-            false
-        } else {
+                    ?: return@withLock false
             val state = hiddenMessageIdsByAccountGroup.getOrPut(key) { mutableStateOf(updated) }
             state.value = updated
             true
         }
-    }
 
-    fun clearHiddenMessagesForAccount(accountRef: String) {
-        MessageHidePreferences.clearAccount(preferences, accountRef)
-        val prefix = MessageHidePreferences.accountKeyPrefix(accountRef) ?: return
-        hiddenMessageIdsByAccountGroup.removeAll { it.startsWith(prefix) }
-    }
+    suspend fun clearHiddenMessagesForAccount(accountRef: String) =
+        withContext(NonCancellable) {
+            hiddenMessageMutationMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    MessageHidePreferences.clearAccount(preferences, accountRef)
+                }
+                val prefix = MessageHidePreferences.accountKeyPrefix(accountRef) ?: return@withLock
+                hiddenMessageIdsByAccountGroup.removeAll { it.startsWith(prefix) }
+            }
+        }
 
     /**
      * Toggle one cell of the active account's auto-download matrix, persist it
