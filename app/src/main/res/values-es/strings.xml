@@ -142,6 +142,7 @@
     <string name="scan_recipient_qr_code">Escanear el código QR del destinatario</string>
     <string name="add_recipient">Agregar destinatario</string>
     <string name="group_name">Nombre del Grupo</string>
+    <string name="edit_group_name_and_description">Editar nombre y descripción del grupo</string>
     <string name="description">Descripción</string>
     <string name="create">crear</string>
     <string name="chat_actions">Acciones de chat</string>

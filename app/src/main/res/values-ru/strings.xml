@@ -158,6 +158,7 @@
     <string name="scan_recipient_qr_code">Отсканируйте QR код получателя</string>
     <string name="add_recipient">Добавить получателя</string>
     <string name="group_name">Название Группы</string>
+    <string name="edit_group_name_and_description">Изменить название и описание группы</string>
     <string name="description">Описание</string>
     <string name="create">Создать</string>
     <string name="chat_actions">Действия в чате</string>

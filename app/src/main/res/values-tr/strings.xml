@@ -142,6 +142,7 @@
     <string name="scan_recipient_qr_code">Alıcı QR kodunu tara</string>
     <string name="add_recipient">Alıcı ekle</string>
     <string name="group_name">Grup Adı</string>
+    <string name="edit_group_name_and_description">Grup adını ve açıklamasını düzenle</string>
     <string name="description">Açıklama</string>
     <string name="create">Yaratmak</string>
     <string name="chat_actions">Sohbet işlemleri</string>
