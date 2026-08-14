@@ -534,7 +534,8 @@ class MarkdownSpeakableTextTest {
             object : AbstractList<List<MarkdownTableCellFfi>>() {
                 override val size = 1
 
-                override fun get(index: Int): List<MarkdownTableCellFfi> = error("read a table row after the traversal budget")
+                override fun get(index: Int): List<MarkdownTableCellFfi> =
+                    error("read a table row after the traversal budget")
             }
         val document =
             MarkdownDocumentFfi(

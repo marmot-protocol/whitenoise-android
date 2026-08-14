@@ -58,10 +58,12 @@ internal fun systemReadAloudProcessTextKeyIds(context: Context): Set<Int> {
 
 private fun ResolveInfo.isAvailableTo(context: Context): Boolean {
     val info = activityInfo ?: return false
-    if (info.packageName == context.packageName) return true
-    if (!info.exported) return false
-    val requiredPermission = info.permission ?: return true
-    return context.checkSelfPermission(requiredPermission) == PackageManager.PERMISSION_GRANTED
+    return when {
+        info.packageName == context.packageName -> true
+        !info.exported -> false
+        info.permission == null -> true
+        else -> context.checkSelfPermission(info.permission) == PackageManager.PERMISSION_GRANTED
+    }
 }
 
 private fun ResolveInfo.isReadAloudActivity(): Boolean {
