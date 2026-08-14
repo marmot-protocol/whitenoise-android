@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -105,6 +106,7 @@ import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -116,6 +118,26 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Locale
+
+/** Keeps the process-wide TTS transport in normal flow above every chat-list state. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ChatListBodyFrame(
+    ttsTransport: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Column(modifier) {
+        ttsTransport()
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            content = content,
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -146,6 +168,7 @@ internal fun ChatsScreen(
     // Shell-owned so the filter survives conversation navigation (issue #1897).
     selectedFolderId: String? = null,
     onSelectFolder: (String?) -> Unit = {},
+    onTtsTransportBodyClick: (() -> Unit)? = null,
     onGroupCreateSubmitted: () -> Long = { 0L },
     onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ ->
         onOpenGroup(item, null, false, null)
@@ -990,7 +1013,15 @@ internal fun ChatsScreen(
                     presentProfileFromVisibleList(npub)
                 },
             )
-            Box(Modifier.fillMaxSize()) {
+            ChatListBodyFrame(
+                modifier = Modifier.fillMaxSize(),
+                ttsTransport = {
+                    TtsTransportBar(
+                        appState = appState,
+                        onBodyClick = onTtsTransportBodyClick,
+                    )
+                },
+            ) {
                 when {
                     controller.isLoading && sourceList.isEmpty() -> LoadingScreen()
                     loadFailurePlacement == LoadFailurePlacement.FullScreen ->

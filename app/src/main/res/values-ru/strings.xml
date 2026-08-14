@@ -1374,6 +1374,8 @@
     <string name="tts_bar_next_message">Следующее сообщение</string>
     <string name="tts_bar_progress">Предложение %1$d из %2$d, сообщение %3$d из %4$d</string>
     <string name="tts_bar_stop">Остановить чтение</string>
+    <string name="tts_bar_return_to_source">Вернуться к озвученному сообщению</string>
+    <string name="tts_source_unavailable">Озвученное сообщение больше недоступно</string>
     <string name="tts_resume_follow">Возобновить слежение</string>
     <string name="tts_bar_error">Не удалось прочитать вслух</string>
     <string name="tts_bar_history_loading">Загрузка других сообщений…</string>

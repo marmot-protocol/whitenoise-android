@@ -1697,6 +1697,10 @@ class WhiteNoiseAppState private constructor(
     // same group — must never extend it.
     private var ttsAutoReadSessionKey by mutableStateOf<String?>(null)
 
+    // Manual speech deliberately has no auto-read session key, but it still
+    // owns decrypted text that must stop when its account is removed.
+    private var ttsSpeechAccountRef: String? = null
+
     fun ownsTtsAutoReadSession(groupIdHex: String): Boolean {
         val key = ttsAutoReadSessionKey ?: return false
         return key == ttsAutoReadSessionKeyFor(activeAccountRef, groupIdHex)
@@ -1718,6 +1722,7 @@ class WhiteNoiseAppState private constructor(
             // Only a speak that actually replaced the queue may end the
             // previous auto-read session: a failed start (blank text, no
             // engine) leaves the old queue playing and still owned.
+            ttsSpeechAccountRef = activeAccountRef
             ttsAutoReadSessionKey = null
             ttsHistorySession.onSessionCleared()
         }
@@ -1837,6 +1842,17 @@ class WhiteNoiseAppState private constructor(
     internal fun stopOwnedTtsAutoReadSession() {
         if (ttsAutoReadSessionKey == null) return
         ttsController.stop()
+        ttsSpeechAccountRef = null
+        ttsAutoReadSessionKey = null
+        ttsHistorySession.onSessionCleared()
+    }
+
+    /** Account removal ends any owned speech so its decrypted text stops being spoken. */
+    internal fun stopTtsForRemovedAccount(accountRef: String) {
+        val speechOwner = ttsSpeechAccountRef
+        if (speechOwner != null && speechOwner != accountRef) return
+        ttsController.stop()
+        ttsSpeechAccountRef = null
         ttsAutoReadSessionKey = null
         ttsHistorySession.onSessionCleared()
     }
@@ -1855,6 +1871,7 @@ class WhiteNoiseAppState private constructor(
 
     fun stopSpeaking() {
         ttsController.stop()
+        ttsSpeechAccountRef = null
         ttsAutoReadSessionKey = null
         ttsHistorySession.onSessionCleared()
     }
@@ -4540,6 +4557,7 @@ class WhiteNoiseAppState private constructor(
         // In-memory plaintext is dropped synchronously here; the on-disk wipe
         // is awaited in this suspend path so it isn't an orphaned background task.
         val signedOutRef = activeAccountRef ?: return null
+        stopTtsForRemovedAccount(signedOutRef)
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
@@ -4639,6 +4657,7 @@ class WhiteNoiseAppState private constructor(
                     restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                     return null
                 }
+            stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
             wipeDecryptedMediaFromDisk()
             clearHiddenMessagesForAccount(wipedRef)
