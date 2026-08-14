@@ -166,10 +166,13 @@ class MainActivity : FragmentActivity() {
         installedAtMs: Long,
     ) {
         splashScreen.setKeepOnScreenCondition {
-            shouldRetainSystemSplash(
-                phase = appState.phase,
-                elapsedMs = SystemClock.elapsedRealtime() - installedAtMs,
-            )
+            val retain =
+                shouldRetainSystemSplash(
+                    phase = appState.phase,
+                    elapsedMs = SystemClock.elapsedRealtime() - installedAtMs,
+                )
+            if (!retain) appState.recordStartupSystemSplashHandoff()
+            retain
         }
     }
 

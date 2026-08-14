@@ -1654,6 +1654,7 @@ class WhiteNoiseAppState private constructor(
     private val bootstrapAttempts = BootstrapAttemptCoordinator()
     private val bootstrapRuntime = BootstrapRuntimeCoordinator<AppMarmotRuntime>()
     private val startupTraceStartedAtMs = SystemClock.elapsedRealtime()
+    private var startupSystemSplashHandoffRecorded = false
     private var startupFirstLocalFrameRecorded = false
     private var startupRelayCatchUpRecorded = false
     private var accountListRevision = 0L
@@ -4336,6 +4337,13 @@ class WhiteNoiseAppState private constructor(
                 startupTiming("unread-aggregate-ready", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
             }
         }
+    }
+
+    /** Records the first frame where app-owned Compose UI replaces the system splash. */
+    internal fun recordStartupSystemSplashHandoff() {
+        if (startupSystemSplashHandoffRecorded) return
+        startupSystemSplashHandoffRecorded = true
+        startupTiming("system-splash-handoff", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
     }
 
     private fun recordStartupRelayCatchUpReady() {
@@ -8761,9 +8769,17 @@ private fun startupTiming(
     elapsedMs: Long,
     durationMs: Long? = null,
 ) {
-    if (BuildConfig.DEBUG || BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT == "staging") {
+    if (
+        BuildConfig.DEBUG ||
+        BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT == "staging" ||
+        BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS
+    ) {
         val duration = durationMs?.let { " duration_ms=${it.coerceAtLeast(0L)}" }.orEmpty()
-        Log.i("WNStartup", "stage=$stage elapsed_ms=${elapsedMs.coerceAtLeast(0L)}$duration")
+        Log.i(
+            "WNStartup",
+            "stage=$stage elapsed_ms=${elapsedMs.coerceAtLeast(0L)} " +
+                "uptime_ms=${SystemClock.elapsedRealtime()}$duration",
+        )
     }
 }
 
