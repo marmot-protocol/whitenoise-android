@@ -158,6 +158,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
@@ -1070,6 +1071,7 @@ internal fun ConversationScreen(
     }
 
     val context = LocalContext.current
+    val documentSaveFallback = rememberDocumentSaveFallback()
     val mediaSender =
         rememberConversationMediaSender(
             appState = appState,
@@ -2513,6 +2515,7 @@ internal fun ConversationScreen(
                                                 messageIdHex = record.messageIdHex,
                                                 mediaReferences = mediaReferences,
                                                 mine = controller.isMessageMine(record),
+                                                documentSaveFallback = documentSaveFallback,
                                             )
                                         },
                                     )
@@ -2776,6 +2779,7 @@ internal fun ConversationScreen(
                                     },
                                     appState = appState,
                                     controller = controller,
+                                    documentSaveFallback = documentSaveFallback,
                                     composerTextState = composerTextState,
                                     highlighted = messageId == navigationState.highlightedMessageId,
                                     selectionMode = selectionMode,

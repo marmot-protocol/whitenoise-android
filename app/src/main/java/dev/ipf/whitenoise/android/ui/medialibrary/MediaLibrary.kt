@@ -94,10 +94,11 @@ import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeDocumentAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
-import dev.ipf.whitenoise.android.ui.conversation.media.openAttachmentExternally
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaSaveOutcome
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberAttachmentOpener
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
-import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentToDownloads
+import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
@@ -868,6 +869,7 @@ private fun FileLibraryTab(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
 ) {
+    val documentSaveFallback = rememberDocumentSaveFallback()
     MonthSectionedColumn(
         sections = tiles.fileSections,
         listState = listState,
@@ -878,6 +880,7 @@ private fun FileLibraryTab(
             row = row,
             controller = controller,
             appState = appState,
+            documentSaveFallback = documentSaveFallback,
         )
     }
 }
@@ -887,6 +890,7 @@ private fun FileLibraryRow(
     row: SharedMediaRow,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    documentSaveFallback: dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -899,6 +903,8 @@ private fun FileLibraryRow(
         remember(row.reference.mediaType, row.reference.fileName) {
             resolveAttachmentPresentation(row.reference.mediaType, row.reference.fileName)
         }
+
+    val openAttachment = rememberAttachmentOpener()
 
     // The tap is the user-initiated download trigger — files never auto-fetch
     // in the library. Prefer retained bytes for own in-flight sends, mirroring
@@ -942,18 +948,16 @@ private fun FileLibraryRow(
                     scope.launch {
                         val outcome =
                             runCatching {
-                                openAttachmentExternally(
-                                    context,
-                                    fetchFile(),
-                                    row.reference.mediaType,
-                                )
+                                openAttachment(fetchFile(), row.reference.mediaType)
                             }.onFailure {
                                 if (it is kotlinx.coroutines.CancellationException) throw it
                             }.getOrDefault(OpenAttachmentResult.Error)
                         when (outcome) {
                             OpenAttachmentResult.Opened -> Unit
                             OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
-                            OpenAttachmentResult.Error -> appState.present(couldntOpenMessage, copyable = true)
+                            OpenAttachmentResult.InstallPermissionRequired,
+                            OpenAttachmentResult.Error,
+                            -> appState.present(couldntOpenMessage, copyable = true)
                         }
                         inFlight = false
                     }
@@ -1020,14 +1024,13 @@ private fun FileLibraryRow(
                                     runCatchingCancellable {
                                         val file = fetchFile()
                                         val saved =
-                                            withContext(Dispatchers.IO) {
-                                                saveDocumentToDownloads(
-                                                    context,
-                                                    file,
-                                                    row.reference.fileName,
-                                                    row.reference.mediaType,
-                                                )
-                                            }
+                                            saveDocumentWithFallback(
+                                                context = context,
+                                                source = file,
+                                                fileName = row.reference.fileName,
+                                                mediaType = row.reference.mediaType,
+                                                fallback = documentSaveFallback,
+                                            )
                                         check(saved) { "MediaStore save returned false" }
                                     }
                                 appState.presentMediaSaveOutcome(

@@ -109,6 +109,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
+import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.reactions.CustomizeReactionsDialog
@@ -260,6 +261,7 @@ internal fun MessageBubble(
     item: TimelineMessage,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    documentSaveFallback: DocumentSaveFallback? = null,
     // #1206: shared composer text state so the full-screen reader's composer
     // stays in sync with the main composer instead of holding a divergent field.
     composerTextState: ComposerTextState,
@@ -1106,6 +1108,7 @@ internal fun MessageBubble(
                                     messageIdHex = record.messageIdHex,
                                     mediaReferences = mediaReferences,
                                     mine = mine,
+                                    documentSaveFallback = documentSaveFallback,
                                 )
                             appState.presentAttachmentSaveOutcome(
                                 context = context,

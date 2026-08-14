@@ -23,6 +23,12 @@ data class DiagnosticIdentityPresentation(
     }
 }
 
+/** Internal failures may provide a stable, privacy-safe support category and detail. */
+internal interface DiagnosticErrorMetadata {
+    val diagnosticErrorCode: String
+    val diagnosticTechnicalDetail: String?
+}
+
 object DiagnosticFormatter {
     data class ErrorReportContext(
         val appVersion: String,
@@ -142,10 +148,14 @@ object DiagnosticFormatter {
         technicalDetail: String? = null,
     ): String =
         buildString {
+            val metadata =
+                causeChain(throwable)
+                    .filterIsInstance<DiagnosticErrorMetadata>()
+                    .firstOrNull()
             appendLine("White Noise error report")
             appendLine("operation=${stableCode(operationCode)}")
             appendLine("error=${errorCode(throwable)}")
-            technicalDetail
+            (technicalDetail ?: metadata?.diagnosticTechnicalDetail)
                 ?.trim()
                 ?.takeIf(String::isNotEmpty)
                 ?.let { appendLine("detail=${redactError(it)}") }
@@ -159,8 +169,10 @@ object DiagnosticFormatter {
         val chain = causeChain(throwable)
         val names = chain.map { it.javaClass.simpleName.lowercase(Locale.ROOT) }
         val marmotError = chain.filterIsInstance<MarmotKitException>().firstOrNull()
+        val diagnosticError = chain.filterIsInstance<DiagnosticErrorMetadata>().firstOrNull()
         return when {
             chain.any { it is java.util.concurrent.CancellationException } -> "CANCELLED"
+            diagnosticError != null -> stableCode(diagnosticError.diagnosticErrorCode)
             marmotError is MarmotKitException.ExternalSignerRejected -> "CANCELLED"
             marmotError is MarmotKitException.InvalidChatPin ||
                 marmotError is MarmotKitException.InvalidMessageDraft ||

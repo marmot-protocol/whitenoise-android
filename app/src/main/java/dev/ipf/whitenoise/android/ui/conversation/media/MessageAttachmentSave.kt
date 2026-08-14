@@ -13,10 +13,18 @@ internal suspend fun saveMessageMediaAttachments(
     messageIdHex: String,
     mediaReferences: List<MediaAttachmentReferenceFfi>,
     mine: Boolean,
+    documentSaveFallback: DocumentSaveFallback? = null,
 ): MessageAttachmentSaveSummary {
     var savedCount = 0
     var firstFailure: Throwable? = null
-    val saveContext = MessageAttachmentSaveContext(context, controller, messageIdHex, mine)
+    val saveContext =
+        MessageAttachmentSaveContext(
+            androidContext = context,
+            controller = controller,
+            messageIdHex = messageIdHex,
+            mine = mine,
+            documentSaveFallback = documentSaveFallback,
+        )
     mediaReferences.forEachIndexed { attachmentIndex, reference ->
         val result =
             runCatching<Boolean> {
@@ -25,7 +33,7 @@ internal suspend fun saveMessageMediaAttachments(
                 check(saved) { "MediaStore save returned false" }
                 true
             }.onFailure {
-                if (it is kotlinx.coroutines.CancellationException) throw it
+                it.rethrowParentCancellation()
             }
         val saved = result.getOrDefault(false)
         if (saved) savedCount += 1
@@ -38,11 +46,19 @@ internal suspend fun saveMessageMediaAttachments(
     )
 }
 
+internal fun Throwable.rethrowParentCancellation() {
+    when (this) {
+        is DocumentDestinationCancelledException -> Unit
+        is kotlinx.coroutines.CancellationException -> throw this
+    }
+}
+
 private data class MessageAttachmentSaveContext(
     val androidContext: Context,
     val controller: ConversationController,
     val messageIdHex: String,
     val mine: Boolean,
+    val documentSaveFallback: DocumentSaveFallback?,
 )
 
 private suspend fun saveMessageMediaAttachment(
@@ -146,12 +162,11 @@ private suspend fun saveMessageDocumentAttachment(
                     ).await()
             },
         )
-    return withContext(Dispatchers.IO) {
-        saveDocumentToDownloads(
-            context = context.androidContext,
-            source = file,
-            fileName = reference.fileName,
-            mediaType = reference.mediaType,
-        )
-    }
+    return saveDocumentWithFallback(
+        context = context.androidContext,
+        source = file,
+        fileName = reference.fileName,
+        mediaType = reference.mediaType,
+        fallback = context.documentSaveFallback,
+    )
 }
