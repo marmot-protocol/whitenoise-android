@@ -78,12 +78,11 @@ class NotificationHapticVisualTimingDeviceTest {
             } finally {
                 Trace.endSection()
             }
-        val listenerPost =
-            checkNotNull(NotificationTimingDeviceEvents.awaitPost(LISTENER_POST_TIMEOUT_MS)) {
-                "Notification listener did not observe the timing probe"
-            }
-
         try {
+            val listenerPost =
+                checkNotNull(NotificationTimingDeviceEvents.awaitPost(LISTENER_POST_TIMEOUT_MS)) {
+                    "Notification listener did not observe the timing probe"
+                }
             assertTrue(posted)
             assertEquals(expected.tag, listenerPost.tag)
             assertEquals(expected.id, listenerPost.id)

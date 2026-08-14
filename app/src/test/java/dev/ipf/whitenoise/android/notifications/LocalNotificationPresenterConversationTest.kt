@@ -235,12 +235,20 @@ class LocalNotificationPresenterConversationTest {
     fun coldAvatarsPostUsefulCardBeforeSilentSameKeyEnrichment() {
         val posts = mutableListOf<Triple<String, Int, Notification>>()
         var pendingEnrichment: (suspend () -> Unit)? = null
+        var shortcutPublishCount = 0
+        var shortcutWasPublishedBeforeFirstPost = false
         val resolvedAvatar = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
         val twoStagePresenter =
             LocalNotificationPresenter(
                 context = context,
-                shortcutPublisher = { shortcut -> publishedShortcut = shortcut },
+                shortcutPublisher = { shortcut ->
+                    publishedShortcut = shortcut
+                    shortcutPublishCount += 1
+                },
                 notificationPoster = { notificationManager, tag, id, notification ->
+                    if (posts.isEmpty()) {
+                        shortcutWasPublishedBeforeFirstPost = publishedShortcut != null
+                    }
                     posts += Triple(tag, id, notification)
                     notificationManager.notify(tag, id, notification)
                 },
@@ -263,6 +271,8 @@ class LocalNotificationPresenterConversationTest {
         )
 
         assertUsefulInitialPost(posts)
+        assertTrue(shortcutWasPublishedBeforeFirstPost)
+        assertEquals(1, shortcutPublishCount)
 
         runBlocking { checkNotNull(pendingEnrichment).invoke() }
 
@@ -273,6 +283,7 @@ class LocalNotificationPresenterConversationTest {
         assertEquals(0, posts[1].third.defaults)
         assertNull(posts[1].third.sound)
         assertNotNull(publishedShortcut)
+        assertEquals(2, shortcutPublishCount)
         val messages =
             checkNotNull(
                 NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posts[1].third),
@@ -283,7 +294,7 @@ class LocalNotificationPresenterConversationTest {
 
     private fun assertUsefulInitialPost(posts: List<Triple<String, Int, Notification>>) {
         assertEquals(1, posts.size)
-        assertNull(publishedShortcut)
+        assertNotNull(publishedShortcut)
         val notification = posts.single().third
         assertEquals(
             "hi",

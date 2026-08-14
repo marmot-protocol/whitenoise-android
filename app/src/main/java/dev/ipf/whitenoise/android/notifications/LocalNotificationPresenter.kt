@@ -494,6 +494,16 @@ class LocalNotificationPresenter(
                 }
             }
 
+            messagingPost?.let { messaging ->
+                withContext(Dispatchers.Default) {
+                    publishInitialConversationShortcut(
+                        update = update,
+                        content = notificationContent,
+                        messaging = messaging,
+                        directShareEligible = directShareEligible,
+                    )
+                }
+            }
             val notificationManager = NotificationManagerCompat.from(context)
             val posted =
                 withContext(Dispatchers.Default) {
@@ -654,6 +664,28 @@ class LocalNotificationPresenter(
         }
     }
 
+    private fun publishInitialConversationShortcut(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+        messaging: MessagingPostContext,
+        directShareEligible: Boolean,
+    ) {
+        val shortcutId = messaging.shortcutId ?: return
+        if (shortcutSnapshots.containsKey(shortcutId)) return
+        publishConversationShortcut(
+            update = update,
+            content = content,
+            shortcutId = shortcutId,
+            locusId = LocusIdCompat(shortcutId),
+            conversationAvatarUrl = messaging.conversationAvatarUrl,
+            conversationAvatarBitmap = messaging.conversationAvatarBitmap,
+            senderAvatarUrl = messaging.senderAvatarUrl,
+            senderAvatarBitmap = messaging.senderAvatarBitmap,
+            sender = messaging.sender,
+            directShareEligible = directShareEligible,
+        )
+    }
+
     private suspend fun dispatchMessagingEnrichment(
         update: NotificationUpdateFfi,
         content: LocalNotificationContent,
@@ -811,7 +843,8 @@ class LocalNotificationPresenter(
                 conversationAvatarBitmap !== messaging.conversationAvatarBitmap ||
                     senderAvatarBitmap !== messaging.senderAvatarBitmap
             if (!avatarChanged) return@withLock
-            val enriched = buildEnrichedMessagingNotification(active, enrichedSender)
+            val enrichedStyle = enrichedMessagingStyle(active, enrichedSender) ?: return@withLock
+            val enriched = buildEnrichedMessagingNotification(active, enrichedStyle)
             postNotificationSafely(
                 NotificationManagerCompat.from(context),
                 content.notificationTag,
@@ -823,15 +856,14 @@ class LocalNotificationPresenter(
 
     private fun buildEnrichedMessagingNotification(
         active: Notification,
-        enrichedSender: Person,
+        enrichedStyle: NotificationCompat.MessagingStyle,
     ): Notification =
         NotificationCompat
             .Builder(context, active)
             .setSilent(true)
             .setOnlyAlertOnce(true)
-            .apply {
-                enrichedMessagingStyle(active, enrichedSender)?.let(::setStyle)
-            }.build()
+            .setStyle(enrichedStyle)
+            .build()
 
     private fun enrichedMessagingStyle(
         notification: Notification,
