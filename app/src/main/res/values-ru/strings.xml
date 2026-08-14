@@ -220,6 +220,7 @@
     <string name="profile_contact_editor_private_hint">Только вы видите псевдоним и заметки на этом устройстве. Очистка псевдонима восстанавливает имя из профиля. Сохранённые псевдонимы очищаются и ограничиваются 80 символами.</string>
     <string name="dismiss">Закрыть</string>
     <string name="edit">Изменить</string>
+    <string name="edit_group_info_title">Изменить информацию о группе</string>
     <string name="save_group">Сохранить группу</string>
     <string name="saving_group">Сохранение группы...</string>
     <string name="no_description">Нет описания</string>

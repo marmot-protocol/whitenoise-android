@@ -250,6 +250,7 @@
     <string name="profile_contact_editor_private_hint">Only you see nickname and notes on this device. Clearing a nickname restores their profile name. Saved nicknames are cleaned and capped at 80 characters.</string>
     <string name="dismiss">Dismiss</string>
     <string name="edit">Edit</string>
+    <string name="edit_group_info_title">Edit group info</string>
     <string name="save_group">Save Group</string>
     <string name="saving_group">Saving group...</string>
     <string name="no_description">No description</string>

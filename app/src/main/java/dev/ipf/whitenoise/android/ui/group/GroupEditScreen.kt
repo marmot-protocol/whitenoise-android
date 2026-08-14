@@ -211,14 +211,7 @@ internal fun GroupEditScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.edit)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-            )
+            GroupEditTopBar(onBack = onBack)
         },
         bottomBar = {
             if (canEdit) {
@@ -310,7 +303,7 @@ internal fun GroupEditScreen(
                 }
             }
             item {
-                SectionCard(title = stringResource(R.string.edit)) {
+                SectionCard(title = stringResource(R.string.edit_group_info_title)) {
                     val profileFieldColors =
                         TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
@@ -378,4 +371,18 @@ internal fun GroupEditScreen(
             onDismiss = { showImageSearch = false },
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+internal fun GroupEditTopBar(onBack: () -> Unit) {
+    TopAppBar(
+        title = { Text(stringResource(R.string.edit_group_info_title)) },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+            }
+        },
+    )
 }
