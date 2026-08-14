@@ -35,14 +35,15 @@ class MessageMultiSelectCoverageTest {
     @Test
     fun batchSelectionStateKeysOnControllerIdentity() {
         val source = source("ConversationScreen.kt").replace(Regex("\\s+"), " ")
-        val controllerIdentity = "chat.id, appState.activeAccountRef, appState.runtimeGeneration"
+        val chatRuntimeIdentity = "chat.id, appState.activeAccountRef, appState.runtimeGeneration"
+        val controllerIdentity = "controller, $chatRuntimeIdentity"
 
         assertTrue(source.contains("val selectedMessages = remember($controllerIdentity)"))
         assertTrue(source.contains("rememberConversationBatchSelectionUiState("))
         assertTrue(source.contains("chatId = chat.id"))
         assertTrue(source.contains("activeAccountRef = appState.activeAccountRef"))
         assertTrue(source.contains("runtimeGeneration = appState.runtimeGeneration"))
-        assertTrue(source.contains("var batchForwardSheetOpen by remember($controllerIdentity)"))
+        assertTrue(source.contains("var batchForwardSheetOpen by remember($chatRuntimeIdentity)"))
         assertTrue(source.contains("var showBatchDeleteConfirm by remember($controllerIdentity)"))
     }
 
