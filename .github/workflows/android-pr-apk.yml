@@ -27,6 +27,11 @@ permissions:
 jobs:
   build:
     name: Build untrusted preview candidates
+    # Preview signing is intentionally limited to branches in this repository.
+    # Skip fork PRs cleanly instead of failing inside the internal-PR resolver.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
