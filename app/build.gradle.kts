@@ -274,7 +274,7 @@ android {
                 "stable" -> {
                     applicationIdSuffix = ".preview"
                     versionNameSuffix = "-preview-pr$previewIdentity-$buildShortSha"
-                    manifestPlaceholders["appName"] = "PR $previewIdentity Preview"
+                    manifestPlaceholders["appName"] = "White Noise PR"
                 }
                 "isolated" -> {
                     applicationIdSuffix = ".preview.pr$previewIdentity"
