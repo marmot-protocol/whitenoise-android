@@ -8053,22 +8053,9 @@ class ConversationController(
         attachmentIndex: Int,
     ): Boolean {
         val account = conversationAccountRef ?: return false
-        val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
-        val initialMemoryHit =
-            withContext(Dispatchers.Main.immediate) { appState.cachedMediaPlaintext(cacheKey) != null }
-        val diskHit =
-            initialMemoryHit ||
-                withContext(Dispatchers.IO) {
-                    appState.diskMediaCache.containsAfterHydration(cacheKey)
-                }
-        // Re-check L1 after the off-main hydration probe. A sibling download
-        // may have completed while hydration was in progress; unlike the old
-        // sticky Boolean publication, this cannot turn a later definitive miss
-        // into a permanent hit after normal LRU eviction.
-        return diskHit ||
-            withContext(Dispatchers.Main.immediate) {
-                appState.cachedMediaPlaintext(cacheKey) != null
-            }
+        return appState.hasCachedAttachmentAfterHydration(
+            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+        )
     }
 
     /** Observable presentation state owned outside the attachment composable. */
@@ -8110,8 +8097,14 @@ class ConversationController(
         attachmentIndex: Int,
         reference: MediaAttachmentReferenceFfi,
         retainedPlaintext: ByteArray? = null,
-    ): Deferred<ByteArray> =
-        attachmentTransfers.request(
+    ): Deferred<ByteArray> {
+        val account = conversationAccountRef
+        if (retainedPlaintext == null && reference.sourceEpoch != 0uL && account != null) {
+            appState.enqueueAttachmentDownload(
+                AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+            )
+        }
+        return attachmentTransfers.request(
             key = attachmentTransferKey(messageIdHex, attachmentIndex),
             load = {
                 retainedPlaintext
@@ -8122,6 +8115,28 @@ class ConversationController(
                     hasCachedAttachmentAfterHydration(messageIdHex, attachmentIndex)
             },
         )
+    }
+
+    /** Upgrade an optimistic imeta fallback before download/save uses its epoch. */
+    internal suspend fun authoritativeAttachmentReference(
+        messageIdHex: String,
+        attachmentIndex: Int,
+        fallback: MediaAttachmentReferenceFfi,
+    ): MediaAttachmentReferenceFfi {
+        if (fallback.sourceEpoch != 0uL) return fallback
+        val account = conversationAccountRef ?: error("no active account")
+        val request = AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex)
+        repeat(ATTACHMENT_REFERENCE_RESOLVE_ATTEMPTS) { attempt ->
+            appState
+                .resolveAttachmentReference(request)
+                ?.takeIf { it.sourceEpoch != 0uL }
+                ?.let { return it }
+            if (attempt < ATTACHMENT_REFERENCE_RESOLVE_ATTEMPTS - 1) {
+                delay(ATTACHMENT_REFERENCE_RESOLVE_BACKOFF_MILLIS)
+            }
+        }
+        throw AttachmentReferenceNotReadyException()
+    }
 
     private fun attachmentTransferKey(
         messageIdHex: String,
@@ -8156,77 +8171,11 @@ class ConversationController(
         attachmentIndex: Int,
         reference: MediaAttachmentReferenceFfi,
     ): ByteArray {
-        // Resolve the account first so the cache key is never unanchored
-        // ("|group|msg|idx"), which a later sign-in could collide with.
         val account = conversationAccountRef ?: error("no active account")
-        val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
-        // L1: in-memory LRU (hottest cache, instant return).
-        withContext(Dispatchers.Main.immediate) { appState.cachedMediaPlaintext(cacheKey) }
-            ?.let { return it }
-        // L2: disk LRU (survives process restart). Read off the main thread
-        // since file I/O on big JPEGs can take 5-30ms.
-        val onDisk = withContext(Dispatchers.IO) { appState.diskMediaCache.get(cacheKey) }
-        if (onDisk != null) {
-            withContext(Dispatchers.Main.immediate) {
-                appState.cacheMediaPlaintext(cacheKey, onDisk)
-            }
-            return onDisk
-        }
-        // The actual Blossom fetch runs on `mutationsScope` so it continues
-        // after the caller is cancelled (e.g. the user tapped a file and
-        // swiped the app away). Memoized so a re-tap or sibling tile that
-        // hits the same key shares the same Deferred — no double-fetch.
-        val groupIdHex = group.groupIdHex
-        val deferred =
-            appState.memoizedDownload(cacheKey) {
-                // Capture before the fetch so a sign-out wipe or expiry sweep
-                // mid-download rejects the L2 persist below. See #154, #1373.
-                val publicationToken = appState.diskMediaCache.capturePublicationToken()
-                val result =
-                    runCatchingCancellable {
-                        // The reference crosses directly into MDK: its downloader
-                        // owns scheme/authority checks, per-hop redirect validation,
-                        // DNS pinning, and the bounded response read.
-                        appState.marmotIo { downloadMedia(account, groupIdHex, reference) }
-                    }.onFailure {
-                        // Strip path AND query/fragment so any signed tokens or
-                        // capabilities in the locator don't end up in logs — a
-                        // path-less locator like `https://host?token=…` would
-                        // otherwise survive the `/`-only trim.
-                        val host =
-                            reference.locators
-                                .firstOrNull()
-                                ?.value
-                                ?.let { url ->
-                                    url
-                                        .substringAfter("://", "")
-                                        .substringBefore('/')
-                                        .substringBefore('?')
-                                        .substringBefore('#')
-                                }.orEmpty()
-                        Log.w(
-                            "DMConversation",
-                            "downloadAttachment failed for ${groupIdHex.take(8)} message=${messageIdHex.take(8)} host=$host",
-                            it,
-                        )
-                    }.getOrThrow()
-                // Never cache empty plaintext — a zero-byte result would
-                // render as a permanent broken image and short-circuit
-                // tap-to-retry.
-                if (result.plaintext.isNotEmpty()) {
-                    appState.cacheMediaPlaintext(cacheKey, result.plaintext)
-                    val plaintext = result.plaintext
-                    // Persist to L2 still on this background scope (same
-                    // lifetime as the FFI fetch). Tag the entry with the
-                    // attachment's ciphertext hash so the expiry sweep can wipe
-                    // it from disk later even if its message isn't loaded then.
-                    withContext(Dispatchers.IO) {
-                        appState.diskMediaCache.put(cacheKey, plaintext, publicationToken, reference.ciphertextSha256)
-                    }
-                }
-                result.plaintext
-            }
-        return deferred.await()
+        return appState.downloadAttachmentPlaintext(
+            request = AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+            reference = reference,
+        )
     }
 
     /** Decoded thumbnail for [messageIdHex] if one is cached (renders with no
@@ -11401,6 +11350,9 @@ class ConversationController(
 
         // Cap retained transient debug rows while the toggle stays on, oldest-first.
         private const val MAX_STREAM_DEBUG_ROWS = 200
+
+        private const val ATTACHMENT_REFERENCE_RESOLVE_ATTEMPTS = 3
+        private const val ATTACHMENT_REFERENCE_RESOLVE_BACKOFF_MILLIS = 150L
 
         /**
          * 32 MiB cap on retained compressed bytes for in-flight/failed
