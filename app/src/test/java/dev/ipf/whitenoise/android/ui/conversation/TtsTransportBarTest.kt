@@ -88,6 +88,27 @@ class TtsTransportBarTest {
     }
 
     @Test
+    fun descriptiveBodyNavigatesWithoutMakingNestedControlsNavigate() {
+        var bodyTaps = 0
+        var pauseTaps = 0
+        var stopTaps = 0
+        renderBar(
+            state = speakingTts(1, 4, 1, 3, "Preview", sentenceIndex = 1, sentenceCount = 2),
+            onBodyClick = { bodyTaps += 1 },
+            onPause = { pauseTaps += 1 },
+            onStop = { stopTaps += 1 },
+        )
+
+        composeRule.onNodeWithTag(TTS_TRANSPORT_BODY_TAG).performClick()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_pause)).performClick()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_stop)).performClick()
+
+        assertEquals(1, bodyTaps)
+        assertEquals(1, pauseTaps)
+        assertEquals(1, stopTaps)
+    }
+
+    @Test
     fun progressIdentifiesBothTheSentenceAndTheMessage() {
         renderBar(state = speakingTts(4, 20, 1, 12, "Preview", sentenceIndex = 2, sentenceCount = 8))
 
@@ -399,6 +420,7 @@ class TtsTransportBarTest {
         onRateSelected: (Float?) -> Unit = {},
         onStop: () -> Unit = {},
         historyEdge: TtsHistoryEdgeState? = null,
+        onBodyClick: (() -> Unit)? = null,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
@@ -417,6 +439,7 @@ class TtsTransportBarTest {
                         onStop = onStop,
                         modifier = Modifier.width(barWidth.dp).testTag(BAR_TAG),
                         historyEdge = historyEdge,
+                        onBodyClick = onBodyClick,
                     )
                 }
             }

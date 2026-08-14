@@ -111,6 +111,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
+import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
@@ -426,6 +427,10 @@ internal fun ConversationScreen(
     // matched message id to scroll to and briefly highlight once the timeline
     // has paged it in. Null for every normal open path.
     focusMessageId: String? = null,
+    // Advances for repeated shell-level focus requests to the same message.
+    focusMessageRequestId: Long = 0L,
+    // Non-null only for a transport-body return to a live TTS session.
+    ttsFocusSessionId: Long? = null,
     // Non-zero when opened by tapping a message notification. Each tap gets a
     // fresh id so an already-mounted conversation re-runs its first-unread
     // anchor; it also implies current membership while verification catches up.
@@ -448,6 +453,7 @@ internal fun ConversationScreen(
     onGroupCreateSubmitted: () -> Long = { 0L },
     onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ -> onOpenConversation(item, false) },
     onGroupCreateFlowSuperseded: () -> Unit = {},
+    onTtsTransportBodyClick: (() -> Unit)? = null,
 ) {
     WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
     // Push the global snackbar host above the conversation composer so
@@ -1382,6 +1388,12 @@ internal fun ConversationScreen(
         timelineItemHeightsPx = navigationState.timelineItemHeightsPx,
         currentTimelineListIndex = ::currentTimelineListIndex,
         currentScrollAnchor = ::currentScrollAnchor,
+        explicitRevealRequestId =
+            if (ttsFocusSessionId == null) {
+                0L
+            } else {
+                focusMessageRequestId
+            },
     )
 
     // Scroll the lazy list so the item at [targetMessageId] sits roughly in the
@@ -2160,12 +2172,31 @@ internal fun ConversationScreen(
     // between the search and the tap) just toasts and leaves the user at the
     // normal anchor. Local-only: loadUntilMessageAvailable paginates the
     // already-persisted store, never a relay fetch.
-    LaunchedEffect(controller, focusMessageId) {
-        val focus = focusMessageId ?: return@LaunchedEffect
+    LaunchedEffect(controller, focusMessageId, focusMessageRequestId, ttsFocusSessionId) {
+        fun latestFocusMessageId(): String? {
+            val sessionId = ttsFocusSessionId ?: return focusMessageId
+            return appState
+                .currentTtsConversationDestination()
+                ?.takeIf {
+                    it.sessionId == sessionId &&
+                        it.accountRef == appState.activeAccountRef &&
+                        it.groupIdHex.equals(controller.group.groupIdHex, ignoreCase = true)
+                }?.passage
+                ?.messageIdHex
+        }
+
+        var focus = latestFocusMessageId() ?: return@LaunchedEffect
         // Let the initial unread/newest anchor run first so our scroll isn't
         // immediately overwritten by it.
         snapshotFlow { initialTimelineAnchored }.filter { it }.first()
-        val target = controller.loadScrollNavigationTarget(focus)
+        var target = controller.loadScrollNavigationTarget(focus)
+        val latestFocus = latestFocusMessageId()
+        if (ttsFocusSessionId != null && latestFocus == null) return@LaunchedEffect
+        if (latestFocus != null && latestFocus != focus) {
+            focus = latestFocus
+            target = controller.loadScrollNavigationTarget(focus)
+        }
+        if (ttsFocusSessionId != null && latestFocusMessageId() != focus) return@LaunchedEffect
         if (target == null) {
             appState.present(R.string.toast_original_message_unavailable)
             return@LaunchedEffect
@@ -2411,6 +2442,7 @@ internal fun ConversationScreen(
                         }
                     }
                 },
+                onTtsTransportBodyClick = onTtsTransportBodyClick,
             )
         },
         bottomBar = {

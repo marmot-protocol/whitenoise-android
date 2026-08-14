@@ -252,6 +252,65 @@ class WhiteNoiseAppStateTtsAutoReadTest {
         assertTrue(appState.ownsTtsAutoReadSession(groupA))
     }
 
+    @Test
+    fun removingOwningAccountStopsManualAndPausedSpeech() {
+        listOf(false, true).forEach { pauseBeforeRemoval ->
+            val appState = testAppState()
+            appState.ttsController.attachEngine(FakeSessionEngine())
+
+            assertTrue(
+                appState.speakAloud(
+                    listOf(TtsSpeakableEntry("manual", "Sender", "Private account text.")),
+                    Locale.US,
+                ),
+            )
+            if (pauseBeforeRemoval) {
+                appState.ttsController.pause()
+                assertTrue(appState.ttsController.state.value is TtsState.Paused)
+            }
+
+            appState.stopTtsForRemovedAccount(accountRef)
+
+            assertTrue(appState.ttsController.state.value is TtsState.Idle)
+        }
+    }
+
+    @Test
+    fun removingOwningAccountStopsAutoReadSpeech() {
+        val appState = testAppState()
+        appState.ttsController.attachEngine(FakeSessionEngine())
+
+        assertTrue(
+            appState.speakAloudAutoRead(
+                groupA,
+                listOf(TtsSpeakableEntry("auto", "Sender", "Private auto-read text.")),
+                Locale.US,
+            ),
+        )
+
+        appState.stopTtsForRemovedAccount(accountRef)
+
+        assertFalse(appState.ownsTtsAutoReadSession(groupA))
+        assertTrue(appState.ttsController.state.value is TtsState.Idle)
+    }
+
+    @Test
+    fun removingAnotherAccountDoesNotStopOwnedManualSpeech() {
+        val appState = testAppStateWithTwoAccounts(activeAccountRef = accountRef)
+        appState.ttsController.attachEngine(FakeSessionEngine())
+
+        assertTrue(
+            appState.speakAloud(
+                listOf(TtsSpeakableEntry("manual", "Sender", "Account A text.")),
+                Locale.US,
+            ),
+        )
+
+        appState.stopTtsForRemovedAccount("account-b")
+
+        assertTrue(appState.ttsController.state.value is TtsState.Speaking)
+    }
+
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,

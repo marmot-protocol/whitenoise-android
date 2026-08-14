@@ -19,6 +19,28 @@ import java.util.Locale
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsHistorySessionTest {
     @Test
+    fun conversationSourceUsesThePlaybackSessionAndClearsAtItsTerminalBoundary() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.loadTimeline("m1")
+            harness.speakConversation("m1")
+
+            assertEquals(
+                TtsConversationSource(
+                    accountRef = "account",
+                    groupIdHex = "group",
+                    sessionId = harness.controller.state.value.sessionId,
+                ),
+                harness.session.conversationSource.value,
+            )
+
+            harness.controller.stop()
+            runCurrent()
+
+            assertNull(harness.session.conversationSource.value)
+        }
+
+    @Test
     fun previousMessageAtHeadSpeaksTheNearestOlderSpeakableFromTheLoadedTimeline() =
         runTest {
             val harness = SessionHarness(this)

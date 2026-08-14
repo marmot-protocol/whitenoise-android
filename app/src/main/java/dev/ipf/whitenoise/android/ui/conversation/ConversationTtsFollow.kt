@@ -71,6 +71,7 @@ internal class ConversationTtsFollowPolicy private constructor(
     private var evaluatedTarget: ConversationTtsFollowTarget? = null
     private var pendingTarget: ConversationTtsFollowTarget? = null
     private var retriedTarget: ConversationTtsFollowTarget? = null
+    private var explicitRevealTarget: ConversationTtsFollowTarget? = null
     private var isSpeaking = false
 
     fun observe(
@@ -93,18 +94,36 @@ internal class ConversationTtsFollowPolicy private constructor(
             isFollowEnabled = true
             evaluatedTarget = null
             retriedTarget = null
+            explicitRevealTarget = null
         } else if (newSentence && isFollowEnabled) {
             evaluatedTarget = null
             retriedTarget = null
+            explicitRevealTarget = null
         }
 
-        pendingTarget =
+        val automaticPending =
             target.takeIf {
                 isFollowEnabled &&
                     isSpeaking &&
                     evaluatedTarget != target
             }
+        if (automaticPending != null) {
+            pendingTarget = automaticPending
+        } else if (explicitRevealTarget != target) {
+            pendingTarget = null
+        }
         showResumeAction = !isFollowEnabled
+    }
+
+    fun requestExplicitReveal(): Boolean {
+        val target = activeTarget ?: return false
+        isFollowEnabled = true
+        showResumeAction = false
+        evaluatedTarget = null
+        retriedTarget = null
+        explicitRevealTarget = target
+        pendingTarget = target
+        return true
     }
 
     fun claimPendingTarget(): ConversationTtsFollowTarget? {
@@ -125,7 +144,12 @@ internal class ConversationTtsFollowPolicy private constructor(
 
     fun isCurrentTarget(target: ConversationTtsFollowTarget): Boolean {
         val followsCurrentTarget = activeTarget == target
-        return isFollowEnabled && isSpeaking && followsCurrentTarget
+        val canReveal = isSpeaking || explicitRevealTarget == target
+        return isFollowEnabled && canReveal && followsCurrentTarget
+    }
+
+    fun onFollowSucceeded(target: ConversationTtsFollowTarget) {
+        if (explicitRevealTarget == target) explicitRevealTarget = null
     }
 
     fun onUserDrag() {
@@ -133,6 +157,7 @@ internal class ConversationTtsFollowPolicy private constructor(
         isFollowEnabled = false
         showResumeAction = true
         pendingTarget = null
+        explicitRevealTarget = null
     }
 
     fun resumeFollow() {
@@ -141,6 +166,7 @@ internal class ConversationTtsFollowPolicy private constructor(
         showResumeAction = false
         evaluatedTarget = null
         retriedTarget = null
+        explicitRevealTarget = null
         pendingTarget = target.takeIf { isSpeaking }
     }
 
@@ -150,6 +176,7 @@ internal class ConversationTtsFollowPolicy private constructor(
         evaluatedTarget = null
         pendingTarget = null
         retriedTarget = null
+        explicitRevealTarget = null
         isSpeaking = false
         isFollowEnabled = false
         showResumeAction = false

@@ -68,6 +68,14 @@ internal class ConversationTtsFollowHandle internal constructor(
         retryGeneration += 1L
     }
 
+    fun revealCurrentPassage(
+        state: TtsState,
+        ownsSession: Boolean,
+    ) {
+        policy.observe(state, ownsSession)
+        if (policy.requestExplicitReveal()) retryGeneration += 1L
+    }
+
     internal fun retryFailedFollowAttempt(target: ConversationTtsFollowTarget) {
         if (policy.retryFailedFollowAttempt(target)) retryGeneration += 1L
     }
@@ -231,6 +239,7 @@ internal fun ConversationTtsFollowEffects(
     timelineItemHeightsPx: Map<String, Int>,
     currentTimelineListIndex: (String) -> Int?,
     currentScrollAnchor: () -> ConversationScrollAnchor,
+    explicitRevealRequestId: Long = 0L,
 ) {
     @SuppressLint("StateFlowValueCalledInComposition")
     val followSignal by
@@ -245,10 +254,18 @@ internal fun ConversationTtsFollowEffects(
         )
     val ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
 
+    LaunchedEffect(explicitRevealRequestId, ownsSession) {
+        if (explicitRevealRequestId > 0L) {
+            handle.revealCurrentPassage(
+                state = appState.ttsController.state.value,
+                ownsSession = ownsSession,
+            )
+        }
+    }
+
     fun isCurrentTarget(target: ConversationTtsFollowTarget): Boolean =
         handle.policy.isCurrentTarget(target) &&
             appState.ownsTtsAutoReadSession(controller.group.groupIdHex) &&
-            appState.ttsController.state.value is TtsState.Speaking &&
             appState.ttsController.state.value
                 .conversationFollowTargetOrNull() == target
 
@@ -338,7 +355,9 @@ internal fun ConversationTtsFollowEffects(
                     currentScrollAnchor = currentScrollAnchor,
                 )
         } finally {
-            if (!followSucceeded && isCurrentTarget(target)) {
+            if (followSucceeded) {
+                handle.policy.onFollowSucceeded(target)
+            } else if (isCurrentTarget(target)) {
                 handle.retryFailedFollowAttempt(target)
             }
         }
