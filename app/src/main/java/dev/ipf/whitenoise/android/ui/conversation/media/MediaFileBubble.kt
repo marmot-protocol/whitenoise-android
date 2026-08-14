@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
-import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,7 +62,6 @@ import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -271,81 +269,6 @@ internal fun MediaFileBubble(
             onDismiss = { readerOpen = false },
         )
     }
-}
-
-private suspend fun materializeMediaFile(
-    context: android.content.Context,
-    controller: ConversationController,
-    messageIdHex: String,
-    attachmentIndex: Int,
-    reference: MediaAttachmentReferenceFfi,
-    mine: Boolean,
-): java.io.File? {
-    val retained =
-        if (mine) {
-            controller
-                .pendingAttachmentsList(messageIdHex)
-                .getOrNull(attachmentIndex)
-                ?.plaintextBytes
-        } else {
-            null
-        }
-    return runCatchingCancellable {
-        materializeDocumentAttachment(
-            context = context,
-            messageIdHex = messageIdHex,
-            attachmentIndex = attachmentIndex,
-            reference = reference,
-            resolveBytes = {
-                controller
-                    .requestAttachmentTransfer(
-                        messageIdHex = messageIdHex,
-                        attachmentIndex = attachmentIndex,
-                        reference = reference,
-                        retainedPlaintext = retained,
-                    ).await()
-            },
-        )
-    }.onFailure {
-        Log.w(
-            "MediaFileBubble",
-            "download failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
-            it,
-        )
-    }.getOrNull()
-}
-
-private suspend fun loadMediaFileBytes(
-    controller: ConversationController,
-    messageIdHex: String,
-    attachmentIndex: Int,
-    reference: MediaAttachmentReferenceFfi,
-    mine: Boolean,
-): ByteArray? {
-    val retained =
-        if (mine) {
-            controller
-                .pendingAttachmentsList(messageIdHex)
-                .getOrNull(attachmentIndex)
-                ?.plaintextBytes
-        } else {
-            null
-        }
-    return runCatchingCancellable {
-        controller
-            .requestAttachmentTransfer(
-                messageIdHex = messageIdHex,
-                attachmentIndex = attachmentIndex,
-                reference = reference,
-                retainedPlaintext = retained,
-            ).await()
-    }.onFailure {
-        Log.w(
-            "MediaFileBubble",
-            "download failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
-            it,
-        )
-    }.getOrNull()
 }
 
 /** A tap during auto-download joins the existing transfer instead of being ignored. */
