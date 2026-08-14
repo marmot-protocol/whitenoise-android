@@ -16,45 +16,11 @@ internal suspend fun saveMessageMediaAttachments(
 ): MessageAttachmentSaveSummary {
     var savedCount = 0
     var firstFailure: Throwable? = null
+    val saveContext = MessageAttachmentSaveContext(context, controller, messageIdHex, mine)
     mediaReferences.forEachIndexed { attachmentIndex, reference ->
         val result =
             runCatching<Boolean> {
-                if (MediaReferenceSupport.isVideoMedia(reference)) {
-                    val file =
-                        materializeVideoAttachment(
-                            context = context,
-                            controller = controller,
-                            messageIdHex = messageIdHex,
-                            attachmentIndex = attachmentIndex,
-                            reference = reference,
-                            mine = mine,
-                        )
-                    withContext(Dispatchers.IO) {
-                        saveVideoToGallery(
-                            context = context,
-                            source = file,
-                            fileName = reference.fileName,
-                            mediaType = reference.mediaType,
-                        )
-                    }
-                } else {
-                    val bytes =
-                        attachmentBytes(
-                            controller = controller,
-                            messageIdHex = messageIdHex,
-                            attachmentIndex = attachmentIndex,
-                            reference = reference,
-                            mine = mine,
-                        )
-                    withContext(Dispatchers.IO) {
-                        saveAttachmentToMediaStore(
-                            context = context,
-                            bytes = bytes,
-                            fileName = reference.fileName,
-                            mediaType = reference.mediaType,
-                        )
-                    }
-                }
+                saveMessageMediaAttachment(saveContext, attachmentIndex, reference)
             }.mapCatching { saved ->
                 check(saved) { "MediaStore save returned false" }
                 true
@@ -70,4 +36,122 @@ internal suspend fun saveMessageMediaAttachments(
         totalCount = mediaReferences.size,
         firstFailure = firstFailure,
     )
+}
+
+private data class MessageAttachmentSaveContext(
+    val androidContext: Context,
+    val controller: ConversationController,
+    val messageIdHex: String,
+    val mine: Boolean,
+)
+
+private suspend fun saveMessageMediaAttachment(
+    context: MessageAttachmentSaveContext,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+): Boolean {
+    val resolvedReference =
+        if (context.mine) {
+            reference
+        } else {
+            context.controller.authoritativeAttachmentReference(
+                context.messageIdHex,
+                attachmentIndex,
+                reference,
+            )
+        }
+    return when {
+        MediaReferenceSupport.isVideoMedia(resolvedReference) ->
+            saveMessageVideoAttachment(context, attachmentIndex, resolvedReference)
+        MediaReferenceSupport.isImageMedia(resolvedReference) ->
+            saveMessageImageAttachment(context, attachmentIndex, resolvedReference)
+        else -> saveMessageDocumentAttachment(context, attachmentIndex, resolvedReference)
+    }
+}
+
+private suspend fun saveMessageVideoAttachment(
+    context: MessageAttachmentSaveContext,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+): Boolean {
+    val file =
+        materializeVideoAttachment(
+            context = context.androidContext,
+            controller = context.controller,
+            messageIdHex = context.messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+            mine = context.mine,
+        )
+    return withContext(Dispatchers.IO) {
+        saveVideoToGallery(
+            context = context.androidContext,
+            source = file,
+            fileName = reference.fileName,
+            mediaType = reference.mediaType,
+        )
+    }
+}
+
+private suspend fun saveMessageImageAttachment(
+    context: MessageAttachmentSaveContext,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+): Boolean {
+    val bytes =
+        attachmentBytes(
+            controller = context.controller,
+            messageIdHex = context.messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+            mine = context.mine,
+        )
+    return withContext(Dispatchers.IO) {
+        saveAttachmentToMediaStore(
+            context = context.androidContext,
+            bytes = bytes,
+            fileName = reference.fileName,
+            mediaType = reference.mediaType,
+        )
+    }
+}
+
+private suspend fun saveMessageDocumentAttachment(
+    context: MessageAttachmentSaveContext,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+): Boolean {
+    val retained =
+        if (context.mine) {
+            context.controller
+                .pendingAttachmentsList(context.messageIdHex)
+                .getOrNull(attachmentIndex)
+                ?.plaintextBytes
+        } else {
+            null
+        }
+    val file =
+        materializeDocumentAttachment(
+            context = context.androidContext,
+            messageIdHex = context.messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+            resolveBytes = {
+                context.controller
+                    .requestAttachmentTransfer(
+                        messageIdHex = context.messageIdHex,
+                        attachmentIndex = attachmentIndex,
+                        reference = reference,
+                        retainedPlaintext = retained,
+                    ).await()
+            },
+        )
+    return withContext(Dispatchers.IO) {
+        saveDocumentToDownloads(
+            context = context.androidContext,
+            source = file,
+            fileName = reference.fileName,
+            mediaType = reference.mediaType,
+        )
+    }
 }

@@ -133,4 +133,12 @@ class AttachmentPresentationTest {
         assertFalse(shouldStartAttachmentDownload(AttachmentTransferState.Failed, true, 12uL, mine = false))
         assertFalse(shouldStartAttachmentDownload(AttachmentTransferState.NotRetained, true, 12uL, mine = false))
     }
+
+    @Test
+    fun tapCanJoinAnAutomaticDownloadAlreadyInFlight() {
+        assertTrue(canRequestAttachmentOpen(AttachmentTransferState.Resolving, sourceEpoch = 12uL, mine = false))
+        assertTrue(canRequestAttachmentOpen(AttachmentTransferState.Downloading, sourceEpoch = 12uL, mine = false))
+        assertTrue(canRequestAttachmentOpen(AttachmentTransferState.Available, sourceEpoch = 12uL, mine = false))
+        assertFalse(canRequestAttachmentOpen(AttachmentTransferState.Remote, sourceEpoch = 0uL, mine = false))
+    }
 }
