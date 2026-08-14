@@ -12,6 +12,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
     fun bindPublishesLocalSnapshotsAndAFrameBeforeCatchUp() {
         val body = controllersSource().readText().kotlinFunctionBody("bind")
         val firstSnapshot = body.indexOf("chatListStream.snapshot()")
+        val localRowsReady = body.indexOf("recordAccountSwitchLocalRowsReady", startIndex = firstSnapshot)
         val secondSnapshot = body.indexOf("chatStream.snapshot()")
         val memberProjection = body.indexOf("seedInitialMemberIdProjection(accountRef, bindEpoch)")
         val publishReady = body.indexOf("isLoading = false", startIndex = secondSnapshot)
@@ -19,6 +20,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val catchUp = body.indexOf("appState.launchCatchUpAccounts()")
 
         assertTrue("chat-list snapshot must be read", firstSnapshot >= 0)
+        assertTrue("cached-row timing must follow its local snapshot", localRowsReady > firstSnapshot)
         assertTrue("chats snapshot must follow the chat-list snapshot", secondSnapshot > firstSnapshot)
         assertTrue("the local member projection must follow both row snapshots", memberProjection > secondSnapshot)
         assertTrue("member-derived UI must be ready before the first visible frame", publishReady > memberProjection)
@@ -37,12 +39,28 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val capturedEpoch = body.indexOf("expectedCacheEpoch = memberCacheEpoch")
         val ffiRead = body.indexOf("loadGroupMemberIdsPages", startIndex = capturedEpoch)
         val staleCheck = body.indexOf("memberCacheEpoch != expectedCacheEpoch", startIndex = ffiRead)
-        val publish = body.indexOf("memberCacheByGroup = updatedCache", startIndex = staleCheck)
+        val profileWarm = body.indexOf("warmProfilePresentationsBlocking", startIndex = staleCheck)
+        val secondStaleCheck = body.indexOf("memberCacheEpoch != expectedCacheEpoch", startIndex = profileWarm)
+        val publish = body.indexOf("memberCacheByGroup = updatedCache", startIndex = secondStaleCheck)
 
         assertTrue("the current cache generation must be captured before suspension", capturedEpoch >= 0)
         assertTrue("the batch FFI read must follow the generation snapshot", ffiRead > capturedEpoch)
         assertTrue("live invalidation must be checked after the FFI read", staleCheck > ffiRead)
-        assertTrue("stale batch results must be rejected before cache publication", publish > staleCheck)
+        assertTrue("DM local profiles must be awaited before cache publication", profileWarm > staleCheck)
+        assertTrue("profile warming must be followed by another generation check", secondStaleCheck > profileWarm)
+        assertTrue("stale batch results must be rejected before cache publication", publish > secondStaleCheck)
+    }
+
+    @Test
+    fun memberDerivedReadinessIsRecordedBeforeTheFirstVisibleFrame() {
+        val body = controllersSource().readText().kotlinFunctionBody("bind")
+        val seed = body.indexOf("seedInitialMemberIdProjection(accountRef, bindEpoch)")
+        val readiness = body.indexOf("recordMemberDerivedLocalReadyIfComplete()", startIndex = seed)
+        val publishReady = body.indexOf("isLoading = false", startIndex = readiness)
+
+        assertTrue("local membership must be seeded", seed >= 0)
+        assertTrue("member-derived readiness must be checked after seeding", readiness > seed)
+        assertTrue("member-derived readiness must precede visible publication", publishReady > readiness)
     }
 
     @Test
@@ -139,6 +157,22 @@ class AccountSwitchLocalSnapshotOrderingTest {
             bind.indexOf("recordAccountSwitchLocalSnapshotRendered") >
                 bind.indexOf("awaitRenderedChatListFrame()"),
         )
+    }
+
+    @Test
+    fun readinessStageTracesAreTargetScopedAndPrivacySafe() {
+        val source = appStateSource().readText()
+        val localRows = source.kotlinFunctionBody("recordAccountSwitchLocalRowsReady")
+        val memberDerived = source.kotlinFunctionBody("recordAccountSwitchMemberDerivedLocalReady")
+        val stageRecorder = source.kotlinFunctionBody("recordPendingAccountSwitchStage")
+
+        listOf(localRows, memberDerived).forEach { recorder ->
+            assertTrue("stale account stages must be rejected", "activeAccountRef != accountRef" in recorder)
+            assertTrue("stage records must use the monotonic startup clock", "SystemClock.elapsedRealtime()" in recorder)
+        }
+        assertTrue("switch stages must reject a superseded trace", "trace.accountRef != accountRef" in stageRecorder)
+        assertTrue("stage output may contain only stage, elapsed time, and row count", "rows=\$rowCount" in stageRecorder)
+        assertFalse("stage output must not interpolate an account identifier", "accountRef}" in stageRecorder)
     }
 
     private fun controllersSource(): File = source("state/Controllers.kt")
