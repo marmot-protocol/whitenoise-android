@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -19,7 +20,6 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
 import java.util.Locale
 
 @Composable
@@ -183,48 +183,44 @@ internal fun TimelineRow(
             ) {
                 onActionMenuOpenChange(false)
             }
-            MessageBubble(
-                item = item,
-                controller = controller,
-                appState = appState,
-                composerTextState = composerTextState,
-                highlighted = highlighted,
-                selectionMode = selectionMode,
-                textSelectionMode = textSelectionMode,
-                onTextSelectionModeChange = onTextSelectionModeChange,
-                onTextSelectionBoundsChange = onTextSelectionBoundsChange,
-                batchSelectable = batchSelectable,
-                selected = selected,
-                onToggleSelection = onToggleSelection,
-                rangeDragActive = rangeDragActive,
-                onDragSelectionStart = onDragSelectionStart,
-                onDragSelection = onDragSelection,
-                onDragSelectionEnd = onDragSelectionEnd,
-                onDragSelectionCancel = onDragSelectionCancel,
-                quickReactionEmojis = quickReactionEmojis,
-                recentEmojis = recentEmojis,
-                onEmojiUsed = onEmojiUsed,
-                isActionMenuOpen = isActionMenuOpen,
-                onActionMenuOpenChange = onActionMenuOpenChange,
-                onQuickReactionsSave = onQuickReactionsSave,
-                onQuickReactionsReset = onQuickReactionsReset,
-                onReplyPreviewClick = onReplyPreviewClick,
-                composerGate = composerGate,
-                groupDisbanded = controller.group.disbanded,
-                inviteMutationInFlight = controller.mutationInFlight,
-                onJoinInvite = { appState.launchMutation { controller.acceptInvite() } },
-                onDeclineInvite = {
-                    appState.launchMutation {
-                        if (controller.declineInvite()) onBack()
-                    }
-                },
-                mentionCandidates = mentionCandidates,
-                mentionPickerEnabled = mentionPickerEnabled,
-                showSenderName = senderDecoration.showName,
-                showSenderAvatar = senderDecoration.showAvatar,
-                collapseLongMessages = collapseLongMessages,
-                readOnly = controller.group.pendingConfirmation,
-            )
+            key(item.record.messageIdHex) {
+                TimelineRowMessageBubble(
+                    messageIdHex = item.record.messageIdHex,
+                    item = item,
+                    controller = controller,
+                    appState = appState,
+                    composerTextState = composerTextState,
+                    highlighted = highlighted,
+                    selectionMode = selectionMode,
+                    textSelectionMode = textSelectionMode,
+                    onTextSelectionModeChange = onTextSelectionModeChange,
+                    onTextSelectionBoundsChange = onTextSelectionBoundsChange,
+                    batchSelectable = batchSelectable,
+                    selected = selected,
+                    onToggleSelection = onToggleSelection,
+                    rangeDragActive = rangeDragActive,
+                    onDragSelectionStart = onDragSelectionStart,
+                    onDragSelection = onDragSelection,
+                    onDragSelectionEnd = onDragSelectionEnd,
+                    onDragSelectionCancel = onDragSelectionCancel,
+                    quickReactionEmojis = quickReactionEmojis,
+                    recentEmojis = recentEmojis,
+                    onEmojiUsed = onEmojiUsed,
+                    isActionMenuOpen = isActionMenuOpen,
+                    onActionMenuOpenChange = onActionMenuOpenChange,
+                    onQuickReactionsSave = onQuickReactionsSave,
+                    onQuickReactionsReset = onQuickReactionsReset,
+                    onReplyPreviewClick = onReplyPreviewClick,
+                    composerGate = composerGate,
+                    onBack = onBack,
+                    mentionCandidates = mentionCandidates,
+                    mentionPickerEnabled = mentionPickerEnabled,
+                    showSenderName = senderDecoration.showName,
+                    showSenderAvatar = senderDecoration.showAvatar,
+                    collapseLongMessages = collapseLongMessages,
+                    readOnly = controller.group.pendingConfirmation,
+                )
+            }
         }
     }
 }
