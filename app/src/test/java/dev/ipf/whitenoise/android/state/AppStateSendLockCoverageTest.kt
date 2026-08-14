@@ -310,10 +310,17 @@ class AppStateSendLockCoverageTest {
         val source = conversationScreenSource().readText()
         val entrySnapshotIndex = source.indexOf("val entryUnreadSnapshot =")
         val scrollRestoreIndex = source.indexOf("val scrollRestore =")
+        val unreadJumpOwner =
+            source.substring(
+                source.indexOf("var unreadJumpState by"),
+                source.indexOf("val scrollCoordinator ="),
+            )
 
         assertTrue(
             "same-group account switches must reset anchoring state and cancel effects that capture the old controller",
-            "remember(controller, notificationOpenRequestId) { mutableStateOf(false) }" in source &&
+            "remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration)" in unreadJumpOwner &&
+                "mutableStateOf(ConversationUnreadJumpState())" in unreadJumpOwner &&
+                "remember(controller, notificationOpenRequestId) { mutableStateOf(false) }" in source &&
                 "val state = remember(controller) { ConversationNavigationState() }" in source &&
                 "onDispose(state::cancelJobs)" in source &&
                 "var lastFollowedLatestId by mutableStateOf<String?>(null)" in source &&

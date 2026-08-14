@@ -56,8 +56,16 @@ internal enum class ConversationScrollReason {
     Search,
     FocusMessage,
     ReadAloudFollow,
+    UnreadStart,
+    UnreadTail,
     JumpToNewest,
     Send,
+}
+
+internal enum class ConversationJumpToNewestOutcome {
+    UnreadStart,
+    Tail,
+    Cancelled,
 }
 
 /** Stable logical anchor; [listIndex] is only the fallback when the ids are gone. */
@@ -179,6 +187,7 @@ internal class ConversationScrollIntentToken internal constructor(
 internal class ConversationScrollCoordinator(
     private val writer: ConversationScrollWriter,
     initialMode: ConversationScrollMode = ConversationScrollMode.FollowingTail,
+    private val onExplicitNavigation: () -> Unit = {},
 ) {
     private var settledMode = initialMode.requireSettled()
     private var readingAnchor: ConversationScrollAnchor? = null
@@ -423,6 +432,7 @@ internal class ConversationScrollCoordinator(
         resultingMode: ConversationScrollMode? = null,
         operation: suspend ConversationScrollCommandScope.() -> Unit,
     ): Boolean {
+        if (reason.supersedesUnreadJump) onExplicitNavigation()
         if (foregroundRestoreInProgress && reason.defersDuringForegroundRestore) return false
         return runCommand(
             transientMode = ConversationScrollMode.ProgrammaticJump(targetMessageId, reason),
@@ -564,6 +574,85 @@ internal suspend fun ConversationScrollCoordinator.jumpToNewest(targetIndex: Int
     ) {
         animateScrollToItem(targetIndex)
     }
+
+/**
+ * First tap: top-align the frozen unread row while retaining history-reading
+ * mode. A missing/consumed target falls through to the physical tail in the
+ * same tap. Cancellation deliberately preserves the caller's pending target.
+ */
+@Suppress("ReturnCount") // Guard clauses preserve the ordered fallback/cancellation contract.
+internal suspend fun ConversationScrollCoordinator.jumpToUnreadOrNewest(
+    pendingUnreadMessageId: String?,
+    resolveUnreadIndex: () -> Int?,
+    isUnreadTopAligned: () -> Boolean,
+    resolveTailIndex: () -> Int,
+): ConversationJumpToNewestOutcome {
+    suspend fun jumpToTail(): ConversationJumpToNewestOutcome =
+        if (
+            programmaticJump(
+                targetMessageId = null,
+                reason = ConversationScrollReason.UnreadTail,
+                resultingMode = ConversationScrollMode.FollowingTail,
+            ) {
+                animateScrollToItem(resolveTailIndex())
+            }
+        ) {
+            ConversationJumpToNewestOutcome.Tail
+        } else {
+            ConversationJumpToNewestOutcome.Cancelled
+        }
+
+    val targetMessageId = pendingUnreadMessageId ?: return jumpToTail()
+    val initialTargetIndex = resolveUnreadIndex() ?: return jumpToTail()
+    if (isUnreadTopAligned()) return jumpToTail()
+
+    var targetResolved = false
+    val completed =
+        programmaticJump(
+            targetMessageId = targetMessageId,
+            reason = ConversationScrollReason.UnreadStart,
+            resultingMode = ConversationScrollMode.ReadingHistory(targetMessageId, 0),
+        ) {
+            targetResolved =
+                animateScrollToItem(initialTargetIndex, 0) {
+                    resolveUnreadIndex()
+                }
+        }
+    if (!completed) return ConversationJumpToNewestOutcome.Cancelled
+    if (!targetResolved || resolveUnreadIndex() == null) return jumpToTail()
+    return if (isUnreadTopAligned()) {
+        ConversationJumpToNewestOutcome.UnreadStart
+    } else {
+        // A completed but clamped first-stage scroll is not cancellation. The
+        // target cannot be represented as the top-aligned destination, so
+        // finish this tap at the tail instead of arming a repeat scroll.
+        jumpToTail()
+    }
+}
+
+private val ConversationScrollReason.supersedesUnreadJump: Boolean
+    get() =
+        when (this) {
+            ConversationScrollReason.Reply,
+            ConversationScrollReason.Mention,
+            ConversationScrollReason.Search,
+            ConversationScrollReason.FocusMessage,
+            ConversationScrollReason.ReadAloudFollow,
+            ConversationScrollReason.JumpToNewest,
+            ConversationScrollReason.Send,
+            -> true
+            ConversationScrollReason.InitialAnchor,
+            ConversationScrollReason.SavedRestore,
+            ConversationScrollReason.LifecycleResume,
+            ConversationScrollReason.ImeTransition,
+            ConversationScrollReason.ViewportChange,
+            ConversationScrollReason.NewMessage,
+            ConversationScrollReason.ReactionLayout,
+            ConversationScrollReason.BottomInput,
+            ConversationScrollReason.UnreadStart,
+            ConversationScrollReason.UnreadTail,
+            -> false
+        }
 
 /**
  * Processes a newer drag immediately, cancelling any older Stop/Cancel waiter
