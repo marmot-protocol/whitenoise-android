@@ -61,23 +61,8 @@ class NotificationHapticVisualTimingDeviceTest {
         val update = update()
         val expected = LocalNotificationFormatter.conversationDismissalKey(update.accountRef, update.groupIdHex)
         NotificationTimingDeviceEvents.arm(context.packageName, expected.tag)
-        var notifyElapsedRealtimeNanos = Long.MIN_VALUE
-        var postedNotification: Notification? = null
-        val presenter =
-            LocalNotificationPresenter(
-                context = context,
-                shortcutPublisher = { },
-                notificationPoster = { manager, tag, id, notification ->
-                    Trace.beginSection("WN notification notify")
-                    try {
-                        notifyElapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
-                        postedNotification = notification
-                        manager.notify(tag, id, notification)
-                    } finally {
-                        Trace.endSection()
-                    }
-                },
-            )
+        val probe = TimingProbe()
+        val presenter = timingPresenter(probe)
         presenter.ensureChannels()
 
         val preparationStartedNanos = SystemClock.elapsedRealtimeNanos()
@@ -102,37 +87,66 @@ class NotificationHapticVisualTimingDeviceTest {
             assertTrue(posted)
             assertEquals(expected.tag, listenerPost.tag)
             assertEquals(expected.id, listenerPost.id)
-            assertTrue(notifyElapsedRealtimeNanos >= preparationStartedNanos)
-            assertTrue(listenerPost.elapsedRealtimeNanos >= notifyElapsedRealtimeNanos)
+            assertTrue(probe.notifyElapsedRealtimeNanos >= preparationStartedNanos)
+            assertTrue(listenerPost.elapsedRealtimeNanos >= probe.notifyElapsedRealtimeNanos)
             assertTrue(
                 "notify-to-listener delivery exceeded the evidence ceiling",
-                listenerPost.elapsedRealtimeNanos - notifyElapsedRealtimeNanos <=
+                listenerPost.elapsedRealtimeNanos - probe.notifyElapsedRealtimeNanos <=
                     TimeUnit.MILLISECONDS.toNanos(MAX_NOTIFY_TO_LISTENER_MS),
             )
-            assertNotNull(postedNotification)
-            instrumentation.sendStatus(
-                0,
-                Bundle().apply {
-                    putLong(
-                        "notification_preparation_ms",
-                        TimeUnit.NANOSECONDS.toMillis(notifyElapsedRealtimeNanos - preparationStartedNanos),
-                    )
-                    putLong(
-                        "notify_to_listener_post_ms",
-                        TimeUnit.NANOSECONDS.toMillis(
-                            listenerPost.elapsedRealtimeNanos - notifyElapsedRealtimeNanos,
-                        ),
-                    )
-                    putString(
-                        "measurement_scope",
-                        "App preparation and framework-listener delivery only; not physical haptic or rendered pixels",
-                    )
-                },
-            )
+            assertNotNull(probe.postedNotification)
+            reportTiming(preparationStartedNanos, probe.notifyElapsedRealtimeNanos, listenerPost)
         } finally {
             NotificationManagerCompat.from(context).cancel(expected.tag, expected.id)
         }
     }
+
+    private fun timingPresenter(probe: TimingProbe): LocalNotificationPresenter =
+        LocalNotificationPresenter(
+            context = context,
+            shortcutPublisher = { },
+            notificationPoster = { manager, tag, id, notification ->
+                Trace.beginSection("WN notification notify")
+                try {
+                    probe.notifyElapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
+                    probe.postedNotification = notification
+                    manager.notify(tag, id, notification)
+                } finally {
+                    Trace.endSection()
+                }
+            },
+        )
+
+    private fun reportTiming(
+        preparationStartedNanos: Long,
+        notifyElapsedRealtimeNanos: Long,
+        listenerPost: NotificationTimingListenerPost,
+    ) {
+        instrumentation.sendStatus(
+            0,
+            Bundle().apply {
+                putLong(
+                    "notification_preparation_ms",
+                    TimeUnit.NANOSECONDS.toMillis(notifyElapsedRealtimeNanos - preparationStartedNanos),
+                )
+                putLong(
+                    "notify_to_listener_post_ms",
+                    TimeUnit.NANOSECONDS.toMillis(
+                        listenerPost.elapsedRealtimeNanos - notifyElapsedRealtimeNanos,
+                    ),
+                )
+                putString(
+                    "measurement_scope",
+                    "App preparation and framework-listener delivery only; not physical haptic or rendered pixels",
+                )
+            },
+        )
+    }
+
+    private data class TimingProbe(
+        var notifyElapsedRealtimeNanos: Long = Long.MIN_VALUE,
+        var postedNotification: Notification? = null,
+    )
 
     private fun update(): NotificationUpdateFfi =
         NotificationUpdateFfi(

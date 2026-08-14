@@ -61,12 +61,15 @@ internal object NotificationTimingDeviceEvents {
         expectedTag = notificationTag
     }
 
-    fun accepts(notification: StatusBarNotification): Boolean = notification.packageName == expectedPackageName && notification.tag == expectedTag
+    fun accepts(notification: StatusBarNotification): Boolean =
+        notification.packageName == expectedPackageName &&
+            notification.tag == expectedTag
 
     fun record(post: NotificationTimingListenerPost) {
         posts.offer(post)
     }
 
+    @Suppress("MaxLineLength")
     fun awaitPost(timeoutMillis: Long): NotificationTimingListenerPost? = posts.poll(timeoutMillis, TimeUnit.MILLISECONDS)
 
     fun clear() {

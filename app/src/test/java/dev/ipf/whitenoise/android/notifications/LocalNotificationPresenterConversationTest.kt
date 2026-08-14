@@ -262,25 +262,7 @@ class LocalNotificationPresenterConversationTest {
             },
         )
 
-        assertEquals(1, posts.size)
-        assertNull(publishedShortcut)
-        assertEquals(
-            "hi",
-            posts
-                .single()
-                .third.extras
-                .getCharSequence(Notification.EXTRA_TEXT)
-                ?.toString(),
-        )
-        assertEquals(0, posts.single().third.flags and Notification.FLAG_ONLY_ALERT_ONCE)
-        assertNotNull(
-            NotificationCompat.MessagingStyle
-                .extractMessagingStyleFromNotification(posts.single().third)
-                ?.messages
-                ?.single()
-                ?.person
-                ?.icon,
-        )
+        assertUsefulInitialPost(posts)
 
         runBlocking { checkNotNull(pendingEnrichment).invoke() }
 
@@ -297,6 +279,27 @@ class LocalNotificationPresenterConversationTest {
             ).messages
         assertEquals(listOf("hi"), messages.map { it.text.toString() })
         assertNotNull(messages.single().person?.icon)
+    }
+
+    private fun assertUsefulInitialPost(posts: List<Triple<String, Int, Notification>>) {
+        assertEquals(1, posts.size)
+        assertNull(publishedShortcut)
+        val notification = posts.single().third
+        assertEquals(
+            "hi",
+            notification.extras
+                .getCharSequence(Notification.EXTRA_TEXT)
+                ?.toString(),
+        )
+        assertEquals(0, notification.flags and Notification.FLAG_ONLY_ALERT_ONCE)
+        assertNotNull(
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(notification)
+                ?.messages
+                ?.single()
+                ?.person
+                ?.icon,
+        )
     }
 
     @Test
