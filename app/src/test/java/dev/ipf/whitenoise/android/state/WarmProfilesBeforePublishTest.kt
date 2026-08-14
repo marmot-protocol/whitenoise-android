@@ -85,6 +85,21 @@ class WarmProfilesBeforePublishTest {
         }
 
     @Test
+    fun cachedDmRowPublicationAwaitsLocalPeerPresentation() =
+        runBlocking {
+            val cache = FakePresentationCache()
+            val peerId = "alice"
+
+            // The chat-list path now follows the same contract as timeline
+            // publication: roster projection identifies the peer, then its
+            // local profile materialization completes before the row publishes.
+            cache.materialize(peerId, name(peerId))
+            val observedFirstFrame = cache.read(peerId)
+
+            assertEquals("Alice", observedFirstFrame)
+        }
+
+    @Test
     fun publishObservesEmptyWhenWarmIsFireAndForget() =
         runBlocking {
             val cache = FakePresentationCache()
