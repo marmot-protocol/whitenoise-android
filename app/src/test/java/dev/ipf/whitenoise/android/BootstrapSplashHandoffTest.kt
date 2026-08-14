@@ -32,6 +32,26 @@ class BootstrapSplashHandoffTest {
     }
 
     @Test
+    fun releasedSplashRecordsTheComposeHandoff() {
+        val source = mainActivitySource()
+        val handoff = source.substringAfter("private fun holdSplashThroughBootstrap(")
+
+        assertTrue(handoff.contains("if (!retain) appState.recordStartupSystemSplashHandoff()"))
+        assertTrue(handoff.indexOf("recordStartupSystemSplashHandoff()") < handoff.indexOf("retain\n"))
+    }
+
+    @Test
+    fun releaseLikeBenchmarkKeepsPrivacySafeStartupMarkers() {
+        val source = appStateSource()
+        val startupTiming = source.substringAfter("private fun startupTiming(")
+
+        assertTrue(startupTiming.contains("BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS"))
+        assertTrue(startupTiming.contains("uptime_ms="))
+        assertTrue(source.contains("startupTiming(\"system-splash-handoff\""))
+        assertTrue(source.contains("startupTiming(\"first-local-frame\""))
+    }
+
+    @Test
     fun completedAndFailedPhasesNeverRetainSystemSplash() {
         val failure = AppPhase.Failed(ErrorPresentation(AppText.Plain("safe"), "operation=TEST"))
 
@@ -65,4 +85,10 @@ class BootstrapSplashHandoffTest {
             File("src/main/java/dev/ipf/whitenoise/android/MainActivity.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt"),
         ).firstOrNull(File::isFile)?.readText() ?: error("Missing MainActivity.kt")
+
+    private fun appStateSource(): String =
+        sequenceOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+        ).firstOrNull(File::isFile)?.readText() ?: error("Missing AppState.kt")
 }

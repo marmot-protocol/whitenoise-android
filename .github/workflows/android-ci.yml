@@ -40,6 +40,9 @@ jobs:
       - name: Test GitHub triage reconciliation
         run: python3 -m unittest scripts/test_check_github_triage.py
 
+      - name: Test package-replacement startup reporter
+        run: bash .github/scripts/test-package-replacement-startup-report.sh
+
       - name: Verify generated performance profiles
         run: |
           bash .github/scripts/test-verify-generated-profiles.sh
