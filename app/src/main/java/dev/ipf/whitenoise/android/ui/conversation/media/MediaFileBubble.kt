@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,8 +63,8 @@ import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -71,9 +72,9 @@ import kotlin.coroutines.resume
 /**
  * Receive-side bubble for any attachment whose MIME isn't an image. Renders
  * as a tappable pill: icon (chosen by MIME family), filename, size + status.
- * Tapping joins any automatic/durable fetch already in flight, materializes a
- * reusable FileProvider artifact, and fires `ACTION_VIEW` so the system picks
- * an external app (PDF reader, package installer, etc.) to open it.
+ * Supported text and Markdown attachments open in a bounded, read-only
+ * in-app reader. Other files join any automatic/durable fetch already in
+ * flight and open a reusable FileProvider artifact in an external viewer.
  */
 @Composable
 internal fun MediaFileBubble(
@@ -82,6 +83,8 @@ internal fun MediaFileBubble(
     reference: MediaAttachmentReferenceFfi,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    senderKey: String,
+    senderDisplayName: String,
     mine: Boolean,
     onLongPress: () -> Unit = {},
     attachedToCaption: Boolean = false,
@@ -91,6 +94,7 @@ internal fun MediaFileBubble(
     val scope = rememberCoroutineScope()
     val pillKey = "$messageIdHex#$attachmentIndex"
     var openRequested by remember(pillKey) { mutableStateOf(false) }
+    var readerOpen by rememberSaveable(pillKey) { mutableStateOf(false) }
     val transferStateFlow =
         remember(controller, pillKey, mine) {
             controller.attachmentTransferState(
@@ -108,6 +112,10 @@ internal fun MediaFileBubble(
     val presentation =
         remember(reference.mediaType, reference.fileName) {
             resolveAttachmentPresentation(reference.mediaType, reference.fileName)
+        }
+    val textCandidate =
+        remember(reference.mediaType, reference.fileName) {
+            textAttachmentCandidate(reference.mediaType, reference.fileName)
         }
     val noOpenAppMessage = stringResource(R.string.media_no_app_to_open)
     val couldntOpenMessage = stringResource(R.string.media_couldnt_open)
@@ -147,43 +155,22 @@ internal fun MediaFileBubble(
                             canRequestAttachmentOpen(transferState, reference.sourceEpoch, mine),
                     onLongClick = onLongPress,
                     onClick = {
+                        if (textCandidate != null) {
+                            readerOpen = true
+                            return@combinedClickable
+                        }
                         openRequested = true
                         scope.launch {
                             try {
-                                val retained =
-                                    if (mine) {
-                                        controller
-                                            .pendingAttachmentsList(messageIdHex)
-                                            .getOrNull(attachmentIndex)
-                                            ?.plaintextBytes
-                                    } else {
-                                        null
-                                    }
                                 val file =
-                                    runCatching {
-                                        materializeDocumentAttachment(
-                                            context = context,
-                                            messageIdHex = messageIdHex,
-                                            attachmentIndex = attachmentIndex,
-                                            reference = reference,
-                                            resolveBytes = {
-                                                controller
-                                                    .requestAttachmentTransfer(
-                                                        messageIdHex = messageIdHex,
-                                                        attachmentIndex = attachmentIndex,
-                                                        reference = reference,
-                                                        retainedPlaintext = retained,
-                                                    ).await()
-                                            },
-                                        )
-                                    }.onFailure {
-                                        if (it is CancellationException) throw it
-                                        Log.w(
-                                            "MediaFileBubble",
-                                            "download failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
-                                            it,
-                                        )
-                                    }.getOrNull() ?: return@launch
+                                    materializeMediaFile(
+                                        context = context,
+                                        controller = controller,
+                                        messageIdHex = messageIdHex,
+                                        attachmentIndex = attachmentIndex,
+                                        reference = reference,
+                                        mine = mine,
+                                    ) ?: return@launch
                                 // If the download finishes while the app is in the
                                 // background, keep this tap pending and open as soon
                                 // as the Activity resumes. Process death is covered by
@@ -245,6 +232,120 @@ internal fun MediaFileBubble(
             attachmentTransferIndicator(transferState)
         }
     }
+    if (readerOpen && textCandidate != null) {
+        TextAttachmentReaderDialog(
+            candidate = textCandidate,
+            appState = appState,
+            senderKey = senderKey,
+            senderDisplayName = senderDisplayName,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            loadBytes = {
+                requireNotNull(
+                    loadMediaFileBytes(
+                        controller = controller,
+                        messageIdHex = messageIdHex,
+                        attachmentIndex = attachmentIndex,
+                        reference = reference,
+                        mine = mine,
+                    ),
+                )
+            },
+            onOpenExternal = openExternal@{
+                val file =
+                    materializeMediaFile(
+                        context = context,
+                        controller = controller,
+                        messageIdHex = messageIdHex,
+                        attachmentIndex = attachmentIndex,
+                        reference = reference,
+                        mine = mine,
+                    ) ?: return@openExternal
+                if (!lifecycleOwner.lifecycle.awaitResumedOrDestroyed()) return@openExternal
+                when (openAttachmentExternally(context, file, reference.mediaType)) {
+                    OpenAttachmentResult.Opened -> Unit
+                    OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
+                    OpenAttachmentResult.Error -> appState.present(couldntOpenMessage, copyable = true)
+                }
+            },
+            onDismiss = { readerOpen = false },
+        )
+    }
+}
+
+private suspend fun materializeMediaFile(
+    context: android.content.Context,
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+): java.io.File? {
+    val retained =
+        if (mine) {
+            controller
+                .pendingAttachmentsList(messageIdHex)
+                .getOrNull(attachmentIndex)
+                ?.plaintextBytes
+        } else {
+            null
+        }
+    return runCatchingCancellable {
+        materializeDocumentAttachment(
+            context = context,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+            resolveBytes = {
+                controller
+                    .requestAttachmentTransfer(
+                        messageIdHex = messageIdHex,
+                        attachmentIndex = attachmentIndex,
+                        reference = reference,
+                        retainedPlaintext = retained,
+                    ).await()
+            },
+        )
+    }.onFailure {
+        Log.w(
+            "MediaFileBubble",
+            "download failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
+            it,
+        )
+    }.getOrNull()
+}
+
+private suspend fun loadMediaFileBytes(
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+): ByteArray? {
+    val retained =
+        if (mine) {
+            controller
+                .pendingAttachmentsList(messageIdHex)
+                .getOrNull(attachmentIndex)
+                ?.plaintextBytes
+        } else {
+            null
+        }
+    return runCatchingCancellable {
+        controller
+            .requestAttachmentTransfer(
+                messageIdHex = messageIdHex,
+                attachmentIndex = attachmentIndex,
+                reference = reference,
+                retainedPlaintext = retained,
+            ).await()
+    }.onFailure {
+        Log.w(
+            "MediaFileBubble",
+            "download failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
+            it,
+        )
+    }.getOrNull()
 }
 
 /** A tap during auto-download joins the existing transfer instead of being ignored. */

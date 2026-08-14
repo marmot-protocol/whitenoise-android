@@ -1494,4 +1494,12 @@
     <string name="global_search_content_voice_audio">Голос и аудио</string>
     <string name="global_search_content_files_documents">Файлы и документы</string>
     <string name="global_search_content_any_attachment">Любое вложение</string>
+    <string name="text_attachment_open_external">Открыть в другом приложении</string>
+    <string name="text_attachment_loading">Загрузка предпросмотра…</string>
+    <string name="text_attachment_preview_truncated">Предпросмотр Markdown сокращён для безопасности. Откройте файл в другом приложении, чтобы увидеть остальное.</string>
+    <string name="text_attachment_empty">Этот текстовый файл пуст.</string>
+    <string name="text_attachment_download_failed">Не удалось скачать файл. Повторите попытку или откройте его в другом приложении.</string>
+    <string name="text_attachment_preview_too_large">Файл слишком велик для безопасного предпросмотра. Откройте его в другом приложении.</string>
+    <string name="text_attachment_preview_invalid_encoding">Файл использует неподдерживаемую кодировку текста. Откройте его в другом приложении.</string>
+    <string name="text_attachment_preview_binary">Похоже, файл не содержит безопасного текста. Откройте его в другом приложении.</string>
 </resources>
