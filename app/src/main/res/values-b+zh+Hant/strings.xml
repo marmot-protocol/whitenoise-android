@@ -605,6 +605,7 @@
     <string name="toast_profile_published_detail">您的 kind:0 元資料在 %1$d 中繼上即時存在。</string>
     <string name="toast_couldnt_publish_profile">無法發布個人檔案</string>
     <string name="toast_send_failed">發送失敗</string>
+    <string name="toast_send_connection_failed">無法連線至中繼站。請檢查網路連線後再試一次。</string>
     <string name="toast_send_queue_full">此聊天有太多訊息正在等待傳送，因此你的訊息未傳送。等積壓清空後再試。</string>
     <string name="toast_chat_still_loading">此聊天仍在載入中，稍後再試。</string>
     <string name="toast_send_membership_verifying">正在確認群組成員身分 — 訊息尚未送出。文字已保留在輸入框中，請稍後再試。</string>

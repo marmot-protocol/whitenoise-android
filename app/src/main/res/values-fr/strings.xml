@@ -616,6 +616,7 @@
     <string name="toast_profile_published_detail">Vos métadonnées kind:0 sont en direct sur les relais %1$d.</string>
     <string name="toast_couldnt_publish_profile">Impossible de publier le profil</string>
     <string name="toast_send_failed">Échec de l’envoi</string>
+    <string name="toast_send_connection_failed">Impossible de joindre le relais. Vérifiez votre connexion et réessayez.</string>
     <string name="toast_send_queue_full">Trop de messages attendent d\'être envoyés dans cette discussion, le vôtre n\'a pas été envoyé. Réessayez une fois le retard rattrapé.</string>
     <string name="toast_chat_still_loading">Cette discussion est encore en cours de chargement. Réessayez dans un instant.</string>
     <string name="toast_send_membership_verifying">Vérification de votre appartenance au groupe — votre message n’a pas été envoyé. Il est conservé dans le champ ; réessayez dans un instant.</string>

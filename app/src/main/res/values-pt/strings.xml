@@ -616,6 +616,7 @@
     <string name="toast_profile_published_detail">Seus metadados kind:0 estão ativos em relés %1$d.</string>
     <string name="toast_couldnt_publish_profile">Não foi possível publicar o perfil</string>
     <string name="toast_send_failed">Falha no envio</string>
+    <string name="toast_send_connection_failed">Não foi possível acessar o relay. Verifique sua conexão e tente novamente.</string>
     <string name="toast_send_queue_full">Esta conversa tem mensagens demais aguardando envio, então a sua não foi enviada. Tente de novo quando ela se atualizar.</string>
     <string name="toast_chat_still_loading">Esta conversa ainda está carregando. Tente de novo em instantes.</string>
     <string name="toast_send_membership_verifying">Verificando sua participação no grupo — sua mensagem não foi enviada. Ela ficou na caixa de texto; tente novamente em instantes.</string>
