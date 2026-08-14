@@ -74,8 +74,9 @@ frozen in `config/detekt/detekt-baseline.xml`. The workflow runs both the
 Two security workflows run separately from the main Gradle validation so their
 permissions and results stay explicit:
 
-- `.github/workflows/codeql.yml` compiles a credential-free Android variant
-  and scans its Java and Kotlin with CodeQL's extended security query suite.
+- `.github/workflows/codeql.yml` compiles the credential-free dev Zapstore and
+  Play debug variants and scans their Java and Kotlin with CodeQL's extended
+  security query suite.
   It runs for pull requests, `master` pushes, a weekly full scan, and manual
   dispatch. Only its SARIF upload receives `security-events: write`.
 - `.github/workflows/dependency-submission.yml` supplies GitHub's dependency
