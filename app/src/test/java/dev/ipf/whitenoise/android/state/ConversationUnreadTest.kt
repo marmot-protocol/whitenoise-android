@@ -19,6 +19,144 @@ import org.junit.Test
  * prepends must not over-count (id-anchored, not index-anchored).
  */
 class ConversationUnreadTest {
+    // ---- two-stage jump-to-newest target -----------------------------------
+
+    @Test
+    fun unreadJump_initialUnreadStackIsOwnedByEntryAnchor() {
+        val state =
+            reconcileConversationUnreadJump(
+                current = ConversationUnreadJumpState(),
+                timeline = listOf(received("r1"), received("r2")),
+                readAnchorMessageId = "r1",
+                unreadCount = 1,
+                nearBottom = false,
+            )
+
+        assertEquals(null, state.pendingMessageId)
+        assertEquals(true, state.unreadStackActive)
+        assertEquals(true, state.initialized)
+    }
+
+    @Test
+    fun unreadJump_freezesFirstEligibleArrivalUntilStackResets() {
+        val ready =
+            reconcileConversationUnreadJump(
+                current = ConversationUnreadJumpState(),
+                timeline = listOf(received("r1")),
+                readAnchorMessageId = "r1",
+                unreadCount = 0,
+                nearBottom = false,
+            )
+        val captured =
+            reconcileConversationUnreadJump(
+                current = ready,
+                timeline = listOf(received("r1"), received("r2")),
+                readAnchorMessageId = "r1",
+                unreadCount = 1,
+                nearBottom = false,
+            )
+        val laterArrival =
+            reconcileConversationUnreadJump(
+                current = captured,
+                timeline = listOf(received("r1"), received("r2"), received("r3")),
+                readAnchorMessageId = "r1",
+                unreadCount = 2,
+                nearBottom = false,
+            )
+
+        assertEquals("r2", captured.pendingMessageId)
+        assertEquals("r2", laterArrival.pendingMessageId)
+    }
+
+    @Test
+    fun unreadJump_skipsOutgoingEditsAndDerivedGroupRows() {
+        val ready = ConversationUnreadJumpState(initialized = true)
+        val state =
+            reconcileConversationUnreadJump(
+                current = ready,
+                timeline =
+                    listOf(
+                        received("anchor"),
+                        sent("outgoing"),
+                        message("edit", direction = "received", kind = 1009uL),
+                        groupSystem("group-state"),
+                        received("destination"),
+                    ),
+                readAnchorMessageId = "anchor",
+                unreadCount = 1,
+                nearBottom = false,
+            )
+
+        assertEquals("destination", state.pendingMessageId)
+    }
+
+    @Test
+    fun unreadJump_consumedOrMissingTargetCannotRetargetCurrentStack() {
+        val captured =
+            ConversationUnreadJumpState(
+                pendingMessageId = "r2",
+                unreadStackActive = true,
+                initialized = true,
+            )
+        val missing =
+            reconcileConversationUnreadJump(
+                current = captured,
+                timeline = listOf(received("r1"), received("r3")),
+                readAnchorMessageId = "r1",
+                unreadCount = 1,
+                nearBottom = false,
+            )
+        val laterArrival =
+            reconcileConversationUnreadJump(
+                current = missing,
+                timeline = listOf(received("r1"), received("r3"), received("r4")),
+                readAnchorMessageId = "r1",
+                unreadCount = 2,
+                nearBottom = false,
+            )
+
+        assertEquals(null, missing.pendingMessageId)
+        assertEquals(null, laterArrival.pendingMessageId)
+    }
+
+    @Test
+    fun unreadJump_tailSuppressesStackAndZeroUnreadArmsNextStack() {
+        val captured =
+            ConversationUnreadJumpState(
+                pendingMessageId = "r2",
+                unreadStackActive = true,
+                initialized = true,
+            )
+        val atTail =
+            reconcileConversationUnreadJump(
+                current = captured,
+                timeline = listOf(received("r1"), received("r2")),
+                readAnchorMessageId = "r1",
+                unreadCount = 1,
+                nearBottom = true,
+            )
+        val reset =
+            reconcileConversationUnreadJump(
+                current = atTail,
+                timeline = listOf(received("r1"), received("r2")),
+                readAnchorMessageId = "r2",
+                unreadCount = 0,
+                nearBottom = true,
+            )
+        val nextStack =
+            reconcileConversationUnreadJump(
+                current = reset,
+                timeline = listOf(received("r1"), received("r2"), received("r3")),
+                readAnchorMessageId = "r2",
+                unreadCount = 1,
+                nearBottom = false,
+            )
+
+        assertEquals(null, atTail.pendingMessageId)
+        assertEquals(false, reset.unreadStackActive)
+        assertEquals("r3", nextStack.pendingMessageId)
+    }
+
     // ---- firstUnreadReceivedIndex -------------------------------------------
 
     @Test

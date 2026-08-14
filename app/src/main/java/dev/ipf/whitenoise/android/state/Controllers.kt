@@ -2246,7 +2246,7 @@ internal fun logUnreadCountDivergence(
 // network but represent state changes (edits, group system events), not
 // new chat. They never inflate unread counts and never block read-anchor
 // advancement.
-private fun isDerivedStateKind(kind: ULong): Boolean = kind == 1009uL || kind == 1210uL
+internal fun isDerivedStateKind(kind: ULong): Boolean = kind == 1009uL || kind == 1210uL
 
 /**
  * Message ids of unread received mentions in [timeline], oldest first — drives
