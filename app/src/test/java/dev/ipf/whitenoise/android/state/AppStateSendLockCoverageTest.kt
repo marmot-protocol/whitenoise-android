@@ -206,7 +206,9 @@ class AppStateSendLockCoverageTest {
 
         assertTrue(
             "unauthorized deletes must produce a failure before mutating deletedMessageIds",
-            authorizationGate >= 0 && authorizationFailure > authorizationGate && optimisticMutation > authorizationFailure,
+            authorizationGate >= 0 &&
+                authorizationFailure > authorizationGate &&
+                optimisticMutation > authorizationFailure,
         )
         assertTrue(
             "unauthorized deletes must produce a failure before reaching the FFI delete call",
