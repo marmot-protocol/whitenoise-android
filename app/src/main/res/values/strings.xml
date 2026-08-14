@@ -994,6 +994,10 @@
     <string name="batch_delete_complete">Selected messages removed</string>
     <string name="batch_delete_partial">Some selected messages were removed; some failed</string>
     <string name="batch_delete_failed">Couldn\'t remove selected messages</string>
+    <string name="batch_delete_failure_progress">%1$d of %2$d selected messages removed</string>
+    <string name="batch_delete_failures_local">Local removals failed: %1$d</string>
+    <string name="batch_delete_failures_everyone">Deletes for everyone failed: %1$d</string>
+    <string name="batch_delete_failures_mixed">Local removals failed: %1$d · Deletes for everyone failed: %2$d</string>
     <string name="toast_forwarded_batch_partial">Some selected messages were forwarded; some failed</string>
     <string name="toast_forward_batch_failed">Couldn\'t forward selected messages</string>
     <plurals name="unread_messages_count">

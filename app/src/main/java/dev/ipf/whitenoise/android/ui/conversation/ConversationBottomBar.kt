@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import android.net.Uri
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,6 +45,11 @@ internal fun ConversationBottomBar(
     onReplySelection: () -> Unit,
     onInfoSelection: () -> Unit,
     onDeleteSelection: () -> Unit,
+    batchDeleteRetryState: BatchDeleteRetryState?,
+    batchDeleteInFlight: Boolean,
+    onRetryBatchDelete: () -> Unit,
+    onDismissBatchDeleteFailure: () -> Unit,
+    onCopyBatchDeleteReport: () -> Unit,
     searchOpen: Boolean,
     searchMatchCount: Int,
     searchActiveIndex: Int,
@@ -96,15 +102,26 @@ internal fun ConversationBottomBar(
     ) {
         when {
             selectionMode ->
-                MessageSelectionBottomBar(
-                    availability = selectionActionAvailability,
-                    onCopy = onCopySelection,
-                    onForward = onForwardSelection,
-                    onSave = onSaveSelection,
-                    onReply = onReplySelection,
-                    onInfo = onInfoSelection,
-                    onDelete = onDeleteSelection,
-                )
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    batchDeleteRetryState?.let { retryState ->
+                        BatchDeleteFailureNotice(
+                            state = retryState,
+                            retryInFlight = batchDeleteInFlight,
+                            onRetry = onRetryBatchDelete,
+                            onDismiss = onDismissBatchDeleteFailure,
+                            onCopyReport = onCopyBatchDeleteReport,
+                        )
+                    }
+                    MessageSelectionBottomBar(
+                        availability = selectionActionAvailability,
+                        onCopy = onCopySelection,
+                        onForward = onForwardSelection,
+                        onSave = onSaveSelection,
+                        onReply = onReplySelection,
+                        onInfo = onInfoSelection,
+                        onDelete = onDeleteSelection,
+                    )
+                }
             searchOpen ->
                 ConversationSearchNavBar(
                     matchCount = searchMatchCount,

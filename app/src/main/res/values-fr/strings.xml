@@ -742,6 +742,10 @@
     <string name="batch_delete_complete">Messages sélectionnés retirés</string>
     <string name="batch_delete_partial">Certains messages sélectionnés ont été retirés ; d’autres ont échoué</string>
     <string name="batch_delete_failed">Impossible de retirer les messages sélectionnés</string>
+    <string name="batch_delete_failure_progress">%1$d messages sélectionnés sur %2$d ont été retirés</string>
+    <string name="batch_delete_failures_local">Échecs du retrait local : %1$d</string>
+    <string name="batch_delete_failures_everyone">Échecs de la suppression pour tous : %1$d</string>
+    <string name="batch_delete_failures_mixed">Échecs du retrait local : %1$d · Échecs de la suppression pour tous : %2$d</string>
     <string name="toast_forwarded_batch_partial">Certains messages sélectionnés ont été transférés ; d’autres ont échoué</string>
     <string name="toast_forward_batch_failed">Impossible de transférer les messages sélectionnés</string>
     <plurals name="unread_messages_count">

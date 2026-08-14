@@ -176,6 +176,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -606,7 +607,7 @@ internal fun ConversationScreen(
     // composition state deliberately: serializing decrypted message snapshots into
     // Android saved state would extend their lifetime and privacy footprint.
     val selectedMessages =
-        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+        remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
             mutableStateMapOf<String, BatchMessageSelection>()
         }
     var batchForwardSheetOpen by
@@ -618,9 +619,17 @@ internal fun ConversationScreen(
             mutableStateOf<BatchMessageSelection?>(null)
         }
     var showBatchDeleteConfirm by
-        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+        remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var batchDeleteInFlight by
-        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+        remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+    val batchDeleteSubmissionGuard =
+        remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+            BatchDeleteSubmissionGuard()
+        }
+    var batchDeleteRetryState by
+        remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateOf<BatchDeleteRetryState?>(null)
+        }
     var initialTimelineAnchored by
         remember(controller, notificationOpenRequestId) { mutableStateOf(false) }
 
@@ -877,7 +886,10 @@ internal fun ConversationScreen(
     val selectionMode = selectedMessages.isNotEmpty()
     LaunchedEffect(selectionMode) {
         if (selectionMode) clearTextSelection()
-        if (!selectionMode) batchInfoSelection = null
+        if (!selectionMode) {
+            batchInfoSelection = null
+            batchDeleteRetryState = null
+        }
     }
     val composerGate =
         conversationComposerGate(
@@ -2389,6 +2401,66 @@ internal fun ConversationScreen(
     // attachment sheet — the composer itself stays interactive while it's open.
     val composerAttachmentSheet = rememberComposerAttachmentSheetState()
 
+    fun startBatchDelete(
+        attempts: List<BatchDeleteAttempt>,
+        priorRetryState: BatchDeleteRetryState?,
+    ) {
+        if (attempts.isEmpty() || !batchDeleteSubmissionGuard.tryStart()) return
+        batchDeleteInFlight = true
+        appState.launchMutation {
+            val completedOutcomes = mutableListOf<BatchDeleteOperationOutcome>()
+            try {
+                val result =
+                    executeBatchDelete(
+                        attempts = attempts,
+                        // The controller revalidates current moderation
+                        // capability on every initial attempt and retry.
+                        deleteForEveryone = { record ->
+                            controller.deleteMessageResult(record, presentFailure = false)
+                        },
+                        hideLocally = controller::hideMessageForMeResult,
+                        onOutcome = completedOutcomes::add,
+                    )
+                val retryState =
+                    priorRetryState?.afterRetry(result)
+                        ?: BatchDeleteRetryState.from(result)
+                selectedMessages.clear()
+                retryState.failedAttempts.forEach { attempt ->
+                    val selection = attempt.selection
+                    selectedMessages[selection.action.messageId] = selection
+                }
+                if (retryState.failures.isEmpty()) {
+                    batchDeleteRetryState = null
+                    controller.boundAccountRef?.let { accountRef ->
+                        appState.presentConversationTransient(
+                            accountRef = accountRef,
+                            groupIdHex = controller.group.groupIdHex,
+                            titleRes = R.string.batch_delete_complete,
+                        )
+                    }
+                } else {
+                    batchDeleteRetryState = retryState
+                }
+            } catch (cancellation: CancellationException) {
+                // Keep unresolved work selected, but do not retry operations
+                // that committed before lifecycle/user cancellation arrived.
+                val completedResult = BatchDeleteResult(completedOutcomes)
+                completedOutcomes
+                    .filter(BatchDeleteOperationOutcome::succeeded)
+                    .forEach { selectedMessages.remove(it.attempt.selection.action.messageId) }
+                val updatedRetryState =
+                    priorRetryState?.afterRetry(completedResult)
+                        ?: BatchDeleteRetryState.from(completedResult)
+                batchDeleteRetryState = updatedRetryState.takeIf { it.failures.isNotEmpty() }
+                throw cancellation
+            } finally {
+                batchDeleteSubmissionGuard.finish()
+                batchDeleteInFlight = false
+                showBatchDeleteConfirm = false
+            }
+        }
+    }
+
     val openDetailsDescription = stringResource(R.string.details)
     LaunchedEffect(batchSelectionUi.forwardBodies.isEmpty()) {
         batchForwardSheetOpen =
@@ -2414,7 +2486,12 @@ internal fun ConversationScreen(
             ConversationTopBar(
                 selectionMode = selectionMode,
                 selectedCount = batchSelectionUi.actionItems.size,
-                onCloseSelection = { selectedMessages.clear() },
+                onCloseSelection = {
+                    if (!batchDeleteInFlight) {
+                        batchDeleteRetryState = null
+                        selectedMessages.clear()
+                    }
+                },
                 searchOpen = navigationState.searchOpen,
                 searchQuery = navigationState.searchQuery,
                 onSearchQueryChange = {
@@ -2486,7 +2563,21 @@ internal fun ConversationScreen(
                 selectionMode = selectionMode,
                 selectionActionAvailability =
                     batchSelectionUi.actionAvailability.let { availability ->
-                        availability.copy(canSave = availability.canSave && !batchAttachmentSaveInFlight)
+                        if (batchDeleteInFlight) {
+                            BatchSelectionActionAvailability(
+                                canCopy = false,
+                                canForward = false,
+                                canSave = false,
+                                canReply = false,
+                                canInfo = false,
+                                canDelete = false,
+                            )
+                        } else {
+                            availability.copy(
+                                canSave = availability.canSave && !batchAttachmentSaveInFlight,
+                                canDelete = availability.canDelete && batchDeleteRetryState == null,
+                            )
+                        }
                     },
                 onCopySelection = {
                     if (batchSelectionUi.copyText.isNotBlank()) {
@@ -2543,6 +2634,24 @@ internal fun ConversationScreen(
                     batchInfoSelection = batchSelectionUi.selections.singleOrNull()
                 },
                 onDeleteSelection = { showBatchDeleteConfirm = true },
+                batchDeleteRetryState = batchDeleteRetryState,
+                batchDeleteInFlight = batchDeleteInFlight,
+                onRetryBatchDelete = {
+                    batchDeleteRetryState?.let { retryState ->
+                        startBatchDelete(retryState.failedAttempts, retryState)
+                    }
+                },
+                onDismissBatchDeleteFailure = {
+                    if (!batchDeleteInFlight) {
+                        batchDeleteRetryState = null
+                        selectedMessages.clear()
+                    }
+                },
+                onCopyBatchDeleteReport = {
+                    batchDeleteRetryState?.let { retryState ->
+                        clipboard.setText(AnnotatedString(batchDeleteDiagnosticReport(retryState)))
+                    }
+                },
                 searchOpen = navigationState.searchOpen,
                 searchMatchCount = effectiveSearchMatchIds.size,
                 searchActiveIndex = searchActiveIndex,
@@ -2796,13 +2905,18 @@ internal fun ConversationScreen(
                                     onTextSelectionBoundsChange = { bounds ->
                                         if (textSelectionMessageId == messageId) textSelectionBubbleBounds = bounds
                                     },
-                                    batchSelectable = messageId in selectableMessages,
+                                    batchSelectable =
+                                        messageId in selectableMessages &&
+                                            batchDeleteRetryState == null &&
+                                            !batchDeleteInFlight,
                                     selected = selectedMessages.containsKey(messageId),
                                     onToggleSelection = {
-                                        if (selectedMessages.containsKey(messageId)) {
-                                            selectedMessages.remove(messageId)
-                                        } else {
-                                            selectableMessages[messageId]?.let { selectedMessages[messageId] = it }
+                                        if (batchDeleteRetryState == null && !batchDeleteInFlight) {
+                                            if (selectedMessages.containsKey(messageId)) {
+                                                selectedMessages.remove(messageId)
+                                            } else {
+                                                selectableMessages[messageId]?.let { selectedMessages[messageId] = it }
+                                            }
                                         }
                                     },
                                     rangeDragActive = dragAnchorTimelineId == item.id,
@@ -3014,54 +3128,22 @@ internal fun ConversationScreen(
     }
 
     if (showBatchDeleteConfirm && batchSelectionUi.actionItems.isNotEmpty()) {
-        val runBatchDelete: (BatchDeleteScope) -> Unit = { scope ->
-            // In-flight guard on top of the mutation's own idempotency: a
-            // second tap before the first completes is dropped.
-            if (!batchDeleteInFlight) {
-                batchDeleteInFlight = true
-                val selections = batchSelectionUi.selections
-                appState.launchMutation {
-                    try {
-                        val result =
-                            executeBatchDelete(
-                                selections = selections,
-                                scope = scope,
-                                // deleteMessage re-validates the capability, so it
-                                // is the moderation security boundary — a stale
-                                // snapshot can never publish an unauthorized delete.
-                                deleteForEveryone = { record ->
-                                    controller.deleteMessage(record, presentFailure = false)
-                                },
-                                hideLocally = { messageId ->
-                                    runCatching { controller.hideMessageForMe(messageId) }.isSuccess
-                                },
-                            )
-                        when (result.succeeded) {
-                            result.attempted ->
-                                controller.boundAccountRef?.let { accountRef ->
-                                    appState.presentConversationTransient(
-                                        accountRef = accountRef,
-                                        groupIdHex = controller.group.groupIdHex,
-                                        titleRes = R.string.batch_delete_complete,
-                                    )
-                                }
-                            0 -> appState.present(R.string.batch_delete_failed, copyable = true)
-                            else -> appState.present(R.string.batch_delete_partial, copyable = true)
-                        }
-                    } finally {
-                        batchDeleteInFlight = false
-                        showBatchDeleteConfirm = false
-                        selectedMessages.clear()
-                    }
-                }
-            }
-        }
         BatchMessageDeleteDialog(
             selectedCount = batchSelectionUi.actionItems.size,
             breakdown = batchSelectionUi.deleteBreakdown,
             deleteInFlight = batchDeleteInFlight,
-            onDeleteForEveryone = { runBatchDelete(BatchDeleteScope.EVERYONE) },
-            onDeleteForMe = { runBatchDelete(BatchDeleteScope.LOCAL_ONLY) },
+            onDeleteForEveryone = {
+                startBatchDelete(
+                    attempts = batchDeleteAttempts(batchSelectionUi.selections, BatchDeleteScope.EVERYONE),
+                    priorRetryState = null,
+                )
+            },
+            onDeleteForMe = {
+                startBatchDelete(
+                    attempts = batchDeleteAttempts(batchSelectionUi.selections, BatchDeleteScope.LOCAL_ONLY),
+                    priorRetryState = null,
+                )
+            },
             onDismissRequest = { if (!batchDeleteInFlight) showBatchDeleteConfirm = false },
         )
     }

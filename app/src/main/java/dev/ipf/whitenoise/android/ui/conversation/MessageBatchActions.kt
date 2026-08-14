@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -52,10 +53,106 @@ internal data class BatchDeleteBreakdown(
     val canOfferDeleteForEveryone: Boolean get() = deleteForEveryone > 0
 }
 
-internal data class BatchDeleteResult(
-    val attempted: Int,
-    val succeeded: Int,
+internal enum class BatchDeleteOperationKind {
+    DeleteForEveryone,
+    HideLocally,
+}
+
+internal data class BatchDeleteAttempt(
+    val selection: BatchMessageSelection,
+    val operation: BatchDeleteOperationKind,
 )
+
+internal enum class BatchDeleteFailureCategory {
+    PermissionDenied,
+    Connectivity,
+    ResourceBusy,
+    NotFound,
+    PlatformUnavailable,
+    InvalidInput,
+    CryptoFailure,
+    Io,
+    Timeout,
+    Unexpected,
+    ;
+
+    companion object {
+        fun from(throwable: Throwable): BatchDeleteFailureCategory =
+            when (DiagnosticFormatter.errorCode(throwable)) {
+                "PERMISSION_DENIED" -> PermissionDenied
+                "CONNECTIVITY" -> Connectivity
+                "RESOURCE_BUSY" -> ResourceBusy
+                "NOT_FOUND" -> NotFound
+                "PLATFORM_UNAVAILABLE" -> PlatformUnavailable
+                "INVALID_INPUT" -> InvalidInput
+                "CRYPTO_FAILURE" -> CryptoFailure
+                "IO" -> Io
+                "TIMEOUT" -> Timeout
+                else -> Unexpected
+            }
+    }
+}
+
+internal data class BatchDeleteOperationOutcome(
+    val attempt: BatchDeleteAttempt,
+    val failure: BatchDeleteFailureCategory? = null,
+) {
+    val succeeded: Boolean get() = failure == null
+}
+
+internal data class BatchDeleteResult(
+    val outcomes: List<BatchDeleteOperationOutcome>,
+) {
+    val attempted: Int get() = outcomes.size
+    val succeeded: Int get() = outcomes.count(BatchDeleteOperationOutcome::succeeded)
+    val failures: List<BatchDeleteOperationOutcome> get() = outcomes.filterNot(BatchDeleteOperationOutcome::succeeded)
+    val failedAttempts: List<BatchDeleteAttempt> get() = failures.map(BatchDeleteOperationOutcome::attempt)
+}
+
+/** Conversation-scoped retry state; only failed operations remain actionable. */
+internal data class BatchDeleteRetryState(
+    val originalAttempts: List<BatchDeleteAttempt>,
+    val failures: List<BatchDeleteOperationOutcome>,
+) {
+    val attempted: Int get() = originalAttempts.size
+    val succeeded: Int get() = attempted - failures.size
+    val failedAttempts: List<BatchDeleteAttempt> get() = failures.map(BatchDeleteOperationOutcome::attempt)
+    val failedLocalHides: Int
+        get() = failures.count { it.attempt.operation == BatchDeleteOperationKind.HideLocally }
+    val failedGroupDeletes: Int
+        get() = failures.count { it.attempt.operation == BatchDeleteOperationKind.DeleteForEveryone }
+
+    fun afterRetry(result: BatchDeleteResult): BatchDeleteRetryState {
+        val retriedKeys = result.outcomes.mapTo(mutableSetOf(), BatchDeleteOperationOutcome::retryKey)
+        val retained = failures.filterNot { it.retryKey() in retriedKeys }
+        return copy(failures = retained + result.failures)
+    }
+
+    companion object {
+        fun from(result: BatchDeleteResult): BatchDeleteRetryState =
+            BatchDeleteRetryState(
+                originalAttempts = result.outcomes.map(BatchDeleteOperationOutcome::attempt),
+                failures = result.failures,
+            )
+    }
+}
+
+/** Recomposition-stable single-flight gate for initial submissions and retries. */
+internal class BatchDeleteSubmissionGuard {
+    private var inFlight = false
+
+    fun tryStart(): Boolean {
+        if (inFlight) return false
+        inFlight = true
+        return true
+    }
+
+    fun finish() {
+        inFlight = false
+    }
+}
+
+private fun BatchDeleteOperationOutcome.retryKey() = attempt.selection.action.messageId to attempt.operation
 
 internal fun isBatchSelectableMessage(
     messageId: String,
@@ -116,12 +213,6 @@ internal fun batchCopyText(items: List<BatchMessageActionItem>): String {
 
 internal fun batchForwardBodies(items: List<BatchMessageActionItem>): List<String> =
     MessageProjector.validatedForwardTextBodies(items.map(BatchMessageActionItem::forwardableText))
-
-internal fun batchDeleteBreakdown(items: List<BatchMessageActionItem>): BatchDeleteBreakdown =
-    BatchDeleteBreakdown(
-        deleteForEveryone = items.count(BatchMessageActionItem::canDeleteForEveryone),
-        hideLocally = items.count { !it.canDeleteForEveryone },
-    )
 
 internal data class BatchSelectionActionAvailability(
     val canCopy: Boolean,
@@ -212,31 +303,4 @@ internal fun messageSelectionBarActionRows(
             index += take
         }
     }
-}
-
-/**
- * Apply the chosen [scope] to every selection. In [BatchDeleteScope.EVERYONE]
- * each message the user may remove for the group is published as a delete and
- * the rest fall back to a local hide (mirroring the per-message capability); in
- * [BatchDeleteScope.LOCAL_ONLY] every message is hidden on this device and
- * nothing is published.
- */
-internal suspend fun executeBatchDelete(
-    selections: List<BatchMessageSelection>,
-    scope: BatchDeleteScope,
-    deleteForEveryone: suspend (AppMessageRecordFfi) -> Boolean,
-    hideLocally: suspend (String) -> Boolean,
-): BatchDeleteResult {
-    var succeeded = 0
-    selections.forEach { selection ->
-        val removeForEveryone = scope == BatchDeleteScope.EVERYONE && selection.action.canDeleteForEveryone
-        val removed =
-            if (removeForEveryone) {
-                deleteForEveryone(selection.record)
-            } else {
-                hideLocally(selection.action.messageId)
-            }
-        if (removed) succeeded += 1
-    }
-    return BatchDeleteResult(attempted = selections.size, succeeded = succeeded)
 }
