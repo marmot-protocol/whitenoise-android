@@ -84,10 +84,10 @@ permissions and results stay explicit:
   Only this submission workflow receives `contents: write`.
 
 Both security workflows pin every third-party action to a full commit SHA,
-cancel superseded work, and have bounded job timeouts. Gradle's setup action
-reuses the normal dependency and build caches. Dependency submission runs only
-from trusted `master` pushes because it is the sole workflow with
-`contents: write`.
+cancel superseded work, and have bounded job timeouts. CodeQL's Gradle setup
+reuses the normal dependency and build caches; the dependency-submission action
+manages its own Gradle execution. Dependency submission runs only from trusted
+`master` pushes because it is the sole workflow with `contents: write`.
 
 Pushes to `master` also run `.github/workflows/android-instrumented.yml`, a
 separate emulator workflow for `:app:connectedDevZapstoreDebugAndroidTest`

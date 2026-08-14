@@ -46,15 +46,16 @@ jobs:
           build-mode: manual
           queries: security-extended
 
-      # One credential-free app variant is enough to compile the shared
+      # Compile both distribution flavors so CodeQL extracts their small
+      # flavor-specific self-update implementations as well as the shared
       # production source set. The :benchmark module contains test-only
       # Macrobenchmark and Baseline Profile drivers, so it is intentionally
-      # excluded from this production-code scan. Keeping the build serial and
-      # focused also avoids tracing two copies of Kotlin/UniFFI compilation.
+      # excluded from this production-code scan.
       - name: Build Java and Kotlin for analysis
         run: >-
           ./gradlew
           :app:compileDevZapstoreDebugKotlin
+          :app:compileDevPlayDebugKotlin
           --no-daemon --stacktrace
 
       - name: Analyze
