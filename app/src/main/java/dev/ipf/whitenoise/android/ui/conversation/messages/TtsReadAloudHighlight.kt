@@ -80,15 +80,19 @@ internal fun rememberTtsLeafHighlightResolver(
     messageIdHex: String,
     projection: SpeakableTextProjection?,
     locale: Locale,
-): TtsLeafHighlightResolver? =
-    remember(passage, messageIdHex, projection, locale) {
-        buildTtsLeafHighlightResolver(
-            passage = passage,
-            messageIdHex = messageIdHex,
-            projection = projection,
-            locale = locale,
-        )
+): TtsLeafHighlightResolver? {
+    val projectionResolver =
+        remember(projection, locale) {
+            projection?.let { TtsHighlightProjectionResolver(it, locale) }
+        }
+    return remember(passage, messageIdHex, projectionResolver) {
+        if (passage == null || passage.messageIdHex != messageIdHex) {
+            null
+        } else {
+            projectionResolver?.resolverFor(passage, messageIdHex)
+        }
     }
+}
 
 internal fun buildTtsLeafHighlightResolver(
     passage: TtsPassage?,

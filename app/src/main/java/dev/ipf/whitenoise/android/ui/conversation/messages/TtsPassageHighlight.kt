@@ -24,25 +24,43 @@ internal fun createTtsLeafHighlightResolver(
     messageIdHex: String,
     projection: SpeakableTextProjection,
     locale: Locale,
-): (String, String) -> IntRange? {
-    val sentenceChunks =
+): (String, String) -> IntRange? =
+    TtsHighlightProjectionResolver(
+        projection = projection,
+        locale = locale,
+    ).resolverFor(passage, messageIdHex)
+
+/** Projection-level work shared by every word update in one active message. */
+internal class TtsHighlightProjectionResolver(
+    private val projection: SpeakableTextProjection,
+    locale: Locale,
+) {
+    private val sentenceChunks =
         TtsChunker.chunk(
             projection.text,
             locale,
             maxChunkLength = ttsHighlightMaxChunkLength(),
         )
-    val leafSpanCache = HashMap<Pair<String, String>, List<RenderedProjectionSpan>?>()
-    return { renderedLeafId, renderedText ->
-        resolveTtsRenderedHighlight(
-            passage = passage,
-            messageIdHex = messageIdHex,
-            projection = projection,
-            renderedLeafId = renderedLeafId,
-            renderedText = renderedText,
-            sentenceChunks = sentenceChunks,
-            leafSpanCache = leafSpanCache,
-        )
-    }
+    private val leafSpanCache = HashMap<Pair<String, String>, List<RenderedProjectionSpan>?>()
+
+    internal val cachedLeafCount: Int
+        get() = leafSpanCache.size
+
+    internal fun resolverFor(
+        passage: TtsPassage,
+        messageIdHex: String,
+    ): (String, String) -> IntRange? =
+        { renderedLeafId, renderedText ->
+            resolveTtsRenderedHighlight(
+                passage = passage,
+                messageIdHex = messageIdHex,
+                projection = projection,
+                renderedLeafId = renderedLeafId,
+                renderedText = renderedText,
+                sentenceChunks = sentenceChunks,
+                leafSpanCache = leafSpanCache,
+            )
+        }
 }
 
 /**

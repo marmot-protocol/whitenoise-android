@@ -14,6 +14,30 @@ import java.util.Locale
 
 class TtsPassageHighlightTest {
     @Test
+    fun projectionResolverReusesRenderedLeafMappingAcrossWordUpdates() {
+        val projection = legacyTextToSpeakableProjection("Hello bright world.")
+        val projectionResolver = TtsHighlightProjectionResolver(projection, Locale.US)
+        val firstPassage =
+            TtsPassage(
+                messageIdHex = "m1",
+                sentenceIndex = 0,
+                projectionId = projection.projectionId,
+                visibleWord = listOf(TtsVisibleTextSpan("plain", 0, 5)),
+            )
+        val secondPassage =
+            firstPassage.copy(
+                visibleWord = listOf(TtsVisibleTextSpan("plain", 6, 12)),
+            )
+        val firstResolver = projectionResolver.resolverFor(firstPassage, "m1")
+        val secondResolver = projectionResolver.resolverFor(secondPassage, "m1")
+
+        assertEquals(0 until 5, firstResolver("plain", projection.text))
+        assertEquals(1, projectionResolver.cachedLeafCount)
+        assertEquals(6 until 12, secondResolver("plain", projection.text))
+        assertEquals(1, projectionResolver.cachedLeafCount)
+    }
+
+    @Test
     fun wordHighlightMapsVisibleLeafCoordinatesIntoRenderedParagraphText() {
         val projection =
             markdownDocumentToSpeakableProjection(
