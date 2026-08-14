@@ -276,6 +276,9 @@ class MessageBubbleTextSelectionSpeakTest {
     }
 
     private fun assertNativeSpeakDisplayed() {
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            nativeTextMenuProvider.dataProvider != null
+        }
         composeRule.runOnIdle {
             assertTrue(
                 checkNotNull(nativeTextMenuProvider.dataProvider)
