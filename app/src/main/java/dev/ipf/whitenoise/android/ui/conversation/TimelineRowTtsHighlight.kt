@@ -14,6 +14,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudProgress
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -58,6 +59,7 @@ internal fun TimelineRowMessageBubble(
     item: TimelineMessage,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    documentSaveFallback: DocumentSaveFallback? = null,
     composerTextState: ComposerTextState,
     highlighted: Boolean,
     selectionMode: Boolean,
@@ -95,6 +97,7 @@ internal fun TimelineRowMessageBubble(
         item = item,
         controller = controller,
         appState = appState,
+        documentSaveFallback = documentSaveFallback,
         composerTextState = composerTextState,
         highlighted = highlighted,
         selectionMode = selectionMode,

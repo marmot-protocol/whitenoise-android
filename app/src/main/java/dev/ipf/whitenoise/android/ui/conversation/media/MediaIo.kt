@@ -6,12 +6,15 @@ import android.content.ClipDescription
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.type
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
+import dev.ipf.whitenoise.android.core.DiagnosticErrorMetadata
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
@@ -78,6 +81,27 @@ internal fun validatedAttachmentCacheFile(file: java.io.File?): java.io.File? =
 
 private val documentMaterializations = SingleFlight<String, java.io.File>()
 private const val MAX_DOCUMENT_EXTENSION_LENGTH = 12
+internal const val ANDROID_PACKAGE_MIME = "application/vnd.android.package-archive"
+private const val MEDIA_STORE_INSERT_ATTEMPTS = 2
+private const val MEDIA_STORE_INSERT_RETRY_DELAY_MILLIS = 150L
+
+internal enum class AttachmentSaveStage {
+    MEDIASTORE_INSERT,
+    MEDIASTORE_OPEN,
+    MEDIASTORE_WRITE,
+    MEDIASTORE_FINALIZE,
+    DOCUMENT_DESTINATION_OPEN,
+    DOCUMENT_DESTINATION_WRITE,
+}
+
+internal class AttachmentSaveException(
+    val stage: AttachmentSaveStage,
+    cause: Throwable? = null,
+) : java.io.IOException("attachment save failed at ${stage.name}", cause),
+    DiagnosticErrorMetadata {
+    override val diagnosticErrorCode: String = "IO"
+    override val diagnosticTechnicalDetail: String = "stage=${stage.name}"
+}
 
 /**
  * Materialize a general document once into the bounded shared-media cache.
@@ -191,18 +215,38 @@ internal suspend fun openAttachmentExternally(
                 val completeSource = validatedAttachmentCacheFile(source) ?: error("missing attachment artifact")
                 fileProviderUri(context, completeSource)
             }.getOrNull()
-        } ?: return OpenAttachmentResult.Error
-    val mime = attachmentOpenMime(mediaType)
-    val intent =
-        android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, mime)
-            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         }
+    return if (uri == null) {
+        OpenAttachmentResult.Error
+    } else {
+        val mime = attachmentOpenMime(mediaType)
+        if (
+            requiresAndroidPackageInstallPermission(
+                mediaType = mime,
+                selfUpdateEnabled = BuildConfig.SELF_UPDATE_ENABLED,
+                sdkInt = Build.VERSION.SDK_INT,
+                canRequestPackageInstalls = {
+                    runCatching { context.packageManager.canRequestPackageInstalls() }.getOrDefault(false)
+                },
+            )
+        ) {
+            OpenAttachmentResult.InstallPermissionRequired
+        } else {
+            launchAttachmentViewIntent(context, uri, mime)
+        }
+    }
+}
+
+private fun launchAttachmentViewIntent(
+    context: Context,
+    uri: Uri,
+    mediaType: String,
+): OpenAttachmentResult {
+    val intent = attachmentViewIntent(uri, mediaType)
     return try {
         context.startActivity(intent)
         OpenAttachmentResult.Opened
-    } catch (_: android.content.ActivityNotFoundException) {
+    } catch (_: ActivityNotFoundException) {
         OpenAttachmentResult.NoHandler
     } catch (_: SecurityException) {
         // FileProvider grant rejected, or target activity has no permission
@@ -212,8 +256,30 @@ internal suspend fun openAttachmentExternally(
     }
 }
 
+internal fun attachmentViewIntent(
+    uri: Uri,
+    mediaType: String,
+): Intent =
+    Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, mediaType)
+        clipData = ClipData.newRawUri("attachment", uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
 /** Presentation classification must never rewrite the MIME used to open a file. */
 internal fun attachmentOpenMime(mediaType: String): String = mediaType.ifBlank { "application/octet-stream" }
+
+internal fun requiresAndroidPackageInstallPermission(
+    mediaType: String,
+    selfUpdateEnabled: Boolean,
+    sdkInt: Int,
+    canRequestPackageInstalls: () -> Boolean,
+): Boolean =
+    mediaType.equals(ANDROID_PACKAGE_MIME, ignoreCase = true) &&
+        selfUpdateEnabled &&
+        sdkInt >= Build.VERSION_CODES.O &&
+        !canRequestPackageInstalls()
 
 /**
  * Persist [bytes] to the device gallery (Pictures/White Noise). Returns success.
@@ -236,22 +302,11 @@ internal fun saveImageToGallery(
             put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/White Noise")
             put(android.provider.MediaStore.Images.Media.IS_PENDING, 1)
         }
-    val uri =
-        resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-            ?: return false
-    return try {
-        resolver.openOutputStream(uri).use { out ->
-            if (out == null) throw java.io.IOException("null output stream")
-            out.write(bytes)
-        }
-        values.clear()
-        values.put(android.provider.MediaStore.Images.Media.IS_PENDING, 0)
-        requireMediaStoreFinalized(resolver.update(uri, values, null, null))
-        true
-    } catch (failure: Throwable) {
-        runCatching { resolver.delete(uri, null, null) } // don't leave a pending orphan
-        throw failure
-    }
+    return publishMediaStoreEntry(
+        resolver = resolver,
+        collection = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+        values = values,
+    ) { output -> output.write(bytes) }
 }
 
 /** Persist a decrypted video to the public Movies/White Noise folder via the
@@ -316,31 +371,12 @@ private fun saveFileToDownloads(
             put(android.provider.MediaStore.Downloads.RELATIVE_PATH, "Download/White Noise")
             put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
         }
-    val uri =
-        requireMediaStoreValue(
-            resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values),
-            "MediaStore insert failed",
-        )
-    return try {
-        resolver.openOutputStream(uri).use { out ->
-            requireMediaStoreValue(out, "null output stream").let { output ->
-                source.copyTo(output, DEFAULT_BUFFER_SIZE)
-            }
-        }
-        values.clear()
-        values.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
-        requireMediaStoreFinalized(resolver.update(uri, values, null, null))
-        true
-    } catch (failure: Throwable) {
-        runCatching { resolver.delete(uri, null, null) }
-        throw failure
-    }
+    return publishMediaStoreEntry(
+        resolver = resolver,
+        collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+        values = values,
+    ) { output -> source.copyTo(output, DEFAULT_BUFFER_SIZE) }
 }
-
-private fun <T> requireMediaStoreValue(
-    value: T?,
-    message: String,
-): T = value ?: throw java.io.IOException(message)
 
 private fun saveVideoToGallery(
     context: android.content.Context,
@@ -356,17 +392,36 @@ private fun saveVideoToGallery(
             put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/White Noise")
             put(android.provider.MediaStore.Video.Media.IS_PENDING, 1)
         }
+    return publishMediaStoreEntry(
+        resolver = resolver,
+        collection = android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+        values = values,
+    ) { output -> source.copyTo(output, DEFAULT_BUFFER_SIZE) }
+}
+
+private inline fun publishMediaStoreEntry(
+    resolver: android.content.ContentResolver,
+    collection: Uri,
+    values: android.content.ContentValues,
+    write: (java.io.OutputStream) -> Unit,
+): Boolean {
     val uri =
-        resolver.insert(android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-            ?: return false
-    return try {
-        resolver.openOutputStream(uri).use { out ->
-            if (out == null) throw java.io.IOException("null output stream")
-            source.copyTo(out, DEFAULT_BUFFER_SIZE)
+        retryNullableMediaStoreInsert {
+            resolver.insert(collection, values)
         }
-        values.clear()
-        values.put(android.provider.MediaStore.Video.Media.IS_PENDING, 0)
-        requireMediaStoreFinalized(resolver.update(uri, values, null, null))
+    return try {
+        val output =
+            attachmentSaveStage(AttachmentSaveStage.MEDIASTORE_OPEN) {
+                requireAttachmentOutputStream(resolver.openOutputStream(uri))
+            }
+        attachmentSaveStage(AttachmentSaveStage.MEDIASTORE_WRITE) {
+            output.use(write)
+        }
+        attachmentSaveStage(AttachmentSaveStage.MEDIASTORE_FINALIZE) {
+            values.clear()
+            values.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
+            requireMediaStoreFinalized(resolver.update(uri, values, null, null))
+        }
         true
     } catch (failure: Throwable) {
         runCatching { resolver.delete(uri, null, null) }
@@ -374,8 +429,62 @@ private fun saveVideoToGallery(
     }
 }
 
+private fun requireAttachmentOutputStream(output: java.io.OutputStream?): java.io.OutputStream =
+    output ?: throw java.io.IOException("MediaStore returned no output stream")
+
 private fun requireMediaStoreFinalized(updatedRows: Int) {
     if (updatedRows <= 0) throw java.io.IOException("MediaStore finalization failed")
+}
+
+@VisibleForTesting
+internal fun <T : Any> retryNullableMediaStoreInsert(
+    attempts: Int = MEDIA_STORE_INSERT_ATTEMPTS,
+    onRetry: () -> Unit = { Thread.sleep(MEDIA_STORE_INSERT_RETRY_DELAY_MILLIS) },
+    insert: () -> T?,
+): T {
+    require(attempts > 0)
+    repeat(attempts) { attempt ->
+        val value =
+            attachmentSaveStage(AttachmentSaveStage.MEDIASTORE_INSERT) {
+                insert()
+            }
+        if (value != null) return value
+        if (attempt < attempts - 1) {
+            attachmentSaveStage(AttachmentSaveStage.MEDIASTORE_INSERT, onRetry)
+        }
+    }
+    throw AttachmentSaveException(AttachmentSaveStage.MEDIASTORE_INSERT)
+}
+
+private inline fun <T> attachmentSaveStage(
+    stage: AttachmentSaveStage,
+    block: () -> T,
+): T =
+    try {
+        block()
+    } catch (cancel: kotlinx.coroutines.CancellationException) {
+        throw cancel
+    } catch (failure: AttachmentSaveException) {
+        throw failure
+    } catch (failure: Throwable) {
+        throw AttachmentSaveException(stage, failure)
+    }
+
+internal fun copyDocumentToDestination(
+    context: Context,
+    source: java.io.File,
+    destination: Uri,
+) {
+    val output =
+        attachmentSaveStage(AttachmentSaveStage.DOCUMENT_DESTINATION_OPEN) {
+            context.contentResolver.openOutputStream(destination, "w")
+                ?: throw java.io.IOException("document provider returned no output stream")
+        }
+    attachmentSaveStage(AttachmentSaveStage.DOCUMENT_DESTINATION_WRITE) {
+        output.use { destinationStream ->
+            source.inputStream().use { input -> input.copyTo(destinationStream, DEFAULT_BUFFER_SIZE) }
+        }
+    }
 }
 
 /** Stream an already-materialized video into a share-safe FileProvider temp. */
