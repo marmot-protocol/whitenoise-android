@@ -32,11 +32,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -396,6 +399,7 @@ internal fun MessageBubble(
         remember(record.messageIdHex) { mutableStateMapOf<Any, SelectableTextLayout>() }
     val markdownLinkLayouts =
         remember(record.messageIdHex) { mutableStateMapOf<Any, MarkdownLinkTextLayout>() }
+    val pendingLongPressLinkDestination = remember(record.messageIdHex) { arrayOfNulls<String>(1) }
     val markdownLinkLayoutReporter =
         remember(record.messageIdHex) {
             {
@@ -666,6 +670,20 @@ internal fun MessageBubble(
     var deleteDialogOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var deleteForEveryoneInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     var attachmentSaveInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
+    key(record.messageIdHex) {
+        val currentActionMenuOpen by rememberUpdatedState(isActionMenuOpen)
+        val currentActionMenuOpenChange by rememberUpdatedState(onActionMenuOpenChange)
+        DisposableEffect(Unit) {
+            onDispose {
+                // A navigation, configuration change, or dataset replacement
+                // can dispose a stationary row without pointer-up. Range-drag
+                // cleanup remains owned by the pointer detector; this keyed
+                // effect retires only this row's popup and cannot close a newly
+                // recycled row's menu.
+                if (currentActionMenuOpen) currentActionMenuOpenChange(false)
+            }
+        }
+    }
     // A deleted message is inert: tear down any open action/reaction surface if
     // the message is deleted out from under it (optimistic or remote delete).
     LaunchedEffect(deleted) {
@@ -931,8 +949,10 @@ internal fun MessageBubble(
                         // long-press — which is why long-press did nothing on a
                         // media bubble while it worked on a text bubble (#262).
                         // A quick tap still reaches the child's viewer/player.
-                        // Once held, release opens actions while a vertical drag
-                        // switches to anchored batch selection. Horizontal motion
+                        // Once held, ordinary message actions open at the platform
+                        // threshold while a vertical drag dismisses them and
+                        // switches to anchored batch selection. Markdown links
+                        // keep their copy-on-release routing. Horizontal motion
                         // remains available to swipe-to-reply above.
                         if (deleted || longPressBlockedBySelection || textSelectionMode) {
                             // A deleted message has no actions menu; batch selection
@@ -940,21 +960,19 @@ internal fun MessageBubble(
                             Modifier
                         } else {
                             Modifier.longPressOrVerticalDrag(
-                                onLongPressStart = {
+                                onLongPressStart = { position ->
                                     haptics.performHapticFeedback(
                                         androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
                                     )
-                                },
-                                onLongPressRelease = { position ->
+                                    pendingLongPressLinkDestination[0] = null
                                     val windowPosition =
                                         rowCoordinates[0]?.let {
                                             messageBubbleLongPressPositionInWindow(it, position)
                                         } ?: return@longPressOrVerticalDrag
                                     val linkDestination =
                                         markdownLinkDestinationAt(markdownLinkLayouts.values, windowPosition)
-                                    if (linkDestination != null) {
-                                        copyMarkdownLink(linkDestination)
-                                    } else {
+                                    pendingLongPressLinkDestination[0] = linkDestination
+                                    if (linkDestination == null) {
                                         // Capture the press in window space before
                                         // opening so both the popover and text
                                         // selection seed at the finger (#326, #1370).
@@ -969,7 +987,17 @@ internal fun MessageBubble(
                                         onActionMenuOpenChange(true)
                                     }
                                 },
+                                onLongPressRelease = {
+                                    val linkDestination = pendingLongPressLinkDestination[0]
+                                    pendingLongPressLinkDestination[0] = null
+                                    if (linkDestination != null) copyMarkdownLink(linkDestination)
+                                },
                                 onDragStart = { position ->
+                                    // A range gesture begins after the threshold
+                                    // action was shown. Hand ownership over without
+                                    // leaving a stale popup above selection mode.
+                                    pendingLongPressLinkDestination[0] = null
+                                    onActionMenuOpenChange(false)
                                     rowCoordinates[0]
                                         ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
                                         ?.let(onDragSelectionStart)
@@ -981,7 +1009,11 @@ internal fun MessageBubble(
                                         ?: false
                                 },
                                 onDragEnd = onDragSelectionEnd,
-                                onGestureCancel = onDragSelectionCancel,
+                                onGestureCancel = {
+                                    pendingLongPressLinkDestination[0] = null
+                                    onActionMenuOpenChange(false)
+                                    onDragSelectionCancel()
+                                },
                             )
                         },
                     ).then(
