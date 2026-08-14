@@ -12,6 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class TtsMessageProjectionTest {
     @Test
@@ -92,6 +93,32 @@ class TtsMessageProjectionTest {
                 ),
                 entry.spokenTextSpans,
             )
+        }
+
+    @Test
+    fun emojiFinalProjectionReachesEngineWithoutSyntheticSuffix() =
+        runBlocking {
+            val emptyDocument =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = byteArrayOf(),
+                )
+            val entry =
+                projectTtsSpeakableEntry(
+                    message = message("Great job 😀", contentTokens = emptyDocument),
+                    editedText = null,
+                    senderDisplayName = "Alice",
+                    parseMarkdown = { emptyDocument },
+                )!!
+            val engine = FakeSessionEngine()
+            val controller = TtsController(audioFocus = FakeSessionFocus(), maxChunkLength = 4_000)
+            controller.attachEngine(engine)
+
+            assertTrue(controller.speak(listOf(entry), Locale.US))
+            val spokenText = engine.spoken.single().text
+            assertEquals("Alice: Great job 😀", spokenText)
+            assertFalse(spokenText.endsWith("."))
         }
 
     @Test

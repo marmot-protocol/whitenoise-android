@@ -16,6 +16,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@Suppress("LargeClass") // Speakable projection regressions share one Markdown AST fixture harness.
 class MarkdownSpeakableTextTest {
     @Test
     fun formattingSyntaxIsRemovedWhileBlockBoundariesStaySpeakable() {
@@ -556,6 +557,106 @@ class MarkdownSpeakableTextTest {
             "a".repeat(MARKDOWN_SPEAKABLE_MAX_LENGTH),
             markdownDocumentToSpeakableText(document),
         )
+    }
+
+    @Test
+    fun singleEmojiIsNotFollowedBySyntheticPunctuation() {
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text("😀")),
+                        ),
+                    ),
+            )
+
+        assertEquals("😀", markdownDocumentToSpeakableText(document))
+    }
+
+    @Test
+    fun emojiSequencesAreNotFollowedBySyntheticPunctuation() {
+        listOf("❤️", "👍🏽", "👨‍👩‍👧", "1️⃣").forEach { emoji ->
+            assertEquals(emoji, legacyTextToSpeakableText(emoji))
+        }
+    }
+
+    @Test
+    fun textEndingInEmojiIsNotFollowedBySyntheticPunctuation() {
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text("Great job 😀")),
+                        ),
+                    ),
+            )
+
+        assertEquals("Great job 😀", markdownDocumentToSpeakableText(document))
+    }
+
+    @Test
+    fun authoredPunctuationAfterEmojiIsPreserved() {
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text("Nice 😀!")),
+                        ),
+                    ),
+            )
+
+        assertEquals("Nice 😀!", markdownDocumentToSpeakableText(document))
+    }
+
+    @Test
+    fun multiBlockEmojiContentKeepsBlockSeparationWithoutSyntheticSuffixes() {
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text("😀")),
+                        ),
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text("👋")),
+                        ),
+                    ),
+            )
+
+        assertEquals("😀 👋", markdownDocumentToSpeakableText(document))
+    }
+
+    @Test
+    fun legacyPlainFallbackMatchesMarkdownProjectionForEmojiFinalText() {
+        val emojiFinal = "Great job 😀"
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text(emojiFinal)),
+                        ),
+                    ),
+            )
+
+        assertEquals(
+            markdownDocumentToSpeakableText(document),
+            legacyTextToSpeakableText(emojiFinal),
+        )
+        assertEquals("Great job 😀", legacyTextToSpeakableText(emojiFinal))
     }
 
     @Test
