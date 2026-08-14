@@ -75,7 +75,7 @@ Two security workflows run separately from the main Gradle validation so their
 permissions and results stay explicit:
 
 - `.github/workflows/codeql.yml` compiles a credential-free Android variant
-  and scans their Java and Kotlin with CodeQL's extended security query suite.
+  and scans its Java and Kotlin with CodeQL's extended security query suite.
   It runs for pull requests, `master` pushes, a weekly full scan, and manual
   dispatch. Only its SARIF upload receives `security-events: write`.
 - `.github/workflows/dependency-submission.yml` supplies GitHub's dependency
@@ -83,10 +83,11 @@ permissions and results stay explicit:
   vulnerability alerts can evaluate direct and transitive Gradle dependencies.
   Only this submission workflow receives `contents: write`.
 
-Both workflows pin every third-party action to a full commit SHA, cancel
-superseded work, and have bounded job timeouts. Gradle's setup action reuses the
-normal dependency and build caches; non-default branches are read-only by the
-dependency-submission action's default cache policy.
+Both security workflows pin every third-party action to a full commit SHA,
+cancel superseded work, and have bounded job timeouts. Gradle's setup action
+reuses the normal dependency and build caches. Dependency submission runs only
+from trusted `master` pushes because it is the sole workflow with
+`contents: write`.
 
 Pushes to `master` also run `.github/workflows/android-instrumented.yml`, a
 separate emulator workflow for `:app:connectedDevZapstoreDebugAndroidTest`

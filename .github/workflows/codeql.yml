@@ -47,8 +47,10 @@ jobs:
           queries: security-extended
 
       # One credential-free app variant is enough to compile the shared
-      # production source set. Keeping this build serial and focused avoids
-      # running two copies of Kotlin/UniFFI compilation under CodeQL tracing.
+      # production source set. The :benchmark module contains test-only
+      # Macrobenchmark and Baseline Profile drivers, so it is intentionally
+      # excluded from this production-code scan. Keeping the build serial and
+      # focused also avoids tracing two copies of Kotlin/UniFFI compilation.
       - name: Build Java and Kotlin for analysis
         run: >-
           ./gradlew
