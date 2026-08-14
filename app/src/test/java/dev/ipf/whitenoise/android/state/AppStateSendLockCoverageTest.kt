@@ -197,58 +197,6 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
-    fun deleteMessageAuthorizationGuardPrecedesOptimisticAndFfiMutation() {
-        val body = controllerFunctionBody("deleteMessage")
-        val authorizationGate = body.indexOf("!deleteCapabilityFor(message).canDeleteForEveryone")
-        val earlyReturn = body.indexOf("return false", startIndex = authorizationGate)
-        val optimisticMutation = body.indexOf("deletedMessageIds = deletedMessageIds + target")
-        val ffiDelete = body.indexOf("appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }")
-
-        assertTrue(
-            "unauthorized deletes must return before mutating deletedMessageIds",
-            authorizationGate >= 0 && earlyReturn > authorizationGate && optimisticMutation > earlyReturn,
-        )
-        assertTrue(
-            "unauthorized deletes must return before reaching the FFI delete call",
-            ffiDelete > earlyReturn,
-        )
-    }
-
-    @Test
-    fun deleteMessageReturnsCommitResultAndBatchUsesIt() {
-        val controllers = controllersSource().readText()
-        val body = controllerFunctionBody("deleteMessage")
-        val conversation = conversationScreenSource().readText()
-
-        assertTrue(
-            "deleteMessage must expose a Boolean commit result",
-            Regex("""suspend\s+fun\s+deleteMessage\s*\([^)]*\)\s*:\s*Boolean""").containsMatchIn(controllers),
-        )
-        assertTrue(
-            "deleteMessage guards must report that no commit occurred",
-            "conversationAccountRef ?: return false" in body &&
-                "!deleteCapabilityFor(message).canDeleteForEveryone" in body &&
-                "return false" in body,
-        )
-        assertTrue(
-            "deleteMessage must report true after the locked commit and false after rollback",
-            body.indexOf("appState.withGroupCommitLock") < body.indexOf("true") &&
-                body.indexOf("deletedMessageIds = deletedMessageIds - target") < body.lastIndexOf("false"),
-        )
-        assertTrue(
-            "deleteMessage must roll back optimistic deletion before propagating cancellation",
-            body.indexOf("deletedMessageIds = deletedMessageIds - target") < body.indexOf("throwable.rethrowIfCancellation()"),
-        )
-        assertTrue(
-            "batch deletion must aggregate commit results without emitting one snackbar per failure",
-            "controller.deleteMessage(record, presentFailure = false)" in conversation &&
-                "R.string.batch_delete_partial" in conversation &&
-                "if (presentFailure)" in body &&
-                "record.messageIdHex !in controller.deletedMessageIds" !in conversation,
-        )
-    }
-
-    @Test
     fun failedSendDiscardTracksPendingOnlyWhenRetryStillExists() {
         val body = controllerFunctionBody("discardFailedSend")
 
@@ -517,7 +465,7 @@ class AppStateSendLockCoverageTest {
         ).firstOrNull { it.exists() }
             ?: error("Missing AppState.kt source file")
 
-    private fun controllerFunctionBody(functionName: String): String {
+    internal fun controllerFunctionBody(functionName: String): String {
         val source = controllersSource().readText()
         val start =
             Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
@@ -530,14 +478,14 @@ class AppStateSendLockCoverageTest {
         return source.kotlinBlockFrom(braceStart, "function $functionName")
     }
 
-    private fun controllersSource(): File =
+    internal fun controllersSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing Controllers.kt source file")
 
-    private fun conversationScreenSource(): File =
+    internal fun conversationScreenSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),

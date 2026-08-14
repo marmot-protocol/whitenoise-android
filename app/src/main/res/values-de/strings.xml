@@ -742,6 +742,10 @@
     <string name="batch_delete_complete">Ausgewählte Nachrichten entfernt</string>
     <string name="batch_delete_partial">Einige ausgewählte Nachrichten wurden entfernt; bei einigen ist der Vorgang fehlgeschlagen</string>
     <string name="batch_delete_failed">Ausgewählte Nachrichten konnten nicht entfernt werden</string>
+    <string name="batch_delete_failure_progress">%1$d von %2$d ausgewählten Nachrichten entfernt</string>
+    <string name="batch_delete_failures_local">Lokales Entfernen fehlgeschlagen: %1$d</string>
+    <string name="batch_delete_failures_everyone">Löschen für alle fehlgeschlagen: %1$d</string>
+    <string name="batch_delete_failures_mixed">Lokales Entfernen fehlgeschlagen: %1$d · Löschen für alle fehlgeschlagen: %2$d</string>
     <string name="toast_forwarded_batch_partial">Einige ausgewählte Nachrichten wurden weitergeleitet; einige sind fehlgeschlagen</string>
     <string name="toast_forward_batch_failed">Ausgewählte Nachrichten konnten nicht weitergeleitet werden</string>
     <plurals name="unread_messages_count">
