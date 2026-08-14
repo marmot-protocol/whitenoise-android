@@ -146,6 +146,28 @@ class TtsControllerTest {
     }
 
     @Test
+    fun speakStartsNewQueueAtRequestedSentence() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+        val text = "First. Second. Third."
+
+        assertTrue(
+            controller.speak(
+                entries = listOf(TtsSpeakableEntry("alice", "Alice", text)),
+                locale = Locale.US,
+                startSentenceIndex = 1,
+            ),
+        )
+
+        assertEquals(listOf("Alice: Second.", "Third."), engine.spoken.map { it.text })
+        assertEquals(
+            speakingTts(1, 3, 0, 1, text, sentenceIndex = 1, sentenceCount = 3),
+            controller.state.value,
+        )
+    }
+
+    @Test
     fun focusLossPausesAndResumeRestartsTheCurrentChunk() {
         val engine = FakeTtsSpeechEngine()
         val focus = FakeTtsAudioFocus()

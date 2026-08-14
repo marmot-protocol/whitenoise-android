@@ -183,7 +183,10 @@ internal class TtsPlaybackQueue(
         if (_state.value is TtsState.Speaking) refreshAtNextBoundary = true
     }
 
-    fun start(messages: List<TtsQueuedMessage>) {
+    fun start(
+        messages: List<TtsQueuedMessage>,
+        startSentenceIndex: Int = 0,
+    ) {
         stopEngine()
         generation += 1
         messageProgressGeneration += 1
@@ -192,16 +195,24 @@ internal class TtsPlaybackQueue(
         rangeTracker.clear()
         refreshAtNextBoundary = false
         replaceMessages(messages)
-        currentIndex = 0
+        currentIndex =
+            if (chunks.isEmpty()) {
+                0
+            } else {
+                firstChunkIndexForSentence(startSentenceIndex.coerceAtLeast(0))
+            }
         resetMessageProgress()
-        announceSenderForCurrentMessage = false
-        senderAnnouncedAtMessageIndex = null
         pendingResumeAnnouncement = null
         messageIndexAtPause = null
         if (chunks.isEmpty()) {
+            announceSenderForCurrentMessage = false
+            senderAnnouncedAtMessageIndex = null
             _state.value = TtsState.Idle(sessionId = playbackSessionId)
             return
         }
+        val messageIndex = projection.messageIndexForChunk(currentIndex)
+        announceSenderForCurrentMessage = currentIndex != projection.firstChunkIndexOfMessage(messageIndex)
+        senderAnnouncedAtMessageIndex = null
         enqueueFromCurrentIndex()
     }
 
@@ -449,6 +460,16 @@ internal class TtsPlaybackQueue(
     }
 
     fun queuedMessagesSnapshot(): List<TtsQueuedMessage> = messages
+
+    private fun firstChunkIndexForSentence(sentenceIndex: Int): Int {
+        val lastChunk =
+            if (messages.size == 1) {
+                chunks.lastIndex
+            } else {
+                projection.firstChunkIndexOfMessage(1) - 1
+            }
+        return (0..lastChunk).firstOrNull { chunks[it].sentenceIndex == sentenceIndex } ?: 0
+    }
 
     private fun targetChunkFor(
         messageIndex: Int,

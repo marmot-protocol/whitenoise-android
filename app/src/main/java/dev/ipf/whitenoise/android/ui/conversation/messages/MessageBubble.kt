@@ -356,6 +356,8 @@ internal fun MessageBubble(
     var longPressWindowPosition by remember(record.messageIdHex) { mutableStateOf<Offset?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
     var actionMenuAnchorBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
+    var actionMenuVisibleText by remember(record.messageIdHex) { mutableStateOf("") }
+    var actionMenuVisibleOffset by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
     val rowCoordinates = remember(record.messageIdHex) { arrayOfNulls<LayoutCoordinates>(1) }
     val messageBoundsInWindow = remember(record.messageIdHex) { arrayOfNulls<IntRect>(1) }
     val actionAnchorBoundsModifier =
@@ -399,14 +401,15 @@ internal fun MessageBubble(
             }
         }
     var textSelectionSeeded by remember(record.messageIdHex) { mutableStateOf(false) }
+    var textSelectionBoundsInWindow by remember(record.messageIdHex) { mutableStateOf<Rect?>(null) }
     val plainTextLayoutKey = remember(record.messageIdHex) { Any() }
     val plainTextLayoutTracker = remember(record.messageIdHex) { SelectableTextLayoutTracker() }
     val textSelectionClipboard =
         rememberExitOnCopyClipboard { onTextSelectionModeChange(false) }
     val selectableTextLayoutReporter =
-        remember(textSelectionMode, record.messageIdHex) {
+        remember(record.messageIdHex) {
             { key: Any, layoutResult: TextLayoutResult?, coordinates: androidx.compose.ui.layout.LayoutCoordinates? ->
-                if (textSelectionMode && layoutResult != null && coordinates != null) {
+                if (layoutResult != null && coordinates != null) {
                     selectableTextLayouts[key] = SelectableTextLayout(key, layoutResult, coordinates)
                 } else {
                     selectableTextLayouts.remove(key)
@@ -427,14 +430,13 @@ internal fun MessageBubble(
     }
     LaunchedEffect(textSelectionMode) {
         if (!textSelectionMode) {
-            selectableTextLayouts.clear()
             textSelectionSeeded = false
+            textSelectionBoundsInWindow = null
             onTextSelectionBoundsChange(null)
         }
     }
 
     fun reportPlainTextLayoutIfReady() {
-        if (!textSelectionMode) return
         val layoutResult = plainTextLayoutTracker.layoutResult ?: return
         val coordinates = plainTextLayoutTracker.coordinates ?: return
         selectableTextLayouts[plainTextLayoutKey] =
@@ -442,17 +444,17 @@ internal fun MessageBubble(
     }
 
     val plainTextSelectionModifier =
-        if (textSelectionMode) {
-            Modifier.onGloballyPositioned { coordinates ->
-                plainTextLayoutTracker.coordinates = coordinates
-                reportPlainTextLayoutIfReady()
-            }
-        } else {
-            Modifier
+        Modifier.onGloballyPositioned { coordinates ->
+            plainTextLayoutTracker.coordinates = coordinates
+            reportPlainTextLayoutIfReady()
         }
     val textSelectionBoundsModifier =
         if (textSelectionMode) {
-            Modifier.onGloballyPositioned { onTextSelectionBoundsChange(it.boundsInWindow()) }
+            Modifier.onGloballyPositioned {
+                val bounds = it.boundsInWindow()
+                textSelectionBoundsInWindow = bounds
+                onTextSelectionBoundsChange(bounds)
+            }
         } else {
             Modifier
         }
@@ -499,6 +501,15 @@ internal fun MessageBubble(
                 else -> MessageProjector.displayBody(record, messageTextCopy)
             }
         }
+    val canSpeakAloud =
+        messageBubbleCanSpeak(
+            record = record,
+            editedText = editState?.latestText,
+            deleted = deleted,
+            invalidated = invalidated,
+            ttsHasUsableEngine = appState.ttsHasUsableEngine,
+        )
+    val speakAloudLabel = stringResource(R.string.speak_aloud)
     // Issue #390 v1 forwards text only. Forward must be hidden for any record
     // whose displayed body is a synthetic surrogate (media filename/placeholder,
     // "Reacted …", delete/system summaries, agent-stream copy) — forwarding
@@ -624,6 +635,17 @@ internal fun MessageBubble(
         onActionMenuOpenChange(false)
     }
 
+    fun captureActionMenuVisibleStart(pressInWindow: Offset?) {
+        val layouts = selectableTextLayouts.values.toList()
+        actionMenuVisibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
+        actionMenuVisibleOffset =
+            if (record.contentTokens.truncated) {
+                null
+            } else {
+                textOffsetAtWindowPosition(layouts, pressInWindow)
+            }
+    }
+
     suspend fun ttsEntry(entryRecord: AppMessageRecordFfi) =
         projectTtsSpeakableEntry(
             message = entryRecord,
@@ -643,23 +665,54 @@ internal fun MessageBubble(
     // point of the action, and Stop on the transport bar is one tap. The
     // session takes auto-read ownership so messages arriving while it speaks
     // continue the read. Falls back to just this bubble when its record has
-    // left the loaded timeline.
+    // left the loaded timeline. When text is selected or the action menu was
+    // opened from a hit-tested press, start at the containing visible sentence.
     fun speakFromHere() {
+        val layouts = selectableTextLayouts.values.toList()
+        val selectionActive = textSelectionMode && messageTextSelectionState.selectedTexts.isNotEmpty()
+        val visibleText =
+            if (selectionActive) {
+                concatenatedVisibleText(layouts).ifBlank { displayedBody }
+            } else {
+                actionMenuVisibleText.ifBlank { concatenatedVisibleText(layouts).ifBlank { displayedBody } }
+            }
+        val visibleOffset =
+            if (record.contentTokens.truncated) {
+                null
+            } else if (selectionActive) {
+                visibleOffsetFromSelection(
+                    layouts = layouts,
+                    selectedTexts = messageTextSelectionState.selectedTexts,
+                    preferredVisibleOffset = actionMenuVisibleOffset,
+                )
+            } else {
+                actionMenuVisibleOffset
+            }
+        val locale = java.util.Locale.getDefault()
         appState.launchMutation {
-            val entries =
+            val candidateRecords =
                 ttsSpeakFromHereCandidates(
                     timeline = controller.timeline,
                     selected = record,
-                ).mapNotNull { entryRecord -> ttsEntry(entryRecord) }
-            if (entries.isNotEmpty()) {
-                appState.speakAloudAutoRead(
-                    controller.group.groupIdHex,
-                    entries,
-                    java.util.Locale.getDefault(),
                 )
-            } else {
+            val entries = candidateRecords.mapNotNull { entryRecord -> ttsEntry(entryRecord) }
+            if (entries.isEmpty()) {
                 appState.present(R.string.tts_bar_error)
+                return@launchMutation
             }
+            val startSentenceIndex =
+                speakableSentenceIndexAtVisibleOffset(
+                    visibleText = visibleText,
+                    speakableText = entries.first().text,
+                    visibleOffset = visibleOffset,
+                    locale = locale,
+                )
+            appState.speakAloudAutoRead(
+                controller.group.groupIdHex,
+                entries,
+                locale,
+                startSentenceIndex,
+            )
         }
     }
 
@@ -794,6 +847,11 @@ internal fun MessageBubble(
                                         longPressWindowPosition = windowPosition
                                         longPressWindowY = windowPosition.y
                                         actionMenuAnchorBounds = messageBoundsInWindow[0]
+                                        // Freeze the rendered hit now. The bubble
+                                        // can move while its popup is open; an old
+                                        // window coordinate must never be re-hit-
+                                        // tested against a different line later.
+                                        captureActionMenuVisibleStart(windowPosition)
                                         onActionMenuOpenChange(true)
                                     }
                                 },
@@ -833,6 +891,7 @@ internal fun MessageBubble(
                                     longPressWindowPosition = null
                                     longPressWindowY = null
                                     actionMenuAnchorBounds = messageBoundsInWindow[0]
+                                    captureActionMenuVisibleStart(null)
                                     onActionMenuOpenChange(true)
                                     true
                                 }
@@ -1048,12 +1107,19 @@ internal fun MessageBubble(
                 // long-click path. Hoisted so every media call site shares one
                 // definition.
                 val onMediaLongPress =
-                    remember(textSelectionMode, selectionMode, onActionMenuOpenChange) {
+                    remember(
+                        textSelectionMode,
+                        selectionMode,
+                        displayedBody,
+                        record.contentTokens.truncated,
+                        onActionMenuOpenChange,
+                    ) {
                         {
                             if (!selectionMode && !textSelectionMode) {
                                 longPressWindowPosition = null
                                 longPressWindowY = null
                                 actionMenuAnchorBounds = messageBoundsInWindow[0]
+                                captureActionMenuVisibleStart(null)
                                 onActionMenuOpenChange(true)
                             }
                         }
@@ -1131,6 +1197,7 @@ internal fun MessageBubble(
                                             longPressWindowPosition = null
                                             longPressWindowY = null
                                             actionMenuAnchorBounds = messageBoundsInWindow[0]
+                                            captureActionMenuVisibleStart(null)
                                             onActionMenuOpenChange(true)
                                         }
                                     },
@@ -1184,8 +1251,24 @@ internal fun MessageBubble(
                 }
                 val selectionWrapper: @Composable (@Composable () -> Unit) -> Unit = { content ->
                     if (textSelectionMode) {
+                        val systemReadAloudKeyIds =
+                            remember(context) { systemReadAloudProcessTextKeyIds(context) }
                         CompositionLocalProvider(LocalClipboard provides textSelectionClipboard) {
-                            SelectionContainer(state = messageTextSelectionState) { content() }
+                            SelectionContainer(
+                                state = messageTextSelectionState,
+                                modifier =
+                                    Modifier.appendSpeakAloudTextContextMenuAction(
+                                        enabled = canSpeakAloud && !deleted,
+                                        label = speakAloudLabel,
+                                        systemReadAloudKeyIds = systemReadAloudKeyIds,
+                                        onSpeak = {
+                                            speakFromHere()
+                                            onTextSelectionModeChange(false)
+                                        },
+                                    ),
+                            ) {
+                                content()
+                            }
                         }
                     } else {
                         content()
@@ -1411,14 +1494,7 @@ internal fun MessageBubble(
                     // Speak aloud uses the same edit-aware user-authored text as TTS
                     // projection, not the display fallback (filenames, placeholders,
                     // reactions, system copy).
-                    canSpeak =
-                        messageBubbleCanSpeak(
-                            record = record,
-                            editedText = editState?.latestText,
-                            deleted = deleted,
-                            invalidated = invalidated,
-                            ttsHasUsableEngine = appState.ttsHasUsableEngine,
-                        ),
+                    canSpeak = canSpeakAloud,
                     canSelectText = !bodyTextToRender.isNullOrBlank(),
                     canSave = mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
                     quickReactionEmojis = quickReactionEmojis,
@@ -1443,8 +1519,8 @@ internal fun MessageBubble(
                     },
                     onCopyText = ::copyMessageText,
                     onSpeak = {
-                        onActionMenuOpenChange(false)
                         speakFromHere()
+                        onActionMenuOpenChange(false)
                     },
                     onSave = ::saveAttachments,
                     onSelectText = ::beginTextSelection,

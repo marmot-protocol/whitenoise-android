@@ -135,8 +135,8 @@ internal fun MarkdownMessageBody(
     // other block types leave it unset.
     onLastTextLayout: ((TextLayoutResult) -> Unit)? = null,
     // Reports every selectable body Text with stable identity plus its latest
-    // layout/coordinates. MessageBubble uses this only while partial text
-    // selection is active to seed the native selection at the original press.
+    // layout/coordinates. MessageBubble uses this to seed native selection and
+    // freeze a reliable visible-sentence hit when the action menu opens.
     onSelectableTextLayoutChanged: SelectableTextLayoutReporter? = null,
     // Link-bearing text leaves report their layout so the bubble's row-level
     // long-press detector can distinguish a URL press from a plain-text press.

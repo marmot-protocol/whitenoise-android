@@ -178,7 +178,7 @@ internal fun textSelectionSeedRange(
     )
 }
 
-private fun compareSelectableTextLayouts(
+internal fun compareSelectableTextLayouts(
     first: SelectableTextLayout,
     second: SelectableTextLayout,
 ): Int {
