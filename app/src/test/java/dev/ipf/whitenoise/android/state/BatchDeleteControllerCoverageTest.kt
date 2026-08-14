@@ -49,7 +49,8 @@ class BatchDeleteControllerCoverageTest {
         )
         assertTrue(
             "deleteMessage must roll back optimistic deletion before propagating cancellation",
-            body.indexOf("deletedMessageIds = deletedMessageIds - target") < body.indexOf("throwable.rethrowIfCancellation()"),
+            body.indexOf("deletedMessageIds = deletedMessageIds - target") <
+                body.indexOf("throwable.rethrowIfCancellation()"),
         )
         assertTrue(
             "batch deletion must retain structured commit failures without emitting one snackbar per item",
