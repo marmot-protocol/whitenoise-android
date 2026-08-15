@@ -332,6 +332,9 @@
     <string name="toast_forwarded_partial">An %1$s Chats weitergeleitet; einige fehlgeschlagen</string>
     <string name="toast_forward_failed">Nachricht konnte nicht weitergeleitet werden</string>
     <string name="share_to">Teilen in</string>
+    <string name="share_sending_as">Senden als</string>
+    <string name="share_choose_sending_account">Sendekonto auswählen</string>
+    <string name="share_choose_sending_account_description">Wähle aus, welchem angemeldeten Konto diese geteilten Entwürfe gehören.</string>
     <string name="share_search_chats">Chats suchen</string>
     <string name="share_no_chats">Keine Chats zum Teilen.</string>
     <string name="share_no_matches">Keine Chats entsprechen Ihrer Suche.</string>

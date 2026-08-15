@@ -2911,19 +2911,33 @@ class WhiteNoiseAppState private constructor(
         chatsController?.requestMemberSnapshots(groupIds)
     }
 
+    /**
+     * Stage an inbound Android share for the explicitly chosen local account.
+     *
+     * The system-share picker can enumerate a non-active account, so resolving
+     * through [activeAccountRef] here would silently move the draft and stream
+     * ownership to whichever account happened to be active at commit time.
+     * Return false when the chosen account is no longer a signed-in signing
+     * account; callers keep the picker/recovery path visible in that case.
+     */
     fun stageInboundShare(
+        accountRef: String,
         targetGroupIds: List<String>,
         payload: SharePayload,
-    ) {
-        val accountRef = activeAccountRef ?: return
-        val accountIdHex = activeAccount?.accountIdHex ?: return
+    ): Boolean {
+        val account =
+            accounts.firstOrNull { summary ->
+                summary.label == accountRef && summary.isSignedInSigningAccount()
+            } ?: return false
+        if (targetGroupIds.none(String::isNotBlank)) return false
         shareInboundStager.stageToChats(
             context = appContext,
-            accountIdHex = accountIdHex,
+            accountIdHex = account.accountIdHex,
             groupIds = targetGroupIds,
             payload = payload,
             draftAccountRef = accountRef,
         )
+        return true
     }
 
     fun consumeInboundShareStreamsCapped(
@@ -7154,8 +7168,13 @@ class WhiteNoiseAppState private constructor(
         return cachedName ?: shortNpub(accountIdHex)
     }
 
-    internal fun contactDisplayNameCachedOrNull(accountIdHex: String): String? {
-        contactNicknameFor(activeAccountRef, accountIdHex)?.let { return it }
+    internal fun contactDisplayNameCachedOrNull(accountIdHex: String): String? = contactDisplayNameCachedOrNull(activeAccountRef, accountIdHex)
+
+    internal fun contactDisplayNameCachedOrNull(
+        accountRef: String?,
+        accountIdHex: String,
+    ): String? {
+        contactNicknameFor(accountRef, accountIdHex)?.let { return it }
         return chatMemberNameCached(accountIdHex)
     }
 
@@ -7163,6 +7182,11 @@ class WhiteNoiseAppState private constructor(
         val cachedName = contactDisplayNameCachedOrNull(accountIdHex)
         return cachedName ?: shortNpub(accountIdHex)
     }
+
+    internal fun contactDisplayNameCached(
+        accountRef: String?,
+        accountIdHex: String,
+    ): String = contactDisplayNameCachedOrNull(accountRef, accountIdHex) ?: shortNpub(accountIdHex)
 
     private fun profileDisplayName(accountIdHex: String): String? =
         resolvedProfileDisplayName(

@@ -332,6 +332,9 @@
     <string name="toast_forwarded_partial">Transfere vers %1$s discussions ; certaines ont echoue</string>
     <string name="toast_forward_failed">Impossible de transferer le message</string>
     <string name="share_to">Partager vers</string>
+    <string name="share_sending_as">Envoyer en tant que</string>
+    <string name="share_choose_sending_account">Choisir le compte d’envoi</string>
+    <string name="share_choose_sending_account_description">Choisissez le compte connecté qui possédera ces brouillons partagés.</string>
     <string name="share_search_chats">Rechercher des discussions</string>
     <string name="share_no_chats">Aucune discussion pour partager.</string>
     <string name="share_no_matches">Aucune discussion ne correspond à votre recherche.</string>

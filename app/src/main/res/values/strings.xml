@@ -441,6 +441,9 @@
     <string name="toast_forwarded_partial">Forwarded to %1$s chats; some failed</string>
     <string name="toast_forward_failed">Couldn\'t forward message</string>
     <string name="share_to">Share to</string>
+    <string name="share_sending_as">Sending as</string>
+    <string name="share_choose_sending_account">Choose sending account</string>
+    <string name="share_choose_sending_account_description">Choose which signed-in account will own these shared drafts.</string>
     <string name="share_search_chats">Search chats</string>
     <string name="share_no_chats">No chats to share to.</string>
     <string name="share_no_matches">No chats match your search.</string>

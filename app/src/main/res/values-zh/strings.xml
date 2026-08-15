@@ -324,6 +324,9 @@
     <string name="toast_forwarded_partial">已转发至 %1$s 个聊天；部分失败</string>
     <string name="toast_forward_failed">无法转发消息</string>
     <string name="share_to">分享到</string>
+    <string name="share_sending_as">发送身份</string>
+    <string name="share_choose_sending_account">选择发送账号</string>
+    <string name="share_choose_sending_account_description">选择用于保存这些共享草稿的已登录账号。</string>
     <string name="share_search_chats">搜索聊天</string>
     <string name="share_no_chats">没有可分享的聊天。</string>
     <string name="share_no_matches">没有匹配的聊天。</string>

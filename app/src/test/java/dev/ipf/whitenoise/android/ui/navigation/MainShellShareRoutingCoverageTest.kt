@@ -22,6 +22,25 @@ class MainShellShareRoutingCoverageTest {
         assertTrue("the request must be acknowledged before its payload is staged", handledIndex < stageIndex)
     }
 
+    @Test
+    fun pickerAccountFlowsExplicitlyIntoStagingAndCrossAccountNavigation() {
+        val source = mainShellSource().readText()
+
+        assertTrue(
+            "picker callback must forward its chosen account",
+            "onStage = { accountRef, groupIds ->" in source &&
+                "stageShareToChats(request, accountRef, groupIds)" in source,
+        )
+        assertTrue(
+            "staging must not fall back to the globally active account",
+            "appState.stageInboundShare(accountRef, groupIds, request.payload)" in source,
+        )
+        assertTrue(
+            "a non-active chosen account must switch before opening its staged chat",
+            "pendingStagedShareOpen" in source && "appState.setActiveAccount(accountRef)" in source,
+        )
+    }
+
     private fun mainShellSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),

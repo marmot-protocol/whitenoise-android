@@ -332,6 +332,9 @@
     <string name="toast_forwarded_partial">%1$s sohbete iletildi; bazıları başarısız oldu</string>
     <string name="toast_forward_failed">Mesaj iletilemedi</string>
     <string name="share_to">Şuraya paylaş</string>
+    <string name="share_sending_as">Gönderen</string>
+    <string name="share_choose_sending_account">Gönderen hesabı seç</string>
+    <string name="share_choose_sending_account_description">Bu paylaşılan taslakların ait olacağı oturum açmış hesabı seçin.</string>
     <string name="share_search_chats">Sohbet ara</string>
     <string name="share_no_chats">Paylaşılacak sohbet yok.</string>
     <string name="share_no_matches">Aramanızla eşleşen sohbet yok.</string>
