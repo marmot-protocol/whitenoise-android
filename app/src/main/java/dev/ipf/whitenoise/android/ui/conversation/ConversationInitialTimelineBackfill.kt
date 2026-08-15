@@ -31,7 +31,7 @@ internal suspend fun backfillInitialConversationTimeline(
     isCurrent: () -> Boolean = { true },
 ): ConversationInitialTimelineBackfillResult {
     var current = snapshot()
-    var result = current.initialBackfillTerminalResult(isCurrent = isCurrent())
+    var result = initialBackfillTerminalResult(current, isCurrent())
     val visitedWindows = hashSetOf(current.rawWindowMessageIds)
 
     while (result == null && current.hasMoreBefore) {
@@ -56,14 +56,14 @@ internal suspend fun backfillInitialConversationTimeline(
     return result ?: ConversationInitialTimelineBackfillResult.Exhausted
 }
 
-private fun ConversationInitialTimelineBackfillSnapshot.initialBackfillTerminalResult(
+private fun initialBackfillTerminalResult(
+    snapshot: ConversationInitialTimelineBackfillSnapshot,
     isCurrent: Boolean,
-): ConversationInitialTimelineBackfillResult? {
-    return when {
+): ConversationInitialTimelineBackfillResult? =
+    when {
         !isCurrent -> ConversationInitialTimelineBackfillResult.Superseded
-        hasRenderableRows -> ConversationInitialTimelineBackfillResult.Renderable
-        hasLoadFailure -> ConversationInitialTimelineBackfillResult.Failed
-        loadInFlight -> ConversationInitialTimelineBackfillResult.NotReady
+        snapshot.hasRenderableRows -> ConversationInitialTimelineBackfillResult.Renderable
+        snapshot.hasLoadFailure -> ConversationInitialTimelineBackfillResult.Failed
+        snapshot.loadInFlight -> ConversationInitialTimelineBackfillResult.NotReady
         else -> null
     }
-}
