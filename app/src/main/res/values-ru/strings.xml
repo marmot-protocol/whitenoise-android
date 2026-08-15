@@ -11,8 +11,6 @@
     <string name="refresh">Обновить дамп</string>
     <string name="retry">Повторить</string>
     <string name="chat_folder_members_loading">Обновление папки</string>
-    <string name="conversation_access_checking">Проверка доступа к беседе…</string>
-    <string name="conversation_access_unavailable">Не удалось проверить доступ</string>
     <string name="creating_identity">Создание индивидуальности</string>
     <string name="creating_identity_title">Создание идентичности</string>
     <string name="create_new_identity">Создать новую идентичность</string>

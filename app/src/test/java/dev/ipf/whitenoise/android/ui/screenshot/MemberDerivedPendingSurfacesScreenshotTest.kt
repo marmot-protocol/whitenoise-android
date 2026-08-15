@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
@@ -11,10 +10,8 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import com.github.takahirom.roborazzi.captureRoboImage
-import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderChipModel
 import dev.ipf.whitenoise.android.ui.chats.ChatListFilterChips
-import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationMembershipPendingBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -32,25 +29,24 @@ class MemberDerivedPendingSurfacesScreenshotTest {
 
     @Test
     fun memberDerivedPendingLight() {
-        render(darkTheme = false, rosterState = GroupRosterLoadState.LOADING)
+        render(darkTheme = false)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/member_derived_pending_light.png")
     }
 
     @Test
     fun memberDerivedPendingDark() {
-        render(darkTheme = true, rosterState = GroupRosterLoadState.LOADING)
+        render(darkTheme = true)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/member_derived_pending_dark.png")
     }
 
     @Test
-    fun memberDerivedFailedDarkLargeText() {
-        render(darkTheme = true, rosterState = GroupRosterLoadState.FAILED, fontScale = 1.5f)
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/member_derived_failed_dark_large.png")
+    fun memberDerivedPendingDarkLargeText() {
+        render(darkTheme = true, fontScale = 1.5f)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/member_derived_pending_dark_large.png")
     }
 
     private fun render(
         darkTheme: Boolean,
-        rosterState: GroupRosterLoadState,
         fontScale: Float = 1f,
     ) {
         composeRule.setContent {
@@ -72,11 +68,6 @@ class MemberDerivedPendingSurfacesScreenshotTest {
                                     ),
                                 selectedFolderId = null,
                                 onSelect = {},
-                            )
-                            Spacer(Modifier.weight(1f))
-                            ConversationMembershipPendingBar(
-                                rosterState = rosterState,
-                                onRetry = {},
                             )
                         }
                     }

@@ -11,8 +11,6 @@
     <string name="refresh">Actualizar volcado</string>
     <string name="retry">Reintentar</string>
     <string name="chat_folder_members_loading">Actualizando carpeta</string>
-    <string name="conversation_access_checking">Comprobando el acceso a la conversación…</string>
-    <string name="conversation_access_unavailable">No se pudo verificar el acceso</string>
     <string name="creating_identity">Creando identidad</string>
     <string name="creating_identity_title">Creando identidad</string>
     <string name="create_new_identity">Crear nueva identidad</string>

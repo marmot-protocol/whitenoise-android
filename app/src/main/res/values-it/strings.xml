@@ -11,8 +11,6 @@
     <string name="refresh">Aggiorna dump</string>
     <string name="retry">Riprova</string>
     <string name="chat_folder_members_loading">Aggiornamento cartella</string>
-    <string name="conversation_access_checking">Verifica dell’accesso alla conversazione…</string>
-    <string name="conversation_access_unavailable">Impossibile verificare l’accesso</string>
     <string name="creating_identity">Creare identità</string>
     <string name="creating_identity_title">Creazione identità</string>
     <string name="create_new_identity">Crea nuova identità</string>
