@@ -134,12 +134,6 @@ class ForegroundStartDecisionTest {
     }
 
     @Test
-    fun runtimeExhaustionReconcilesOnlyWhenAUserOwnedStartWasQueued() {
-        assertEquals(true, shouldReconcileRuntimeExhaustion(userOwnedStartRequested = true))
-        assertEquals(false, shouldReconcileRuntimeExhaustion(userOwnedStartRequested = false))
-    }
-
-    @Test
     fun nativePushSyncActionRequestsOneShotSync() {
         assertEquals(
             true,

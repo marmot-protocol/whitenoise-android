@@ -60,6 +60,17 @@ class NotificationPushWakeDrainCoverageTest {
     }
 
     @Test
+    fun nativePushSyncFlagClearsOnlyAfterSuccessfulSync() {
+        val drain = serviceFunctionBody("drainPendingNativePushRegistrationSync")
+
+        assertTrue(
+            "a failed native-push sync must remain pending for the supervisor retry",
+            drain.indexOf("appState.syncNativePushRegistrationIfEnabled()") in 0 until
+                drain.indexOf("pendingNativePushRegistrationSync = false"),
+        )
+    }
+
+    @Test
     fun pushWakeLockTimeoutCoversDrainBootstrapAndNativePushSyncBudgets() {
         assertEquals(30_000L, pushWakeLockTimeoutMs())
         assertEquals(35_000L, pushWakeLockTimeoutMs(pushDrainTimeoutMs = 10_000L, bootstrapBudgetMs = 5_000L, nativePushSyncBudgetMs = 20_000L))

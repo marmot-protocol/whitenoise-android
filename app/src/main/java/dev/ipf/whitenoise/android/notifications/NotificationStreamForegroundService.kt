@@ -40,7 +40,7 @@ class NotificationStreamForegroundService : Service() {
     private var pendingNativePushRegistrationSync = false
     private var pendingPushWakeGeneration = 0L
     private var completedPushWakeGeneration = 0L
-    private var userOwnedStartRequested = false
+    private var pendingUserOwnedStart = false
     private var latestStartId = 0
 
     override fun onStartCommand(
@@ -50,7 +50,7 @@ class NotificationStreamForegroundService : Service() {
     ): Int {
         val trigger = foregroundStartTrigger(intent)
         latestStartId = startId
-        if (trigger == ForegroundStartTrigger.UserToggle) userOwnedStartRequested = true
+        if (trigger == ForegroundStartTrigger.UserToggle) pendingUserOwnedStart = true
         if (trigger == ForegroundStartTrigger.PushWake) {
             if (pendingPushWakeGeneration == Long.MAX_VALUE) {
                 pendingPushWakeGeneration = 1L
@@ -119,6 +119,7 @@ class NotificationStreamForegroundService : Service() {
                             initialTrigger = trigger,
                             hasIntent = intent != null,
                             initialOneShotRequested = isOneShotForegroundStart(syncNativePushRegistration, trigger),
+                            bootstrapStartId = startId,
                         )
                     }
             }
@@ -139,37 +140,48 @@ class NotificationStreamForegroundService : Service() {
         initialTrigger: ForegroundStartTrigger,
         hasIntent: Boolean,
         initialOneShotRequested: Boolean,
+        bootstrapStartId: Int,
     ) {
         val keepConnectedAtStart = backgroundConnectionEnabledOffMain(applicationContext)
-        if (
+        val stickyRestartShouldStop =
             shouldStopStickySystemWakeRestart(
                 hasIntent = hasIntent,
                 trigger = initialTrigger,
                 backgroundConnectionEnabled = keepConnectedAtStart,
             )
-        ) {
-            stopSelf(latestStartId)
+        if (stickyRestartShouldStop && latestStartId == bootstrapStartId) {
+            stopSelf(bootstrapStartId)
             return
         }
+        val stopWhenFinished = initialOneShotRequested || stickyRestartShouldStop
 
         val appState = (application as WhiteNoiseApplication).appState
         val recoveryGeneration = appState.notificationRuntimeRecoveryGeneration()
         var action = NotificationRuntimeBootstrapAction.Continue
+        var terminalStartId = bootstrapStartId
         while (action == NotificationRuntimeBootstrapAction.Continue) {
+            val attemptStartId = latestStartId
+            terminalStartId = attemptStartId
             val pushWakeGeneration = pendingPushWakeGeneration
             val pushWakePending = pushWakeGeneration > completedPushWakeGeneration
             val attemptTrigger =
-                if (pushWakePending) {
-                    ForegroundStartTrigger.PushWake
-                } else {
-                    initialTrigger
+                when {
+                    pushWakePending -> ForegroundStartTrigger.PushWake
+                    pendingUserOwnedStart -> ForegroundStartTrigger.UserToggle
+                    else -> initialTrigger
                 }
             val outcome = superviseRuntimeAttempt(appState, recoveryGeneration, attemptTrigger)
-            action = handleSupervisionOutcome(appState, outcome, pushWakePending, pushWakeGeneration)
+            action =
+                handleSupervisionOutcome(
+                    appState = appState,
+                    outcome = outcome,
+                    attemptedStartId = attemptStartId,
+                    attemptedPushWakeGeneration = pushWakeGeneration.takeIf { pushWakePending },
+                )
         }
         if (action == NotificationRuntimeBootstrapAction.Finish) {
-            if (shouldStopAfterOneShotForegroundStart(initialOneShotRequested, appState.backgroundConnectionEnabled)) {
-                stopSelf(latestStartId)
+            if (shouldStopAfterOneShotForegroundStart(stopWhenFinished, appState.backgroundConnectionEnabled)) {
+                stopSelf(terminalStartId)
             }
         }
     }
@@ -177,40 +189,50 @@ class NotificationStreamForegroundService : Service() {
     private fun handleSupervisionOutcome(
         appState: WhiteNoiseAppState,
         outcome: NotificationRuntimeSupervisionOutcome,
-        pushWakePending: Boolean,
-        pushWakeGeneration: Long,
-    ): NotificationRuntimeBootstrapAction =
+        attemptedStartId: Int,
+        attemptedPushWakeGeneration: Long?,
+    ): NotificationRuntimeBootstrapAction {
+        val decision =
+            decideNotificationRuntimeBootstrap(
+                outcome = outcome,
+                snapshot =
+                    NotificationRuntimeBootstrapSnapshot(
+                        attemptedStartId = attemptedStartId,
+                        latestStartId = latestStartId,
+                        attemptedPushWakeGeneration = attemptedPushWakeGeneration,
+                        pendingPushWakeGeneration = pendingPushWakeGeneration,
+                        completedPushWakeGeneration = completedPushWakeGeneration,
+                        pendingNativePushRegistrationSync = pendingNativePushRegistrationSync,
+                        pendingUserOwnedStart = pendingUserOwnedStart,
+                    ),
+            )
+        completedPushWakeGeneration = decision.completedPushWakeGeneration
+        pendingUserOwnedStart = decision.pendingUserOwnedStart
         when (outcome) {
-            is NotificationRuntimeSupervisionOutcome.Started -> {
-                if (pushWakePending) completedPushWakeGeneration = pushWakeGeneration
+            is NotificationRuntimeSupervisionOutcome.Started ->
                 if (outcome.attempts > 1) {
                     foregroundServiceDiagnostic("notification runtime recovered attempts=${outcome.attempts}")
                 }
-                val pushWakeQueued = pendingPushWakeGeneration > completedPushWakeGeneration
-                if (pushWakeQueued || pendingNativePushRegistrationSync) {
-                    NotificationRuntimeBootstrapAction.Continue
-                } else {
-                    NotificationRuntimeBootstrapAction.Finish
-                }
-            }
             is NotificationRuntimeSupervisionOutcome.RecoveryBoundaryChanged -> {
                 foregroundServiceDiagnostic(
                     "notification runtime retry cancelled boundary_changed attempts=${outcome.attempts}",
                 )
-                NotificationRuntimeBootstrapAction.Finish
             }
             is NotificationRuntimeSupervisionOutcome.Exhausted -> {
                 foregroundServiceDiagnostic(
                     "notification runtime retries exhausted " +
                         "attempts=${outcome.attempts} reason=${outcome.failureClass}",
                 )
-                if (shouldReconcileRuntimeExhaustion(userOwnedStartRequested)) {
+                if (decision.reconcileUserOwnedFailure) {
                     appState.onBackgroundConnectionRuntimeExhausted()
                 }
-                stopSelf(latestStartId)
-                NotificationRuntimeBootstrapAction.FinishWithoutOneShotCheck
+                if (decision.action == NotificationRuntimeBootstrapAction.StopAfterExhaustion) {
+                    stopSelf(attemptedStartId)
+                }
             }
         }
+        return decision.action
+    }
 
     private suspend fun superviseRuntimeAttempt(
         appState: WhiteNoiseAppState,
@@ -244,13 +266,13 @@ class NotificationStreamForegroundService : Service() {
                 PushTokenStore.create(applicationContext).nativePushRegistrationSyncPending()
             }
         if (!inMemorySyncRequested && !durableSyncPending) return
-        pendingNativePushRegistrationSync = false
         // The FCM token-rotation fallback (#755) starts this service to
         // re-register native push when it can't reach AppState directly.
         // ensureNotificationRuntimeStarted() alone does not push the rotated
         // token to the MIP-05 server, so sync explicitly here. Idempotent: a
         // no-op when the token/server/relay fingerprint is unchanged.
         appState.syncNativePushRegistrationIfEnabled()
+        pendingNativePushRegistrationSync = false
     }
 
     private fun recordPendingPushWakeCatchUpAfterStop() {
@@ -374,12 +396,6 @@ private suspend fun startNotificationRuntimeForTrigger(
     }
 }
 
-private enum class NotificationRuntimeBootstrapAction {
-    Continue,
-    Finish,
-    FinishWithoutOneShotCheck,
-}
-
 internal enum class ForegroundStartTrigger(
     val extraValue: String,
 ) {
@@ -470,8 +486,6 @@ internal fun decideForegroundStart(
     }
 
 internal fun shouldReconcileBackgroundConnectionRejection(trigger: ForegroundStartTrigger): Boolean = trigger == ForegroundStartTrigger.UserToggle
-
-internal fun shouldReconcileRuntimeExhaustion(userOwnedStartRequested: Boolean): Boolean = userOwnedStartRequested
 
 internal fun foregroundServiceTypeForTrigger(trigger: ForegroundStartTrigger): Int =
     when (trigger) {

@@ -30,6 +30,88 @@ internal sealed interface NotificationRuntimeSupervisionOutcome {
     ) : NotificationRuntimeSupervisionOutcome
 }
 
+internal enum class NotificationRuntimeBootstrapAction {
+    Continue,
+    Finish,
+    StopAfterExhaustion,
+}
+
+internal data class NotificationRuntimeBootstrapDecision(
+    val action: NotificationRuntimeBootstrapAction,
+    val completedPushWakeGeneration: Long,
+    val pendingUserOwnedStart: Boolean,
+    val reconcileUserOwnedFailure: Boolean = false,
+)
+
+internal data class NotificationRuntimeBootstrapSnapshot(
+    val attemptedStartId: Int,
+    val latestStartId: Int,
+    val attemptedPushWakeGeneration: Long?,
+    val pendingPushWakeGeneration: Long,
+    val completedPushWakeGeneration: Long,
+    val pendingNativePushRegistrationSync: Boolean,
+    val pendingUserOwnedStart: Boolean,
+)
+
+/**
+ * Pure transition for the service-owned bootstrap loop.
+ *
+ * [attemptedStartId] and [attemptedPushWakeGeneration] fence the work captured
+ * before the suspending runtime attempt. A newer start or push wake therefore
+ * receives its own bounded round instead of being consumed by an older
+ * attempt's terminal result.
+ */
+internal fun decideNotificationRuntimeBootstrap(
+    outcome: NotificationRuntimeSupervisionOutcome,
+    snapshot: NotificationRuntimeBootstrapSnapshot,
+): NotificationRuntimeBootstrapDecision =
+    with(snapshot) {
+        when (outcome) {
+            is NotificationRuntimeSupervisionOutcome.Started -> {
+                val completedGeneration =
+                    attemptedPushWakeGeneration
+                        ?.takeIf { it <= pendingPushWakeGeneration }
+                        ?: completedPushWakeGeneration
+                val workQueuedDuringAttempt =
+                    latestStartId > attemptedStartId ||
+                        pendingPushWakeGeneration > completedGeneration ||
+                        pendingNativePushRegistrationSync
+                NotificationRuntimeBootstrapDecision(
+                    action =
+                        if (workQueuedDuringAttempt) {
+                            NotificationRuntimeBootstrapAction.Continue
+                        } else {
+                            NotificationRuntimeBootstrapAction.Finish
+                        },
+                    completedPushWakeGeneration = completedGeneration,
+                    pendingUserOwnedStart = false,
+                )
+            }
+            is NotificationRuntimeSupervisionOutcome.RecoveryBoundaryChanged ->
+                NotificationRuntimeBootstrapDecision(
+                    action = NotificationRuntimeBootstrapAction.Finish,
+                    completedPushWakeGeneration = completedPushWakeGeneration,
+                    pendingUserOwnedStart = false,
+                )
+            is NotificationRuntimeSupervisionOutcome.Exhausted -> {
+                val capturedPushWakeGeneration = attemptedPushWakeGeneration ?: completedPushWakeGeneration
+                val workQueuedDuringAttempt =
+                    latestStartId > attemptedStartId || pendingPushWakeGeneration > capturedPushWakeGeneration
+                NotificationRuntimeBootstrapDecision(
+                    action =
+                        if (workQueuedDuringAttempt) {
+                            NotificationRuntimeBootstrapAction.Continue
+                        } else {
+                            NotificationRuntimeBootstrapAction.StopAfterExhaustion
+                        },
+                    completedPushWakeGeneration = completedPushWakeGeneration,
+                    pendingUserOwnedStart = pendingUserOwnedStart && workQueuedDuringAttempt,
+                    reconcileUserOwnedFailure = pendingUserOwnedStart && !workQueuedDuringAttempt,
+                )
+            }
+        }
+    }
+
 /**
  * Owns the bounded retry contract for a foreground-service notification-runtime bootstrap.
  *
