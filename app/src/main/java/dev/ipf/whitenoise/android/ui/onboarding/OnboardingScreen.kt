@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -23,10 +25,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -43,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -401,6 +406,17 @@ fun OnboardingContent(
                 OnboardingRotatingSlogan()
             }
 
+            // Keep the blocking setup notice in its own row above the stable
+            // action slate. This follows the same non-overlap rule as the
+            // conversation notice layout: the flexible hero yields space, but
+            // the primary actions never move off-screen or get covered.
+            if (offlineErrorVisible) {
+                OnboardingOfflineNotice(
+                    onRetry = onOfflineRetry,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+            }
+
             // Bottom slate: a lifted surface panel holding the auth actions,
             // echoing the old app's WnSlate. Login (tonal) sits above Sign up
             // (filled primary), matching the old auth-buttons order.
@@ -413,9 +429,6 @@ fun OnboardingContent(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
                 ) {
-                    if (offlineErrorVisible) {
-                        OnboardingOfflineNotice(onRetry = onOfflineRetry)
-                    }
                     FilledTonalButton(
                         onClick = {
                             onOfflineErrorDismiss()
@@ -511,35 +524,66 @@ internal fun OnboardingOfflineNotice(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val actionOnNewLine = LocalDensity.current.fontScale >= 1.3f
     Surface(
         modifier =
             modifier
                 .fillMaxWidth()
                 .testTag(ONBOARDING_OFFLINE_NOTICE_TAG),
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.medium,
+        tonalElevation = 2.dp,
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, end = 8.dp, bottom = 6.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.onboarding_offline_setup_message),
-                style = MaterialTheme.typography.bodyMedium,
-                modifier =
-                    Modifier
-                        .padding(end = 8.dp)
-                        .semantics { liveRegion = LiveRegionMode.Polite },
-            )
-            TextButton(
-                onClick = onRetry,
-                modifier = Modifier.align(Alignment.End),
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onErrorContainer),
+        if (actionOnNewLine) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 10.dp, end = 8.dp, bottom = 4.dp),
             ) {
-                Text(stringResource(R.string.retry))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    OnboardingOfflineMessage()
+                }
+                TextButton(
+                    onClick = onRetry,
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Text(stringResource(R.string.retry))
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 10.dp, end = 8.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OnboardingOfflineMessage()
+                TextButton(onClick = onRetry) {
+                    Text(stringResource(R.string.retry))
+                }
             }
         }
     }
+}
+
+@Composable
+private fun RowScope.OnboardingOfflineMessage() {
+    Icon(
+        imageVector = Icons.Default.WifiOff,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.error,
+        modifier = Modifier.size(20.dp),
+    )
+    Text(
+        text = stringResource(R.string.onboarding_offline_setup_message),
+        style = MaterialTheme.typography.bodySmall,
+        modifier =
+            Modifier
+                .weight(1f)
+                .semantics { liveRegion = LiveRegionMode.Polite },
+    )
 }
 
 /**

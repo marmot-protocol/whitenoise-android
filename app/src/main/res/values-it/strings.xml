@@ -1225,7 +1225,7 @@
     <string name="recent_chats">Chat recenti</string>
     <string name="onboarding_login">Accedi</string>
     <string name="onboarding_login_with_amber">Accedi con Amber</string>
-    <string name="onboarding_offline_setup_message">Per configurare l’account è necessaria una connessione Internet. Attiva il Wi-Fi, i dati mobili o un’altra connessione disponibile, quindi riprova.</string>
+    <string name="onboarding_offline_setup_message">Nessuna connessione Internet. Connettiti tramite Wi-Fi, dati mobili o un’altra rete, quindi riprova.</string>
     <string name="toast_couldnt_login_amber">Impossibile accedere con Amber</string>
     <string name="toast_amber_sign_in_cancelled">Accesso con Amber annullato</string>
     <string name="onboarding_sign_up">Registrati</string>

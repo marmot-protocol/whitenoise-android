@@ -117,38 +117,61 @@ internal fun SignInContent(
         // rides above the keyboard and the field stays reachable.
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         bottomBar = {
-            // Match the landing's bottom slate: same surface + shape, and the
-            // primary button in the same 12dp shape/size as the landing's
-            // buttons — no bordered, tonally-elevated action bar behind it.
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            Column(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .navigationBarsPadding()
-                            .imePadding()
-                            .padding(horizontal = 24.dp, vertical = 20.dp),
+                // Keep the form-level failure beside its recovery action, not
+                // above the key field. Giving the notice a dedicated row makes
+                // Scaffold reserve space for it, so it neither covers the form
+                // nor pushes the key field behind the sticky action slate.
+                if (offlineErrorVisible) {
+                    OnboardingOfflineNotice(
+                        onRetry = onOfflineRetry,
+                        modifier =
+                            Modifier
+                                .widthIn(max = OnboardingMaxContentWidth)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
+
+                // Match the landing's bottom slate: same surface + shape, and
+                // the primary button in the same 12dp shape/size as the
+                // landing's buttons.
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Button(
-                        onClick = submit,
-                        enabled = canSignIn,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .imePadding()
+                                .padding(horizontal = 24.dp, vertical = 20.dp),
                     ) {
-                        if (busy) {
-                            LoadingIndicator(
-                                modifier =
-                                    Modifier
-                                        .size(24.dp)
-                                        .semantics { contentDescription = signInDescription },
+                        Button(
+                            onClick = submit,
+                            enabled = canSignIn,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                        ) {
+                            if (busy) {
+                                LoadingIndicator(
+                                    modifier =
+                                        Modifier
+                                            .size(24.dp)
+                                            .semantics { contentDescription = signInDescription },
+                                )
+                                Spacer(Modifier.width(10.dp))
+                            }
+                            Text(
+                                stringResource(R.string.sign_in),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
                             )
-                            Spacer(Modifier.width(10.dp))
                         }
-                        Text(stringResource(R.string.sign_in), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -200,10 +223,6 @@ internal fun SignInContent(
                     textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(28.dp))
-                if (offlineErrorVisible) {
-                    OnboardingOfflineNotice(onRetry = onOfflineRetry)
-                    Spacer(Modifier.height(20.dp))
-                }
                 IdentityEntryForm(
                     identity = identity,
                     busy = busy,
