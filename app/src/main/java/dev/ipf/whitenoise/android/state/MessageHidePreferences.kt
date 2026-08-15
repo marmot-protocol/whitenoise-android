@@ -119,19 +119,24 @@ internal object MessageHidePreferences {
             preferences.all.keys
                 .filter { it.startsWith(prefix) }
                 .associateWith { key -> readHiddenMessageIdsByKey(preferences, key) }
-        if (previousByKey.isEmpty()) return true
+        val removalCommitted =
+            if (previousByKey.isEmpty()) {
+                true
+            } else {
+                val edit = preferences.edit()
+                previousByKey.keys.forEach(edit::remove)
+                edit.commit()
+            }
 
-        val edit = preferences.edit()
-        previousByKey.keys.forEach(edit::remove)
-        if (edit.commit()) return true
-
-        // SharedPreferences has already changed its process-local map when a
-        // disk write reports false. Restore every removed set so callers see
-        // the same retryable state now and after a process restart.
-        val restore = preferences.edit()
-        previousByKey.forEach { (key, ids) -> restore.putStringSet(key, HashSet(ids)) }
-        restore.commit()
-        return false
+        if (!removalCommitted) {
+            // SharedPreferences has already changed its process-local map when a
+            // disk write reports false. Restore every removed set so callers see
+            // the same retryable state now and after a process restart.
+            val restore = preferences.edit()
+            previousByKey.forEach { (key, ids) -> restore.putStringSet(key, HashSet(ids)) }
+            restore.commit()
+        }
+        return removalCommitted
     }
 }
 
