@@ -1442,6 +1442,8 @@
     <string name="global_search_content_files_documents">Dateien &amp; Dokumente</string>
     <string name="global_search_content_any_attachment">Jeder Anhang</string>
     <string name="text_attachment_open_external">In einer anderen App öffnen</string>
+    <string name="text_attachment_filename">Dateiname</string>
+    <string name="text_attachment_view_full_filename">Vollständigen Dateinamen anzeigen</string>
     <string name="text_attachment_loading">Vorschau wird geladen…</string>
     <string name="text_attachment_preview_truncated">Diese Markdown-Vorschau wurde aus Sicherheitsgründen gekürzt. Öffne die Datei in einer anderen App, um den Rest zu sehen.</string>
     <string name="text_attachment_empty">Diese Textdatei ist leer.</string>

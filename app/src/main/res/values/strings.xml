@@ -1537,6 +1537,8 @@
     <string name="global_search_content_files_documents">Files &amp; documents</string>
     <string name="global_search_content_any_attachment">Any attachment</string>
     <string name="text_attachment_open_external">Open in another app</string>
+    <string name="text_attachment_filename">File name</string>
+    <string name="text_attachment_view_full_filename">View full file name</string>
     <string name="text_attachment_loading">Loading preview…</string>
     <string name="text_attachment_preview_truncated">This Markdown preview was truncated for safety. Open the file in another app to see the rest.</string>
     <string name="text_attachment_empty">This text file is empty.</string>
