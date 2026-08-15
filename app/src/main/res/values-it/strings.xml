@@ -1444,6 +1444,8 @@
     <string name="global_search_content_files_documents">File e documenti</string>
     <string name="global_search_content_any_attachment">Qualsiasi allegato</string>
     <string name="text_attachment_open_external">Apri in un’altra app</string>
+    <string name="text_attachment_filename">Nome file</string>
+    <string name="text_attachment_view_full_filename">Visualizza il nome completo</string>
     <string name="text_attachment_loading">Caricamento anteprima…</string>
     <string name="text_attachment_preview_truncated">Questa anteprima Markdown è stata troncata per sicurezza. Apri il file in un’altra app per vedere il resto.</string>
     <string name="text_attachment_empty">Questo file di testo è vuoto.</string>
