@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.filled.Settings
@@ -43,6 +44,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
+import dev.ipf.whitenoise.android.state.observeTtsConversationDestination
 import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
@@ -183,15 +185,18 @@ internal fun nextNotificationConversationOpenContext(current: ConversationOpenCo
 internal enum class MainShellContentRoute {
     Conversation,
     NotificationLoading,
+    TtsReturnTransition,
     Main,
 }
 
 internal fun resolveMainShellContentRoute(
     conversationOpen: Boolean,
     routingNotification: Boolean,
+    routingTtsReturn: Boolean,
 ): MainShellContentRoute =
     when {
         routingNotification -> MainShellContentRoute.NotificationLoading
+        routingTtsReturn -> MainShellContentRoute.TtsReturnTransition
         conversationOpen -> MainShellContentRoute.Conversation
         else -> MainShellContentRoute.Main
     }
@@ -273,13 +278,22 @@ internal fun MainShell(
     var pendingTtsDestinationNavigation by remember {
         mutableStateOf<TtsDestinationNavigationRequest?>(null)
     }
+    var pendingTtsAccountSwitchOwnership by remember {
+        mutableStateOf<TtsDestinationAccountSwitchOwnership?>(null)
+    }
+    val observedTtsDestination = appState.observeTtsConversationDestination()
     var nextTtsDestinationRequestId by remember { mutableLongStateOf(0L) }
+    val supersedePendingTtsDestinationNavigation: () -> Unit = {
+        pendingTtsDestinationNavigation = null
+        pendingTtsAccountSwitchOwnership = null
+    }
     val requestTtsDestinationOpen: () -> Unit = {
         val destination = appState.currentTtsConversationDestination()
         if (destination == null) {
             appState.present(R.string.tts_source_unavailable)
         } else {
             nextTtsDestinationRequestId += 1L
+            pendingTtsAccountSwitchOwnership = null
             pendingTtsDestinationNavigation =
                 TtsDestinationNavigationRequest(
                     requestId = nextTtsDestinationRequestId,
@@ -304,6 +318,7 @@ internal fun MainShell(
     }
 
     fun commitExplicitConversationOpen(chatId: String) {
+        supersedePendingTtsDestinationNavigation()
         shellNavState =
             reduceShellNavigation(
                 shellNavState,
@@ -427,6 +442,7 @@ internal fun MainShell(
     LaunchedEffect(appState.pendingProfileNpub) {
         val current = appState.pendingProfileNpub
         if (current != null && current != previousPendingProfileNpub) {
+            supersedePendingTtsDestinationNavigation()
             shellNavState = armShellProfileForeground(shellNavState, profileGroupForegroundState)
         }
         previousPendingProfileNpub = current
@@ -458,6 +474,7 @@ internal fun MainShell(
                 return@LaunchedEffect
             }
         if (routingRequestId != armedNotificationRequestId) {
+            supersedePendingTtsDestinationNavigation()
             armedNotificationRequestId = routingRequestId
             shellNavState = armShellNotificationRequest(shellNavState, profileGroupForegroundState)
         }
@@ -665,6 +682,7 @@ internal fun MainShell(
     LaunchedEffect(inboundAppUpdateTap, appState.phase) {
         val tap = inboundAppUpdateTap
         if (tap == 0 || appState.phase != AppPhase.Ready) return@LaunchedEffect
+        supersedePendingTtsDestinationNavigation()
         sectionName = MainSection.Chats.name
         settingsDetailName = null
         supersedePendingGroupCreateOpen()
@@ -719,6 +737,7 @@ internal fun MainShell(
 
     LaunchedEffect(appState.appLockScreenVisible) {
         if (appState.appLockScreenVisible) {
+            supersedePendingTtsDestinationNavigation()
             clearSharePickerRequest()
         }
     }
@@ -735,6 +754,7 @@ internal fun MainShell(
         chatsController.items,
     ) {
         val request = inboundShareRequest ?: return@LaunchedEffect
+        supersedePendingTtsDestinationNavigation()
         if (!shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) return@LaunchedEffect
         if (appState.accounts.isEmpty()) return@LaunchedEffect
         val accountRef = appState.activeAccountRef ?: return@LaunchedEffect
@@ -840,6 +860,17 @@ internal fun MainShell(
     LaunchedEffect(appState.activeAccountRef) {
         val current = appState.activeAccountRef
         if (shouldResetNavOnAccountChange(previousActiveAccountRef, current)) {
+            val ttsOwnsAccountChange =
+                pendingTtsAccountSwitchOwnership.ownsAccountChange(
+                    previousAccountRef = previousActiveAccountRef,
+                    currentAccountRef = current,
+                    request = pendingTtsDestinationNavigation,
+                )
+            if (!ttsOwnsAccountChange) {
+                supersedePendingTtsDestinationNavigation()
+            } else {
+                pendingTtsAccountSwitchOwnership = null
+            }
             clearSharePickerRequest()
             shellNavState =
                 reduceShellNavigation(shellNavState, ShellNavigationEvent.AccountSwitched).state
@@ -860,6 +891,7 @@ internal fun MainShell(
     // advance during an account switch or local read cannot open a stale row.
     LaunchedEffect(
         pendingTtsDestinationNavigation,
+        observedTtsDestination,
         appState.activeAccountRef,
         appState.accounts,
         chatsController,
@@ -870,7 +902,7 @@ internal fun MainShell(
         chatsController.materializedGroupsRevision,
     ) {
         val request = pendingTtsDestinationNavigation ?: return@LaunchedEffect
-        val currentDestination = appState.currentTtsConversationDestination()
+        val currentDestination = observedTtsDestination
         val allChats = chatsController.items + chatsController.archivedItems
         val chatListReady =
             chatsController.boundAccountRef == request.accountRef &&
@@ -885,16 +917,21 @@ internal fun MainShell(
             )
 
         fun clearPendingRequest() {
-            if (pendingTtsDestinationNavigation?.requestId != request.requestId) return
+            if (!pendingTtsDestinationNavigation.ownsCompletion(request.requestId)) return
             pendingTtsDestinationNavigation = null
+            if (pendingTtsAccountSwitchOwnership?.requestId == request.requestId) {
+                pendingTtsAccountSwitchOwnership = null
+            }
         }
 
         fun failUnavailable() {
+            if (!pendingTtsDestinationNavigation.ownsCompletion(request.requestId)) return
             clearPendingRequest()
             appState.present(R.string.tts_source_unavailable)
         }
 
         fun openDestination(item: ChatListItem) {
+            if (!pendingTtsDestinationNavigation.ownsCompletion(request.requestId)) return
             val latest = appState.currentTtsConversationDestination()
             val valid =
                 latest?.takeIf {
@@ -918,24 +955,36 @@ internal fun MainShell(
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
             selectedChat = item
-            pendingTtsDestinationNavigation = null
+            clearPendingRequest()
         }
 
         when (step) {
-            TtsDestinationNavigationStep.AccountSwitchSuperseded,
-            TtsDestinationNavigationStep.Cancelled,
-            TtsDestinationNavigationStep.MissingAccount,
-            -> failUnavailable()
+            TtsDestinationNavigationStep.Cancelled -> clearPendingRequest()
+
+            TtsDestinationNavigationStep.MissingAccount -> failUnavailable()
+
+            TtsDestinationNavigationStep.AwaitAccountSwitch -> Unit
 
             is TtsDestinationNavigationStep.SwitchAccount -> {
                 pendingTtsDestinationNavigation = request.copy(accountSwitchRequested = true)
+                pendingTtsAccountSwitchOwnership =
+                    TtsDestinationAccountSwitchOwnership(
+                        requestId = request.requestId,
+                        sourceAccountRef = appState.activeAccountRef,
+                        targetAccountRef = step.accountRef,
+                    )
                 selectedChat = null
                 selectedChatOpenContext = ConversationOpenContext()
                 selectedChatJustCreated = false
                 selectedChatOpenedAsDmHint = false
                 chatListReturnHeadSnap = resetChatListReturnHeadSnap()
                 appState.launchMutation {
-                    appState.setActiveAccount(step.accountRef)
+                    appState.setActiveAccount(
+                        label = step.accountRef,
+                        shouldActivate = {
+                            pendingTtsDestinationNavigation.ownsCompletion(request.requestId)
+                        },
+                    )
                     // setActiveAccount already presents its specific failure;
                     // do not stack a second generic unavailable message.
                     if (appState.activeAccountRef != step.accountRef) clearPendingRequest()
@@ -1066,6 +1115,7 @@ internal fun MainShell(
             resolveMainShellContentRoute(
                 conversationOpen = openChat != null,
                 routingNotification = routingNotification,
+                routingTtsReturn = pendingTtsDestinationNavigation != null,
             )
         ) {
             MainShellContentRoute.Conversation -> {
@@ -1117,6 +1167,12 @@ internal fun MainShell(
                 // one loading surface over that whole route.
                 LoadingScreen()
             }
+            MainShellContentRoute.TtsReturnTransition -> {
+                BackHandler { supersedePendingTtsDestinationNavigation() }
+                TtsReturnTransitionScreen(
+                    requestId = requireNotNull(pendingTtsDestinationNavigation).requestId,
+                )
+            }
             MainShellContentRoute.Main ->
                 when (section) {
                     MainSection.Chats -> {
@@ -1137,6 +1193,7 @@ internal fun MainShell(
                                 chatListReturnHeadSnap = onConversationReturnHeadHandled(chatListReturnHeadSnap)
                             },
                             onOpenSettings = {
+                                supersedePendingTtsDestinationNavigation()
                                 chatListReturnHeadSnap = resetChatListReturnHeadSnap()
                                 supersedePendingGroupCreateOpen()
                                 sectionName = MainSection.Settings.name

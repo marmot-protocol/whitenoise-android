@@ -94,6 +94,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val end = source.indexOf("internal fun recordAccountSwitchLocalSnapshotRendered", startIndex = start)
         check(start >= 0 && end > start) { "Missing setActiveAccount section" }
         val body = source.substring(start, end)
+        val activationGuard = body.indexOf("if (!shouldActivate()) return")
         val activeRef = body.indexOf("activeAccountRef = label")
         val localUiState = body.indexOf("reloadMediaAutoDownloadMatrix()", startIndex = activeRef)
         val activated = body.indexOf("onActivated()", startIndex = localUiState)
@@ -102,6 +103,10 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val notifications = body.indexOf("refreshLocalNotificationSettings()", startIndex = activated)
         val push = body.indexOf("syncNativePushRegistrationIfEnabled()", startIndex = activated)
 
+        assertTrue(
+            "a stale route must be rejected before the active account is published",
+            activationGuard >= 0 && activeRef > activationGuard,
+        )
         assertTrue(
             "target account context must flip before the activation callback",
             activeRef >= 0 && localUiState > activeRef,
