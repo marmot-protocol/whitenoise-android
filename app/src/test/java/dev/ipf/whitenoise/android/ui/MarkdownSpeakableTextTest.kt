@@ -13,9 +13,11 @@ import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@Suppress("LargeClass") // Speakable projection regressions share one Markdown AST fixture harness.
 class MarkdownSpeakableTextTest {
     @Test
     fun formattingSyntaxIsRemovedWhileBlockBoundariesStaySpeakable() {
@@ -556,6 +558,249 @@ class MarkdownSpeakableTextTest {
             "a".repeat(MARKDOWN_SPEAKABLE_MAX_LENGTH),
             markdownDocumentToSpeakableText(document),
         )
+    }
+
+    @Test
+    fun singleEmojiIsNotFollowedBySyntheticPunctuation() {
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text("😀")),
+                        ),
+                    ),
+            )
+
+        assertEquals("😀", markdownDocumentToSpeakableText(document))
+    }
+
+    @Test
+    fun emojiSequencesAreNotFollowedBySyntheticPunctuation() {
+        listOf("❤️", "👍🏽", "👨‍👩‍👧", "1️⃣").forEach { emoji ->
+            assertEquals(emoji, legacyTextToSpeakableText(emoji))
+        }
+    }
+
+    @Test
+    fun textEndingInEmojiIsNotFollowedBySyntheticPunctuation() {
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text("Great job 😀")),
+                        ),
+                    ),
+            )
+
+        assertEquals("Great job 😀", markdownDocumentToSpeakableText(document))
+    }
+
+    @Test
+    fun authoredPunctuationAfterEmojiIsPreserved() {
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text("Nice 😀!")),
+                        ),
+                    ),
+            )
+
+        assertEquals("Nice 😀!", markdownDocumentToSpeakableText(document))
+    }
+
+    @Test
+    fun multiBlockEmojiContentKeepsBlockSeparationWithoutSyntheticSuffixes() {
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text("😀")),
+                        ),
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text("👋")),
+                        ),
+                    ),
+            )
+
+        assertEquals("😀 👋", markdownDocumentToSpeakableText(document))
+    }
+
+    @Test
+    fun nonEmojiSymbolTerminalKeepsSyntheticPunctuationInBothProjections() {
+        val symbolFinal = "Value ⌈"
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text(symbolFinal)),
+                        ),
+                    ),
+            )
+
+        assertEquals("Value ⌈.", markdownDocumentToSpeakableText(document))
+        assertEquals("Value ⌈.", legacyTextToSpeakableText(symbolFinal))
+    }
+
+    @Test
+    fun plainCopyrightKeepsSyntheticPunctuationInBothProjections() {
+        val text = "Value \u00A9"
+        assertEquals("Value \u00A9.", legacyTextToSpeakableText(text))
+        assertFalse(text.endsWithSpeakableEmojiSequence())
+    }
+
+    @Test
+    fun copyrightWithEmojiPresentationOmitsSyntheticPunctuation() {
+        val text = "Value \u00A9\uFE0F"
+        assertEquals(text, legacyTextToSpeakableText(text))
+        assertTrue(text.endsWithSpeakableEmojiSequence())
+    }
+
+    @Test
+    fun textVariationSelectorDoesNotMakeEmojiTerminal() {
+        val text = "Value \u00A9\uFE0E"
+        assertEquals("Value \u00A9\uFE0E.", legacyTextToSpeakableText(text))
+        assertFalse(text.endsWithSpeakableEmojiSequence())
+    }
+
+    @Test
+    fun invalidTagSequencesDoNotPassTheEmojiSequencePredicate() {
+        val blackFlag = speakableCodePointString(0x1F3F4)
+        val grinningFace = speakableCodePointString(0x1F600)
+        val blackFlagCancelOnly = blackFlag + speakableCodePointString(0xE007F)
+        val wrongBaseTagSequence =
+            grinningFace +
+                speakableCodePointString(0xE0067) +
+                speakableCodePointString(0xE007F)
+
+        assertFalse(blackFlagCancelOnly.endsWithSpeakableEmojiSequence())
+        assertFalse(wrongBaseTagSequence.endsWithSpeakableEmojiSequence())
+    }
+
+    @Test
+    fun doubleSkinToneModifierKeepsSyntheticPunctuation() {
+        val text =
+            speakableCodePointString(0x1F44D) +
+                speakableCodePointString(0x1F3FB) +
+                speakableCodePointString(0x1F3FC)
+        assertEquals("Nice $text.", legacyTextToSpeakableText("Nice $text"))
+        assertFalse(text.endsWithSpeakableEmojiSequence())
+    }
+
+    @Test
+    fun oddRegionalIndicatorRunKeepsSyntheticPunctuation() {
+        val threeRegionalIndicators =
+            speakableCodePointString(0x1F1E6) +
+                speakableCodePointString(0x1F1E7) +
+                speakableCodePointString(0x1F1E8)
+        val text = "Flags $threeRegionalIndicators"
+        assertEquals("$text.", legacyTextToSpeakableText(text))
+        assertFalse(text.endsWithSpeakableEmojiSequence())
+    }
+
+    @Test
+    fun plainBlackFlagOmitsSyntheticPunctuationInBothProjections() {
+        val blackFlag = speakableCodePointString(0x1F3F4)
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text(blackFlag)),
+                        ),
+                    ),
+            )
+
+        assertTrue(blackFlag.endsWithSpeakableEmojiSequence())
+        assertEquals(blackFlag, markdownDocumentToSpeakableText(document))
+        assertEquals(blackFlag, legacyTextToSpeakableText(blackFlag))
+    }
+
+    @Test
+    fun trailingWhitespaceAfterEmojiIsTrimmedWithoutSyntheticPunctuationInBothProjections() {
+        val emojiWithWhitespace = "Great job 😀   "
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text(emojiWithWhitespace)),
+                        ),
+                    ),
+            )
+
+        assertEquals("Great job 😀", markdownDocumentToSpeakableText(document))
+        assertEquals("Great job 😀", legacyTextToSpeakableText(emojiWithWhitespace))
+    }
+
+    @Test
+    fun subdivisionTagFlagTerminalOmitsSyntheticPunctuationInBothProjections() {
+        val scotlandFlag =
+            speakableCodePointString(0x1F3F4) +
+                speakableCodePointString(0xE0073) +
+                speakableCodePointString(0xE0063) +
+                speakableCodePointString(0xE0074) +
+                speakableCodePointString(0xE006C) +
+                speakableCodePointString(0xE007F)
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text(scotlandFlag)),
+                        ),
+                    ),
+            )
+        val speakableFlag = speakableCodePointString(0x1F3F4)
+
+        assertTrue(scotlandFlag.endsWithSpeakableEmojiSequence())
+        assertEquals(speakableFlag, markdownDocumentToSpeakableText(document))
+        assertEquals(speakableFlag, legacyTextToSpeakableText(scotlandFlag))
+    }
+
+    private fun speakableCodePointString(codePoint: Int): String = String(Character.toChars(codePoint))
+
+    @Test
+    fun legacyPlainFallbackMatchesMarkdownProjectionForEmojiFinalText() {
+        val emojiFinal = "Great job 😀"
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Text(emojiFinal)),
+                        ),
+                    ),
+            )
+
+        assertEquals(
+            markdownDocumentToSpeakableText(document),
+            legacyTextToSpeakableText(emojiFinal),
+        )
+        assertEquals("Great job 😀", legacyTextToSpeakableText(emojiFinal))
     }
 
     @Test
