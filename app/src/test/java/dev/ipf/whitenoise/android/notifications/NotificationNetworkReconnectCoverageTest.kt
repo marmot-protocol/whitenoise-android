@@ -141,6 +141,7 @@ class NotificationNetworkReconnectCoverageTest {
         )
     }
 
+    @Suppress("LongMethod") // One source-ordering scenario is clearer as a single regression contract.
     @Test
     fun accountTeardownCancelsReconnectOwnersBeforeTheListener() {
         val appState = appStateSource().readText()

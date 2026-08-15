@@ -40,15 +40,22 @@ class NotificationPushWakeDrainCoverageTest {
     @Test
     fun pushWakeBootstrapHoldsWakeLockAcrossDrainAwait() {
         val source = serviceSource().readText()
+        val attemptMarker = "private suspend fun superviseRuntimeAttempt("
+        val nextFunctionMarker = "private suspend fun drainPendingNativePushRegistrationSync("
+        val attemptStart = source.indexOf(attemptMarker)
+        require(attemptStart >= 0) { "Missing superviseRuntimeAttempt" }
+        val attemptEnd = source.indexOf(nextFunctionMarker, startIndex = attemptStart)
+        require(attemptEnd > attemptStart) { "Missing function after superviseRuntimeAttempt" }
+        val attempt = source.substring(attemptStart, attemptEnd)
 
         assertTrue(
             "bootstrap branch must call the drain-aware runtime start before releasing the wake lock",
             Regex(
-                """val\s+wakeLock\s*=\s*acquirePushWakeLockIfNeeded\(attemptTrigger\).*""" +
-                    """startNotificationRuntimeForTrigger\(appState,\s*attemptTrigger\).*""" +
+                """val\s+wakeLock\s*=\s*acquirePushWakeLockIfNeeded\(trigger\).*""" +
+                    """startNotificationRuntimeForTrigger\(appState,\s*trigger\).*""" +
                     """finally\s*\{\s*releaseWakeLock\(wakeLock\)\s*\}""",
                 RegexOption.DOT_MATCHES_ALL,
-            ).containsMatchIn(source),
+            ).containsMatchIn(attempt),
         )
     }
 
@@ -176,7 +183,10 @@ class NotificationPushWakeDrainCoverageTest {
 
     private fun appStateFunctionBody(functionName: String): String = appStateSource().readText().kotlinFunctionBody(functionName)
 
-    private fun firebaseServiceFunctionBody(functionName: String): String = firebaseServiceSource().readText().kotlinFunctionBody(functionName)
+    private fun firebaseServiceFunctionBody(functionName: String): String {
+        val source = firebaseServiceSource().readText()
+        return source.kotlinFunctionBody(functionName)
+    }
 
     private fun serviceSource(): File =
         listOf(

@@ -140,7 +140,7 @@ class NotificationStreamForegroundService : Service() {
         hasIntent: Boolean,
         initialOneShotRequested: Boolean,
     ) {
-        val keepConnectedAtStart = backgroundConnectionEnabledOffMain()
+        val keepConnectedAtStart = backgroundConnectionEnabledOffMain(applicationContext)
         if (
             shouldStopStickySystemWakeRestart(
                 hasIntent = hasIntent,
@@ -154,7 +154,8 @@ class NotificationStreamForegroundService : Service() {
 
         val appState = (application as WhiteNoiseApplication).appState
         val recoveryGeneration = appState.notificationRuntimeRecoveryGeneration()
-        while (true) {
+        var action = NotificationRuntimeBootstrapAction.Continue
+        while (action == NotificationRuntimeBootstrapAction.Continue) {
             val pushWakeGeneration = pendingPushWakeGeneration
             val pushWakePending = pushWakeGeneration > completedPushWakeGeneration
             val attemptTrigger =
@@ -163,83 +164,78 @@ class NotificationStreamForegroundService : Service() {
                 } else {
                     initialTrigger
                 }
-            val outcome =
-                runtimeSupervisor.supervise(
-                    recoveryAllowed = { appState.notificationRuntimeRecoveryAllowed(recoveryGeneration) },
-                    startRuntime = {
-                        val wakeLock = acquirePushWakeLockIfNeeded(attemptTrigger)
-                        try {
-                            startNotificationRuntimeForTrigger(appState, attemptTrigger)
-                            drainPendingNativePushRegistrationSync(appState)
-                        } finally {
-                            releaseWakeLock(wakeLock)
-                        }
-                    },
-                    onAttemptFailed = { attempt, retryDelayMillis, failureClass ->
-                        val retrySummary = retryDelayMillis?.let { " retry_ms=$it" }.orEmpty()
-                        foregroundServiceDiagnostic(
-                            "notification runtime attempt failed attempt=$attempt$retrySummary reason=$failureClass",
-                        )
-                    },
-                )
-
-            when (outcome) {
-                is NotificationRuntimeSupervisionOutcome.Started -> {
-                    if (pushWakePending) completedPushWakeGeneration = pushWakeGeneration
-                    if (outcome.attempts > 1) {
-                        foregroundServiceDiagnostic(
-                            "notification runtime recovered attempts=${outcome.attempts}",
-                        )
-                    }
-                    val pushWakeQueued = pendingPushWakeGeneration > completedPushWakeGeneration
-                    if (!pushWakeQueued && !pendingNativePushRegistrationSync) break
-                }
-                is NotificationRuntimeSupervisionOutcome.RecoveryBoundaryChanged -> {
-                    foregroundServiceDiagnostic(
-                        "notification runtime retry cancelled boundary_changed attempts=${outcome.attempts}",
-                    )
-                    stopAfterOneShotIfNeeded(appState, initialOneShotRequested)
-                    return
-                }
-                is NotificationRuntimeSupervisionOutcome.Exhausted -> {
-                    foregroundServiceDiagnostic(
-                        "notification runtime retries exhausted attempts=${outcome.attempts} reason=${outcome.failureClass}",
-                    )
-                    if (shouldReconcileRuntimeExhaustion(userOwnedStartRequested)) {
-                        appState.onBackgroundConnectionRuntimeExhausted()
-                    }
-                    stopSelf(latestStartId)
-                    return
-                }
+            val outcome = superviseRuntimeAttempt(appState, recoveryGeneration, attemptTrigger)
+            action = handleSupervisionOutcome(appState, outcome, pushWakePending, pushWakeGeneration)
+        }
+        if (action == NotificationRuntimeBootstrapAction.Finish) {
+            if (shouldStopAfterOneShotForegroundStart(initialOneShotRequested, appState.backgroundConnectionEnabled)) {
+                stopSelf(latestStartId)
             }
         }
-        stopAfterOneShotIfNeeded(appState, initialOneShotRequested)
     }
 
-    private fun stopAfterOneShotIfNeeded(
+    private fun handleSupervisionOutcome(
         appState: WhiteNoiseAppState,
-        oneShotRequested: Boolean,
-    ) {
-        if (shouldStopAfterOneShotForegroundStart(oneShotRequested, appState.backgroundConnectionEnabled)) {
-            stopSelf(latestStartId)
+        outcome: NotificationRuntimeSupervisionOutcome,
+        pushWakePending: Boolean,
+        pushWakeGeneration: Long,
+    ): NotificationRuntimeBootstrapAction =
+        when (outcome) {
+            is NotificationRuntimeSupervisionOutcome.Started -> {
+                if (pushWakePending) completedPushWakeGeneration = pushWakeGeneration
+                if (outcome.attempts > 1) {
+                    foregroundServiceDiagnostic("notification runtime recovered attempts=${outcome.attempts}")
+                }
+                val pushWakeQueued = pendingPushWakeGeneration > completedPushWakeGeneration
+                if (pushWakeQueued || pendingNativePushRegistrationSync) {
+                    NotificationRuntimeBootstrapAction.Continue
+                } else {
+                    NotificationRuntimeBootstrapAction.Finish
+                }
+            }
+            is NotificationRuntimeSupervisionOutcome.RecoveryBoundaryChanged -> {
+                foregroundServiceDiagnostic(
+                    "notification runtime retry cancelled boundary_changed attempts=${outcome.attempts}",
+                )
+                NotificationRuntimeBootstrapAction.Finish
+            }
+            is NotificationRuntimeSupervisionOutcome.Exhausted -> {
+                foregroundServiceDiagnostic(
+                    "notification runtime retries exhausted " +
+                        "attempts=${outcome.attempts} reason=${outcome.failureClass}",
+                )
+                if (shouldReconcileRuntimeExhaustion(userOwnedStartRequested)) {
+                    appState.onBackgroundConnectionRuntimeExhausted()
+                }
+                stopSelf(latestStartId)
+                NotificationRuntimeBootstrapAction.FinishWithoutOneShotCheck
+            }
         }
-    }
 
-    private suspend fun backgroundConnectionEnabledOffMain(): Boolean =
-        withContext(Dispatchers.Default) {
-            BackgroundConnectionPreferences.isEnabled(applicationContext)
-        }
-
-    private suspend fun startNotificationRuntimeForTrigger(
+    private suspend fun superviseRuntimeAttempt(
         appState: WhiteNoiseAppState,
+        recoveryGeneration: Long,
         trigger: ForegroundStartTrigger,
-    ) {
-        if (trigger == ForegroundStartTrigger.PushWake) {
-            appState.ensureNotificationRuntimeStartedAndAwaitPushDrain()
-        } else {
-            appState.ensureNotificationRuntimeStarted()
-        }
-    }
+    ): NotificationRuntimeSupervisionOutcome =
+        runtimeSupervisor.supervise(
+            recoveryAllowed = { appState.notificationRuntimeRecoveryAllowed(recoveryGeneration) },
+            startRuntime = {
+                val wakeLock = acquirePushWakeLockIfNeeded(trigger)
+                try {
+                    startNotificationRuntimeForTrigger(appState, trigger)
+                    drainPendingNativePushRegistrationSync(appState)
+                } finally {
+                    releaseWakeLock(wakeLock)
+                }
+            },
+            onAttemptFailed = { attempt, retryDelayMillis, failureClass ->
+                val retrySummary = retryDelayMillis?.let { " retry_ms=$it" }.orEmpty()
+                foregroundServiceDiagnostic(
+                    "notification runtime attempt failed " +
+                        "attempt=$attempt$retrySummary reason=$failureClass",
+                )
+            },
+        )
 
     private suspend fun drainPendingNativePushRegistrationSync(appState: WhiteNoiseAppState) {
         val inMemorySyncRequested = pendingNativePushRegistrationSync
@@ -360,6 +356,28 @@ class NotificationStreamForegroundService : Service() {
                 false
             }
     }
+}
+
+private suspend fun backgroundConnectionEnabledOffMain(context: Context): Boolean =
+    withContext(Dispatchers.Default) {
+        BackgroundConnectionPreferences.isEnabled(context)
+    }
+
+private suspend fun startNotificationRuntimeForTrigger(
+    appState: WhiteNoiseAppState,
+    trigger: ForegroundStartTrigger,
+) {
+    if (trigger == ForegroundStartTrigger.PushWake) {
+        appState.ensureNotificationRuntimeStartedAndAwaitPushDrain()
+    } else {
+        appState.ensureNotificationRuntimeStarted()
+    }
+}
+
+private enum class NotificationRuntimeBootstrapAction {
+    Continue,
+    Finish,
+    FinishWithoutOneShotCheck,
 }
 
 internal enum class ForegroundStartTrigger(

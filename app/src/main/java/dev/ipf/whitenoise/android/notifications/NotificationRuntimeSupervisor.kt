@@ -47,38 +47,56 @@ internal class NotificationRuntimeSupervisor(
         onAttemptFailed: (attempt: Int, retryDelayMillis: Long?, failureClass: String) -> Unit = { _, _, _ -> },
     ): NotificationRuntimeSupervisionOutcome {
         var retryDelayMillis = policy.initialDelayMillis
-        for (attempt in 1..policy.maxAttempts) {
+        var attempt = 0
+        var outcome: NotificationRuntimeSupervisionOutcome? = null
+        while (outcome == null && attempt < policy.maxAttempts) {
+            attempt += 1
             if (!recoveryAllowed()) {
-                return NotificationRuntimeSupervisionOutcome.RecoveryBoundaryChanged(attempts = attempt - 1)
-            }
-            try {
-                startRuntime()
-                if (!recoveryAllowed()) {
-                    return NotificationRuntimeSupervisionOutcome.RecoveryBoundaryChanged(attempts = attempt)
+                outcome = NotificationRuntimeSupervisionOutcome.RecoveryBoundaryChanged(attempts = attempt - 1)
+            } else {
+                val failure = runCatching { startRuntime() }.exceptionOrNull()
+                rethrowFatalNotificationRuntimeFailure(failure)
+                if (failure == null) {
+                    outcome =
+                        if (recoveryAllowed()) {
+                            NotificationRuntimeSupervisionOutcome.Started(attempts = attempt)
+                        } else {
+                            NotificationRuntimeSupervisionOutcome.RecoveryBoundaryChanged(attempts = attempt)
+                        }
+                } else {
+                    val failureClass = failure.javaClass.simpleName.ifBlank { "UnknownFailure" }
+                    when {
+                        !recoveryAllowed() -> {
+                            outcome = NotificationRuntimeSupervisionOutcome.RecoveryBoundaryChanged(attempts = attempt)
+                        }
+                        attempt == policy.maxAttempts -> {
+                            onAttemptFailed(attempt, null, failureClass)
+                            outcome =
+                                NotificationRuntimeSupervisionOutcome.Exhausted(
+                                    attempts = attempt,
+                                    failureClass = failureClass,
+                                )
+                        }
+                        else -> {
+                            onAttemptFailed(attempt, retryDelayMillis, failureClass)
+                            waitBeforeRetry(retryDelayMillis)
+                            retryDelayMillis = (retryDelayMillis * 2L).coerceAtMost(policy.maxDelayMillis)
+                        }
+                    }
                 }
-                return NotificationRuntimeSupervisionOutcome.Started(attempts = attempt)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Throwable) {
-                if (failure is VirtualMachineError || failure is LinkageError || failure is ThreadDeath) {
-                    throw failure
-                }
-                val failureClass = failure.javaClass.simpleName.ifBlank { "UnknownFailure" }
-                if (!recoveryAllowed()) {
-                    return NotificationRuntimeSupervisionOutcome.RecoveryBoundaryChanged(attempts = attempt)
-                }
-                if (attempt == policy.maxAttempts) {
-                    onAttemptFailed(attempt, null, failureClass)
-                    return NotificationRuntimeSupervisionOutcome.Exhausted(
-                        attempts = attempt,
-                        failureClass = failureClass,
-                    )
-                }
-                onAttemptFailed(attempt, retryDelayMillis, failureClass)
-                waitBeforeRetry(retryDelayMillis)
-                retryDelayMillis = (retryDelayMillis * 2L).coerceAtMost(policy.maxDelayMillis)
             }
         }
-        error("unreachable notification-runtime supervision state")
+        return checkNotNull(outcome)
+    }
+}
+
+private fun rethrowFatalNotificationRuntimeFailure(failure: Throwable?) {
+    when (failure) {
+        is CancellationException -> throw failure
+        is VirtualMachineError,
+        is LinkageError,
+        is ThreadDeath,
+        -> throw failure
+        else -> Unit
     }
 }
