@@ -1417,6 +1417,8 @@
     <string name="global_search_content_files_documents">文件和文档</string>
     <string name="global_search_content_any_attachment">任意附件</string>
     <string name="text_attachment_open_external">在其他应用中打开</string>
+    <string name="text_attachment_filename">文件名</string>
+    <string name="text_attachment_view_full_filename">查看完整文件名</string>
     <string name="text_attachment_loading">正在加载预览…</string>
     <string name="text_attachment_preview_truncated">为确保安全，此 Markdown 预览已截断。请在其他应用中打开文件以查看其余内容。</string>
     <string name="text_attachment_empty">此文本文件为空。</string>

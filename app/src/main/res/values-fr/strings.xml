@@ -1444,6 +1444,8 @@
     <string name="global_search_content_files_documents">Fichiers et documents</string>
     <string name="global_search_content_any_attachment">Toute pièce jointe</string>
     <string name="text_attachment_open_external">Ouvrir dans une autre application</string>
+    <string name="text_attachment_filename">Nom du fichier</string>
+    <string name="text_attachment_view_full_filename">Afficher le nom complet</string>
     <string name="text_attachment_loading">Chargement de l’aperçu…</string>
     <string name="text_attachment_preview_truncated">Cet aperçu Markdown a été tronqué par sécurité. Ouvrez le fichier dans une autre application pour voir la suite.</string>
     <string name="text_attachment_empty">Ce fichier texte est vide.</string>

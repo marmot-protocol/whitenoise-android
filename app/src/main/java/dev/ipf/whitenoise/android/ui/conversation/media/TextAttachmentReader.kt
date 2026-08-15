@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -44,6 +46,7 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -60,6 +63,9 @@ import java.util.Locale
 internal const val TEXT_ATTACHMENT_READER_TAG = "text-attachment-reader"
 internal const val TEXT_ATTACHMENT_READER_BODY_TAG = "text-attachment-reader-body"
 internal const val TEXT_ATTACHMENT_READER_RETRY_TAG = "text-attachment-reader-retry"
+internal const val TEXT_ATTACHMENT_READER_FILENAME_TAG = "text-attachment-reader-filename"
+internal const val TEXT_ATTACHMENT_READER_FILENAME_DIALOG_TAG = "text-attachment-reader-filename-dialog"
+internal const val TEXT_ATTACHMENT_READER_FULL_FILENAME_TAG = "text-attachment-reader-full-filename"
 
 private suspend fun WhiteNoiseAppState.speakTextAttachment(
     preview: TextAttachmentPreview,
@@ -234,7 +240,7 @@ private fun TextAttachmentReaderTopBar(
                 )
             },
         )
-        TextAttachmentMetadata(candidate)
+        TextAttachmentMetadata(candidate = candidate, onCopy = onCopy)
         HorizontalDivider()
         transport()
     }
@@ -272,7 +278,13 @@ private fun TextAttachmentReaderActions(
 }
 
 @Composable
-private fun TextAttachmentMetadata(candidate: TextAttachmentCandidate) {
+private fun TextAttachmentMetadata(
+    candidate: TextAttachmentCandidate,
+    onCopy: (String) -> Unit,
+) {
+    var showFullFilename by remember(candidate.displayName) { mutableStateOf(false) }
+    var filenameTruncated by remember(candidate.displayName) { mutableStateOf(false) }
+    val viewFullFilenameLabel = stringResource(R.string.text_attachment_view_full_filename)
     Column(
         modifier =
             Modifier
@@ -280,14 +292,85 @@ private fun TextAttachmentMetadata(candidate: TextAttachmentCandidate) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(candidate.displayName, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+        Text(
+            text = candidate.displayName,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            onTextLayout = { result ->
+                if (filenameTruncated != result.hasVisualOverflow) {
+                    filenameTruncated = result.hasVisualOverflow
+                }
+            },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .testTag(TEXT_ATTACHMENT_READER_FILENAME_TAG),
+        )
         Text(
             candidate.normalizedMime,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (filenameTruncated) {
+            TextButton(
+                onClick = { showFullFilename = true },
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Text(viewFullFilenameLabel)
+            }
+        }
+    }
+    if (showFullFilename) {
+        TextAttachmentFilenameDialog(
+            filename = candidate.displayName,
+            onCopy = {
+                onCopy(candidate.displayName)
+                showFullFilename = false
+            },
+            onDismiss = { showFullFilename = false },
         )
     }
+}
+
+@Composable
+private fun TextAttachmentFilenameDialog(
+    filename: String,
+    onCopy: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(TEXT_ATTACHMENT_READER_FILENAME_DIALOG_TAG),
+        title = { Text(stringResource(R.string.text_attachment_filename)) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+            ) {
+                SelectionContainer {
+                    Text(
+                        text = filename,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .testTag(TEXT_ATTACHMENT_READER_FULL_FILENAME_TAG),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onCopy) {
+                Text(stringResource(R.string.copy))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.close))
+            }
+        },
+    )
 }
 
 @Composable

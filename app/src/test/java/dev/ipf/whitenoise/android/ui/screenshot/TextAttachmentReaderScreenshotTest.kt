@@ -6,8 +6,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -29,6 +31,9 @@ import dev.ipf.marmotkit.MarkdownListItemFfi
 import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.conversation.media.TEXT_ATTACHMENT_READER_FILENAME_DIALOG_TAG
+import dev.ipf.whitenoise.android.ui.conversation.media.TEXT_ATTACHMENT_READER_FILENAME_TAG
+import dev.ipf.whitenoise.android.ui.conversation.media.TEXT_ATTACHMENT_READER_FULL_FILENAME_TAG
 import dev.ipf.whitenoise.android.ui.conversation.media.TEXT_ATTACHMENT_READER_RETRY_TAG
 import dev.ipf.whitenoise.android.ui.conversation.media.TEXT_ATTACHMENT_READER_TAG
 import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentCandidate
@@ -115,6 +120,46 @@ class TextAttachmentReaderScreenshotTest {
     }
 
     @Test
+    @Config(sdk = [36], qualifiers = "w240dp-h640dp-mdpi")
+    fun longUnbrokenFilenameStaysAccessibleAtNarrowLargeRtl() {
+        var copied = ""
+        render(
+            candidate = longFilenameCandidate,
+            state =
+                TextAttachmentReaderState.Ready(
+                    TextAttachmentPreview(
+                        candidate = longFilenameCandidate,
+                        text = "Attachment body remains readable.",
+                    ),
+                ),
+            fontScale = 1.8f,
+            layoutDirection = LayoutDirection.Rtl,
+            onCopy = { copied = it },
+        )
+
+        composeRule
+            .onNodeWithTag(TEXT_ATTACHMENT_READER_FILENAME_TAG)
+            .assertTextEquals(longFilenameCandidate.displayName)
+        composeRule
+            .onNodeWithTag(TEXT_ATTACHMENT_READER_TAG)
+            .captureRoboImage("src/test/snapshots/text_attachment_reader_long_filename_narrow_large_rtl.png")
+
+        composeRule
+            .onNodeWithText(string(R.string.text_attachment_view_full_filename))
+            .assertHasClickAction()
+            .performClick()
+        composeRule
+            .onNodeWithTag(TEXT_ATTACHMENT_READER_FULL_FILENAME_TAG)
+            .assertTextEquals(longFilenameCandidate.displayName)
+        composeRule
+            .onNodeWithTag(TEXT_ATTACHMENT_READER_FILENAME_DIALOG_TAG)
+            .captureRoboImage("src/test/snapshots/text_attachment_reader_long_filename_dialog_narrow_large_rtl.png")
+        composeRule.onNodeWithText(string(R.string.copy)).performClick()
+
+        assertEquals(longFilenameCandidate.displayName, copied)
+    }
+
+    @Test
     fun readyActionsAreAccessibleAndDoNotOfferEditing() {
         var dismissed = 0
         var copied = ""
@@ -133,6 +178,9 @@ class TextAttachmentReaderScreenshotTest {
         composeRule.onNodeWithContentDescription(string(R.string.copy_text)).assertIsEnabled().performClick()
         composeRule.onNodeWithContentDescription(string(R.string.speak_aloud)).assertIsEnabled().performClick()
         composeRule.onNodeWithContentDescription(string(R.string.text_attachment_open_external)).performClick()
+        composeRule
+            .onNodeWithText(string(R.string.text_attachment_view_full_filename))
+            .assertDoesNotExist()
 
         assertEquals(1, dismissed)
         assertEquals(markdownPreview().text, copied)
@@ -416,5 +464,11 @@ class TextAttachmentReaderScreenshotTest {
             TextAttachmentCandidate("release-notes.md", "text/markdown", TextAttachmentFormat.Markdown)
         val plainCandidate =
             TextAttachmentCandidate("ملاحظات-الاجتماع.txt", "text/plain", TextAttachmentFormat.PlainText)
+        val longFilenameCandidate =
+            TextAttachmentCandidate(
+                "quarterly-export-${"unbroken".repeat(14)}.md",
+                "text/markdown",
+                TextAttachmentFormat.Markdown,
+            )
     }
 }
