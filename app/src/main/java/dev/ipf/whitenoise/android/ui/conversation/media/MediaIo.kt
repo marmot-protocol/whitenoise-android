@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.Saver
@@ -20,6 +21,8 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
@@ -570,6 +573,19 @@ internal fun launchImageShare(
             },
         )
     }
+
+/** Expected missing-handler outcomes stay non-diagnostic; operational failures retain their cause. */
+internal fun WhiteNoiseAppState.presentMediaLaunchFailure(
+    @StringRes titleRes: Int,
+    operationCode: String,
+    throwable: Throwable,
+) {
+    if (throwable is ActivityNotFoundException) {
+        present(titleRes)
+    } else {
+        presentFailure(titleRes, operationCode, throwable)
+    }
+}
 
 @Throws(java.io.IOException::class)
 private fun writeSharedMediaFile(

@@ -70,6 +70,14 @@ class UserFacingErrorArchitectureTest {
                 appState.present(R.string.profile_picture_invalid, copyable = true)
             }
             """.trimIndent()
+        val customFailure =
+            """
+            try {
+                prepareImage()
+            } catch (_: ImagePreparationFailure) {
+                appState.present(R.string.toast_couldnt_prepare_image, copyable = true)
+            }
+            """.trimIndent()
         val cancellation =
             """
             try {
@@ -91,6 +99,7 @@ class UserFacingErrorArchitectureTest {
             }
             """.trimIndent()
         assertTrue(discardedCauseWithLegacyCopyLines(unsafe).isNotEmpty())
+        assertTrue(discardedCauseWithLegacyCopyLines(customFailure).isNotEmpty())
         assertTrue(discardedCauseWithLegacyCopyLines(validation).isEmpty())
         assertTrue(discardedCauseWithLegacyCopyLines(cancellation).isEmpty())
         assertTrue(discardedCauseWithLegacyCopyLines(migrated).isEmpty())
@@ -147,7 +156,7 @@ class UserFacingErrorArchitectureTest {
     private fun discardedCauseWithLegacyCopyLines(source: String): List<Int> {
         val systemCatch =
             Regex(
-                """\bcatch\s*\(\s*[A-Za-z_]\w*\s*:\s*([\w.]*?(?:Exception|Throwable))\s*\)\s*\{""",
+                """\bcatch\s*\(\s*[A-Za-z_]\w*\s*:\s*([A-Za-z_][\w.]*)\s*\)\s*\{""",
             )
         return systemCatch
             .findAll(source)

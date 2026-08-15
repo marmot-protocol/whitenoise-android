@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.kotlinBlockFrom
 import dev.ipf.whitenoise.android.ui.profile.ProfileImageTarget
 import dev.ipf.whitenoise.android.ui.profile.profileImageFailureOperation
 import org.junit.Assert.assertEquals
@@ -88,6 +89,7 @@ class ErrorPresentationTest {
                 "ui/group/GroupEditScreen.kt" to
                     listOf("GROUP_IMAGE_PREPARE", "GROUP_AVATAR_UPDATE", "GROUP_IMAGE_UPLOAD"),
                 "ui/profile/ProfileEditScreen.kt" to listOf("PROFILE_EDIT_LOAD"),
+                "ui/conversation/media/MediaViewer.kt" to listOf("MEDIA_VIEWER_IMAGE_SHARE"),
                 "ui/medialibrary/MediaLibrary.kt" to
                     listOf(
                         "MEDIA_LIBRARY_VOICE_LOAD",
@@ -101,6 +103,7 @@ class ErrorPresentationTest {
             val source = mainSource(path).readText()
             operationCodes.forEach { operationCode ->
                 assertTrue("Missing migrated operation $operationCode in $path", operationCode in source)
+                assertCausePreservingFailureHandler(source, path, operationCode)
                 val presentation =
                     privacySafeErrorPresentation(
                         operationCode = operationCode,
@@ -133,6 +136,12 @@ class ErrorPresentationTest {
             ),
             profileOperations,
         )
+        val profileSource = mainSource("ui/profile/ProfileEditScreen.kt").readText()
+        val profileFailureCall =
+            failurePresentationCalls(profileSource).single { call ->
+                "operationCode = profileImageFailureOperation(target, prepared)" in call
+            }
+        assertTrue("throwable = error" in profileFailureCall)
         profileOperations.forEach { operationCode ->
             val presentation =
                 privacySafeErrorPresentation(
@@ -161,4 +170,30 @@ class ErrorPresentationTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
         ).firstOrNull(File::exists)
             ?: error("Missing source file: $relativePath")
+
+    private fun assertCausePreservingFailureHandler(
+        source: String,
+        path: String,
+        operationCode: String,
+    ) {
+        val call =
+            failurePresentationCalls(source).firstOrNull { candidate ->
+                operationCode in candidate && Regex("""(?:throwable\s*=\s*)?\berror\b""").containsMatchIn(candidate)
+            }
+        assertTrue(
+            "Handler for $operationCode in $path must present the caught error",
+            call != null,
+        )
+    }
+
+    private fun failurePresentationCalls(source: String): List<String> =
+        Regex("""\b(?:presentFailure|presentMediaLaunchFailure)\s*\(""")
+            .findAll(source)
+            .mapNotNull { match ->
+                val openParen = source.indexOf('(', match.range.first)
+                runCatching {
+                    source.substring(match.range.first, openParen) +
+                        source.kotlinBlockFrom(openParen, "failure presentation", '(', ')')
+                }.getOrNull()
+            }.toList()
 }

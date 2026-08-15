@@ -95,6 +95,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeDocumentAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaLaunchFailure
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberAttachmentOpener
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFallback
@@ -1069,7 +1070,7 @@ private fun FileLibraryRow(
                                         row.reference.mediaType,
                                     ).getOrThrow()
                                 }.onFailure { error ->
-                                    appState.presentFailure(
+                                    appState.presentMediaLaunchFailure(
                                         R.string.media_couldnt_open,
                                         "MEDIA_LIBRARY_FILE_SHARE",
                                         error,
@@ -1111,7 +1112,7 @@ private fun UrlLibraryTab(
                         },
                     )
                 }.onFailure { error ->
-                    appState.presentFailure(
+                    appState.presentMediaLaunchFailure(
                         R.string.media_couldnt_open,
                         "MEDIA_LIBRARY_URL_OPEN",
                         error,
