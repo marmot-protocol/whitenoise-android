@@ -89,7 +89,7 @@ private fun String.asSpeakableSentence(): String {
             .replace(spaceBeforeSpeakablePunctuation, "$1")
             .trim()
     if (normalized.isEmpty()) return normalized
-    return if (normalized.last() in ".!?;:,") normalized else "$normalized."
+    return if (normalized.endsWithSpeakableSentenceTerminal()) normalized else "$normalized."
 }
 
 internal fun String.safeUtf16Prefix(maxChars: Int): String =

@@ -549,6 +549,12 @@ private data class MappedText(
     }
 }
 
+/** True when a speakable segment already ends with authored punctuation or an emoji. */
+@Suppress("MaxLineLength")
+internal fun String.endsWithSpeakableSentenceTerminal(): Boolean = hasAuthoredSpeakableTerminalPunctuation() || endsWithSpeakableEmojiSequence()
+
+private fun String.hasAuthoredSpeakableTerminalPunctuation(): Boolean = isEmpty() || last() in ".!?;:,"
+
 private fun MappedText.asSpeakableSentence(): MappedText {
     var normalized = trimWhitespace()
     normalized = normalized.replaceMatches(emptySpeakableDelimiters) { MappedText.synthetic(" ") }
@@ -558,7 +564,7 @@ private fun MappedText.asSpeakableSentence(): MappedText {
             match.slice(match.text.lastIndex, match.text.length)
         }
     normalized = normalized.trimWhitespace()
-    if (normalized.text.isEmpty() || normalized.text.last() in ".!?;:,") return normalized
+    if (normalized.text.isEmpty() || normalized.text.endsWithSpeakableSentenceTerminal()) return normalized
     return MappedTextBuilder()
         .apply {
             append(normalized)
