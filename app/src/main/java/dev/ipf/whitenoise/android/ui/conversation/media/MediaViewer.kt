@@ -256,7 +256,7 @@ internal fun FullScreenMediaViewer(
                     } else {
                         runCatching {
                             attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
-                        }.getOrNull()?.let { shareImage(context, it, ref.fileName, ref.mediaType) }
+                        }.getOrNull()?.let { shareImage(context, it, ref.fileName, ref.mediaType).getOrNull() }
                     }
                 }
             },

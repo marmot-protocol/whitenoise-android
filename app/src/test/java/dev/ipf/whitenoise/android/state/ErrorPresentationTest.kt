@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.ui.profile.ProfileImageTarget
+import dev.ipf.whitenoise.android.ui.profile.profileImageFailureOperation
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -75,10 +78,87 @@ class ErrorPresentationTest {
         assertFalse((presentation.message as AppText.Plain).value.contains("IllegalStateException"))
     }
 
+    @Test
+    fun migratedLegacyCallersProduceBoundedReport() {
+        val secret = "nsec1" + "q".repeat(60)
+        val failure = java.io.IOException("failed with $secret at https://user:pass@example.test")
+        val operationsBySource =
+            mapOf(
+                "ui/chats/newchat/NewGroupSetupScreen.kt" to listOf("NEW_GROUP_IMAGE_PREPARE"),
+                "ui/group/GroupEditScreen.kt" to
+                    listOf("GROUP_IMAGE_PREPARE", "GROUP_AVATAR_UPDATE", "GROUP_IMAGE_UPLOAD"),
+                "ui/profile/ProfileEditScreen.kt" to listOf("PROFILE_EDIT_LOAD"),
+                "ui/medialibrary/MediaLibrary.kt" to
+                    listOf(
+                        "MEDIA_LIBRARY_VOICE_LOAD",
+                        "MEDIA_LIBRARY_FILE_OPEN",
+                        "MEDIA_LIBRARY_FILE_SHARE",
+                        "MEDIA_LIBRARY_URL_OPEN",
+                    ),
+            )
+
+        operationsBySource.forEach { (path, operationCodes) ->
+            val source = mainSource(path).readText()
+            operationCodes.forEach { operationCode ->
+                assertTrue("Missing migrated operation $operationCode in $path", operationCode in source)
+                val presentation =
+                    privacySafeErrorPresentation(
+                        operationCode = operationCode,
+                        throwable = failure,
+                        appVersion = "test",
+                        androidVersion = "test",
+                        occurredAtUtc = "2026-08-15T12:00:00Z",
+                    )
+                assertTrue(presentation.report.contains("operation=$operationCode"))
+                assertTrue(presentation.report.isNotBlank())
+                assertTrue(presentation.report.length <= 600)
+                assertFalse(presentation.report.contains(secret))
+                assertFalse(presentation.report.contains("user:pass"))
+            }
+        }
+
+        val profileOperations =
+            listOf(
+                profileImageFailureOperation(ProfileImageTarget.Picture, prepared = false),
+                profileImageFailureOperation(ProfileImageTarget.Picture, prepared = true),
+                profileImageFailureOperation(ProfileImageTarget.Banner, prepared = false),
+                profileImageFailureOperation(ProfileImageTarget.Banner, prepared = true),
+            )
+        assertEquals(
+            listOf(
+                "PROFILE_IMAGE_PREPARE",
+                "PROFILE_IMAGE_UPLOAD",
+                "PROFILE_BANNER_PREPARE",
+                "PROFILE_BANNER_UPLOAD",
+            ),
+            profileOperations,
+        )
+        profileOperations.forEach { operationCode ->
+            val presentation =
+                privacySafeErrorPresentation(
+                    operationCode = operationCode,
+                    throwable = failure,
+                    appVersion = "test",
+                    androidVersion = "test",
+                    occurredAtUtc = "2026-08-15T12:00:00Z",
+                )
+            assertTrue(presentation.report.contains("operation=$operationCode"))
+            assertTrue(presentation.report.length <= 600)
+            assertFalse(presentation.report.contains(secret))
+        }
+    }
+
     private fun appStateSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull(File::exists)
             ?: error("Missing AppState.kt source file")
+
+    private fun mainSource(relativePath: String): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
+        ).firstOrNull(File::exists)
+            ?: error("Missing source file: $relativePath")
 }

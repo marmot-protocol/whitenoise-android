@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -524,17 +525,18 @@ internal suspend fun shareVideo(
  * Suspends because the temp-file write is multi-megabyte for any non-trivial
  * attachment; doing it on the main dispatcher would stall the UI for the
  * write. The `startActivity` call has to run on Main, so the I/O is hopped
- * to `Dispatchers.IO` and the chooser is fired back on Main.
+ * to `Dispatchers.IO` and the chooser is fired back on Main. Failures are
+ * returned so each owning surface can apply its own user-visible contract.
  */
 internal suspend fun shareImage(
     context: android.content.Context,
     bytes: ByteArray,
     fileName: String,
     mediaType: String,
-) {
-    val uri =
-        withContext(Dispatchers.IO) {
-            runCatching {
+): Result<Unit> =
+    runCatchingCancellable {
+        val uri =
+            withContext(Dispatchers.IO) {
                 val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
                 // Unique temp keyed off a sanitized basename — avoids
                 // collisions and path traversal from a remote-supplied
@@ -546,22 +548,28 @@ internal suspend fun shareImage(
                     "${context.packageName}.fileprovider",
                     file,
                 )
-            }.getOrNull()
-        } ?: return
-    runCatching {
-        val intent =
+            }
+        launchImageShare(context, uri, mediaType).getOrThrow()
+    }
+
+internal fun launchImageShare(
+    context: android.content.Context,
+    uri: Uri,
+    mediaType: String,
+): Result<Unit> =
+    runCatchingCancellable {
+        val shareIntent =
             android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                 type = mediaType.ifBlank { MediaPipeline.RECOMPRESSED_MIME }
                 putExtra(android.content.Intent.EXTRA_STREAM, uri)
                 addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
         context.startActivity(
-            android.content.Intent.createChooser(intent, null).apply {
+            android.content.Intent.createChooser(shareIntent, null).apply {
                 addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
             },
         )
     }
-}
 
 @Throws(java.io.IOException::class)
 private fun writeSharedMediaFile(

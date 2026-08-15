@@ -78,6 +78,7 @@ import dev.ipf.whitenoise.android.core.ProfilePseudonymGenerator
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ProfilePublicWarning
 import dev.ipf.whitenoise.android.ui.common.SectionCard
@@ -91,6 +92,15 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 internal enum class ProfileImageTarget { Picture, Banner }
+
+internal fun profileImageFailureOperation(
+    target: ProfileImageTarget,
+    prepared: Boolean,
+): String =
+    when (target) {
+        ProfileImageTarget.Picture -> if (prepared) "PROFILE_IMAGE_UPLOAD" else "PROFILE_IMAGE_PREPARE"
+        ProfileImageTarget.Banner -> if (prepared) "PROFILE_BANNER_UPLOAD" else "PROFILE_BANNER_PREPARE"
+    }
 
 internal data class ProfileImageDrafts(
     val picture: String = "",
@@ -613,17 +623,19 @@ internal fun ProfileEditScreen(
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (_: Exception) {
-                    appState.present(
-                        if (prepared) {
-                            when (target) {
-                                ProfileImageTarget.Picture -> R.string.toast_couldnt_upload_profile_image
-                                ProfileImageTarget.Banner -> R.string.toast_couldnt_upload_profile_banner
-                            }
-                        } else {
-                            R.string.toast_couldnt_prepare_image
-                        },
-                        copyable = true,
+                } catch (error: Exception) {
+                    appState.presentFailure(
+                        titleRes =
+                            if (prepared) {
+                                when (target) {
+                                    ProfileImageTarget.Picture -> R.string.toast_couldnt_upload_profile_image
+                                    ProfileImageTarget.Banner -> R.string.toast_couldnt_upload_profile_banner
+                                }
+                            } else {
+                                R.string.toast_couldnt_prepare_image
+                            },
+                        operationCode = profileImageFailureOperation(target, prepared),
+                        throwable = error,
                     )
                 } finally {
                     when (target) {
@@ -673,10 +685,14 @@ internal fun ProfileEditScreen(
             lud16 = loadedLud16
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
             val emptyMetadata = profileEditMetadata("", "", "", "", "", "")
             if (saveState.completeLoad(accountId, emptyMetadata)) {
-                appState.present(R.string.toast_couldnt_load_profile, copyable = true)
+                appState.presentFailure(
+                    R.string.toast_couldnt_load_profile,
+                    "PROFILE_EDIT_LOAD",
+                    error,
+                )
             }
         }
     }

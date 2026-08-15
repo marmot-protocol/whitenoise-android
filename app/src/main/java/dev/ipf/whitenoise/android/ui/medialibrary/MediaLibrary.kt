@@ -80,6 +80,7 @@ import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.SectionCard
@@ -810,9 +811,13 @@ private fun VoiceLibraryRow(
                                         reference = row.reference,
                                         mine = row.mine,
                                     )
-                                }.onFailure {
-                                    if (it is kotlinx.coroutines.CancellationException) throw it
-                                    appState.present(R.string.shared_media_voice_failed, copyable = true)
+                                }.onFailure { error ->
+                                    if (error is kotlinx.coroutines.CancellationException) throw error
+                                    appState.presentFailure(
+                                        R.string.shared_media_voice_failed,
+                                        "MEDIA_LIBRARY_VOICE_LOAD",
+                                        error,
+                                    )
                                 }.also { loading = false }
                                     .getOrNull() ?: return@launch
                             localFile = file
@@ -897,7 +902,6 @@ private fun FileLibraryRow(
     var inFlight by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
     var menuOpen by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
     val noOpenAppMessage = stringResource(R.string.media_no_app_to_open)
-    val couldntOpenMessage = stringResource(R.string.media_couldnt_open)
     val recordedAtLabel = rememberRelativeTimestamp(row.recordedAt)
     val presentation =
         remember(row.reference.mediaType, row.reference.fileName) {
@@ -947,17 +951,27 @@ private fun FileLibraryRow(
                     inFlight = true
                     scope.launch {
                         val outcome =
-                            runCatching {
+                            runCatchingCancellable {
                                 openAttachment(fetchFile(), row.reference.mediaType)
-                            }.onFailure {
-                                if (it is kotlinx.coroutines.CancellationException) throw it
-                            }.getOrDefault(OpenAttachmentResult.Error)
+                            }.getOrElse { error ->
+                                appState.presentFailure(
+                                    R.string.media_couldnt_open,
+                                    "MEDIA_LIBRARY_FILE_OPEN",
+                                    error,
+                                )
+                                inFlight = false
+                                return@launch
+                            }
                         when (outcome) {
                             OpenAttachmentResult.Opened -> Unit
                             OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
-                            OpenAttachmentResult.InstallPermissionRequired,
-                            OpenAttachmentResult.Error,
-                            -> appState.present(couldntOpenMessage, copyable = true)
+                            OpenAttachmentResult.InstallPermissionRequired -> appState.present(R.string.media_couldnt_open)
+                            OpenAttachmentResult.Error ->
+                                appState.presentFailure(
+                                    R.string.media_couldnt_open,
+                                    "MEDIA_LIBRARY_FILE_OPEN",
+                                    IllegalStateException("attachment open returned $outcome"),
+                                )
                         }
                         inFlight = false
                     }
@@ -1047,16 +1061,19 @@ private fun FileLibraryRow(
                         onClick = {
                             menuOpen = false
                             scope.launch {
-                                runCatching {
+                                runCatchingCancellable {
                                     shareImage(
                                         context,
                                         fetchBytes(),
                                         row.reference.fileName,
                                         row.reference.mediaType,
+                                    ).getOrThrow()
+                                }.onFailure { error ->
+                                    appState.presentFailure(
+                                        R.string.media_couldnt_open,
+                                        "MEDIA_LIBRARY_FILE_SHARE",
+                                        error,
                                     )
-                                }.onFailure {
-                                    if (it is kotlinx.coroutines.CancellationException) throw it
-                                    appState.present(couldntOpenMessage, copyable = true)
                                 }
                             }
                         },
@@ -1076,7 +1093,6 @@ private fun UrlLibraryTab(
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    val couldntOpenMessage = stringResource(R.string.media_couldnt_open)
     MonthSectionedColumn(
         sections = tiles.urlSections,
         listState = listState,
@@ -1088,13 +1104,19 @@ private fun UrlLibraryTab(
             entry = entry,
             appState = appState,
             onOpen = {
-                runCatching {
+                runCatchingCancellable {
                     context.startActivity(
                         Intent(Intent.ACTION_VIEW, Uri.parse(entry.url)).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         },
                     )
-                }.onFailure { appState.present(couldntOpenMessage, copyable = true) }
+                }.onFailure { error ->
+                    appState.presentFailure(
+                        R.string.media_couldnt_open,
+                        "MEDIA_LIBRARY_URL_OPEN",
+                        error,
+                    )
+                }
             },
             onCopy = {
                 clipboard.setText(AnnotatedString(entry.url))

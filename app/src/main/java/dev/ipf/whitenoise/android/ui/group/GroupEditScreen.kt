@@ -55,6 +55,7 @@ import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
 import dev.ipf.whitenoise.android.ui.common.SectionCard
@@ -153,8 +154,12 @@ internal fun GroupEditScreen(
                 if (controller.updateGroupImage(draft)) showImageSearch = false
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                appState.present(R.string.toast_couldnt_prepare_image, copyable = true)
+            } catch (error: Exception) {
+                appState.presentFailure(
+                    R.string.toast_couldnt_prepare_image,
+                    "GROUP_IMAGE_PREPARE",
+                    error,
+                )
             } finally {
                 imageSaving = false
             }
@@ -177,8 +182,12 @@ internal fun GroupEditScreen(
                 if (controller.updateGroupAvatarUrl(safeUrl)) showImageSearch = false
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                appState.present(R.string.toast_couldnt_upload_group_image, copyable = true)
+            } catch (error: Exception) {
+                appState.presentFailure(
+                    R.string.toast_couldnt_upload_group_image,
+                    "GROUP_AVATAR_UPDATE",
+                    error,
+                )
             } finally {
                 imageSaving = false
             }
@@ -207,14 +216,16 @@ internal fun GroupEditScreen(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                appState.present(
-                    if (prepared) {
-                        R.string.toast_couldnt_upload_group_image
-                    } else {
-                        R.string.toast_couldnt_prepare_image
-                    },
-                    copyable = true,
+            } catch (error: Exception) {
+                appState.presentFailure(
+                    titleRes =
+                        if (prepared) {
+                            R.string.toast_couldnt_upload_group_image
+                        } else {
+                            R.string.toast_couldnt_prepare_image
+                        },
+                    operationCode = if (prepared) "GROUP_IMAGE_UPLOAD" else "GROUP_IMAGE_PREPARE",
+                    throwable = error,
                 )
             } finally {
                 imageSaving = false
