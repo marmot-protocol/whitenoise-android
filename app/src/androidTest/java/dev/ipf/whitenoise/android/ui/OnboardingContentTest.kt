@@ -20,6 +20,8 @@ class OnboardingContentTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private val nsec = "nsec1" + "q".repeat(58)
+
     @Test
     fun landingShowsCreateAndSignInBeforeNsecEntryPage() {
         var createClicks = 0
@@ -52,9 +54,9 @@ class OnboardingContentTest {
         composeRule.onNodeWithText("Nostr nsec").assertIsDisplayed()
         composeRule.onNodeWithText("Import Existing Identity").assertDoesNotExist()
 
-        composeRule.onNodeWithText("Nostr nsec").performTextInput("nsec1example")
+        composeRule.onNodeWithText("Nostr nsec").performTextInput(nsec)
         composeRule.onNodeWithText("Sign in").performClick()
-        composeRule.runOnIdle { assertEquals("nsec1example", importedIdentity) }
+        composeRule.runOnIdle { assertEquals(nsec, importedIdentity) }
     }
 
     @Test
@@ -80,7 +82,7 @@ class OnboardingContentTest {
     fun signInButtonShowsProgressWhileImporting() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                var identity by remember { mutableStateOf("nsec1example") }
+                var identity by remember { mutableStateOf(nsec) }
                 OnboardingContent(
                     identity = identity,
                     creatingIdentity = false,
