@@ -234,7 +234,10 @@ class ShareChatPickerFullScreenBackTest {
                         tracker.dismissCount++
                         tracker.showPicker = false
                     }
-                    val onStage: (List<String>) -> Unit = { tracker.stageCount++ }
+                    val onStage: (String, List<String>) -> Boolean = { _, _ ->
+                        tracker.stageCount++
+                        true
+                    }
                     val registrar =
                         ShareChatPickerOverlayBackRegistrar { priority, callback ->
                             tracker.overlayBackPriority = priority

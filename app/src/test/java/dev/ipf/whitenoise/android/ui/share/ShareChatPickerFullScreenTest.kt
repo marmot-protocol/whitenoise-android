@@ -5,11 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -17,6 +19,7 @@ import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -31,6 +34,8 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
+import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -75,7 +80,7 @@ class ShareChatPickerFullScreenTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -88,6 +93,25 @@ class ShareChatPickerFullScreenTest {
                 .boundsInRoot.top
         assertTrue("Full-screen title must be in the top app bar", titleTop < 100f)
         composeRule.onNodeWithText("Person 5").assertIsDisplayed()
+    }
+
+    @Test
+    fun activeAccountLoadingStateIsVisible() {
+        val appState = emptyAppState()
+        appState.attachChatsController(ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() })
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerFullScreenContent(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = { _, _ -> true },
+                )
+            }
+        }
+
+        composeRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertIsDisplayed()
     }
 
     @Test
@@ -113,7 +137,10 @@ class ShareChatPickerFullScreenTest {
                     requestId = request.requestId,
                     payload = request.payload,
                     onDismiss = {},
-                    onStage = { staged = it },
+                    onStage = { _, groupIds ->
+                        staged = groupIds
+                        true
+                    },
                 )
             }
         }
@@ -146,6 +173,83 @@ class ShareChatPickerFullScreenTest {
     }
 
     @Test
+    @Suppress("LongMethod")
+    fun chosenAccountReloadsTargetsClearsSelectionAndSurvivesRestoration() {
+        val workAccountRef = "work"
+        val workAccountHex = "a1".repeat(32)
+        val appState =
+            emptyAppState(
+                profiles =
+                    mutableMapOf(
+                        PEER_A to profile(displayName = "Alice"),
+                        PEER_B to profile(displayName = "Bob"),
+                    ),
+                accounts =
+                    listOf(
+                        testAccount(ACCOUNT_REF, ACCOUNT_HEX),
+                        testAccount(workAccountRef, workAccountHex),
+                    ),
+            )
+        val activeController = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
+        activeController.applyChatListRow(chatRow(GROUP_A))
+        activeController.applyLocalGroupDetails(
+            record = group(GROUP_A).copy(name = "Personal chat"),
+            members = listOf(member(ACCOUNT_HEX, local = true), member(PEER_A, local = false)),
+        )
+        appState.attachChatsController(activeController)
+        val workControllerFactory: (WhiteNoiseAppState) -> ChatsController = { state ->
+            ChatsController(state, workAccountRef) { _, _ -> emptyList() }.also { controller ->
+                controller.applyChatListRow(chatRow(GROUP_B))
+                controller.applyLocalGroupDetails(
+                    record = group(GROUP_B).copy(name = "Work chat"),
+                    members = listOf(member(workAccountHex, local = true), member(PEER_B, local = false)),
+                )
+            }
+        }
+        var stagedAccountRef: String? = null
+        var stagedGroupIds = emptyList<String>()
+        val restorationTester = StateRestorationTester(composeRule)
+        restorationTester.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerFullScreenContent(
+                    appState = appState,
+                    requestId = "multi-account-request",
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = { accountRef, groupIds ->
+                        stagedAccountRef = accountRef
+                        stagedGroupIds = groupIds
+                        true
+                    },
+                    controllerFactory = workControllerFactory,
+                    controllerBinder = { _, _ -> },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(app.getString(R.string.share_sending_as)).assertIsDisplayed()
+        composeRule.onNodeWithText("Alice").performClick()
+        composeRule.onNodeWithTag(SHARE_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG).performClick()
+        composeRule.onNodeWithText(workAccountRef).performClick()
+
+        composeRule.onNodeWithText("Bob").assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.share)).assertIsNotEnabled()
+        composeRule.onNodeWithText("Bob").performClick()
+
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        composeRule.onNodeWithText(workAccountRef).assertIsDisplayed()
+        composeRule.onNodeWithText("Bob").assertIsSelected()
+        composeRule
+            .onNodeWithText(app.resources.getQuantityString(R.plurals.share_to_chats_count, 1, 1))
+            .performClick()
+        composeRule.runOnIdle {
+            assertEquals(workAccountRef, stagedAccountRef)
+            assertEquals(listOf(GROUP_B), stagedGroupIds)
+        }
+    }
+
+    @Test
     fun listPositionSurvivesSavedStateRecreation() {
         val chats =
             (0 until 20).map { index ->
@@ -166,7 +270,7 @@ class ShareChatPickerFullScreenTest {
                     requestId = request.requestId,
                     payload = request.payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -200,7 +304,7 @@ class ShareChatPickerFullScreenTest {
                     requestId = requestId.value,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -226,7 +330,7 @@ class ShareChatPickerFullScreenTest {
                     requestId = request.value.requestId,
                     payload = request.value.payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -254,7 +358,7 @@ class ShareChatPickerFullScreenTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -285,7 +389,10 @@ class ShareChatPickerFullScreenTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = { dismissCount++ },
-                    onStage = { staged = it },
+                    onStage = { _, groupIds ->
+                        staged = groupIds
+                        true
+                    },
                 )
             }
         }
@@ -305,6 +412,33 @@ class ShareChatPickerFullScreenTest {
     }
 
     @Test
+    fun rejectedStageKeepsThePickerOpenForRecovery() {
+        val profiles = mutableMapOf(PEER_A to profile(displayName = "Alice"))
+        val appState = appStateWithDirectChat(GROUP_A, PEER_A, profiles = profiles)
+        var dismissCount = 0
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerFullScreenContent(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = { dismissCount++ },
+                    onStage = { _, _ -> false },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Alice").performClick()
+        composeRule
+            .onNodeWithText(app.resources.getQuantityString(R.plurals.share_to_chats_count, 1, 1))
+            .performClick()
+
+        composeRule.runOnIdle { assertEquals(0, dismissCount) }
+        composeRule.onNodeWithText(app.getString(R.string.share_search_chats)).assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.no_share_target_available)).assertIsDisplayed()
+    }
+
+    @Test
     fun primaryActionAndResultsStayVisibleAboveImeInsets() {
         val profiles = mutableMapOf(PEER_A to profile(displayName = "Alice"))
         val appState = appStateWithDirectChat(GROUP_A, PEER_A, profiles = profiles)
@@ -315,7 +449,7 @@ class ShareChatPickerFullScreenTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -360,7 +494,7 @@ class ShareChatPickerFullScreenTest {
                         appState = appState,
                         payload = payload,
                         onDismiss = {},
-                        onStage = {},
+                        onStage = { _, _ -> true },
                     )
                 }
             }

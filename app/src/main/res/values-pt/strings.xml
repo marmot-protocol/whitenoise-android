@@ -332,6 +332,10 @@
     <string name="toast_forwarded_partial">Encaminhado para %1$s conversas; algumas falharam</string>
     <string name="toast_forward_failed">Nao foi possivel encaminhar a mensagem</string>
     <string name="share_to">Compartilhar em</string>
+    <string name="share_sending_as">Enviar como</string>
+    <string name="share_sending_as_value">Enviar como: %1$s</string>
+    <string name="share_choose_sending_account">Escolher conta de envio</string>
+    <string name="share_choose_sending_account_description">Escolha qual conta conectada será proprietária destes rascunhos compartilhados.</string>
     <string name="share_search_chats">Buscar conversas</string>
     <string name="share_no_chats">Nenhuma conversa para compartilhar.</string>
     <string name="share_no_matches">Nenhuma conversa corresponde à sua busca.</string>

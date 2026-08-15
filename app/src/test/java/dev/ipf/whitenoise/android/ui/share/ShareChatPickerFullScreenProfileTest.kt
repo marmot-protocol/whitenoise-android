@@ -73,7 +73,7 @@ class ShareChatPickerFullScreenProfileTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -101,7 +101,7 @@ class ShareChatPickerFullScreenProfileTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -139,7 +139,7 @@ class ShareChatPickerFullScreenProfileTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -179,7 +179,7 @@ class ShareChatPickerFullScreenProfileTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -213,7 +213,7 @@ class ShareChatPickerFullScreenProfileTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -239,7 +239,7 @@ class ShareChatPickerFullScreenProfileTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -259,13 +259,6 @@ class ShareChatPickerFullScreenProfileTest {
     fun npubSearchRequiresFullIdentityThreshold() {
         assertFalse(looksLikeShareIdentityNeedle("npub1"))
         assertTrue(looksLikeShareIdentityNeedle("npub1abc"))
-    }
-
-    @Test
-    fun stagingRequiresTheAccountThatOpenedThePicker() {
-        assertTrue(sharePickerAccountStillActive("account-a", "account-a"))
-        assertFalse(sharePickerAccountStillActive("account-a", "account-b"))
-        assertFalse(sharePickerAccountStillActive(null, "account-a"))
     }
 
     @Test
@@ -296,7 +289,7 @@ class ShareChatPickerFullScreenProfileTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -346,7 +339,7 @@ class ShareChatPickerFullScreenProfileTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -386,7 +379,7 @@ class ShareChatPickerFullScreenProfileTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -413,7 +406,7 @@ class ShareChatPickerFullScreenProfileTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }
@@ -439,7 +432,10 @@ class ShareChatPickerFullScreenProfileTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = { staged = it },
+                    onStage = { _, groupIds ->
+                        staged = groupIds
+                        true
+                    },
                 )
             }
         }
@@ -475,7 +471,7 @@ class ShareChatPickerFullScreenProfileTest {
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
-                    onStage = {},
+                    onStage = { _, _ -> true },
                 )
             }
         }

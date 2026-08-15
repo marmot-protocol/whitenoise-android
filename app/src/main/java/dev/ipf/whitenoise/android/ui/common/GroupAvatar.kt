@@ -21,8 +21,8 @@ internal fun encryptedGroupAvatarCacheKey(
 internal fun rememberEncryptedGroupAvatar(
     appState: WhiteNoiseAppState,
     group: AppGroupRecordFfi,
+    accountRef: String? = appState.activeAccountRef,
 ): ImageBitmap? {
-    val accountRef = appState.activeAccountRef
     val hash =
         group.imageHashHex
             ?.takeIf { !group.pendingConfirmation && group.avatarUrl.isNullOrBlank() }

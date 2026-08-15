@@ -17,6 +17,7 @@ internal data class ShareAccountAliases(
 @Composable
 internal fun rememberShareAccountAliases(
     appState: WhiteNoiseAppState,
+    ownerAccountRef: String?,
     accountIds: List<String>,
 ): Map<String, ShareAccountAliases> =
     buildMap {
@@ -25,11 +26,11 @@ internal fun rememberShareAccountAliases(
                 val revision = appState.profileAccountRevisionForCompose(accountIdHex)
                 put(
                     accountIdHex,
-                    remember(appState, accountIdHex, revision) {
+                    remember(appState, ownerAccountRef, accountIdHex, revision) {
                         val profile = appState.userProfileCached(accountIdHex)
                         val human =
                             listOfNotNull(
-                                appState.contactDisplayNameCachedOrNull(accountIdHex),
+                                appState.contactDisplayNameCachedOrNull(ownerAccountRef, accountIdHex),
                                 profile?.displayName,
                                 profile?.name,
                                 profile?.nip05,
@@ -49,11 +50,6 @@ internal fun rememberShareAccountAliases(
             }
         }
     }
-
-internal fun sharePickerAccountStillActive(
-    openedAccountRef: String?,
-    currentAccountRef: String?,
-): Boolean = openedAccountRef != null && openedAccountRef == currentAccountRef
 
 internal fun looksLikeShareIdentityNeedle(foldedNeedle: String): Boolean =
     looksLikeGroupIdNeedle(foldedNeedle) ||

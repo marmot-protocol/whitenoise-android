@@ -1465,6 +1465,7 @@ class WhiteNoiseAppState private constructor(
     private val notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription,
     private val notificationDispatcher: CoroutineDispatcher,
     private val notificationReceiverTimeoutMillis: () -> Long,
+    private val inboundShareTextStager: ((String, String, String) -> Unit)?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
@@ -1483,6 +1484,7 @@ class WhiteNoiseAppState private constructor(
             notificationSubscriber = ::subscribeToNotifications,
             notificationDispatcher = Dispatchers.IO,
             notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+            inboundShareTextStager = null,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
         )
@@ -1503,6 +1505,7 @@ class WhiteNoiseAppState private constructor(
         notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription = ::subscribeToNotifications,
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+        inboundShareTextStager: ((String, String, String) -> Unit)? = null,
     ) : this(
         context = context,
         draftStore = draftStore,
@@ -1517,6 +1520,7 @@ class WhiteNoiseAppState private constructor(
         notificationSubscriber = notificationSubscriber,
         notificationDispatcher = notificationDispatcher,
         notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
+        inboundShareTextStager = inboundShareTextStager,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
     )
@@ -2317,26 +2321,28 @@ class WhiteNoiseAppState private constructor(
         get() = shareStaging.revision + draftHydrationRevision
     private val shareInboundStager =
         ShareInboundStager(
-            stageText = { accountRef, groupIdHex, text ->
-                mutationsScope.launch {
-                    val completion = draftWriter.mergeText(accountRef, groupIdHex, text)
-                    completion.contentForHydration?.let { content ->
-                        draftStore.hydrate(
-                            accountRef,
-                            groupIdHex,
-                            content,
-                            completion.draftedAtMs ?: System.currentTimeMillis(),
-                            replaceExisting = true,
-                        )
-                        draftHydrationRevision += 1
+            stageText =
+                inboundShareTextStager ?: { accountRef, groupIdHex, text ->
+                    mutationsScope.launch {
+                        val completion = draftWriter.mergeText(accountRef, groupIdHex, text)
+                        completion.contentForHydration?.let { content ->
+                            draftStore.hydrate(
+                                accountRef,
+                                groupIdHex,
+                                content,
+                                completion.draftedAtMs ?: System.currentTimeMillis(),
+                                replaceExisting = true,
+                            )
+                            draftHydrationRevision += 1
+                        }
+                        when (val result = completion.result) {
+                            is MessageDraftMutationResult.Failure ->
+                                appStateDebug(result.cause) { "shared text staging failed group=${groupIdHex.take(8)}" }
+                            else -> Unit
+                        }
                     }
-                    when (val result = completion.result) {
-                        is MessageDraftMutationResult.Failure ->
-                            appStateDebug(result.cause) { "shared text staging failed group=${groupIdHex.take(8)}" }
-                        else -> Unit
-                    }
-                }
-            },
+                    Unit
+                },
             shareStaging = shareStaging,
             resolveMime = { context, uri -> shareResolveMime(context, uri) },
         )
@@ -2910,6 +2916,12 @@ class WhiteNoiseAppState private constructor(
      */
     fun forwardTargets(): List<ChatListItem> = chatsController?.forwardTargets().orEmpty()
 
+    internal val forwardTargetsLoading: Boolean
+        get() = chatsController?.isLoading == true
+
+    internal val forwardTargetsError: ErrorPresentation?
+        get() = chatsController?.error
+
     internal val forwardTargetMembersRevision: Long
         get() = chatsController?.memberSnapshotsRevision ?: 0L
 
@@ -2917,19 +2929,38 @@ class WhiteNoiseAppState private constructor(
         chatsController?.requestMemberSnapshots(groupIds)
     }
 
+    internal fun retryForwardTargets() {
+        chatsController?.retryLoad()
+    }
+
+    /**
+     * Stage an inbound Android share for the explicitly chosen local account.
+     *
+     * The system-share picker can enumerate a non-active account, so resolving
+     * through [activeAccountRef] here would silently move the draft and stream
+     * ownership to whichever account happened to be active at commit time.
+     * Return false when the chosen account is no longer a signed-in signing
+     * account; callers keep the picker/recovery path visible in that case.
+     */
     fun stageInboundShare(
+        accountRef: String,
         targetGroupIds: List<String>,
         payload: SharePayload,
-    ) {
-        val accountRef = activeAccountRef ?: return
-        val accountIdHex = activeAccount?.accountIdHex ?: return
+    ): Boolean {
+        val account =
+            accounts.firstOrNull { summary ->
+                summary.label == accountRef && summary.isSignedInSigningAccount()
+            }
+        val validGroupIds = targetGroupIds.filter(String::isNotBlank)
+        if (account == null || validGroupIds.isEmpty()) return false
         shareInboundStager.stageToChats(
             context = appContext,
-            accountIdHex = accountIdHex,
-            groupIds = targetGroupIds,
+            accountIdHex = account.accountIdHex,
+            groupIds = validGroupIds,
             payload = payload,
             draftAccountRef = accountRef,
         )
+        return true
     }
 
     fun consumeInboundShareStreamsCapped(
@@ -7178,8 +7209,17 @@ class WhiteNoiseAppState private constructor(
         return cachedName ?: shortNpub(accountIdHex)
     }
 
-    internal fun contactDisplayNameCachedOrNull(accountIdHex: String): String? {
-        contactNicknameFor(activeAccountRef, accountIdHex)?.let { return it }
+    internal fun contactDisplayNameCachedOrNull(accountIdHex: String): String? =
+        contactDisplayNameCachedOrNull(
+            accountRef = activeAccountRef,
+            accountIdHex = accountIdHex,
+        )
+
+    internal fun contactDisplayNameCachedOrNull(
+        accountRef: String?,
+        accountIdHex: String,
+    ): String? {
+        contactNicknameFor(accountRef, accountIdHex)?.let { return it }
         return chatMemberNameCached(accountIdHex)
     }
 
@@ -7187,6 +7227,11 @@ class WhiteNoiseAppState private constructor(
         val cachedName = contactDisplayNameCachedOrNull(accountIdHex)
         return cachedName ?: shortNpub(accountIdHex)
     }
+
+    internal fun contactDisplayNameCached(
+        accountRef: String?,
+        accountIdHex: String,
+    ): String = contactDisplayNameCachedOrNull(accountRef, accountIdHex) ?: shortNpub(accountIdHex)
 
     private fun profileDisplayName(accountIdHex: String): String? =
         resolvedProfileDisplayName(
