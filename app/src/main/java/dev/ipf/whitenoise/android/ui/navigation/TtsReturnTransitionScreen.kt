@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.R
 
 internal const val TTS_RETURN_TRANSITION_TAG = "tts-return-transition"
 
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 @Composable
 internal fun TtsReturnTransitionScreen(
     requestId: Long,

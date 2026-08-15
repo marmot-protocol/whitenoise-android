@@ -278,10 +278,14 @@ internal fun MainShell(
     var pendingTtsDestinationNavigation by remember {
         mutableStateOf<TtsDestinationNavigationRequest?>(null)
     }
+    var pendingTtsAccountSwitchOwnership by remember {
+        mutableStateOf<TtsDestinationAccountSwitchOwnership?>(null)
+    }
     val observedTtsDestination = appState.observeTtsConversationDestination()
     var nextTtsDestinationRequestId by remember { mutableLongStateOf(0L) }
     val supersedePendingTtsDestinationNavigation: () -> Unit = {
         pendingTtsDestinationNavigation = null
+        pendingTtsAccountSwitchOwnership = null
     }
     val requestTtsDestinationOpen: () -> Unit = {
         val destination = appState.currentTtsConversationDestination()
@@ -289,6 +293,7 @@ internal fun MainShell(
             appState.present(R.string.tts_source_unavailable)
         } else {
             nextTtsDestinationRequestId += 1L
+            pendingTtsAccountSwitchOwnership = null
             pendingTtsDestinationNavigation =
                 TtsDestinationNavigationRequest(
                     requestId = nextTtsDestinationRequestId,
@@ -855,6 +860,17 @@ internal fun MainShell(
     LaunchedEffect(appState.activeAccountRef) {
         val current = appState.activeAccountRef
         if (shouldResetNavOnAccountChange(previousActiveAccountRef, current)) {
+            val ttsOwnsAccountChange =
+                pendingTtsAccountSwitchOwnership.ownsAccountChange(
+                    previousAccountRef = previousActiveAccountRef,
+                    currentAccountRef = current,
+                    request = pendingTtsDestinationNavigation,
+                )
+            if (!ttsOwnsAccountChange) {
+                supersedePendingTtsDestinationNavigation()
+            } else {
+                pendingTtsAccountSwitchOwnership = null
+            }
             clearSharePickerRequest()
             shellNavState =
                 reduceShellNavigation(shellNavState, ShellNavigationEvent.AccountSwitched).state
@@ -903,6 +919,9 @@ internal fun MainShell(
         fun clearPendingRequest() {
             if (!pendingTtsDestinationNavigation.ownsCompletion(request.requestId)) return
             pendingTtsDestinationNavigation = null
+            if (pendingTtsAccountSwitchOwnership?.requestId == request.requestId) {
+                pendingTtsAccountSwitchOwnership = null
+            }
         }
 
         fun failUnavailable() {
@@ -948,6 +967,12 @@ internal fun MainShell(
 
             is TtsDestinationNavigationStep.SwitchAccount -> {
                 pendingTtsDestinationNavigation = request.copy(accountSwitchRequested = true)
+                pendingTtsAccountSwitchOwnership =
+                    TtsDestinationAccountSwitchOwnership(
+                        requestId = request.requestId,
+                        sourceAccountRef = appState.activeAccountRef,
+                        targetAccountRef = step.accountRef,
+                    )
                 selectedChat = null
                 selectedChatOpenContext = ConversationOpenContext()
                 selectedChatJustCreated = false

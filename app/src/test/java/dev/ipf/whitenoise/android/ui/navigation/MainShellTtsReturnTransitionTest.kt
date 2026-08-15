@@ -101,5 +101,8 @@ class MainShellTtsReturnTransitionTest {
             .captureRoboImage("src/test/snapshots/$fileName")
     }
 
-    private fun label(): String = ApplicationProvider.getApplicationContext<Context>().getString(R.string.tts_returning_to_passage)
+    private fun label(): String =
+        ApplicationProvider
+            .getApplicationContext<Context>()
+            .getString(R.string.tts_returning_to_passage)
 }

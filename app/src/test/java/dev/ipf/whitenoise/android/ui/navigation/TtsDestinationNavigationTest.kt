@@ -92,6 +92,21 @@ class TtsDestinationNavigationTest {
         assertFalse((null as TtsDestinationNavigationRequest?).ownsCompletion(requestId = 3L))
     }
 
+    @Test
+    fun onlyTheRequestOwnedAccountTransitionKeepsRoutingAlive() {
+        val ownership =
+            TtsDestinationAccountSwitchOwnership(
+                requestId = request.requestId,
+                sourceAccountRef = "account-b",
+                targetAccountRef = "account-a",
+            )
+
+        assertTrue(ownership.ownsAccountChange("account-b", "account-a", request))
+        assertFalse(ownership.ownsAccountChange("account-b", "account-c", request))
+        assertFalse(ownership.ownsAccountChange("account-b", "account-a", request.copy(requestId = 4L)))
+        assertFalse(ownership.ownsAccountChange("account-c", "account-a", request))
+    }
+
     private fun resolve(
         current: TtsConversationDestination? = destination,
         knownAccounts: Set<String> = setOf("account-a"),

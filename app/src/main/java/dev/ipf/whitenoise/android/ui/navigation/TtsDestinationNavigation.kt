@@ -10,7 +10,23 @@ internal data class TtsDestinationNavigationRequest(
     val accountSwitchRequested: Boolean = false,
 )
 
+internal data class TtsDestinationAccountSwitchOwnership(
+    val requestId: Long,
+    val sourceAccountRef: String?,
+    val targetAccountRef: String,
+)
+
 internal fun TtsDestinationNavigationRequest?.ownsCompletion(requestId: Long): Boolean = this?.requestId == requestId
+
+internal fun TtsDestinationAccountSwitchOwnership?.ownsAccountChange(
+    previousAccountRef: String?,
+    currentAccountRef: String?,
+    request: TtsDestinationNavigationRequest?,
+): Boolean =
+    this != null &&
+        request.ownsCompletion(requestId) &&
+        previousAccountRef == sourceAccountRef &&
+        currentAccountRef == targetAccountRef
 
 internal sealed interface TtsDestinationNavigationStep {
     data object Cancelled : TtsDestinationNavigationStep
