@@ -42,7 +42,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
@@ -1193,16 +1192,12 @@ internal fun GroupDetailsScreen(
                 Column {
                     AppDivider()
                     Spacer(Modifier.height(Dimens.spaceSm))
-                    FlowQuickActionRow(
-                        icon = Icons.Default.Group,
-                        title = stringResource(R.string.contact_create_group_with, conversationTitle),
-                        onClick = { showStartGroupWithContact = true },
-                    )
-                    FlowQuickActionRow(
-                        icon = Icons.Default.PersonAdd,
-                        title = stringResource(R.string.contact_add_to_group),
-                        enabled = !addingContactToGroups,
-                        onClick = { showAddContactToGroups = true },
+                    DmDetailsContactActionRows(
+                        createGroupTitle = stringResource(R.string.contact_create_group_with, conversationTitle),
+                        addToGroupTitle = stringResource(R.string.contact_add_to_group),
+                        addingContactToGroups = addingContactToGroups,
+                        onCreateGroup = { showStartGroupWithContact = true },
+                        onAddToGroup = { showAddContactToGroups = true },
                     )
                     if (dmSharedGroups.isNotEmpty()) {
                         SectionHeader(

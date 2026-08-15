@@ -18,9 +18,9 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasTestTag
@@ -135,20 +135,8 @@ class ProfileSheetAdminActionRowsTest {
         )
 
         composeRule.onAllNodes(progressMatcher, useUnmergedTree = true).assertCountEquals(0)
-        assertFalse(
-            composeRule
-                .onNodeWithText(string(R.string.make_admin))
-                .fetchSemanticsNode()
-                .config
-                .contains(SemanticsActions.OnClick),
-        )
-        assertFalse(
-            composeRule
-                .onNodeWithText(string(R.string.remove_member))
-                .fetchSemanticsNode()
-                .config
-                .contains(SemanticsActions.OnClick),
-        )
+        composeRule.onNodeWithText(string(R.string.make_admin)).assertIsNotEnabled().performClick()
+        composeRule.onNodeWithText(string(R.string.remove_member)).assertIsNotEnabled().performClick()
         assertEquals(0, grantClicks)
         assertEquals(0, removeClicks)
     }

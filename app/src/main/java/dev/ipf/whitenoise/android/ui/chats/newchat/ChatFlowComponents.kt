@@ -253,8 +253,13 @@ internal fun SettingsActionRow(
             modifier
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
-                .let { if (onClick != null && enabled) it.clickable(role = Role.Button, onClick = onClick) else it }
-                .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm)
+                .then(
+                    if (onClick == null) {
+                        Modifier
+                    } else {
+                        Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                    },
+                ).padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm)
                 .alpha(if (enabled) 1f else 0.45f),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
