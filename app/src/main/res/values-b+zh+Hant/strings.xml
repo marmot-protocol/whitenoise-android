@@ -1198,6 +1198,7 @@
     <string name="recent_chats">最近的聊天</string>
     <string name="onboarding_login">登入</string>
     <string name="onboarding_login_with_amber">使用 Amber 登入</string>
+    <string name="onboarding_offline_setup_message">沒有網際網路連線。請使用 Wi-Fi、行動數據或其他網路連線，然後重試。</string>
     <string name="toast_couldnt_login_amber">無法使用 Amber 登入</string>
     <string name="toast_amber_sign_in_cancelled">已取消 Amber 登入</string>
     <string name="onboarding_sign_up">註冊</string>

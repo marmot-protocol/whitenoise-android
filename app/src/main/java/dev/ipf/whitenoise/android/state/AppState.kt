@@ -5874,6 +5874,22 @@ class WhiteNoiseAppState private constructor(
     fun hasActiveNetwork(): Boolean = hasActiveNetworkSnapshot
 
     /**
+     * True when Android currently exposes a validated non-VPN internet
+     * upstream. This is stricter than [hasActiveNetwork]: an app-default VPN
+     * can remain present (and retain stale validation) after airplane mode
+     * removes its Wi-Fi/cellular upstream. Network-gated setup uses this signal
+     * so it fails fast without rejecting a healthy VPN whose upstream remains
+     * validated. The active-default bit is also required because OEM network
+     * stacks can briefly retain a validated physical handle after its route is
+     * gone; such a handle cannot make setup reachable on its own.
+     */
+    fun hasValidatedInternet(): Boolean =
+        hasUsableValidatedInternet(
+            hasActiveDefaultNetwork = hasActiveNetworkSnapshot,
+            hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet(),
+        )
+
+    /**
      * Every [MediaAutoDownloadNetwork] the active connection currently matches.
      * A single connection can match several at once (e.g. cellular that is both
      * roaming and metered). An empty set (no/unknown connection) makes the
@@ -5893,6 +5909,8 @@ class WhiteNoiseAppState private constructor(
 
     @Volatile
     private var hasActiveNetworkSnapshot = false
+
+    private val validatedInternetNetworks = ValidatedInternetNetworkTracker()
 
     /**
      * Reactive mirror of the two signals the chat-list connectivity banner
@@ -6016,6 +6034,60 @@ class WhiteNoiseAppState private constructor(
             // Too many callbacks / SecurityException: keep the seeded snapshot
             // rather than crash; it just won't track later connectivity changes.
             appStateDebug(it) { "default network callback registration failed: ${it.readableMessage()}" }
+        }
+        registerValidatedInternetListener(cm)
+    }
+
+    /**
+     * Track validated physical upstreams independently from the app-default
+     * network. A VPN is allowed to remain the default network, but it cannot by
+     * itself prove that packets can leave the device: a stranded tunnel may
+     * keep stale INTERNET/VALIDATED capabilities after losing its upstream.
+     *
+     * VALIDATED is mutable, so it is inspected in capability callbacks instead
+     * of being placed in the request. NOT_VPN selects the Wi-Fi/cellular/etc.
+     * upstream beneath a healthy tunnel and excludes the stale tunnel itself.
+     */
+    @Suppress("DEPRECATION") // Only platform API that can seed every non-default upstream before callbacks arrive.
+    private fun registerValidatedInternetListener(cm: android.net.ConnectivityManager) {
+        val request =
+            android.net.NetworkRequest
+                .Builder()
+                .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                .build()
+        val callback =
+            object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onCapabilitiesChanged(
+                    network: android.net.Network,
+                    networkCapabilities: android.net.NetworkCapabilities,
+                ) {
+                    validatedInternetNetworks.update(
+                        networkHandle = network.networkHandle,
+                        available = networkCapabilities.providesValidatedNonVpnInternet(),
+                    )
+                }
+
+                override fun onLost(network: android.net.Network) {
+                    validatedInternetNetworks.remove(network.networkHandle)
+                }
+            }
+        runCatchingCancellable {
+            validatedInternetNetworks.seedAtomically {
+                // Register before reading the snapshot so no transition can be
+                // missed. Callback mutations block on the tracker's monitor and
+                // are applied after this seed, so a concurrent loss cannot be
+                // overwritten by stale capabilities from allNetworks.
+                cm.registerNetworkCallback(request, callback)
+                cm.allNetworks.associate { network ->
+                    network.networkHandle to
+                        (cm.getNetworkCapabilities(network)?.providesValidatedNonVpnInternet() == true)
+                }
+            }
+        }.onFailure {
+            // Conservative failure mode: setup stays gated rather than treating
+            // an unverified or VPN-only network as usable internet.
+            appStateDebug(it) { "validated internet callback registration failed: ${it.readableMessage()}" }
         }
     }
 
