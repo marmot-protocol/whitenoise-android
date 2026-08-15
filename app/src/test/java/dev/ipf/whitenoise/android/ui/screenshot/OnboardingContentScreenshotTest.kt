@@ -2,11 +2,15 @@ package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.unit.Density
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingContent
+import dev.ipf.whitenoise.android.ui.onboarding.SignInContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -51,5 +55,52 @@ class OnboardingContentScreenshotTest {
             }
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/onboarding_content_idle_light.png")
+    }
+
+    @Test
+    fun onboardingOfflineLight() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    OnboardingContent(
+                        identity = "",
+                        creatingIdentity = false,
+                        signingInBusy = false,
+                        onIdentityChange = {},
+                        onCreateIdentity = {},
+                        onImportIdentity = {},
+                        offlineErrorVisible = true,
+                        onOfflineRetry = {},
+                        amberSignerAvailable = true,
+                    )
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/onboarding_content_offline_light.png")
+    }
+
+    @Test
+    fun signInOfflineDarkLargeText() {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 1.5f)) {
+                WhiteNoiseTheme(darkTheme = true) {
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        SignInContent(
+                            identity = "nsec1••••••••••••••••",
+                            busy = false,
+                            errorRes = null,
+                            offlineErrorVisible = true,
+                            onOfflineRetry = {},
+                            onIdentityChange = {},
+                            onErrorChange = {},
+                            onBack = {},
+                            onSignIn = {},
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/onboarding_sign_in_offline_dark_large.png")
     }
 }

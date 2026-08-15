@@ -1223,6 +1223,7 @@
     <string name="recent_chats">Son sohbetler</string>
     <string name="onboarding_login">Giriş Yap</string>
     <string name="onboarding_login_with_amber">Amber ile giriş yap</string>
+    <string name="onboarding_offline_setup_message">Hesabınızı kurmak için internet bağlantısı gerekir. Wi-Fi, mobil veri veya kullanılabilir başka bir bağlantıyı açıp tekrar deneyin.</string>
     <string name="toast_couldnt_login_amber">Amber ile giriş yapılamadı</string>
     <string name="toast_amber_sign_in_cancelled">Amber girişi iptal edildi</string>
     <string name="onboarding_sign_up">Kayıt Ol</string>

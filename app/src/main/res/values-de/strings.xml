@@ -1223,6 +1223,7 @@
     <string name="recent_chats">Letzte Chats</string>
     <string name="onboarding_login">Anmelden</string>
     <string name="onboarding_login_with_amber">Mit Amber anmelden</string>
+    <string name="onboarding_offline_setup_message">Für die Einrichtung deines Kontos ist eine Internetverbindung erforderlich. Aktiviere WLAN, mobile Daten oder eine andere nutzbare Verbindung und versuche es erneut.</string>
     <string name="toast_couldnt_login_amber">Anmeldung mit Amber fehlgeschlagen</string>
     <string name="toast_amber_sign_in_cancelled">Amber-Anmeldung abgebrochen</string>
     <string name="onboarding_sign_up">Registrieren</string>

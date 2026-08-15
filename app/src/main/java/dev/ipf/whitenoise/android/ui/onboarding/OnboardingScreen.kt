@@ -24,12 +24,14 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,8 +43,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -61,6 +66,34 @@ import kotlinx.coroutines.launch
 // disables the other while one runs.
 internal enum class OnboardingAction { Idle, Creating, Importing, AmberLogin }
 
+internal enum class OnboardingActionDecision { Start, ShowOffline, IgnoreBusy }
+
+internal fun onboardingActionDecision(
+    inFlightAction: OnboardingAction,
+    hasActiveNetwork: Boolean,
+): OnboardingActionDecision =
+    when {
+        inFlightAction != OnboardingAction.Idle -> OnboardingActionDecision.IgnoreBusy
+        !hasActiveNetwork -> OnboardingActionDecision.ShowOffline
+        else -> OnboardingActionDecision.Start
+    }
+
+internal fun dispatchOnboardingAction(
+    inFlightAction: OnboardingAction,
+    hasActiveNetwork: Boolean,
+    requestedAction: OnboardingAction,
+    onOffline: (OnboardingAction) -> Unit,
+    onStart: () -> Unit,
+) {
+    when (onboardingActionDecision(inFlightAction, hasActiveNetwork)) {
+        OnboardingActionDecision.IgnoreBusy -> Unit
+        OnboardingActionDecision.ShowOffline -> onOffline(requestedAction)
+        OnboardingActionDecision.Start -> onStart()
+    }
+}
+
+internal const val ONBOARDING_OFFLINE_NOTICE_TAG = "onboarding-offline-notice"
+
 // Adaptive cap for the onboarding + sign-in surfaces: on a phone the hero and
 // actions fill the width, but on tablets / unfolded foldables / desktop windows
 // they stay a readable single column centered in the window rather than
@@ -68,10 +101,14 @@ internal enum class OnboardingAction { Idle, Creating, Importing, AmberLogin }
 internal val OnboardingMaxContentWidth = 440.dp
 
 @Composable
-internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
+internal fun OnboardingScreen(
+    appState: WhiteNoiseAppState,
+    hasActiveNetwork: () -> Boolean = appState::hasActiveNetwork,
+) {
     var identity by remember { mutableStateOf("") }
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
+    var offlineRetryAction by remember { mutableStateOf<OnboardingAction?>(null) }
     var recoveryConsentVisible by remember { mutableStateOf(false) }
     // The key an acknowledged recovery already ran for, cleared as soon as the
     // field changes, so it never outlives the attempt it belongs to. It stops a
@@ -110,32 +147,66 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
         }
     }
 
+    fun startNetworkSetupAction(action: OnboardingAction) {
+        dispatchOnboardingAction(
+            inFlightAction = inFlightAction,
+            hasActiveNetwork = hasActiveNetwork(),
+            requestedAction = action,
+            onOffline = { offlineRetryAction = it },
+            onStart = {
+                offlineRetryAction = null
+                when (action) {
+                    OnboardingAction.Creating -> {
+                        inFlightAction = OnboardingAction.Creating
+                        scope.launch {
+                            try {
+                                appState.createIdentity()
+                            } finally {
+                                inFlightAction = OnboardingAction.Idle
+                            }
+                        }
+                    }
+                    OnboardingAction.Importing -> {
+                        val value = identity.trim()
+                        runStep { signInStepFor(appState.importIdentity(value), value, recoveryConsentedFor) }
+                    }
+                    OnboardingAction.AmberLogin -> {
+                        inFlightAction = OnboardingAction.AmberLogin
+                        scope.launch {
+                            try {
+                                appState.loginWithAmber()
+                            } finally {
+                                inFlightAction = OnboardingAction.Idle
+                            }
+                        }
+                    }
+                    OnboardingAction.Idle -> Unit
+                }
+            },
+        )
+    }
+
     OnboardingContent(
         identity = identity,
         creatingIdentity = inFlightAction == OnboardingAction.Creating,
         signingInBusy = inFlightAction == OnboardingAction.Importing,
         importErrorRes = importErrorRes,
+        offlineErrorVisible = offlineRetryAction != null,
+        onOfflineRetry = {
+            offlineRetryAction?.let(::startNetworkSetupAction)
+        },
+        onOfflineErrorDismiss = { offlineRetryAction = null },
         onIdentityChange = {
             identity = it
             importErrorRes = null
+            offlineRetryAction = null
             // Editing the field ends the attempt the acknowledgement belonged to,
             // so the key it held must not outlive it.
             recoveryConsentedFor = null
         },
         onImportErrorChange = { importErrorRes = it },
-        onCreateIdentity = {
-            inFlightAction = OnboardingAction.Creating
-            scope.launch {
-                try {
-                    appState.createIdentity()
-                } finally {
-                    inFlightAction = OnboardingAction.Idle
-                }
-            }
-        },
-        onImportIdentity = { value ->
-            runStep { signInStepFor(appState.importIdentity(value), value, recoveryConsentedFor) }
-        },
+        onCreateIdentity = { startNetworkSetupAction(OnboardingAction.Creating) },
+        onImportIdentity = { _ -> startNetworkSetupAction(OnboardingAction.Importing) },
         recoveryConsentVisible = recoveryConsentVisible,
         // The engine needs the same nsec again, so the already-entered value is
         // reused from the field rather than stashed anywhere new — it leaves
@@ -155,16 +226,7 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
         loggingInWithAmber = inFlightAction == OnboardingAction.AmberLogin,
         amberSignInStage = appState.amberSignInStage,
         amberSignerAvailable = amberSignerAvailable,
-        onLoginWithAmber = {
-            inFlightAction = OnboardingAction.AmberLogin
-            scope.launch {
-                try {
-                    appState.loginWithAmber()
-                } finally {
-                    inFlightAction = OnboardingAction.Idle
-                }
-            }
-        },
+        onLoginWithAmber = { startNetworkSetupAction(OnboardingAction.AmberLogin) },
     )
 }
 
@@ -257,6 +319,9 @@ fun OnboardingContent(
     onImportIdentity: (String) -> Unit,
     importErrorRes: Int? = null,
     onImportErrorChange: (Int?) -> Unit = {},
+    offlineErrorVisible: Boolean = false,
+    onOfflineRetry: () -> Unit = {},
+    onOfflineErrorDismiss: () -> Unit = {},
     loggingInWithAmber: Boolean = false,
     amberSignInStage: Int? = null,
     amberSignerAvailable: Boolean = false,
@@ -275,9 +340,14 @@ fun OnboardingContent(
             identity = identity,
             busy = signingInBusy,
             errorRes = importErrorRes,
+            offlineErrorVisible = offlineErrorVisible,
+            onOfflineRetry = onOfflineRetry,
             onIdentityChange = onIdentityChange,
             onErrorChange = onImportErrorChange,
-            onBack = { signingIn = false },
+            onBack = {
+                onOfflineErrorDismiss()
+                signingIn = false
+            },
             onSignIn = { onImportIdentity(identity.trim()) },
             recoveryConsentVisible = recoveryConsentVisible,
             onRecoveryConsentConfirm = onRecoveryConsentConfirm,
@@ -343,8 +413,14 @@ fun OnboardingContent(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
                 ) {
+                    if (offlineErrorVisible) {
+                        OnboardingOfflineNotice(onRetry = onOfflineRetry)
+                    }
                     FilledTonalButton(
-                        onClick = { signingIn = true },
+                        onClick = {
+                            onOfflineErrorDismiss()
+                            signingIn = true
+                        },
                         enabled = !busy,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
@@ -424,6 +500,42 @@ fun OnboardingContent(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun OnboardingOfflineNotice(
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .testTag(ONBOARDING_OFFLINE_NOTICE_TAG),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, end = 8.dp, bottom = 6.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.onboarding_offline_setup_message),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier =
+                    Modifier
+                        .padding(end = 8.dp)
+                        .semantics { liveRegion = LiveRegionMode.Polite },
+            )
+            TextButton(
+                onClick = onRetry,
+                modifier = Modifier.align(Alignment.End),
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onErrorContainer),
+            ) {
+                Text(stringResource(R.string.retry))
             }
         }
     }

@@ -80,6 +80,8 @@ internal fun SignInContent(
     identity: String,
     busy: Boolean,
     errorRes: Int?,
+    offlineErrorVisible: Boolean = false,
+    onOfflineRetry: () -> Unit = {},
     onIdentityChange: (String) -> Unit,
     onErrorChange: (Int?) -> Unit,
     onBack: () -> Unit,
@@ -94,10 +96,12 @@ internal fun SignInContent(
     // Login is nsec-only: reject a public key (npub) with a clear message
     // rather than importing it as a read-only account.
     val submit = {
-        if (IdentityEntryInput.classify(identity) == IdentityEntryInput.Kind.PublicKey) {
-            onErrorChange(R.string.sign_in_error_public_key)
-        } else {
-            onSignIn()
+        when (IdentityEntryInput.classify(identity)) {
+            IdentityEntryInput.Kind.Invalid -> onErrorChange(R.string.identity_entry_error_invalid_key)
+            IdentityEntryInput.Kind.PublicKey -> onErrorChange(R.string.sign_in_error_public_key)
+            IdentityEntryInput.Kind.SecretKey,
+            IdentityEntryInput.Kind.EncryptedSecretKey,
+            -> onSignIn()
         }
     }
     // System back on the login screen returns to the landing (same as the
@@ -196,6 +200,10 @@ internal fun SignInContent(
                     textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(28.dp))
+                if (offlineErrorVisible) {
+                    OnboardingOfflineNotice(onRetry = onOfflineRetry)
+                    Spacer(Modifier.height(20.dp))
+                }
                 IdentityEntryForm(
                     identity = identity,
                     busy = busy,

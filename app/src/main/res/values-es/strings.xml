@@ -1225,6 +1225,7 @@
     <string name="recent_chats">Chats recientes</string>
     <string name="onboarding_login">Iniciar sesión</string>
     <string name="onboarding_login_with_amber">Iniciar sesión con Amber</string>
+    <string name="onboarding_offline_setup_message">Se necesita conexión a internet para configurar tu cuenta. Activa el Wi-Fi, los datos móviles u otra conexión disponible y vuelve a intentarlo.</string>
     <string name="toast_couldnt_login_amber">No se pudo iniciar sesión con Amber</string>
     <string name="toast_amber_sign_in_cancelled">Inicio de sesión con Amber cancelado</string>
     <string name="onboarding_sign_up">Registrarse</string>
