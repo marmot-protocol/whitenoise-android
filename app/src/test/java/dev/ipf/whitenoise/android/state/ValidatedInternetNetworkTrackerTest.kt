@@ -35,6 +35,30 @@ class ValidatedInternetNetworkTrackerTest {
     }
 
     @Test
+    fun initialSnapshotIsAvailableWithoutWaitingForACallback() {
+        val tracker = ValidatedInternetNetworkTracker()
+
+        assertTrue(
+            tracker.seedAtomically {
+                mapOf(
+                    1L to true,
+                    2L to false,
+                )
+            },
+        )
+        assertTrue(tracker.hasValidatedInternet())
+    }
+
+    @Test
+    fun callbackAfterInitialSnapshotWinsTheAtomicHandoff() {
+        val tracker = ValidatedInternetNetworkTracker()
+        tracker.seedAtomically { mapOf(1L to true) }
+
+        assertFalse(tracker.remove(networkHandle = 1L))
+        assertFalse(tracker.hasValidatedInternet())
+    }
+
+    @Test
     fun losingLastValidatedUpstreamClearsUsableInternet() {
         val tracker = ValidatedInternetNetworkTracker()
         tracker.update(

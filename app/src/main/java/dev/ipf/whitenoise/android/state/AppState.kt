@@ -6042,6 +6042,7 @@ class WhiteNoiseAppState private constructor(
      * of being placed in the request. NOT_VPN selects the Wi-Fi/cellular/etc.
      * upstream beneath a healthy tunnel and excludes the stale tunnel itself.
      */
+    @Suppress("DEPRECATION") // Only platform API that can seed every non-default upstream before callbacks arrive.
     private fun registerValidatedInternetListener(cm: android.net.ConnectivityManager) {
         val request =
             android.net.NetworkRequest
@@ -6049,25 +6050,34 @@ class WhiteNoiseAppState private constructor(
                 .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
                 .build()
-        runCatchingCancellable {
-            cm.registerNetworkCallback(
-                request,
-                object : android.net.ConnectivityManager.NetworkCallback() {
-                    override fun onCapabilitiesChanged(
-                        network: android.net.Network,
-                        networkCapabilities: android.net.NetworkCapabilities,
-                    ) {
-                        validatedInternetNetworks.update(
-                            networkHandle = network.networkHandle,
-                            available = networkCapabilities.providesValidatedNonVpnInternet(),
-                        )
-                    }
+        val callback =
+            object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onCapabilitiesChanged(
+                    network: android.net.Network,
+                    networkCapabilities: android.net.NetworkCapabilities,
+                ) {
+                    validatedInternetNetworks.update(
+                        networkHandle = network.networkHandle,
+                        available = networkCapabilities.providesValidatedNonVpnInternet(),
+                    )
+                }
 
-                    override fun onLost(network: android.net.Network) {
-                        validatedInternetNetworks.remove(network.networkHandle)
-                    }
-                },
-            )
+                override fun onLost(network: android.net.Network) {
+                    validatedInternetNetworks.remove(network.networkHandle)
+                }
+            }
+        runCatchingCancellable {
+            validatedInternetNetworks.seedAtomically {
+                // Register before reading the snapshot so no transition can be
+                // missed. Callback mutations block on the tracker's monitor and
+                // are applied after this seed, so a concurrent loss cannot be
+                // overwritten by stale capabilities from allNetworks.
+                cm.registerNetworkCallback(request, callback)
+                cm.allNetworks.associate { network ->
+                    network.networkHandle to
+                        (cm.getNetworkCapabilities(network)?.providesValidatedNonVpnInternet() == true)
+                }
+            }
         }.onFailure {
             // Conservative failure mode: setup stays gated rather than treating
             // an unverified or VPN-only network as usable internet.

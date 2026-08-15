@@ -23,6 +23,23 @@ internal fun NetworkCapabilities.providesValidatedNonVpnInternet(): Boolean =
 internal class ValidatedInternetNetworkTracker {
     private val validatedNetworkHandles = mutableSetOf<Long>()
 
+    /**
+     * Publish the initial network snapshot without letting callback updates race
+     * ahead of, and then get overwritten by, that snapshot. The caller must
+     * register the callback inside [snapshot] before reading current networks.
+     * Callback [update]/[remove] calls share this monitor, so any delivery during
+     * the seed is applied immediately after the snapshot handoff.
+     */
+    @Synchronized
+    fun seedAtomically(snapshot: () -> Map<Long, Boolean>): Boolean {
+        val networkAvailability = snapshot()
+        validatedNetworkHandles.clear()
+        networkAvailability.forEach { (networkHandle, available) ->
+            if (available) validatedNetworkHandles += networkHandle
+        }
+        return validatedNetworkHandles.isNotEmpty()
+    }
+
     @Synchronized
     fun update(
         networkHandle: Long,
