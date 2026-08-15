@@ -185,19 +185,35 @@ class ConversationTransientNoticeTest {
                         groupIdHex = visibleGroupId.value,
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     ) {
-                        timelineState = rememberLazyListState()
+                        timelineState =
+                            rememberLazyListState(
+                                initialFirstVisibleItemIndex = 1,
+                                initialFirstVisibleItemScrollOffset = 8,
+                            )
                         LazyColumn(
                             state = timelineState,
                             modifier = Modifier.fillMaxSize(),
                         ) {
                             item {
+                                Text(
+                                    "Earlier message",
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                )
+                            }
+                            item {
+                                Text(
+                                    "Visible message before separator",
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                )
+                            }
+                            item {
                                 Box(Modifier.fillMaxWidth().testTag(DAY_SEPARATOR_TAG)) {
                                     DaySeparator("Today")
                                 }
                             }
-                            item {
+                            items(12) { index ->
                                 Text(
-                                    "First visible message",
+                                    "Visible message $index",
                                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                                 )
                             }

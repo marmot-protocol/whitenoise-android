@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,8 +26,11 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
+import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
+import dev.ipf.whitenoise.android.ui.common.ErrorContent
+import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTransientNoticeLayout
 import dev.ipf.whitenoise.android.ui.conversation.DaySeparator
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -107,6 +111,35 @@ class MediaSaveConfirmationScreenshotTest {
             .captureRoboImage("src/test/snapshots/media_save_confirmation_conversation_amoled_ime.png")
     }
 
+    // Pin every full-screen state that now shares the transient-notice frame.
+    @Test
+    fun conversationTransientLoading() =
+        captureConversationState(
+            state = ConversationFixtureState.Loading,
+            fileName = "conversation_transient_loading.png",
+        )
+
+    @Test
+    fun conversationTransientEmpty() =
+        captureConversationState(
+            state = ConversationFixtureState.Empty,
+            fileName = "conversation_transient_empty.png",
+        )
+
+    @Test
+    fun conversationTransientControllerError() =
+        captureConversationState(
+            state = ConversationFixtureState.ControllerError,
+            fileName = "conversation_transient_controller_error.png",
+        )
+
+    @Test
+    fun conversationTransientInitialBackfillError() =
+        captureConversationState(
+            state = ConversationFixtureState.InitialBackfillError,
+            fileName = "conversation_transient_initial_backfill_error.png",
+        )
+
     private fun renderConversationConfirmation(
         darkTheme: Boolean = false,
         amoled: Boolean = false,
@@ -160,8 +193,81 @@ class MediaSaveConfirmationScreenshotTest {
         }
     }
 
+    private fun captureConversationState(
+        state: ConversationFixtureState,
+        fileName: String,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(modifier = Modifier.fillMaxWidth().testTag(CONVERSATION_STATE_TAG)) {
+                    Column {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            Text("Alpine group", style = MaterialTheme.typography.titleMedium)
+                        }
+                        ConversationTransientNoticeLayout(
+                            notice =
+                                TransientNotice(
+                                    id = 2L,
+                                    title = AppText.Resource(R.string.shared_media_saved),
+                                    conversation = ConversationNoticeDestination("account-a", "group-a"),
+                                ),
+                            accountRef = "account-a",
+                            groupIdHex = "group-a",
+                            modifier = Modifier.fillMaxWidth().height(240.dp),
+                        ) {
+                            ConversationFixtureContent(state)
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(CONVERSATION_STATE_TAG)
+            .captureRoboImage("src/test/snapshots/$fileName")
+    }
+
     private companion object {
         const val GLOBAL_TAG = "media-save-global-confirmation"
         const val CONVERSATION_TAG = "media-save-conversation-confirmation"
+        const val CONVERSATION_STATE_TAG = "conversation-transient-state"
     }
+}
+
+private enum class ConversationFixtureState {
+    Loading,
+    Empty,
+    ControllerError,
+    InitialBackfillError,
+}
+
+@Composable
+private fun ConversationFixtureContent(state: ConversationFixtureState) {
+    when (state) {
+        ConversationFixtureState.Loading -> LoadingScreen()
+        ConversationFixtureState.Empty ->
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No messages yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        ConversationFixtureState.ControllerError ->
+            ConversationFixtureError("Couldn't refresh this conversation")
+        ConversationFixtureState.InitialBackfillError ->
+            ConversationFixtureError("Couldn't find a visible message")
+    }
+}
+
+@Composable
+private fun ConversationFixtureError(message: String) {
+    ErrorContent(
+        title = "Couldn't load conversation",
+        error =
+            ErrorPresentation(
+                message = AppText.Plain(message),
+                report = "operation=CONVERSATION_INITIAL_LOAD\nerror=CONNECTIVITY",
+            ),
+        onRetry = {},
+    )
 }

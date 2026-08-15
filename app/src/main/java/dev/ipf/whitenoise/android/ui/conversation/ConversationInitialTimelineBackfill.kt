@@ -31,28 +31,39 @@ internal suspend fun backfillInitialConversationTimeline(
     isCurrent: () -> Boolean = { true },
 ): ConversationInitialTimelineBackfillResult {
     var current = snapshot()
-    when {
-        !isCurrent() -> return ConversationInitialTimelineBackfillResult.Superseded
-        current.hasRenderableRows -> return ConversationInitialTimelineBackfillResult.Renderable
-        current.hasLoadFailure -> return ConversationInitialTimelineBackfillResult.Failed
-        current.loadInFlight -> return ConversationInitialTimelineBackfillResult.NotReady
-    }
+    var result = current.initialBackfillTerminalResult(isCurrent = isCurrent())
     val visitedWindows = hashSetOf(current.rawWindowMessageIds)
 
-    while (current.hasMoreBefore) {
+    while (result == null && current.hasMoreBefore) {
         val madeProgress = loadOlder()
-        if (!isCurrent()) return ConversationInitialTimelineBackfillResult.Superseded
-
-        current = snapshot()
-        when {
-            current.hasLoadFailure -> return ConversationInitialTimelineBackfillResult.Failed
-            current.hasRenderableRows -> return ConversationInitialTimelineBackfillResult.Renderable
-            !current.hasMoreBefore -> return ConversationInitialTimelineBackfillResult.Exhausted
-            current.loadInFlight -> return ConversationInitialTimelineBackfillResult.NotReady
-            !madeProgress || !visitedWindows.add(current.rawWindowMessageIds) ->
-                return ConversationInitialTimelineBackfillResult.NoProgress
+        if (!isCurrent()) {
+            result = ConversationInitialTimelineBackfillResult.Superseded
+        } else {
+            current = snapshot()
+            result =
+                when {
+                    current.hasLoadFailure -> ConversationInitialTimelineBackfillResult.Failed
+                    current.hasRenderableRows -> ConversationInitialTimelineBackfillResult.Renderable
+                    !current.hasMoreBefore -> ConversationInitialTimelineBackfillResult.Exhausted
+                    current.loadInFlight -> ConversationInitialTimelineBackfillResult.NotReady
+                    !madeProgress || !visitedWindows.add(current.rawWindowMessageIds) ->
+                        ConversationInitialTimelineBackfillResult.NoProgress
+                    else -> null
+                }
         }
     }
 
-    return ConversationInitialTimelineBackfillResult.Exhausted
+    return result ?: ConversationInitialTimelineBackfillResult.Exhausted
+}
+
+private fun ConversationInitialTimelineBackfillSnapshot.initialBackfillTerminalResult(
+    isCurrent: Boolean,
+): ConversationInitialTimelineBackfillResult? {
+    return when {
+        !isCurrent -> ConversationInitialTimelineBackfillResult.Superseded
+        hasRenderableRows -> ConversationInitialTimelineBackfillResult.Renderable
+        hasLoadFailure -> ConversationInitialTimelineBackfillResult.Failed
+        loadInFlight -> ConversationInitialTimelineBackfillResult.NotReady
+        else -> null
+    }
 }

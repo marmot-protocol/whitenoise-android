@@ -1657,12 +1657,14 @@ internal fun ConversationScreen(
         latestTimelineItemId,
         navigationState.initialTimelineBackfillRetryGeneration,
     ) {
-        if (
-            initialTimelineAnchored ||
-            scrollRestore != null ||
+        val hasEstablishedInitialPosition = initialTimelineAnchored || scrollRestore != null
+        val timelineCannotBackfill =
             !navigationState.initialTimelineLoadStarted ||
-            controller.group.pendingConfirmation ||
-            controller.timeline.isEmpty() ||
+                controller.group.pendingConfirmation ||
+                controller.timeline.isEmpty()
+        if (
+            hasEstablishedInitialPosition ||
+            timelineCannotBackfill ||
             renderedTimeline.isNotEmpty()
         ) {
             if (renderedTimeline.isNotEmpty()) {
