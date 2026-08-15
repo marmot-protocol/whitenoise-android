@@ -92,6 +92,13 @@ object AmberActivityCoordinator {
             deliverSerializedResult(serialized, resultOk, data)
             return
         }
+        if (!relayRequestId.isNullOrBlank()) {
+            android.util.Log.w(
+                "AmberSigner",
+                "dropped stale relay result: resultId=$relayRequestId ok=$resultOk",
+            )
+            return
+        }
         deliverGroupedResult(resultOk, data)
     }
 

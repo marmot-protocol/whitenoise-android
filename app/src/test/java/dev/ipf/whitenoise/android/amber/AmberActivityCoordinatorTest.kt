@@ -712,6 +712,53 @@ class AmberActivityCoordinatorTest {
     }
 
     @Test
+    fun staleRelayCancellationAfterTimeoutDoesNotCancelAGroupedRequest() {
+        val staleId = "stale-serialized"
+        val currentId = "current-grouped"
+        val stale = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val current = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val staleDone = CountDownLatch(1)
+        val currentDone = CountDownLatch(1)
+
+        Thread {
+            stale.set(
+                AmberActivityCoordinator.awaitApproval(
+                    Nip55.buildGetPublicKeyIntent(staleId),
+                    timeoutMs = 100,
+                    requestId = staleId,
+                ),
+            )
+            staleDone.countDown()
+        }.start()
+        awaitRelayLaunch()
+        assertTrue(staleDone.await(2, TimeUnit.SECONDS))
+        assertEquals(AmberActivityCoordinator.Outcome.TimedOut, stale.get())
+
+        Thread {
+            current.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent(currentId, currentUser = "account-a"),
+                    timeoutMs = 5_000,
+                    requestId = currentId,
+                    allowGrouping = true,
+                ),
+            )
+            currentDone.countDown()
+        }.start()
+        awaitLaunchCount(2)
+
+        AmberActivityCoordinator.deliverResult(
+            resultOk = false,
+            data = AmberSignerRelay.buildResultIntent(staleId, signerData = null),
+        )
+        assertFalse(currentDone.await(200, TimeUnit.MILLISECONDS))
+
+        AmberActivityCoordinator.deliverResult(resultOk = false, data = null)
+        assertTrue(currentDone.await(2, TimeUnit.SECONDS))
+        assertFalse((current.get() as AmberActivityCoordinator.Outcome.Completed).resultOk)
+    }
+
+    @Test
     fun expiredRequestsAreRemovedBeforeTheirQueuedLaunchRuns() {
         val serialized = AtomicReference<AmberActivityCoordinator.Outcome>()
         val serializedDone = CountDownLatch(1)
