@@ -5,9 +5,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.testTag
@@ -38,6 +42,8 @@ class ConversationTransientNoticeTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private lateinit var timelineState: LazyListState
+
     @Test
     fun otherConversationDoesNotRenderScopedNoticeOrMoveHeader() {
         val visibleGroup = mutableStateOf(GROUP_B)
@@ -59,6 +65,8 @@ class ConversationTransientNoticeTest {
         val notice = mutableStateOf<TransientNotice?>(null)
         renderHarness(mutableStateOf(GROUP_A), notice)
         val headerBefore = headerBounds()
+        val initialIndex = timelineState.firstVisibleItemIndex
+        val initialOffset = timelineState.firstVisibleItemScrollOffset
 
         composeRule.runOnUiThread {
             notice.value = scopedNotice(GROUP_A)
@@ -73,6 +81,23 @@ class ConversationTransientNoticeTest {
                 .boundsInRoot
         assertEquals(headerBefore, headerBounds())
         assertEquals(headerBefore.bottom, noticeBounds.top, POSITION_TOLERANCE)
+        val daySeparatorBounds =
+            composeRule
+                .onNodeWithTag(DAY_SEPARATOR_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        assertTrue(noticeBounds.bottom <= daySeparatorBounds.top)
+        assertEquals(initialIndex, timelineState.firstVisibleItemIndex)
+        assertEquals(initialOffset, timelineState.firstVisibleItemScrollOffset)
+
+        composeRule.runOnUiThread {
+            notice.value = null
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(NOTICE_TEXT).assertDoesNotExist()
+        assertEquals(initialIndex, timelineState.firstVisibleItemIndex)
+        assertEquals(initialOffset, timelineState.firstVisibleItemScrollOffset)
     }
 
     @Test
@@ -154,17 +179,45 @@ class ConversationTransientNoticeTest {
                             .height(56.dp)
                             .testTag(HEADER_TAG),
                     )
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
+                    ConversationTransientNoticeLayout(
+                        notice = notice.value,
+                        accountRef = ACCOUNT,
+                        groupIdHex = visibleGroupId.value,
+                        modifier = Modifier.fillMaxWidth().weight(1f),
                     ) {
-                        ConversationTransientNotice(
-                            notice = notice.value,
-                            accountRef = ACCOUNT,
-                            groupIdHex = visibleGroupId.value,
-                            modifier = Modifier.align(Alignment.TopCenter),
-                        )
+                        timelineState =
+                            rememberLazyListState(
+                                initialFirstVisibleItemIndex = 1,
+                                initialFirstVisibleItemScrollOffset = 8,
+                            )
+                        LazyColumn(
+                            state = timelineState,
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            item {
+                                Text(
+                                    "Earlier message",
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                )
+                            }
+                            item {
+                                Text(
+                                    "Visible message before separator",
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                )
+                            }
+                            item {
+                                Box(Modifier.fillMaxWidth().testTag(DAY_SEPARATOR_TAG)) {
+                                    DaySeparator("Today")
+                                }
+                            }
+                            items(12) { index ->
+                                Text(
+                                    "Visible message $index",
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -187,6 +240,7 @@ class ConversationTransientNoticeTest {
         const val GROUP_B = "group-b"
         const val HEADER_TAG = "conversation-header"
         const val CONTENT_TAG = "shell-content"
+        const val DAY_SEPARATOR_TAG = "conversation-day-separator"
         const val NOTICE_TEXT = "Admin removed"
         const val POSITION_TOLERANCE = 0.5f
     }
