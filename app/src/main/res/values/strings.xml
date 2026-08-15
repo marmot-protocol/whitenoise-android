@@ -11,6 +11,9 @@
     <string name="startup_taking_too_long">Startup is taking longer than expected. Please try again.</string>
     <string name="refresh">Refresh</string>
     <string name="retry">Retry</string>
+    <string name="chat_folder_members_loading">Updating folder</string>
+    <string name="conversation_access_checking">Checking conversation access…</string>
+    <string name="conversation_access_unavailable">Couldn’t verify access</string>
     <string name="error_try_again">Something went wrong. Try again; if it keeps happening, copy the error report.</string>
     <string name="error_loaded_content_may_be_out_of_date">Your loaded content is still available, but it may be out of date. Retrying…</string>
     <string name="error_loaded_content_kept">Couldn\'t load more. Your messages are still available; retry when you\'re ready.</string>

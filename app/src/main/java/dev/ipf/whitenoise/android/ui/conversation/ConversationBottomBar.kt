@@ -3,14 +3,10 @@ package dev.ipf.whitenoise.android.ui.conversation
 import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.union
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
@@ -19,7 +15,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageTextCopy
@@ -30,6 +25,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAttachmentShe
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationMembershipPendingBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.DisbandedGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
@@ -134,12 +130,9 @@ internal fun ConversationBottomBar(
             else ->
                 when (composerGate) {
                     ComposerGate.PENDING ->
-                        Spacer(
-                            Modifier
-                                .fillMaxWidth()
-                                .navigationBarsPadding()
-                                .imePadding()
-                                .height(64.dp),
+                        ConversationMembershipPendingBar(
+                            rosterState = controller.memberRosterState,
+                            onRetry = { appState.launchMutation { controller.retryMembers() } },
                         )
                     ComposerGate.NOTICE -> RemovedMemberComposerNotice()
                     ComposerGate.FROZEN -> FrozenGroupComposerNotice()

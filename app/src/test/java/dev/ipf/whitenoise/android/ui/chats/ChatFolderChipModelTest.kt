@@ -63,6 +63,26 @@ class ChatFolderChipModelTest {
     }
 
     @Test
+    fun unresolvedMemberFolderRemainsVisibleAndExplicitlyPending() {
+        val memberFolder = ChatFolder("people", "People", "", order = 0, systemKind = null)
+        val rule = ChatFolderRule(includeMemberPubkeys = setOf("peer"))
+        val unresolvedItems = listOf(item("g1", unread = true, members = 0))
+
+        val chips =
+            chips(
+                folders = listOf(memberFolder),
+                activeItems = unresolvedItems,
+                rules = mapOf(memberFolder.id to rule),
+                pendingFolderIds = setOf(memberFolder.id),
+            )
+
+        assertTrue(memberBasedFolderPending(rule, unresolvedItems))
+        assertEquals(listOf(memberFolder.id), chips.map { it.folderId })
+        assertTrue(chips.single().pending)
+        assertEquals(0, chips.single().trailingCount)
+    }
+
+    @Test
     fun archivedChipCountsItsUnread() {
         val chips =
             chips(
@@ -124,6 +144,7 @@ class ChatFolderChipModelTest {
         archivedItems: List<ChatListItem> = emptyList(),
         rules: Map<String, ChatFolderRule> = defaultRules(),
         manual: Map<String, Set<String>> = emptyMap(),
+        pendingFolderIds: Set<String> = emptySet(),
         selectedFolderId: String? = null,
     ) = chatFolderChipModels(
         folders = folders,
@@ -142,6 +163,7 @@ class ChatFolderChipModelTest {
                 displayTitle = { "" },
             )
         },
+        pendingFolderIds = pendingFolderIds,
         selectedFolderId = selectedFolderId,
     )
 

@@ -17,9 +17,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -107,6 +104,7 @@ import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationMembershipPendingBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.DisbandedGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
@@ -1730,12 +1728,9 @@ internal fun MessageBubble(
                         bottomBar = {
                             when (composerGate) {
                                 ComposerGate.PENDING ->
-                                    Spacer(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .navigationBarsPadding()
-                                            .imePadding()
-                                            .height(64.dp),
+                                    ConversationMembershipPendingBar(
+                                        rosterState = controller.memberRosterState,
+                                        onRetry = { appState.launchMutation { controller.retryMembers() } },
                                     )
                                 ComposerGate.NOTICE -> RemovedMemberComposerNotice()
                                 ComposerGate.FROZEN -> FrozenGroupComposerNotice()

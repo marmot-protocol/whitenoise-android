@@ -10,6 +10,9 @@
     <string name="error_loaded_content_kept">Impossible de charger davantage de contenu. Vos messages restent disponibles ; réessayez quand vous le souhaitez.</string>
     <string name="refresh">Actualiser l’export</string>
     <string name="retry">Réessayer</string>
+    <string name="chat_folder_members_loading">Mise à jour du dossier</string>
+    <string name="conversation_access_checking">Vérification de l’accès à la conversation…</string>
+    <string name="conversation_access_unavailable">Impossible de vérifier l’accès</string>
     <string name="creating_identity">Créer une identité</string>
     <string name="creating_identity_title">Création de l’identité</string>
     <string name="create_new_identity">Créer une nouvelle identité</string>

@@ -10,6 +10,9 @@
     <string name="error_loaded_content_kept">無法載入更多內容。你的訊息仍可使用；請在方便時重試。</string>
     <string name="refresh">重新整理傾印</string>
     <string name="retry">重試</string>
+    <string name="chat_folder_members_loading">正在更新資料夾</string>
+    <string name="conversation_access_checking">正在檢查對話存取權限…</string>
+    <string name="conversation_access_unavailable">無法驗證存取權限</string>
     <string name="creating_identity">創造身份</string>
     <string name="creating_identity_title">正在建立身分</string>
     <string name="create_new_identity">建立新身分</string>

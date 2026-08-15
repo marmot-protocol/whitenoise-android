@@ -10,6 +10,9 @@
     <string name="error_loaded_content_kept">Daha fazla içerik yüklenemedi. Mesajlarınız hâlâ kullanılabilir; hazır olduğunuzda tekrar deneyin.</string>
     <string name="refresh">Dökümü yenile</string>
     <string name="retry">Tekrar dene</string>
+    <string name="chat_folder_members_loading">Klasör güncelleniyor</string>
+    <string name="conversation_access_checking">Sohbete erişim kontrol ediliyor…</string>
+    <string name="conversation_access_unavailable">Erişim doğrulanamadı</string>
     <string name="creating_identity">Kimlik oluşturma</string>
     <string name="creating_identity_title">Kimlik Oluşturuluyor</string>
     <string name="create_new_identity">Yeni Kimlik Oluştur</string>

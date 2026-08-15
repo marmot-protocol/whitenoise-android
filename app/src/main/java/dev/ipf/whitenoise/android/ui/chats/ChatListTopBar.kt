@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -359,6 +360,7 @@ internal fun ChatListFilterChips(
                 onClick = { onSelect(chip.folderId) },
                 onLongClick = { onEditFolder(chip.folderId) },
                 trailingCount = chip.trailingCount,
+                pending = chip.pending,
                 modifier = Modifier.testTag(chatListFilterChipTag(chip.folderId)),
             )
         }
@@ -374,10 +376,18 @@ private fun ChatFolderChip(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     trailingCount: Int = 0,
+    pending: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val trailingIcon: (@Composable () -> Unit)? =
-        if (trailingCount > 0) {
+        if (pending) {
+            {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(14.dp),
+                    strokeWidth = 2.dp,
+                )
+            }
+        } else if (trailingCount > 0) {
             {
                 Text(
                     text = if (trailingCount > 99) "99+" else trailingCount.toString(),
@@ -387,7 +397,7 @@ private fun ChatFolderChip(
         } else {
             null
         }
-    val accessibleDescription = chatFolderChipAccessibleDescription(label, trailingCount)
+    val accessibleDescription = chatFolderChipAccessibleDescription(label, trailingCount, pending)
     val interactionSource = remember { MutableInteractionSource() }
     val longClickLabel = if (onLongClick != null) stringResource(R.string.edit) else null
     val gestureModifier =
@@ -425,8 +435,11 @@ private fun ChatFolderChip(
 private fun chatFolderChipAccessibleDescription(
     label: String,
     trailingCount: Int,
+    pending: Boolean,
 ): String =
-    if (trailingCount > 0) {
+    if (pending) {
+        "$label, ${stringResource(R.string.chat_folder_members_loading)}"
+    } else if (trailingCount > 0) {
         val countLabel =
             pluralStringResource(
                 R.plurals.chat_folder_chat_count,
