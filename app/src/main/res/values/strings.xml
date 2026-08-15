@@ -1416,6 +1416,7 @@
     <string name="tts_bar_stop">Stop reading</string>
     <string name="tts_bar_return_to_source">Return to spoken message</string>
     <string name="tts_source_unavailable">The spoken message is no longer available</string>
+    <string name="tts_returning_to_passage">Returning to the spoken passage…</string>
     <string name="tts_resume_follow">Resume follow</string>
     <string name="tts_bar_error">Couldn\'t read aloud</string>
     <string name="tts_bar_history_loading">Loading more messages…</string>

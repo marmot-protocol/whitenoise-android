@@ -1299,6 +1299,7 @@
     <string name="tts_bar_stop">停止朗讀</string>
     <string name="tts_bar_return_to_source">返回正在朗讀的訊息</string>
     <string name="tts_source_unavailable">正在朗讀的訊息已無法使用</string>
+    <string name="tts_returning_to_passage">正在返回朗讀段落…</string>
     <string name="tts_resume_follow">恢復跟隨</string>
     <string name="tts_bar_error">無法朗讀</string>
     <string name="tts_bar_history_loading">正在載入更多訊息…</string>

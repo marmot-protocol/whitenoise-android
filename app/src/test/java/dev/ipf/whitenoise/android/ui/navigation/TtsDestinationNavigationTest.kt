@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.navigation
 import dev.ipf.whitenoise.android.audio.tts.TtsConversationDestination
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TtsDestinationNavigationTest {
@@ -39,8 +41,20 @@ class TtsDestinationNavigationTest {
             resolve(activeAccount = "account-b"),
         )
         assertEquals(
-            TtsDestinationNavigationStep.AccountSwitchSuperseded,
+            TtsDestinationNavigationStep.AwaitAccountSwitch,
             resolve(
+                activeAccount = "account-b",
+                navigationRequest = request.copy(accountSwitchRequested = true),
+            ),
+        )
+    }
+
+    @Test
+    fun passageAdvanceWhileAccountSwitchIsPendingKeepsWaitingForTheOwnedSwitch() {
+        assertEquals(
+            TtsDestinationNavigationStep.AwaitAccountSwitch,
+            resolve(
+                current = destination.copy(passage = TtsPassage("message-newer", sentenceIndex = 2)),
                 activeAccount = "account-b",
                 navigationRequest = request.copy(accountSwitchRequested = true),
             ),
@@ -68,6 +82,14 @@ class TtsDestinationNavigationTest {
             ),
             resolve(availableGroups = emptySet()),
         )
+    }
+
+    @Test
+    fun onlyTheCurrentRequestOwnsAnAsyncCompletion() {
+        assertTrue(request.ownsCompletion(requestId = 3L))
+        assertFalse(request.ownsCompletion(requestId = 2L))
+        assertFalse(request.copy(requestId = 4L).ownsCompletion(requestId = 3L))
+        assertFalse((null as TtsDestinationNavigationRequest?).ownsCompletion(requestId = 3L))
     }
 
     private fun resolve(
