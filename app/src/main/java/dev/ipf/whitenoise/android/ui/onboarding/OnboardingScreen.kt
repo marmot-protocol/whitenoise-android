@@ -505,6 +505,7 @@ fun OnboardingContent(
     }
 }
 
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 @Composable
 internal fun OnboardingOfflineNotice(
     onRetry: () -> Unit,
