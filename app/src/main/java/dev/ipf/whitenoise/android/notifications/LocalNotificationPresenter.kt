@@ -98,6 +98,7 @@ class LocalNotificationPresenter(
     private val enrichmentLauncher: (suspend () -> Unit) -> Unit = { block ->
         notificationEnrichmentScope.launch { block() }
     },
+    private val quickReactionChoices: () -> List<String> = { notificationQuickReactionChoices(context) },
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
     },
@@ -206,8 +207,8 @@ class LocalNotificationPresenter(
         }
     }
 
-    // Replying / marking read owns the acted-on card, so cancel it before taking
-    // the sibling snapshot. Both action paths share this operation so their
+    // Replying, reacting, or marking read owns the acted-on card, so cancel it
+    // before taking the sibling snapshot. All action paths share this operation so their
     // ordering and newer-sibling preservation cannot drift apart.
     fun dismissActionNotificationAndOlderSiblings(
         notificationTag: String,
@@ -444,12 +445,6 @@ class LocalNotificationPresenter(
                         builder.addExtras(Bundle().apply { putBoolean(EXTRA_CONTENT_REDACTED, true) })
                     }
                     if (!redactContent) {
-                        val quickReactions =
-                            if (decision.actions.contains(NotificationActionKind.REACT)) {
-                                withContext(Dispatchers.Default) { notificationQuickReactionChoices(context) }
-                            } else {
-                                emptyList()
-                            }
                         NotificationActions
                             .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                             ?.let { actionTarget ->
@@ -457,9 +452,7 @@ class LocalNotificationPresenter(
                                     when (action) {
                                         NotificationActionKind.REPLY -> builder.addAction(replyNotificationAction(actionTarget))
                                         NotificationActionKind.REACT ->
-                                            quickReactions.forEach { reaction ->
-                                                builder.addAction(reactionNotificationAction(actionTarget, reaction))
-                                            }
+                                            reactionNotificationAction(actionTarget)?.let(builder::addAction)
                                         NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
                                     }
                                 }
@@ -1046,10 +1039,12 @@ class LocalNotificationPresenter(
     /**
      * Re-post the (tag, id) notification carrying a RemoteInput history entry —
      * the documented "reply handled" signal that clears the system's
-     * FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY. A direct-reply notification is
-     * lifetime-extended by the system (API 34+) and a bare [cancel] is ignored
-     * while that flag is set, so the caller must do this (and let it settle)
-     * before cancelling. Returns true once the live notification was found and
+     * FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY. Sending any RemoteInput action —
+     * typed reply text or a tapped reaction chip — lifetime-extends the card
+     * (API 34+) and a bare [cancel] is ignored while that flag is set, so the
+     * caller must do this (and let it settle) before cancelling. [handledText]
+     * is what the card shows in the meantime: the reply, or the reaction.
+     * Returns true once the live notification was found and
      * re-posted; false if it isn't in the active set yet (caller should retry —
      * the extension is applied a beat after the reply broadcast fires).
      *
@@ -1063,7 +1058,7 @@ class LocalNotificationPresenter(
     fun markDirectReplyHandled(
         notificationTag: String,
         notificationId: Int,
-        replyText: String,
+        handledText: String,
     ): Boolean =
         ConversationCardPostSynchronizer.withLock(
             notificationTag,
@@ -1087,7 +1082,7 @@ class LocalNotificationPresenter(
                 val resolved =
                     NotificationCompat
                         .Builder(context, active.notification)
-                        .setRemoteInputHistory(arrayOf(replyText))
+                        .setRemoteInputHistory(arrayOf(handledText))
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
                         .build()
@@ -1412,39 +1407,59 @@ class LocalNotificationPresenter(
             .setShowsUserInterface(false)
             .build()
 
-    private fun reactionNotificationAction(
-        actionTarget: NotificationActionTarget,
-        reaction: String,
-    ): NotificationCompat.Action =
-        NotificationCompat
+    /**
+     * React offers the user's quick reactions as RemoteInput choice chips rather
+     * than emoji action buttons: chips escape the three-action-button cap, expand
+     * inline instead of collapsing the shade, and take one tap instead of two.
+     * Free-form input is off and editing is disabled, so a chip tap sends
+     * straight away. Null when nothing is configured to offer — a React button
+     * with no chips could never produce a reaction.
+     */
+    private fun reactionNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action? {
+        val choices = notificationQuickReactionChoices(quickReactionChoices())
+        if (choices.isEmpty()) return null
+        val remoteInput =
+            RemoteInput
+                .Builder(NotificationActions.KEY_REACTION_CHOICE)
+                .setLabel(context.getString(R.string.message_react))
+                .setChoices(choices.toTypedArray())
+                .setAllowFreeFormInput(false)
+                .setEditChoicesBeforeSending(RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED)
+                .build()
+        return NotificationCompat
             .Action
             .Builder(
                 R.drawable.ic_stat_whitenoise,
-                reaction,
-                actionPendingIntent(actionTarget, NotificationActionKind.REACT, reaction),
-            ).setShowsUserInterface(false)
+                context.getString(R.string.message_react),
+                actionPendingIntent(actionTarget, NotificationActionKind.REACT),
+            ).addRemoteInput(remoteInput)
+            .setAllowGeneratedReplies(false)
+            .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_THUMBS_UP)
+            .setShowsUserInterface(false)
             .build()
+    }
 
+    // Actions carrying a RemoteInput must be mutable — the system fills the typed
+    // text or chosen chip into the broadcast, and posting an immutable one is
+    // rejected. The receiver is not exported, so only the shade can fire these.
     private fun actionPendingIntent(
         actionTarget: NotificationActionTarget,
         kind: NotificationActionKind,
-        reaction: String? = null,
     ): PendingIntent {
         val actionIntent =
             Intent(context, NotificationActionReceiver::class.java).apply {
-                NotificationActions.applyToIntent(this, kind, actionTarget, reaction)
+                NotificationActions.applyToIntent(this, kind, actionTarget)
             }
-        val mutableFlag =
-            if (kind == NotificationActionKind.REPLY) {
-                PendingIntent.FLAG_MUTABLE
-            } else {
-                PendingIntent.FLAG_IMMUTABLE
+        val mutabilityFlag =
+            when (kind) {
+                NotificationActionKind.REPLY, NotificationActionKind.REACT -> PendingIntent.FLAG_MUTABLE
+                NotificationActionKind.MARK_READ -> PendingIntent.FLAG_IMMUTABLE
             }
         return PendingIntent.getBroadcast(
             context,
-            NotificationActions.requestCode(kind, actionTarget.notificationTag, reaction),
+            NotificationActions.requestCode(kind, actionTarget.notificationTag),
             actionIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or mutableFlag,
+            PendingIntent.FLAG_UPDATE_CURRENT or mutabilityFlag,
         )
     }
 

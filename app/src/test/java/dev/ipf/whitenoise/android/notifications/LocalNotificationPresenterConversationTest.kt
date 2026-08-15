@@ -25,7 +25,6 @@ import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGO
 import dev.ipf.whitenoise.android.share.ShareShortcutTarget
 import dev.ipf.whitenoise.android.share.buildShareShortcut
 import dev.ipf.whitenoise.android.state.ChatListItem
-import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -657,25 +656,24 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
-    fun groupMessageOffersReplyAndTheFirstTwoCustomizedQuickReactions() {
-        RecentEmojiPreferences.saveQuickReactions(context, listOf("🥳", "🔥", "😂", "👍"))
-        try {
-            presenter.ensureChannels()
+    fun groupMessageOffersReplyReactAndMarkRead() {
+        presenter.ensureChannels()
 
-            runBlocking {
-                presenter.show(update(isMention = false), previewTextOverride = "hi", shortNpub = { "npub1test" })
-            }
-
-            assertEquals(
-                listOf(context.getString(R.string.reply), "🥳", "🔥"),
-                manager.activeNotifications
-                    .single()
-                    .notification.actions
-                    .map { it.title.toString() },
-            )
-        } finally {
-            RecentEmojiPreferences.resetQuickReactions(context)
+        runBlocking {
+            presenter.show(update(isMention = false), previewTextOverride = "hi", shortNpub = { "npub1test" })
         }
+
+        assertEquals(
+            listOf(
+                context.getString(R.string.reply),
+                context.getString(R.string.message_react),
+                context.getString(R.string.chat_row_action_mark_read),
+            ),
+            manager.activeNotifications
+                .single()
+                .notification.actions
+                .map { it.title.toString() },
+        )
     }
 
     @Test

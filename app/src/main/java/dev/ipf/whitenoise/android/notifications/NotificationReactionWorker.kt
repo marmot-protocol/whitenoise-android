@@ -258,7 +258,7 @@ class NotificationReactionWorker(
         private const val MAX_SEND_ATTEMPTS = 3
         private const val BACKOFF_DELAY_SECONDS = 30L
 
-        suspend fun enqueue(
+        suspend fun enqueueActionBatch(
             context: Context,
             action: NotificationAction,
             reaction: String,
@@ -266,17 +266,16 @@ class NotificationReactionWorker(
             val enqueueResult =
                 runCatching {
                     val requestId = UUID.randomUUID()
-                    val routingAction = action.copy(reaction = null)
                     val normalizedReaction = requireNotNull(normalizeNotificationReaction(reaction))
-                    val encrypted =
-                        NotificationReplyCipher.create().encrypt(normalizedReaction, requestId, routingAction)
+                    val encrypted = NotificationReplyCipher.create().encrypt(normalizedReaction, requestId, action)
                     WorkManager
                         .getInstance(context.applicationContext)
-                        .enqueueUniqueWork(
-                            notificationReactionWorkName(routingAction, normalizedReaction),
+                        .beginUniqueWork(
+                            notificationReactionActionWorkName(action),
                             ExistingWorkPolicy.KEEP,
-                            notificationReactionRequest(routingAction, requestId, encrypted),
-                        ).await()
+                            notificationReactionActionRequests(action, requestId, encrypted),
+                        ).enqueue()
+                        .await()
                 }
             val failure = enqueueResult.exceptionOrNull()
             if (failure is CancellationException) throw failure
@@ -284,22 +283,29 @@ class NotificationReactionWorker(
             return enqueueResult.isSuccess
         }
 
-        internal fun shouldRetryAfterFailure(operationAttempt: Int): Boolean = operationAttempt < MAX_SEND_ATTEMPTS - 1
-
-        internal fun notificationReactionWorkName(
-            action: NotificationAction,
-            reaction: String,
-        ): String {
+        internal fun notificationReactionActionWorkName(action: NotificationAction): String {
             val canonical =
                 listOf(
                     action.target.accountRef,
                     action.target.groupIdHex,
                     action.target.messageIdHex.orEmpty(),
-                    reaction,
                 ).joinToString("\u0000")
             val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray())
-            return "notification_reaction_" + digest.toLowercaseHexString()
+            return "notification_reaction_action_" + digest.toLowercaseHexString()
         }
+
+        internal fun notificationReactionActionRequests(
+            action: NotificationAction,
+            requestId: UUID,
+            encryptedReaction: EncryptedNotificationReply,
+        ) = listOf(
+            notificationReactionRequest(action, requestId, encryptedReaction),
+            NotificationMarkReadWorker.notificationMarkReadRequest(
+                action.copy(kind = NotificationActionKind.MARK_READ),
+            ),
+        )
+
+        internal fun shouldRetryAfterFailure(operationAttempt: Int): Boolean = operationAttempt < MAX_SEND_ATTEMPTS - 1
 
         internal fun notificationReactionRequest(
             action: NotificationAction,
@@ -325,7 +331,7 @@ class NotificationReactionWorker(
         ): Data =
             Data
                 .Builder()
-                .putAll(NotificationActionWorkData.encode(action.copy(reaction = null)))
+                .putAll(NotificationActionWorkData.encode(action))
                 .putByteArray(KEY_REACTION_IV, encryptedReaction.initializationVector)
                 .putByteArray(KEY_REACTION_CIPHERTEXT, encryptedReaction.ciphertext)
                 .build()
