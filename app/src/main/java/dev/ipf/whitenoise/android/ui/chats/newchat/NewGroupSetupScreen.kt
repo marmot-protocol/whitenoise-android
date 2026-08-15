@@ -306,6 +306,7 @@ internal fun NewGroupSetupScreen(
         }
     }
 
+    @Suppress("TooGenericExceptionCaught") // The callback can surface any non-cancellation preparation failure.
     fun prepareImage(load: suspend () -> ImageUploadDraft) {
         if (imagePreparing || busy) return
         imagePreparing = true

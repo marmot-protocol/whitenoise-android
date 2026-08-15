@@ -574,7 +574,7 @@ internal fun ProfileEditScreen(
         }
     }
 
-    @Suppress("LongMethod")
+    @Suppress("LongMethod", "TooGenericExceptionCaught") // Preparation and upload have different failure types.
     fun uploadProfileDraft(
         target: ProfileImageTarget,
         prepare: suspend () -> dev.ipf.whitenoise.android.media.ImageUploadDraft,
@@ -657,6 +657,7 @@ internal fun ProfileEditScreen(
         }
     }
 
+    @Suppress("TooGenericExceptionCaught") // The injected or FFI profile reader can throw any non-cancellation failure.
     LaunchedEffect(activeAccountId) {
         saveState.beginLoad(activeAccountId)
         val accountId = activeAccountId ?: return@LaunchedEffect

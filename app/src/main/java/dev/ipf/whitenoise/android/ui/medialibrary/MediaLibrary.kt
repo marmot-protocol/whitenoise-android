@@ -966,7 +966,8 @@ private fun FileLibraryRow(
                         when (outcome) {
                             OpenAttachmentResult.Opened -> Unit
                             OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
-                            OpenAttachmentResult.InstallPermissionRequired -> appState.present(R.string.media_couldnt_open)
+                            OpenAttachmentResult.InstallPermissionRequired ->
+                                appState.present(R.string.media_couldnt_open)
                             OpenAttachmentResult.Error ->
                                 appState.presentFailure(
                                     R.string.media_couldnt_open,

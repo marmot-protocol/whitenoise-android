@@ -144,6 +144,7 @@ internal fun GroupEditScreen(
         }
     }
 
+    @Suppress("TooGenericExceptionCaught") // The callback can surface any non-cancellation preparation failure.
     fun updateImage(prepare: suspend () -> ImageUploadDraft?) {
         if (imageSaving || controller.mutationInFlight) return
         imageSaving = true
@@ -166,6 +167,7 @@ internal fun GroupEditScreen(
         }
     }
 
+    @Suppress("TooGenericExceptionCaught") // The FFI boundary can surface unchecked non-cancellation failures.
     fun setPublicAvatarUrl(url: String) {
         if (imageSaving || controller.mutationInFlight) return
         // Same HTTPS/credential/loopback policy the upload path enforces, but a
@@ -197,6 +199,7 @@ internal fun GroupEditScreen(
     // A device photo becomes a public avatar by uploading the plaintext bytes
     // to Blossom first: the encrypted group image is unreadable to anyone
     // outside the group, so invite previews and QR codes can't render it.
+    @Suppress("TooGenericExceptionCaught") // Preparation, upload, and FFI calls have different failure types.
     fun uploadPublicAvatar(uri: Uri) {
         val accountRef = appState.activeAccountRef ?: return
         if (imageSaving || controller.mutationInFlight) return
