@@ -104,10 +104,33 @@ class MessageHidePreferencesTest {
         MessageHidePreferences.hideMessage(preferences, "account-a", "group-b", "msg-2")
         MessageHidePreferences.hideMessage(preferences, "account-b", "group-a", "msg-3")
 
-        MessageHidePreferences.clearAccount(preferences, "account-a")
+        assertTrue(MessageHidePreferences.clearAccount(preferences, "account-a"))
 
         assertTrue(MessageHidePreferences.readHiddenMessageIds(preferences, "account-a", "group-a").isEmpty())
         assertTrue(MessageHidePreferences.readHiddenMessageIds(preferences, "account-a", "group-b").isEmpty())
+        assertEquals(
+            setOf("msg-3"),
+            MessageHidePreferences.readHiddenMessageIds(preferences, "account-b", "group-a"),
+        )
+    }
+
+    @Test
+    fun failedAccountClearRestoresHiddenMessagesAndReportsFailure() {
+        MessageHidePreferences.hideMessage(preferences, "account-a", "group-a", "msg-1")
+        MessageHidePreferences.hideMessage(preferences, "account-a", "group-b", "msg-2")
+        MessageHidePreferences.hideMessage(preferences, "account-b", "group-a", "msg-3")
+
+        val cleared = MessageHidePreferences.clearAccount(CommitFailingPreferences(preferences), "account-a")
+
+        assertFalse(cleared)
+        assertEquals(
+            setOf("msg-1"),
+            MessageHidePreferences.readHiddenMessageIds(preferences, "account-a", "group-a"),
+        )
+        assertEquals(
+            setOf("msg-2"),
+            MessageHidePreferences.readHiddenMessageIds(preferences, "account-a", "group-b"),
+        )
         assertEquals(
             setOf("msg-3"),
             MessageHidePreferences.readHiddenMessageIds(preferences, "account-b", "group-a"),

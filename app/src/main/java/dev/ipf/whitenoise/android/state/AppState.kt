@@ -4765,7 +4765,9 @@ class WhiteNoiseAppState private constructor(
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
             wipeDecryptedMediaFromDisk()
-            clearHiddenMessagesForAccount(wipedRef)
+            if (!clearHiddenMessagesForAccount(wipedRef)) {
+                appStateDebug { "hidden-message cleanup failed after wipe account=${wipedRef.take(8)}" }
+            }
             withContext(NonCancellable + Dispatchers.IO) {
                 runCatching {
                     if (editorSessionStore.removeAccount(wipedRef)) {
@@ -5828,14 +5830,17 @@ class WhiteNoiseAppState private constructor(
             true
         }
 
-    suspend fun clearHiddenMessagesForAccount(accountRef: String) =
+    suspend fun clearHiddenMessagesForAccount(accountRef: String): Boolean =
         withContext(NonCancellable) {
             hiddenMessageMutationMutex.withLock {
-                withContext(Dispatchers.IO) {
-                    MessageHidePreferences.clearAccount(preferences, accountRef)
-                }
-                val prefix = MessageHidePreferences.accountKeyPrefix(accountRef) ?: return@withLock
+                val prefix = MessageHidePreferences.accountKeyPrefix(accountRef) ?: return@withLock false
+                val cleared =
+                    withContext(Dispatchers.IO) {
+                        MessageHidePreferences.clearAccount(preferences, accountRef)
+                    }
+                if (!cleared) return@withLock false
                 hiddenMessageIdsByAccountGroup.removeAll { it.startsWith(prefix) }
+                true
             }
         }
 

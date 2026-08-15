@@ -117,6 +117,42 @@ class DeletedMessageLocalRemovalTest {
     }
 
     @Test
+    fun remoteDeletionClosesAnAlreadyOpenMessageInfoSheet() {
+        val surface = renderLive()
+        liveMessage().performTouchInput { longClick() }
+        composeRule.onNodeWithText(string(R.string.message_info), substring = false).performClick()
+        composeRule.onNodeWithText(string(R.string.message_info_message_id), substring = false).assertIsDisplayed()
+
+        surface.markDeleted()
+
+        composeRule.waitUntil(timeoutMillis = ASYNC_TIMEOUT_MILLIS) {
+            runCatching {
+                composeRule
+                    .onNodeWithText(string(R.string.message_info_message_id), substring = false)
+                    .assertDoesNotExist()
+            }.isSuccess
+        }
+        placeholder().assertIsDisplayed()
+    }
+
+    @Test
+    fun remoteDeletionClosesAnAlreadyOpenForwardSheet() {
+        val surface = renderLive()
+        liveMessage().performTouchInput { longClick() }
+        composeRule.onNodeWithText(string(R.string.forward), substring = false).performClick()
+        composeRule.onNodeWithText(string(R.string.forward_to), substring = false).assertIsDisplayed()
+
+        surface.markDeleted()
+
+        composeRule.waitUntil(timeoutMillis = ASYNC_TIMEOUT_MILLIS) {
+            runCatching {
+                composeRule.onNodeWithText(string(R.string.forward_to), substring = false).assertDoesNotExist()
+            }.isSuccess
+        }
+        placeholder().assertIsDisplayed()
+    }
+
+    @Test
     fun cancelKeepsTheTombstoneVisible() {
         val surface = render(failCommits = false)
         placeholder().performTouchInput { longClick() }
@@ -210,6 +246,8 @@ class DeletedMessageLocalRemovalTest {
 
     private fun placeholder() = composeRule.onNodeWithText(string(R.string.message_deleted), substring = false)
 
+    private fun liveMessage() = composeRule.onNodeWithText(LIVE_BODY, substring = false)
+
     private fun deleteAction() = composeRule.onNodeWithText(string(R.string.delete), substring = false)
 
     private fun string(resource: Int): String = app.getString(resource)
@@ -282,6 +320,85 @@ class DeletedMessageLocalRemovalTest {
         }
     }
 
+    @Suppress("LongMethod")
+    private fun renderLive(
+        body: String = LIVE_BODY,
+        collapseLongMessages: Boolean = false,
+    ): LiveTestSurface {
+        val appState = appState(backingPreferences)
+        val controller = ConversationController(appState = appState, initialGroup = group())
+        val projected = messageRecord(body = body, deleted = false)
+        val item =
+            TimelineMessage(
+                id = "msg:$MESSAGE_ID",
+                record = TimelineProjector.toAppMessageRecord(projected),
+                status = MessageStatus.Received,
+                projected = projected,
+                timelineOrder = 1uL,
+            )
+        seedTimeline(controller, item)
+        val composerTextState = ComposerTextState(TextFieldValue(""))
+        lateinit var markDeleted: () -> Unit
+
+        composeRule.setContent {
+            var actionMenuOpen by remember { mutableStateOf(false) }
+            var current by remember { mutableStateOf(item) }
+            markDeleted = {
+                val tombstone = messageRecord(body = body, deleted = true)
+                current =
+                    current.copy(
+                        record = TimelineProjector.toAppMessageRecord(tombstone),
+                        projected = tombstone,
+                    )
+            }
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth()) {
+                    TimelineRowMessageBubble(
+                        messageIdHex = current.record.messageIdHex,
+                        item = current,
+                        controller = controller,
+                        appState = appState,
+                        composerTextState = composerTextState,
+                        highlighted = false,
+                        selectionMode = false,
+                        textSelectionMode = false,
+                        onTextSelectionModeChange = {},
+                        onTextSelectionBoundsChange = {},
+                        batchSelectable = true,
+                        selected = false,
+                        onToggleSelection = {},
+                        rangeDragActive = false,
+                        onDragSelectionStart = {},
+                        onDragSelection = { false },
+                        onDragSelectionEnd = {},
+                        onDragSelectionCancel = {},
+                        quickReactionEmojis = listOf("👍"),
+                        recentEmojis = emptyList(),
+                        onEmojiUsed = {},
+                        isActionMenuOpen = actionMenuOpen,
+                        onActionMenuOpenChange = { actionMenuOpen = it },
+                        onQuickReactionsSave = {},
+                        onQuickReactionsReset = {},
+                        onReplyPreviewClick = {},
+                        composerGate = ComposerGate.COMPOSER,
+                        onBack = {},
+                        mentionCandidates = emptyList(),
+                        mentionPickerEnabled = false,
+                        showSenderName = false,
+                        showSenderAvatar = false,
+                        collapseLongMessages = collapseLongMessages,
+                        readOnly = false,
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        return LiveTestSurface {
+            composeRule.runOnIdle { markDeleted() }
+            composeRule.waitForIdle()
+        }
+    }
+
     private fun appState(preferences: SharedPreferences) =
         WhiteNoiseAppState(
             context = context,
@@ -351,14 +468,19 @@ class DeletedMessageLocalRemovalTest {
         }
     }
 
-    private fun deletedRecord() =
+    private fun deletedRecord() = messageRecord(body = LIVE_BODY, deleted = true)
+
+    private fun messageRecord(
+        body: String,
+        deleted: Boolean,
+    ) =
         TimelineMessageRecordFfi(
             messageIdHex = MESSAGE_ID,
             sourceMessageIdHex = null,
             direction = "received",
             groupIdHex = GROUP_ID,
             sender = SENDER_ID,
-            plaintext = "secret body retained in protocol storage",
+            plaintext = body,
             contentTokens =
                 MarkdownDocumentFfi(
                     truncated = false,
@@ -376,8 +498,8 @@ class DeletedMessageLocalRemovalTest {
             agentTextStreamJson = null,
             groupSystem = null,
             reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
-            deleted = true,
-            deletedByMessageIdHex = "delete-event",
+            deleted = deleted,
+            deletedByMessageIdHex = if (deleted) "delete-event" else null,
             invalidationStatus = null,
             sourceEpoch = null,
             retentionSeconds = null,
@@ -434,6 +556,10 @@ class DeletedMessageLocalRemovalTest {
         val projected: TimelineMessageRecordFfi,
         val appState: WhiteNoiseAppState,
         val hiddenMessageIds: () -> Set<String>,
+    )
+
+    private data class LiveTestSurface(
+        val markDeleted: () -> Unit,
     )
 
     private class CommitControllablePreferences(
@@ -493,6 +619,7 @@ class DeletedMessageLocalRemovalTest {
         val SENDER_ID = "02" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
         val MESSAGE_ID = "05" + "00".repeat(31)
+        const val LIVE_BODY = "secret body retained in protocol storage"
         const val ASYNC_TIMEOUT_MILLIS = 20_000L
     }
 }

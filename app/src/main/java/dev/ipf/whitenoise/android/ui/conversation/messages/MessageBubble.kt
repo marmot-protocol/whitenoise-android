@@ -685,14 +685,20 @@ internal fun MessageBubble(
             }
         }
     }
-    // A deleted message is inert: tear down any open action/reaction surface if
-    // the message is deleted out from under it (optimistic or remote delete).
+    // A deleted message is inert: tear down every live-message surface if the
+    // message is deleted out from under it (optimistic or remote delete).
     LaunchedEffect(deleted) {
         if (deleted) {
             onActionMenuOpenChange(false)
             onTextSelectionModeChange(false)
             emojiPickerOpen = false
+            expandedFullView = false
+            infoSheetOpen = false
+            forwardSheetOpen = false
+            editHistoryOpen = false
             reactionSheetOpen = false
+            customizeReactionsOpen = false
+            restoreReactionPickerExpanded = false
             deleteDialogOpen = false
         }
     }
@@ -710,12 +716,13 @@ internal fun MessageBubble(
     }
 
     fun beginReply() {
-        if (readOnly) return
+        if (deleted || readOnly) return
         controller.replyingTo = record
         onActionMenuOpenChange(false)
     }
 
     fun openInfoSheet() {
+        if (deleted) return
         onActionMenuOpenChange(false)
         infoSheetOpen = true
     }
@@ -772,6 +779,7 @@ internal fun MessageBubble(
     }
 
     fun copyMessageText() {
+        if (deleted) return
         clipboard.setText(AnnotatedString(displayedBody))
         onActionMenuOpenChange(false)
     }
@@ -809,6 +817,7 @@ internal fun MessageBubble(
     // left the loaded timeline. When text is selected or the action menu was
     // opened from a hit-tested press, start at the containing visible sentence.
     fun speakFromHere() {
+        if (deleted) return
         val layouts = selectableTextLayouts.values.toList()
         val selectionActive = textSelectionMode && messageTextSelectionState.selectedTexts.isNotEmpty()
         val visibleText =
@@ -858,11 +867,13 @@ internal fun MessageBubble(
     }
 
     fun copyMarkdownLink(url: String) {
+        if (deleted) return
         clipboard.setText(AnnotatedString(url))
         onActionMenuOpenChange(false)
     }
 
     fun beginTextSelection() {
+        if (deleted) return
         selectableTextLayouts.clear()
         textSelectionSeeded = false
         onActionMenuOpenChange(false)
@@ -873,7 +884,7 @@ internal fun MessageBubble(
         // Defensive: the menu only renders Forward when forwardBody != null, but
         // gate here too so a stale tap can never open the picker for a non-text
         // record (issue #390 is text-only).
-        if (forwardBody == null) return
+        if (deleted || readOnly || forwardBody == null) return
         onActionMenuOpenChange(false)
         forwardSheetOpen = true
     }
@@ -1146,7 +1157,7 @@ internal fun MessageBubble(
                 val anyConfirmedMedia = bubbleMedia.hasConfirmedMedia
 
                 fun saveAttachments() {
-                    if (mediaReferences.isEmpty() || attachmentSaveInFlight) return
+                    if (deleted || mediaReferences.isEmpty() || attachmentSaveInFlight) return
                     onActionMenuOpenChange(false)
                     attachmentSaveInFlight = true
                     appState.launchMutation {
@@ -1519,7 +1530,7 @@ internal fun MessageBubble(
                                     footerOnPendingVisual = footerOnPendingVisual,
                                     invalidationWarning = invalidationWarning,
                                     mine = mine,
-                                    onExpand = { expandedFullView = true },
+                                    onExpand = { if (!deleted) expandedFullView = true },
                                 )
                             }
                         } else {
@@ -1581,7 +1592,7 @@ internal fun MessageBubble(
                                     footerOnPendingVisual = footerOnPendingVisual,
                                     invalidationWarning = invalidationWarning,
                                     mine = mine,
-                                    onExpand = { expandedFullView = true },
+                                    onExpand = { if (!deleted) expandedFullView = true },
                                 )
                             }
                         }
@@ -1643,7 +1654,7 @@ internal fun MessageBubble(
                             footerOnPendingVisual = footerOnPendingVisual,
                             invalidationWarning = invalidationWarning,
                             mine = mine,
-                            onExpand = { expandedFullView = true },
+                            onExpand = { if (!deleted) expandedFullView = true },
                         )
                     }
                 }
@@ -1675,22 +1686,28 @@ internal fun MessageBubble(
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->
-                        onActionMenuOpenChange(false)
-                        onEmojiUsed(emoji)
-                        reactWithEmoji(emoji)
+                        if (!deleted && !readOnly) {
+                            onActionMenuOpenChange(false)
+                            onEmojiUsed(emoji)
+                            reactWithEmoji(emoji)
+                        }
                     },
                     onOpenEmojiPicker = {
-                        onActionMenuOpenChange(false)
-                        emojiPickerOpen = true
+                        if (!deleted && !readOnly) {
+                            onActionMenuOpenChange(false)
+                            emojiPickerOpen = true
+                        }
                     },
                     onReply = ::beginReply,
                     onEdit = {
-                        onActionMenuOpenChange(false)
-                        // Cancel any reply-in-progress: reply and
-                        // edit modes are mutually exclusive in the
-                        // composer banner.
-                        controller.replyingTo = null
-                        controller.editingMessageId = record.messageIdHex
+                        if (!deleted && !readOnly) {
+                            onActionMenuOpenChange(false)
+                            // Cancel any reply-in-progress: reply and
+                            // edit modes are mutually exclusive in the
+                            // composer banner.
+                            controller.replyingTo = null
+                            controller.editingMessageId = record.messageIdHex
+                        }
                     },
                     onCopyText = ::copyMessageText,
                     onSpeak = {
@@ -1701,19 +1718,21 @@ internal fun MessageBubble(
                     onSelectText = ::beginTextSelection,
                     onForward = ::beginForward,
                     onSelect = {
-                        onActionMenuOpenChange(false)
-                        onToggleSelection()
+                        if (!deleted && !readOnly) {
+                            onActionMenuOpenChange(false)
+                            onToggleSelection()
+                        }
                     },
                     onInfo = ::openInfoSheet,
                     onDelete = ::requestDelete,
                 )
-                if (expandedFullView) {
+                if (expandedFullView && !deleted) {
                     val groupIdHex = controller.group.groupIdHex
                     val editingRecord =
                         controller.editingMessageId?.let { id ->
                             controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
                         }
-                    val canUseExpandedComposer = !readOnly && composerGate == ComposerGate.COMPOSER
+                    val canUseExpandedComposer = !deleted && !readOnly && composerGate == ComposerGate.COMPOSER
                     MessageFullScreenView(
                         senderDisplayName = appState.displayName(record.sender),
                         senderSeed = record.sender,
@@ -1802,7 +1821,7 @@ internal fun MessageBubble(
                         },
                     )
                 }
-                if (emojiPickerOpen && !readOnly) {
+                if (emojiPickerOpen && !deleted && !readOnly) {
                     EmojiPickerSheet(
                         restoreExpanded = restoreReactionPickerExpanded,
                         purpose = EmojiPickerPurpose.USE,
@@ -1829,7 +1848,7 @@ internal fun MessageBubble(
                         },
                     )
                 }
-                if (customizeReactionsOpen) {
+                if (customizeReactionsOpen && !deleted) {
                     fun closeCustomizeToReactionSheet() {
                         customizeReactionsOpen = false
                     }
@@ -1844,7 +1863,7 @@ internal fun MessageBubble(
                         onReset = onQuickReactionsReset,
                     )
                 }
-                if (editHistoryOpen && editState != null) {
+                if (editHistoryOpen && !deleted && editState != null) {
                     EditHistorySheet(
                         original = record.plaintext,
                         originalTimestamp = record.recordedAt,
@@ -1852,7 +1871,7 @@ internal fun MessageBubble(
                         onDismissRequest = { editHistoryOpen = false },
                     )
                 }
-                if (infoSheetOpen) {
+                if (infoSheetOpen && !deleted) {
                     MessageInfoSheet(
                         record = record,
                         status = item.status,
@@ -1865,14 +1884,14 @@ internal fun MessageBubble(
                         },
                     )
                 }
-                if (forwardSheetOpen && forwardBody != null) {
+                if (forwardSheetOpen && !deleted && forwardBody != null) {
                     ForwardMessageSheet(
                         appState = appState,
                         body = forwardBody,
                         originGroupIdHex = record.groupIdHex,
                         onDismiss = { forwardSheetOpen = false },
                         onForward = { targetGroupIds ->
-                            appState.forwardText(targetGroupIds, forwardBody)
+                            if (!deleted) appState.forwardText(targetGroupIds, forwardBody)
                         },
                     )
                 }

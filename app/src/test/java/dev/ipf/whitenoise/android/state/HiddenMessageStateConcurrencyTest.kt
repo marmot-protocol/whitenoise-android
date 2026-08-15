@@ -9,6 +9,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -97,7 +98,7 @@ class HiddenMessageStateConcurrencyTest {
             // Queued on this runBlocking event loop. Without shared serialization,
             // clear returns before this release and the older hide resurrects state.
             val releaseCommit = launch { preferences.releaseFirstHiddenPutCommit.countDown() }
-            appState.clearHiddenMessagesForAccount(ACCOUNT_REF)
+            assertTrue(appState.clearHiddenMessagesForAccount(ACCOUNT_REF))
 
             releaseCommit.join()
             assertTrue(hide.await())
@@ -105,6 +106,26 @@ class HiddenMessageStateConcurrencyTest {
             assertTrue(MessageHidePreferences.readHiddenMessageIds(backingPreferences, ACCOUNT_REF, GROUP_ID).isEmpty())
             assertEquals(0, preferences.hiddenClearApplyCalls.get())
             assertEquals(1, preferences.hiddenClearCommitCalls.get())
+        }
+
+    @Test
+    fun failedDestructiveClearPreservesPublishedAndDurableHiddenState() =
+        runBlocking {
+            val preferences = ClearFailingPreferences(backingPreferences)
+            val appState = appState(preferences)
+            assertTrue(appState.hideMessageForMe(ACCOUNT_REF, GROUP_ID, MESSAGE_ONE))
+
+            val cleared = appState.clearHiddenMessagesForAccount(ACCOUNT_REF)
+
+            assertFalse(cleared)
+            assertEquals(
+                setOf(MESSAGE_ONE),
+                appState.hiddenMessageIdsInGroup(ACCOUNT_REF, GROUP_ID),
+            )
+            assertEquals(
+                setOf(MESSAGE_ONE),
+                MessageHidePreferences.readHiddenMessageIds(backingPreferences, ACCOUNT_REF, GROUP_ID),
+            )
         }
 
     private fun appState(preferences: SharedPreferences) =
@@ -176,6 +197,29 @@ class HiddenMessageStateConcurrencyTest {
             override fun apply() {
                 if (removesHiddenMessages) owner.hiddenClearApplyCalls.incrementAndGet()
                 delegate.apply()
+            }
+        }
+    }
+
+    private class ClearFailingPreferences(
+        private val delegate: SharedPreferences,
+    ) : SharedPreferences by delegate {
+        override fun edit(): SharedPreferences.Editor = Editor(delegate.edit())
+
+        private class Editor(
+            private val delegate: SharedPreferences.Editor,
+        ) : SharedPreferences.Editor by delegate {
+            private var removesHiddenMessages = false
+
+            override fun remove(key: String?): SharedPreferences.Editor {
+                if (key?.startsWith(HIDDEN_MESSAGE_KEY_PREFIX) == true) removesHiddenMessages = true
+                delegate.remove(key)
+                return this
+            }
+
+            override fun commit(): Boolean {
+                val result = delegate.commit()
+                return result && !removesHiddenMessages
             }
         }
     }

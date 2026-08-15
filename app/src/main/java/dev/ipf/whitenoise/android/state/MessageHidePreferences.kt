@@ -113,13 +113,25 @@ internal object MessageHidePreferences {
     fun clearAccount(
         preferences: SharedPreferences,
         accountRef: String?,
-    ) {
-        val prefix = accountKeyPrefix(accountRef) ?: return
+    ): Boolean {
+        val prefix = accountKeyPrefix(accountRef) ?: return false
+        val previousByKey =
+            preferences.all.keys
+                .filter { it.startsWith(prefix) }
+                .associateWith { key -> readHiddenMessageIdsByKey(preferences, key) }
+        if (previousByKey.isEmpty()) return true
+
         val edit = preferences.edit()
-        preferences.all.keys
-            .filter { it.startsWith(prefix) }
-            .forEach(edit::remove)
-        edit.commit()
+        previousByKey.keys.forEach(edit::remove)
+        if (edit.commit()) return true
+
+        // SharedPreferences has already changed its process-local map when a
+        // disk write reports false. Restore every removed set so callers see
+        // the same retryable state now and after a process restart.
+        val restore = preferences.edit()
+        previousByKey.forEach { (key, ids) -> restore.putStringSet(key, HashSet(ids)) }
+        restore.commit()
+        return false
     }
 }
 
