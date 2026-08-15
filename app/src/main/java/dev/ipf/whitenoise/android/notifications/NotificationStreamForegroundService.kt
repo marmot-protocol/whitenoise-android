@@ -35,8 +35,13 @@ private const val START_TRIGGER_SYSTEM_WAKE = "system_wake"
 
 class NotificationStreamForegroundService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val runtimeSupervisor = NotificationRuntimeSupervisor()
     private var bootstrapJob: Job? = null
     private var pendingNativePushRegistrationSync = false
+    private var pendingPushWakeGeneration = 0L
+    private var completedPushWakeGeneration = 0L
+    private var userOwnedStartRequested = false
+    private var latestStartId = 0
 
     override fun onStartCommand(
         intent: Intent?,
@@ -44,6 +49,16 @@ class NotificationStreamForegroundService : Service() {
         startId: Int,
     ): Int {
         val trigger = foregroundStartTrigger(intent)
+        latestStartId = startId
+        if (trigger == ForegroundStartTrigger.UserToggle) userOwnedStartRequested = true
+        if (trigger == ForegroundStartTrigger.PushWake) {
+            if (pendingPushWakeGeneration == Long.MAX_VALUE) {
+                pendingPushWakeGeneration = 1L
+                completedPushWakeGeneration = 0L
+            } else {
+                pendingPushWakeGeneration += 1L
+            }
+        }
         // Android 14+ rejects a foreground-service start from a disallowed
         // context with ForegroundServiceStartNotAllowedException (an
         // IllegalStateException); a missing FGS grant throws SecurityException.
@@ -100,75 +115,114 @@ class NotificationStreamForegroundService : Service() {
             ForegroundStartDecision.BootstrapAndKeep -> {
                 bootstrapJob =
                     serviceScope.launch {
-                        val wakeLock = acquirePushWakeLockIfNeeded(trigger)
-                        try {
-                            val keepConnectedEnabled = backgroundConnectionEnabledOffMain()
-                            if (
-                                shouldStopStickySystemWakeRestart(
-                                    hasIntent = intent != null,
-                                    trigger = trigger,
-                                    backgroundConnectionEnabled = keepConnectedEnabled,
-                                )
-                            ) {
-                                stopSelf(startId)
-                                return@launch
-                            }
-                            val stopAfterSync =
-                                shouldStopAfterOneShotForegroundStart(
-                                    oneShotRequested = isOneShotForegroundStart(syncNativePushRegistration, trigger),
-                                    backgroundConnectionEnabled = keepConnectedEnabled,
-                                )
-                            runCatching {
-                                val appState = (application as WhiteNoiseApplication).appState
-                                startNotificationRuntimeForTrigger(appState, trigger)
-                                drainPendingNativePushRegistrationSync(appState)
-                            }.onFailure {
-                                foregroundServiceDebug(it) { "notification runtime failed" }
-                            }
-                            if (stopAfterSync) stopSelf(startId)
-                        } finally {
-                            releaseWakeLock(wakeLock)
-                        }
+                        runSupervisedBootstrap(
+                            initialTrigger = trigger,
+                            hasIntent = intent != null,
+                            initialOneShotRequested = isOneShotForegroundStart(syncNativePushRegistration, trigger),
+                        )
                     }
             }
             // Repeated onStartCommand calls (Android may redeliver) must not
             // stack notification-runtime bootstraps — an idempotency contract.
             ForegroundStartDecision.KeepRunningExistingBootstrap -> {
-                val oneShotRequested = isOneShotForegroundStart(syncNativePushRegistration, trigger)
-                if (oneShotRequested) {
-                    val inFlightBootstrap = bootstrapJob
-                    serviceScope.launch {
-                        val wakeLock = acquirePushWakeLockIfNeeded(trigger)
-                        try {
-                            val keepConnectedEnabled = backgroundConnectionEnabledOffMain()
-                            val stopAfterSync =
-                                shouldStopAfterOneShotForegroundStart(
-                                    oneShotRequested = oneShotRequested,
-                                    backgroundConnectionEnabled = keepConnectedEnabled,
-                                )
-                            runCatching {
-                                val appState = (application as WhiteNoiseApplication).appState
-                                inFlightBootstrap?.join()
-                                startNotificationRuntimeForTrigger(appState, trigger)
-                                if (syncNativePushRegistration) {
-                                    drainPendingNativePushRegistrationSync(appState)
-                                }
-                            }.onFailure {
-                                foregroundServiceDebug(it) { "notification runtime one-shot completion failed" }
-                            }
-                            // A one-shot sync nudge that raced an existing bootstrap must not
-                            // keep the foreground service (and its notification) alive unless
-                            // the user enabled Keep Connected — same rule as BootstrapAndKeep.
-                            if (stopAfterSync) stopSelf(startId)
-                        } finally {
-                            releaseWakeLock(wakeLock)
-                        }
-                    }
-                }
+                // Push-wake generations and the native-sync flag above are
+                // consumed by the active bootstrap before it exits. Do not
+                // launch a waiter per duplicate start: several redeliveries
+                // must still have exactly one runtime owner.
             }
         }
         foregroundServiceDebug { "started" }
         return START_STICKY
+    }
+
+    private suspend fun runSupervisedBootstrap(
+        initialTrigger: ForegroundStartTrigger,
+        hasIntent: Boolean,
+        initialOneShotRequested: Boolean,
+    ) {
+        val keepConnectedAtStart = backgroundConnectionEnabledOffMain()
+        if (
+            shouldStopStickySystemWakeRestart(
+                hasIntent = hasIntent,
+                trigger = initialTrigger,
+                backgroundConnectionEnabled = keepConnectedAtStart,
+            )
+        ) {
+            stopSelf(latestStartId)
+            return
+        }
+
+        val appState = (application as WhiteNoiseApplication).appState
+        val recoveryGeneration = appState.notificationRuntimeRecoveryGeneration()
+        while (true) {
+            val pushWakeGeneration = pendingPushWakeGeneration
+            val pushWakePending = pushWakeGeneration > completedPushWakeGeneration
+            val attemptTrigger =
+                if (pushWakePending) {
+                    ForegroundStartTrigger.PushWake
+                } else {
+                    initialTrigger
+                }
+            val outcome =
+                runtimeSupervisor.supervise(
+                    recoveryAllowed = { appState.notificationRuntimeRecoveryAllowed(recoveryGeneration) },
+                    startRuntime = {
+                        val wakeLock = acquirePushWakeLockIfNeeded(attemptTrigger)
+                        try {
+                            startNotificationRuntimeForTrigger(appState, attemptTrigger)
+                            drainPendingNativePushRegistrationSync(appState)
+                        } finally {
+                            releaseWakeLock(wakeLock)
+                        }
+                    },
+                    onAttemptFailed = { attempt, retryDelayMillis, failureClass ->
+                        val retrySummary = retryDelayMillis?.let { " retry_ms=$it" }.orEmpty()
+                        foregroundServiceDiagnostic(
+                            "notification runtime attempt failed attempt=$attempt$retrySummary reason=$failureClass",
+                        )
+                    },
+                )
+
+            when (outcome) {
+                is NotificationRuntimeSupervisionOutcome.Started -> {
+                    if (pushWakePending) completedPushWakeGeneration = pushWakeGeneration
+                    if (outcome.attempts > 1) {
+                        foregroundServiceDiagnostic(
+                            "notification runtime recovered attempts=${outcome.attempts}",
+                        )
+                    }
+                    val pushWakeQueued = pendingPushWakeGeneration > completedPushWakeGeneration
+                    if (!pushWakeQueued && !pendingNativePushRegistrationSync) break
+                }
+                is NotificationRuntimeSupervisionOutcome.RecoveryBoundaryChanged -> {
+                    foregroundServiceDiagnostic(
+                        "notification runtime retry cancelled boundary_changed attempts=${outcome.attempts}",
+                    )
+                    stopAfterOneShotIfNeeded(appState, initialOneShotRequested)
+                    return
+                }
+                is NotificationRuntimeSupervisionOutcome.Exhausted -> {
+                    foregroundServiceDiagnostic(
+                        "notification runtime retries exhausted attempts=${outcome.attempts} reason=${outcome.failureClass}",
+                    )
+                    if (shouldReconcileRuntimeExhaustion(userOwnedStartRequested)) {
+                        appState.onBackgroundConnectionRuntimeExhausted()
+                    }
+                    stopSelf(latestStartId)
+                    return
+                }
+            }
+        }
+        stopAfterOneShotIfNeeded(appState, initialOneShotRequested)
+    }
+
+    private fun stopAfterOneShotIfNeeded(
+        appState: WhiteNoiseAppState,
+        oneShotRequested: Boolean,
+    ) {
+        if (shouldStopAfterOneShotForegroundStart(oneShotRequested, appState.backgroundConnectionEnabled)) {
+            stopSelf(latestStartId)
+        }
     }
 
     private suspend fun backgroundConnectionEnabledOffMain(): Boolean =
@@ -399,6 +453,8 @@ internal fun decideForegroundStart(
 
 internal fun shouldReconcileBackgroundConnectionRejection(trigger: ForegroundStartTrigger): Boolean = trigger == ForegroundStartTrigger.UserToggle
 
+internal fun shouldReconcileRuntimeExhaustion(userOwnedStartRequested: Boolean): Boolean = userOwnedStartRequested
+
 internal fun foregroundServiceTypeForTrigger(trigger: ForegroundStartTrigger): Int =
     when (trigger) {
         // Android 14+ forbids BOOT_COMPLETED / MY_PACKAGE_REPLACED starts for
@@ -438,7 +494,9 @@ private fun recordPendingPushWakeCatchUp(context: Context) {
     runCatching {
         PushTokenStore.create(context).recordPendingPushWakeCatchUp()
     }.onFailure {
-        foregroundServiceDebug(it) { "pending push wake catch-up retry record failed" }
+        foregroundServiceDiagnostic(
+            "pending push wake catch-up retry record failed reason=${it.javaClass.simpleName}",
+        )
     }
 }
 
@@ -509,4 +567,10 @@ private inline fun foregroundServiceDebug(
     message: () -> String,
 ) {
     Log.e("DMForegroundSvc", message(), error)
+}
+
+private fun foregroundServiceDiagnostic(message: String) {
+    // Aggregate lifecycle telemetry only: callers pass attempt counts, trigger
+    // classes, and exception class names — never account or protocol data.
+    Log.w("DMForegroundSvc", message)
 }

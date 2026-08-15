@@ -65,32 +65,23 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     private fun wakeForegroundStream() {
+        // Record before asking Android to start the service. A start can be
+        // accepted and still fail inside notification-runtime bootstrap; the
+        // durable obligation must survive that in-runtime failure or process
+        // death, not only a synchronous foreground-start rejection.
+        recordPendingPushWakeCatchUp()
         try {
-            val started = NotificationStreamForegroundService.start(applicationContext, ForegroundStartTrigger.PushWake)
-            if (shouldRecordPendingPushWakeCatchUp(ForegroundStartTrigger.PushWake, started)) {
-                recordPendingPushWakeCatchUp()
-            }
+            NotificationStreamForegroundService.start(applicationContext, ForegroundStartTrigger.PushWake)
         } catch (error: Exception) {
-            recordPendingPushWakeCatchUp(error)
+            Log.w(TAG, "Failed to start foreground stream from push wake", error)
         }
     }
 
-    private fun recordPendingPushWakeCatchUp(error: Throwable? = null) {
+    private fun recordPendingPushWakeCatchUp() {
         val recordError =
             runCatching {
                 PushTokenStore.create(applicationContext).recordPendingPushWakeCatchUp()
             }.exceptionOrNull()
-        val message =
-            if (recordError == null) {
-                "Failed to start foreground stream from push wake; durable catch-up retry recorded"
-            } else {
-                "Failed to start foreground stream from push wake; durable catch-up retry could not be recorded"
-            }
-        if (error == null) {
-            Log.w(TAG, message)
-        } else {
-            Log.w(TAG, message, error)
-        }
         if (recordError != null) {
             Log.w(TAG, "Failed to record durable push wake catch-up retry", recordError)
         }

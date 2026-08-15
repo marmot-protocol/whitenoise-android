@@ -2399,6 +2399,7 @@ class WhiteNoiseAppState private constructor(
     private val notificationReceiverRetryWake = MutableStateFlow(0L)
 
     private val notificationDrainSequence = AtomicLong(0)
+    private val notificationRuntimeRecoveryGeneration = AtomicLong(0)
     private val notificationPostEpoch = NotificationPostEpoch()
     private val notificationDrainSignals = MutableSharedFlow<Long>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
@@ -2783,9 +2784,14 @@ class WhiteNoiseAppState private constructor(
     }
 
     private suspend fun prepareForDestructiveAccountWipe(accountRef: String): Boolean {
+        // Fence any foreground-service retry that was captured before this
+        // destructive teardown. The wipe/restore path owns listener restart;
+        // a delayed service retry must not reinstall work across that boundary.
+        notificationRuntimeRecoveryGeneration.incrementAndGet()
         networkNotificationRecoverySuppressed = true
         val restartNotifications =
-            notificationJob.isActive() ||
+            backgroundConnectionEnabled ||
+                notificationJob.isActive() ||
                 notificationReconnectJob.isActive() ||
                 pushWakeCatchUpDrainJob.isActive()
         val chatsControllerForTeardown = chatsController
@@ -3706,6 +3712,11 @@ class WhiteNoiseAppState private constructor(
         drainPendingNativePushRegistrationSyncIfNeeded()
         drainPendingPushWakeCatchUpIfNeeded()
     }
+
+    internal fun notificationRuntimeRecoveryGeneration(): Long = notificationRuntimeRecoveryGeneration.get()
+
+    internal fun notificationRuntimeRecoveryAllowed(generation: Long): Boolean =
+        !networkNotificationRecoverySuppressed && notificationRuntimeRecoveryGeneration.get() == generation
 
     private suspend fun ensureNotificationReceiverForNetworkReconnect(): Boolean {
         if (!bootstrapCompleted) bootstrap()
@@ -6707,6 +6718,14 @@ class WhiteNoiseAppState private constructor(
         if (!backgroundConnectionEnabled) return
         updateBackgroundConnectionPreference(false)
         present(R.string.toast_couldnt_keep_connected, R.string.toast_android_blocked_foreground_service, copyable = true)
+    }
+
+    /** Reconcile a user-owned foreground connection after supervised runtime retries exhaust. */
+    fun onBackgroundConnectionRuntimeExhausted() {
+        assertMainThread { "onBackgroundConnectionRuntimeExhausted" }
+        if (!backgroundConnectionEnabled) return
+        updateBackgroundConnectionPreference(false)
+        appStateDebug { "background connection runtime retries exhausted" }
     }
 
     /**
