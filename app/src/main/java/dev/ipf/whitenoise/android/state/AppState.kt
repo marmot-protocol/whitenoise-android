@@ -7185,8 +7185,7 @@ class WhiteNoiseAppState private constructor(
         return cachedName ?: shortNpub(accountIdHex)
     }
 
-    internal fun contactDisplayNameCachedOrNull(accountIdHex: String): String? =
-        contactDisplayNameCachedOrNull(activeAccountRef, accountIdHex)
+    internal fun contactDisplayNameCachedOrNull(accountIdHex: String): String? = contactDisplayNameCachedOrNull(activeAccountRef, accountIdHex)
 
     internal fun contactDisplayNameCachedOrNull(
         accountRef: String?,
