@@ -40,7 +40,7 @@ class OnboardingOfflineSetupTest {
         setupActions.forEach { action ->
             dispatchOnboardingAction(
                 inFlightAction = OnboardingAction.Idle,
-                hasActiveNetwork = false,
+                hasValidatedInternet = false,
                 requestedAction = action,
                 onOffline = offline::add,
                 onStart = { starts += 1 },
@@ -60,7 +60,7 @@ class OnboardingOfflineSetupTest {
         fun dispatch(action: OnboardingAction) {
             dispatchOnboardingAction(
                 inFlightAction = OnboardingAction.Idle,
-                hasActiveNetwork = online,
+                hasValidatedInternet = online,
                 requestedAction = action,
                 onOffline = { pending = it },
                 onStart = {
@@ -86,7 +86,7 @@ class OnboardingOfflineSetupTest {
         setupActions.forEach { requested ->
             dispatchOnboardingAction(
                 inFlightAction = OnboardingAction.Creating,
-                hasActiveNetwork = true,
+                hasValidatedInternet = true,
                 requestedAction = requested,
                 onOffline = { error("busy work must not be replaced by an offline prompt") },
                 onStart = { error("busy work must not start a second setup call") },
@@ -101,7 +101,7 @@ class OnboardingOfflineSetupTest {
         val appState = signInTestAppState(context, engine)
         composeRule.setContent {
             WhiteNoiseTheme {
-                OnboardingScreen(appState = appState, hasActiveNetwork = { online })
+                OnboardingScreen(appState = appState, hasValidatedInternet = { online })
             }
         }
 
@@ -129,7 +129,7 @@ class OnboardingOfflineSetupTest {
         val appState = signInTestAppState(context, engine)
         composeRule.setContent {
             WhiteNoiseTheme {
-                OnboardingScreen(appState = appState, hasActiveNetwork = { false })
+                OnboardingScreen(appState = appState, hasValidatedInternet = { false })
             }
         }
 

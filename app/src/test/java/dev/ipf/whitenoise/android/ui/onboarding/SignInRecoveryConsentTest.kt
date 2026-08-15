@@ -58,7 +58,7 @@ class SignInRecoveryConsentTest {
         val appState = signInTestAppState(app, engine)
         composeRule.setContent {
             WhiteNoiseTheme {
-                OnboardingScreen(appState = appState, hasActiveNetwork = { true })
+                OnboardingScreen(appState = appState, hasValidatedInternet = { true })
             }
         }
         composeRule.onNodeWithText(string(R.string.onboarding_login)).performClick()

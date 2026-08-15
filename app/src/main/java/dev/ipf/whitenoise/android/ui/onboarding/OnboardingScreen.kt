@@ -75,22 +75,22 @@ internal enum class OnboardingActionDecision { Start, ShowOffline, IgnoreBusy }
 
 internal fun onboardingActionDecision(
     inFlightAction: OnboardingAction,
-    hasActiveNetwork: Boolean,
+    hasValidatedInternet: Boolean,
 ): OnboardingActionDecision =
     when {
         inFlightAction != OnboardingAction.Idle -> OnboardingActionDecision.IgnoreBusy
-        !hasActiveNetwork -> OnboardingActionDecision.ShowOffline
+        !hasValidatedInternet -> OnboardingActionDecision.ShowOffline
         else -> OnboardingActionDecision.Start
     }
 
 internal fun dispatchOnboardingAction(
     inFlightAction: OnboardingAction,
-    hasActiveNetwork: Boolean,
+    hasValidatedInternet: Boolean,
     requestedAction: OnboardingAction,
     onOffline: (OnboardingAction) -> Unit,
     onStart: () -> Unit,
 ) {
-    when (onboardingActionDecision(inFlightAction, hasActiveNetwork)) {
+    when (onboardingActionDecision(inFlightAction, hasValidatedInternet)) {
         OnboardingActionDecision.IgnoreBusy -> Unit
         OnboardingActionDecision.ShowOffline -> onOffline(requestedAction)
         OnboardingActionDecision.Start -> onStart()
@@ -108,7 +108,7 @@ internal val OnboardingMaxContentWidth = 440.dp
 @Composable
 internal fun OnboardingScreen(
     appState: WhiteNoiseAppState,
-    hasActiveNetwork: () -> Boolean = appState::hasActiveNetwork,
+    hasValidatedInternet: () -> Boolean = appState::hasValidatedInternet,
 ) {
     var identity by remember { mutableStateOf("") }
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
@@ -155,7 +155,7 @@ internal fun OnboardingScreen(
     fun startNetworkSetupAction(action: OnboardingAction) {
         dispatchOnboardingAction(
             inFlightAction = inFlightAction,
-            hasActiveNetwork = hasActiveNetwork(),
+            hasValidatedInternet = hasValidatedInternet(),
             requestedAction = action,
             onOffline = { offlineRetryAction = it },
             onStart = {
@@ -569,6 +569,7 @@ internal fun OnboardingOfflineNotice(
 }
 
 @Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 private fun RowScope.OnboardingOfflineMessage() {
     Icon(
         imageVector = Icons.Default.WifiOff,
