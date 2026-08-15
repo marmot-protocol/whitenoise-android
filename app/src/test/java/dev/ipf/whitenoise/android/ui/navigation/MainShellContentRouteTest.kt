@@ -11,6 +11,27 @@ class MainShellContentRouteTest {
             resolveMainShellContentRoute(
                 conversationOpen = true,
                 routingNotification = true,
+                routingTtsReturn = true,
+            ),
+        )
+    }
+
+    @Test
+    fun ttsReturnTransitionHidesAnOpenConversationAndMainContent() {
+        assertEquals(
+            MainShellContentRoute.TtsReturnTransition,
+            resolveMainShellContentRoute(
+                conversationOpen = true,
+                routingNotification = false,
+                routingTtsReturn = true,
+            ),
+        )
+        assertEquals(
+            MainShellContentRoute.TtsReturnTransition,
+            resolveMainShellContentRoute(
+                conversationOpen = false,
+                routingNotification = false,
+                routingTtsReturn = true,
             ),
         )
     }
@@ -22,6 +43,7 @@ class MainShellContentRouteTest {
             resolveMainShellContentRoute(
                 conversationOpen = true,
                 routingNotification = false,
+                routingTtsReturn = false,
             ),
         )
     }
@@ -33,6 +55,7 @@ class MainShellContentRouteTest {
             resolveMainShellContentRoute(
                 conversationOpen = false,
                 routingNotification = false,
+                routingTtsReturn = false,
             ),
         )
     }

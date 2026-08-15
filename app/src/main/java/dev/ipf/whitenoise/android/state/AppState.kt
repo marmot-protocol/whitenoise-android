@@ -4238,6 +4238,7 @@ class WhiteNoiseAppState private constructor(
     suspend fun setActiveAccount(
         label: String,
         deferUnreadRefresh: Boolean = false,
+        shouldActivate: () -> Boolean = { true },
         onActivated: () -> Unit = {},
     ) {
         val switchingAccounts = label != activeAccountRef
@@ -4277,6 +4278,10 @@ class WhiteNoiseAppState private constructor(
                 refreshAccountUnreadCounts(refreshedAccounts)
             }
         }
+        // A route may outlive the UI intent that requested it while a signed-out
+        // account is being restored. Let request-scoped callers reject that late
+        // activation without cancelling the process-lifetime sign-in work.
+        if (!shouldActivate()) return
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
         reloadMediaAutoDownloadMatrix()

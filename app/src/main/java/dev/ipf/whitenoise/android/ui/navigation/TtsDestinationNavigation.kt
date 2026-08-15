@@ -10,12 +10,30 @@ internal data class TtsDestinationNavigationRequest(
     val accountSwitchRequested: Boolean = false,
 )
 
+internal data class TtsDestinationAccountSwitchOwnership(
+    val requestId: Long,
+    val sourceAccountRef: String?,
+    val targetAccountRef: String,
+)
+
+internal fun TtsDestinationNavigationRequest?.ownsCompletion(requestId: Long): Boolean = this?.requestId == requestId
+
+internal fun TtsDestinationAccountSwitchOwnership?.ownsAccountChange(
+    previousAccountRef: String?,
+    currentAccountRef: String?,
+    request: TtsDestinationNavigationRequest?,
+): Boolean =
+    this != null &&
+        request.ownsCompletion(requestId) &&
+        previousAccountRef == sourceAccountRef &&
+        currentAccountRef == targetAccountRef
+
 internal sealed interface TtsDestinationNavigationStep {
     data object Cancelled : TtsDestinationNavigationStep
 
     data object MissingAccount : TtsDestinationNavigationStep
 
-    data object AccountSwitchSuperseded : TtsDestinationNavigationStep
+    data object AwaitAccountSwitch : TtsDestinationNavigationStep
 
     data class SwitchAccount(
         val accountRef: String,
@@ -56,7 +74,7 @@ internal fun resolveTtsDestinationNavigation(
         destination == null -> TtsDestinationNavigationStep.Cancelled
         request.accountRef !in knownAccountRefs -> TtsDestinationNavigationStep.MissingAccount
         activeAccountRef != request.accountRef && request.accountSwitchRequested ->
-            TtsDestinationNavigationStep.AccountSwitchSuperseded
+            TtsDestinationNavigationStep.AwaitAccountSwitch
         activeAccountRef != request.accountRef ->
             TtsDestinationNavigationStep.SwitchAccount(request.accountRef)
         groupAvailable ->
