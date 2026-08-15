@@ -473,38 +473,37 @@ class DeletedMessageLocalRemovalTest {
     private fun messageRecord(
         body: String,
         deleted: Boolean,
-    ) =
-        TimelineMessageRecordFfi(
-            messageIdHex = MESSAGE_ID,
-            sourceMessageIdHex = null,
-            direction = "received",
-            groupIdHex = GROUP_ID,
-            sender = SENDER_ID,
-            plaintext = body,
-            contentTokens =
-                MarkdownDocumentFfi(
-                    truncated = false,
-                    blocks = emptyList(),
-                    blankLinesBefore = byteArrayOf(),
-                ),
-            kind = 9uL,
-            tags = emptyList(),
-            timelineAt = 1uL,
-            receivedAt = 1uL,
-            replyToMessageIdHex = null,
-            replyPreview = null,
-            mediaJson = null,
-            media = emptyList(),
-            agentTextStreamJson = null,
-            groupSystem = null,
-            reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
-            deleted = deleted,
-            deletedByMessageIdHex = if (deleted) "delete-event" else null,
-            invalidationStatus = null,
-            sourceEpoch = null,
-            retentionSeconds = null,
-            retentionExpiresAt = null,
-        )
+    ) = TimelineMessageRecordFfi(
+        messageIdHex = MESSAGE_ID,
+        sourceMessageIdHex = null,
+        direction = "received",
+        groupIdHex = GROUP_ID,
+        sender = SENDER_ID,
+        plaintext = body,
+        contentTokens =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blocks = emptyList(),
+                blankLinesBefore = byteArrayOf(),
+            ),
+        kind = 9uL,
+        tags = emptyList(),
+        timelineAt = 1uL,
+        receivedAt = 1uL,
+        replyToMessageIdHex = null,
+        replyPreview = null,
+        mediaJson = null,
+        media = emptyList(),
+        agentTextStreamJson = null,
+        groupSystem = null,
+        reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
+        deleted = deleted,
+        deletedByMessageIdHex = if (deleted) "delete-event" else null,
+        invalidationStatus = null,
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
+    )
 
     private fun group() =
         AppGroupRecordFfi(
