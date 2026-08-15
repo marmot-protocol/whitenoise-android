@@ -42,14 +42,23 @@ internal fun appStateWithDirectChats(
     vararg chats: Pair<String, String>,
     profiles: MutableMap<String, UserProfileMetadataFfi> = mutableMapOf(),
     profileRefresh: suspend (String) -> Unit = {},
+    accounts: List<AccountSummaryFfi> = listOf(testAccount(ACCOUNT_REF, ACCOUNT_HEX)),
+    activeAccountRef: String = ACCOUNT_REF,
 ): WhiteNoiseAppState {
-    val appState = emptyAppState(profiles = profiles, profileRefresh = profileRefresh)
-    val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
+    val appState =
+        emptyAppState(
+            profiles = profiles,
+            profileRefresh = profileRefresh,
+            accounts = accounts,
+            activeAccountRef = activeAccountRef,
+        )
+    val activeAccountHex = accounts.first { it.label == activeAccountRef }.accountIdHex
+    val controller = ChatsController(appState, activeAccountRef) { _, _ -> emptyList() }
     chats.forEach { (groupId, _) -> controller.applyChatListRow(chatRow(groupId)) }
     chats.forEach { (groupId, peerId) ->
         controller.applyLocalGroupDetails(
             record = group(groupId),
-            members = listOf(member(ACCOUNT_HEX, local = true), member(peerId, local = false)),
+            members = listOf(member(activeAccountHex, local = true), member(peerId, local = false)),
         )
     }
     appState.attachChatsController(controller)
@@ -68,13 +77,15 @@ internal fun emptyAppState(
     profiles: MutableMap<String, UserProfileMetadataFfi> = mutableMapOf(),
     profileRefresh: suspend (String) -> Unit = {},
     profileDisplayName: suspend (String) -> String? = { profiles[it]?.displayName },
+    accounts: List<AccountSummaryFfi> = listOf(testAccount(ACCOUNT_REF, ACCOUNT_HEX)),
+    activeAccountRef: String = ACCOUNT_REF,
 ): WhiteNoiseAppState =
     WhiteNoiseAppState(
         context = ApplicationProvider.getApplicationContext<Context>(),
         draftStore = DraftStore(InMemoryDraftPersistence()),
         accountIdHexResolver = { null },
-        accounts = listOf(activeAccount()),
-        activeAccountRef = ACCOUNT_REF,
+        accounts = accounts,
+        activeAccountRef = activeAccountRef,
         profileReader = { profiles[it] },
         profileDisplayNameReader = profileDisplayName,
         profileRefreshRequest = profileRefresh,
@@ -92,15 +103,17 @@ internal fun profile(
     lud16 = null,
 )
 
-private fun activeAccount() =
-    AccountSummaryFfi(
-        label = ACCOUNT_REF,
-        accountIdHex = ACCOUNT_HEX,
-        localSigning = true,
-        externalSigning = false,
-        signedOut = false,
-        running = true,
-    )
+internal fun testAccount(
+    label: String,
+    accountIdHex: String,
+) = AccountSummaryFfi(
+    label = label,
+    accountIdHex = accountIdHex,
+    localSigning = true,
+    externalSigning = false,
+    signedOut = false,
+    running = true,
+)
 
 internal fun member(
     id: String,

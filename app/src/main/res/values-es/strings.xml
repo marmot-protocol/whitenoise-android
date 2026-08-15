@@ -332,6 +332,10 @@
     <string name="toast_forwarded_partial">Reenviado a %1$s chats; algunos fallaron</string>
     <string name="toast_forward_failed">No se pudo reenviar el mensaje</string>
     <string name="share_to">Compartir en</string>
+    <string name="share_sending_as">Enviar como</string>
+    <string name="share_sending_as_value">Enviar como: %1$s</string>
+    <string name="share_choose_sending_account">Elegir cuenta de envío</string>
+    <string name="share_choose_sending_account_description">Elige qué cuenta con sesión iniciada será propietaria de estos borradores compartidos.</string>
     <string name="share_search_chats">Buscar chats</string>
     <string name="share_no_chats">No hay chats para compartir.</string>
     <string name="share_no_matches">Ningún chat coincide con tu búsqueda.</string>

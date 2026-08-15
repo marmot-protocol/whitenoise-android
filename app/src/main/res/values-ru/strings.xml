@@ -352,6 +352,10 @@
     <string name="toast_forwarded_partial">Переслано в %1$s чатов; некоторые не удалось</string>
     <string name="toast_forward_failed">Не удалось переслать сообщение</string>
     <string name="share_to">Поделиться в</string>
+    <string name="share_sending_as">Отправить как</string>
+    <string name="share_sending_as_value">Отправить как: %1$s</string>
+    <string name="share_choose_sending_account">Выбрать аккаунт отправителя</string>
+    <string name="share_choose_sending_account_description">Выберите аккаунт, которому будут принадлежать эти общие черновики.</string>
     <string name="share_search_chats">Поиск чатов</string>
     <string name="share_no_chats">Нет чатов для отправки.</string>
     <string name="share_no_matches">Нет чатов, соответствующих поиску.</string>
