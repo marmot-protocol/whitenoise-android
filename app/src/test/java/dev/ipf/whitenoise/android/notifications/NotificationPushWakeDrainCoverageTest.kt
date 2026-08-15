@@ -21,8 +21,32 @@ class NotificationPushWakeDrainCoverageTest {
     }
 
     @Test
+    fun duplicateStartsShareOneBootstrapOwner() {
+        val onStart = serviceFunctionBody("onStartCommand")
+
+        assertEquals(
+            "only the BootstrapAndKeep branch may launch a service-owned bootstrap",
+            1,
+            Regex("serviceScope\\.launch").findAll(onStart).count(),
+        )
+        assertTrue(
+            "queued push wakes must be folded into the active bootstrap instead of launching waiters",
+            "pendingPushWakeGeneration" in onStart &&
+                "KeepRunningExistingBootstrap" in onStart &&
+                "Do not" in onStart,
+        )
+    }
+
+    @Test
     fun pushWakeBootstrapHoldsWakeLockAcrossDrainAwait() {
         val source = serviceSource().readText()
+        val attemptMarker = "private suspend fun superviseRuntimeAttempt("
+        val nextFunctionMarker = "private suspend fun drainPendingNativePushRegistrationSync("
+        val attemptStart = source.indexOf(attemptMarker)
+        require(attemptStart >= 0) { "Missing superviseRuntimeAttempt" }
+        val attemptEnd = source.indexOf(nextFunctionMarker, startIndex = attemptStart)
+        require(attemptEnd > attemptStart) { "Missing function after superviseRuntimeAttempt" }
+        val attempt = source.substring(attemptStart, attemptEnd)
 
         assertTrue(
             "bootstrap branch must call the drain-aware runtime start before releasing the wake lock",
@@ -31,7 +55,18 @@ class NotificationPushWakeDrainCoverageTest {
                     """startNotificationRuntimeForTrigger\(appState,\s*trigger\).*""" +
                     """finally\s*\{\s*releaseWakeLock\(wakeLock\)\s*\}""",
                 RegexOption.DOT_MATCHES_ALL,
-            ).containsMatchIn(source),
+            ).containsMatchIn(attempt),
+        )
+    }
+
+    @Test
+    fun nativePushSyncFlagClearsOnlyAfterSuccessfulSync() {
+        val drain = serviceFunctionBody("drainPendingNativePushRegistrationSync")
+
+        assertTrue(
+            "a failed native-push sync must remain pending for the supervisor retry",
+            drain.indexOf("appState.syncNativePushRegistrationIfEnabled()") in 0 until
+                drain.indexOf("pendingNativePushRegistrationSync = false"),
         )
     }
 
@@ -109,6 +144,18 @@ class NotificationPushWakeDrainCoverageTest {
     }
 
     @Test
+    fun everyPushWakeRecordsDurableCatchUpBeforeStartingTheService() {
+        val wake = firebaseServiceFunctionBody("wakeForegroundStream")
+
+        assertTrue(
+            "an accepted foreground start can still fail in-runtime, so every wake must be durable before start()",
+            "recordPendingPushWakeCatchUp()" in wake &&
+                wake.indexOf("recordPendingPushWakeCatchUp()") <
+                wake.indexOf("NotificationStreamForegroundService.start("),
+        )
+    }
+
+    @Test
     fun pendingPushWakeDrainUsesSingleFlightAndGenerationClear() {
         val appState = appStateSource().readText()
         val drain = appStateFunctionBody("drainPendingPushWakeCatchUpIfNeeded")
@@ -147,6 +194,11 @@ class NotificationPushWakeDrainCoverageTest {
 
     private fun appStateFunctionBody(functionName: String): String = appStateSource().readText().kotlinFunctionBody(functionName)
 
+    private fun firebaseServiceFunctionBody(functionName: String): String {
+        val source = firebaseServiceSource().readText()
+        return source.kotlinFunctionBody(functionName)
+    }
+
     private fun serviceSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/notifications/NotificationStreamForegroundService.kt"),
@@ -160,6 +212,13 @@ class NotificationPushWakeDrainCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing AppState.kt source file")
+
+    private fun firebaseServiceSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/notifications/MarmotFirebaseMessagingService.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/notifications/MarmotFirebaseMessagingService.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing MarmotFirebaseMessagingService.kt source file")
 
     private fun String.kotlinFunctionBody(functionName: String): String {
         val start =

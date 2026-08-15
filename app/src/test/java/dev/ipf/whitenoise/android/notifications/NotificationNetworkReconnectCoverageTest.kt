@@ -141,6 +141,7 @@ class NotificationNetworkReconnectCoverageTest {
         )
     }
 
+    @Suppress("LongMethod") // One source-ordering scenario is clearer as a single regression contract.
     @Test
     fun accountTeardownCancelsReconnectOwnersBeforeTheListener() {
         val appState = appStateSource().readText()
@@ -153,7 +154,8 @@ class NotificationNetworkReconnectCoverageTest {
 
         assertTrue(
             "failed-wipe recovery must remember every notification runtime owner",
-            "notificationJob.isActive()" in prepare &&
+            "backgroundConnectionEnabled" in prepare &&
+                "notificationJob.isActive()" in prepare &&
                 "notificationReconnectJob.isActive()" in prepare &&
                 "pushWakeCatchUpDrainJob.isActive()" in prepare,
         )
@@ -168,6 +170,19 @@ class NotificationNetworkReconnectCoverageTest {
             "teardown must suppress connectivity callbacks before its first suspension",
             prepare.indexOf("networkNotificationRecoverySuppressed = true") in 0 until
                 prepare.indexOf("closeLiveSubscriptionsForAccountTeardown"),
+        )
+        assertTrue(
+            "destructive teardown must invalidate captured service retries before suppression or suspension",
+            prepare.indexOf("notificationRuntimeRecoveryGeneration.incrementAndGet()") in 0 until
+                prepare.indexOf("networkNotificationRecoverySuppressed = true"),
+        )
+        assertTrue(
+            "service retries must require both an unchanged wipe generation and active recovery",
+            Regex(
+                """fun\s+notificationRuntimeRecoveryAllowed\(generation:\s*Long\):\s*Boolean\s*=\s*""" +
+                    """!networkNotificationRecoverySuppressed\s*&&\s*""" +
+                    """notificationRuntimeRecoveryGeneration\.get\(\)\s*==\s*generation""",
+            ).containsMatchIn(appState),
         )
         assertTrue(
             "connectivity callbacks must not reinstall notification work during account teardown",
