@@ -325,6 +325,7 @@
     <string name="toast_forward_failed">无法转发消息</string>
     <string name="share_to">分享到</string>
     <string name="share_sending_as">发送身份</string>
+    <string name="share_sending_as_value">发送身份：%1$s</string>
     <string name="share_choose_sending_account">选择发送账号</string>
     <string name="share_choose_sending_account_description">选择用于保存这些共享草稿的已登录账号。</string>
     <string name="share_search_chats">搜索聊天</string>

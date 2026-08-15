@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.Density
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
@@ -64,6 +67,34 @@ class ShareChatPickerFullScreenScreenshotTest {
         composeRule
             .onNodeWithTag(SHARE_CHAT_PICKER_ACCOUNT_SHEET_TEST_TAG)
             .captureRoboImage("src/test/snapshots/share_chat_picker_account_sheet_dark.png")
+    }
+
+    @Test
+    fun accountChoiceSheetDarkLargeFont() {
+        val accounts =
+            listOf(
+                testAccount(ACCOUNT_REF, ACCOUNT_HEX),
+                testAccount("work", hexId(0x71)),
+            )
+        val appState = emptyAppState(accounts = accounts)
+        composeRule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = 2f)) {
+                WhiteNoiseTheme(darkTheme = true) {
+                    Surface {
+                        ShareChatPickerAccountSheetContent(
+                            appState = appState,
+                            accounts = accounts,
+                            selectedAccountRef = ACCOUNT_REF,
+                            onChooseAccount = {},
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(SHARE_CHAT_PICKER_ACCOUNT_SHEET_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/share_chat_picker_account_sheet_dark_large.png")
     }
 
     private fun renderMultiAccountPicker() {

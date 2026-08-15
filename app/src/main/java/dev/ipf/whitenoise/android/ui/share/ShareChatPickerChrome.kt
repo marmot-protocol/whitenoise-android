@@ -83,7 +83,7 @@ internal fun ShareChatPickerAccountIdentity(
     Column(modifier) {
         if (compact) {
             Text(
-                text = "${stringResource(R.string.share_sending_as)}: $accountTitle",
+                text = stringResource(R.string.share_sending_as_value, accountTitle),
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

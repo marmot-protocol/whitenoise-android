@@ -333,6 +333,7 @@
     <string name="toast_forward_failed">Mesaj iletilemedi</string>
     <string name="share_to">Şuraya paylaş</string>
     <string name="share_sending_as">Gönderen</string>
+    <string name="share_sending_as_value">Gönderen: %1$s</string>
     <string name="share_choose_sending_account">Gönderen hesabı seç</string>
     <string name="share_choose_sending_account_description">Bu paylaşılan taslakların ait olacağı oturum açmış hesabı seçin.</string>
     <string name="share_search_chats">Sohbet ara</string>

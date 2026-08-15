@@ -26,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -36,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,6 +75,7 @@ import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetAvatarAccount
@@ -80,6 +83,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetMembersP
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import kotlinx.coroutines.launch
 
 internal const val SHARE_CHAT_PICKER_SCREEN_TEST_TAG = "share_chat_picker_full_screen"
 internal const val SHARE_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG = "share_chat_picker_account_row"
@@ -110,6 +114,9 @@ internal fun ShareChatPickerFullScreenContent(
     val presentedTargets = rememberShareChatPickerPresentations(appState, pickerState)
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    val stageRejectedMessage = stringResource(R.string.no_share_target_available)
     var finishing by remember(requestId) { mutableStateOf(false) }
     val dismissPicker: () -> Unit = {
         if (!finishing) {
@@ -125,8 +132,15 @@ internal fun ShareChatPickerFullScreenContent(
         ShareChatPickerScaffoldActions(
             dismiss = dismissPicker,
             stage = {
-                if (!finishing && pickerState.stage(onStage)) {
-                    dismissPicker()
+                if (!finishing) {
+                    if (pickerState.stage(onStage)) {
+                        dismissPicker()
+                    } else {
+                        coroutineScope.launch {
+                            snackbarHostState.currentSnackbarData?.dismiss()
+                            snackbarHostState.showSnackbar(stageRejectedMessage)
+                        }
+                    }
                 }
             },
         )
@@ -135,6 +149,7 @@ internal fun ShareChatPickerFullScreenContent(
         presentedTargets = presentedTargets,
         requestId = requestId,
         actions = scaffoldActions,
+        snackbarHostState = snackbarHostState,
         overlayBackRegistrar = overlayBackRegistrar,
     )
     if (pickerState.accountSelectorOpen) {
@@ -159,6 +174,7 @@ private fun ShareChatPickerScaffold(
     presentedTargets: List<ShareChatPickerTargetPresentation>,
     requestId: String,
     actions: ShareChatPickerScaffoldActions,
+    snackbarHostState: SnackbarHostState,
     overlayBackRegistrar: ShareChatPickerOverlayBackRegistrar?,
 ) {
     val shareToTitle = stringResource(R.string.share_to)
@@ -180,6 +196,7 @@ private fun ShareChatPickerScaffold(
                     paneTitle = shareToTitle
                 },
             containerColor = amoledSheetContainerColor(),
+            snackbarHost = { WhiteNoiseSnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     title = { Text(shareToTitle) },

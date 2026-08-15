@@ -435,6 +435,7 @@ class ShareChatPickerFullScreenTest {
 
         composeRule.runOnIdle { assertEquals(0, dismissCount) }
         composeRule.onNodeWithText(app.getString(R.string.share_search_chats)).assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.no_share_target_available)).assertIsDisplayed()
     }
 
     @Test

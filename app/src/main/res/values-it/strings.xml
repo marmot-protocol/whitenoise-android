@@ -333,6 +333,7 @@
     <string name="toast_forward_failed">Impossibile inoltrare il messaggio</string>
     <string name="share_to">Condividi in</string>
     <string name="share_sending_as">Invia come</string>
+    <string name="share_sending_as_value">Invia come: %1$s</string>
     <string name="share_choose_sending_account">Scegli account di invio</string>
     <string name="share_choose_sending_account_description">Scegli a quale account connesso apparterranno queste bozze condivise.</string>
     <string name="share_search_chats">Cerca chat</string>
