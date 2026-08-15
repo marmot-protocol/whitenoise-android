@@ -1225,7 +1225,7 @@
     <string name="recent_chats">Discussions récentes</string>
     <string name="onboarding_login">Connexion</string>
     <string name="onboarding_login_with_amber">Se connecter avec Amber</string>
-    <string name="onboarding_offline_setup_message">Pas de connexion Internet. Connectez-vous par Wi-Fi, données mobiles ou un autre réseau, puis réessayez.</string>
+    <string name="onboarding_offline_setup_message">Pas de connexion Internet. Connectez-vous au Wi-Fi, activez les données mobiles ou utilisez un autre réseau, puis réessayez.</string>
     <string name="toast_couldnt_login_amber">Impossible de se connecter avec Amber</string>
     <string name="toast_amber_sign_in_cancelled">Connexion avec Amber annulée</string>
     <string name="onboarding_sign_up">S\'inscrire</string>
