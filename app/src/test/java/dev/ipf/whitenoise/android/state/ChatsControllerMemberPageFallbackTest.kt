@@ -34,6 +34,7 @@ class ChatsControllerMemberPageFallbackTest {
                         groupIds = groupIds + groupIds.take(3),
                         cutoffMillis = 500L,
                         maxConcurrent = 8,
+                        nowMillis = { currentTime },
                     ) { groupIdHex ->
                         attempts[groupIdHex] = attempts.getOrDefault(groupIdHex, 0) + 1
                         active += 1
@@ -70,6 +71,7 @@ class ChatsControllerMemberPageFallbackTest {
                             groupIds = listOf("fast-a", "slow", "fast-b"),
                             cutoffMillis = 500L,
                             maxConcurrent = 8,
+                            nowMillis = { currentTime },
                         ) { groupIdHex ->
                             delay(if (groupIdHex == "slow") 800L else 100L)
                             groupIdHex
@@ -111,6 +113,7 @@ class ChatsControllerMemberPageFallbackTest {
                             groupIds = listOf("slow-a", "slow-b"),
                             cutoffMillis = 500L,
                             maxConcurrent = 8,
+                            nowMillis = { currentTime },
                         ) {
                             try {
                                 awaitCancellation()
@@ -129,6 +132,36 @@ class ChatsControllerMemberPageFallbackTest {
 
             lifecycle.cancelAndJoin()
             assertEquals(2, cancelledReads)
+        }
+
+    @Test
+    fun cutoffBoundaryNeverLosesACompletedResult() =
+        runTest {
+            val returned = CompletableDeferred<FirstFrameMemberFallbackBatch<String>>()
+            val lifecycle =
+                launch {
+                    returned.complete(
+                        loadFirstFrameMemberFallback(
+                            groupIds = listOf("boundary"),
+                            cutoffMillis = 500L,
+                            maxConcurrent = 8,
+                            nowMillis = { currentTime },
+                        ) {
+                            delay(500L)
+                            "boundary"
+                        },
+                    )
+                    awaitCancellation()
+                }
+
+            advanceTimeBy(500L)
+            runCurrent()
+            val batch = returned.await()
+            assertEquals(1, batch.firstFrameResults.size + batch.remainingCount)
+            if (batch.remainingCount == 1) {
+                assertEquals("boundary", batch.remainingResults.receive().groupIdHex)
+            }
+            lifecycle.cancelAndJoin()
         }
 
     @Test

@@ -941,6 +941,7 @@ internal suspend fun <T> loadFirstFrameMemberFallback(
     groupIds: Iterable<String>,
     cutoffMillis: Long,
     maxConcurrent: Int,
+    nowMillis: () -> Long = { System.nanoTime() / NANOS_PER_MILLISECOND },
     load: suspend (String) -> T,
 ): FirstFrameMemberFallbackBatch<T> {
     require(cutoffMillis >= 0L)
@@ -965,12 +966,23 @@ internal suspend fun <T> loadFirstFrameMemberFallback(
         }
     }
 
+    val cutoffStartedAtMillis = nowMillis()
     val firstFrame = mutableListOf<FirstFrameMemberFallbackResult<T>>()
     var remaining = requested.size
-    withTimeoutOrNull(cutoffMillis) {
-        while (remaining > 0) {
-            firstFrame += results.receive()
+    while (remaining > 0) {
+        val completed = results.tryReceive().getOrNull()
+        if (completed != null) {
+            firstFrame += completed
             remaining -= 1
+        } else {
+            val elapsedMillis = (nowMillis() - cutoffStartedAtMillis).coerceAtLeast(0L)
+            val waitMillis = cutoffMillis - elapsedMillis
+            if (waitMillis <= 0L) break
+            // Never suspend inside a channel receive: prompt cancellation may
+            // consume an element before the caller records it. A short bounded
+            // delay leaves every result either synchronously drained above or
+            // available to the lifecycle-bound late collector.
+            delay(minOf(waitMillis, FIRST_FRAME_FALLBACK_POLL_MILLIS))
         }
     }
     return FirstFrameMemberFallbackBatch(firstFrame, results, remaining)
@@ -6097,6 +6109,8 @@ private const val SEARCH_MAX_PAGES = 20
 private const val MEMBER_FETCH_FANOUT = 4
 private const val INITIAL_MEMBER_FALLBACK_FANOUT = 8
 private const val INITIAL_MEMBER_FALLBACK_CUTOFF_MS = 500L
+private const val FIRST_FRAME_FALLBACK_POLL_MILLIS = 5L
+private const val NANOS_PER_MILLISECOND = 1_000_000L
 private const val GROUP_MEMBER_IDS_PAGE_SIZE = 100
 private const val MEMBER_FETCH_INITIAL_RETRY_DELAY_MS = 250L
 private const val MEMBER_FETCH_MAX_RETRY_DELAY_MS = 300_000L
