@@ -19,8 +19,8 @@ just install-debug         # install dev debug on connected device
 just run-debug             # install + launch dev debug
 just apk-production        # signed production arm64-v8a APK (fast)
 just apk-staging           # signed staging arm64-v8a APK (fast)
-just release               # signed production + staging APKs, rebuilds MDK bindings
-just release-fast          # signed production + staging APKs, reuses checked-in bindings
+just release               # signed production + staging APKs with pinned MarmotKit
+just release-fast          # backward-compatible alias for just release
 just install-production    # install production arm64-v8a APK on connected device
 just install-staging       # install staging arm64-v8a APK on connected device
 just keystore-gen          # one-time release keystore generation
@@ -92,15 +92,15 @@ manages its own Gradle execution. Dependency submission runs only from trusted
 
 Pushes to `master` also run `.github/workflows/android-instrumented.yml`, a
 separate emulator workflow for `:app:connectedDevZapstoreDebugAndroidTest`
-(Zapstore debug, exercising direct-distribution config). It is
-master-only, not a pull-request gate, because emulator boot is slower and more
-flake-prone than the fast JVM checks. It uploads Android test reports when
-available and retains them for seven days.
+(Zapstore debug, exercising direct-distribution config). Master runs the full
+suite; pull requests that change MarmotKit preparation run the focused packaged
+native-library smoke test. It uploads Android test reports when available and
+retains them for seven days.
 
 Pushes to `master` also run `.github/workflows/android-staging-apk.yml`, which
 builds and uploads a signed `arm64-v8a` staging release APK for internal
 installation. That workflow is also manually runnable from GitHub Actions. It
-uses the checked-in Marmot bindings and requires these repository Actions
+uses the checksum-verified MarmotKit artifact pinned by the repository and requires these repository Actions
 secrets:
 
 - `ANDROID_GOOGLE_SERVICES_JSON_BASE64`
@@ -254,25 +254,48 @@ Unset push values mean the runtime treats push as unconfigured rather than regis
 just apk-production
 ```
 
-Builds the signed production `arm64-v8a` APK using the checked-in Marmot bindings and native libraries. The output filename is `whitenoise-production-v8a-release-YYYY-MM-DD.apk`. The release folder is printed as the final line for Finder.
+Builds the signed production `arm64-v8a` APK using the immutable MarmotKit
+artifact pinned in `app/src/main/marmotkit/MARMOT_VERSION`. Gradle downloads it
+once, verifies its checksum, provenance, layout, and native architectures, and
+reuses the content-addressed cache afterward. The output filename is
+`whitenoise-production-v8a-release-YYYY-MM-DD-<sha>.apk`. The release folder is
+printed as the final line for Finder.
 
 ```bash
 just apk-staging
 ```
 
-Builds the signed staging `arm64-v8a` APK. The output filename is `whitenoise-staging-v8a-release-YYYY-MM-DD.apk`.
+Builds the signed staging `arm64-v8a` APK. The output filename is
+`whitenoise-staging-v8a-release-YYYY-MM-DD-<sha>.apk`.
 
 ```bash
 just release
 ```
 
-Builds all signed production and staging APKs (per-ABI + universal) and rebuilds the MDK/Marmot bindings. Set `WHITENOISE_MDK_DIR` to the MDK workspace before running this command.
+Builds all signed production and staging APKs (per-ABI + universal) with the
+same pinned MarmotKit artifact. No local MDK checkout or NDK binding rebuild is
+required. After one successful preparation, Gradle `--offline` builds reuse the
+verified artifact from the Gradle user-home cache. Set
+`WHITENOISE_MARMOTKIT_CACHE_DIR` only when an explicit shared cache location is
+needed.
+For an air-gapped first build, provide the exact pinned ZIP with
+`-Pwhitenoise.marmotkit.artifactFile=/path/to/marmotkit-android-0.9.12.zip`
+or `WHITENOISE_MARMOTKIT_ARTIFACT_FILE`; the same checksum and provenance checks
+still apply.
+Python 3 is required for artifact preparation. Gradle selects `python3` on
+Unix-like hosts and `python` on Windows; set `WHITENOISE_PYTHON` to override the
+executable name or path.
+
+Maintainers updating the pinned release should follow
+[docs/updating-marmotkit.md](docs/updating-marmotkit.md). The lock, generated
+API signature, and consumer/native checks must move together.
 
 ```bash
 just release-fast
 ```
 
-Same as `just release` but reuses the checked-in Marmot bindings and native libraries.
+Backward-compatible alias for `just release`; both use the same cached,
+checksum-verified artifact path.
 
 ### Reproducible unsigned release APK (#1261)
 

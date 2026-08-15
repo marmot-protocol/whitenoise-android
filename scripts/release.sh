@@ -3,9 +3,11 @@
 #
 # Pre-reqs:
 #   - JAVA_HOME or a JBR pointing at JDK 17+
-#   - Android SDK + NDK installed
+#   - Android SDK installed
 #   - Signing creds in local.properties (see scripts/release.sh --help)
-#   - MDK binding workspace at $WHITENOISE_MDK_DIR
+#
+# Gradle downloads and verifies the immutable MarmotKit artifact pinned in
+# app/src/main/marmotkit/MARMOT_VERSION. No local MDK checkout is required.
 #
 # Outputs signed per-ABI and universal APKs under app/build/outputs/apk/<flavor>/release/.
 
@@ -13,9 +15,8 @@ set -euo pipefail
 
 usage() {
   cat <<EOF
-Usage: scripts/release.sh [--skip-bindings] [--abi <ABI>] [--help]
+Usage: scripts/release.sh [--abi <ABI>] [--flavor <name>] [--help]
 
-  --skip-bindings   Don't rebuild the Rust .so libs (use whatever's checked in)
   --abi <ABI>       Build only a specific ABI APK, then print its path
                     (arm64-v8a | armeabi-v7a | x86 | x86_64 | universal)
   --flavor <name>   Build one release flavor, or both with "all"
@@ -37,18 +38,15 @@ Staging signing creds:
   WHITENOISE_STAGING_KEY_PASSWORD
 
 Optional env:
-  WHITENOISE_MDK_DIR             Path to MDK binding workspace when rebuilding bindings
-  WHITENOISE_MARMOT_DIR          Deprecated fallback for WHITENOISE_MDK_DIR
-  ANDROID_ABIS                   Space-separated ABIs to build (default: all 4)
+  WHITENOISE_MARMOTKIT_CACHE_DIR      Content-addressed MarmotKit artifact cache
+  WHITENOISE_MARMOTKIT_ARTIFACT_FILE  Pre-downloaded artifact for offline builds
 EOF
 }
 
-SKIP_BINDINGS=false
 TARGET_ABI=""
 FLAVOR="production"
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --skip-bindings) SKIP_BINDINGS=true; shift ;;
     --abi)
       if [[ $# -lt 2 || "$2" == --* ]]; then
         echo "error: --abi requires a value" >&2
@@ -73,7 +71,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-MDK_DIR="${WHITENOISE_MDK_DIR:-${WHITENOISE_MARMOT_DIR:-}}"
 
 android_build_tool() {
   local tool="$1"
@@ -235,44 +232,6 @@ require_flavor_signing() {
 for flavor in "${BUILD_FLAVORS[@]}"; do
   require_flavor_signing "$flavor"
 done
-
-# --- Rebuild Rust .so (smaller via strip=symbols) ---
-if [[ "$SKIP_BINDINGS" == "false" ]]; then
-  if [[ -z "$MDK_DIR" || ! -d "$MDK_DIR" ]]; then
-    echo "error: MDK binding workspace not found. Set WHITENOISE_MDK_DIR." >&2
-    exit 1
-  fi
-  if [[ -z "${WHITENOISE_MDK_DIR:-}" && -n "${WHITENOISE_MARMOT_DIR:-}" ]]; then
-    echo "warning: WHITENOISE_MARMOT_DIR is deprecated; use WHITENOISE_MDK_DIR." >&2
-  fi
-  # Android release binaries include the OTLP exporter; tokens remain runtime config.
-  echo "==> Rebuilding MDK bindings with RUSTFLAGS=-C strip=symbols OTLP_EXPORT=1"
-  pushd "$MDK_DIR" >/dev/null
-  OTLP_EXPORT=1 RUSTFLAGS="-C strip=symbols" bash crates/marmot-uniffi/kotlin-bindings.sh
-  popd >/dev/null
-
-  echo "==> Copying generated bindings + native libs into Android repo"
-  mdk_sha="$(git -C "$MDK_DIR" rev-parse HEAD)"
-  mdk_branch="$(git -C "$MDK_DIR" rev-parse --abbrev-ref HEAD)"
-  mkdir -p "$REPO_DIR/app/src/main/marmotkit"
-  {
-    printf 'source=marmot-protocol/mdk\n'
-    printf 'mdk-sha=%s\n' "$mdk_sha"
-    printf 'mdk-short-sha=%s\n' "${mdk_sha:0:8}"
-    printf 'mdk-branch=%s\n' "$mdk_branch"
-    printf 'features=otlp-export\n'
-  } > "$REPO_DIR/app/src/main/marmotkit/MARMOT_VERSION"
-  cp "$MDK_DIR/crates/marmot-uniffi/output/android/kotlin/dev/ipf/marmotkit/marmot_uniffi.kt" \
-     "$REPO_DIR/app/src/main/java/dev/ipf/marmotkit/marmot_uniffi.kt"
-  cp "$MDK_DIR/crates/marmot-uniffi/output/android/kotlin/dev/ipf/marmotkit/MarmotAndroid.kt" \
-     "$REPO_DIR/app/src/main/java/dev/ipf/marmotkit/MarmotAndroid.kt"
-  cp "$MDK_DIR/crates/marmot-uniffi/output/android/kotlin/io/crates/keyring/Keyring.kt" \
-     "$REPO_DIR/app/src/main/java/io/crates/keyring/Keyring.kt"
-  for abi in arm64-v8a armeabi-v7a x86 x86_64; do
-    cp "$MDK_DIR/crates/marmot-uniffi/output/android/jniLibs/$abi/libmarmot_uniffi.so" \
-       "$REPO_DIR/app/src/main/jniLibs/$abi/libmarmot_uniffi.so"
-  done
-fi
 
 # --- Gradle release build ---
 cd "$REPO_DIR"

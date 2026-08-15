@@ -29,23 +29,23 @@ cat > "$FIXTURE_DIR/repo/gradlew" <<'EOF'
 set -euo pipefail
 printf '%s\n' "$*" >> "$RELEASE_TEST_GRADLE_LOG"
 mkdir -p \
-  app/build/outputs/apk/zapstore/release
+  app/build/outputs/apk/productionZapstore/release
 touch \
-  app/build/outputs/apk/zapstore/release/app-zapstore-universal-release.apk
+  app/build/outputs/apk/productionZapstore/release/app-production-zapstore-universal-release.apk
 EOF
 chmod +x "$FIXTURE_DIR/bin/java" "$FIXTURE_DIR/bin/aapt" "$FIXTURE_DIR/repo/gradlew"
 
 export RELEASE_TEST_AAPT_LOG="$FIXTURE_DIR/aapt.log"
 export RELEASE_TEST_GRADLE_LOG="$FIXTURE_DIR/gradle.log"
-export DARKMATTER_KEYSTORE_PATH="$FIXTURE_DIR/release.p12"
-export DARKMATTER_KEY_ALIAS="release"
-export DARKMATTER_KEYSTORE_PASSWORD="password"
-export DARKMATTER_KEY_PASSWORD="password"
+export WHITENOISE_PRODUCTION_KEYSTORE_PATH="$FIXTURE_DIR/release.p12"
+export WHITENOISE_PRODUCTION_KEY_ALIAS="release"
+export WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD="password"
+export WHITENOISE_PRODUCTION_KEY_PASSWORD="password"
 
 set +e
 output="$({
   cd "$FIXTURE_DIR/repo"
-  PATH="$FIXTURE_DIR/bin:$PATH" ./scripts/release.sh --skip-bindings --abi universal
+  PATH="$FIXTURE_DIR/bin:$PATH" ./scripts/release.sh --abi universal
 } 2>&1)"
 status=$?
 set -e
@@ -55,14 +55,14 @@ if (( status != 0 )); then
   exit "$status"
 fi
 
-selected_apk="$FIXTURE_DIR/repo/app/build/outputs/apk/zapstore/release/app-zapstore-universal-release.apk"
+selected_apk="$FIXTURE_DIR/repo/app/build/outputs/apk/productionZapstore/release/app-production-zapstore-universal-release.apk"
 
 if [[ "$output" != *"==> Selected: $selected_apk"* ]]; then
   printf 'error: universal APK was not selected\n%s\n' "$output" >&2
   exit 1
 fi
 
-if ! grep -Fq -- ':app:assembleZapstoreRelease' "$RELEASE_TEST_GRADLE_LOG"; then
+if ! grep -Fq -- ':app:assembleProductionZapstoreRelease' "$RELEASE_TEST_GRADLE_LOG"; then
   echo 'error: Zapstore release task was not invoked' >&2
   exit 1
 fi
