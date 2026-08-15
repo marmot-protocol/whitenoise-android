@@ -717,16 +717,27 @@ internal fun MainShell(
                     return@stageShare true
                 }
                 if (otherCount > 0) {
-                    appState.presentTransient(AppText.Resource(R.string.toast_share_staged_other_chats, listOf(otherCount)))
+                    appState.presentTransient(
+                        AppText.Resource(R.string.toast_share_staged_other_chats, listOf(otherCount)),
+                    )
                 }
             } else {
-                pendingStagedShareOpen =
+                val pending =
                     PendingStagedShareOpen(
                         accountRef = accountRef,
                         groupIdHex = groupIds.first(),
                         otherChatCount = otherCount,
                     )
-                appState.launchMutation { appState.setActiveAccount(accountRef) }
+                pendingStagedShareOpen = pending
+                appState.launchMutation {
+                    appState.setActiveAccount(accountRef)
+                    if (
+                        appState.activeAccountRef != accountRef &&
+                        pendingStagedShareOpen === pending
+                    ) {
+                        pendingStagedShareOpen = null
+                    }
+                }
             }
             true
         }

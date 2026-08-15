@@ -34,31 +34,55 @@ class InboundShareAccountOwnershipTest {
 
         assertNull(appState.shareStaging.consume(personal.accountIdHex, "group-work"))
         assertEquals(listOf(uri), appState.shareStaging.consume(work.accountIdHex, "group-work")?.mediaUris)
+
+        assertTrue(
+            appState.stageInboundShare(
+                accountRef = work.label,
+                targetGroupIds = listOf("", "group-text", "  "),
+                payload = SharePayload(text = "private draft", streamUris = emptyList(), intentMimeType = "text/plain"),
+            ),
+        )
+        assertNull(appState.draftStore.get(personal.label, "group-text"))
+        assertEquals("private draft", appState.draftStore.get(work.label, "group-text"))
+        assertNull(appState.draftStore.get(work.label, ""))
     }
 
     @Test
     fun unavailableOrSignedOutChosenAccountCannotReceiveStagedContent() {
         val personal = account("personal", "a0".repeat(32))
         val signedOut = account("signed-out", "a2".repeat(32), signedOut = true)
-        val appState = appState(listOf(personal, signedOut), activeAccountRef = personal.label)
+        val persistence = InMemoryDraftPersistence()
+        val appState =
+            appState(
+                accounts = listOf(personal, signedOut),
+                activeAccountRef = personal.label,
+                persistence = persistence,
+            )
         val payload = SharePayload(text = "private draft", streamUris = emptyList(), intentMimeType = "text/plain")
 
         assertFalse(appState.stageInboundShare("missing", listOf("group"), payload))
+        assertTrue(persistence.isEmpty())
         assertFalse(appState.stageInboundShare(signedOut.label, listOf("group"), payload))
+        assertTrue(persistence.isEmpty())
         assertFalse(appState.stageInboundShare(personal.label, listOf(""), payload))
+        assertTrue(persistence.isEmpty())
     }
 
     private fun appState(
         accounts: List<AccountSummaryFfi>,
         activeAccountRef: String,
-    ): WhiteNoiseAppState =
-        WhiteNoiseAppState(
+        persistence: InMemoryDraftPersistence = InMemoryDraftPersistence(),
+    ): WhiteNoiseAppState {
+        val draftStore = DraftStore(persistence)
+        return WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext<Context>(),
-            draftStore = DraftStore(InMemoryDraftPersistence()),
+            draftStore = draftStore,
             accountIdHexResolver = { null },
             accounts = accounts,
             activeAccountRef = activeAccountRef,
+            inboundShareTextStager = draftStore::mergeText,
         )
+    }
 
     private fun account(
         label: String,
@@ -74,11 +98,17 @@ class InboundShareAccountOwnershipTest {
     )
 
     private class InMemoryDraftPersistence : DraftPersistence {
-        override fun read(): Map<String, String> = emptyMap()
+        private val values = mutableMapOf<String, String>()
+
+        override fun read(): Map<String, String> = values.toMap()
 
         override fun write(
             key: String,
             value: String?,
-        ) = Unit
+        ) {
+            if (value == null) values.remove(key) else values[key] = value
+        }
+
+        fun isEmpty(): Boolean = values.isEmpty()
     }
 }

@@ -1465,6 +1465,7 @@ class WhiteNoiseAppState private constructor(
     private val notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription,
     private val notificationDispatcher: CoroutineDispatcher,
     private val notificationReceiverTimeoutMillis: () -> Long,
+    private val inboundShareTextStager: ((String, String, String) -> Unit)?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
@@ -1483,6 +1484,7 @@ class WhiteNoiseAppState private constructor(
             notificationSubscriber = ::subscribeToNotifications,
             notificationDispatcher = Dispatchers.IO,
             notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+            inboundShareTextStager = null,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
         )
@@ -1503,6 +1505,7 @@ class WhiteNoiseAppState private constructor(
         notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription = ::subscribeToNotifications,
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+        inboundShareTextStager: ((String, String, String) -> Unit)? = null,
     ) : this(
         context = context,
         draftStore = draftStore,
@@ -1517,6 +1520,7 @@ class WhiteNoiseAppState private constructor(
         notificationSubscriber = notificationSubscriber,
         notificationDispatcher = notificationDispatcher,
         notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
+        inboundShareTextStager = inboundShareTextStager,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
     )
@@ -2317,26 +2321,28 @@ class WhiteNoiseAppState private constructor(
         get() = shareStaging.revision + draftHydrationRevision
     private val shareInboundStager =
         ShareInboundStager(
-            stageText = { accountRef, groupIdHex, text ->
-                mutationsScope.launch {
-                    val completion = draftWriter.mergeText(accountRef, groupIdHex, text)
-                    completion.contentForHydration?.let { content ->
-                        draftStore.hydrate(
-                            accountRef,
-                            groupIdHex,
-                            content,
-                            completion.draftedAtMs ?: System.currentTimeMillis(),
-                            replaceExisting = true,
-                        )
-                        draftHydrationRevision += 1
+            stageText =
+                inboundShareTextStager ?: { accountRef, groupIdHex, text ->
+                    mutationsScope.launch {
+                        val completion = draftWriter.mergeText(accountRef, groupIdHex, text)
+                        completion.contentForHydration?.let { content ->
+                            draftStore.hydrate(
+                                accountRef,
+                                groupIdHex,
+                                content,
+                                completion.draftedAtMs ?: System.currentTimeMillis(),
+                                replaceExisting = true,
+                            )
+                            draftHydrationRevision += 1
+                        }
+                        when (val result = completion.result) {
+                            is MessageDraftMutationResult.Failure ->
+                                appStateDebug(result.cause) { "shared text staging failed group=${groupIdHex.take(8)}" }
+                            else -> Unit
+                        }
                     }
-                    when (val result = completion.result) {
-                        is MessageDraftMutationResult.Failure ->
-                            appStateDebug(result.cause) { "shared text staging failed group=${groupIdHex.take(8)}" }
-                        else -> Unit
-                    }
-                }
-            },
+                    Unit
+                },
             shareStaging = shareStaging,
             resolveMime = { context, uri -> shareResolveMime(context, uri) },
         )
@@ -2904,11 +2910,21 @@ class WhiteNoiseAppState private constructor(
      */
     fun forwardTargets(): List<ChatListItem> = chatsController?.forwardTargets().orEmpty()
 
+    internal val forwardTargetsLoading: Boolean
+        get() = chatsController?.isLoading == true
+
+    internal val forwardTargetsError: ErrorPresentation?
+        get() = chatsController?.error
+
     internal val forwardTargetMembersRevision: Long
         get() = chatsController?.memberSnapshotsRevision ?: 0L
 
     internal fun requestForwardTargetMembers(groupIds: Iterable<String>) {
         chatsController?.requestMemberSnapshots(groupIds)
+    }
+
+    internal fun retryForwardTargets() {
+        chatsController?.retryLoad()
     }
 
     /**
@@ -2928,12 +2944,13 @@ class WhiteNoiseAppState private constructor(
         val account =
             accounts.firstOrNull { summary ->
                 summary.label == accountRef && summary.isSignedInSigningAccount()
-            } ?: return false
-        if (targetGroupIds.none(String::isNotBlank)) return false
+            }
+        val validGroupIds = targetGroupIds.filter(String::isNotBlank)
+        if (account == null || validGroupIds.isEmpty()) return false
         shareInboundStager.stageToChats(
             context = appContext,
             accountIdHex = account.accountIdHex,
-            groupIds = targetGroupIds,
+            groupIds = validGroupIds,
             payload = payload,
             draftAccountRef = accountRef,
         )
@@ -7168,7 +7185,8 @@ class WhiteNoiseAppState private constructor(
         return cachedName ?: shortNpub(accountIdHex)
     }
 
-    internal fun contactDisplayNameCachedOrNull(accountIdHex: String): String? = contactDisplayNameCachedOrNull(activeAccountRef, accountIdHex)
+    internal fun contactDisplayNameCachedOrNull(accountIdHex: String): String? =
+        contactDisplayNameCachedOrNull(activeAccountRef, accountIdHex)
 
     internal fun contactDisplayNameCachedOrNull(
         accountRef: String?,

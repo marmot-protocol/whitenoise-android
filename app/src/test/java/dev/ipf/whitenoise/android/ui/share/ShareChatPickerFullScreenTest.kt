@@ -5,11 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -33,6 +35,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -90,6 +93,25 @@ class ShareChatPickerFullScreenTest {
                 .boundsInRoot.top
         assertTrue("Full-screen title must be in the top app bar", titleTop < 100f)
         composeRule.onNodeWithText("Person 5").assertIsDisplayed()
+    }
+
+    @Test
+    fun activeAccountLoadingStateIsVisible() {
+        val appState = emptyAppState()
+        appState.attachChatsController(ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() })
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerFullScreenContent(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = { _, _ -> true },
+                )
+            }
+        }
+
+        composeRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertIsDisplayed()
     }
 
     @Test
@@ -151,6 +173,7 @@ class ShareChatPickerFullScreenTest {
     }
 
     @Test
+    @Suppress("LongMethod")
     fun chosenAccountReloadsTargetsClearsSelectionAndSurvivesRestoration() {
         val workAccountRef = "work"
         val workAccountHex = "a1".repeat(32)
@@ -174,7 +197,7 @@ class ShareChatPickerFullScreenTest {
             members = listOf(member(ACCOUNT_HEX, local = true), member(PEER_A, local = false)),
         )
         appState.attachChatsController(activeController)
-        val workControllerFactory: (dev.ipf.whitenoise.android.state.WhiteNoiseAppState) -> ChatsController = { state ->
+        val workControllerFactory: (WhiteNoiseAppState) -> ChatsController = { state ->
             ChatsController(state, workAccountRef) { _, _ -> emptyList() }.also { controller ->
                 controller.applyChatListRow(chatRow(GROUP_B))
                 controller.applyLocalGroupDetails(

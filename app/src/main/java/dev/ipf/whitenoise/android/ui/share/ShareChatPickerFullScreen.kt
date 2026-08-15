@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.share
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,47 +21,34 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
@@ -125,7 +110,6 @@ internal fun ShareChatPickerFullScreenContent(
     val presentedTargets = rememberShareChatPickerPresentations(appState, pickerState)
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val shareToTitle = stringResource(R.string.share_to)
     var finishing by remember(requestId) { mutableStateOf(false) }
     val dismissPicker: () -> Unit = {
         if (!finishing) {
@@ -137,13 +121,54 @@ internal fun ShareChatPickerFullScreenContent(
             )
         }
     }
+    val scaffoldActions =
+        ShareChatPickerScaffoldActions(
+            dismiss = dismissPicker,
+            stage = {
+                if (!finishing && pickerState.stage(onStage)) {
+                    dismissPicker()
+                }
+            },
+        )
+    ShareChatPickerScaffold(
+        pickerState = pickerState,
+        presentedTargets = presentedTargets,
+        requestId = requestId,
+        actions = scaffoldActions,
+        overlayBackRegistrar = overlayBackRegistrar,
+    )
+    if (pickerState.accountSelectorOpen) {
+        ShareChatPickerAccountSheet(
+            appState = pickerState.appState,
+            accounts = pickerState.accounts,
+            selectedAccountRef = pickerState.selectedAccountRef,
+            onChooseAccount = pickerState::chooseAccount,
+            onDismiss = { pickerState.accountSelectorOpen = false },
+        )
+    }
+}
+
+private data class ShareChatPickerScaffoldActions(
+    val dismiss: () -> Unit,
+    val stage: () -> Unit,
+)
+
+@Composable
+private fun ShareChatPickerScaffold(
+    pickerState: ShareChatPickerState,
+    presentedTargets: List<ShareChatPickerTargetPresentation>,
+    requestId: String,
+    actions: ShareChatPickerScaffoldActions,
+    overlayBackRegistrar: ShareChatPickerOverlayBackRegistrar?,
+) {
+    val shareToTitle = stringResource(R.string.share_to)
     ShareChatPickerBackAwareScreen(
         overlayBack = pickerState.searchFocused || pickerState.accountSelectorOpen,
         onBackCommit = {
             if (pickerState.accountSelectorOpen) {
                 pickerState.accountSelectorOpen = false
             } else {
-                dismissPicker()
+                actions.dismiss()
             }
         },
         overlayBackRegistrar = overlayBackRegistrar,
@@ -158,18 +183,14 @@ internal fun ShareChatPickerFullScreenContent(
             topBar = {
                 TopAppBar(
                     title = { Text(shareToTitle) },
-                    navigationIcon = { ShareChatPickerCloseButton(dismissPicker) },
+                    navigationIcon = { ShareChatPickerCloseButton(actions.dismiss) },
                 )
             },
             bottomBar = {
                 ShareChatPickerFooter(
                     selectedCount = pickerState.selected.size,
                     enabled = pickerState.canStage,
-                    onStage = {
-                        if (!finishing && pickerState.stage(onStage)) {
-                            dismissPicker()
-                        }
-                    },
+                    onStage = actions.stage,
                 )
             },
         ) { padding ->
@@ -181,19 +202,6 @@ internal fun ShareChatPickerFullScreenContent(
                 )
             }
         }
-    }
-    if (pickerState.accountSelectorOpen) {
-        ShareChatPickerAccountSheet(
-            pickerState = pickerState,
-            onDismiss = { pickerState.accountSelectorOpen = false },
-        )
-    }
-}
-
-@Composable
-private fun ShareChatPickerCloseButton(onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
     }
 }
 
@@ -209,20 +217,20 @@ private fun rememberShareChatPickerPresentations(
             pickerState.targets
         }
     val unresolvedDirectGroupIds =
-        remember(currentTargets, pickerState.activeAccountIdHex) {
+        remember(currentTargets, pickerState.selectedAccountIdHex) {
             currentTargets
                 .filter { target ->
                     target.projection?.conversationKind == ChatConversationKindFfi.DIRECT &&
-                        shareTargetAccountIds(target, pickerState.activeAccountIdHex).isEmpty()
+                        shareTargetAccountIds(target, pickerState.selectedAccountIdHex).isEmpty()
                 }.map { it.group.groupIdHex }
         }
     LaunchedEffect(pickerState.selectedAccountRef, unresolvedDirectGroupIds) {
         pickerState.requestTargetMembers(unresolvedDirectGroupIds)
     }
     val targetAccountIds =
-        remember(currentTargets, pickerState.activeAccountIdHex) {
+        remember(currentTargets, pickerState.selectedAccountIdHex) {
             currentTargets
-                .flatMap { shareTargetAccountIds(it, pickerState.activeAccountIdHex) }
+                .flatMap { shareTargetAccountIds(it, pickerState.selectedAccountIdHex) }
                 .distinct()
         }
     LaunchedEffect(appState, targetAccountIds) {
@@ -237,7 +245,7 @@ private fun rememberShareChatPickerPresentations(
     return currentTargets.map { item ->
         key(item.group.groupIdHex) {
             val accountAliases =
-                shareTargetAccountIds(item, pickerState.activeAccountIdHex)
+                shareTargetAccountIds(item, pickerState.selectedAccountIdHex)
                     .mapNotNull { accountIdHex ->
                         aliasesByAccount[accountIdHex]?.let { accountIdHex to it }
                     }.toMap()
@@ -261,11 +269,12 @@ private fun ShareChatPickerContent(
     val listState = rememberLazyListState()
     BoxWithConstraints(modifier) {
         val compactHeight = maxHeight < 480.dp
+        val selectedAccount = pickerState.selectedAccount
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(if (compactHeight) 8.dp else 12.dp),
         ) {
-            if (compactHeight) {
+            if (compactHeight && selectedAccount != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -279,6 +288,7 @@ private fun ShareChatPickerContent(
                     )
                     ShareChatPickerAccountRow(
                         pickerState = pickerState,
+                        account = selectedAccount,
                         compact = true,
                         modifier = Modifier.weight(1f),
                     )
@@ -289,10 +299,13 @@ private fun ShareChatPickerContent(
                     attachmentCount = pickerState.attachmentCount,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
                 )
-                ShareChatPickerAccountRow(
-                    pickerState = pickerState,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
-                )
+                selectedAccount?.let { account ->
+                    ShareChatPickerAccountRow(
+                        pickerState = pickerState,
+                        account = account,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+                    )
+                }
             }
             FlowSearchField(
                 value = pickerState.query,
@@ -310,40 +323,6 @@ private fun ShareChatPickerContent(
                 listState = listState,
             )
         }
-    }
-}
-
-@Composable
-private fun ShareChatPickerPreview(
-    previewText: String,
-    attachmentCount: Int,
-    modifier: Modifier = Modifier,
-    compact: Boolean = false,
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
-        modifier = modifier,
-    ) {
-        Text(
-            when {
-                previewText.isNotEmpty() && attachmentCount > 0 ->
-                    stringResource(R.string.share_preview_text_and_attachments, previewText, attachmentCount)
-                previewText.isNotEmpty() -> previewText
-                attachmentCount > 0 ->
-                    pluralStringResource(
-                        R.plurals.share_preview_attachments_count,
-                        attachmentCount,
-                        attachmentCount,
-                    )
-                else -> ""
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = if (compact) 1 else 3,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-        )
     }
 }
 
@@ -398,7 +377,7 @@ private fun ShareChatPickerTargetList(
                     item = target.item,
                     title = target.title,
                     selected = pickerState.selected.contains(target.item.group.groupIdHex),
-                    activeAccountIdHex = pickerState.activeAccountIdHex,
+                    selectedAccountIdHex = pickerState.selectedAccountIdHex,
                     ownerAccountRef = pickerState.selectedAccountRef,
                     appState = pickerState.appState,
                     onToggle = pickerState::toggleSelection,
@@ -443,16 +422,17 @@ private fun ShareChatPickerFooter(
 
 private class ShareChatPickerState(
     val appState: WhiteNoiseAppState,
-    val payload: SharePayload,
     val targets: List<ChatListItem>,
+    private val targetGroupIds: Set<String>,
     val accounts: List<AccountSummaryFfi>,
     val selectedAccountRef: String?,
-    val activeAccountIdHex: String?,
+    val selectedAccountIdHex: String?,
     val isLoading: Boolean,
     val error: ErrorPresentation?,
     val memberSnapshotsRevision: Long,
     private val selectedAccountRefState: MutableState<String?>,
     private val accountController: ChatsController?,
+    private val retryLoadAction: () -> Unit,
     val previewText: String,
     val attachmentCount: Int,
     private val queryState: MutableState<String>,
@@ -477,12 +457,10 @@ private class ShareChatPickerState(
         }
     val selected: List<String>
         get() = selectedState.value
+    val selectedAccount: AccountSummaryFfi?
+        get() = accounts.firstOrNull { it.label == selectedAccountRef }
     val canStage: Boolean
-        get() {
-            if (selected.isEmpty()) return false
-            val targetIds = targets.mapTo(hashSetOf()) { it.group.groupIdHex }
-            return selected.all(targetIds::contains)
-        }
+        get() = selected.isNotEmpty() && selected.all(targetGroupIds::contains)
 
     fun filtered(presentedTargets: List<ShareChatPickerTargetPresentation>): List<ShareChatPickerTargetPresentation> {
         val needle = query.trim()
@@ -524,24 +502,24 @@ private class ShareChatPickerState(
     }
 
     fun retryLoad() {
-        accountController?.retryLoad()
+        retryLoadAction()
     }
 
-    fun stage(onStage: (String, List<String>) -> Boolean): Boolean {
-        val accountRef = selectedAccountRef ?: return false
-        if (accounts.none { it.label == accountRef && it.isSignedInSigningAccount() }) return false
-        if (!canStage) return false
-        return onStage(accountRef, selected.toList())
-    }
+    fun stage(onStage: (String, List<String>) -> Boolean): Boolean =
+        selectedAccountRef?.let { accountRef ->
+            accounts.any { it.label == accountRef && it.isSignedInSigningAccount() } &&
+                canStage &&
+                onStage(accountRef, selected.toList())
+        } == true
 }
 
 @Composable
 private fun ShareChatPickerAccountRow(
     pickerState: ShareChatPickerState,
+    account: AccountSummaryFfi,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
-    val account = pickerState.accounts.firstOrNull { it.label == pickerState.selectedAccountRef } ?: return
     val accountTitle = pickerState.appState.networkDisplayName(account.accountIdHex)
     val multipleAccounts = pickerState.accounts.size > 1
     Surface(
@@ -563,121 +541,17 @@ private fun ShareChatPickerAccountRow(
                 size = if (compact) 32.dp else 40.dp,
                 pictureUrl = pickerState.appState.avatarUrl(account.accountIdHex),
             )
-            Column(Modifier.weight(1f)) {
-                if (compact) {
-                    Text(
-                        text = "${stringResource(R.string.share_sending_as)}: $accountTitle",
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                } else {
-                    Text(
-                        text = stringResource(R.string.share_sending_as),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(accountTitle, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        pickerState.appState.shortNpub(account.accountIdHex),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
+            ShareChatPickerAccountIdentity(
+                appState = pickerState.appState,
+                account = account,
+                accountTitle = accountTitle,
+                compact = compact,
+                modifier = Modifier.weight(1f),
+            )
             if (multipleAccounts) {
-                Icon(Icons.Default.ExpandMore, contentDescription = stringResource(R.string.share_choose_sending_account))
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ShareChatPickerAccountSheet(
-    pickerState: ShareChatPickerState,
-    onDismiss: () -> Unit,
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = amoledSheetContainerColor(),
-    ) {
-        ShareChatPickerAccountSheetContent(
-            appState = pickerState.appState,
-            accounts = pickerState.accounts,
-            selectedAccountRef = pickerState.selectedAccountRef,
-            onChooseAccount = pickerState::chooseAccount,
-        )
-    }
-}
-
-@Composable
-internal fun ShareChatPickerAccountSheetContent(
-    appState: WhiteNoiseAppState,
-    accounts: List<AccountSummaryFfi>,
-    selectedAccountRef: String?,
-    onChooseAccount: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .testTag(SHARE_CHAT_PICKER_ACCOUNT_SHEET_TEST_TAG)
-                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(stringResource(R.string.share_choose_sending_account), style = MaterialTheme.typography.titleLarge)
-        Text(
-            stringResource(R.string.share_choose_sending_account_description),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
-            items(accounts, key = AccountSummaryFfi::label) { account ->
-                val selected = account.label == selectedAccountRef
-                val accountTitle = appState.networkDisplayName(account.accountIdHex)
-                ListItem(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable(role = Role.RadioButton) { onChooseAccount(account.label) }
-                            .semantics { this.selected = selected },
-                    colors =
-                        ListItemDefaults.colors(
-                            containerColor =
-                                if (selected) {
-                                    MaterialTheme.colorScheme.secondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.surface
-                                },
-                        ),
-                    leadingContent = {
-                        Avatar(
-                            title = accountTitle,
-                            seed = account.accountIdHex,
-                            size = 44.dp,
-                            pictureUrl = appState.avatarUrl(account.accountIdHex),
-                        )
-                    },
-                    headlineContent = { Text(accountTitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    supportingContent = {
-                        Text(
-                            appState.shortNpub(account.accountIdHex),
-                            fontFamily = FontFamily.Monospace,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    trailingContent = {
-                        if (selected) {
-                            Icon(Icons.Default.Check, contentDescription = stringResource(R.string.selected))
-                        }
-                    },
+                Icon(
+                    Icons.Default.ExpandMore,
+                    contentDescription = stringResource(R.string.share_choose_sending_account),
                 )
             }
         }
@@ -737,7 +611,7 @@ private fun shareTargetPresentation(
 
 private fun shareTargetAccountIds(
     item: ChatListItem,
-    activeAccountIdHex: String?,
+    selectedAccountIdHex: String?,
 ): List<String> =
     buildList {
         item.presentationOtherMemberAccount?.let(::add)
@@ -752,9 +626,10 @@ private fun shareTargetAccountIds(
             item.group.welcomerAccountIdHex?.let(::add)
             item.latest?.sender?.let(::add)
         }
-    }.filter { it.isNotBlank() && it != activeAccountIdHex }.distinct()
+    }.filter { it.isNotBlank() && it != selectedAccountIdHex }.distinct()
 
 @Composable
+@Suppress("LongMethod") // Centralizes request-keyed Compose state and controller ownership.
 private fun rememberShareChatPickerState(
     appState: WhiteNoiseAppState,
     requestId: String,
@@ -763,55 +638,28 @@ private fun rememberShareChatPickerState(
     controllerBinder: suspend (ChatsController, String) -> Unit,
 ): ShareChatPickerState {
     val accounts = appState.accounts.filter(AccountSummaryFfi::isSignedInSigningAccount)
-    val initialAccountRef =
-        appState.activeAccountRef?.takeIf { active -> accounts.any { it.label == active } }
-            ?: accounts.firstOrNull()?.label
-    val selectedAccountRefState =
-        rememberSaveable(requestId, payload) {
-            mutableStateOf(initialAccountRef)
-        }
-    val selectedAccountRef =
-        selectedAccountRefState.value.takeIf { selected -> accounts.any { it.label == selected } }
-            ?: initialAccountRef
-    val queryState = rememberSaveable(requestId, payload) { mutableStateOf("") }
-    val selectedState =
-        rememberSaveable(requestId, payload) {
-            mutableStateOf(arrayListOf<String>())
-        }
-    val searchFocusedState = remember(requestId, payload) { mutableStateOf(false) }
-    val accountSelectorOpenState = remember(requestId, payload) { mutableStateOf(false) }
-    LaunchedEffect(selectedAccountRef, selectedAccountRefState.value) {
-        if (selectedAccountRefState.value != selectedAccountRef) {
-            selectedAccountRefState.value = selectedAccountRef
-            selectedState.value = arrayListOf()
-        }
-    }
-    val accountController =
-        if (selectedAccountRef != null && selectedAccountRef != appState.activeAccountRef) {
-            remember(appState, selectedAccountRef) { controllerFactory(appState) }
-        } else {
-            null
-        }
-    DisposableEffect(accountController) {
-        onDispose { accountController?.onCleared() }
-    }
-    LaunchedEffect(accountController, selectedAccountRef) {
-        if (accountController != null && selectedAccountRef != null) {
-            controllerBinder(accountController, selectedAccountRef)
-        }
-    }
-    val targets =
-        if (accountController == null) {
-            appState.forwardTargets()
-        } else {
-            accountController.forwardTargets()
-        }
+    val selectionState =
+        rememberShareChatPickerSelectionState(
+            accounts = accounts,
+            activeAccountRef = appState.activeAccountRef,
+            requestId = requestId,
+            payload = payload,
+        )
+    val selectedAccountRef = selectionState.selectedAccountRef
+    val dataSource =
+        rememberShareChatPickerDataSource(
+            appState = appState,
+            selectedAccountRef = selectedAccountRef,
+            controllerFactory = controllerFactory,
+            controllerBinder = controllerBinder,
+        )
+    val targets = dataSource.targets
+    val targetGroupIds = remember(targets) { targets.mapTo(hashSetOf()) { it.group.groupIdHex } }
     val selectedAccount = accounts.firstOrNull { it.label == selectedAccountRef }
-    LaunchedEffect(selectedAccountRef, accountController?.isLoading, targets) {
-        if (accountController?.isLoading == true) return@LaunchedEffect
-        val targetIds = targets.mapTo(hashSetOf()) { it.group.groupIdHex }
-        val validSelection = selectedState.value.filterTo(arrayListOf(), targetIds::contains)
-        if (validSelection != selectedState.value) selectedState.value = validSelection
+    LaunchedEffect(selectedAccountRef, dataSource.isLoading, targetGroupIds) {
+        if (dataSource.isLoading) return@LaunchedEffect
+        val validSelection = selectionState.selectedState.value.filterTo(arrayListOf(), targetGroupIds::contains)
+        if (validSelection != selectionState.selectedState.value) selectionState.selectedState.value = validSelection
     }
     return remember(
         appState,
@@ -820,34 +668,29 @@ private fun rememberShareChatPickerState(
         targets,
         accounts,
         selectedAccountRef,
-        accountController,
-        accountController?.isLoading,
-        accountController?.error,
-        accountController?.memberSnapshotsRevision,
-        queryState,
-        selectedState,
-        searchFocusedState,
-        accountSelectorOpenState,
+        targetGroupIds,
+        dataSource,
+        selectionState,
     ) {
         ShareChatPickerState(
             appState = appState,
-            payload = payload,
             targets = targets,
+            targetGroupIds = targetGroupIds,
             accounts = accounts,
             selectedAccountRef = selectedAccountRef,
-            activeAccountIdHex = selectedAccount?.accountIdHex,
-            isLoading = accountController?.isLoading == true,
-            error = accountController?.error,
-            memberSnapshotsRevision =
-                accountController?.memberSnapshotsRevision ?: appState.forwardTargetMembersRevision,
-            selectedAccountRefState = selectedAccountRefState,
-            accountController = accountController,
+            selectedAccountIdHex = selectedAccount?.accountIdHex,
+            isLoading = dataSource.isLoading,
+            error = dataSource.error,
+            memberSnapshotsRevision = dataSource.memberSnapshotsRevision,
+            selectedAccountRefState = selectionState.selectedAccountRefState,
+            accountController = dataSource.controller,
+            retryLoadAction = dataSource.retryLoad,
             previewText = payload.text?.trim().orEmpty(),
             attachmentCount = payload.streamUris.size,
-            queryState = queryState,
-            selectedState = selectedState,
-            searchFocusedState = searchFocusedState,
-            accountSelectorOpenState = accountSelectorOpenState,
+            queryState = selectionState.queryState,
+            selectedState = selectionState.selectedState,
+            searchFocusedState = selectionState.searchFocusedState,
+            accountSelectorOpenState = selectionState.accountSelectorOpenState,
         )
     }
 }
@@ -857,7 +700,7 @@ private fun ShareTargetRow(
     item: ChatListItem,
     title: String,
     selected: Boolean,
-    activeAccountIdHex: String?,
+    selectedAccountIdHex: String?,
     ownerAccountRef: String?,
     appState: WhiteNoiseAppState,
     onToggle: (String) -> Unit,
@@ -865,18 +708,18 @@ private fun ShareTargetRow(
     val groupId = item.group.groupIdHex
     val avatarAccount = forwardTargetAvatarAccount(item)
     val memberIds =
-        remember(item, activeAccountIdHex) {
+        remember(item, selectedAccountIdHex) {
             item.memberSnapshot
                 ?.members
                 .orEmpty()
                 .map { it.memberIdHex }
-                .filter { it.isNotBlank() && it != activeAccountIdHex }
+                .filter { it.isNotBlank() && it != selectedAccountIdHex }
                 .distinct()
         }
     val memberRevisions = memberIds.map(appState::profileAccountRevisionForCompose)
     val membersPreview =
         remember(item, ownerAccountRef, memberRevisions) {
-            forwardTargetMembersPreview(item, activeAccountIdHex) { memberIdHex ->
+            forwardTargetMembersPreview(item, selectedAccountIdHex) { memberIdHex ->
                 appState.contactDisplayNameCached(ownerAccountRef, memberIdHex)
             }
         }
