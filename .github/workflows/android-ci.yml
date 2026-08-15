@@ -34,6 +34,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
+
       - name: Test PR screenshot renderer
         run: node --test .github/scripts/update-pr-screenshots.test.js
 
@@ -42,6 +46,9 @@ jobs:
 
       - name: Test package-replacement startup reporter
         run: bash .github/scripts/test-package-replacement-startup-report.sh
+
+      - name: Test MarmotKit artifact preparation
+        run: ./scripts/test-prepare-marmotkit-artifact.sh
 
       - name: Verify generated performance profiles
         run: |
@@ -59,6 +66,31 @@ jobs:
       # across runs (read/write on master pushes, read-only on PRs).
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Read MarmotKit artifact pin
+        id: marmotkit
+        shell: bash
+        run: |
+          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore MarmotKit artifact
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
+
+      - name: Prepare MarmotKit API signature
+        run: ./gradlew :app:stageMarmotKitApiSignature --no-daemon --stacktrace
+
+      - name: Upload MarmotKit API signature
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: marmotkit-api-signature
+          path: app/build/reports/marmotkit/marmotkit-api-signature.txt
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Compile (Kotlin)
         run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --no-daemon --stacktrace

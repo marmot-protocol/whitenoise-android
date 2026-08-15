@@ -86,7 +86,7 @@ class AccountSetupRecoveryTest {
             ?.readText()
             ?: error("Missing AppState.kt source file")
 
-    // The vendored engine bindings declare the reset API, so only first-party
+    // The pinned engine bindings declare the reset API, so only first-party
     // sources are inspected for call sites.
     private fun appSources(): List<File> =
         listOf(File("src/main/java/dev/ipf/whitenoise/android"), File("app/src/main/java/dev/ipf/whitenoise/android"))

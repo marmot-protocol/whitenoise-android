@@ -28,6 +28,10 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
+
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
@@ -37,6 +41,20 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Read MarmotKit artifact pin
+        id: marmotkit
+        shell: bash
+        run: |
+          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore MarmotKit artifact
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       - name: Check staging secrets
         env:
@@ -132,7 +150,7 @@ jobs:
           WHITENOISE_STAGING_TELEMETRY_TENANT: ${{ secrets.WHITENOISE_STAGING_TELEMETRY_TENANT }}
           WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX: ${{ secrets.WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX }}
           WHITENOISE_STAGING_PUSH_RELAY_HINT: ${{ secrets.WHITENOISE_STAGING_PUSH_RELAY_HINT }}
-        run: ./scripts/release.sh --skip-bindings --flavor staging --abi arm64-v8a
+        run: ./scripts/release.sh --flavor staging --abi arm64-v8a
 
       - name: Compute short SHA
         id: sha

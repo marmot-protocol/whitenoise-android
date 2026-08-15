@@ -1,4 +1,5 @@
 import com.android.build.api.attributes.ProductFlavorAttr
+import org.gradle.api.tasks.Exec
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.Properties
@@ -32,6 +33,77 @@ val marmotKitVersionProperties =
     Properties().apply {
         val file = project.file("src/main/marmotkit/MARMOT_VERSION")
         if (file.exists()) file.inputStream().use { load(it) }
+    }
+
+fun requiredMarmotKitProperty(key: String): String =
+    marmotKitVersionProperties.getProperty(key)
+        ?: throw GradleException("Missing MarmotKit lock property '$key'")
+
+val marmotKitArtifactSha = requiredMarmotKitProperty("artifact-sha256")
+val marmotKitArchiveRoot = requiredMarmotKitProperty("archive-root")
+val marmotKitCacheRoot =
+    providers
+        .gradleProperty("whitenoise.marmotkit.cacheDir")
+        .orNull
+        ?.let(rootProject::file)
+        ?: providers
+            .environmentVariable("WHITENOISE_MARMOTKIT_CACHE_DIR")
+            .orNull
+            ?.let(rootProject::file)
+        ?: gradle.gradleUserHomeDir.resolve("caches/whitenoise/marmotkit")
+val marmotKitPreparedDir = marmotKitCacheRoot.resolve(marmotKitArtifactSha).resolve(marmotKitArchiveRoot)
+val marmotKitArtifactOverride =
+    providers
+        .gradleProperty("whitenoise.marmotkit.artifactFile")
+        .orNull
+        ?.let(rootProject::file)
+        ?: providers
+            .environmentVariable("WHITENOISE_MARMOTKIT_ARTIFACT_FILE")
+            .orNull
+            ?.let(rootProject::file)
+val marmotKitPreparationLauncher =
+    if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
+        listOf(
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            rootProject.file("scripts/prepare-marmotkit-artifact.ps1").absolutePath,
+        )
+    } else {
+        listOf(rootProject.file("scripts/prepare-marmotkit-artifact.sh").absolutePath)
+    }
+
+val prepareMarmotKitArtifact =
+    tasks.register<Exec>("prepareMarmotKitArtifact") {
+        group = "build setup"
+        description = "Download and verify the immutable MarmotKit Android artifact"
+        inputs.file(project.file("src/main/marmotkit/MARMOT_VERSION"))
+        inputs.file(rootProject.file("scripts/prepare_marmotkit_artifact.py"))
+        inputs.file(rootProject.file("scripts/prepare-marmotkit-artifact.sh"))
+        inputs.file(rootProject.file("scripts/prepare-marmotkit-artifact.ps1"))
+        outputs.dir(marmotKitPreparedDir)
+        marmotKitArtifactOverride?.let(inputs::file)
+        environment("PYTHONDONTWRITEBYTECODE", "1")
+        commandLine(*marmotKitPreparationLauncher.toTypedArray())
+        args(
+            rootProject.file("scripts/prepare_marmotkit_artifact.py"),
+            "--lock",
+            project.file("src/main/marmotkit/MARMOT_VERSION"),
+            "--cache-root",
+            marmotKitCacheRoot,
+        )
+        marmotKitArtifactOverride?.let { args("--artifact", it) }
+        if (gradle.startParameter.isOffline) args("--offline")
+    }
+val stageMarmotKitApiSignature =
+    tasks.register<Sync>("stageMarmotKitApiSignature") {
+        group = "verification"
+        description = "Stage the inspectable MarmotKit API signature for review and CI"
+        dependsOn(prepareMarmotKitArtifact)
+        from(marmotKitPreparedDir.resolve("marmotkit-api-signature.txt"))
+        into(layout.buildDirectory.dir("reports/marmotkit"))
     }
 
 fun signingProperty(vararg keys: String): String? =
@@ -501,6 +573,14 @@ android {
             isIncludeAndroidResources = true
         }
     }
+    sourceSets {
+        getByName("main") {
+            @Suppress("DEPRECATION")
+            kotlin.srcDir(marmotKitPreparedDir.resolve("kotlin"))
+            @Suppress("DEPRECATION")
+            jniLibs.srcDir(marmotKitPreparedDir.resolve("jniLibs"))
+        }
+    }
     packaging {
         jniLibs {
             excludes +=
@@ -519,6 +599,17 @@ android {
             isUniversalApk = true
         }
     }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(prepareMarmotKitArtifact, stageMarmotKitApiSignature)
+}
+
+// AGP exposes the prepared Kotlin directory to source-aware quality plugins.
+// Declare its producer explicitly so a combined lint/build invocation is valid
+// under Gradle 9's task dependency checks even though ktlint excludes the files.
+tasks.matching { it.name.startsWith("runKtlint") }.configureEach {
+    dependsOn(prepareMarmotKitArtifact)
 }
 
 androidComponents {
@@ -667,8 +758,8 @@ kover {
         filters {
             excludes {
                 // Keep coverage focused on app-owned code. These mirror the ktlint
-                // excludes below: generated UniFFI bindings, the vendored keyring
-                // stub, and Android's generated BuildConfig class.
+                // exclusions below: prepared MarmotKit sources and Android's
+                // generated BuildConfig class.
                 classes(
                     "dev.ipf.marmotkit.*",
                     "io.crates.keyring.*",
@@ -686,14 +777,12 @@ kover {
 }
 
 detekt {
-    // Cover every app source set, including future flavors, while excluding the
-    // two generated/vendored files that are regenerated wholesale and must stay
-    // byte-stable. MarmotAndroid.kt is hand-written app code and remains covered.
+    // Cover every repository-owned app source set, including future flavors.
+    // Prepared MarmotKit sources live outside src/ and are validated as part of
+    // their immutable artifact instead.
     source.setFrom(
         fileTree("src") {
             include("**/*.kt")
-            exclude("main/java/dev/ipf/marmotkit/marmot_uniffi.kt")
-            exclude("main/java/io/crates/keyring/Keyring.kt")
         },
     )
     // Start from detekt's defaults and keep project-specific changes in one
@@ -712,10 +801,9 @@ ktlint {
     android.set(true)
     ignoreFailures.set(false)
     filter {
-        // Never lint/format the UniFFI-generated bindings or the vendored
-        // keyring stub — they are regenerated wholesale and must stay
-        // byte-stable with the matching native libs. Normalize separators so
-        // the matches also hold on Windows paths.
+        // Never lint/format prepared MarmotKit sources. They are verified as
+        // immutable artifact bytes with their matching native libraries.
+        // Normalize separators so the matches also hold on Windows paths.
         fun normalized(path: String) = path.replace('\\', '/')
         exclude { normalized(it.file.path).contains("/marmotkit/") }
         exclude { normalized(it.file.path).contains("marmot_uniffi.kt") }
