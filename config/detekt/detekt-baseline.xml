@@ -133,6 +133,7 @@
     <ID>FunctionNaming:AccountSwitcher.kt:@Composable internal fun OtherAccountAvatarsRow</ID>
     <ID>FunctionNaming:AccountSwitcher.kt:@Composable private fun OverflowAccountChip</ID>
     <ID>FunctionNaming:AccountSwitcher.kt:@OptIn(ExperimentalFoundationApi::class) @Composable private fun OtherAccountAvatar</ID>
+    <ID>FunctionNaming:AccountSwitcher.kt:@Composable private fun OtherAccountUnreadDotSlot</ID>
     <ID>FunctionNaming:AddIdentitySheet.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AddIdentitySheet</ID>
     <ID>FunctionNaming:AddIdentitySheet.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun AddAccountSheetContent</ID>
     <ID>FunctionNaming:AddIdentitySheet.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable private fun AddAccountOptionRow</ID>

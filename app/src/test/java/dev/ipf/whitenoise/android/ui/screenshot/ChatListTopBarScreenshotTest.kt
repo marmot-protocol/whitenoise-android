@@ -134,6 +134,106 @@ class ChatListTopBarScreenshotTest {
             .captureRoboImage("src/test/snapshots/chat_list_top_bar_search_active_chips_rtl.png")
     }
 
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+    fun threeAccountsAdjacentUnreadLight() {
+        renderUnreadAccounts(
+            accountCount = 3,
+            dark = false,
+            amoled = false,
+            unreadAccountRefs = setOf("account-2", "account-3"),
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/chat_list_top_bar_three_accounts_adjacent_unread_light.png")
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+    fun threeAccountsAdjacentUnreadDark() {
+        renderUnreadAccounts(
+            accountCount = 3,
+            dark = true,
+            amoled = false,
+            unreadAccountRefs = setOf("account-2", "account-3"),
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/chat_list_top_bar_three_accounts_adjacent_unread_dark.png")
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+    fun threeAccountsAdjacentUnreadAmoled() {
+        renderUnreadAccounts(
+            accountCount = 3,
+            dark = true,
+            amoled = true,
+            unreadAccountRefs = setOf("account-2", "account-3"),
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/chat_list_top_bar_three_accounts_adjacent_unread_amoled.png")
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+    fun activeAccountUnreadLight() {
+        renderUnreadAccounts(
+            accountCount = 2,
+            dark = false,
+            amoled = false,
+            unreadAccountRefs = setOf("personal"),
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/chat_list_top_bar_active_account_unread_light.png")
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+    fun overflowUnreadLight() {
+        renderUnreadAccounts(
+            accountCount = 5,
+            dark = false,
+            amoled = false,
+            unreadAccountRefs = setOf("account-4"),
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/chat_list_top_bar_overflow_unread_light.png")
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+    fun threeAccountsAdjacentUnreadLargeText() {
+        renderUnreadAccounts(
+            accountCount = 3,
+            dark = false,
+            amoled = false,
+            fontScale = 2f,
+            unreadAccountRefs = setOf("account-2", "account-3"),
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/chat_list_top_bar_three_accounts_adjacent_unread_large_text.png")
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+    fun threeAccountsAdjacentUnreadRtl() {
+        renderUnreadAccounts(
+            accountCount = 3,
+            dark = false,
+            amoled = false,
+            rtl = true,
+            unreadAccountRefs = setOf("account-2", "account-3"),
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/chat_list_top_bar_three_accounts_adjacent_unread_rtl.png")
+    }
+
     private fun render(
         accountCount: Int,
         dark: Boolean,
@@ -161,6 +261,55 @@ class ChatListTopBarScreenshotTest {
                             onSwitchAccount = {},
                             connectivityState = ConnectivityBannerState.Connecting,
                         )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun renderUnreadAccounts(
+        accountCount: Int,
+        dark: Boolean,
+        amoled: Boolean,
+        unreadAccountRefs: Set<String>,
+        fontScale: Float = 1f,
+        rtl: Boolean = false,
+    ) {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale),
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
+                    Surface {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .testTag(TAG),
+                        ) {
+                            ChatListTopBar(
+                                appState =
+                                    remember {
+                                        testAppState(accountCount).also { state ->
+                                            unreadAccountRefs.forEach { ref ->
+                                                state.updateAccountUnreadCount(ref, 1uL)
+                                            }
+                                        }
+                                    },
+                                searchOpen = false,
+                                searchQuery = "",
+                                searchFocusRequester = remember { FocusRequester() },
+                                onSearchQueryChange = {},
+                                onSearchOpen = {},
+                                onSearchClose = {},
+                                onMic = {},
+                                onOpenSettings = {},
+                                onSwitchAccount = {},
+                                connectivityState = ConnectivityBannerState.Hidden,
+                            )
+                        }
                     }
                 }
             }
