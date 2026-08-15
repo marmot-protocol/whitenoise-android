@@ -201,6 +201,8 @@ private data class ConversationSearchScrollAnchor(
 private class ConversationNavigationState {
     var lastFollowedLatestId by mutableStateOf<String?>(null)
     var initialTimelineLoadStarted by mutableStateOf(false)
+    var initialTimelineBackfillNoProgress by mutableStateOf(false)
+    var initialTimelineBackfillRetryGeneration by mutableStateOf(0L)
     var highlightedMessageId by mutableStateOf<String?>(null)
     var transientHighlightOwner by mutableStateOf<Any?>(null)
     var navigateReplyJob by mutableStateOf<Job?>(null)
@@ -218,6 +220,23 @@ private class ConversationNavigationState {
         navigateReplyJob?.cancel()
     }
 }
+
+private fun ConversationController.initialTimelineBackfillSnapshot() =
+    ConversationInitialTimelineBackfillSnapshot(
+        hasRenderableRows = timeline.any { !MessageProjector.isEdit(it.record) },
+        hasMoreBefore = hasMoreBefore,
+        loadInFlight = isLoading || isLoadingOlder,
+        hasLoadFailure = error != null,
+        rawWindowMessageIds = timeline.map { it.id },
+    )
+
+private val InitialTimelineBackfillNoProgressError =
+    ErrorPresentation(
+        message = AppText.Resource(R.string.error_loaded_content_kept),
+        report =
+            "Operation: CONVERSATION_INITIAL_BACKFILL_NO_PROGRESS\n" +
+                "No backward timeline progress was observed.",
+    )
 
 @Composable
 private fun rememberConversationNavigationState(controller: ConversationController): ConversationNavigationState {
@@ -1619,11 +1638,64 @@ internal fun ConversationScreen(
         }
     }
     val latestTimelineItemId = renderedTimeline.lastOrNull()?.id
-    val loadFailurePlacement = loadFailurePlacement(controller.error != null, controller.timeline.isNotEmpty())
+    val currentController by rememberUpdatedState(controller)
+    val loadFailurePlacement = loadFailurePlacement(controller.error != null, renderedTimeline.isNotEmpty())
     val transcriptLocale = LocalConfiguration.current.locales[0]
     val olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
     val bottomTimelineIndex = renderedTimeline.size + 1 + olderHeaderCount
     val currentTailIndex by rememberUpdatedState(newValue = bottomTimelineIndex)
+
+    // Edit events are derived state, so a raw subscription page can be non-empty
+    // while offering no row for the initial anchor. Page backward before the
+    // transcript is revealed; the pure coordinator stops on renderable content,
+    // exhaustion, failure, no progress, cancellation, or controller replacement.
+    LaunchedEffect(
+        controller,
+        navigationState.initialTimelineLoadStarted,
+        controller.isLoading,
+        controller.isLoadingOlder,
+        latestTimelineItemId,
+        navigationState.initialTimelineBackfillRetryGeneration,
+    ) {
+        val hasEstablishedInitialPosition = initialTimelineAnchored || scrollRestore != null
+        val timelineCannotBackfill =
+            !navigationState.initialTimelineLoadStarted ||
+                controller.group.pendingConfirmation ||
+                controller.timeline.isEmpty()
+        if (
+            hasEstablishedInitialPosition ||
+            timelineCannotBackfill ||
+            renderedTimeline.isNotEmpty()
+        ) {
+            if (renderedTimeline.isNotEmpty()) {
+                navigationState.initialTimelineBackfillNoProgress = false
+            }
+            return@LaunchedEffect
+        }
+        val result =
+            backfillInitialConversationTimeline(
+                snapshot = controller::initialTimelineBackfillSnapshot,
+                loadOlder = controller::loadOlderTimelinePage,
+                isCurrent = { currentController === controller },
+            )
+        if (currentController !== controller) return@LaunchedEffect
+        when (result) {
+            ConversationInitialTimelineBackfillResult.Exhausted -> {
+                navigationState.initialTimelineBackfillNoProgress = false
+                initialTimelineAnchored = true
+            }
+            ConversationInitialTimelineBackfillResult.NoProgress -> {
+                navigationState.initialTimelineBackfillNoProgress = true
+            }
+            ConversationInitialTimelineBackfillResult.Renderable -> {
+                navigationState.initialTimelineBackfillNoProgress = false
+            }
+            ConversationInitialTimelineBackfillResult.Failed,
+            ConversationInitialTimelineBackfillResult.NotReady,
+            ConversationInitialTimelineBackfillResult.Superseded,
+            -> Unit
+        }
+    }
 
     // Day label for the topmost visible message, surfaced by the sticky ribbon
     // overlay while scrolling. Hoisted into derivedStateOf and held as a State
@@ -2658,7 +2730,9 @@ internal fun ConversationScreen(
                 hasSearchQuery = navigationState.searchQuery.isNotBlank(),
                 onPreviousSearchMatch = { navigateToSearchMatch(forward = false) },
                 onNextSearchMatch = { navigateToSearchMatch(forward = true) },
-                hasError = loadFailurePlacement == LoadFailurePlacement.FullScreen,
+                hasError =
+                    loadFailurePlacement == LoadFailurePlacement.FullScreen ||
+                        navigationState.initialTimelineBackfillNoProgress,
                 composerGate = composerGate,
                 controller = controller,
                 appState = appState,
@@ -2765,19 +2839,36 @@ internal fun ConversationScreen(
             )
         },
     ) { padding ->
-        Box(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                // The composer bottomBar owns IME padding; consume here so the
-                // transcript does not count the keyboard a second time (#895).
-                .consumeWindowInsets(WindowInsets.ime),
+        ConversationTransientNoticeLayout(
+            notice = appState.transientNotice,
+            accountRef = appState.activeAccountRef,
+            groupIdHex = controller.group.groupIdHex,
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    // The composer bottomBar owns IME padding; consume here so the
+                    // transcript does not count the keyboard a second time (#895).
+                    .consumeWindowInsets(WindowInsets.ime),
         ) {
             when {
+                navigationState.initialTimelineBackfillNoProgress ->
+                    ConversationLoadErrorContent(
+                        error = InitialTimelineBackfillNoProgressError,
+                        onRetry = {
+                            navigationState.initialTimelineBackfillNoProgress = false
+                            navigationState.initialTimelineBackfillRetryGeneration += 1L
+                        },
+                    )
                 loadFailurePlacement == LoadFailurePlacement.FullScreen ->
                     ConversationLoadErrorContent(
                         error = requireNotNull(controller.error),
-                        onRetry = { scope.launch { controller.retryLoadFailure() } },
+                        onRetry = {
+                            scope.launch {
+                                controller.retryLoadFailure()
+                                navigationState.initialTimelineBackfillRetryGeneration += 1L
+                            }
+                        },
                     )
                 controller.group.pendingConfirmation &&
                     renderedTimeline.isEmpty() &&
@@ -2787,7 +2878,10 @@ internal fun ConversationScreen(
                         inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
                     )
                 controller.group.pendingConfirmation && renderedTimeline.isEmpty() -> LoadingScreen()
-                controller.timeline.isEmpty() &&
+                renderedTimeline.isEmpty() &&
+                    !controller.hasMoreBefore &&
+                    !controller.hasMoreAfterTimeline &&
+                    !controller.isLoadingOlder &&
                     !controller.isLoading &&
                     navigationState.initialTimelineLoadStarted -> {
                     if (
@@ -3071,12 +3165,6 @@ internal fun ConversationScreen(
                         }
                     }
             }
-            ConversationTransientNotice(
-                notice = appState.transientNotice,
-                accountRef = appState.activeAccountRef,
-                groupIdHex = controller.group.groupIdHex,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
             if (composerAttachmentSheet.isOpen) {
                 // Transparent scrim over the transcript only — the composer
                 // stays reachable, so the keyboard and emoji toggles can still
