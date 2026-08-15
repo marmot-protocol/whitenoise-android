@@ -15,6 +15,11 @@ internal fun NetworkCapabilities.providesValidatedNonVpnInternet(): Boolean =
         hasNotVpnCapability = hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN),
     )
 
+internal fun hasUsableValidatedInternet(
+    hasActiveDefaultNetwork: Boolean,
+    hasValidatedPhysicalNetwork: Boolean,
+): Boolean = hasActiveDefaultNetwork && hasValidatedPhysicalNetwork
+
 /**
  * Tracks every validated physical internet network Android currently exposes.
  * A set is required because a Wi-Fi/cellular handover briefly exposes both;

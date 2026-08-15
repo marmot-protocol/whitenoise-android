@@ -5879,9 +5879,15 @@ class WhiteNoiseAppState private constructor(
      * can remain present (and retain stale validation) after airplane mode
      * removes its Wi-Fi/cellular upstream. Network-gated setup uses this signal
      * so it fails fast without rejecting a healthy VPN whose upstream remains
-     * validated.
+     * validated. The active-default bit is also required because OEM network
+     * stacks can briefly retain a validated physical handle after its route is
+     * gone; such a handle cannot make setup reachable on its own.
      */
-    fun hasValidatedInternet(): Boolean = validatedInternetNetworks.hasValidatedInternet()
+    fun hasValidatedInternet(): Boolean =
+        hasUsableValidatedInternet(
+            hasActiveDefaultNetwork = hasActiveNetworkSnapshot,
+            hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet(),
+        )
 
     /**
      * Every [MediaAutoDownloadNetwork] the active connection currently matches.

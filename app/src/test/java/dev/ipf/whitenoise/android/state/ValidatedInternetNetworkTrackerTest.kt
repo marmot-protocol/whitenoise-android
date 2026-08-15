@@ -35,6 +35,28 @@ class ValidatedInternetNetworkTrackerTest {
     }
 
     @Test
+    fun staleValidatedPhysicalNetworkCannotStandInForAnActiveDefaultNetwork() {
+        assertFalse(
+            hasUsableValidatedInternet(
+                hasActiveDefaultNetwork = false,
+                hasValidatedPhysicalNetwork = true,
+            ),
+        )
+        assertFalse(
+            hasUsableValidatedInternet(
+                hasActiveDefaultNetwork = true,
+                hasValidatedPhysicalNetwork = false,
+            ),
+        )
+        assertTrue(
+            hasUsableValidatedInternet(
+                hasActiveDefaultNetwork = true,
+                hasValidatedPhysicalNetwork = true,
+            ),
+        )
+    }
+
+    @Test
     fun initialSnapshotIsAvailableWithoutWaitingForACallback() {
         val tracker = ValidatedInternetNetworkTracker()
 
