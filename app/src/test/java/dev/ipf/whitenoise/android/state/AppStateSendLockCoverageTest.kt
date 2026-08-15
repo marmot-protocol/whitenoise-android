@@ -114,6 +114,31 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
+    fun failedDestructiveWipeBranchesExitBeforeProcessGlobalProfileCachesAreCleared() {
+        val body = appStateFunctionBody("signOutAndWipeActiveAccount")
+        val engineFailureIndex = body.indexOf("val failure = wipeResult.exceptionOrNull()")
+        val engineFailureReturnIndex = body.indexOf("return null", startIndex = engineFailureIndex)
+        val nullOutcomeFallbackIndex = body.indexOf("wipeResult.getOrNull() ?: run")
+        val nullOutcomeReturnIndex = body.indexOf("return null", startIndex = nullOutcomeFallbackIndex)
+        val avatarClearIndex = body.indexOf("AvatarImageLoader.clear()")
+        val scopedCacheClearIndex = body.indexOf("clearCrossAccountCaches()")
+
+        assertTrue(
+            "an engine failure must return before the null-outcome fallback and cache eviction",
+            engineFailureIndex >= 0 &&
+                engineFailureReturnIndex > engineFailureIndex &&
+                engineFailureReturnIndex < nullOutcomeFallbackIndex,
+        )
+        assertTrue(
+            "a null wipe outcome must return before process-global profile caches are evicted",
+            nullOutcomeFallbackIndex >= 0 &&
+                nullOutcomeReturnIndex > nullOutcomeFallbackIndex &&
+                avatarClearIndex > nullOutcomeReturnIndex &&
+                scopedCacheClearIndex > nullOutcomeReturnIndex,
+        )
+    }
+
+    @Test
     fun retentionSweepRoutesThroughEngineAccountWorker() {
         val body = appStateFunctionBody("runRetentionSweep")
 
