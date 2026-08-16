@@ -35,6 +35,7 @@ import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_ELSEWHERE_ACTION_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
+import dev.ipf.whitenoise.android.ui.conversation.composer.RecordingStripLeading
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -142,6 +143,28 @@ class ComposerBarScreenshotTest {
             composeRule
                 .onNodeWithTag(TAG)
                 .captureRoboImage("src/test/snapshots/composer_dictation_and_voice_note_idle_compact.png")
+        } finally {
+            voiceRecording.release()
+        }
+    }
+
+    @Test
+    fun voiceRecordingStripUnlockedLight() {
+        val voiceRecording = previewVoiceRecordingController()
+        try {
+            composeRule.mainClock.autoAdvance = false
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = false) {
+                    Surface(modifier = Modifier.width(320.dp).testTag(RECORDING_STRIP_TAG)) {
+                        RecordingStripLeading(controller = voiceRecording)
+                    }
+                }
+            }
+            composeRule.mainClock.advanceTimeBy(350L)
+
+            composeRule
+                .onNodeWithTag(RECORDING_STRIP_TAG)
+                .captureRoboImage("src/test/snapshots/composer_voice_recording_strip_unlocked_light.png")
         } finally {
             voiceRecording.release()
         }
@@ -419,6 +442,7 @@ class ComposerBarScreenshotTest {
     private companion object {
         const val TAG = "composer-bar"
         const val LONG_TAG = "long-composer-bar"
+        const val RECORDING_STRIP_TAG = "composer-voice-recording-strip"
         const val ACCOUNT = "account"
         const val GROUP = "group"
         const val OTHER_ACCOUNT = "other-account"
