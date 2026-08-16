@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -22,10 +23,12 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
+import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -42,6 +45,8 @@ class ComposerDictationControlTest {
     @Test
     fun availableDictationDoesNotDisplaceOrMoveTheEmojiAction() {
         render()
+
+        composeRule.onNodeWithContentDescription("Dictate text").assertIsDisplayed()
 
         val before =
             composeRule
@@ -62,6 +67,38 @@ class ComposerDictationControlTest {
         assertEquals(before.top, after.top)
         assertEquals(before.right, after.right)
         assertEquals(before.bottom, after.bottom)
+        composeRule.onNodeWithContentDescription("Dictate text").assertIsDisplayed()
+    }
+
+    @Test
+    fun dictationRemainsReachableBesideSendForANonBlankDraft() {
+        render(draft = TextFieldValue("Ready"))
+
+        composeRule.onNodeWithContentDescription("Dictate text").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Send").assertIsDisplayed()
+    }
+
+    @Test
+    fun compactComposerActionUsesTheAppOwnedRecognizer() {
+        val controller = render()
+
+        composeRule.onNodeWithContentDescription("Dictate text").performClick()
+
+        assertTrue(controller.state is ConversationDictationState.Starting)
+        assertTrue(controller.ownsMicrophone)
+    }
+
+    @Test
+    fun attachmentSheetActionUsesTheProviderOwnedRecognitionActivity() {
+        val controller = render(withAttachments = true)
+        composeRule.onNodeWithContentDescription("Add attachment").performClick()
+
+        val dictationActions = composeRule.onAllNodesWithContentDescription("Dictate text")
+        assertEquals(2, dictationActions.fetchSemanticsNodes().size)
+        dictationActions[1].performClick()
+
+        assertTrue(controller.state is ConversationDictationState.ProviderActivityRequired)
+        assertFalse(controller.ownsMicrophone)
     }
 
     @Test
@@ -74,20 +111,30 @@ class ComposerDictationControlTest {
                 .onNodeWithContentDescription("Open emoji picker")
                 .assertIsDisplayed()
                 .getUnclippedBoundsInRoot()
+        val dictation =
+            composeRule
+                .onNodeWithContentDescription("Dictate text")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
         val field = composeRule.onNode(hasSetTextAction()).assertIsDisplayed().getUnclippedBoundsInRoot()
 
         assertTrue(action.left >= root.left && action.right <= root.right)
         assertTrue(action.top >= root.top && action.bottom <= root.bottom)
         assertTrue(action.right - action.left >= 48.dp)
         assertTrue(action.bottom - action.top >= 48.dp)
+        assertTrue(dictation.left >= root.left && dictation.right <= root.right)
+        assertTrue(dictation.top >= root.top && dictation.bottom <= root.bottom)
+        assertTrue(dictation.right - dictation.left >= 48.dp)
+        assertTrue(dictation.bottom - dictation.top >= 48.dp)
         assertTrue("RTL emoji action must remain on the leading side", action.left >= field.left)
     }
 
     private fun render(
         fontScale: Float = 1f,
         rtl: Boolean = false,
-    ) {
-        val draft = TextFieldValue("")
+        draft: TextFieldValue = TextFieldValue(""),
+        withAttachments: Boolean = false,
+    ): ConversationDictationController {
         val dictationController = idleDictationController(draft)
         composeRule.setContent {
             val density = LocalDensity.current
@@ -101,6 +148,7 @@ class ComposerDictationControlTest {
                         messageTextCopy = MessageTextCopy.Default,
                         onCancelReply = {},
                         onSend = { _, _ -> },
+                        onPickFromGallery = if (withAttachments) ({}) else null,
                         initialDraft = draft,
                         dictationController = dictationController,
                         dictationAccountRef = ACCOUNT,
@@ -110,6 +158,7 @@ class ComposerDictationControlTest {
                 }
             }
         }
+        return dictationController
     }
 
     private fun idleDictationController(draft: TextFieldValue): ConversationDictationController =

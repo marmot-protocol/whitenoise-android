@@ -5337,6 +5337,7 @@ class WhiteNoiseAppState private constructor(
         // In-memory plaintext is dropped synchronously here; the on-disk wipe
         // is awaited in this suspend path so it isn't an orphaned background task.
         val signedOutRef = activeAccountRef ?: return null
+        conversationDictation.onAccountUnavailable(signedOutRef)
         stopTtsForRemovedAccount(signedOutRef)
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
@@ -5406,6 +5407,7 @@ class WhiteNoiseAppState private constructor(
     // One cancellation-safe bracket owns wipe, editor purge, account switch, and recovery.
     suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
         val wipedRef = activeAccountRef ?: return null
+        conversationDictation.onAccountUnavailable(wipedRef)
         clearInMemoryMediaCaches()
         clearConversationShortcutSurfaces()
         try {

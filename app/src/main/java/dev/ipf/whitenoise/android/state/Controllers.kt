@@ -12291,6 +12291,11 @@ class ConversationController(
         membersLoaded = true
         membersVerified = true
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
+        // UseAfterEviction is the engine's authoritative signal that this
+        // conversation can no longer accept composer writes. Invalidate an
+        // in-flight immutable dictation target before any late provider result
+        // can reach the draft persistence path.
+        appState.conversationDictation.onTargetRemoved(account, group.groupIdHex)
         appState.cacheGroupMemberSnapshot(account, group.groupIdHex, updatedMembers)
     }
 

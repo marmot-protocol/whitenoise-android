@@ -28,6 +28,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
+import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -92,6 +93,37 @@ class ConversationDictationStripTest {
     }
 
     @Test
+    fun compactElsewhereActionKeepsListeningSessionVisibleAndCancellable() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        fixture.platform.listener.onReady()
+        renderElsewhereAction(fixture)
+
+        composeRule
+            .onNodeWithTag(COMPOSER_DICTATION_ELSEWHERE_ACTION_TAG)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Dictation is active in another chat"))
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Cancel dictation").performClick()
+
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
+    @Test
+    fun compactElsewhereReviewActionDoesNotDiscardTranscript() {
+        val fixture = fixture(TextFieldValue("Original anchor", TextRange(8)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        fixture.edit(TextFieldValue("Rewritten draft", TextRange(15)))
+        fixture.platform.listener.onResult("dictated words")
+        renderElsewhereAction(fixture)
+
+        composeRule.onNodeWithContentDescription("Review dictated text").performClick()
+
+        composeRule.onNodeWithTag(COMPOSER_DICTATION_REVIEW_DIALOG_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("dictated words").assertIsDisplayed()
+        assertTrue(fixture.controller.state is ConversationDictationState.ReviewRequired)
+    }
+
+    @Test
     fun compactLargeFontRtlStripDoesNotClipItsActions() {
         val fixture = fixture(TextFieldValue(""))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
@@ -128,6 +160,17 @@ class ConversationDictationStripTest {
                         )
                     }
                 }
+            }
+        }
+    }
+
+    private fun renderElsewhereAction(fixture: Fixture) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ConversationDictationElsewhereAction(
+                    state = fixture.controller.state,
+                    controller = fixture.controller,
+                )
             }
         }
     }

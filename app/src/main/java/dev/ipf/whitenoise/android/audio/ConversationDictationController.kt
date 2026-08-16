@@ -28,7 +28,13 @@ internal data class ConversationDictationTarget(
     val groupIdHex: String,
     val capturedDraft: TextFieldValue,
     val capturedDraftRevision: Long,
+    val mode: ConversationDictationMode,
 )
+
+internal enum class ConversationDictationMode {
+    InApp,
+    ProviderActivity,
+}
 
 internal data class ConversationDictationDraftSnapshot(
     val value: TextFieldValue,
@@ -82,6 +88,18 @@ internal sealed interface ConversationDictationState {
         override val target: ConversationDictationTarget,
     ) : ConversationDictationState
 
+    /** The provider-owned recognition Activity is queued for launch. */
+    data class ProviderActivityRequired(
+        override val sessionId: Long,
+        override val target: ConversationDictationTarget,
+    ) : ConversationDictationState
+
+    /** The provider-owned recognition Activity has been launched. */
+    data class ProviderActivityActive(
+        override val sessionId: Long,
+        override val target: ConversationDictationTarget,
+    ) : ConversationDictationState
+
     data class Failed(
         override val sessionId: Long,
         override val target: ConversationDictationTarget,
@@ -124,6 +142,8 @@ internal interface ConversationDictationPlatform {
     fun hasRecordAudioPermission(): Boolean
 
     fun recognitionAvailable(): Boolean
+
+    fun recognitionActivityAvailable(): Boolean = true
 
     fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession
 }
@@ -216,6 +236,10 @@ internal class ConversationDictationController internal constructor(
     val permissionRequestId: Long
         get() = _permissionRequestId.longValue
 
+    private val _providerActivityRequestId = mutableLongStateOf(0L)
+    val providerActivityRequestId: Long
+        get() = _providerActivityRequestId.longValue
+
     val hasPendingSession: Boolean
         get() = state !is ConversationDictationState.Idle
 
@@ -241,9 +265,53 @@ internal class ConversationDictationController internal constructor(
         accountRef: String,
         groupIdHex: String,
         draft: TextFieldValue,
-    ): Boolean {
-        if (blocksNewRequest || !targetAvailable(accountRef, groupIdHex)) return false
+    ): Boolean =
+        requestStart(
+            accountRef = accountRef,
+            groupIdHex = groupIdHex,
+            draft = draft,
+            mode = ConversationDictationMode.InApp,
+        )
 
+    fun requestProviderActivityStart(
+        accountRef: String,
+        groupIdHex: String,
+        draft: TextFieldValue,
+    ): Boolean =
+        requestStart(
+            accountRef = accountRef,
+            groupIdHex = groupIdHex,
+            draft = draft,
+            mode = ConversationDictationMode.ProviderActivity,
+        )
+
+    private fun requestStart(
+        accountRef: String,
+        groupIdHex: String,
+        draft: TextFieldValue,
+        mode: ConversationDictationMode,
+    ): Boolean {
+        if (!targetAvailable(accountRef, groupIdHex)) return false
+        // Unlike the app-owned SpeechRecognizer, an external provider Activity
+        // cannot be synchronously terminated by this controller. Keep its one
+        // ActivityResult owner stable until the provider returns, so a result
+        // can never be misattributed to a replacement target.
+        if (state is ConversationDictationState.ProviderActivityActive) return false
+        if (
+            blocksNewRequest &&
+            state.target?.let {
+                it.accountRef == accountRef &&
+                    it.groupIdHex == groupIdHex &&
+                    it.mode == mode
+            } == true
+        ) {
+            return false
+        }
+
+        // A request for a different target/mode is an explicit replacement.
+        // Tear down the previous generation before publishing the new target;
+        // all callbacks from the previous generation then fail the session-id
+        // ownership check and become no-ops.
         clearRecognitionSession(cancel = true)
         val sessionId = ++nextSessionId
         val capturedRevision = readDraft(accountRef, groupIdHex).revision
@@ -253,19 +321,20 @@ internal class ConversationDictationController internal constructor(
                 groupIdHex = groupIdHex,
                 capturedDraft = draft.copy(composition = null),
                 capturedDraftRevision = capturedRevision,
+                mode = mode,
             )
         if (!disclosureAccepted()) {
             state = ConversationDictationState.DisclosureRequired(sessionId, target)
             return true
         }
-        startOrRequestPermission(sessionId, target)
+        startTarget(sessionId, target)
         return true
     }
 
     fun acceptDisclosure() {
         val pending = state as? ConversationDictationState.DisclosureRequired ?: return
         markDisclosureAccepted()
-        startOrRequestPermission(pending.sessionId, pending.target)
+        startTarget(pending.sessionId, pending.target)
     }
 
     fun onPermissionResult(
@@ -308,6 +377,40 @@ internal class ConversationDictationController internal constructor(
         state = ConversationDictationState.Idle
     }
 
+    fun beginProviderActivityLaunch(requestId: Long): Boolean {
+        if (requestId != providerActivityRequestId) return false
+        val pending = state as? ConversationDictationState.ProviderActivityRequired ?: return false
+        state = ConversationDictationState.ProviderActivityActive(pending.sessionId, pending.target)
+        return true
+    }
+
+    fun onProviderActivityResult(transcript: String?) {
+        val active = state as? ConversationDictationState.ProviderActivityActive ?: return
+        val recognized = transcript?.trim().orEmpty()
+        if (recognized.isBlank()) {
+            fail(active.sessionId, active.target, ConversationDictationFailure.NoSpeech)
+            return
+        }
+        if (!targetAvailable(active.target.accountRef, active.target.groupIdHex)) {
+            cancel()
+            return
+        }
+        deliverTranscript(active.sessionId, active.target, recognized)
+    }
+
+    fun onProviderActivityCancelled() {
+        if (state is ConversationDictationState.ProviderActivityActive) cancel()
+    }
+
+    fun onProviderActivityLaunchFailed() {
+        val providerState = state as? ConversationDictationState.ProviderActivityActive ?: return
+        fail(
+            providerState.sessionId,
+            providerState.target,
+            ConversationDictationFailure.ProviderUnavailable,
+        )
+    }
+
     fun dismissFailure() {
         if (state is ConversationDictationState.Failed) state = ConversationDictationState.Idle
     }
@@ -318,6 +421,7 @@ internal class ConversationDictationController internal constructor(
             accountRef = failed.target.accountRef,
             groupIdHex = failed.target.groupIdHex,
             draft = readDraft(failed.target.accountRef, failed.target.groupIdHex).value,
+            mode = failed.target.mode,
         )
     }
 
@@ -348,16 +452,16 @@ internal class ConversationDictationController internal constructor(
         if (state is ConversationDictationState.ReviewRequired) state = ConversationDictationState.Idle
     }
 
-    fun onActiveAccountChanged(activeAccountRef: String?) {
-        val owner = state.target?.accountRef ?: return
-        if (owner != activeAccountRef) cancel()
-    }
-
     fun onTargetRemoved(
         accountRef: String,
         groupIdHex: String,
     ) {
         if (isOwnedBy(accountRef, groupIdHex)) cancel()
+    }
+
+    /** Cancels only when the target account is signed out or removed, not when it becomes inactive. */
+    fun onAccountUnavailable(accountRef: String) {
+        if (state.target?.accountRef == accountRef) cancel()
     }
 
     /** Releases any provider/microphone resource without discarding terminal review text. */
@@ -369,8 +473,36 @@ internal class ConversationDictationController internal constructor(
             is ConversationDictationState.Listening,
             is ConversationDictationState.Processing,
             -> cancel()
+            // Launching the provider Activity necessarily backgrounds White
+            // Noise. Its registered ActivityResult callback remains the owner
+            // across that transition and across Activity recreation.
+            is ConversationDictationState.ProviderActivityRequired,
+            is ConversationDictationState.ProviderActivityActive,
+            -> Unit
             else -> Unit
         }
+    }
+
+    private fun startTarget(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+    ) {
+        when (target.mode) {
+            ConversationDictationMode.InApp -> startOrRequestPermission(sessionId, target)
+            ConversationDictationMode.ProviderActivity -> prepareProviderActivity(sessionId, target)
+        }
+    }
+
+    private fun prepareProviderActivity(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+    ) {
+        state = ConversationDictationState.ProviderActivityRequired(sessionId, target)
+        if (!platform.recognitionActivityAvailable()) {
+            fail(sessionId, target, ConversationDictationFailure.ProviderUnavailable)
+            return
+        }
+        _providerActivityRequestId.longValue += 1L
     }
 
     private fun startOrRequestPermission(
@@ -460,7 +592,13 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    private fun owns(sessionId: Long): Boolean = state.sessionId == sessionId && recognitionSession != null
+    private fun owns(sessionId: Long): Boolean =
+        state.sessionId == sessionId &&
+            (
+                recognitionSession != null ||
+                    state is ConversationDictationState.ProviderActivityRequired ||
+                    state is ConversationDictationState.ProviderActivityActive
+            )
 
     private fun fail(
         sessionId: Long,
@@ -733,9 +871,17 @@ private class AndroidConversationDictationPlatform(
 
     override fun recognitionAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
 
+    override fun recognitionActivityAvailable(): Boolean = conversationDictationRecognitionActivityIntent().resolveActivity(context.packageManager) != null
+
     override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession =
         AndroidConversationDictationRecognitionSession(context, listener)
 }
+
+internal fun conversationDictationRecognitionActivityIntent(): Intent =
+    Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+        .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
 
 private class AndroidConversationDictationRecognitionSession(
     private val context: Context,

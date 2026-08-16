@@ -412,6 +412,7 @@ internal fun ComposerBar(
             dictationController?.isOwnedBy(dictationAccountRef, dictationGroupIdHex) == true
     val dictationPendingElsewhere = dictationController?.blocksNewRequest == true && !dictationOwnedByComposer
     val dictationOwnsMicrophoneElsewhere = dictationController?.ownsMicrophone == true && !dictationOwnedByComposer
+    val dictationActiveElsewhere = dictationState !is ConversationDictationState.Idle && !dictationOwnedByComposer
     // Snapshot the in-flight composer state (full TextFieldValue — text +
     // caret) when entering edit mode so cancelling restores both. Keyed on
     // the message id so a tap-Edit on a different message snapshots a fresh
@@ -454,7 +455,7 @@ internal fun ComposerBar(
     val controllerForDictation = dictationController
     val accountForDictation = dictationAccountRef
     val groupForDictation = dictationGroupIdHex
-    val startDictation: (() -> Unit)? =
+    val startInAppDictation: (() -> Unit)? =
         if (controllerForDictation != null && accountForDictation != null && groupForDictation != null) {
             if (editingMessageId != null) {
                 null
@@ -467,6 +468,29 @@ internal fun ComposerBar(
                     focusManager.clearFocus(force = true)
                     keyboardController?.hide()
                     controllerForDictation.requestStart(
+                        accountRef = accountForDictation,
+                        groupIdHex = groupForDictation,
+                        draft = textFieldValue,
+                    )
+                    onBottomInputChanged()
+                }
+            }
+        } else {
+            null
+        }
+    val startProviderDictation: (() -> Unit)? =
+        if (controllerForDictation != null && accountForDictation != null && groupForDictation != null) {
+            if (editingMessageId != null) {
+                null
+            } else {
+                {
+                    composerEmojiPickerOpen = false
+                    composerEmojiPickerRequested = false
+                    attachmentSheetState.dismiss()
+                    composerExpansion = ComposerExpansionState()
+                    focusManager.clearFocus(force = true)
+                    keyboardController?.hide()
+                    controllerForDictation.requestProviderActivityStart(
                         accountRef = accountForDictation,
                         groupIdHex = groupForDictation,
                         draft = textFieldValue,
@@ -1030,6 +1054,15 @@ internal fun ComposerBar(
                     (text.isBlank() || isRecordingVoice) &&
                         editingMessageId == null &&
                         voiceRecordingController != null
+                val showPrimaryTrailingAction = !(showMicButton && dictationPendingElsewhere)
+                val primaryTrailingActionWidth =
+                    if (showMicButton && voiceRecordingController.locked) 84.dp else 44.dp
+                val trailingControlsWidth =
+                    when {
+                        dictationActiveElsewhere && showPrimaryTrailingAction -> primaryTrailingActionWidth + 52.dp
+                        dictationActiveElsewhere -> 48.dp
+                        else -> primaryTrailingActionWidth
+                    }
                 Box(
                     modifier =
                         Modifier
@@ -1100,6 +1133,12 @@ internal fun ComposerBar(
                         onPickFromGallery = onPickFromGallery,
                         onPickDocument = onPickDocument,
                         onPasteImageUris = onPasteImageUris?.takeIf { editingMessageId == null && !isRecordingVoice },
+                        onDictation =
+                            startInAppDictation?.takeIf {
+                                dictationState is ConversationDictationState.Idle &&
+                                    !dictationPendingElsewhere &&
+                                    !isRecordingVoice
+                            },
                         highlightMentionChips = mentionPickerEnabled,
                         mentionCandidates = mentionCandidates,
                         enterKeyBehavior = enterKeyBehavior,
@@ -1134,9 +1173,7 @@ internal fun ComposerBar(
                         trailingAction =
                             if (expandedControlLayout) {
                                 {
-                                    val width =
-                                        if (showMicButton && voiceRecordingController.locked) 84.dp else 44.dp
-                                    Spacer(Modifier.width(width))
+                                    Spacer(Modifier.width(trailingControlsWidth))
                                 }
                             } else {
                                 null
@@ -1148,10 +1185,8 @@ internal fun ComposerBar(
                                     end =
                                         if (expandedControlLayout) {
                                             0.dp
-                                        } else if (showMicButton && voiceRecordingController.locked) {
-                                            92.dp
                                         } else {
-                                            52.dp
+                                            trailingControlsWidth + 8.dp
                                         },
                                 ).fillMaxWidth()
                                 .then(
@@ -1165,6 +1200,7 @@ internal fun ComposerBar(
                     if (!dictationVisible) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier =
                                 Modifier
                                     .align(
@@ -1175,9 +1211,15 @@ internal fun ComposerBar(
                                         },
                                     ).height(44.dp),
                         ) {
+                            if (dictationActiveElsewhere && dictationController != null) {
+                                ConversationDictationElsewhereAction(
+                                    state = dictationState,
+                                    controller = dictationController,
+                                )
+                            }
                             // This call site stays shared by idle and recording states;
                             // moving it would break the active hold gesture's identity.
-                            if (showMicButton && voiceRecordingController.locked) {
+                            if (showPrimaryTrailingAction && showMicButton && voiceRecordingController.locked) {
                                 IconButton(
                                     onClick = { voiceRecordingController.cancel() },
                                     modifier = Modifier.size(40.dp),
@@ -1200,7 +1242,7 @@ internal fun ComposerBar(
                                         modifier = Modifier.size(20.dp),
                                     )
                                 }
-                            } else if (showMicButton) {
+                            } else if (showPrimaryTrailingAction && showMicButton) {
                                 Box(contentAlignment = Alignment.BottomCenter) {
                                     LockHintAbove(controller = voiceRecordingController)
                                     MicHoldButton(
@@ -1208,7 +1250,7 @@ internal fun ComposerBar(
                                         enabled = !dictationOwnsMicrophoneElsewhere,
                                     )
                                 }
-                            } else {
+                            } else if (showPrimaryTrailingAction) {
                                 FloatingActionButton(
                                     onClick = { submitMessage() },
                                     modifier = Modifier.size(44.dp),
@@ -1337,7 +1379,7 @@ internal fun ComposerBar(
                                 },
                             onComingSoon = { appState?.present(R.string.coming_soon) },
                             onDictation =
-                                startDictation?.takeIf {
+                                startProviderDictation?.takeIf {
                                     !dictationPendingElsewhere && voiceRecordingController?.isRecording != true
                                 },
                         )

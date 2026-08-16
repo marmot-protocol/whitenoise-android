@@ -183,11 +183,10 @@ internal fun ComposerAttachmentSheetPane(
                     .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
         ) {
-            // Dictation remains discoverable while the text field owns focus,
-            // without permanently adding another control to the compact input
-            // pill. It enters the same conversation-owned recognition flow as
-            // the idle composer icon, so both paths share disclosure, cancel,
-            // microphone exclusion, and draft-conflict behavior.
+            // This explicit secondary entry point delegates visible capture to
+            // the installed provider's standard recognition Activity. It still
+            // shares the immutable target and draft-conflict delivery pipeline
+            // with the compact in-composer action.
             if (onDictation != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),

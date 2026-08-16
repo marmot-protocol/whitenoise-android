@@ -30,10 +30,15 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
+import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_ELSEWHERE_ACTION_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -119,6 +124,27 @@ class ComposerBarScreenshotTest {
     }
 
     @Test
+    fun composerDictationIsVisuallyDistinctFromVoiceNoteOnBlankDraft() {
+        val voiceRecording = previewVoiceRecordingController()
+        try {
+            render(
+                darkTheme = false,
+                draft = "",
+                width = 320,
+                dictationPreview = DictationPreview.Idle,
+                voiceRecordingController = voiceRecording,
+            )
+            composeRule.onNodeWithContentDescription("Dictate text").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Hold to record voice message").assertIsDisplayed()
+            composeRule
+                .onNodeWithTag(TAG)
+                .captureRoboImage("src/test/snapshots/composer_dictation_and_voice_note_idle_compact.png")
+        } finally {
+            voiceRecording.release()
+        }
+    }
+
+    @Test
     fun composerDictationListeningCompactLargeFont() {
         render(
             darkTheme = false,
@@ -145,6 +171,49 @@ class ComposerBarScreenshotTest {
         composeRule
             .onNodeWithTag(TAG)
             .captureRoboImage("src/test/snapshots/composer_dictation_processing_compact_large_font_rtl.png")
+    }
+
+    @Test
+    fun composerDictationIdleWithReplyCompactLargeFont() {
+        render(
+            darkTheme = false,
+            draft = "Reply draft",
+            width = 320,
+            fontScale = 1.6f,
+            dictationPreview = DictationPreview.Idle,
+            showReply = true,
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/composer_dictation_idle_reply_compact_large_font.png")
+    }
+
+    @Test
+    fun composerDictationEditConstraintCompactRtl() {
+        render(
+            darkTheme = true,
+            draft = "Preserved draft",
+            width = 320,
+            rtl = true,
+            dictationPreview = DictationPreview.Idle,
+            showEdit = true,
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/composer_dictation_edit_compact_rtl.png")
+    }
+
+    @Test
+    fun composerKeepsOtherChatDictationVisibleBesideDraft() {
+        render(
+            darkTheme = false,
+            draft = "Draft message text",
+            width = 320,
+            dictationPreview = DictationPreview.ElsewhereListening,
+        )
+
+        composeRule.onNodeWithTag(COMPOSER_DICTATION_ELSEWHERE_ACTION_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("Draft message text").assertIsDisplayed()
     }
 
     @Test
@@ -179,6 +248,9 @@ class ComposerBarScreenshotTest {
         fontScale: Float = 1f,
         rtl: Boolean = false,
         dictationPreview: DictationPreview? = null,
+        showReply: Boolean = false,
+        showEdit: Boolean = false,
+        voiceRecordingController: VoiceRecordingController? = null,
     ) {
         val dictation = dictationPreview?.let { createDictationPreview(it, TextFieldValue(draft)) }
         composeRule.setContent {
@@ -190,14 +262,22 @@ class ComposerBarScreenshotTest {
                 WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                     Surface(modifier = Modifier.width(width.dp).testTag(TAG)) {
                         ComposerBar(
-                            replyingTo = null,
+                            replyingTo = replyRecord().takeIf { showReply },
+                            replyingToDisplay =
+                                TimelineReplyDisplay(
+                                    sender = "alice",
+                                    body = "Parent message",
+                                ).takeIf { showReply },
                             messageTextCopy = MessageTextCopy.Default,
                             onCancelReply = {},
                             onSend = { _, _ -> },
                             initialDraft = TextFieldValue(draft),
+                            editingMessageId = "edited-message".takeIf { showEdit },
+                            editingInitialText = "Message being edited".takeIf { showEdit },
                             dictationController = dictation,
                             dictationAccountRef = dictation?.let { ACCOUNT },
                             dictationGroupIdHex = dictation?.let { GROUP },
+                            voiceRecordingController = voiceRecordingController,
                         )
                     }
                 }
@@ -243,6 +323,18 @@ class ComposerBarScreenshotTest {
         composeRule.waitForIdle()
     }
 
+    private fun previewVoiceRecordingController(): VoiceRecordingController {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        return VoiceRecordingController(
+            context = context,
+            outputDirectory = context.cacheDir,
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+            onPermissionRequest = { true },
+            onRecordingComplete = { _, _ -> },
+            onError = {},
+        )
+    }
+
     private fun createDictationPreview(
         preview: DictationPreview,
         draft: TextFieldValue,
@@ -268,6 +360,10 @@ class ComposerBarScreenshotTest {
                 controller.requestStart(ACCOUNT, GROUP, draft)
                 platform.listener.onReady()
                 platform.listener.onEndOfSpeech()
+            }
+            DictationPreview.ElsewhereListening -> {
+                controller.requestStart(OTHER_ACCOUNT, OTHER_GROUP, draft)
+                platform.listener.onReady()
             }
         }
         return controller
@@ -300,12 +396,15 @@ class ComposerBarScreenshotTest {
         const val LONG_TAG = "long-composer-bar"
         const val ACCOUNT = "account"
         const val GROUP = "group"
+        const val OTHER_ACCOUNT = "other-account"
+        const val OTHER_GROUP = "other-group"
     }
 
     private enum class DictationPreview {
         Idle,
         Listening,
         Processing,
+        ElsewhereListening,
     }
 
     @Suppress("MaxLineLength")

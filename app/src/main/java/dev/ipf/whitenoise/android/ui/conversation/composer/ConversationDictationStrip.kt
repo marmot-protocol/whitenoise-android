@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -58,6 +59,7 @@ import android.provider.Settings as AndroidSettings
 
 internal const val COMPOSER_DICTATION_STRIP_TAG = "composer-dictation-strip"
 internal const val COMPOSER_DICTATION_REVIEW_DIALOG_TAG = "composer-dictation-review-dialog"
+internal const val COMPOSER_DICTATION_ELSEWHERE_ACTION_TAG = "composer-dictation-elsewhere-action"
 
 @Composable
 @Suppress("CyclomaticComplexMethod", "LongMethod")
@@ -254,6 +256,108 @@ private fun ConversationDictationReviewDialog(
 }
 
 @Composable
+internal fun ConversationDictationElsewhereAction(
+    state: ConversationDictationState,
+    controller: ConversationDictationController,
+    modifier: Modifier = Modifier,
+) {
+    if (state is ConversationDictationState.Idle) return
+
+    var reviewDialogOpen by remember(state.sessionId) { mutableStateOf(false) }
+    val context = LocalContext.current
+    val elsewhereStatus = stringResource(R.string.dictation_in_use_other_chat)
+    val actionLabel =
+        when (state) {
+            is ConversationDictationState.Failed ->
+                stringResource(
+                    if (state.reason == ConversationDictationFailure.PermissionPermanentlyDenied) {
+                        R.string.open_app_settings
+                    } else {
+                        R.string.retry
+                    },
+                )
+            is ConversationDictationState.ReviewRequired -> stringResource(R.string.dictation_review_action)
+            else -> stringResource(R.string.dictation_cancel)
+        }
+    val onClick: () -> Unit =
+        when (state) {
+            is ConversationDictationState.Failed ->
+                if (state.reason == ConversationDictationFailure.PermissionPermanentlyDenied) {
+                    { openDictationAppSettings(context) }
+                } else {
+                    controller::retry
+                }
+            is ConversationDictationState.ReviewRequired -> {
+                { reviewDialogOpen = true }
+            }
+            else -> controller::cancel
+        }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(24.dp),
+        modifier =
+            modifier
+                .size(48.dp)
+                .testTag(COMPOSER_DICTATION_ELSEWHERE_ACTION_TAG)
+                .semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    stateDescription = elsewhereStatus
+                },
+    ) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier.semantics { contentDescription = actionLabel },
+        ) {
+            when (state) {
+                is ConversationDictationState.Listening ->
+                    Icon(
+                        Icons.Default.KeyboardVoice,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                is ConversationDictationState.Failed ->
+                    Icon(
+                        if (state.reason == ConversationDictationFailure.PermissionPermanentlyDenied) {
+                            Icons.Default.Settings
+                        } else {
+                            Icons.Default.Refresh
+                        },
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                is ConversationDictationState.ReviewRequired ->
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                else ->
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                    )
+            }
+        }
+    }
+
+    if (reviewDialogOpen && state is ConversationDictationState.ReviewRequired) {
+        ConversationDictationReviewDialog(
+            transcript = state.transcript,
+            onInsert = {
+                reviewDialogOpen = false
+                controller.insertReviewAtEnd()
+            },
+            onDiscard = {
+                reviewDialogOpen = false
+                controller.dismissReview()
+            },
+            onDismiss = { reviewDialogOpen = false },
+        )
+    }
+}
+
+@Composable
 private fun ListeningIndicator(startedAtElapsedMillis: Long) {
     val pulseScale by rememberInfiniteRecordingPulse()
     var elapsedMillis by remember(startedAtElapsedMillis) { mutableLongStateOf(0L) }
@@ -293,6 +397,8 @@ private fun dictationStatusLabel(state: ConversationDictationState): String =
     when (state) {
         is ConversationDictationState.DisclosureRequired,
         is ConversationDictationState.PermissionRequired,
+        is ConversationDictationState.ProviderActivityRequired,
+        is ConversationDictationState.ProviderActivityActive,
         -> stringResource(R.string.dictation_preparing)
         is ConversationDictationState.Starting -> stringResource(R.string.dictation_starting)
         is ConversationDictationState.Listening -> stringResource(R.string.dictation_listening)

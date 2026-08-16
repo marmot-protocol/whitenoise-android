@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.audio.conversationDictationRecognitionActivityIntent
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AppPhase
@@ -157,6 +159,7 @@ fun WhiteNoiseApp(
     val dictation = appState.conversationDictation
     val dictationState = dictation.state
     val dictationPermissionRequestId = dictation.permissionRequestId
+    val dictationProviderActivityRequestId = dictation.providerActivityRequestId
     val dictationPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             val permanentlyDenied =
@@ -165,6 +168,18 @@ fun WhiteNoiseApp(
                         !ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.RECORD_AUDIO)
                     } == true
             dictation.onPermissionResult(granted, permanentlyDenied)
+        }
+    val dictationProviderActivityLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                dictation.onProviderActivityResult(
+                    result.data
+                        ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                        ?.firstOrNull(),
+                )
+            } else {
+                dictation.onProviderActivityCancelled()
+            }
         }
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -239,11 +254,21 @@ fun WhiteNoiseApp(
             dictationPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
-    LaunchedEffect(appState.activeAccountRef, appState.appLockScreenVisible) {
+    LaunchedEffect(dictationProviderActivityRequestId) {
+        if (
+            dictationProviderActivityRequestId > 0L &&
+            dictation.beginProviderActivityLaunch(dictationProviderActivityRequestId)
+        ) {
+            runCatching {
+                dictationProviderActivityLauncher.launch(conversationDictationRecognitionActivityIntent())
+            }.onFailure {
+                dictation.onProviderActivityLaunchFailed()
+            }
+        }
+    }
+    LaunchedEffect(appState.appLockScreenVisible) {
         if (appState.appLockScreenVisible) {
             dictation.cancel()
-        } else {
-            dictation.onActiveAccountChanged(appState.activeAccountRef)
         }
     }
 

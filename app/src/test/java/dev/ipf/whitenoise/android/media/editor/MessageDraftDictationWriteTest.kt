@@ -1,16 +1,31 @@
 package dev.ipf.whitenoise.android.media.editor
 
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
+import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
+import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
+import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
+import dev.ipf.whitenoise.android.state.DraftPersistence
+import dev.ipf.whitenoise.android.state.DraftStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
 class MessageDraftDictationWriteTest {
     @Test
     fun conditionalWriteRejectsAStaleGenerationAndPreservesAttachments() =
@@ -84,12 +99,122 @@ class MessageDraftDictationWriteTest {
             assertEquals("visible other", gateway.values.getValue(otherKey).content)
         }
 
+    @Test
+    fun controllerResultSurvivesNavigationAndReopensFromAuthoritativeMdkDraft() =
+        runTest {
+            val originKey = ACCOUNT to GROUP
+            val otherKey = OTHER_ACCOUNT to OTHER_GROUP
+            val gateway =
+                KeyedDraftGateway(
+                    mutableMapOf(
+                        originKey to draft(GROUP, "Origin "),
+                        otherKey to draft(OTHER_GROUP, "Other"),
+                    ),
+                )
+            val repository =
+                MessageDraftRepository(
+                    gateway = gateway,
+                    editorSessions = EditorSessionStore(TestStringStore()),
+                    ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                )
+            val writer = CoalescingMessageDraftWriter(this, repository, debounceMillis = 0)
+            val cache =
+                mutableMapOf(
+                    originKey to TextFieldValue("Origin ", TextRange(7)),
+                    otherKey to TextFieldValue("Other", TextRange(5)),
+                )
+            val platform = DraftDictationPlatform()
+            val controller =
+                ConversationDictationController(
+                    platform = platform,
+                    readDraft = { account, group ->
+                        ConversationDictationDraftSnapshot(
+                            cache.getValue(account to group),
+                            writer.generation(account, group).value,
+                        )
+                    },
+                    writeDraft = { account, group, expectedRevision, value ->
+                        writer
+                            .submitIfCurrent(
+                                accountRef = account,
+                                groupIdHex = group,
+                                expected = MessageDraftGeneration(expectedRevision),
+                                content = value.text,
+                            )?.let {
+                                cache[account to group] = value
+                                true
+                            } ?: false
+                    },
+                    disclosureAccepted = { true },
+                    markDisclosureAccepted = {},
+                    scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
+                )
+
+            controller.requestStart(ACCOUNT, GROUP, cache.getValue(originKey))
+            // The visible account/chat can change while the immutable origin
+            // remains the delivery target.
+            platform.listener.onResult("dictated")
+            writer.flush()
+
+            assertEquals("Other", gateway.values.getValue(otherKey).content)
+            val reopenedRepository =
+                MessageDraftRepository(
+                    gateway = gateway,
+                    editorSessions = EditorSessionStore(TestStringStore()),
+                    ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                )
+            val authoritative = reopenedRepository.draft(ACCOUNT, GROUP).getOrThrow()
+            val reopenedStore = DraftStore(NoOpDraftPersistence)
+            reopenedStore.replaceFromAuthoritative(
+                ACCOUNT,
+                GROUP,
+                authoritative?.content,
+                authoritative?.createdAtMs,
+            )
+
+            assertEquals("Origin dictated", authoritative?.content)
+            assertEquals(
+                TextFieldValue("Origin dictated", TextRange("Origin dictated".length)),
+                reopenedStore.getDraft(ACCOUNT, GROUP)?.textFieldValue,
+            )
+        }
+
     private companion object {
         const val ACCOUNT = "account"
         const val GROUP = "group"
         const val OTHER_ACCOUNT = "other-account"
         const val OTHER_GROUP = "other-group"
     }
+}
+
+private class DraftDictationPlatform : ConversationDictationPlatform {
+    lateinit var listener: ConversationDictationRecognitionListener
+
+    override fun hasRecordAudioPermission() = true
+
+    override fun recognitionAvailable() = true
+
+    override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
+        this.listener = listener
+        return object : ConversationDictationRecognitionSession {
+            override fun start() = Unit
+
+            override fun stop() = Unit
+
+            override fun cancel() = Unit
+
+            override fun destroy() = Unit
+        }
+    }
+}
+
+private data object NoOpDraftPersistence : DraftPersistence {
+    override fun read(): Map<String, String> = emptyMap()
+
+    override fun write(
+        key: String,
+        value: String?,
+    ) = Unit
 }
 
 private class KeyedDraftGateway(

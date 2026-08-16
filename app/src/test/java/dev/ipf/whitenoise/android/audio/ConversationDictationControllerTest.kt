@@ -14,6 +14,18 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class ConversationDictationControllerTest {
     @Test
+    fun resultPopulatesAnEmptyDraftAndLeavesItEditable() {
+        val fixture = fixture(draft = TextFieldValue("", TextRange.Zero))
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("editable words")
+
+        assertEquals("editable words", fixture.drafts.getValue(key()).text)
+        assertEquals(TextRange("editable words".length), fixture.drafts.getValue(key()).selection)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
+    @Test
     fun resultIsInsertedAtCapturedSelectionAndNeverSent() {
         val fixture = fixture(draft = TextFieldValue("Hello world", TextRange(6, 11)))
 
@@ -70,12 +82,12 @@ class ConversationDictationControllerTest {
     }
 
     @Test
-    fun accountSwitchCancelsOwnedSession() {
+    fun accountBecomingUnavailableCancelsOwnedSession() {
         val fixture = fixture(draft = TextFieldValue("Keep", TextRange(4)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onReady()
 
-        fixture.controller.onActiveAccountChanged(OTHER_ACCOUNT)
+        fixture.controller.onAccountUnavailable(ACCOUNT)
 
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         assertTrue(fixture.platform.session.cancelled)
@@ -148,6 +160,119 @@ class ConversationDictationControllerTest {
         controller.onPermissionResult(true)
         assertTrue(controller.state is ConversationDictationState.Starting)
         assertTrue(platform.session.started)
+    }
+
+    @Test
+    fun providerActivityPathUsesProviderUiWithoutAppPermissionOrMicrophoneLease() {
+        var microphoneAcquireCalls = 0
+        val platform = FakePlatform(hasPermission = false)
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Hello ", TextRange(6)),
+                platform = platform,
+                tryAcquireMicrophone = {
+                    microphoneAcquireCalls += 1
+                    true
+                },
+            )
+
+        assertTrue(
+            fixture.controller.requestProviderActivityStart(
+                ACCOUNT,
+                GROUP,
+                fixture.drafts.getValue(key()),
+            ),
+        )
+        assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
+        assertEquals(1L, fixture.controller.providerActivityRequestId)
+        assertEquals(0, microphoneAcquireCalls)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertFalse(platform.session.started)
+
+        assertTrue(fixture.controller.beginProviderActivityLaunch(1L))
+        fixture.controller.onProviderActivityResult("provider words")
+
+        assertEquals("Hello provider words", fixture.drafts.getValue(key()).text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertEquals(1, fixture.writes)
+    }
+
+    @Test
+    fun providerActivityAlsoWaitsForTheSharedFirstUseDisclosure() {
+        var accepted = false
+        val controller =
+            ConversationDictationController(
+                platform = FakePlatform(hasPermission = false),
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(TextFieldValue(""), 0) },
+                writeDraft = { _, _, _, _ -> true },
+                disclosureAccepted = { accepted },
+                markDisclosureAccepted = { accepted = true },
+            )
+
+        controller.requestProviderActivityStart(ACCOUNT, GROUP, TextFieldValue(""))
+        assertTrue(controller.state is ConversationDictationState.DisclosureRequired)
+        assertEquals(0L, controller.providerActivityRequestId)
+
+        controller.acceptDisclosure()
+
+        assertTrue(controller.state is ConversationDictationState.ProviderActivityRequired)
+        assertEquals(1L, controller.providerActivityRequestId)
+        assertFalse(controller.ownsMicrophone)
+    }
+
+    @Test
+    fun providerActivityCancellationAndUnavailableProviderAreDeterministic() {
+        val cancelled = fixture(draft = TextFieldValue("Keep"))
+        cancelled.controller.requestProviderActivityStart(ACCOUNT, GROUP, cancelled.drafts.getValue(key()))
+        cancelled.controller.beginProviderActivityLaunch(cancelled.controller.providerActivityRequestId)
+
+        cancelled.controller.onProviderActivityCancelled()
+        cancelled.controller.onProviderActivityResult("late")
+
+        assertEquals("Keep", cancelled.drafts.getValue(key()).text)
+        assertEquals(0, cancelled.writes)
+        assertTrue(cancelled.controller.state is ConversationDictationState.Idle)
+
+        val unavailable =
+            fixture(
+                draft = TextFieldValue("Keep"),
+                platform = FakePlatform(activityAvailable = false),
+            )
+        unavailable.controller.requestProviderActivityStart(ACCOUNT, GROUP, unavailable.drafts.getValue(key()))
+
+        assertEquals(
+            ConversationDictationFailure.ProviderUnavailable,
+            (unavailable.controller.state as ConversationDictationState.Failed).reason,
+        )
+
+        val empty = fixture(draft = TextFieldValue("Keep", TextRange(4)))
+        empty.controller.requestProviderActivityStart(ACCOUNT, GROUP, empty.drafts.getValue(key()))
+        empty.controller.beginProviderActivityLaunch(empty.controller.providerActivityRequestId)
+        empty.controller.onProviderActivityResult("   ")
+        assertEquals("Keep", empty.drafts.getValue(key()).text)
+        assertEquals(
+            ConversationDictationFailure.NoSpeech,
+            (empty.controller.state as ConversationDictationState.Failed).reason,
+        )
+    }
+
+    @Test
+    fun activeProviderActivityKeepsOneStableResultOwnerUntilItReturns() {
+        val fixture = fixture(draft = TextFieldValue("Origin", TextRange(6)))
+        fixture.controller.requestProviderActivityStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.beginProviderActivityLaunch(fixture.controller.providerActivityRequestId)
+
+        assertFalse(
+            fixture.controller.requestStart(
+                OTHER_ACCOUNT,
+                OTHER_GROUP,
+                TextFieldValue("Other"),
+            ),
+        )
+        fixture.controller.onProviderActivityResult("result")
+
+        assertEquals("Origin result", fixture.drafts.getValue(key()).text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
     @Test
@@ -301,25 +426,58 @@ class ConversationDictationControllerTest {
         review.platform.listener.onResult("keep me")
         review.controller.onAppBackgrounded()
         assertTrue(review.controller.state is ConversationDictationState.ReviewRequired)
+
+        val provider = fixture(draft = TextFieldValue("Provider"))
+        provider.controller.requestProviderActivityStart(ACCOUNT, GROUP, provider.drafts.getValue(key()))
+        provider.controller.beginProviderActivityLaunch(provider.controller.providerActivityRequestId)
+        provider.controller.onAppBackgrounded()
+        assertTrue(provider.controller.state is ConversationDictationState.ProviderActivityActive)
     }
 
     @Test
-    fun duplicateStartIsRejectedWithoutReplacingTheActiveTarget() {
+    fun duplicateStartForTheSameTargetAndModeIsRejectedWithoutRestarting() {
         val fixture = fixture(draft = TextFieldValue("Source", TextRange(6)))
 
         assertTrue(fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key())))
         val session = fixture.platform.session
         assertFalse(
             fixture.controller.requestStart(
-                OTHER_ACCOUNT,
-                OTHER_GROUP,
-                TextFieldValue("Other", TextRange(5)),
+                ACCOUNT,
+                GROUP,
+                fixture.drafts.getValue(key()),
             ),
         )
 
         assertTrue(fixture.controller.isOwnedBy(ACCOUNT, GROUP))
         assertTrue(fixture.platform.session === session)
         assertEquals(0, session.destroyCalls)
+    }
+
+    @Test
+    fun differentTargetReplacesActiveGenerationAndRejectsItsLateCallbacks() {
+        val fixture = fixture(draft = TextFieldValue("Source", TextRange(6)))
+        fixture.drafts[OTHER_ACCOUNT to OTHER_GROUP] = TextFieldValue("Other", TextRange(5))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val firstListener = fixture.platform.listener
+        val firstSession = fixture.platform.session
+
+        assertTrue(
+            fixture.controller.requestStart(
+                OTHER_ACCOUNT,
+                OTHER_GROUP,
+                fixture.drafts.getValue(OTHER_ACCOUNT to OTHER_GROUP),
+            ),
+        )
+        val secondListener = fixture.platform.listener
+        firstListener.onResult("stale")
+        secondListener.onResult("fresh")
+
+        assertEquals("Source", fixture.drafts.getValue(key()).text)
+        assertEquals("Other fresh", fixture.drafts.getValue(OTHER_ACCOUNT to OTHER_GROUP).text)
+        assertTrue(firstSession.cancelled)
+        assertTrue(firstSession.destroyed)
+        assertEquals(1, firstSession.cancelCalls)
+        assertEquals(1, firstSession.destroyCalls)
     }
 
     @Test
@@ -448,6 +606,7 @@ class ConversationDictationControllerTest {
     private class FakePlatform(
         var hasPermission: Boolean = true,
         var available: Boolean = true,
+        var activityAvailable: Boolean = true,
     ) : ConversationDictationPlatform {
         lateinit var listener: ConversationDictationRecognitionListener
         var session = FakeSession()
@@ -455,6 +614,8 @@ class ConversationDictationControllerTest {
         override fun hasRecordAudioPermission(): Boolean = hasPermission
 
         override fun recognitionAvailable(): Boolean = available
+
+        override fun recognitionActivityAvailable(): Boolean = activityAvailable
 
         override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
             this.listener = listener

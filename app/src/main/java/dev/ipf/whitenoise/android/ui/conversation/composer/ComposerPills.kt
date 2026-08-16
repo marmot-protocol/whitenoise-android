@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.KeyboardVoice
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -111,6 +112,7 @@ internal fun ComposerPill(
     onPickFromGallery: (() -> Unit)?,
     onPickDocument: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    onDictation: (() -> Unit)? = null,
     // Gate inputs only: the sheet these open lives in ComposerBar, but the
     // attach button must appear whenever ANY attachment action is wired, not
     // just gallery/document.
@@ -428,6 +430,26 @@ internal fun ComposerPill(
                         .align(Alignment.BottomEnd)
                         .height(44.dp),
             ) {
+                if (onDictation != null) {
+                    IconButton(
+                        onClick = onDictation,
+                        enabled = inputContentVisible,
+                        modifier =
+                            Modifier
+                                .size(48.dp)
+                                .alpha(if (inputContentVisible) 1f else 0f)
+                                .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                    ) {
+                        // Keyboard + microphone is intentionally distinct from the
+                        // plain microphone used by hold-to-record voice notes.
+                        Icon(
+                            Icons.Default.KeyboardVoice,
+                            contentDescription = stringResource(R.string.dictate_text),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(21.dp),
+                        )
+                    }
+                }
                 if (hasAttachmentAction) {
                     IconButton(
                         onClick = onAttachmentsToggle,
