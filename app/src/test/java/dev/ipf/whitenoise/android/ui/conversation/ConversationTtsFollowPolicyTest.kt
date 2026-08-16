@@ -210,6 +210,23 @@ class ConversationTtsFollowPolicyTest {
     }
 
     @Test
+    fun restoredFollowWithoutActiveTargetRoundTripsFailClosedToForward() {
+        val legacyStateWithoutTarget = listOf(1L, true, true)
+        val policy = ConversationTtsFollowPolicy.Saver.restore(legacyStateWithoutTarget)!!
+
+        val saved = with(ConversationTtsFollowPolicy.Saver) { saveableScope.save(policy) }!!
+        val restored = ConversationTtsFollowPolicy.Saver.restore(saved)!!
+
+        assertTrue(restored.isFollowEnabled)
+        assertFalse(restored.requestExplicitReveal())
+
+        val current = speaking(sessionId = 1, sentenceIndex = 1)
+        restored.observe(current, ownsSession = true)
+
+        assertEquals(TtsFollowDirection.Forward, restored.claimPendingRequest()?.direction)
+    }
+
+    @Test
     fun staleTargetCannotConsumeNewTargetsScrollBudgets() {
         val policy = ConversationTtsFollowPolicy()
         val first = speaking(sessionId = 1, sentenceIndex = 0).followTarget()
