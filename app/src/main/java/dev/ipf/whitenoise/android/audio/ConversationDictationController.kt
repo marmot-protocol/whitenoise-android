@@ -297,14 +297,7 @@ internal class ConversationDictationController internal constructor(
         // ActivityResult owner stable until the provider returns, so a result
         // can never be misattributed to a replacement target.
         if (state is ConversationDictationState.ProviderActivityActive) return false
-        if (
-            blocksNewRequest &&
-            state.target?.let {
-                it.accountRef == accountRef &&
-                    it.groupIdHex == groupIdHex &&
-                    it.mode == mode
-            } == true
-        ) {
+        if (blocksNewRequest && hasSameTarget(accountRef, groupIdHex, mode)) {
             return false
         }
 
@@ -330,6 +323,17 @@ internal class ConversationDictationController internal constructor(
         startTarget(sessionId, target)
         return true
     }
+
+    private fun hasSameTarget(
+        accountRef: String,
+        groupIdHex: String,
+        mode: ConversationDictationMode,
+    ): Boolean =
+        state.target?.let { target ->
+            target.accountRef == accountRef &&
+                target.groupIdHex == groupIdHex &&
+                target.mode == mode
+        } == true
 
     fun acceptDisclosure() {
         val pending = state as? ConversationDictationState.DisclosureRequired ?: return
@@ -760,7 +764,7 @@ private fun insertConversationDictationTranscript(
             !transcript.first().isWhitespace()
     val needsTrailingSpace =
         end < current.text.length &&
-            current.text[end].isLetterOrDigit() &&
+            Character.isLetterOrDigit(current.text.codePointAt(end)) &&
             !transcript.last().isWhitespace()
     val insertion =
         buildString {

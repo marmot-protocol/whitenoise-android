@@ -101,8 +101,12 @@ class ConversationDictationStripTest {
 
         composeRule
             .onNodeWithTag(COMPOSER_DICTATION_ELSEWHERE_ACTION_TAG)
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Dictation is active in another chat"))
-            .assertIsDisplayed()
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    "Dictation is active in another chat",
+                ),
+            ).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Cancel dictation").performClick()
 
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)

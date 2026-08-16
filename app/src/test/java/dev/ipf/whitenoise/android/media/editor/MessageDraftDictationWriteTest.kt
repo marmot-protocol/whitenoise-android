@@ -13,6 +13,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -36,12 +37,7 @@ class MessageDraftDictationWriteTest {
                 KeyedDraftGateway(
                     mutableMapOf(key to draft(GROUP, "baseline", listOf(keptAttachment))),
                 )
-            val repository =
-                MessageDraftRepository(
-                    gateway = gateway,
-                    editorSessions = EditorSessionStore(TestStringStore()),
-                    ioDispatcher = UnconfinedTestDispatcher(testScheduler),
-                )
+            val repository = repository(gateway, UnconfinedTestDispatcher(testScheduler))
             val writer = CoalescingMessageDraftWriter(this, repository, debounceMillis = 0)
             val captured = writer.generation(ACCOUNT, GROUP)
 
@@ -75,12 +71,7 @@ class MessageDraftDictationWriteTest {
                         otherKey to draft(OTHER_GROUP, "visible other"),
                     ),
                 )
-            val repository =
-                MessageDraftRepository(
-                    gateway = gateway,
-                    editorSessions = EditorSessionStore(TestStringStore()),
-                    ioDispatcher = UnconfinedTestDispatcher(testScheduler),
-                )
+            val repository = repository(gateway, UnconfinedTestDispatcher(testScheduler))
             val writer = CoalescingMessageDraftWriter(this, repository, debounceMillis = 0)
             val capturedGeneration = writer.generation(ACCOUNT, GROUP)
 
@@ -111,12 +102,8 @@ class MessageDraftDictationWriteTest {
                         otherKey to draft(OTHER_GROUP, "Other"),
                     ),
                 )
-            val repository =
-                MessageDraftRepository(
-                    gateway = gateway,
-                    editorSessions = EditorSessionStore(TestStringStore()),
-                    ioDispatcher = UnconfinedTestDispatcher(testScheduler),
-                )
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            val repository = repository(gateway, dispatcher)
             val writer = CoalescingMessageDraftWriter(this, repository, debounceMillis = 0)
             val cache =
                 mutableMapOf(
@@ -124,31 +111,7 @@ class MessageDraftDictationWriteTest {
                     otherKey to TextFieldValue("Other", TextRange(5)),
                 )
             val platform = DraftDictationPlatform()
-            val controller =
-                ConversationDictationController(
-                    platform = platform,
-                    readDraft = { account, group ->
-                        ConversationDictationDraftSnapshot(
-                            cache.getValue(account to group),
-                            writer.generation(account, group).value,
-                        )
-                    },
-                    writeDraft = { account, group, expectedRevision, value ->
-                        writer
-                            .submitIfCurrent(
-                                accountRef = account,
-                                groupIdHex = group,
-                                expected = MessageDraftGeneration(expectedRevision),
-                                content = value.text,
-                            )?.let {
-                                cache[account to group] = value
-                                true
-                            } ?: false
-                    },
-                    disclosureAccepted = { true },
-                    markDisclosureAccepted = {},
-                    scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
-                )
+            val controller = dictationController(platform, cache, writer)
 
             controller.requestStart(ACCOUNT, GROUP, cache.getValue(originKey))
             // The visible account/chat can change while the immutable origin
@@ -157,12 +120,7 @@ class MessageDraftDictationWriteTest {
             writer.flush()
 
             assertEquals("Other", gateway.values.getValue(otherKey).content)
-            val reopenedRepository =
-                MessageDraftRepository(
-                    gateway = gateway,
-                    editorSessions = EditorSessionStore(TestStringStore()),
-                    ioDispatcher = UnconfinedTestDispatcher(testScheduler),
-                )
+            val reopenedRepository = repository(gateway, dispatcher)
             val authoritative = reopenedRepository.draft(ACCOUNT, GROUP).getOrThrow()
             val reopenedStore = DraftStore(NoOpDraftPersistence)
             reopenedStore.replaceFromAuthoritative(
@@ -179,6 +137,44 @@ class MessageDraftDictationWriteTest {
             )
         }
 
+    private fun repository(
+        gateway: MessageDraftGateway,
+        ioDispatcher: CoroutineDispatcher,
+    ) = MessageDraftRepository(
+        gateway = gateway,
+        editorSessions = EditorSessionStore(TestStringStore()),
+        ioDispatcher = ioDispatcher,
+    )
+
+    private fun dictationController(
+        platform: DraftDictationPlatform,
+        cache: MutableMap<Pair<String, String>, TextFieldValue>,
+        writer: CoalescingMessageDraftWriter,
+    ) = ConversationDictationController(
+        platform = platform,
+        readDraft = { account, group ->
+            ConversationDictationDraftSnapshot(
+                cache.getValue(account to group),
+                writer.generation(account, group).value,
+            )
+        },
+        writeDraft = { account, group, expectedRevision, value ->
+            writer
+                .submitIfCurrent(
+                    accountRef = account,
+                    groupIdHex = group,
+                    expected = MessageDraftGeneration(expectedRevision),
+                    content = value.text,
+                )?.let {
+                    cache[account to group] = value
+                    true
+                } ?: false
+        },
+        disclosureAccepted = { true },
+        markDisclosureAccepted = {},
+        scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
+    )
+
     private companion object {
         const val ACCOUNT = "account"
         const val GROUP = "group"
@@ -194,6 +190,7 @@ private class DraftDictationPlatform : ConversationDictationPlatform {
 
     override fun recognitionAvailable() = true
 
+    @Suppress("MaxLineLength")
     override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
         this.listener = listener
         return object : ConversationDictationRecognitionSession {

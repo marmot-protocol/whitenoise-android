@@ -41,6 +41,34 @@ class ConversationDictationControllerTest {
     }
 
     @Test
+    fun resultSeparatesTranscriptFromAdjacentUnicodeLetters() {
+        val cases =
+            listOf(
+                "A\uD840\uDC00" to "A dictated \uD840\uDC00",
+                "אב" to "א dictated ב",
+            )
+
+        cases.forEach { (draft, expected) ->
+            val fixture = fixture(draft = TextFieldValue(draft, TextRange(1)))
+
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onResult("dictated")
+
+            assertEquals(expected, fixture.drafts.getValue(key()).text)
+        }
+    }
+
+    @Test
+    fun resultKeepsAdjacentPunctuationTight() {
+        val fixture = fixture(draft = TextFieldValue("Hello,", TextRange(5)))
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("dictated")
+
+        assertEquals("Hello dictated,", fixture.drafts.getValue(key()).text)
+    }
+
+    @Test
     fun concurrentSuffixEditKeepsTheCapturedInsertionAnchor() {
         val fixture = fixture(draft = TextFieldValue("First", TextRange(5)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))

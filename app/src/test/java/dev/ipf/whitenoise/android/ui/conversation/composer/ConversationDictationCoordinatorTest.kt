@@ -416,6 +416,7 @@ class ConversationDictationCoordinatorTest {
 
         override fun recognitionActivityAvailable() = providerActivityAvailable
 
+        @Suppress("MaxLineLength")
         override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
             this.listenerOrNull = listener
             return MatrixSession().also { sessionOrNull = it }
