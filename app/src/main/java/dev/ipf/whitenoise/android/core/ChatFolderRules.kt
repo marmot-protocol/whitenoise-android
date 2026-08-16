@@ -93,13 +93,17 @@ private fun chatFolderRuleMatches(
 // Matches against the roster snapshot the chat-list row already carries. A
 // DM's roster often holds only the active account (the counterpart is not an
 // enumerable member), so the resolved counterpart is matched too; a row whose
-// snapshot ChatsController hasn't loaded yet matches by counterpart only
-// until the roster cache lands and the list recomputes.
+// snapshot ChatsController hasn't loaded yet matches by its presentation-only
+// counterpart until the roster cache lands and the list recomputes. That
+// fallback affects only this local organizational rule; it never populates an
+// authoritative roster or enables membership-sensitive group actions.
 private fun chatHasAnyMember(
     item: ChatListItem,
     wantedMemberHexes: Set<String>,
 ): Boolean {
-    val counterpart = item.otherMemberAccount?.lowercase(Locale.ROOT)
+    val counterpart =
+        (item.otherMemberAccount ?: item.presentationOtherMemberAccount)
+            ?.lowercase(Locale.ROOT)
     val roster = item.memberSnapshot?.members.orEmpty()
     return (counterpart != null && counterpart in wantedMemberHexes) ||
         roster.any { it.memberIdHex.lowercase(Locale.ROOT) in wantedMemberHexes }

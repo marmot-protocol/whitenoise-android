@@ -10,6 +10,7 @@
     <string name="error_loaded_content_kept">Não foi possível carregar mais conteúdo. Suas mensagens continuam disponíveis; tente novamente quando quiser.</string>
     <string name="refresh">Atualizar dump</string>
     <string name="retry">Tentar novamente</string>
+    <string name="chat_folder_members_loading">Atualizando pasta</string>
     <string name="creating_identity">Criando identidade</string>
     <string name="creating_identity_title">Criando identidade</string>
     <string name="create_new_identity">Criar nova identidade</string>

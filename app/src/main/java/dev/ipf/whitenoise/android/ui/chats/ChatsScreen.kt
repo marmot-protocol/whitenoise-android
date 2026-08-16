@@ -747,12 +747,30 @@ internal fun ChatsScreen(
         remember(controller.items) {
             controller.items.count { it.hasUnread }
         }
+    val pendingFolderIds =
+        remember(
+            accountFolders,
+            folderStoreState,
+            appState.activeAccountRef,
+            controller.items,
+            controller.archivedItems,
+            controller.memberSnapshotsRevision,
+        ) {
+            accountFolders
+                .mapNotNullTo(mutableSetOf()) { folder ->
+                    val accountRef = appState.activeAccountRef ?: return@mapNotNullTo null
+                    val rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id)
+                    val source = if (rule?.archivedOnly == true) controller.archivedItems else controller.items
+                    folder.id.takeIf { memberBasedFolderPending(rule, source) }
+                }
+        }
     val folderChipModels =
         remember(
             accountFolders,
             controller.items,
             controller.archivedItems,
             resolveFolderChatIds,
+            pendingFolderIds,
             selectedFolderId,
         ) {
             chatFolderChipModels(
@@ -764,6 +782,7 @@ internal fun ChatsScreen(
                     appState.activeAccountRef?.let { appState.chatFolderPreferences.folderRule(it, folderId) }
                 },
                 membershipOf = resolveFolderChatIds,
+                pendingFolderIds = pendingFolderIds,
                 selectedFolderId = selectedFolderId,
             )
         }

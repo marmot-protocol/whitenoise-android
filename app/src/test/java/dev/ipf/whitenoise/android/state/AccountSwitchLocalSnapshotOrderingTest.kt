@@ -49,7 +49,9 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val profileWarm = body.indexOf("warmProfilePresentationsBlocking", startIndex = staleCheck)
         val secondStaleCheck = body.indexOf("initialMemberProjectionIsCurrent", startIndex = profileWarm)
         val publish = body.indexOf("applyInitialMemberIdProjections", startIndex = secondStaleCheck)
-        val guardCapturesGeneration = "memberCacheEpoch == expectedCacheEpoch" in currentCheck
+        val guardCapturesGeneration =
+            "initialMemberFallbackGenerationIsCurrent" in currentCheck &&
+                "currentCacheEpoch = memberCacheEpoch" in currentCheck
         val publisherReplacesCache = "memberCacheByGroup = updatedCache" in publisher
 
         assertTrue("the current cache generation must be captured before suspension", capturedEpoch >= 0)
