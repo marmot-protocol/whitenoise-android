@@ -1,3 +1,17 @@
+// Keep AGP's Bouncy Castle modules aligned on the security-fixed release.
+buildscript {
+    val bouncyCastleVersion = providers.gradleProperty("bouncycastle.version").get()
+
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.bouncycastle:bcprov-jdk18on:$bouncyCastleVersion")
+        classpath("org.bouncycastle:bcpkix-jdk18on:$bouncyCastleVersion")
+        classpath("org.bouncycastle:bcutil-jdk18on:$bouncyCastleVersion")
+    }
+}
+
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 plugins {
     alias(libs.plugins.android.application) apply false
