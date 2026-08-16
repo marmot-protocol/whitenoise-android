@@ -61,7 +61,46 @@ internal class TtsHighlightProjectionResolver(
                 leafSpanCache = leafSpanCache,
             )
         }
+
+    @Suppress("ReturnCount")
+    internal fun sentenceLayoutFor(
+        sentenceIndex: Int,
+        renderedLeafId: String,
+        renderedText: String,
+    ): TtsSentenceLeafLayout? {
+        if (renderedText.isEmpty()) return null
+        val sentence = sentenceSourceInterval(sentenceIndex, sentenceChunks) ?: return null
+        val mappedSpans =
+            mapProjectionSpansToRenderedLeaf(
+                projection = projection,
+                renderedLeafId = renderedLeafId,
+                renderedText = renderedText,
+                leafSpanCache = leafSpanCache,
+            ) ?: return null
+        val expectedCoverage = projection.sentenceCoverage(sentence)
+        val coverage = mappedSpans.sentenceCoverage(sentence)
+        if (expectedCoverage.isEmpty() || coverage.isEmpty()) return null
+        val ranges = mappedSpans.sentenceRenderedRanges(sentence)
+        if (ranges.isEmpty()) return null
+        return TtsSentenceLeafLayout(
+            renderedRanges = ranges,
+            coverage = coverage,
+            expectedCoverage = expectedCoverage,
+        )
+    }
 }
+
+internal data class TtsSentenceProjectionSegment(
+    val leafId: String,
+    val spokenStart: Int,
+    val spokenEnd: Int,
+)
+
+internal data class TtsSentenceLeafLayout(
+    val renderedRanges: List<IntRange>,
+    val coverage: Set<TtsSentenceProjectionSegment>,
+    val expectedCoverage: Set<TtsSentenceProjectionSegment>,
+)
 
 /**
  * Resolves the active read-aloud passage into a half-open UTF-16 range inside
@@ -107,18 +146,13 @@ private fun resolveTtsRenderedHighlight(
     if (passage == null || passage.messageIdHex != messageIdHex) return null
     if (passage.projectionId != projection.projectionId) return null
     if (renderedText.isEmpty()) return null
-    val cacheKey = renderedLeafId to renderedText
     val mappedSpans =
-        if (leafSpanCache != null && leafSpanCache.containsKey(cacheKey)) {
-            leafSpanCache[cacheKey]
-        } else {
-            mapProjectionSpansToRenderedLeaf(
-                projection = projection,
-                renderedLeafId = renderedLeafId,
-                renderedText = renderedText,
-            ).also { leafSpanCache?.put(cacheKey, it) }
-        }
-    if (mappedSpans == null) return null
+        mapProjectionSpansToRenderedLeaf(
+            projection = projection,
+            renderedLeafId = renderedLeafId,
+            renderedText = renderedText,
+            leafSpanCache = leafSpanCache,
+        ) ?: return null
     return if (passage.visibleWord.isNotEmpty()) {
         visibleWordHighlight(passage.visibleWord, renderedLeafId, mappedSpans)
     } else {
@@ -146,14 +180,22 @@ private fun mapProjectionSpansToRenderedLeaf(
     projection: SpeakableTextProjection,
     renderedLeafId: String,
     renderedText: String,
+    leafSpanCache: MutableMap<Pair<String, String>, List<RenderedProjectionSpan>?>? = null,
 ): List<RenderedProjectionSpan>? {
+    val cacheKey = renderedLeafId to renderedText
+    if (leafSpanCache != null && leafSpanCache.containsKey(cacheKey)) return leafSpanCache[cacheKey]
     val spans =
         projection.spans
             .filter { it.isValidForRenderedLeaf(renderedLeafId, projection.text.length) }
             .sortedBy(SpeakableTextProjectionSpan::spokenStart)
-    if (spans.isEmpty()) return null
-    return directProjectionSpanMapping(spans, projection.text, renderedLeafId, renderedText)
-        ?: alignedProjectionSpanMapping(spans, projection.text, renderedText)
+    val mapped =
+        if (spans.isEmpty()) {
+            null
+        } else {
+            directProjectionSpanMapping(spans, projection.text, renderedLeafId, renderedText)
+                ?: alignedProjectionSpanMapping(spans, projection.text, renderedText)
+        }
+    return mapped.also { leafSpanCache?.put(cacheKey, it) }
 }
 
 @Suppress("ReturnCount")
@@ -275,11 +317,11 @@ private fun sentenceHighlight(
     mappedSpans: List<RenderedProjectionSpan>,
     sentenceChunks: List<TtsChunk>,
 ): IntRange? {
-    val sentence = sentenceChunks.firstOrNull { it.sentenceIndex == sentenceIndex } ?: return null
+    val sentence = sentenceSourceInterval(sentenceIndex, sentenceChunks) ?: return null
     val intervals = ArrayList<RenderedInterval>()
     for (mapped in mappedSpans) {
-        val overlapStart = max(sentence.sourceStart, mapped.source.spokenStart)
-        val overlapEnd = min(sentence.sourceEnd, mapped.source.spokenEnd)
+        val overlapStart = max(sentence.start, mapped.source.spokenStart)
+        val overlapEnd = min(sentence.end, mapped.source.spokenEnd)
         if (overlapStart >= overlapEnd) continue
         intervals +=
             RenderedInterval(
@@ -288,6 +330,75 @@ private fun sentenceHighlight(
             )
     }
     return contiguousRange(intervals)
+}
+
+private data class SentenceSourceInterval(
+    val start: Int,
+    val end: Int,
+)
+
+private typealias SentenceCoverage = Set<TtsSentenceProjectionSegment>
+
+private fun sentenceSourceInterval(
+    sentenceIndex: Int,
+    sentenceChunks: List<TtsChunk>,
+): SentenceSourceInterval? {
+    val chunks = sentenceChunks.filter { it.sentenceIndex == sentenceIndex }
+    if (chunks.isEmpty()) return null
+    return SentenceSourceInterval(
+        start = chunks.minOf(TtsChunk::sourceStart),
+        end = chunks.maxOf(TtsChunk::sourceEnd),
+    )
+}
+
+private fun SpeakableTextProjection.sentenceCoverage(sentence: SentenceSourceInterval): SentenceCoverage =
+    spans
+        .mapNotNull { span -> span.sentenceCoverageSegment(sentence, text.length) }
+        .toSet()
+
+private fun List<RenderedProjectionSpan>.sentenceCoverage(sentence: SentenceSourceInterval): SentenceCoverage =
+    mapNotNull { mapped -> mapped.source.sentenceCoverageSegment(sentence, Int.MAX_VALUE) }
+        .toSet()
+
+private fun SpeakableTextProjectionSpan.sentenceCoverageSegment(
+    sentence: SentenceSourceInterval,
+    projectionTextLength: Int,
+): TtsSentenceProjectionSegment? {
+    if (spokenStart < 0 || spokenEnd <= spokenStart || spokenEnd > projectionTextLength) return null
+    val overlapStart = max(sentence.start, spokenStart)
+    val overlapEnd = min(sentence.end, spokenEnd)
+    return if (overlapStart < overlapEnd) {
+        TtsSentenceProjectionSegment(leafId, overlapStart, overlapEnd)
+    } else {
+        null
+    }
+}
+
+private fun List<RenderedProjectionSpan>.sentenceRenderedRanges(sentence: SentenceSourceInterval): List<IntRange> {
+    val intervals =
+        mapNotNull { mapped ->
+            val overlapStart = max(sentence.start, mapped.source.spokenStart)
+            val overlapEnd = min(sentence.end, mapped.source.spokenEnd)
+            if (overlapStart >= overlapEnd) {
+                null
+            } else {
+                RenderedInterval(
+                    start = mapped.renderedStart + overlapStart - mapped.source.spokenStart,
+                    end = mapped.renderedStart + overlapEnd - mapped.source.spokenStart,
+                )
+            }
+        }.sortedBy(RenderedInterval::start)
+    if (intervals.isEmpty()) return emptyList()
+    val merged = ArrayList<RenderedInterval>()
+    for (interval in intervals) {
+        val previous = merged.lastOrNull()
+        if (previous != null && interval.start <= previous.end) {
+            merged[merged.lastIndex] = previous.copy(end = max(previous.end, interval.end))
+        } else {
+            merged += interval
+        }
+    }
+    return merged.map { it.start until it.end }
 }
 
 private fun contiguousRange(intervals: List<RenderedInterval>): IntRange? {

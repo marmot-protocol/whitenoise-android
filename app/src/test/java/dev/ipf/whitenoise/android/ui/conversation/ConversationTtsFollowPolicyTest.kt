@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.runtime.saveable.SaverScope
+import androidx.compose.ui.geometry.Rect
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsSentenceProjectionSegment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -11,6 +14,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationTtsFollowPolicyTest {
+    private val saveableScope = SaverScope { true }
+
     @Test
     fun eachSentenceIsClaimedOnceAndWordProgressDoesNotCreateAnotherScroll() {
         val policy = ConversationTtsFollowPolicy()
@@ -64,6 +69,274 @@ class ConversationTtsFollowPolicyTest {
             )
 
         assertEquals(sentenceFallback.conversationFollowSignal(), exactWord.conversationFollowSignal())
+    }
+
+    @Test
+    fun reverseSentenceNavigationKeepsOneReverseDecisionAcrossWordCallbacks() {
+        val policy = ConversationTtsFollowPolicy()
+        val later = speaking(sessionId = 1, sentenceIndex = 2)
+        policy.observe(later, ownsSession = true)
+        policy.claimPendingRequest()
+
+        val earlier = speaking(sessionId = 1, sentenceIndex = 1)
+        policy.observe(earlier, ownsSession = true)
+        assertEquals(
+            ConversationTtsFollowRequest(earlier.followTarget(), TtsFollowDirection.Reverse),
+            policy.claimPendingRequest(),
+        )
+
+        policy.observe(
+            earlier.copy(
+                passage =
+                    earlier.passage?.copy(
+                        visibleWord = listOf(TtsVisibleTextSpan("plain", 0, 5)),
+                    ),
+            ),
+            ownsSession = true,
+        )
+        assertNull(policy.claimPendingRequest())
+    }
+
+    @Test
+    fun reverseMessageNavigationUsesQueueOrderWhenTimestampsTie() {
+        val policy = ConversationTtsFollowPolicy()
+        policy.observe(
+            speaking(
+                sessionId = 1,
+                sentenceIndex = 0,
+                messageIdHex = "later",
+                messageIndex = 2,
+            ),
+            ownsSession = true,
+        )
+        policy.claimPendingRequest()
+
+        val earlier =
+            speaking(
+                sessionId = 1,
+                sentenceIndex = 0,
+                messageIdHex = "earlier",
+                messageIndex = 1,
+            )
+        policy.observe(earlier, ownsSession = true)
+
+        assertEquals(
+            ConversationTtsFollowRequest(earlier.followTarget(), TtsFollowDirection.Reverse),
+            policy.claimPendingRequest(),
+        )
+    }
+
+    @Test
+    fun restoredReverseTargetKeepsBottomAnchorForOversizedSentence() {
+        val policy = ConversationTtsFollowPolicy()
+        val later = speaking(sessionId = 1, sentenceIndex = 2)
+        policy.observe(later, ownsSession = true)
+        policy.claimPendingRequest()
+
+        val earlier = speaking(sessionId = 1, sentenceIndex = 1)
+        policy.observe(earlier, ownsSession = true)
+        assertEquals(TtsFollowDirection.Reverse, policy.claimPendingRequest()?.direction)
+
+        val saved = with(ConversationTtsFollowPolicy.Saver) { saveableScope.save(policy) }!!
+        val restored = ConversationTtsFollowPolicy.Saver.restore(saved)!!
+        restored.observe(earlier, ownsSession = true)
+        val restoredRequest = restored.claimPendingRequest()!!
+
+        assertEquals(TtsFollowDirection.Reverse, restoredRequest.direction)
+        assertEquals(
+            TtsFollowViewportDecision.ScrollToItemOffset(100),
+            decide(
+                itemOffset = 0,
+                sentenceTop = 100,
+                sentenceBottom = 900,
+                direction = restoredRequest.direction,
+            ),
+        )
+    }
+
+    @Test
+    fun restoredReverseDirectionDoesNotLeakWhenPlaybackAdvancesBeforeObservation() {
+        val policy = ConversationTtsFollowPolicy()
+        val later = speaking(sessionId = 1, sentenceIndex = 2)
+        policy.observe(later, ownsSession = true)
+        policy.claimPendingRequest()
+
+        val earlier = speaking(sessionId = 1, sentenceIndex = 1)
+        policy.observe(earlier, ownsSession = true)
+        assertEquals(TtsFollowDirection.Reverse, policy.claimPendingRequest()?.direction)
+
+        val saved = with(ConversationTtsFollowPolicy.Saver) { saveableScope.save(policy) }!!
+        val restored = ConversationTtsFollowPolicy.Saver.restore(saved)!!
+        restored.observe(later, ownsSession = true)
+        val restoredRequest = restored.claimPendingRequest()!!
+
+        assertEquals(TtsFollowDirection.Forward, restoredRequest.direction)
+        assertEquals(
+            TtsFollowViewportDecision.ScrollToItemOffset(-100),
+            decide(
+                itemOffset = 0,
+                sentenceTop = 100,
+                sentenceBottom = 900,
+                direction = restoredRequest.direction,
+            ),
+        )
+    }
+
+    @Test
+    fun restoredQueuePositionStillDetectsReverseMessageNavigation() {
+        val policy = ConversationTtsFollowPolicy()
+        val later =
+            speaking(
+                sessionId = 1,
+                sentenceIndex = 0,
+                messageIdHex = "later",
+                messageIndex = 2,
+            )
+        policy.observe(later, ownsSession = true)
+        policy.claimPendingRequest()
+
+        val saved = with(ConversationTtsFollowPolicy.Saver) { saveableScope.save(policy) }!!
+        val restored = ConversationTtsFollowPolicy.Saver.restore(saved)!!
+        val earlier =
+            speaking(
+                sessionId = 1,
+                sentenceIndex = 0,
+                messageIdHex = "earlier",
+                messageIndex = 1,
+            )
+        restored.observe(earlier, ownsSession = true)
+
+        assertEquals(TtsFollowDirection.Reverse, restored.claimPendingRequest()?.direction)
+    }
+
+    @Test
+    fun restoredFollowWithoutActiveTargetRoundTripsFailClosedToForward() {
+        val legacyStateWithoutTarget = listOf(1L, true, true)
+        val policy = ConversationTtsFollowPolicy.Saver.restore(legacyStateWithoutTarget)!!
+
+        val saved = with(ConversationTtsFollowPolicy.Saver) { saveableScope.save(policy) }!!
+        val restored = ConversationTtsFollowPolicy.Saver.restore(saved)!!
+
+        assertTrue(restored.isFollowEnabled)
+        assertFalse(restored.requestExplicitReveal())
+
+        val current = speaking(sessionId = 1, sentenceIndex = 1)
+        restored.observe(current, ownsSession = true)
+
+        assertEquals(TtsFollowDirection.Forward, restored.claimPendingRequest()?.direction)
+    }
+
+    @Test
+    fun staleTargetCannotConsumeNewTargetsScrollBudgets() {
+        val policy = ConversationTtsFollowPolicy()
+        val first = speaking(sessionId = 1, sentenceIndex = 0).followTarget()
+        val secondState = speaking(sessionId = 1, sentenceIndex = 1)
+        val second = secondState.followTarget()
+        policy.observe(speaking(sessionId = 1, sentenceIndex = 0), ownsSession = true)
+        policy.claimPendingRequest()
+        policy.observe(secondState, ownsSession = true)
+
+        assertFalse(policy.claimPreposition(first))
+        assertFalse(policy.claimCorrectiveScroll(first))
+        assertTrue(policy.claimPreposition(second))
+        assertTrue(policy.claimCorrectiveScroll(second))
+        assertFalse(policy.claimPreposition(second))
+        assertFalse(policy.claimCorrectiveScroll(second))
+    }
+
+    @Test
+    fun sentenceLayoutRequiresCompleteCoverageFromCurrentRowInstance() {
+        val registry = ConversationTtsSentenceLayoutRegistry()
+        val target = speaking(sessionId = 1, sentenceIndex = 0).followTarget()
+        val oldRow = Any()
+        val currentRow = Any()
+        val firstCoverage = TtsSentenceProjectionSegment("a", 0, 5)
+        val secondCoverage = TtsSentenceProjectionSegment("b", 5, 10)
+        val expected = setOf(firstCoverage, secondCoverage)
+        registry.mountRow(target.messageIdHex, oldRow)
+        registry.report(
+            ConversationTtsSentenceLayoutReport(
+                target = target,
+                rowInstance = oldRow,
+                renderedLeafId = "a",
+                boundsInWindow = Rect(0f, 100f, 100f, 140f),
+                coverage = setOf(firstCoverage),
+                expectedCoverage = expected,
+            ),
+        )
+        assertNull(registry.completeSentenceBounds(target))
+
+        registry.mountRow(target.messageIdHex, currentRow)
+        registry.report(
+            ConversationTtsSentenceLayoutReport(
+                target = target,
+                rowInstance = oldRow,
+                renderedLeafId = "b",
+                boundsInWindow = Rect(0f, 140f, 100f, 180f),
+                coverage = setOf(secondCoverage),
+                expectedCoverage = expected,
+            ),
+        )
+        assertNull(registry.completeSentenceBounds(target))
+
+        registry.report(
+            ConversationTtsSentenceLayoutReport(
+                target = target,
+                rowInstance = currentRow,
+                renderedLeafId = "a",
+                boundsInWindow = Rect(0f, 200f, 100f, 240f),
+                coverage = setOf(firstCoverage),
+                expectedCoverage = expected,
+            ),
+        )
+        registry.report(
+            ConversationTtsSentenceLayoutReport(
+                target = target,
+                rowInstance = currentRow,
+                renderedLeafId = "b",
+                boundsInWindow = Rect(0f, 240f, 100f, 280f),
+                coverage = setOf(secondCoverage),
+                expectedCoverage = expected,
+            ),
+        )
+
+        assertEquals(Rect(0f, 200f, 100f, 280f), registry.completeSentenceBounds(target))
+    }
+
+    @Test
+    fun sentenceLayoutRejectsReportsFromPreviousViewportGeometry() {
+        val registry = ConversationTtsSentenceLayoutRegistry()
+        val target = speaking(sessionId = 1, sentenceIndex = 0).followTarget()
+        val row = Any()
+        val coverage = setOf(TtsSentenceProjectionSegment("plain", 0, 10))
+        registry.mountRow(target.messageIdHex, row)
+        registry.updateViewportBounds(Rect(0f, 0f, 100f, 1_000f))
+        registry.report(
+            ConversationTtsSentenceLayoutReport(
+                target = target,
+                rowInstance = row,
+                renderedLeafId = "plain",
+                boundsInWindow = Rect(0f, 300f, 100f, 400f),
+                coverage = coverage,
+                expectedCoverage = coverage,
+            ),
+        )
+        assertEquals(Rect(0f, 300f, 100f, 400f), registry.completeSentenceBounds(target))
+
+        registry.updateViewportBounds(Rect(0f, 100f, 100f, 1_000f))
+        assertNull(registry.completeSentenceBounds(target))
+
+        registry.report(
+            ConversationTtsSentenceLayoutReport(
+                target = target,
+                rowInstance = row,
+                renderedLeafId = "plain",
+                boundsInWindow = Rect(0f, 400f, 100f, 500f),
+                coverage = coverage,
+                expectedCoverage = coverage,
+            ),
+        )
+        assertEquals(Rect(0f, 400f, 100f, 500f), registry.completeSentenceBounds(target))
     }
 
     @Test
@@ -175,77 +448,77 @@ class ConversationTtsFollowPolicyTest {
     }
 
     @Test
-    fun viewportUsesTheMiddleSixtyPercentAsItsNoScrollBand() {
+    fun measuredSentenceUsesMinimumDeltaToEnterTheMiddleSixtyPercentBand() {
         assertEquals(
             TtsFollowViewportDecision.Stay,
-            decide(itemOffset = 0, sentenceIndex = 4, sentenceCount = 10),
+            decide(itemOffset = 0, sentenceTop = 350, sentenceBottom = 450),
         )
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(-450),
-            decide(itemOffset = 0, sentenceIndex = 0, sentenceCount = 10),
+            TtsFollowViewportDecision.ScrollToItemOffset(-150),
+            decide(itemOffset = 0, sentenceTop = 50, sentenceBottom = 150),
         )
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(450),
-            decide(itemOffset = 0, sentenceIndex = 9, sentenceCount = 10),
+            TtsFollowViewportDecision.ScrollToItemOffset(100),
+            decide(itemOffset = 0, sentenceTop = 850, sentenceBottom = 900),
         )
     }
 
     @Test
-    fun viewportDecisionUsesMountedRowCoordinatesButReturnsAStableTargetOffset() {
+    fun oversizedMeasuredSentenceUsesStableDirectionAnchor() {
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(-150),
-            TtsFollowViewport.decide(
-                viewportStart = 100,
-                viewportEnd = 900,
-                itemOffset = -200,
-                itemSize = 500,
-                sentenceIndex = 0,
-                sentenceCount = 1,
+            TtsFollowViewportDecision.ScrollToItemOffset(-100),
+            decide(
+                itemOffset = 0,
+                sentenceTop = 100,
+                sentenceBottom = 900,
+                direction = TtsFollowDirection.Forward,
             ),
         )
         assertEquals(
-            TtsFollowViewportDecision.Stay,
-            TtsFollowViewport.decide(
-                viewportStart = 100,
-                viewportEnd = 900,
-                itemOffset = 350,
-                itemSize = 100,
-                sentenceIndex = 0,
-                sentenceCount = 1,
+            TtsFollowViewportDecision.ScrollToItemOffset(100),
+            decide(
+                itemOffset = 0,
+                sentenceTop = 100,
+                sentenceBottom = 900,
+                direction = TtsFollowDirection.Reverse,
             ),
         )
     }
 
     private fun decide(
         itemOffset: Int,
-        sentenceIndex: Int,
-        sentenceCount: Int,
+        sentenceTop: Int,
+        sentenceBottom: Int,
+        direction: TtsFollowDirection = TtsFollowDirection.Forward,
     ): TtsFollowViewportDecision =
         TtsFollowViewport.decide(
             viewportStart = 0,
             viewportEnd = 1_000,
             itemOffset = itemOffset,
-            itemSize = 1_000,
-            sentenceIndex = sentenceIndex,
-            sentenceCount = sentenceCount,
+            sentenceTop = sentenceTop,
+            sentenceBottom = sentenceBottom,
+            direction = direction,
         )
 
     private fun speaking(
         sessionId: Long,
         sentenceIndex: Int,
+        messageIdHex: String = "m1",
+        messageIndex: Int = 0,
+        messageCount: Int = 3,
     ): TtsState.Speaking =
         TtsState.Speaking(
             sessionId = sessionId,
             chunkIndex = sentenceIndex,
             chunkCount = 3,
-            messageIndex = 0,
-            messageCount = 1,
+            messageIndex = messageIndex,
+            messageCount = messageCount,
             sentenceIndexWithinMessage = sentenceIndex,
             sentenceCountWithinMessage = 3,
             messagePreview = "preview",
             passage =
                 TtsPassage(
-                    messageIdHex = "m1",
+                    messageIdHex = messageIdHex,
                     sentenceIndex = sentenceIndex,
                     projectionId = "projection-1",
                     timelineAt = 42uL,

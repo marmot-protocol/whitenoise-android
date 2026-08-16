@@ -65,6 +65,7 @@ internal fun TimelineRow(
     mentionCandidates: List<MentionComposer.Candidate>,
     mentionPickerEnabled: Boolean,
     collapseLongMessages: Boolean,
+    ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
 ) {
     Column(Modifier.fillMaxWidth()) {
         val daySeparatorLabel =
@@ -226,6 +227,7 @@ internal fun TimelineRow(
                     showSenderAvatar = senderDecoration.showAvatar,
                     collapseLongMessages = collapseLongMessages,
                     readOnly = controller.group.pendingConfirmation,
+                    ttsSentenceLayoutSink = ttsSentenceLayoutSink,
                 )
             }
         }

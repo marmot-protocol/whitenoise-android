@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Rect
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
@@ -47,9 +49,15 @@ internal fun timelineRowTtsReadAloudProgress(
         else -> null
     }
 
-private data class TimelineRowTtsHighlightState(
+internal fun timelineRowTtsFollowTarget(
+    messageIdHex: String,
+    state: TtsState,
+): ConversationTtsFollowTarget? = state.conversationFollowTargetOrNull()?.takeIf { it.messageIdHex == messageIdHex }
+
+internal data class TimelineRowTtsHighlightState(
     val passage: TtsPassage?,
     val progress: TtsReadAloudProgress?,
+    val followTarget: ConversationTtsFollowTarget? = null,
 )
 
 @Composable
@@ -90,9 +98,17 @@ internal fun TimelineRowMessageBubble(
     showSenderAvatar: Boolean,
     collapseLongMessages: Boolean,
     readOnly: Boolean,
+    ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
 ) {
     val ttsHighlightState by rememberRowScopedTtsHighlightState(messageIdHex, appState)
+    val ttsRowInstance = remember(messageIdHex) { Any() }
+    DisposableEffect(ttsSentenceLayoutSink, messageIdHex, ttsRowInstance) {
+        ttsSentenceLayoutSink?.mountRow(messageIdHex, ttsRowInstance)
+        onDispose {
+            ttsSentenceLayoutSink?.unmountRow(messageIdHex, ttsRowInstance)
+        }
+    }
     MessageBubble(
         item = item,
         controller = controller,
@@ -137,6 +153,9 @@ internal fun TimelineRowMessageBubble(
         readOnly = readOnly,
         ttsHighlightPassage = ttsHighlightState.passage,
         ttsReadAloudProgress = ttsHighlightState.progress,
+        ttsFollowTarget = ttsHighlightState.followTarget,
+        ttsSentenceLayoutSink = ttsSentenceLayoutSink,
+        ttsRowInstance = ttsRowInstance,
         parseMarkdown = parseMarkdown,
     )
 }
@@ -155,6 +174,7 @@ private fun rememberRowScopedTtsHighlightState(
             TimelineRowTtsHighlightState(
                 passage = timelineRowTtsHighlightPassage(messageIdHex, state),
                 progress = timelineRowTtsReadAloudProgress(messageIdHex, state),
+                followTarget = timelineRowTtsFollowTarget(messageIdHex, state),
             )
         }.distinctUntilChanged()
         .collect { value = it }

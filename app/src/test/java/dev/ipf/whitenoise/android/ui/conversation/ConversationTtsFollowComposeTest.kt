@@ -1,14 +1,17 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,6 +19,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
@@ -25,15 +33,23 @@ import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.MarkdownBlockFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsState
+import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsSentenceProjectionSegment
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.filter
@@ -44,9 +60,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
+@Suppress("LargeClass")
 class ConversationTtsFollowComposeTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -282,7 +300,125 @@ class ConversationTtsFollowComposeTest {
         }
     }
 
+    @Test
+    fun staleLargeRowHeightEstimateCannotLeaveCompactTargetUnmounted() {
+        var request by mutableStateOf(0)
+        lateinit var visibleKeys: () -> List<Any>
+        val messages = (0 until 100).map { "message-$it" }
+        val targetMessageId = "message-5"
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                FollowViewportHarness(
+                    messages = messages,
+                    initialFirstVisibleItemIndex = 90,
+                    targetMessageId = targetMessageId,
+                    request = request,
+                    onVisibleKeys = { visibleKeys = it },
+                    estimatedItemHeightPx = 10_000,
+                )
+            }
+        }
+        composeRule.runOnIdle { request++ }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            assertTrue("the provisional jump must mount the target row", targetMessageId in visibleKeys())
+        }
+    }
+
+    @Test
+    fun markdownLeafReportsItsNewWindowPositionAfterParentRelayout() {
+        var offsetPx by mutableStateOf(0)
+        val reportedTops = mutableListOf<Float>()
+        val document =
+            MarkdownDocumentFfi(
+                blocks = listOf(MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("Sentence")))),
+                truncated = false,
+                blankLinesBefore = byteArrayOf(0),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.offset { IntOffset(0, offsetPx) }) {
+                    MarkdownMessageBody(
+                        document = document,
+                        ttsSentenceLayoutReporter = { _, _, layout, coordinates ->
+                            if (layout != null && coordinates != null) {
+                                reportedTops += coordinates.positionInWindow().y
+                            }
+                        },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val initialTop = reportedTops.last()
+
+        composeRule.runOnIdle { offsetPx = 120 }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            assertTrue(
+                "a placement-only move must publish fresh sentence coordinates",
+                reportedTops.last() >= initialTop + 119f,
+            )
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h780dp-mdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun tallMediaBeforeSentenceUsesMeasuredSentenceGeometry() {
+        assertMeasuredShapeFollowsSentence(FollowTargetShape.TallMediaBeforeSentence)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/tts_follow_tall_media_sentence_light.png")
+    }
+
+    @Test
+    fun markdownSentenceSplitAcrossRenderedLeavesWaitsForCompleteGeometry() {
+        assertMeasuredShapeFollowsSentence(FollowTargetShape.SplitMarkdown)
+    }
+
+    @Test
+    fun replyAndFooterDoNotBiasBodySentenceFollow() {
+        assertMeasuredShapeFollowsSentence(FollowTargetShape.ReplyAndFooterAroundBody)
+    }
+
+    private fun assertMeasuredShapeFollowsSentence(shape: FollowTargetShape) {
+        var request by mutableStateOf(0)
+        lateinit var targetLayout: () -> Pair<Rect?, Rect?>
+        val messages = (0 until 30).map { "message-$it" }
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                FollowViewportHarness(
+                    messages = messages,
+                    initialFirstVisibleItemIndex = 25,
+                    targetMessageId = "message-5",
+                    request = request,
+                    onVisibleKeys = {},
+                    targetShape = shape,
+                    onTargetLayout = { targetLayout = it },
+                )
+            }
+        }
+        composeRule.runOnIdle { request++ }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            val (sentenceBounds, viewportBounds) = targetLayout()
+            val sentence = requireNotNull(sentenceBounds)
+            val viewport = requireNotNull(viewportBounds)
+            val safeTop = viewport.top + viewport.height * 0.20f
+            val safeBottom = viewport.bottom - viewport.height * 0.20f
+            assertTrue(
+                "sentence top ${sentence.top} must be at or below safe top $safeTop in viewport $viewport",
+                sentence.top >= safeTop - 2f,
+            )
+            assertTrue("sentence bottom must be inside the measured safe band", sentence.bottom <= safeBottom + 2f)
+        }
+    }
+
     @Composable
+    @Suppress("LongMethod")
     private fun FollowViewportHarness(
         messages: List<String>,
         initialFirstVisibleItemIndex: Int,
@@ -290,8 +426,12 @@ class ConversationTtsFollowComposeTest {
         request: Int,
         onVisibleKeys: (() -> List<Any>) -> Unit,
         targetIndexResolver: (() -> Int?)? = null,
+        targetShape: FollowTargetShape = FollowTargetShape.Compact,
+        onTargetLayout: ((() -> Pair<Rect?, Rect?>) -> Unit)? = null,
+        estimatedItemHeightPx: Int? = null,
     ) {
         val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialFirstVisibleItemIndex)
+        val sentenceLayouts = remember { ConversationTtsSentenceLayoutRegistry() }
         val coordinator =
             remember(listState) {
                 ConversationScrollCoordinator(
@@ -300,17 +440,25 @@ class ConversationTtsFollowComposeTest {
                 )
             }
         onVisibleKeys { listState.layoutInfo.visibleItemsInfo.map { it.key } }
+        onTargetLayout?.invoke {
+            sentenceLayouts.completeSentenceBounds(followTarget(targetMessageId)) to
+                sentenceLayouts.viewportBoundsInWindow
+        }
         LaunchedEffect(request, targetMessageId) {
             if (request == 0) return@LaunchedEffect
             val targetIndex = messages.indexOf(targetMessageId)
             if (targetIndex < 0) return@LaunchedEffect
             followTtsTargetInViewport(
                 target = followTarget(targetMessageId),
+                direction = TtsFollowDirection.Forward,
                 itemKey = targetMessageId,
                 targetIndex = targetIndex,
-                estimatedItemHeightPx = null,
+                estimatedItemHeightPx = estimatedItemHeightPx,
                 listState = listState,
                 scrollCoordinator = coordinator,
+                sentenceLayouts = sentenceLayouts,
+                claimPreposition = { true },
+                claimCorrectiveScroll = { true },
                 resolveTargetIndex =
                     targetIndexResolver
                         ?: { messages.indexOf(targetMessageId).takeIf { it >= 0 } },
@@ -335,15 +483,29 @@ class ConversationTtsFollowComposeTest {
         }
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxWidth().height(320.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(320.dp)
+                    .onGloballyPositioned { sentenceLayouts.updateViewportBounds(it.boundsInWindow()) },
         ) {
             items(messages, key = { it }) { messageId ->
-                Text(messageId, Modifier.fillMaxWidth().height(80.dp))
+                if (messageId == targetMessageId) {
+                    ProductionShapedFollowTargetRow(
+                        messageId = messageId,
+                        target = followTarget(messageId),
+                        shape = targetShape,
+                        sentenceLayouts = sentenceLayouts,
+                    )
+                } else {
+                    Text(messageId, Modifier.fillMaxWidth().height(80.dp))
+                }
             }
         }
     }
 
     @Composable
+    @Suppress("LongMethod")
     private fun DeferredFollowHarness(
         messages: List<String>,
         targetMessageId: String,
@@ -352,6 +514,7 @@ class ConversationTtsFollowComposeTest {
         onVisibleKeys: (() -> List<Any>) -> Unit,
     ) {
         val listState = rememberLazyListState(initialFirstVisibleItemIndex = 90)
+        val sentenceLayouts = remember { ConversationTtsSentenceLayoutRegistry() }
         val coordinator =
             remember(listState) {
                 ConversationScrollCoordinator(
@@ -379,17 +542,22 @@ class ConversationTtsFollowComposeTest {
             )
         }
         LaunchedEffect(policy, targetMessageId) {
-            val target = policy.claimPendingTarget() ?: return@LaunchedEffect
+            val request = policy.claimPendingRequest() ?: return@LaunchedEffect
+            val target = request.target
             pagingStarted.complete(Unit)
             releasePaging.await()
             if (!policy.isCurrentTarget(target)) return@LaunchedEffect
             followTtsTargetInViewport(
                 target = target,
+                direction = request.direction,
                 itemKey = targetMessageId,
                 targetIndex = messages.indexOf(targetMessageId),
                 estimatedItemHeightPx = null,
                 listState = listState,
                 scrollCoordinator = coordinator,
+                sentenceLayouts = sentenceLayouts,
+                claimPreposition = { policy.claimPreposition(target) },
+                claimCorrectiveScroll = { policy.claimCorrectiveScroll(target) },
                 resolveTargetIndex = { messages.indexOf(targetMessageId).takeIf { it >= 0 } },
                 isCurrentTarget = { policy.isCurrentTarget(target) },
                 currentScrollAnchor = { listState.followAnchor() },
@@ -398,16 +566,171 @@ class ConversationTtsFollowComposeTest {
         Box {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxWidth().height(320.dp).testTag(TRANSCRIPT_TAG),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(320.dp)
+                        .testTag(TRANSCRIPT_TAG)
+                        .onGloballyPositioned { sentenceLayouts.updateViewportBounds(it.boundsInWindow()) },
             ) {
                 items(messages, key = { it }) { messageId ->
-                    Text(messageId, Modifier.fillMaxWidth().height(80.dp))
+                    if (messageId == targetMessageId) {
+                        ProductionShapedFollowTargetRow(
+                            messageId = messageId,
+                            target = followTarget(messageId),
+                            shape = FollowTargetShape.Compact,
+                            sentenceLayouts = sentenceLayouts,
+                        )
+                    } else {
+                        Text(messageId, Modifier.fillMaxWidth().height(80.dp))
+                    }
                 }
             }
             if (policy.showResumeAction) {
                 TtsResumeFollowButton(onClick = policy::resumeFollow)
             }
         }
+    }
+
+    @Composable
+    @Suppress("LongMethod")
+    private fun ProductionShapedFollowTargetRow(
+        messageId: String,
+        target: ConversationTtsFollowTarget,
+        shape: FollowTargetShape,
+        sentenceLayouts: ConversationTtsSentenceLayoutRegistry,
+    ) {
+        val rowInstance = remember(messageId) { Any() }
+        val segments =
+            remember(shape) {
+                when (shape) {
+                    FollowTargetShape.SplitMarkdown ->
+                        listOf(
+                            TtsSentenceProjectionSegment("markdown-a", 0, 8),
+                            TtsSentenceProjectionSegment("markdown-b", 8, 16),
+                        )
+                    else -> listOf(TtsSentenceProjectionSegment("plain", 0, 16))
+                }.toSet()
+            }
+        DisposableEffect(sentenceLayouts, messageId, rowInstance) {
+            sentenceLayouts.mountRow(messageId, rowInstance)
+            onDispose { sentenceLayouts.unmountRow(messageId, rowInstance) }
+        }
+        Column(Modifier.fillMaxWidth()) {
+            when (shape) {
+                FollowTargetShape.Compact ->
+                    FollowSentenceFragment(
+                        text = "Measured sentence",
+                        leafId = "plain",
+                        heightDp = 80,
+                        target = target,
+                        rowInstance = rowInstance,
+                        coverage = segments,
+                        expectedCoverage = segments,
+                        sentenceLayouts = sentenceLayouts,
+                    )
+                FollowTargetShape.TallMediaBeforeSentence -> {
+                    Box(Modifier.fillMaxWidth().height(500.dp))
+                    FollowSentenceFragment(
+                        text = "Sentence after tall media",
+                        leafId = "plain",
+                        heightDp = 48,
+                        target = target,
+                        rowInstance = rowInstance,
+                        coverage = segments,
+                        expectedCoverage = segments,
+                        sentenceLayouts = sentenceLayouts,
+                    )
+                    Box(Modifier.fillMaxWidth().height(180.dp))
+                }
+                FollowTargetShape.SplitMarkdown -> {
+                    Box(Modifier.fillMaxWidth().height(460.dp))
+                    FollowSentenceFragment(
+                        text = "Markdown",
+                        leafId = "markdown-a",
+                        heightDp = 40,
+                        target = target,
+                        rowInstance = rowInstance,
+                        coverage = setOf(TtsSentenceProjectionSegment("markdown-a", 0, 8)),
+                        expectedCoverage = segments,
+                        sentenceLayouts = sentenceLayouts,
+                    )
+                    FollowSentenceFragment(
+                        text = "sentence",
+                        leafId = "markdown-b",
+                        heightDp = 40,
+                        target = target,
+                        rowInstance = rowInstance,
+                        coverage = setOf(TtsSentenceProjectionSegment("markdown-b", 8, 16)),
+                        expectedCoverage = segments,
+                        sentenceLayouts = sentenceLayouts,
+                    )
+                    Box(Modifier.fillMaxWidth().height(120.dp))
+                }
+                FollowTargetShape.ReplyAndFooterAroundBody -> {
+                    Box(Modifier.fillMaxWidth().height(180.dp))
+                    FollowSentenceFragment(
+                        text = "Body sentence",
+                        leafId = "plain",
+                        heightDp = 48,
+                        target = target,
+                        rowInstance = rowInstance,
+                        coverage = segments,
+                        expectedCoverage = segments,
+                        sentenceLayouts = sentenceLayouts,
+                    )
+                    Box(Modifier.fillMaxWidth().height(300.dp))
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun FollowSentenceFragment(
+        text: String,
+        leafId: String,
+        heightDp: Int,
+        target: ConversationTtsFollowTarget,
+        rowInstance: Any,
+        coverage: Set<TtsSentenceProjectionSegment>,
+        expectedCoverage: Set<TtsSentenceProjectionSegment>,
+        sentenceLayouts: ConversationTtsSentenceLayoutRegistry,
+    ) {
+        DisposableEffect(sentenceLayouts, target, rowInstance, leafId) {
+            onDispose { sentenceLayouts.clear(target, rowInstance, leafId) }
+        }
+        Text(
+            text,
+            Modifier
+                .fillMaxWidth()
+                .height(heightDp.dp)
+                .onGloballyPositioned { coordinates ->
+                    val topLeft = coordinates.localToWindow(Offset.Zero)
+                    sentenceLayouts.report(
+                        ConversationTtsSentenceLayoutReport(
+                            target = target,
+                            rowInstance = rowInstance,
+                            renderedLeafId = leafId,
+                            boundsInWindow =
+                                Rect(
+                                    left = topLeft.x,
+                                    top = topLeft.y,
+                                    right = topLeft.x + coordinates.size.width,
+                                    bottom = topLeft.y + coordinates.size.height,
+                                ),
+                            coverage = coverage,
+                            expectedCoverage = expectedCoverage,
+                        ),
+                    )
+                },
+        )
+    }
+
+    private enum class FollowTargetShape {
+        Compact,
+        TallMediaBeforeSentence,
+        SplitMarkdown,
+        ReplyAndFooterAroundBody,
     }
 
     private fun LazyListState.followAnchor() =

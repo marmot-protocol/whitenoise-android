@@ -5,6 +5,8 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
+import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
+import dev.ipf.whitenoise.android.ui.SpeakableTextProjectionSpan
 import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableProjection
 import org.junit.Assert.assertEquals
@@ -13,6 +15,31 @@ import org.junit.Test
 import java.util.Locale
 
 class TtsPassageHighlightTest {
+    @Test
+    fun sentenceLayoutRequiresAndCombinesEveryRenderedLeafFragment() {
+        val projection =
+            SpeakableTextProjection(
+                text = "Hello world.",
+                spans =
+                    listOf(
+                        SpeakableTextProjectionSpan(0, 6, "b0", 0, 6),
+                        SpeakableTextProjectionSpan(6, 12, "b1", 0, 6),
+                    ),
+            )
+        val resolver = TtsHighlightProjectionResolver(projection, Locale.US)
+
+        val first = resolver.sentenceLayoutFor(sentenceIndex = 0, renderedLeafId = "b0", renderedText = "Hello ")
+        val second = resolver.sentenceLayoutFor(sentenceIndex = 0, renderedLeafId = "b1", renderedText = "world.")
+
+        assertEquals(listOf(0 until 6), first?.renderedRanges)
+        assertEquals(listOf(0 until 6), second?.renderedRanges)
+        assertEquals(2, first?.expectedCoverage?.size)
+        assertEquals(2, second?.expectedCoverage?.size)
+        assertEquals(first?.expectedCoverage, second?.expectedCoverage)
+        assertEquals(first?.expectedCoverage, first?.coverage.orEmpty() + second?.coverage.orEmpty())
+        assertEquals(2, resolver.cachedLeafCount)
+    }
+
     @Test
     fun projectionResolverReusesRenderedLeafMappingAcrossWordUpdates() {
         val projection = legacyTextToSpeakableProjection("Hello bright world.")
