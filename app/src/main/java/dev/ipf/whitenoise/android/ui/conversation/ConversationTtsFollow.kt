@@ -82,8 +82,14 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
         val renderedLeafId: String,
     )
 
+    private data class StampedReport(
+        val report: ConversationTtsSentenceLayoutReport,
+        val viewportGeometryRevision: Long,
+    )
+
     private val activeRows = mutableStateMapOf<String, Any>()
-    private val reports = mutableStateMapOf<ReportKey, ConversationTtsSentenceLayoutReport>()
+    private val reports = mutableStateMapOf<ReportKey, StampedReport>()
+    private var viewportGeometryRevision = 0L
 
     var viewportBoundsInWindow by mutableStateOf<Rect?>(null)
         private set
@@ -113,7 +119,8 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
 
     override fun report(report: ConversationTtsSentenceLayoutReport) {
         if (activeRows[report.target.messageIdHex] !== report.rowInstance) return
-        reports[ReportKey(report.target, report.rowInstance, report.renderedLeafId)] = report
+        reports[ReportKey(report.target, report.rowInstance, report.renderedLeafId)] =
+            StampedReport(report, viewportGeometryRevision)
         revision++
     }
 
@@ -126,6 +133,8 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
     }
 
     fun updateViewportBounds(boundsInWindow: Rect) {
+        if (viewportBoundsInWindow == boundsInWindow) return
+        if (viewportBoundsInWindow != null) viewportGeometryRevision++
         viewportBoundsInWindow = boundsInWindow
         revision++
     }
@@ -134,9 +143,12 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
     fun completeSentenceBounds(target: ConversationTtsFollowTarget): Rect? {
         val activeRow = activeRows[target.messageIdHex] ?: return null
         val matching =
-            reports.values.filter { report ->
-                report.target == target && report.rowInstance === activeRow
-            }
+            reports.values
+                .filter { stamped ->
+                    stamped.viewportGeometryRevision == viewportGeometryRevision &&
+                        stamped.report.target == target &&
+                        stamped.report.rowInstance === activeRow
+                }.map(StampedReport::report)
         val expected = matching.firstOrNull()?.expectedCoverage.orEmpty()
         if (expected.isEmpty() || matching.any { it.expectedCoverage != expected }) return null
         if (matching.flatMapTo(mutableSetOf()) { it.coverage } != expected) return null

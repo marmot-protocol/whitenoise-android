@@ -232,6 +232,42 @@ class ConversationTtsFollowPolicyTest {
     }
 
     @Test
+    fun sentenceLayoutRejectsReportsFromPreviousViewportGeometry() {
+        val registry = ConversationTtsSentenceLayoutRegistry()
+        val target = speaking(sessionId = 1, sentenceIndex = 0).followTarget()
+        val row = Any()
+        val coverage = setOf(TtsSentenceProjectionSegment("plain", 0, 10))
+        registry.mountRow(target.messageIdHex, row)
+        registry.updateViewportBounds(Rect(0f, 0f, 100f, 1_000f))
+        registry.report(
+            ConversationTtsSentenceLayoutReport(
+                target = target,
+                rowInstance = row,
+                renderedLeafId = "plain",
+                boundsInWindow = Rect(0f, 300f, 100f, 400f),
+                coverage = coverage,
+                expectedCoverage = coverage,
+            ),
+        )
+        assertEquals(Rect(0f, 300f, 100f, 400f), registry.completeSentenceBounds(target))
+
+        registry.updateViewportBounds(Rect(0f, 100f, 100f, 1_000f))
+        assertNull(registry.completeSentenceBounds(target))
+
+        registry.report(
+            ConversationTtsSentenceLayoutReport(
+                target = target,
+                rowInstance = row,
+                renderedLeafId = "plain",
+                boundsInWindow = Rect(0f, 400f, 100f, 500f),
+                coverage = coverage,
+                expectedCoverage = coverage,
+            ),
+        )
+        assertEquals(Rect(0f, 400f, 100f, 500f), registry.completeSentenceBounds(target))
+    }
+
+    @Test
     fun followRelevantTransitionsChangeTheConversationFollowSignal() {
         val firstSentence = speaking(sessionId = 1, sentenceIndex = 0)
 
