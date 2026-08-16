@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.Box
@@ -11,6 +13,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -75,16 +78,22 @@ internal fun effectiveTtsReadAloudProgress(
 ): TtsReadAloudProgress? = progress.takeIf { effectivePassage != null }
 
 @Composable
+internal fun rememberTtsHighlightProjectionResolver(
+    projection: SpeakableTextProjection?,
+    locale: Locale,
+): TtsHighlightProjectionResolver? =
+    remember(projection, locale) {
+        projection?.let { TtsHighlightProjectionResolver(it, locale) }
+    }
+
+@Composable
 internal fun rememberTtsLeafHighlightResolver(
     passage: TtsPassage?,
     messageIdHex: String,
     projection: SpeakableTextProjection?,
     locale: Locale,
 ): TtsLeafHighlightResolver? {
-    val projectionResolver =
-        remember(projection, locale) {
-            projection?.let { TtsHighlightProjectionResolver(it, locale) }
-        }
+    val projectionResolver = rememberTtsHighlightProjectionResolver(projection, locale)
     return remember(passage, messageIdHex, projectionResolver) {
         if (passage == null || passage.messageIdHex != messageIdHex) {
             null
@@ -92,6 +101,37 @@ internal fun rememberTtsLeafHighlightResolver(
             projectionResolver?.resolverFor(passage, messageIdHex)
         }
     }
+}
+
+internal fun ttsSentenceBoundsInWindow(
+    layoutResult: TextLayoutResult,
+    coordinates: LayoutCoordinates,
+    renderedRanges: List<IntRange>,
+): Rect? {
+    if (!coordinates.isAttached) return null
+    val textLength = layoutResult.layoutInput.text.length
+    return renderedRanges
+        .mapNotNull { range ->
+            val start = range.first.coerceIn(0, textLength)
+            val end = (range.last + 1).coerceIn(start, textLength)
+            if (start >= end) return@mapNotNull null
+            val localBounds = layoutResult.getPathForRange(start, end).getBounds()
+            val topLeft = coordinates.localToWindow(Offset(localBounds.left, localBounds.top))
+            val bottomRight = coordinates.localToWindow(Offset(localBounds.right, localBounds.bottom))
+            Rect(
+                left = min(topLeft.x, bottomRight.x),
+                top = min(topLeft.y, bottomRight.y),
+                right = max(topLeft.x, bottomRight.x),
+                bottom = max(topLeft.y, bottomRight.y),
+            )
+        }.reduceOrNull { first, second ->
+            Rect(
+                left = min(first.left, second.left),
+                top = min(first.top, second.top),
+                right = max(first.right, second.right),
+                bottom = max(first.bottom, second.bottom),
+            )
+        }
 }
 
 internal fun buildTtsLeafHighlightResolver(

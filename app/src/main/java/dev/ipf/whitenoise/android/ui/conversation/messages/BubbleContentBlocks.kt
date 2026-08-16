@@ -17,6 +17,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -48,6 +50,7 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
+import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaFileBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageBubble
@@ -315,6 +318,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     plainTextSelectionModifier: Modifier,
     onPlainTextLayout: (TextLayoutResult) -> Unit,
     ttsLeafHighlightResolver: TtsLeafHighlightResolver? = null,
+    ttsSentenceLayoutReporter: TtsSentenceLayoutReporter? = null,
     ttsReadAloudProgress: TtsReadAloudProgress? = null,
     selectionWrapper: @Composable (@Composable () -> Unit) -> Unit,
     collapsible: Boolean,
@@ -372,12 +376,17 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 measuredBodyHeightPx = measuredBodyHeightPx,
                 maxBodyHeightPx = maxBodyHeightPx,
             )
+        val bodyCollapsePending = collapsible && measuredBodyHeightPx == null
         val presentedTtsLeafHighlightResolver =
             activeTtsLeafHighlightResolver(
                 resolver = ttsLeafHighlightResolver,
                 textSelectionMode = textSelectionMode,
-                suppressForCollapsed = bodyIsCollapsed,
+                suppressForCollapsed = bodyIsCollapsed || bodyCollapsePending,
             )
+        val presentedTtsSentenceLayoutReporter =
+            ttsSentenceLayoutReporter.takeUnless {
+                textSelectionMode || bodyIsCollapsed || bodyCollapsePending
+            }
         val bodyMeasurementModifier =
             if (collapsible) {
                 Modifier.onSizeChanged { measuredBodyHeightPx = it.height }
@@ -386,6 +395,12 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             }
         val highlightColor = ttsReadAloudHighlightColor()
         var plainLayoutResult by remember(bodyText) { mutableStateOf<TextLayoutResult?>(null) }
+        var plainLayoutCoordinates by remember(bodyText) { mutableStateOf<LayoutCoordinates?>(null) }
+        DisposableEffect(presentedTtsSentenceLayoutReporter, bodyText) {
+            onDispose {
+                presentedTtsSentenceLayoutReporter?.invoke("plain", bodyText, null, null)
+            }
+        }
         val plainHighlightRange = presentedTtsLeafHighlightResolver?.invoke("plain", bodyText)
         val plainHighlightModifier =
             Modifier.ttsReadAloudHighlight(plainLayoutResult, plainHighlightRange, highlightColor)
@@ -422,6 +437,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                         onLinkTextLayoutChanged = markdownLinkLayoutReporter,
                         onCopyLink = onCopyMarkdownLink,
                         ttsLeafHighlightResolver = presentedTtsLeafHighlightResolver,
+                        ttsSentenceLayoutReporter = presentedTtsSentenceLayoutReporter,
                     )
                 }
             } else {
@@ -432,11 +448,28 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                         Text(
                             bodyText,
                             style = MaterialTheme.typography.bodyLarge,
-                            modifier = plainTextSelectionModifier.then(plainHighlightModifier),
+                            modifier =
+                                plainTextSelectionModifier
+                                    .then(plainHighlightModifier)
+                                    .onGloballyPositioned { coordinates ->
+                                        plainLayoutCoordinates = coordinates
+                                        presentedTtsSentenceLayoutReporter?.invoke(
+                                            "plain",
+                                            bodyText,
+                                            plainLayoutResult,
+                                            coordinates,
+                                        )
+                                    },
                             maxLines = if (collapsible) MESSAGE_COLLAPSE_LINE_LIMIT + 1 else Int.MAX_VALUE,
                             onTextLayout = {
                                 lastLineLayout = it
                                 plainLayoutResult = it
+                                presentedTtsSentenceLayoutReporter?.invoke(
+                                    "plain",
+                                    bodyText,
+                                    it,
+                                    plainLayoutCoordinates,
+                                )
                                 onPlainTextLayout(it)
                             },
                         )

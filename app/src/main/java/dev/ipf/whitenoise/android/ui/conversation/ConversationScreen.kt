@@ -2921,8 +2921,17 @@ internal fun ConversationScreen(
                                     .padding(horizontal = 12.dp)
                                     .alpha(if (initialTimelineAnchored) 1f else 0f)
                                     .onGloballyPositioned { coordinates ->
-                                        transcriptWindowTop = coordinates.positionInWindow().y
+                                        val position = coordinates.positionInWindow()
+                                        transcriptWindowTop = position.y
                                         transcriptHeightPx = coordinates.size.height.toFloat()
+                                        ttsFollowHandle.sentenceLayouts.updateViewportBounds(
+                                            Rect(
+                                                left = position.x,
+                                                top = position.y,
+                                                right = position.x + coordinates.size.width,
+                                                bottom = position.y + coordinates.size.height,
+                                            ),
+                                        )
                                     },
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(bottom = 8.dp + snackbarContentInset.value),
@@ -3052,6 +3061,7 @@ internal fun ConversationScreen(
                                     mentionCandidates = mentionPicker.candidates,
                                     mentionPickerEnabled = mentionPicker.enabled,
                                     collapseLongMessages = collapseLongMessages,
+                                    ttsSentenceLayoutSink = ttsFollowHandle.sentenceLayouts,
                                 )
                             }
                             conversationLoadErrorItem(

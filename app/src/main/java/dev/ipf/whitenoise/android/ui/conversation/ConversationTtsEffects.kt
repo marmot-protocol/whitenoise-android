@@ -49,6 +49,7 @@ private const val TTS_AUTO_READ_RESUME_SYNC_TIMEOUT_MS = 10_000L
 internal class ConversationTtsFollowHandle internal constructor(
     internal val policy: ConversationTtsFollowPolicy,
 ) {
+    internal val sentenceLayouts = ConversationTtsSentenceLayoutRegistry()
     internal var retryGeneration: Long by mutableLongStateOf(0L)
         private set
 
@@ -284,7 +285,8 @@ internal fun ConversationTtsFollowEffects(
     ) {
         handle.policy.observe(appState.ttsController.state.value, ownsSession)
         if (!initialTimelineAnchored) return@LaunchedEffect
-        val target = handle.policy.claimPendingTarget() ?: return@LaunchedEffect
+        val request = handle.policy.claimPendingRequest() ?: return@LaunchedEffect
+        val target = request.target
         var followSucceeded = false
         try {
             if (!isCurrentTarget(target)) return@LaunchedEffect
@@ -345,11 +347,15 @@ internal fun ConversationTtsFollowEffects(
             followSucceeded =
                 followTtsTargetInViewport(
                     target = target,
+                    direction = request.direction,
                     itemKey = row.id,
                     targetIndex = targetIndex,
                     estimatedItemHeightPx = itemHeight,
                     listState = listState,
                     scrollCoordinator = scrollCoordinator,
+                    sentenceLayouts = handle.sentenceLayouts,
+                    claimPreposition = { handle.policy.claimPreposition(target) },
+                    claimCorrectiveScroll = { handle.policy.claimCorrectiveScroll(target) },
                     resolveTargetIndex = { currentTimelineListIndex(target.messageIdHex) },
                     isCurrentTarget = { isCurrentTarget(target) },
                     currentScrollAnchor = currentScrollAnchor,

@@ -99,10 +99,14 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
+import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
+import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsFollowTarget
+import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutReport
+import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
 import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -302,6 +306,9 @@ internal fun MessageBubble(
     readOnly: Boolean = false,
     ttsHighlightPassage: TtsPassage? = null,
     ttsReadAloudProgress: TtsReadAloudProgress? = null,
+    ttsFollowTarget: ConversationTtsFollowTarget? = null,
+    ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
+    ttsRowInstance: Any? = null,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
 ) {
     val record = item.record
@@ -620,13 +627,62 @@ internal fun MessageBubble(
             progress = ttsReadAloudProgress,
         )
     val effectiveTtsPassage = ttsProjectionState.effectivePassage
+    val ttsLocale = LocalLocale.current.platformLocale
+    val ttsProjectionResolver = rememberTtsHighlightProjectionResolver(speakableProjection, ttsLocale)
     val ttsLeafHighlightResolver =
-        rememberTtsLeafHighlightResolver(
-            passage = effectiveTtsPassage,
-            messageIdHex = record.messageIdHex,
-            projection = speakableProjection,
-            locale = LocalLocale.current.platformLocale,
-        )
+        remember(effectiveTtsPassage, record.messageIdHex, ttsProjectionResolver) {
+            if (effectiveTtsPassage == null || effectiveTtsPassage.messageIdHex != record.messageIdHex) {
+                null
+            } else {
+                ttsProjectionResolver?.resolverFor(effectiveTtsPassage, record.messageIdHex)
+            }
+        }
+    val effectiveTtsFollowTarget =
+        ttsFollowTarget?.takeIf { target ->
+            target.messageIdHex == record.messageIdHex &&
+                target.projectionId == speakableProjection?.projectionId &&
+                target.sentenceIndex == effectiveTtsPassage?.sentenceIndex
+        }
+    val ttsSentenceLayoutReporter: TtsSentenceLayoutReporter? =
+        remember(
+            effectiveTtsFollowTarget,
+            ttsProjectionResolver,
+            ttsSentenceLayoutSink,
+            ttsRowInstance,
+        ) {
+            val target = effectiveTtsFollowTarget
+            val projectionResolver = ttsProjectionResolver
+            val sink = ttsSentenceLayoutSink
+            val rowInstance = ttsRowInstance
+            when {
+                target == null || projectionResolver == null -> null
+                sink == null || rowInstance == null -> null
+                else ->
+                    { leafId: String, text: String, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates? ->
+                        val leafLayout = projectionResolver.sentenceLayoutFor(target.sentenceIndex, leafId, text)
+                        val bounds =
+                            if (layoutResult != null && coordinates != null && leafLayout != null) {
+                                ttsSentenceBoundsInWindow(layoutResult, coordinates, leafLayout.renderedRanges)
+                            } else {
+                                null
+                            }
+                        if (leafLayout == null || bounds == null) {
+                            sink.clear(target, rowInstance, leafId)
+                        } else {
+                            sink.report(
+                                ConversationTtsSentenceLayoutReport(
+                                    target = target,
+                                    rowInstance = rowInstance,
+                                    renderedLeafId = leafId,
+                                    boundsInWindow = bounds,
+                                    coverage = leafLayout.coverage,
+                                    expectedCoverage = leafLayout.expectedCoverage,
+                                ),
+                            )
+                        }
+                    }
+            }
+        }
     val effectiveTtsReadAloudProgress = ttsProjectionState.effectiveProgress
     // Issue #390 v1 forwards text only. Forward must be hidden for any record
     // whose displayed body is a synthetic surrogate (media filename/placeholder,
@@ -1486,6 +1542,7 @@ internal fun MessageBubble(
                                     plainTextSelectionModifier = plainTextSelectionModifier,
                                     onPlainTextLayout = onPlainTextLayout,
                                     ttsLeafHighlightResolver = ttsLeafHighlightResolver,
+                                    ttsSentenceLayoutReporter = ttsSentenceLayoutReporter,
                                     ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                                     selectionWrapper = selectionWrapper,
                                     collapsible = collapsible,
@@ -1548,6 +1605,7 @@ internal fun MessageBubble(
                                     plainTextSelectionModifier = plainTextSelectionModifier,
                                     onPlainTextLayout = onPlainTextLayout,
                                     ttsLeafHighlightResolver = ttsLeafHighlightResolver,
+                                    ttsSentenceLayoutReporter = ttsSentenceLayoutReporter,
                                     ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                                     selectionWrapper = selectionWrapper,
                                     collapsible = collapsible,
@@ -1610,6 +1668,7 @@ internal fun MessageBubble(
                             plainTextSelectionModifier = plainTextSelectionModifier,
                             onPlainTextLayout = onPlainTextLayout,
                             ttsLeafHighlightResolver = ttsLeafHighlightResolver,
+                            ttsSentenceLayoutReporter = ttsSentenceLayoutReporter,
                             ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                             selectionWrapper = selectionWrapper,
                             collapsible = collapsible,

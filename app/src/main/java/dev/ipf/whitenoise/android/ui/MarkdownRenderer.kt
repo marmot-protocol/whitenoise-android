@@ -147,6 +147,7 @@ internal fun MarkdownMessageBody(
     // Accessibility actions invoke the same copy path without a pointer event.
     onCopyLink: ((String) -> Unit)? = null,
     ttsLeafHighlightResolver: TtsLeafHighlightResolver? = null,
+    ttsSentenceLayoutReporter: TtsSentenceLayoutReporter? = null,
 ) {
     val context = LocalContext.current
     // A tapped spoofable `[label](url)` link parks its destination here until
@@ -183,6 +184,7 @@ internal fun MarkdownMessageBody(
         LocalMarkdownLinkTextLayoutReporter provides onLinkTextLayoutChanged,
         LocalMarkdownLinkCopyHandler provides onCopyLink,
         LocalTtsLeafHighlightResolver provides ttsLeafHighlightResolver,
+        LocalTtsSentenceLayoutReporter provides ttsSentenceLayoutReporter,
     ) {
         MarkdownBlockList(
             blocks = document.blocks,
@@ -359,6 +361,9 @@ internal typealias SelectableTextLayoutReporter =
 
 internal typealias TtsLeafHighlightResolver = (leafId: String, renderedText: String) -> IntRange?
 
+internal typealias TtsSentenceLayoutReporter =
+    (leafId: String, renderedText: String, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates?) -> Unit
+
 internal typealias MarkdownLinkTextLayoutReporter =
     (key: Any, text: AnnotatedString, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates?) -> Unit
 
@@ -373,6 +378,9 @@ private val LocalSelectableTextLayoutReporter =
 
 private val LocalTtsLeafHighlightResolver =
     compositionLocalOf<TtsLeafHighlightResolver?> { null }
+
+private val LocalTtsSentenceLayoutReporter =
+    compositionLocalOf<TtsSentenceLayoutReporter?> { null }
 
 private val LocalMarkdownLinkTextLayoutReporter =
     staticCompositionLocalOf<MarkdownLinkTextLayoutReporter?> { null }
@@ -397,23 +405,25 @@ private fun MarkdownBodyText(
 ) {
     val reporter = LocalSelectableTextLayoutReporter.current
     val highlightResolver = LocalTtsLeafHighlightResolver.current
+    val sentenceLayoutReporter = LocalTtsSentenceLayoutReporter.current
     val linkReporter = LocalMarkdownLinkTextLayoutReporter.current
     val onCopyLink = LocalMarkdownLinkCopyHandler.current
     val copyLabel = stringResource(R.string.copy)
     val linkDestinations = remember(text) { markdownLinkDestinations(text) }
     val reportsLinks = linkDestinations.isNotEmpty()
-    val tracker = remember(leafId) { MarkdownTextLayoutTracker() }
+    val tracker = remember(leafId, text) { MarkdownTextLayoutTracker() }
     val highlightColor = ttsReadAloudHighlightColor()
-    var layoutResult by remember(leafId) { mutableStateOf<TextLayoutResult?>(null) }
+    var layoutResult by remember(leafId, text) { mutableStateOf<TextLayoutResult?>(null) }
     val highlightRange =
         remember(highlightResolver, leafId, text.text) {
             highlightResolver?.invoke(leafId, text.text)
         }
 
-    DisposableEffect(reporter, linkReporter, leafId, text) {
+    DisposableEffect(reporter, linkReporter, sentenceLayoutReporter, leafId, text) {
         onDispose {
             reporter?.invoke(leafId, null, null)
             linkReporter?.invoke(leafId, text, null, null)
+            sentenceLayoutReporter?.invoke(leafId, text.text, null, null)
         }
     }
 
@@ -427,6 +437,7 @@ private fun MarkdownBodyText(
         } else {
             linkReporter?.invoke(leafId, text, null, null)
         }
+        sentenceLayoutReporter?.invoke(leafId, text.text, measuredLayout, coordinates)
     }
 
     val accessibilityModifier =
@@ -456,9 +467,10 @@ private fun MarkdownBodyText(
                 },
         style = style,
         textAlign = textAlign,
-        onTextLayout = { layoutResult ->
-            tracker.layoutResult = layoutResult
-            onTextLayout?.invoke(layoutResult)
+        onTextLayout = { measuredLayout ->
+            tracker.layoutResult = measuredLayout
+            layoutResult = measuredLayout
+            onTextLayout?.invoke(measuredLayout)
             reportIfReady()
         },
     )
