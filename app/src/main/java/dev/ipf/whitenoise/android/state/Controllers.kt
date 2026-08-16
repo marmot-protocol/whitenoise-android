@@ -905,6 +905,89 @@ internal suspend fun loadGroupMemberIdsPages(
     return loaded
 }
 
+internal data class FirstFrameMemberFallbackResult<T>(
+    val groupIdHex: String,
+    val result: Result<T>,
+)
+
+internal data class FirstFrameMemberFallbackBatch<T>(
+    val firstFrameResults: List<FirstFrameMemberFallbackResult<T>>,
+    val remainingResults: Channel<FirstFrameMemberFallbackResult<T>>,
+    val remainingCount: Int,
+)
+
+internal fun initialMemberFallbackGenerationIsCurrent(
+    expectedAccount: String,
+    expectedBindEpoch: Long,
+    expectedCacheEpoch: Long,
+    currentAccount: String?,
+    currentBindEpoch: Long,
+    currentCacheEpoch: Long,
+    lifecycleActive: Boolean,
+): Boolean =
+    lifecycleActive &&
+        currentAccount == expectedAccount &&
+        currentBindEpoch == expectedBindEpoch &&
+        currentCacheEpoch == expectedCacheEpoch
+
+/**
+ * Start one lifecycle-child local read per distinct group, bounded by
+ * [maxConcurrent], and return the results available within [cutoffMillis].
+ * Workers that miss the cutoff keep running under the caller's coroutine job;
+ * [remainingResults] lets the owner fold those late answers in without
+ * restarting any group read.
+ */
+internal suspend fun <T> loadFirstFrameMemberFallback(
+    groupIds: Iterable<String>,
+    cutoffMillis: Long,
+    maxConcurrent: Int,
+    nowMillis: () -> Long = { System.nanoTime() / NANOS_PER_MILLISECOND },
+    load: suspend (String) -> T,
+): FirstFrameMemberFallbackBatch<T> {
+    require(cutoffMillis >= 0L)
+    require(maxConcurrent > 0)
+    val requested =
+        groupIds
+            .asSequence()
+            .filter { it.isNotBlank() }
+            .distinctBy { it.lowercase() }
+            .toList()
+    val results = Channel<FirstFrameMemberFallbackResult<T>>(requested.size)
+    if (requested.isEmpty()) {
+        return FirstFrameMemberFallbackBatch(emptyList(), results, 0)
+    }
+
+    val gate = Semaphore(maxConcurrent)
+    val lifecycleScope = CoroutineScope(coroutineContext)
+    requested.forEach { groupIdHex ->
+        lifecycleScope.launch {
+            val result = runCatchingCancellable { gate.withPermit { load(groupIdHex) } }
+            results.send(FirstFrameMemberFallbackResult(groupIdHex, result))
+        }
+    }
+
+    val cutoffStartedAtMillis = nowMillis()
+    val firstFrame = mutableListOf<FirstFrameMemberFallbackResult<T>>()
+    var remaining = requested.size
+    while (remaining > 0) {
+        val completed = results.tryReceive().getOrNull()
+        if (completed != null) {
+            firstFrame += completed
+            remaining -= 1
+        } else {
+            val elapsedMillis = (nowMillis() - cutoffStartedAtMillis).coerceAtLeast(0L)
+            val waitMillis = cutoffMillis - elapsedMillis
+            if (waitMillis <= 0L) break
+            // Never suspend inside a channel receive: prompt cancellation may
+            // consume an element before the caller records it. A short bounded
+            // delay leaves every result either synchronously drained above or
+            // available to the lifecycle-bound late collector.
+            delay(minOf(waitMillis, FIRST_FRAME_FALLBACK_POLL_MILLIS))
+        }
+    }
+    return FirstFrameMemberFallbackBatch(firstFrame, results, remaining)
+}
+
 /**
  * Return the projected counterparty ids whose locally persisted presentation
  * must be materialized before the first cached chat-list frame. The caller
@@ -3806,8 +3889,9 @@ class ChatsController private constructor(
      * N-call `groupMembers` fan-out (#1534).
      *
      * The page contract is all-or-nothing. If any requested group is unknown
-     * or quarantined, retain Unknown here and let the existing bounded,
-     * retrying per-group loader resolve it after the usable chat rows render.
+     * or quarantined, fall back to eight bounded per-group local reads and hold
+     * the first frame for at most 500 ms. Reads that miss the cutoff keep
+     * running under this bind's lifecycle and publish in coalesced batches.
      */
     private suspend fun seedInitialMemberIdProjection(
         account: String,
@@ -3816,20 +3900,216 @@ class ChatsController private constructor(
         val groupIds = chatRows.map { it.groupIdHex }
         if (groupIds.isEmpty()) return
         val expectedCacheEpoch = memberCacheEpoch
-        loadInitialMemberIdProjections(account, groupIds)
-            ?.takeIf { initialMemberProjectionIsCurrent(account, epoch, expectedCacheEpoch) }
-            ?.let { projections ->
-                val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
-                // Await only on-device DM peer presentation so the first row
-                // cannot flash a short identity or empty avatar. Relay
-                // freshness remains in requestProfile below.
-                appState.warmProfilePresentationsBlocking(
-                    initialDirectPeerProfileIds(projections, activeAccountIdHex),
-                )
-                if (initialMemberProjectionIsCurrent(account, epoch, expectedCacheEpoch)) {
-                    applyInitialMemberIdProjections(projections, activeAccountIdHex)
+        val projections = loadInitialMemberIdProjections(account, groupIds)
+        if (projections == null) {
+            seedInitialMemberFallback(account, epoch, expectedCacheEpoch, groupIds)
+            return
+        }
+        if (initialMemberProjectionIsCurrent(account, epoch, expectedCacheEpoch)) {
+            val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
+            // Await only on-device DM peer presentation so the first row
+            // cannot flash a short identity or empty avatar. Relay freshness
+            // remains in requestProfile below. The degraded fallback uses this
+            // same barrier for every roster resolved before the cutoff.
+            appState.warmProfilePresentationsBlocking(
+                initialDirectPeerProfileIds(projections, activeAccountIdHex),
+            )
+            if (initialMemberProjectionIsCurrent(account, epoch, expectedCacheEpoch)) {
+                applyInitialMemberIdProjections(projections, activeAccountIdHex)
+            }
+        }
+    }
+
+    private suspend fun seedInitialMemberFallback(
+        account: String,
+        epoch: Long,
+        cacheEpoch: Long,
+        groupIds: List<String>,
+    ) {
+        val liveGroupIds = chatRows.mapTo(mutableSetOf()) { it.groupIdHex }
+        val pending =
+            groupIds
+                .asSequence()
+                .filter { it in liveGroupIds }
+                .distinctBy { it.lowercase() }
+                .filter { memberSnapshotNeedsFetch(it) }
+                .filterNot { it in inFlightMemberFetches }
+                .filterNot { memberFetchRetryJobsByGroup[it]?.isActive == true }
+                .toList()
+        if (pending.isEmpty()) return
+        inFlightMemberFetches.addAll(pending)
+        val cutoffStartedAtMs = SystemClock.elapsedRealtime()
+
+        val fallback =
+            loadFirstFrameMemberFallback(
+                groupIds = pending,
+                cutoffMillis = INITIAL_MEMBER_FALLBACK_CUTOFF_MS,
+                maxConcurrent = INITIAL_MEMBER_FALLBACK_FANOUT,
+            ) { groupIdHex ->
+                // Share the controller-wide permit pool with ordinary and
+                // retry reads. Otherwise a retry released by one failed
+                // fallback could overlap eight still-running fallback reads.
+                memberFetchGate.withPermit {
+                    memberSnapshotLoader(account, groupIdHex)
                 }
             }
+        val remainingProfileWarmBudgetMillis =
+            (
+                INITIAL_MEMBER_FALLBACK_CUTOFF_MS -
+                    (SystemClock.elapsedRealtime() - cutoffStartedAtMs)
+            ).coerceAtLeast(0L)
+        publishInitialMemberFallbackResults(
+            results = fallback.firstFrameResults,
+            account = account,
+            epoch = epoch,
+            cacheEpoch = cacheEpoch,
+            scheduleRecomputeAfterPublish = false,
+            profileWarmBudgetMillis = remainingProfileWarmBudgetMillis,
+        )
+        if (fallback.remainingCount == 0) return
+
+        CoroutineScope(coroutineContext).launch {
+            var remaining = fallback.remainingCount
+            while (remaining > 0) {
+                val completed = mutableListOf(fallback.remainingResults.receive())
+                remaining -= 1
+                while (remaining > 0) {
+                    val next = fallback.remainingResults.tryReceive().getOrNull() ?: break
+                    completed += next
+                    remaining -= 1
+                }
+                publishInitialMemberFallbackResults(
+                    results = completed,
+                    account = account,
+                    epoch = epoch,
+                    cacheEpoch = cacheEpoch,
+                    scheduleRecomputeAfterPublish = true,
+                )
+            }
+        }
+    }
+
+    private suspend fun publishInitialMemberFallbackResults(
+        results: List<FirstFrameMemberFallbackResult<List<AppGroupMemberRecordFfi>>>,
+        account: String,
+        epoch: Long,
+        cacheEpoch: Long,
+        scheduleRecomputeAfterPublish: Boolean,
+        profileWarmBudgetMillis: Long? = null,
+    ) {
+        when {
+            results.isEmpty() -> Unit
+            rejectStaleInitialMemberFallbackResults(results, account, epoch, cacheEpoch) -> Unit
+            !warmInitialMemberFallbackProfiles(results, profileWarmBudgetMillis) -> {
+                continueInitialMemberFallbackProfileWarm(results, account, epoch, cacheEpoch)
+            }
+            rejectStaleInitialMemberFallbackResults(results, account, epoch, cacheEpoch) -> Unit
+            else -> {
+                applyInitialMemberFallbackResults(results, epoch, cacheEpoch)
+                scheduleRecomputeIfRequested(scheduleRecomputeAfterPublish)
+            }
+        }
+    }
+
+    private fun rejectStaleInitialMemberFallbackResults(
+        results: List<FirstFrameMemberFallbackResult<List<AppGroupMemberRecordFfi>>>,
+        account: String,
+        epoch: Long,
+        cacheEpoch: Long,
+    ): Boolean {
+        val stale = !initialMemberProjectionIsCurrent(account, epoch, cacheEpoch)
+        if (stale && isActiveBindEpoch(epoch)) {
+            results.forEach { inFlightMemberFetches.remove(it.groupIdHex) }
+            schedulePendingMemberFetches(results.map { it.groupIdHex })
+        }
+        return stale
+    }
+
+    private suspend fun warmInitialMemberFallbackProfiles(
+        results: List<FirstFrameMemberFallbackResult<List<AppGroupMemberRecordFfi>>>,
+        budgetMillis: Long?,
+    ): Boolean {
+        val liveResults =
+            results.filter { result ->
+                chatRowsByGroup.containsKey(chatRowKey(result.groupIdHex))
+            }
+        val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
+        val projections =
+            liveResults.mapNotNull { result ->
+                result.result.getOrNull()?.let { members ->
+                    AppGroupMemberIdsFfi(result.groupIdHex, members.map { it.memberIdHex })
+                }
+            }
+        val peerProfileIds = initialDirectPeerProfileIds(projections, activeAccountIdHex)
+        return when {
+            peerProfileIds.isEmpty() -> true
+            budgetMillis == null -> {
+                appState.warmProfilePresentationsBlocking(peerProfileIds)
+                true
+            }
+            budgetMillis == 0L -> false
+            else ->
+                withTimeoutOrNull(budgetMillis) {
+                    appState.warmProfilePresentationsBlocking(peerProfileIds)
+                    true
+                } == true
+        }
+    }
+
+    private suspend fun continueInitialMemberFallbackProfileWarm(
+        results: List<FirstFrameMemberFallbackResult<List<AppGroupMemberRecordFfi>>>,
+        account: String,
+        epoch: Long,
+        cacheEpoch: Long,
+    ) {
+        // The 500 ms first-frame budget is authoritative. Keep these rosters
+        // unresolved for that frame rather than publishing a DM peer without
+        // its locally persisted name/avatar, then finish the same consumed
+        // results under the bind lifecycle.
+        CoroutineScope(coroutineContext).launch {
+            publishInitialMemberFallbackResults(
+                results = results,
+                account = account,
+                epoch = epoch,
+                cacheEpoch = cacheEpoch,
+                scheduleRecomputeAfterPublish = true,
+            )
+        }
+    }
+
+    private fun applyInitialMemberFallbackResults(
+        results: List<FirstFrameMemberFallbackResult<List<AppGroupMemberRecordFfi>>>,
+        epoch: Long,
+        cacheEpoch: Long,
+    ) {
+        results.forEach { completed ->
+            val groupIdHex = completed.groupIdHex
+            inFlightMemberFetches.remove(groupIdHex)
+            if (!chatRowsByGroup.containsKey(chatRowKey(groupIdHex))) return@forEach
+            completed.result.fold(
+                onSuccess = { members ->
+                    applyFetchedMemberSnapshot(
+                        groupIdHex = groupIdHex,
+                        members = members,
+                        epoch = epoch,
+                        cacheEpoch = cacheEpoch,
+                        scheduleRecomputeAfterPublish = false,
+                    )
+                },
+                onFailure = { throwable ->
+                    chatsDebug(throwable) {
+                        "initial member fallback failed group=${groupIdHex.take(8)}: " +
+                            (throwable.message ?: throwable.javaClass.simpleName)
+                    }
+                    markMemberSnapshotFetchFailed(groupIdHex)
+                    scheduleMemberSnapshotRetry(groupIdHex, epoch)
+                },
+            )
+        }
+    }
+
+    private fun scheduleRecomputeIfRequested(requested: Boolean) {
+        if (requested) scheduleRecompute()
     }
 
     private suspend fun loadInitialMemberIdProjections(
@@ -3852,9 +4132,15 @@ class ChatsController private constructor(
         epoch: Long,
         expectedCacheEpoch: Long,
     ): Boolean =
-        isActiveBindEpoch(epoch) &&
-            accountRef == account &&
-            memberCacheEpoch == expectedCacheEpoch
+        initialMemberFallbackGenerationIsCurrent(
+            expectedAccount = account,
+            expectedBindEpoch = epoch,
+            expectedCacheEpoch = expectedCacheEpoch,
+            currentAccount = accountRef,
+            currentBindEpoch = bindEpoch,
+            currentCacheEpoch = memberCacheEpoch,
+            lifecycleActive = isActiveBindEpoch(epoch),
+        )
 
     private fun initialDirectPeerProfileIds(
         projections: List<AppGroupMemberIdsFfi>,
@@ -5396,6 +5682,7 @@ class ChatsController private constructor(
         members: List<AppGroupMemberRecordFfi>,
         epoch: Long,
         cacheEpoch: Long,
+        scheduleRecomputeAfterPublish: Boolean = true,
     ) {
         if (!isActiveBindEpoch(epoch) || cacheEpoch != memberCacheEpoch) return
         val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
@@ -5460,7 +5747,7 @@ class ChatsController private constructor(
         }
         // Coalesce: a burst of member-fetch completions on account open/switch
         // would otherwise drive N un-debounced full recomputes. Defer into one.
-        scheduleRecompute()
+        scheduleRecomputeIfRequested(scheduleRecomputeAfterPublish)
     }
 
     private fun markMemberSnapshotFetchFailed(groupIdHex: String) {
@@ -5820,6 +6107,10 @@ private const val SEARCH_MAX_PAGES = 20
 // chat-list projection. Keeps large accounts from flooding IO at startup while
 // still letting shared-group snapshots materialize in the background.
 private const val MEMBER_FETCH_FANOUT = 4
+private const val INITIAL_MEMBER_FALLBACK_FANOUT = 8
+private const val INITIAL_MEMBER_FALLBACK_CUTOFF_MS = 500L
+private const val FIRST_FRAME_FALLBACK_POLL_MILLIS = 5L
+private const val NANOS_PER_MILLISECOND = 1_000_000L
 private const val GROUP_MEMBER_IDS_PAGE_SIZE = 100
 private const val MEMBER_FETCH_INITIAL_RETRY_DELAY_MS = 250L
 private const val MEMBER_FETCH_MAX_RETRY_DELAY_MS = 300_000L

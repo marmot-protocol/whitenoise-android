@@ -17,6 +17,7 @@ internal data class ChatFolderChipModel(
     val systemKind: SystemFolderKind?,
     val customLabel: String,
     val trailingCount: Int,
+    val pending: Boolean = false,
 )
 
 /**
@@ -36,6 +37,7 @@ internal fun chatFolderChipModels(
     activeAccountIdHex: String?,
     ruleOf: (folderId: String) -> ChatFolderRule?,
     membershipOf: (folderId: String) -> Set<String>,
+    pendingFolderIds: Set<String> = emptySet(),
     selectedFolderId: String? = null,
 ): List<ChatFolderChipModel> =
     folders
@@ -44,7 +46,8 @@ internal fun chatFolderChipModels(
             val source = if (ruleOf(folder.id)?.archivedOnly == true) archivedItems else activeItems
             val ids = membershipOf(folder.id)
             val members = source.filter { it.group.groupIdHex.lowercase(Locale.ROOT) in ids }
-            if (members.isEmpty() && folder.id != selectedFolderId) {
+            val pending = folder.id in pendingFolderIds
+            if (members.isEmpty() && folder.id != selectedFolderId && !pending) {
                 null
             } else {
                 ChatFolderChipModel(
@@ -52,6 +55,15 @@ internal fun chatFolderChipModels(
                     systemKind = folder.systemKind,
                     customLabel = folder.name,
                     trailingCount = members.count { it.effectiveHasUnread(activeAccountIdHex) },
+                    pending = pending,
                 )
             }
         }
+
+/** An unresolved roster is not an authoritative empty member-rule answer. */
+internal fun memberBasedFolderPending(
+    rule: ChatFolderRule?,
+    items: Iterable<ChatListItem>,
+): Boolean =
+    rule?.includeMemberPubkeys?.isNotEmpty() == true &&
+        items.any { it.memberSnapshot == null }

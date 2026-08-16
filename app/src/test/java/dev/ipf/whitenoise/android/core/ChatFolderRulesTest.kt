@@ -25,10 +25,11 @@ class ChatFolderRulesTest {
     }
 
     @Test
-    fun memberRuleMatchesTheDmCounterpartWithoutARoster() {
+    fun resolvedDmCounterpartStillMatchesWhileRosterIsPending() {
         val rule = ChatFolderRule(includeMemberPubkeys = setOf("cc"))
-        val dm = item("g2", members = null, otherMember = "CC")
+        val dm = item("g2", members = null, presentationOtherMember = "CC")
 
+        assertEquals(null, dm.otherMemberAccount)
         assertEquals(setOf("g2"), folderIds(listOf(dm), rule = rule))
     }
 
@@ -191,6 +192,7 @@ class ChatFolderRulesTest {
         groupIdHex: String,
         members: List<String>? = null,
         otherMember: String? = null,
+        presentationOtherMember: String? = otherMember,
         unread: Boolean = false,
         description: String = "",
         dm: Boolean = false,
@@ -207,6 +209,7 @@ class ChatFolderRulesTest {
                         roster.map { AppGroupMemberRecordFfi(memberIdHex = it, account = null, local = false) },
                     )
                 },
+            presentationOtherMemberAccount = presentationOtherMember,
             projection = row(groupIdHex, unread, dm, archived),
         )
 

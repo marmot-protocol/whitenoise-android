@@ -10,6 +10,7 @@
     <string name="error_loaded_content_kept">No se pudo cargar más contenido. Tus mensajes siguen disponibles; vuelve a intentarlo cuando quieras.</string>
     <string name="refresh">Actualizar volcado</string>
     <string name="retry">Reintentar</string>
+    <string name="chat_folder_members_loading">Actualizando carpeta</string>
     <string name="creating_identity">Creando identidad</string>
     <string name="creating_identity_title">Creando identidad</string>
     <string name="create_new_identity">Crear nueva identidad</string>

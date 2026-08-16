@@ -10,6 +10,7 @@
     <string name="error_loaded_content_kept">Impossibile caricare altri contenuti. I tuoi messaggi sono ancora disponibili; riprova quando vuoi.</string>
     <string name="refresh">Aggiorna dump</string>
     <string name="retry">Riprova</string>
+    <string name="chat_folder_members_loading">Aggiornamento cartella</string>
     <string name="creating_identity">Creare identità</string>
     <string name="creating_identity_title">Creazione identità</string>
     <string name="create_new_identity">Crea nuova identità</string>
