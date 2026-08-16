@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -27,6 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -38,16 +40,19 @@ import java.util.concurrent.atomic.AtomicReference
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
+@Suppress("LargeClass") // Relay and grouped prompt lifecycle scenarios share one process-wide coordinator fixture.
 class AmberActivityCoordinatorTest {
     private val context: Context
         get() = RuntimeEnvironment.getApplication()
 
     private lateinit var coordinatorLauncher: androidx.activity.result.ActivityResultLauncher<Intent>
     private val launched = AtomicReference<Intent>()
+    private val launches = ConcurrentLinkedQueue<Intent>()
 
     @Before
     fun attachCoordinatorLauncher() {
         launched.set(null)
+        launches.clear()
         coordinatorLauncher = CapturingLauncher()
         AmberActivityCoordinator.attach(coordinatorLauncher)
     }
@@ -64,6 +69,7 @@ class AmberActivityCoordinatorTest {
             options: androidx.core.app.ActivityOptionsCompat?,
         ) {
             launched.set(input)
+            launches.add(input)
         }
 
         override fun unregister() = Unit
@@ -82,6 +88,20 @@ class AmberActivityCoordinatorTest {
         val relayLaunch = launched.get()
         assertNotNull(relayLaunch)
         return relayLaunch!!
+    }
+
+    private fun awaitLaunchCount(
+        expected: Int,
+        timeoutMs: Long = 2_000,
+    ): List<Intent> {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            shadowOf(Looper.getMainLooper()).idle()
+            if (launches.size >= expected) return launches.toList()
+            Thread.sleep(5)
+        }
+        assertEquals(expected, launches.size)
+        return launches.toList()
     }
 
     @Test
@@ -472,6 +492,387 @@ class AmberActivityCoordinatorTest {
     }
 
     @Test
+    fun groupedResultsAreCorrelatedByIdAcrossReorderingAndMixedDecisions() {
+        val approvedId = "grouped-approved"
+        val rejectedId = "grouped-rejected"
+        val packageName = Nip55.AMBER_PACKAGE
+        val approved = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val rejected = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val done = CountDownLatch(2)
+
+        fun launchRequest(
+            id: String,
+            destination: AtomicReference<AmberActivityCoordinator.Outcome>,
+        ) = Thread {
+            destination.set(
+                AmberActivityCoordinator.awaitApproval(
+                    Nip55.buildCryptoIntent(
+                        SignerOp.Nip44Encrypt,
+                        packageName,
+                        content = "content-$id",
+                        counterparty = "counterparty",
+                        currentUser = "account-a",
+                        id = id,
+                    ),
+                    timeoutMs = 5_000,
+                    requestId = id,
+                    allowGrouping = true,
+                ),
+            )
+            done.countDown()
+        }.apply(Thread::start)
+
+        launchRequest(approvedId, approved)
+        launchRequest(rejectedId, rejected)
+        val directLaunches = awaitLaunchCount(2)
+        assertTrue(directLaunches.all { it.`package` == packageName })
+        assertTrue(directLaunches.none { it.component?.className == AmberSignerRelayActivity::class.java.name })
+
+        val aggregate =
+            JSONArray()
+                .put(JSONObject().put("id", rejectedId).put("rejected", true))
+                .put(JSONObject().put("id", approvedId).put("result", "ciphertext"))
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data = Intent().putExtra(Nip55.EXTRA_RESULTS, aggregate.toString()),
+        )
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        val approvedOutcome = approved.get() as AmberActivityCoordinator.Outcome.Completed
+        val rejectedOutcome = rejected.get() as AmberActivityCoordinator.Outcome.Completed
+        assertEquals("ciphertext", approvedOutcome.data?.getStringExtra(Nip55.EXTRA_RESULT))
+        assertFalse(readRejectedIntentExtra(approvedOutcome.data))
+        assertTrue(readRejectedIntentExtra(rejectedOutcome.data))
+        assertEquals(
+            packageName,
+            approvedOutcome.data?.getStringExtra(AmberSignerRelay.EXTRA_HANDLED_SIGNER_PACKAGE),
+        )
+    }
+
+    @Test
+    @Suppress("LongMethod") // Duplicate, unknown, and missing IDs must remain one exact-once correlation scenario.
+    fun duplicateUnknownAndMissingAggregateIdsCannotCompletePendingRequests() {
+        val firstId = "grouped-first"
+        val secondId = "grouped-second"
+        val first = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val second = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val done = CountDownLatch(2)
+
+        listOf(firstId to first, secondId to second).forEach { (id, destination) ->
+            Thread {
+                destination.set(
+                    AmberActivityCoordinator.awaitApproval(
+                        Nip55.buildCryptoIntent(
+                            SignerOp.Nip44Decrypt,
+                            Nip55.AMBER_PACKAGE,
+                            content = "payload-$id",
+                            counterparty = "counterparty",
+                            currentUser = "account-a",
+                            id = id,
+                        ),
+                        timeoutMs = 5_000,
+                        requestId = id,
+                        allowGrouping = true,
+                    ),
+                )
+                done.countDown()
+            }.start()
+        }
+        awaitLaunchCount(2)
+
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data =
+                Intent().putExtra(
+                    Nip55.EXTRA_RESULTS,
+                    """
+                    [
+                        {"id":"$firstId","result":"first-value"},
+                        {"id":"unknown","result":"unknown-value"},
+                        {"id":"$firstId","result":"duplicate-value"}
+                    ]
+                    """.trimIndent(),
+                ),
+        )
+        assertFalse(done.await(200, TimeUnit.MILLISECONDS))
+        assertNull(first.get())
+        assertNull(second.get())
+
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data = Intent().putExtra(Nip55.EXTRA_ID, firstId).putExtra(Nip55.EXTRA_RESULT, "first-safe"),
+        )
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data = Intent().putExtra(Nip55.EXTRA_ID, secondId).putExtra(Nip55.EXTRA_RESULT, "second-safe"),
+        )
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertEquals(
+            "first-safe",
+            (first.get() as AmberActivityCoordinator.Outcome.Completed).data?.getStringExtra(Nip55.EXTRA_RESULT),
+        )
+        assertEquals(
+            "second-safe",
+            (second.get() as AmberActivityCoordinator.Outcome.Completed).data?.getStringExtra(Nip55.EXTRA_RESULT),
+        )
+    }
+
+    @Test
+    fun groupedApprovalConcurrencyIsBoundedAndCancellationCompletesTheVisibleSession() {
+        val outcomes = List(Nip55.MAX_GROUPED_APPROVALS + 1) { AtomicReference<AmberActivityCoordinator.Outcome>() }
+        val done = CountDownLatch(outcomes.size)
+
+        fun startRequest(
+            index: Int,
+            timeoutMs: Long,
+        ) {
+            val destination = outcomes[index]
+            Thread {
+                destination.set(
+                    AmberActivityCoordinator.awaitApproval(
+                        Nip55.buildCryptoIntent(
+                            SignerOp.Nip44Encrypt,
+                            Nip55.AMBER_PACKAGE,
+                            content = "content-$index",
+                            counterparty = "counterparty",
+                            currentUser = "account-a",
+                            id = "bounded-$index",
+                        ),
+                        timeoutMs = timeoutMs,
+                        requestId = "bounded-$index",
+                        allowGrouping = true,
+                    ),
+                )
+                done.countDown()
+            }.start()
+        }
+
+        repeat(Nip55.MAX_GROUPED_APPROVALS) { index -> startRequest(index, timeoutMs = 5_000) }
+
+        awaitLaunchCount(Nip55.MAX_GROUPED_APPROVALS)
+        startRequest(Nip55.MAX_GROUPED_APPROVALS, timeoutMs = 250)
+        Thread.sleep(350)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(Nip55.MAX_GROUPED_APPROVALS, launches.size)
+        assertEquals(
+            AmberActivityCoordinator.Outcome.TimedOut,
+            outcomes.last().get(),
+        )
+
+        AmberActivityCoordinator.deliverResult(resultOk = false, data = null)
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        outcomes.dropLast(1).forEach { outcome ->
+            val completed = outcome.get() as AmberActivityCoordinator.Outcome.Completed
+            assertFalse(completed.resultOk)
+        }
+    }
+
+    @Test
+    fun cancellationAfterOneTimeoutRejectsTheRemainingVisibleGroupedSession() {
+        val staleId = "stale-grouped"
+        val currentId = "current-grouped"
+        val stale = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val current = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val staleDone = CountDownLatch(1)
+        val currentDone = CountDownLatch(1)
+
+        Thread {
+            stale.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent(staleId, currentUser = "account-a"),
+                    timeoutMs = 100,
+                    requestId = staleId,
+                    allowGrouping = true,
+                ),
+            )
+            staleDone.countDown()
+        }.start()
+        awaitLaunchCount(1)
+        assertTrue(staleDone.await(2, TimeUnit.SECONDS))
+        assertEquals(AmberActivityCoordinator.Outcome.TimedOut, stale.get())
+
+        Thread {
+            current.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent(currentId, currentUser = "account-a"),
+                    timeoutMs = 5_000,
+                    requestId = currentId,
+                    allowGrouping = true,
+                ),
+            )
+            currentDone.countDown()
+        }.start()
+        awaitLaunchCount(2)
+
+        AmberActivityCoordinator.deliverResult(resultOk = false, data = null)
+        assertTrue(currentDone.await(2, TimeUnit.SECONDS))
+        assertFalse((current.get() as AmberActivityCoordinator.Outcome.Completed).resultOk)
+    }
+
+    @Test
+    fun staleRelayCancellationAfterTimeoutDoesNotCancelAGroupedRequest() {
+        val staleId = "stale-serialized"
+        val currentId = "current-grouped"
+        val stale = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val current = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val staleDone = CountDownLatch(1)
+        val currentDone = CountDownLatch(1)
+
+        Thread {
+            stale.set(
+                AmberActivityCoordinator.awaitApproval(
+                    Nip55.buildGetPublicKeyIntent(staleId),
+                    timeoutMs = 100,
+                    requestId = staleId,
+                ),
+            )
+            staleDone.countDown()
+        }.start()
+        awaitRelayLaunch()
+        assertTrue(staleDone.await(2, TimeUnit.SECONDS))
+        assertEquals(AmberActivityCoordinator.Outcome.TimedOut, stale.get())
+
+        Thread {
+            current.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent(currentId, currentUser = "account-a"),
+                    timeoutMs = 5_000,
+                    requestId = currentId,
+                    allowGrouping = true,
+                ),
+            )
+            currentDone.countDown()
+        }.start()
+        awaitLaunchCount(2)
+
+        AmberActivityCoordinator.deliverResult(
+            resultOk = false,
+            data = AmberSignerRelay.buildResultIntent(staleId, signerData = null),
+        )
+        assertFalse(currentDone.await(200, TimeUnit.MILLISECONDS))
+
+        AmberActivityCoordinator.deliverResult(resultOk = false, data = null)
+        assertTrue(currentDone.await(2, TimeUnit.SECONDS))
+        assertFalse((current.get() as AmberActivityCoordinator.Outcome.Completed).resultOk)
+    }
+
+    @Test
+    fun expiredRequestsAreRemovedBeforeTheirQueuedLaunchRuns() {
+        val serialized = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val serializedDone = CountDownLatch(1)
+        Thread {
+            serialized.set(
+                AmberActivityCoordinator.awaitApproval(
+                    Nip55.buildGetPublicKeyIntent("expired-serialized"),
+                    timeoutMs = 50,
+                    requestId = "expired-serialized",
+                ),
+            )
+            serializedDone.countDown()
+        }.start()
+
+        assertTrue(serializedDone.await(2, TimeUnit.SECONDS))
+        assertEquals(AmberActivityCoordinator.Outcome.TimedOut, serialized.get())
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(launches.isEmpty())
+
+        val grouped = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val groupedDone = CountDownLatch(1)
+        Thread {
+            grouped.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent("expired-grouped", currentUser = "account-a"),
+                    timeoutMs = 50,
+                    requestId = "expired-grouped",
+                    allowGrouping = true,
+                ),
+            )
+            groupedDone.countDown()
+        }.start()
+
+        assertTrue(groupedDone.await(2, TimeUnit.SECONDS))
+        assertEquals(AmberActivityCoordinator.Outcome.TimedOut, grouped.get())
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(launches.isEmpty())
+    }
+
+    @Test
+    fun groupedRequestsFromDifferentAccountsCannotShareAnApprovalSession() {
+        val first = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val second = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val done = CountDownLatch(2)
+
+        Thread {
+            first.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent("account-a-request", currentUser = "account-a"),
+                    timeoutMs = 5_000,
+                    requestId = "account-a-request",
+                    allowGrouping = true,
+                ),
+            )
+            done.countDown()
+        }.start()
+        awaitLaunchCount(1)
+
+        Thread {
+            second.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent("account-b-request", currentUser = "account-b"),
+                    timeoutMs = 250,
+                    requestId = "account-b-request",
+                    allowGrouping = true,
+                ),
+            )
+            done.countDown()
+        }.start()
+        Thread.sleep(350)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(1, launches.size)
+        assertEquals(AmberActivityCoordinator.Outcome.TimedOut, second.get())
+        AmberActivityCoordinator.deliverResult(resultOk = false, data = null)
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertFalse((first.get() as AmberActivityCoordinator.Outcome.Completed).resultOk)
+    }
+
+    @Test
+    fun groupedResultSurvivesForegroundLauncherRecreation() {
+        val requestId = "grouped-recreated-launcher"
+        val outcome = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val done = CountDownLatch(1)
+        Thread {
+            outcome.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent(requestId, currentUser = "account-a"),
+                    timeoutMs = 5_000,
+                    requestId = requestId,
+                    allowGrouping = true,
+                ),
+            )
+            done.countDown()
+        }.start()
+        awaitLaunchCount(1)
+
+        val replaced = coordinatorLauncher
+        coordinatorLauncher = CapturingLauncher()
+        AmberActivityCoordinator.attach(coordinatorLauncher)
+        AmberActivityCoordinator.detach(replaced)
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data = Intent().putExtra(Nip55.EXTRA_ID, requestId).putExtra(Nip55.EXTRA_RESULT, "recreated-value"),
+        )
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertEquals(
+            "recreated-value",
+            (outcome.get() as AmberActivityCoordinator.Outcome.Completed).data?.getStringExtra(Nip55.EXTRA_RESULT),
+        )
+    }
+
+    @Test
     fun staleNip55RejectionAfterTimeoutDoesNotSatisfyNextRequest() {
         val staleRequestId = "stale-sign-event"
         val currentRequestId = "current-sign-event"
@@ -562,6 +963,19 @@ class AmberActivityCoordinatorTest {
         )
         shadowOf(context.packageManager).addResolveInfoForIntent(intent, resolveInfo)
     }
+
+    private fun groupedCryptoIntent(
+        requestId: String,
+        currentUser: String,
+    ): Intent =
+        Nip55.buildCryptoIntent(
+            SignerOp.Nip44Encrypt,
+            Nip55.AMBER_PACKAGE,
+            content = "content-$requestId",
+            counterparty = "counterparty",
+            currentUser = currentUser,
+            id = requestId,
+        )
 
     private fun assertSignerFacingLoginIntent(
         intent: Intent,

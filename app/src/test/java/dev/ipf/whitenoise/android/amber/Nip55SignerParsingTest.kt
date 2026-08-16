@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.amber
 
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -313,5 +315,102 @@ class Nip55SignerParsingTest {
         assertThrows(IllegalArgumentException::class.java) {
             SignerPermission(SignerOp.SignEvent, kind = -1)
         }
+    }
+
+    @Test
+    fun aggregateResultsPreserveOrderIndependentIdsAndMixedDecisions() {
+        val json =
+            JSONArray()
+                .put(
+                    JSONObject()
+                        .put("id", "request-b")
+                        .put("rejected", true),
+                ).put(
+                    JSONObject()
+                        .put("id", "request-a")
+                        .put("result", "approved-value"),
+                ).toString()
+
+        val parsed = parseAmberAggregateResults(json) as AmberAggregateParseOutcome.Parsed
+
+        assertEquals(listOf("request-b", "request-a"), parsed.entries.map { it.id })
+        assertTrue(parsed.entries.first().rejected)
+        assertEquals("approved-value", parsed.entries.last().result)
+        assertTrue(parsed.duplicateIds.isEmpty())
+        assertEquals(0, parsed.malformedEntryCount)
+    }
+
+    @Test
+    fun aggregateResultsExcludeDuplicateIdsWithoutDroppingOtherEntries() {
+        val json =
+            """
+            [
+                {"id":"duplicate","result":"first"},
+                {"id":"safe","result":"safe-value"},
+                {"id":"duplicate","result":"second"}
+            ]
+            """.trimIndent()
+
+        val parsed = parseAmberAggregateResults(json) as AmberAggregateParseOutcome.Parsed
+
+        assertEquals(listOf("safe"), parsed.entries.map { it.id })
+        assertEquals(setOf("duplicate"), parsed.duplicateIds)
+    }
+
+    @Test
+    fun aggregateResultsIgnoreMalformedEntriesAndKeepAddressableOnes() {
+        val json =
+            """
+            [
+                {"id":42,"result":"wrong-id-type"},
+                {"id":"wrong-result-type","result":42},
+                {"id":"known","result":"value"},
+                "not-an-object"
+            ]
+            """.trimIndent()
+
+        val parsed = parseAmberAggregateResults(json) as AmberAggregateParseOutcome.Parsed
+
+        assertEquals(listOf("known"), parsed.entries.map { it.id })
+        assertEquals(3, parsed.malformedEntryCount)
+    }
+
+    @Test
+    fun aggregateResultsRejectMalformedOversizedAndOverCountEnvelopes() {
+        assertEquals(AmberAggregateParseOutcome.Malformed, parseAmberAggregateResults("not-json"))
+        assertEquals(
+            AmberAggregateParseOutcome.Malformed,
+            parseAmberAggregateResults(" ".repeat(Nip55.MAX_AGGREGATE_RESULTS_UTF8_BYTES + 1)),
+        )
+        val tooMany =
+            JSONArray().apply {
+                repeat(Nip55.MAX_GROUPED_APPROVALS + 1) { index ->
+                    put(JSONObject().put("id", "request-$index").put("result", "value"))
+                }
+            }
+        assertEquals(AmberAggregateParseOutcome.Malformed, parseAmberAggregateResults(tooMany.toString()))
+    }
+
+    @Test
+    fun aggregateSignatureRebuildsOnlyAWellFormedSignedEvent() {
+        val unsigned = """{"id":"event-id","pubkey":"abc","sig":""}"""
+        val signature = "ab".repeat(64)
+
+        val signed = checkNotNull(signedEventFromAggregate(unsigned, signature.uppercase()))
+
+        assertEquals("event-id", JSONObject(signed).getString("id"))
+        assertEquals(signature, JSONObject(signed).getString("sig"))
+        assertEquals(null, signedEventFromAggregate(unsigned, "not-a-signature"))
+        assertEquals(null, signedEventFromAggregate("not-json", signature))
+    }
+
+    @Test
+    fun groupedApprovalCapabilityIsLimitedToAmber63AndNewer() {
+        assertFalse(amberVersionSupportsGroupedApprovals(Nip55.AMBER_PACKAGE, "6.2.9"))
+        assertTrue(amberVersionSupportsGroupedApprovals(Nip55.AMBER_PACKAGE, "6.3.0"))
+        assertTrue(amberVersionSupportsGroupedApprovals(Nip55.AMBER_PACKAGE, "6.4.0-play"))
+        assertTrue(amberVersionSupportsGroupedApprovals(Nip55.AMBER_DEBUG_PACKAGE, "7.0"))
+        assertFalse(amberVersionSupportsGroupedApprovals(Nip55.AMBER_PACKAGE, null))
+        assertFalse(amberVersionSupportsGroupedApprovals("com.example.signer", "99.0.0"))
     }
 }

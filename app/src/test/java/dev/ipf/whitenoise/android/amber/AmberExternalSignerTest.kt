@@ -5,6 +5,8 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageInfo
 import android.content.pm.ResolveInfo
 import android.database.Cursor
 import android.database.MatrixCursor
@@ -14,7 +16,10 @@ import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityOptionsCompat
 import dev.ipf.marmotkit.MarmotKitException
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -105,6 +110,87 @@ class AmberExternalSignerTest {
         }
         assertNull(Nip55.savedSignerPackage(context))
         assertNull(launcher.launched.get())
+    }
+
+    @Test
+    fun amber64AggregateSignatureCompletesTheMatchingSignEvent() {
+        val accountPubkey = "ab".repeat(32)
+        val unsignedEvent =
+            JSONObject()
+                .put("id", "event-id")
+                .put("pubkey", accountPubkey)
+                .put("created_at", 1_700_000_000)
+                .put("kind", 1)
+                .put("tags", JSONArray())
+                .put("content", "hello")
+                .put("sig", "")
+                .toString()
+        val signature = "cd".repeat(64)
+        installAmber64()
+        Nip55.saveSignerPackage(context, Nip55.AMBER_PACKAGE)
+        val result = AtomicReference<String>()
+        val failure = AtomicReference<Throwable>()
+        val done = CountDownLatch(1)
+
+        Thread {
+            try {
+                result.set(
+                    AmberExternalSigner(context, accountPubkey, approvalTimeoutMs = 5_000)
+                        .signEvent(unsignedEvent),
+                )
+            } catch (error: Throwable) {
+                failure.set(error)
+            } finally {
+                done.countDown()
+            }
+        }.start()
+
+        val deadline = System.currentTimeMillis() + 2_000
+        while (launcher.launched.get() == null && System.currentTimeMillis() < deadline) {
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            Thread.sleep(5)
+        }
+        val signerIntent = checkNotNull(launcher.launched.get())
+        val requestId = checkNotNull(signerIntent.getStringExtra(Nip55.EXTRA_ID))
+        assertEquals(Nip55.AMBER_PACKAGE, signerIntent.`package`)
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data =
+                Intent().putExtra(
+                    Nip55.EXTRA_RESULTS,
+                    JSONArray()
+                        .put(JSONObject().put("id", requestId).put("signature", signature).put("result", signature))
+                        .toString(),
+                ),
+        )
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        failure.get()?.let { throw it }
+        assertEquals(signature, JSONObject(checkNotNull(result.get())).getString("sig"))
+        assertEquals(accountPubkey, JSONObject(checkNotNull(result.get())).getString("pubkey"))
+    }
+
+    private fun installAmber64() {
+        shadowOf(context.packageManager).installPackage(
+            PackageInfo().apply {
+                packageName = Nip55.AMBER_PACKAGE
+                versionName = "6.4.0"
+                applicationInfo =
+                    ApplicationInfo().apply {
+                        packageName = Nip55.AMBER_PACKAGE
+                    }
+            },
+        )
+        shadowOf(context.packageManager).addResolveInfoForIntent(
+            Intent(Intent.ACTION_VIEW, Uri.parse("${Nip55.SCHEME}:")).setPackage(Nip55.AMBER_PACKAGE),
+            ResolveInfo().apply {
+                activityInfo =
+                    ActivityInfo().apply {
+                        packageName = Nip55.AMBER_PACKAGE
+                        name = "${Nip55.AMBER_PACKAGE}.SignerActivity"
+                    }
+            },
+        )
     }
 
     private class CapturingLauncher : ActivityResultLauncher<Intent>() {

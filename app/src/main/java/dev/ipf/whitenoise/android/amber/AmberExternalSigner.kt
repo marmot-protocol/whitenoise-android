@@ -102,8 +102,23 @@ class AmberExternalSigner(
                 SignerOp.SignEvent -> Nip55.buildSignEventIntent(packageName, content, requestId, accountPubkey)
                 else -> Nip55.buildCryptoIntent(op, packageName, content, counterparty.orEmpty(), accountPubkey, requestId)
             }
-        return when (val outcome = coordinator.awaitApproval(intent, approvalTimeoutMs, requestId)) {
-            is AmberActivityCoordinator.Outcome.Completed -> parseCompleted(op, outcome.data, outcome.resultOk, packageName)
+        return when (
+            val outcome =
+                coordinator.awaitApproval(
+                    intent,
+                    approvalTimeoutMs,
+                    requestId,
+                    allowGrouping = Nip55.supportsGroupedApprovals(appContext, packageName),
+                )
+        ) {
+            is AmberActivityCoordinator.Outcome.Completed ->
+                parseCompleted(
+                    op = op,
+                    data = outcome.data,
+                    resultOk = outcome.resultOk,
+                    expectedPackageName = packageName,
+                    unsignedEventJson = content,
+                )
             AmberActivityCoordinator.Outcome.NoForegroundActivity ->
                 throw MarmotKitException.ExternalSignerUnavailable(accountPubkey)
             AmberActivityCoordinator.Outcome.TimedOut ->
@@ -116,6 +131,7 @@ class AmberExternalSigner(
         data: Intent?,
         resultOk: Boolean,
         expectedPackageName: String,
+        unsignedEventJson: String,
     ): String =
         when (
             val parsed =
@@ -124,7 +140,9 @@ class AmberExternalSigner(
                     resultOk,
                     rejected = readRejectedIntentExtra(data),
                     resultExtra = data?.getStringExtra(Nip55.EXTRA_RESULT),
-                    eventExtra = data?.getStringExtra(Nip55.EXTRA_EVENT),
+                    eventExtra =
+                        data?.getStringExtra(Nip55.EXTRA_EVENT)
+                            ?: aggregateSignedEvent(data, op, unsignedEventJson),
                     packageExtra = data?.getStringExtra(Nip55.EXTRA_PACKAGE),
                 )
         ) {
@@ -167,4 +185,18 @@ class AmberExternalSigner(
     companion object {
         const val APPROVAL_TIMEOUT_MS = 120_000L
     }
+}
+
+private fun aggregateSignedEvent(
+    data: Intent?,
+    op: SignerOp,
+    unsignedEventJson: String,
+): String? {
+    if (op != SignerOp.SignEvent || data?.getBooleanExtra(Nip55.EXTRA_AGGREGATE_RESULT, false) != true) {
+        return null
+    }
+    val signature =
+        data.getStringExtra(Nip55.EXTRA_SIGNATURE)
+            ?: data.getStringExtra(Nip55.EXTRA_RESULT)
+    return signedEventFromAggregate(unsignedEventJson, signature)
 }
