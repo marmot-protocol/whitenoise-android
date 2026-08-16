@@ -315,6 +315,7 @@ internal fun MessageBubble(
         } else {
             controller.deleteCapabilityFor(record, alreadyDeleted = deleted)
         }
+    val tombstoneCleanupUnavailable = deleted && !deleteCapability.canDeleteForMe
     // Convergence reasons and local publish failures keep their content and
     // add a warning; only unknown reasons still take the error-styled
     // tombstone. Explicit deletion always wins.
@@ -668,7 +669,7 @@ internal fun MessageBubble(
     var customizeReactionsOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var restoreReactionPickerExpanded by remember(record.messageIdHex) { mutableStateOf(false) }
     var deleteDialogOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    var deleteForEveryoneInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
+    var deleteInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     var attachmentSaveInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     key(record.messageIdHex) {
         val currentActionMenuOpen by rememberUpdatedState(isActionMenuOpen)
@@ -684,14 +685,20 @@ internal fun MessageBubble(
             }
         }
     }
-    // A deleted message is inert: tear down any open action/reaction surface if
-    // the message is deleted out from under it (optimistic or remote delete).
+    // A deleted message is inert: tear down every live-message surface if the
+    // message is deleted out from under it (optimistic or remote delete).
     LaunchedEffect(deleted) {
         if (deleted) {
             onActionMenuOpenChange(false)
             onTextSelectionModeChange(false)
             emojiPickerOpen = false
+            expandedFullView = false
+            infoSheetOpen = false
+            forwardSheetOpen = false
+            editHistoryOpen = false
             reactionSheetOpen = false
+            customizeReactionsOpen = false
+            restoreReactionPickerExpanded = false
             deleteDialogOpen = false
         }
     }
@@ -709,12 +716,13 @@ internal fun MessageBubble(
     }
 
     fun beginReply() {
-        if (readOnly) return
+        if (deleted || readOnly) return
         controller.replyingTo = record
         onActionMenuOpenChange(false)
     }
 
     fun openInfoSheet() {
+        if (deleted) return
         onActionMenuOpenChange(false)
         infoSheetOpen = true
     }
@@ -726,16 +734,24 @@ internal fun MessageBubble(
     }
 
     fun performDeleteForMe() {
-        deleteDialogOpen = false
-        controller.hideMessageForMe(record.messageIdHex)
+        if (deleteInFlight) return
+        deleteInFlight = true
+        appState.launchMutation {
+            try {
+                val removed = controller.hideMessageForMe(record.messageIdHex)
+                if (removed) deleteDialogOpen = false
+            } finally {
+                deleteInFlight = false
+            }
+        }
     }
 
     fun performDeleteForEveryone() {
         // The in-flight flag is the repeated-tap guard on top of the
         // controller's own idempotency (a second deleteMessage on an already
         // tombstoned id is a no-op).
-        if (deleteForEveryoneInFlight) return
-        deleteForEveryoneInFlight = true
+        if (deleteInFlight) return
+        deleteInFlight = true
         // launchMutation so the MLS commit + Nostr publish survive navigating
         // away from the conversation. The dialog stays open with its options
         // disabled until the outcome is known, and stays open on failure so
@@ -747,8 +763,8 @@ internal fun MessageBubble(
                 if (removed) deleteDialogOpen = false
             } finally {
                 // Cancellation must not leave the flag stuck true, which would
-                // disable delete-for-everyone for this bubble's remember scope.
-                deleteForEveryoneInFlight = false
+                // disable deletion for this bubble's remember scope.
+                deleteInFlight = false
             }
         }
     }
@@ -763,6 +779,7 @@ internal fun MessageBubble(
     }
 
     fun copyMessageText() {
+        if (deleted) return
         clipboard.setText(AnnotatedString(displayedBody))
         onActionMenuOpenChange(false)
     }
@@ -800,6 +817,7 @@ internal fun MessageBubble(
     // left the loaded timeline. When text is selected or the action menu was
     // opened from a hit-tested press, start at the containing visible sentence.
     fun speakFromHere() {
+        if (deleted) return
         val layouts = selectableTextLayouts.values.toList()
         val selectionActive = textSelectionMode && messageTextSelectionState.selectedTexts.isNotEmpty()
         val visibleText =
@@ -849,11 +867,13 @@ internal fun MessageBubble(
     }
 
     fun copyMarkdownLink(url: String) {
+        if (deleted) return
         clipboard.setText(AnnotatedString(url))
         onActionMenuOpenChange(false)
     }
 
     fun beginTextSelection() {
+        if (deleted) return
         selectableTextLayouts.clear()
         textSelectionSeeded = false
         onActionMenuOpenChange(false)
@@ -864,7 +884,7 @@ internal fun MessageBubble(
         // Defensive: the menu only renders Forward when forwardBody != null, but
         // gate here too so a stale tap can never open the picker for a non-text
         // record (issue #390 is text-only).
-        if (forwardBody == null) return
+        if (deleted || readOnly || forwardBody == null) return
         onActionMenuOpenChange(false)
         forwardSheetOpen = true
     }
@@ -954,9 +974,9 @@ internal fun MessageBubble(
                         // switches to anchored batch selection. Markdown links
                         // keep their copy-on-release routing. Horizontal motion
                         // remains available to swipe-to-reply above.
-                        if (deleted || longPressBlockedBySelection || textSelectionMode) {
-                            // A deleted message has no actions menu; batch selection
-                            // and text selection route the row through their own UI.
+                        if (tombstoneCleanupUnavailable || longPressBlockedBySelection || textSelectionMode) {
+                            // Batch/text selection own the row. A tombstone remains
+                            // actionable only when its local cleanup path is usable.
                             Modifier
                         } else {
                             Modifier.longPressOrVerticalDrag(
@@ -970,7 +990,11 @@ internal fun MessageBubble(
                                             messageBubbleLongPressPositionInWindow(it, position)
                                         } ?: return@longPressOrVerticalDrag
                                     val linkDestination =
-                                        markdownLinkDestinationAt(markdownLinkLayouts.values, windowPosition)
+                                        if (deleted) {
+                                            null
+                                        } else {
+                                            markdownLinkDestinationAt(markdownLinkLayouts.values, windowPosition)
+                                        }
                                     pendingLongPressLinkDestination[0] = linkDestination
                                     if (linkDestination == null) {
                                         // Capture the press in window space before
@@ -993,6 +1017,7 @@ internal fun MessageBubble(
                                     if (linkDestination != null) copyMarkdownLink(linkDestination)
                                 },
                                 onDragStart = { position ->
+                                    if (deleted) return@longPressOrVerticalDrag
                                     // A range gesture begins after the threshold
                                     // action was shown. Hand ownership over without
                                     // leaving a stale popup above selection mode.
@@ -1003,16 +1028,19 @@ internal fun MessageBubble(
                                         ?.let(onDragSelectionStart)
                                 },
                                 onDrag = { position ->
+                                    if (deleted) return@longPressOrVerticalDrag false
                                     rowCoordinates[0]
                                         ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
                                         ?.let(onDragSelection)
                                         ?: false
                                 },
-                                onDragEnd = onDragSelectionEnd,
+                                onDragEnd = {
+                                    if (!deleted) onDragSelectionEnd()
+                                },
                                 onGestureCancel = {
                                     pendingLongPressLinkDestination[0] = null
                                     onActionMenuOpenChange(false)
-                                    onDragSelectionCancel()
+                                    if (!deleted) onDragSelectionCancel()
                                 },
                             )
                         },
@@ -1025,9 +1053,10 @@ internal fun MessageBubble(
                         // onLongClick semantic action for the whole row (#262).
                         // Re-publish that action via Modifier.semantics so the
                         // reply/copy/delete/reaction entry point stays reachable
-                        // without a hold gesture. Guarded by `!deleted` and
-                        // disabled while batch/text selection owns the row.
-                        if (deleted || selectionMode || textSelectionMode) {
+                        // without a hold gesture. Tombstones expose this only for
+                        // their focused local cleanup; batch/text selection still
+                        // owns all other row interaction.
+                        if (tombstoneCleanupUnavailable || selectionMode || textSelectionMode) {
                             Modifier
                         } else {
                             Modifier.semantics {
@@ -1128,7 +1157,7 @@ internal fun MessageBubble(
                 val anyConfirmedMedia = bubbleMedia.hasConfirmedMedia
 
                 fun saveAttachments() {
-                    if (mediaReferences.isEmpty() || attachmentSaveInFlight) return
+                    if (deleted || mediaReferences.isEmpty() || attachmentSaveInFlight) return
                     onActionMenuOpenChange(false)
                     attachmentSaveInFlight = true
                     appState.launchMutation {
@@ -1501,7 +1530,7 @@ internal fun MessageBubble(
                                     footerOnPendingVisual = footerOnPendingVisual,
                                     invalidationWarning = invalidationWarning,
                                     mine = mine,
-                                    onExpand = { expandedFullView = true },
+                                    onExpand = { if (!deleted) expandedFullView = true },
                                 )
                             }
                         } else {
@@ -1563,7 +1592,7 @@ internal fun MessageBubble(
                                     footerOnPendingVisual = footerOnPendingVisual,
                                     invalidationWarning = invalidationWarning,
                                     mine = mine,
-                                    onExpand = { expandedFullView = true },
+                                    onExpand = { if (!deleted) expandedFullView = true },
                                 )
                             }
                         }
@@ -1625,53 +1654,60 @@ internal fun MessageBubble(
                             footerOnPendingVisual = footerOnPendingVisual,
                             invalidationWarning = invalidationWarning,
                             mine = mine,
-                            onExpand = { expandedFullView = true },
+                            onExpand = { if (!deleted) expandedFullView = true },
                         )
                     }
                 }
                 MessageActionMenu(
-                    // Never render the menu for a deleted message or while batch
-                    // or partial text selection owns the row interaction.
-                    expanded = isActionMenuOpen && !deleted && !selectionMode && !textSelectionMode,
+                    // A tombstone gets a focused delete-only menu. Batch or partial
+                    // text selection still owns the row interaction completely.
+                    expanded = isActionMenuOpen && !selectionMode && !textSelectionMode,
                     anchorBoundsInWindow = actionMenuAnchorBounds,
                     anchorWindowYPx = longPressWindowY,
                     centerOverAnchor = hasMedia,
-                    canReply = !readOnly,
-                    canReact = !readOnly,
+                    canReply = !deleted && !readOnly,
+                    canReact = !deleted && !readOnly,
                     canDelete = deleteCapability.canDeleteAtAll,
                     canEdit = !readOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
-                    canForward = !readOnly && forwardBody != null,
-                    canSelect = !readOnly && batchSelectable,
+                    canForward = !deleted && !readOnly && forwardBody != null,
+                    canSelect = !deleted && !readOnly && batchSelectable,
                     // Whole-message Copy keeps using its actual clipboard payload,
                     // including card-style bubbles whose body is rendered by the
                     // card rather than the text renderer. Partial selection is only
                     // available when this bubble has selectable rendered text.
-                    canCopyText = displayedBody.isNotBlank(),
+                    canCopyText = !deleted && displayedBody.isNotBlank(),
                     // Speak aloud uses the same edit-aware user-authored text as TTS
                     // projection, not the display fallback (filenames, placeholders,
                     // reactions, system copy).
-                    canSpeak = canSpeakAloud,
-                    canSelectText = !bodyTextToRender.isNullOrBlank(),
-                    canSave = mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
+                    canSpeak = !deleted && canSpeakAloud,
+                    canSelectText = !deleted && !bodyTextToRender.isNullOrBlank(),
+                    canSave = !deleted && mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
+                    canInfo = !deleted,
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->
-                        onActionMenuOpenChange(false)
-                        onEmojiUsed(emoji)
-                        reactWithEmoji(emoji)
+                        if (!deleted && !readOnly) {
+                            onActionMenuOpenChange(false)
+                            onEmojiUsed(emoji)
+                            reactWithEmoji(emoji)
+                        }
                     },
                     onOpenEmojiPicker = {
-                        onActionMenuOpenChange(false)
-                        emojiPickerOpen = true
+                        if (!deleted && !readOnly) {
+                            onActionMenuOpenChange(false)
+                            emojiPickerOpen = true
+                        }
                     },
                     onReply = ::beginReply,
                     onEdit = {
-                        onActionMenuOpenChange(false)
-                        // Cancel any reply-in-progress: reply and
-                        // edit modes are mutually exclusive in the
-                        // composer banner.
-                        controller.replyingTo = null
-                        controller.editingMessageId = record.messageIdHex
+                        if (!deleted && !readOnly) {
+                            onActionMenuOpenChange(false)
+                            // Cancel any reply-in-progress: reply and
+                            // edit modes are mutually exclusive in the
+                            // composer banner.
+                            controller.replyingTo = null
+                            controller.editingMessageId = record.messageIdHex
+                        }
                     },
                     onCopyText = ::copyMessageText,
                     onSpeak = {
@@ -1682,19 +1718,21 @@ internal fun MessageBubble(
                     onSelectText = ::beginTextSelection,
                     onForward = ::beginForward,
                     onSelect = {
-                        onActionMenuOpenChange(false)
-                        onToggleSelection()
+                        if (!deleted && !readOnly) {
+                            onActionMenuOpenChange(false)
+                            onToggleSelection()
+                        }
                     },
                     onInfo = ::openInfoSheet,
                     onDelete = ::requestDelete,
                 )
-                if (expandedFullView) {
+                if (expandedFullView && !deleted) {
                     val groupIdHex = controller.group.groupIdHex
                     val editingRecord =
                         controller.editingMessageId?.let { id ->
                             controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
                         }
-                    val canUseExpandedComposer = !readOnly && composerGate == ComposerGate.COMPOSER
+                    val canUseExpandedComposer = !deleted && !readOnly && composerGate == ComposerGate.COMPOSER
                     MessageFullScreenView(
                         senderDisplayName = appState.displayName(record.sender),
                         senderSeed = record.sender,
@@ -1783,7 +1821,7 @@ internal fun MessageBubble(
                         },
                     )
                 }
-                if (emojiPickerOpen && !readOnly) {
+                if (emojiPickerOpen && !deleted && !readOnly) {
                     EmojiPickerSheet(
                         restoreExpanded = restoreReactionPickerExpanded,
                         purpose = EmojiPickerPurpose.USE,
@@ -1810,7 +1848,7 @@ internal fun MessageBubble(
                         },
                     )
                 }
-                if (customizeReactionsOpen) {
+                if (customizeReactionsOpen && !deleted) {
                     fun closeCustomizeToReactionSheet() {
                         customizeReactionsOpen = false
                     }
@@ -1825,7 +1863,7 @@ internal fun MessageBubble(
                         onReset = onQuickReactionsReset,
                     )
                 }
-                if (editHistoryOpen && editState != null) {
+                if (editHistoryOpen && !deleted && editState != null) {
                     EditHistorySheet(
                         original = record.plaintext,
                         originalTimestamp = record.recordedAt,
@@ -1833,7 +1871,7 @@ internal fun MessageBubble(
                         onDismissRequest = { editHistoryOpen = false },
                     )
                 }
-                if (infoSheetOpen) {
+                if (infoSheetOpen && !deleted) {
                     MessageInfoSheet(
                         record = record,
                         status = item.status,
@@ -1846,14 +1884,14 @@ internal fun MessageBubble(
                         },
                     )
                 }
-                if (forwardSheetOpen && forwardBody != null) {
+                if (forwardSheetOpen && !deleted && forwardBody != null) {
                     ForwardMessageSheet(
                         appState = appState,
                         body = forwardBody,
                         originGroupIdHex = record.groupIdHex,
                         onDismiss = { forwardSheetOpen = false },
                         onForward = { targetGroupIds ->
-                            appState.forwardText(targetGroupIds, forwardBody)
+                            if (!deleted) appState.forwardText(targetGroupIds, forwardBody)
                         },
                     )
                 }
@@ -1862,7 +1900,7 @@ internal fun MessageBubble(
                         capability = deleteCapability,
                         mine = mine,
                         senderDisplayName = appState.displayName(record.sender),
-                        deleteInFlight = deleteForEveryoneInFlight,
+                        deleteInFlight = deleteInFlight,
                         onDeleteForEveryone = ::performDeleteForEveryone,
                         onDeleteForMe = ::performDeleteForMe,
                         onDismissRequest = { deleteDialogOpen = false },

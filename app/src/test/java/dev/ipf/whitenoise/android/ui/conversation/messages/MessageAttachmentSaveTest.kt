@@ -84,8 +84,8 @@ class MessageAttachmentSaveTest {
         val saveBody = saveAttachmentsBody()
 
         assertTrue(
-            "attachment saves must survive navigation and ignore a second invocation while active",
-            "if (mediaReferences.isEmpty() || attachmentSaveInFlight) return" in saveBody &&
+            "attachment saves must require a live message, survive navigation, and reject concurrent launches",
+            "if (deleted || mediaReferences.isEmpty() || attachmentSaveInFlight) return" in saveBody &&
                 "attachmentSaveInFlight = true" in saveBody &&
                 "appState.launchMutation" in saveBody &&
                 Regex("finally\\s*\\{\\s*attachmentSaveInFlight = false").containsMatchIn(saveBody),

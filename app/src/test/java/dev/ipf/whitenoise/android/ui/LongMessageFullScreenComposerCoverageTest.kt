@@ -56,8 +56,9 @@ class LongMessageFullScreenComposerCoverageTest {
                 "InvitePreviewActionBar(" in fullScreenCall,
         )
         assertTrue(
-            "expanded reader reply/react/delete actions must be enabled only when the shared gate allows the active composer",
-            "val canUseExpandedComposer = !readOnly && composerGate == ComposerGate.COMPOSER" in body &&
+            "expanded reader reply/react actions must require a live message and an active shared composer",
+            "if (expandedFullView && !deleted)" in body &&
+                "val canUseExpandedComposer = !deleted && !readOnly && composerGate == ComposerGate.COMPOSER" in body &&
                 "canReply = canUseExpandedComposer" in fullScreenCall &&
                 "canReact = canUseExpandedComposer" in fullScreenCall,
         )

@@ -15,12 +15,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
@@ -65,6 +67,40 @@ class ConversationPolishScreenshotTest {
         )
 
     @Test
+    fun deletedMessageDeleteOnlyActionLight() =
+        captureDeletedMessageActionMenu(
+            "deleted_message_delete_only_action_light",
+            dark = false,
+            amoled = false,
+        )
+
+    @Test
+    fun deletedMessageDeleteOnlyActionDark() =
+        captureDeletedMessageActionMenu(
+            "deleted_message_delete_only_action_dark",
+            dark = true,
+            amoled = false,
+        )
+
+    @Test
+    fun deletedMessageDeleteOnlyActionAmoled() =
+        captureDeletedMessageActionMenu(
+            "deleted_message_delete_only_action_amoled",
+            dark = true,
+            amoled = true,
+        )
+
+    @Test
+    fun deletedMessageDeleteOnlyActionLargeFontRtl() =
+        captureDeletedMessageActionMenu(
+            "deleted_message_delete_only_action_font_scale_2x_rtl",
+            dark = false,
+            amoled = false,
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+        )
+
+    @Test
     fun attachmentTypesLight() = captureAttachmentTypes("attachment_type_gallery_light", dark = false, amoled = false)
 
     @Test
@@ -100,6 +136,27 @@ class ConversationPolishScreenshotTest {
         composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).captureRoboImage("src/test/snapshots/$name.png")
     }
 
+    private fun captureDeletedMessageActionMenu(
+        name: String,
+        dark: Boolean,
+        amoled: Boolean,
+        fontScale: Float = 1f,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
+                val density = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalDensity provides Density(density.density, fontScale),
+                    LocalLayoutDirection provides layoutDirection,
+                ) {
+                    DeletedMessageActionMenu()
+                }
+            }
+        }
+        composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).captureRoboImage("src/test/snapshots/$name.png")
+    }
+
     @Composable
     private fun MaximumActionMenu() {
         MessageActionMenu(
@@ -117,6 +174,40 @@ class ConversationPolishScreenshotTest {
             canSelectText = true,
             canSave = true,
             quickReactionEmojis = listOf("👍", "❤️", "😂", "😮", "😢"),
+            onDismissRequest = {},
+            onReact = {},
+            onOpenEmojiPicker = {},
+            onReply = {},
+            onEdit = {},
+            onForward = {},
+            onSelect = {},
+            onSelectText = {},
+            onCopyText = {},
+            onSpeak = {},
+            onSave = {},
+            onInfo = {},
+            onDelete = {},
+        )
+    }
+
+    @Composable
+    private fun DeletedMessageActionMenu() {
+        MessageActionMenu(
+            expanded = true,
+            anchorBoundsInWindow = null,
+            anchorWindowYPx = 8f,
+            canReply = false,
+            canReact = false,
+            canDelete = true,
+            canEdit = false,
+            canForward = false,
+            canSelect = false,
+            canCopyText = false,
+            canSpeak = false,
+            canSelectText = false,
+            canSave = false,
+            canInfo = false,
+            quickReactionEmojis = emptyList(),
             onDismissRequest = {},
             onReact = {},
             onOpenEmojiPicker = {},

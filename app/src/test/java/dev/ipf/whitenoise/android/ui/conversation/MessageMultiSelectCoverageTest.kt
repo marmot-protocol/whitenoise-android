@@ -97,14 +97,14 @@ class MessageMultiSelectCoverageTest {
         assertTrue(source.contains("messageBubbleSelectionGutterWidth"))
         assertTrue(source.contains("if (mine) Spacer(Modifier.weight(1f))"))
         assertTrue(!source.contains(".matchParentSize()"))
-        assertTrue(source.contains("canSelect = !readOnly && batchSelectable"))
+        assertTrue(source.contains("canSelect = !deleted && !readOnly && batchSelectable"))
     }
 
     @Test
     fun selectionModeBlocksEveryMessageActionMenuEntryPoint() {
         val source = source("messages/MessageBubble.kt").replace(Regex("\\s+"), " ")
 
-        assertTrue(source.contains("expanded = isActionMenuOpen && !deleted && !selectionMode && !textSelectionMode"))
+        assertTrue(source.contains("expanded = isActionMenuOpen && !selectionMode && !textSelectionMode"))
         assertTrue(
             source.contains(
                 "remember( textSelectionMode, selectionMode, displayedBody, " +
@@ -127,6 +127,21 @@ class MessageMultiSelectCoverageTest {
                     "captureActionMenuVisibleStart(null) onActionMenuOpenChange(true)",
             ),
         )
+    }
+
+    @Test
+    fun messageBubbleUsesOneGuardForBothDeleteMutations() {
+        val source =
+            source("messages/MessageBubble.kt")
+                .substringAfter("var deleteDialogOpen")
+                .substringBefore("fun reactWithEmoji")
+
+        assertFalse(source.contains("deleteForMeInFlight"))
+        assertFalse(source.contains("deleteForEveryoneInFlight"))
+        assertTrue(source.contains("var deleteInFlight by remember"))
+        assertTrue(source.split("if (deleteInFlight) return").size - 1 == 2)
+        assertTrue(source.split("deleteInFlight = true").size - 1 == 2)
+        assertTrue(source.split("deleteInFlight = false").size - 1 == 2)
     }
 
     private fun source(relativePath: String): String =
