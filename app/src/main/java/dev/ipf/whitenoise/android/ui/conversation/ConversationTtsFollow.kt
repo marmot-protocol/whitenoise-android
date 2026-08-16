@@ -196,6 +196,9 @@ internal fun rememberConversationTtsFollowPolicy(groupIdHex: String): Conversati
 internal class ConversationTtsFollowPolicy private constructor(
     private var sessionId: Long?,
     initialFollowEnabled: Boolean,
+    private var activeTarget: ConversationTtsFollowTarget? = null,
+    private var activeMessageIndex: Int? = null,
+    private var activeDirection: TtsFollowDirection = TtsFollowDirection.Forward,
 ) {
     constructor() : this(sessionId = null, initialFollowEnabled = false)
 
@@ -205,9 +208,6 @@ internal class ConversationTtsFollowPolicy private constructor(
     var showResumeAction: Boolean by mutableStateOf(sessionId != null && !initialFollowEnabled)
         private set
 
-    private var activeTarget: ConversationTtsFollowTarget? = null
-    private var activeMessageIndex: Int? = null
-    private var activeDirection = TtsFollowDirection.Forward
     private var evaluatedTarget: ConversationTtsFollowTarget? = null
     private var pendingTarget: ConversationTtsFollowTarget? = null
     private var pendingDirection = TtsFollowDirection.Forward
@@ -379,20 +379,55 @@ internal class ConversationTtsFollowPolicy private constructor(
                         it.sessionId,
                         it.isFollowEnabled,
                         it.activeDirection == TtsFollowDirection.Reverse,
+                        it.activeTarget?.messageIdHex,
+                        it.activeTarget?.sentenceIndex,
+                        it.activeTarget?.sentenceCount,
+                        it.activeTarget?.projectionId,
+                        it.activeTarget?.timelineAt?.toLong(),
+                        it.activeMessageIndex,
                     )
                 },
                 restore = { restored ->
+                    val restoredSessionId = restored[0] as Long?
+                    val restoredTarget =
+                        restoredSessionId?.let { targetSessionId ->
+                            val messageIdHex = restored.getOrNull(3) as? String
+                            val sentenceIndex = restored.getOrNull(4) as? Int
+                            val sentenceCount = restored.getOrNull(5) as? Int
+                            val projectionId = restored.getOrNull(6) as? String
+                            val timelineAt = restored.getOrNull(7) as? Long
+                            if (
+                                messageIdHex != null &&
+                                sentenceIndex != null &&
+                                sentenceCount != null &&
+                                projectionId != null &&
+                                timelineAt != null
+                            ) {
+                                ConversationTtsFollowTarget(
+                                    sessionId = targetSessionId,
+                                    messageIdHex = messageIdHex,
+                                    sentenceIndex = sentenceIndex,
+                                    sentenceCount = sentenceCount,
+                                    projectionId = projectionId,
+                                    timelineAt = timelineAt.toULong(),
+                                )
+                            } else {
+                                null
+                            }
+                        }
                     ConversationTtsFollowPolicy(
-                        sessionId = restored[0] as Long?,
+                        sessionId = restoredSessionId,
                         initialFollowEnabled = restored[1] as Boolean,
-                    ).apply {
+                        activeTarget = restoredTarget,
+                        activeMessageIndex =
+                            (restored.getOrNull(8) as? Int).takeIf { restoredTarget != null },
                         activeDirection =
-                            if (restored.getOrNull(2) == true) {
+                            if (restoredTarget != null && restored.getOrNull(2) == true) {
                                 TtsFollowDirection.Reverse
                             } else {
                                 TtsFollowDirection.Forward
-                            }
-                    }
+                            },
+                    )
                 },
             )
     }

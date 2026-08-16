@@ -155,6 +155,61 @@ class ConversationTtsFollowPolicyTest {
     }
 
     @Test
+    fun restoredReverseDirectionDoesNotLeakWhenPlaybackAdvancesBeforeObservation() {
+        val policy = ConversationTtsFollowPolicy()
+        val later = speaking(sessionId = 1, sentenceIndex = 2)
+        policy.observe(later, ownsSession = true)
+        policy.claimPendingRequest()
+
+        val earlier = speaking(sessionId = 1, sentenceIndex = 1)
+        policy.observe(earlier, ownsSession = true)
+        assertEquals(TtsFollowDirection.Reverse, policy.claimPendingRequest()?.direction)
+
+        val saved = with(ConversationTtsFollowPolicy.Saver) { saveableScope.save(policy) }!!
+        val restored = ConversationTtsFollowPolicy.Saver.restore(saved)!!
+        restored.observe(later, ownsSession = true)
+        val restoredRequest = restored.claimPendingRequest()!!
+
+        assertEquals(TtsFollowDirection.Forward, restoredRequest.direction)
+        assertEquals(
+            TtsFollowViewportDecision.ScrollToItemOffset(-100),
+            decide(
+                itemOffset = 0,
+                sentenceTop = 100,
+                sentenceBottom = 900,
+                direction = restoredRequest.direction,
+            ),
+        )
+    }
+
+    @Test
+    fun restoredQueuePositionStillDetectsReverseMessageNavigation() {
+        val policy = ConversationTtsFollowPolicy()
+        val later =
+            speaking(
+                sessionId = 1,
+                sentenceIndex = 0,
+                messageIdHex = "later",
+                messageIndex = 2,
+            )
+        policy.observe(later, ownsSession = true)
+        policy.claimPendingRequest()
+
+        val saved = with(ConversationTtsFollowPolicy.Saver) { saveableScope.save(policy) }!!
+        val restored = ConversationTtsFollowPolicy.Saver.restore(saved)!!
+        val earlier =
+            speaking(
+                sessionId = 1,
+                sentenceIndex = 0,
+                messageIdHex = "earlier",
+                messageIndex = 1,
+            )
+        restored.observe(earlier, ownsSession = true)
+
+        assertEquals(TtsFollowDirection.Reverse, restored.claimPendingRequest()?.direction)
+    }
+
+    @Test
     fun staleTargetCannotConsumeNewTargetsScrollBudgets() {
         val policy = ConversationTtsFollowPolicy()
         val first = speaking(sessionId = 1, sentenceIndex = 0).followTarget()
