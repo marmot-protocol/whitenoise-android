@@ -134,8 +134,11 @@ class ComposerBarScreenshotTest {
                 dictationPreview = DictationPreview.Idle,
                 voiceRecordingController = voiceRecording,
             )
-            composeRule.onNodeWithContentDescription("Dictate text").assertIsDisplayed()
-            composeRule.onNodeWithContentDescription("Hold to record voice message").assertIsDisplayed()
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).assertIsDisplayed()
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.voice_message_record))
+                .assertIsDisplayed()
             composeRule
                 .onNodeWithTag(TAG)
                 .captureRoboImage("src/test/snapshots/composer_dictation_and_voice_note_idle_compact.png")

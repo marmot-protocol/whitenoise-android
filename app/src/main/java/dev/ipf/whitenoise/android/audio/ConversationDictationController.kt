@@ -29,7 +29,14 @@ internal data class ConversationDictationTarget(
     val capturedDraft: TextFieldValue,
     val capturedDraftRevision: Long,
     val mode: ConversationDictationMode,
-)
+) {
+    fun matchesConversation(
+        accountRef: String,
+        groupIdHex: String,
+    ): Boolean =
+        this.accountRef.equals(accountRef, ignoreCase = true) &&
+            this.groupIdHex.equals(groupIdHex, ignoreCase = true)
+}
 
 internal enum class ConversationDictationMode {
     InApp,
@@ -155,7 +162,14 @@ internal fun interface ConversationDictationTimeoutHandle {
 private data class ConversationDictationKey(
     val accountRef: String,
     val groupIdHex: String,
-)
+) {
+    companion object {
+        fun from(
+            accountRef: String,
+            groupIdHex: String,
+        ): ConversationDictationKey = ConversationDictationKey(accountRef.lowercase(), groupIdHex.lowercase())
+    }
+}
 
 /**
  * Process-level owner for composer dictation.
@@ -254,12 +268,12 @@ internal class ConversationDictationController internal constructor(
     fun completionRevision(
         accountRef: String,
         groupIdHex: String,
-    ): Int = completionRevisions[ConversationDictationKey(accountRef, groupIdHex)] ?: 0
+    ): Int = completionRevisions[ConversationDictationKey.from(accountRef, groupIdHex)] ?: 0
 
     fun isOwnedBy(
         accountRef: String,
         groupIdHex: String,
-    ): Boolean = state.target?.let { it.accountRef == accountRef && it.groupIdHex == groupIdHex } == true
+    ): Boolean = state.target?.matchesConversation(accountRef, groupIdHex) == true
 
     fun requestStart(
         accountRef: String,
@@ -330,8 +344,7 @@ internal class ConversationDictationController internal constructor(
         mode: ConversationDictationMode,
     ): Boolean =
         state.target?.let { target ->
-            target.accountRef == accountRef &&
-                target.groupIdHex == groupIdHex &&
+            target.matchesConversation(accountRef, groupIdHex) &&
                 target.mode == mode
         } == true
 
@@ -465,7 +478,7 @@ internal class ConversationDictationController internal constructor(
 
     /** Cancels only when the target account is signed out or removed, not when it becomes inactive. */
     fun onAccountUnavailable(accountRef: String) {
-        if (state.target?.accountRef == accountRef) cancel()
+        if (state.target?.accountRef?.equals(accountRef, ignoreCase = true) == true) cancel()
     }
 
     /** Releases any provider/microphone resource without discarding terminal review text. */
@@ -675,7 +688,7 @@ internal class ConversationDictationController internal constructor(
 
     private fun complete(target: ConversationDictationTarget) {
         clearRecognitionSession(cancel = false)
-        val key = ConversationDictationKey(target.accountRef, target.groupIdHex)
+        val key = ConversationDictationKey.from(target.accountRef, target.groupIdHex)
         completionRevisions[key] = (completionRevisions[key] ?: 0) + 1
         state = ConversationDictationState.Idle
     }
@@ -798,7 +811,11 @@ private fun remapConversationDictationSelection(
 
     val candidates =
         if (selected.isEmpty()) {
-            (0..current.text.length).map { TextRange(it) }
+            EmptySelectionCandidateWindow.create(
+                capturedOffset = start,
+                capturedTextLength = captured.text.length,
+                currentText = current.text,
+            )
         } else {
             current.text
                 .occurrenceStarts(selected)
@@ -810,12 +827,10 @@ private fun remapConversationDictationSelection(
 
     val scored =
         candidates.map { candidate ->
-            val currentLeft = current.text.substring(0, candidate.start)
-            val currentRight = current.text.substring(candidate.end)
             candidate to
                 (
-                    commonSuffixLength(leftContext, currentLeft) +
-                        commonPrefixLength(rightContext, currentRight)
+                    commonSuffixLengthAt(leftContext, current.text, candidate.start) +
+                        commonPrefixLengthAt(rightContext, current.text, candidate.end)
                 )
         }
     val bestScore = scored.maxOf { it.second }
@@ -823,6 +838,32 @@ private fun remapConversationDictationSelection(
     if (selected.isEmpty() && bestScore < requiredContext) return null
     val best = scored.filter { it.second == bestScore }
     return best.singleOrNull()?.first
+}
+
+private object EmptySelectionCandidateWindow {
+    fun create(
+        capturedOffset: Int,
+        capturedTextLength: Int,
+        currentText: String,
+    ): List<TextRange> {
+        val offsets =
+            if (currentText.length <= MAX_EMPTY_SELECTION_SCAN_LENGTH) {
+                (0..currentText.length).asSequence()
+            } else {
+                val originalOffset = capturedOffset.coerceIn(0, currentText.length)
+                val shiftedOffset =
+                    (capturedOffset + currentText.length - capturedTextLength)
+                        .coerceIn(0, currentText.length)
+                sequenceOf(originalOffset, shiftedOffset)
+                    .distinct()
+                    .flatMap { center ->
+                        val first = (center - EMPTY_SELECTION_SCAN_RADIUS).coerceAtLeast(0)
+                        val last = (center + EMPTY_SELECTION_SCAN_RADIUS).coerceAtMost(currentText.length)
+                        (first..last).asSequence()
+                    }.distinct()
+            }
+        return offsets.map(::TextRange).toList()
+    }
 }
 
 private fun String.occurrenceStarts(needle: String): List<Int> {
@@ -841,27 +882,37 @@ private fun String.occurrenceStarts(needle: String): List<Int> {
 @Suppress("MaxLineLength")
 private fun String.isGraphemeBoundary(index: Int): Boolean = index in 0..length && graphemeBoundaryAtOrBefore(index) == index
 
-private fun commonPrefixLength(
-    first: String,
-    second: String,
+private fun commonPrefixLengthAt(
+    context: String,
+    text: String,
+    startInclusive: Int,
 ): Int {
-    val limit = minOf(first.length, second.length)
+    val limit = minOf(context.length, text.length - startInclusive, MAX_ANCHOR_SCORE_CHARS)
     var index = 0
-    while (index < limit && first[index] == second[index]) index += 1
+    while (index < limit && context[index] == text[startInclusive + index]) index += 1
     return index
 }
 
-private fun commonSuffixLength(
-    first: String,
-    second: String,
+private fun commonSuffixLengthAt(
+    context: String,
+    text: String,
+    endExclusive: Int,
 ): Int {
-    val limit = minOf(first.length, second.length)
+    val limit = minOf(context.length, endExclusive, MAX_ANCHOR_SCORE_CHARS)
     var count = 0
-    while (count < limit && first[first.length - 1 - count] == second[second.length - 1 - count]) count += 1
+    while (
+        count < limit &&
+        context[context.length - 1 - count] == text[endExclusive - 1 - count]
+    ) {
+        count += 1
+    }
     return count
 }
 
 private const val MIN_ANCHOR_CONTEXT_CHARS = 3
+private const val MAX_ANCHOR_SCORE_CHARS = 64
+private const val MAX_EMPTY_SELECTION_SCAN_LENGTH = 4_096
+private const val EMPTY_SELECTION_SCAN_RADIUS = 1_024
 
 @Suppress("MaxLineLength")
 private class AndroidConversationDictationPlatform(

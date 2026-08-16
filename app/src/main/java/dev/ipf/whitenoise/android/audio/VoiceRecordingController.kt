@@ -155,7 +155,7 @@ class VoiceRecordingController(
                         restarting = false
                         if (isRecording && generation == startGeneration) beginRecording(generation)
                     } finally {
-                        restartJob = null
+                        completeRestart()
                     }
                 }
             return true
@@ -186,6 +186,12 @@ class VoiceRecordingController(
             }
         }
         return true
+    }
+
+    private fun completeRestart() {
+        restartJob = null
+        restarting = false
+        if (!isRecording && recorder == null) releaseMicrophoneLease()
     }
 
     private suspend fun beginRecording(generation: Long): Boolean {

@@ -482,6 +482,28 @@ class ConversationDictationControllerTest {
     }
 
     @Test
+    fun conversationIdentityIsCaseInsensitiveAcrossOwnershipAndRemoval() {
+        val fixture = fixture(draft = TextFieldValue("Source", TextRange(6)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val session = fixture.platform.session
+
+        assertTrue(fixture.controller.isOwnedBy(ACCOUNT.uppercase(), GROUP.uppercase()))
+        assertFalse(
+            fixture.controller.requestStart(
+                ACCOUNT.uppercase(),
+                GROUP.uppercase(),
+                fixture.drafts.getValue(key()),
+            ),
+        )
+        assertTrue(fixture.platform.session === session)
+
+        fixture.controller.onTargetRemoved(ACCOUNT.uppercase(), GROUP.uppercase())
+
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertEquals(1, session.cancelCalls)
+    }
+
+    @Test
     fun differentTargetReplacesActiveGenerationAndRejectsItsLateCallbacks() {
         val fixture = fixture(draft = TextFieldValue("Source", TextRange(6)))
         fixture.drafts[OTHER_ACCOUNT to OTHER_GROUP] = TextFieldValue("Other", TextRange(5))
@@ -533,6 +555,19 @@ class ConversationDictationControllerTest {
 
         assertEquals("Before first line\nsecond line after", fixture.drafts.getValue(key()).text)
         assertEquals(TextRange(29), fixture.drafts.getValue(key()).selection)
+    }
+
+    @Test
+    fun longPrefixEditRemapsAnEmptySelectionWithoutScanningTheWholeDraft() {
+        val captured = TextFieldValue("left right", TextRange(4))
+        val fixture = fixture(draft = captured)
+        fixture.controller.requestStart(ACCOUNT, GROUP, captured)
+        val prefix = "prefixed ".repeat(2_000)
+        fixture.edit(key(), TextFieldValue(prefix + captured.text))
+
+        fixture.platform.listener.onResult("dictated")
+
+        assertEquals(prefix + "left dictated right", fixture.drafts.getValue(key()).text)
     }
 
     @Test
