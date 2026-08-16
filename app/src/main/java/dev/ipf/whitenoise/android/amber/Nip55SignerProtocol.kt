@@ -2,10 +2,14 @@ package dev.ipf.whitenoise.android.amber
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
 import org.json.JSONArray
 import org.json.JSONObject
+
+private const val AMBER_GROUPED_APPROVALS_MIN_MAJOR = 6
+private const val AMBER_GROUPED_APPROVALS_MIN_MINOR = 3
 
 // NIP-55 external-signer (Amber) protocol layer.
 //
@@ -83,6 +87,9 @@ sealed interface ActivityResultOutcome {
 object Nip55 {
     const val SCHEME = "nostrsigner"
 
+    internal const val AMBER_PACKAGE = "com.greenart7c3.nostrsigner"
+    internal const val AMBER_DEBUG_PACKAGE = "$AMBER_PACKAGE.debug"
+
     /**
      * Conservative UTF-8 byte budget for event/content embedded in a NIP-55
      * foreground Intent's `nostrsigner:` data URI. Intent extras cross Binder
@@ -100,8 +107,16 @@ object Nip55 {
     const val EXTRA_CURRENT_USER = "current_user"
     const val EXTRA_PUBKEY = "pubkey"
     const val EXTRA_RESULT = "result"
+    const val EXTRA_RESULTS = "results"
     const val EXTRA_EVENT = "event"
+    const val EXTRA_SIGNATURE = "signature"
     const val EXTRA_PACKAGE = "package"
+    const val EXTRA_AGGREGATE_RESULT = "dev.ipf.whitenoise.android.amber.AGGREGATE_RESULT"
+
+    /** Amber/Android Binder safety bounds for one foreground approval session. */
+    const val MAX_GROUPED_APPROVALS = 16
+    const val MAX_AGGREGATE_RESULTS_UTF8_BYTES = 512 * 1024
+    const val MAX_REQUEST_ID_CHARS = 128
 
     const val COLUMN_REJECTED = "rejected"
     const val EXTRA_REJECTED = COLUMN_REJECTED
@@ -139,6 +154,24 @@ object Nip55 {
         if (packageName.isBlank()) return false
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$SCHEME:")).setPackage(packageName)
         return context.packageManager.queryIntentActivities(intent, 0).isNotEmpty()
+    }
+
+    /**
+     * Amber 6.3 introduced local-intent grouping. Keep every older or unknown
+     * signer on the established one-prompt relay path instead of assuming that
+     * repeated launches are safe merely because it implements NIP-55.
+     */
+    fun supportsGroupedApprovals(
+        context: Context,
+        packageName: String,
+    ): Boolean {
+        val versionName =
+            runCatching {
+                context.packageManager
+                    .getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+                    .versionName
+            }.getOrNull()
+        return amberVersionSupportsGroupedApprovals(packageName, versionName)
     }
 
     fun savedSignerPackage(context: Context): String? = prefs(context).getString(PREFS_KEY_PACKAGE, null)?.takeIf { it.isNotEmpty() }
@@ -326,6 +359,38 @@ internal fun signedEventPubkeyMismatchReason(
     val pubkey = signedEventPubkey(eventJson) ?: return "signed event missing pubkey"
     return if (pubkey.equals(expectedPubkey, ignoreCase = true)) null else "signed event pubkey mismatch"
 }
+
+/** Rebuild the signed event JSON from Amber's grouped signature-only result. */
+internal fun signedEventFromAggregate(
+    unsignedEventJson: String,
+    signature: String?,
+): String? {
+    val normalizedSignature = signature?.takeIf { it.matches(Regex("[0-9a-fA-F]{128}")) } ?: return null
+    return runCatching {
+        JSONObject(unsignedEventJson)
+            .put("sig", normalizedSignature.lowercase())
+            .toString()
+    }.getOrNull()
+}
+
+internal fun amberVersionSupportsGroupedApprovals(
+    packageName: String,
+    versionName: String?,
+): Boolean =
+    if (packageName != Nip55.AMBER_PACKAGE && packageName != Nip55.AMBER_DEBUG_PACKAGE) {
+        false
+    } else {
+        val match = Regex("^(\\d+)\\.(\\d+)(?:\\.(\\d+))?").find(versionName.orEmpty())
+        val version = match?.groupValues?.drop(1)?.map { it.toIntOrNull() ?: 0 }
+        version != null &&
+            (
+                version[0] > AMBER_GROUPED_APPROVALS_MIN_MAJOR ||
+                    (
+                        version[0] == AMBER_GROUPED_APPROVALS_MIN_MAJOR &&
+                            version[1] >= AMBER_GROUPED_APPROVALS_MIN_MINOR
+                    )
+            )
+    }
 
 internal fun signerPackageEchoMismatchReason(
     packageName: String?,
