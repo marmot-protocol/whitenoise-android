@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
+import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
@@ -305,6 +306,7 @@ internal fun NewGroupSetupScreen(
         }
     }
 
+    @Suppress("TooGenericExceptionCaught") // The callback can surface any non-cancellation preparation failure.
     fun prepareImage(load: suspend () -> ImageUploadDraft) {
         if (imagePreparing || busy) return
         imagePreparing = true
@@ -314,8 +316,12 @@ internal fun NewGroupSetupScreen(
                 showImagePicker = false
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                appState.present(R.string.toast_couldnt_prepare_image, copyable = true)
+            } catch (error: Exception) {
+                appState.presentFailure(
+                    R.string.toast_couldnt_prepare_image,
+                    "NEW_GROUP_IMAGE_PREPARE",
+                    error,
+                )
             } finally {
                 imagePreparing = false
             }

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.content.ContentProvider
 import android.content.ContentResolver
 import android.content.ContentValues
+import android.content.ContextWrapper
 import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
@@ -129,6 +130,46 @@ class MediaAttachmentSaveTest {
         assertTrue(intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         assertEquals(uri, intent.clipData?.getItemAt(0)?.uri)
     }
+
+    @Test
+    fun imageSharePreservesPlatformFailureForPresentation() =
+        runTest {
+            val failure = SecurityException("credential-bearing provider detail")
+            val failingContext =
+                object : ContextWrapper(context()) {
+                    override fun startActivity(intent: Intent): Unit = throw failure
+                }
+
+            val result =
+                launchImageShare(
+                    failingContext,
+                    Uri.parse("content://dev.ipf.whitenoise.android.dev.fileprovider/shared_media/photo.png"),
+                    "image/png",
+                )
+
+            assertSame(failure, result.exceptionOrNull())
+        }
+
+    @Test
+    fun imageShareRethrowsCancellation() =
+        runTest {
+            val cancellation = CancellationException("screen closed")
+            val cancellingContext =
+                object : ContextWrapper(context()) {
+                    override fun startActivity(intent: Intent): Unit = throw cancellation
+                }
+
+            val observed =
+                runCatching {
+                    launchImageShare(
+                        cancellingContext,
+                        Uri.parse("content://dev.ipf.whitenoise.android.dev.fileprovider/shared_media/photo.png"),
+                        "image/png",
+                    )
+                }.exceptionOrNull()
+
+            assertSame(cancellation, observed)
+        }
 
     @Test
     fun documentSaveUsesSelectedDestinationAfterMediaStoreFailure() =

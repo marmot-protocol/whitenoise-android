@@ -1,6 +1,10 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.kotlinBlockFrom
+import dev.ipf.whitenoise.android.ui.profile.ProfileImageTarget
+import dev.ipf.whitenoise.android.ui.profile.profileImageFailureOperation
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -75,10 +79,137 @@ class ErrorPresentationTest {
         assertFalse((presentation.message as AppText.Plain).value.contains("IllegalStateException"))
     }
 
+    @Test
+    fun migratedLegacyCallersProduceBoundedReport() {
+        val secret = "nsec1" + "q".repeat(60)
+        val failure = java.io.IOException("failed with $secret at https://user:pass@example.test")
+        migratedOperationsBySource().forEach { (path, operationCodes) ->
+            assertMigratedOperations(path, operationCodes, failure, secret)
+        }
+
+        assertProfileImageOperations(failure, secret)
+    }
+
+    private fun migratedOperationsBySource(): Map<String, List<String>> =
+        mapOf(
+            "ui/chats/newchat/NewGroupSetupScreen.kt" to listOf("NEW_GROUP_IMAGE_PREPARE"),
+            "ui/group/GroupEditScreen.kt" to
+                listOf("GROUP_IMAGE_PREPARE", "GROUP_AVATAR_UPDATE", "GROUP_IMAGE_UPLOAD"),
+            "ui/profile/ProfileEditScreen.kt" to listOf("PROFILE_EDIT_LOAD"),
+            "ui/conversation/media/MediaViewer.kt" to listOf("MEDIA_VIEWER_IMAGE_SHARE"),
+            "ui/medialibrary/MediaLibrary.kt" to
+                listOf(
+                    "MEDIA_LIBRARY_VOICE_LOAD",
+                    "MEDIA_LIBRARY_FILE_OPEN",
+                    "MEDIA_LIBRARY_FILE_SHARE",
+                    "MEDIA_LIBRARY_URL_OPEN",
+                ),
+        )
+
+    private fun assertMigratedOperations(
+        path: String,
+        operationCodes: List<String>,
+        failure: Throwable,
+        secret: String,
+    ) {
+        val source = mainSource(path).readText()
+        operationCodes.forEach { operationCode ->
+            assertTrue("Missing migrated operation $operationCode in $path", operationCode in source)
+            assertCausePreservingFailureHandler(source, path, operationCode)
+            assertBoundedReport(operationCode, failure, secret)
+        }
+    }
+
+    private fun assertProfileImageOperations(
+        failure: Throwable,
+        secret: String,
+    ) {
+        val profileOperations = profileImageOperations()
+        assertEquals(
+            listOf(
+                "PROFILE_IMAGE_PREPARE",
+                "PROFILE_IMAGE_UPLOAD",
+                "PROFILE_BANNER_PREPARE",
+                "PROFILE_BANNER_UPLOAD",
+            ),
+            profileOperations,
+        )
+        val profileSource = mainSource("ui/profile/ProfileEditScreen.kt").readText()
+        val profileFailureCall =
+            failurePresentationCalls(profileSource).single { call ->
+                "operationCode = profileImageFailureOperation(target, prepared)" in call
+            }
+        assertTrue("throwable = error" in profileFailureCall)
+        profileOperations.forEach { operationCode ->
+            assertBoundedReport(operationCode, failure, secret)
+        }
+    }
+
+    private fun profileImageOperations(): List<String> =
+        listOf(
+            profileImageFailureOperation(ProfileImageTarget.Picture, prepared = false),
+            profileImageFailureOperation(ProfileImageTarget.Picture, prepared = true),
+            profileImageFailureOperation(ProfileImageTarget.Banner, prepared = false),
+            profileImageFailureOperation(ProfileImageTarget.Banner, prepared = true),
+        )
+
+    private fun assertBoundedReport(
+        operationCode: String,
+        failure: Throwable,
+        secret: String,
+    ) {
+        val presentation =
+            privacySafeErrorPresentation(
+                operationCode = operationCode,
+                throwable = failure,
+                appVersion = "test",
+                androidVersion = "test",
+                occurredAtUtc = "2026-08-15T12:00:00Z",
+            )
+        assertTrue(presentation.report.contains("operation=$operationCode"))
+        assertTrue(presentation.report.isNotBlank())
+        assertTrue(presentation.report.length <= 600)
+        assertFalse(presentation.report.contains(secret))
+        assertFalse(presentation.report.contains("user:pass"))
+    }
+
     private fun appStateSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull(File::exists)
             ?: error("Missing AppState.kt source file")
+
+    private fun mainSource(relativePath: String): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
+        ).firstOrNull(File::exists)
+            ?: error("Missing source file: $relativePath")
+
+    private fun assertCausePreservingFailureHandler(
+        source: String,
+        path: String,
+        operationCode: String,
+    ) {
+        val call =
+            failurePresentationCalls(source).firstOrNull { candidate ->
+                operationCode in candidate && Regex("""(?:throwable\s*=\s*)?\berror\b""").containsMatchIn(candidate)
+            }
+        assertTrue(
+            "Handler for $operationCode in $path must present the caught error",
+            call != null,
+        )
+    }
+
+    private fun failurePresentationCalls(source: String): List<String> =
+        Regex("""\b(?:presentFailure|presentMediaLaunchFailure)\s*\(""")
+            .findAll(source)
+            .mapNotNull { match ->
+                val openParen = source.indexOf('(', match.range.first)
+                runCatching {
+                    source.substring(match.range.first, openParen) +
+                        source.kotlinBlockFrom(openParen, "failure presentation", '(', ')')
+                }.getOrNull()
+            }.toList()
 }
