@@ -63,43 +63,80 @@ internal object MessageHidePreferences {
             ?.toSet()
             ?: emptySet()
 
+    @Synchronized
     fun hideMessage(
         preferences: SharedPreferences,
         accountRef: String?,
         groupIdHex: String,
         messageIdHex: String,
-    ): Set<String> {
-        val key = preferenceKey(accountRef, groupIdHex) ?: return emptySet()
-        val messageId = normalizedMessageId(messageIdHex) ?: return readHiddenMessageIdsByKey(preferences, key)
-        val updated = readHiddenMessageIdsByKey(preferences, key) + messageId
-        writeHiddenMessageIdsByKey(preferences, key, updated)
-        return updated
+    ): Set<String>? {
+        val key = preferenceKey(accountRef, groupIdHex)
+        val messageId = normalizedMessageId(messageIdHex)
+        return if (key == null || messageId == null) {
+            null
+        } else {
+            val current = readHiddenMessageIdsByKey(preferences, key)
+            if (messageId in current) {
+                current
+            } else {
+                val updated = current + messageId
+                if (writeHiddenMessageIdsByKey(preferences, key, updated)) {
+                    updated
+                } else {
+                    // SharedPreferences updates its process-local view before a
+                    // failed disk write reports false. Restore the old set so a
+                    // failed hide cannot vanish now and reappear after restart.
+                    writeHiddenMessageIdsByKey(preferences, key, current)
+                    null
+                }
+            }
+        }
     }
 
     fun writeHiddenMessageIdsByKey(
         preferences: SharedPreferences,
         key: String,
         ids: Set<String>,
-    ) {
+    ): Boolean {
         val edit = preferences.edit()
         if (ids.isEmpty()) {
             edit.remove(key)
         } else {
             edit.putStringSet(key, HashSet(ids))
         }
-        edit.apply()
+        // Local removal is only successful once it is durable. `apply()` cannot
+        // report a disk-write failure, so callers run this tiny commit off-main.
+        return edit.commit()
     }
 
+    @Synchronized
     fun clearAccount(
         preferences: SharedPreferences,
         accountRef: String?,
-    ) {
-        val prefix = accountKeyPrefix(accountRef) ?: return
-        val edit = preferences.edit()
-        preferences.all.keys
-            .filter { it.startsWith(prefix) }
-            .forEach(edit::remove)
-        edit.apply()
+    ): Boolean {
+        val prefix = accountKeyPrefix(accountRef) ?: return false
+        val previousByKey =
+            preferences.all.keys
+                .filter { it.startsWith(prefix) }
+                .associateWith { key -> readHiddenMessageIdsByKey(preferences, key) }
+        val removalCommitted =
+            if (previousByKey.isEmpty()) {
+                true
+            } else {
+                val edit = preferences.edit()
+                previousByKey.keys.forEach(edit::remove)
+                edit.commit()
+            }
+
+        if (!removalCommitted) {
+            // SharedPreferences has already changed its process-local map when a
+            // disk write reports false. Restore every removed set so callers see
+            // the same retryable state now and after a process restart.
+            val restore = preferences.edit()
+            previousByKey.forEach { (key, ids) -> restore.putStringSet(key, HashSet(ids)) }
+            restore.commit()
+        }
+        return removalCommitted
     }
 }
 

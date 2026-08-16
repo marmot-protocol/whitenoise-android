@@ -1197,6 +1197,9 @@ internal const val GROUP_MODERATION_DELETE_SUPPORTED = true
  *    current user moderates this group (admin/owner) and the runtime supports
  *    delivering it ([moderationDeleteSupported]); regular members get
  *    delete for me only.
+ *  - Already-deleted projection: delete for me only. The underlying protocol
+ *    tombstone remains authoritative; local cleanup never offers or retries a
+ *    delete for everyone.
  *
  * [localDeleteSupported] and [remoteDeleteSupported] carry the plumbing facts
  * (usable message id, live membership / publish path); this function owns only
@@ -1211,7 +1214,12 @@ internal fun messageDeleteCapability(
     alreadyDeleted: Boolean,
     moderationDeleteSupported: Boolean = GROUP_MODERATION_DELETE_SUPPORTED,
 ): MessageDeleteCapability {
-    if (alreadyDeleted) return MessageDeleteCapability(canDeleteForMe = false, canDeleteForEveryone = false)
+    if (alreadyDeleted) {
+        return MessageDeleteCapability(
+            canDeleteForMe = localDeleteSupported,
+            canDeleteForEveryone = false,
+        )
+    }
     val moderatesOthersMessages = !isDirectConversation && selfIsAdmin && moderationDeleteSupported
     return MessageDeleteCapability(
         canDeleteForMe = localDeleteSupported,
@@ -8241,14 +8249,23 @@ class ConversationController(
         }
     }
 
-    fun hideMessageForMe(messageIdHex: String) {
-        val target = messageIdHex.takeIf { it.isNotBlank() } ?: return
-        appState.hideMessageForMe(conversationAccountRef, group.groupIdHex, target)
-        publishTimelineFromIndexes()
+    suspend fun hideMessageForMe(
+        messageIdHex: String,
+        presentFailure: Boolean = true,
+    ): Boolean {
+        val result = hideMessageForMeResult(messageIdHex)
+        if (result.isFailure && presentFailure) {
+            appState.presentFailure(
+                R.string.toast_couldnt_delete_message,
+                "MESSAGE_HIDE_LOCAL",
+                result.exceptionOrNull() ?: IllegalStateException("Local message hide failed"),
+            )
+        }
+        return result.isSuccess
     }
 
     /** Account-bound local-hide variant used by batch retry accounting. */
-    internal fun hideMessageForMeResult(messageIdHex: String): Result<Unit> {
+    internal suspend fun hideMessageForMeResult(messageIdHex: String): Result<Unit> {
         val account = conversationAccountRef
         val target = messageIdHex.takeIf { it.isNotBlank() }
         return when {
@@ -8256,9 +8273,12 @@ class ConversationController(
             target == null -> Result.failure(IllegalArgumentException("Message id unavailable"))
             else ->
                 try {
-                    appState.hideMessageForMe(account, group.groupIdHex, target)
-                    publishTimelineFromIndexes()
-                    Result.success(Unit)
+                    if (appState.hideMessageForMe(account, group.groupIdHex, target)) {
+                        publishTimelineFromIndexes()
+                        Result.success(Unit)
+                    } else {
+                        Result.failure(java.io.IOException("Local message hide was not persisted"))
+                    }
                 } catch (throwable: Throwable) {
                     throwable.rethrowIfCancellation()
                     Result.failure(throwable)
