@@ -220,6 +220,28 @@ class ComposerBarScreenshotTest {
     }
 
     @Test
+    fun crossChatDictationReplacesVoiceNoteWithoutADeadMicControl() {
+        val voiceRecording = previewVoiceRecordingController()
+        try {
+            render(
+                darkTheme = false,
+                draft = "",
+                width = 320,
+                dictationPreview = DictationPreview.ElsewhereListening,
+                voiceRecordingController = voiceRecording,
+            )
+
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            composeRule.onNodeWithTag(COMPOSER_DICTATION_ELSEWHERE_ACTION_TAG).assertIsDisplayed()
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.voice_message_record))
+                .assertDoesNotExist()
+        } finally {
+            voiceRecording.release()
+        }
+    }
+
+    @Test
     fun composerReplyShowsConvergenceWarning() {
         val warning = "May not be visible to everyone"
 

@@ -33,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.changedToUp
@@ -41,7 +40,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -54,10 +52,7 @@ import dev.ipf.whitenoise.android.R
  * Compose doesn't fight us for the up event.
  */
 @Composable
-internal fun MicHoldButton(
-    controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController,
-    enabled: Boolean = true,
-) {
+internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController) {
     val haptics = LocalHapticFeedback.current
     val cancelThresholdDp = 120.dp
     val lockThresholdDp = 80.dp
@@ -70,20 +65,16 @@ internal fun MicHoldButton(
         // Enter, switch access) toggles record-and-lock so users who can't
         // perform the press-and-hold gesture can still send voice notes.
         onClick = {
-            if (enabled) {
-                if (controller.isRecording) {
-                    controller.stop()
-                } else if (controller.start()) {
-                    controller.lock()
-                }
+            if (controller.isRecording) {
+                controller.stop()
+            } else if (controller.start()) {
+                controller.lock()
             }
         },
         modifier =
             Modifier
                 .size(44.dp)
-                .alpha(if (enabled) 1f else VOICE_RECORD_DISABLED_ALPHA)
-                .pointerInput(controller, enabled) {
-                    if (!enabled) return@pointerInput
+                .pointerInput(controller) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val started = controller.start()
@@ -154,15 +145,10 @@ internal fun MicHoldButton(
     ) {
         Icon(
             Icons.Default.Mic,
-            contentDescription =
-                stringResource(
-                    if (enabled) R.string.voice_message_record else R.string.dictation_in_use_other_chat,
-                ),
+            contentDescription = stringResource(R.string.voice_message_record),
         )
     }
 }
-
-private const val VOICE_RECORD_DISABLED_ALPHA = 0.38f
 
 @Composable
 internal fun RecordingStripLeading(

@@ -411,7 +411,6 @@ internal fun ComposerBar(
             dictationGroupIdHex != null &&
             dictationController?.isOwnedBy(dictationAccountRef, dictationGroupIdHex) == true
     val dictationPendingElsewhere = dictationController?.blocksNewRequest == true && !dictationOwnedByComposer
-    val dictationOwnsMicrophoneElsewhere = dictationController?.ownsMicrophone == true && !dictationOwnedByComposer
     val dictationActiveElsewhere = dictationState !is ConversationDictationState.Idle && !dictationOwnedByComposer
     // Snapshot the in-flight composer state (full TextFieldValue — text +
     // caret) when entering edit mode so cancelling restores both. Keyed on
@@ -1245,10 +1244,7 @@ internal fun ComposerBar(
                             } else if (showPrimaryTrailingAction && showMicButton) {
                                 Box(contentAlignment = Alignment.BottomCenter) {
                                     LockHintAbove(controller = voiceRecordingController)
-                                    MicHoldButton(
-                                        controller = voiceRecordingController,
-                                        enabled = !dictationOwnsMicrophoneElsewhere,
-                                    )
+                                    MicHoldButton(controller = voiceRecordingController)
                                 }
                             } else if (showPrimaryTrailingAction) {
                                 FloatingActionButton(
