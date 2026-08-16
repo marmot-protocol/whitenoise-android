@@ -75,6 +75,7 @@ internal class TtsHighlightProjectionResolver(
                 projection = projection,
                 renderedLeafId = renderedLeafId,
                 renderedText = renderedText,
+                leafSpanCache = leafSpanCache,
             ) ?: return null
         val expectedCoverage = projection.sentenceCoverage(sentence)
         val coverage = mappedSpans.sentenceCoverage(sentence)
@@ -145,18 +146,13 @@ private fun resolveTtsRenderedHighlight(
     if (passage == null || passage.messageIdHex != messageIdHex) return null
     if (passage.projectionId != projection.projectionId) return null
     if (renderedText.isEmpty()) return null
-    val cacheKey = renderedLeafId to renderedText
     val mappedSpans =
-        if (leafSpanCache != null && leafSpanCache.containsKey(cacheKey)) {
-            leafSpanCache[cacheKey]
-        } else {
-            mapProjectionSpansToRenderedLeaf(
-                projection = projection,
-                renderedLeafId = renderedLeafId,
-                renderedText = renderedText,
-            ).also { leafSpanCache?.put(cacheKey, it) }
-        }
-    if (mappedSpans == null) return null
+        mapProjectionSpansToRenderedLeaf(
+            projection = projection,
+            renderedLeafId = renderedLeafId,
+            renderedText = renderedText,
+            leafSpanCache = leafSpanCache,
+        ) ?: return null
     return if (passage.visibleWord.isNotEmpty()) {
         visibleWordHighlight(passage.visibleWord, renderedLeafId, mappedSpans)
     } else {
@@ -184,14 +180,22 @@ private fun mapProjectionSpansToRenderedLeaf(
     projection: SpeakableTextProjection,
     renderedLeafId: String,
     renderedText: String,
+    leafSpanCache: MutableMap<Pair<String, String>, List<RenderedProjectionSpan>?>? = null,
 ): List<RenderedProjectionSpan>? {
+    val cacheKey = renderedLeafId to renderedText
+    if (leafSpanCache != null && leafSpanCache.containsKey(cacheKey)) return leafSpanCache[cacheKey]
     val spans =
         projection.spans
             .filter { it.isValidForRenderedLeaf(renderedLeafId, projection.text.length) }
             .sortedBy(SpeakableTextProjectionSpan::spokenStart)
-    if (spans.isEmpty()) return null
-    return directProjectionSpanMapping(spans, projection.text, renderedLeafId, renderedText)
-        ?: alignedProjectionSpanMapping(spans, projection.text, renderedText)
+    val mapped =
+        if (spans.isEmpty()) {
+            null
+        } else {
+            directProjectionSpanMapping(spans, projection.text, renderedLeafId, renderedText)
+                ?: alignedProjectionSpanMapping(spans, projection.text, renderedText)
+        }
+    return mapped.also { leafSpanCache?.put(cacheKey, it) }
 }
 
 @Suppress("ReturnCount")

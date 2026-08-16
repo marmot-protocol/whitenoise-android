@@ -35,7 +35,9 @@ class TtsPassageHighlightTest {
         assertEquals(listOf(0 until 6), second?.renderedRanges)
         assertEquals(2, first?.expectedCoverage?.size)
         assertEquals(2, second?.expectedCoverage?.size)
+        assertEquals(first?.expectedCoverage, second?.expectedCoverage)
         assertEquals(first?.expectedCoverage, first?.coverage.orEmpty() + second?.coverage.orEmpty())
+        assertEquals(2, resolver.cachedLeafCount)
     }
 
     @Test

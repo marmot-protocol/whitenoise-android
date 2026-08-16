@@ -433,13 +433,14 @@ class ConversationTtsFollowPolicyTest {
         sentenceIndex: Int,
         messageIdHex: String = "m1",
         messageIndex: Int = 0,
+        messageCount: Int = 3,
     ): TtsState.Speaking =
         TtsState.Speaking(
             sessionId = sessionId,
             chunkIndex = sentenceIndex,
             chunkCount = 3,
             messageIndex = messageIndex,
-            messageCount = (messageIndex + 1).coerceAtLeast(1),
+            messageCount = messageCount,
             sentenceIndexWithinMessage = sentenceIndex,
             sentenceCountWithinMessage = 3,
             messagePreview = "preview",
