@@ -55,6 +55,7 @@ import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
 import dev.ipf.whitenoise.android.ui.common.SectionCard
@@ -143,6 +144,7 @@ internal fun GroupEditScreen(
         }
     }
 
+    @Suppress("TooGenericExceptionCaught") // The callback can surface any non-cancellation preparation failure.
     fun updateImage(prepare: suspend () -> ImageUploadDraft?) {
         if (imageSaving || controller.mutationInFlight) return
         imageSaving = true
@@ -153,14 +155,19 @@ internal fun GroupEditScreen(
                 if (controller.updateGroupImage(draft)) showImageSearch = false
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                appState.present(R.string.toast_couldnt_prepare_image, copyable = true)
+            } catch (error: Exception) {
+                appState.presentFailure(
+                    R.string.toast_couldnt_prepare_image,
+                    "GROUP_IMAGE_PREPARE",
+                    error,
+                )
             } finally {
                 imageSaving = false
             }
         }
     }
 
+    @Suppress("TooGenericExceptionCaught") // The FFI boundary can surface unchecked non-cancellation failures.
     fun setPublicAvatarUrl(url: String) {
         if (imageSaving || controller.mutationInFlight) return
         // Same HTTPS/credential/loopback policy the upload path enforces, but a
@@ -177,8 +184,12 @@ internal fun GroupEditScreen(
                 if (controller.updateGroupAvatarUrl(safeUrl)) showImageSearch = false
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                appState.present(R.string.toast_couldnt_upload_group_image, copyable = true)
+            } catch (error: Exception) {
+                appState.presentFailure(
+                    R.string.toast_couldnt_upload_group_image,
+                    "GROUP_AVATAR_UPDATE",
+                    error,
+                )
             } finally {
                 imageSaving = false
             }
@@ -188,6 +199,7 @@ internal fun GroupEditScreen(
     // A device photo becomes a public avatar by uploading the plaintext bytes
     // to Blossom first: the encrypted group image is unreadable to anyone
     // outside the group, so invite previews and QR codes can't render it.
+    @Suppress("TooGenericExceptionCaught") // Preparation, upload, and FFI calls have different failure types.
     fun uploadPublicAvatar(uri: Uri) {
         val accountRef = appState.activeAccountRef ?: return
         if (imageSaving || controller.mutationInFlight) return
@@ -207,14 +219,16 @@ internal fun GroupEditScreen(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                appState.present(
-                    if (prepared) {
-                        R.string.toast_couldnt_upload_group_image
-                    } else {
-                        R.string.toast_couldnt_prepare_image
-                    },
-                    copyable = true,
+            } catch (error: Exception) {
+                appState.presentFailure(
+                    titleRes =
+                        if (prepared) {
+                            R.string.toast_couldnt_upload_group_image
+                        } else {
+                            R.string.toast_couldnt_prepare_image
+                        },
+                    operationCode = if (prepared) "GROUP_IMAGE_UPLOAD" else "GROUP_IMAGE_PREPARE",
+                    throwable = error,
                 )
             } finally {
                 imageSaving = false

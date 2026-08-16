@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import androidx.compose.material3.SnackbarDuration
 import androidx.test.core.app.ApplicationProvider
@@ -133,6 +134,53 @@ class MediaSavePresentationTest {
         assertFalse(failure.copyText.orEmpty().contains("avatar.jpg"))
         assertFalse(failure.copyText.orEmpty().contains("content://"))
         assertFalse(failure.copyText.orEmpty().contains(failure.message))
+    }
+
+    @Test
+    fun missingShareOrUrlHandlerStaysNonDiagnostic() {
+        val state = appState()
+
+        state.presentMediaLaunchFailure(
+            R.string.media_couldnt_open,
+            "MEDIA_LIBRARY_FILE_SHARE",
+            ActivityNotFoundException("no share target"),
+        )
+
+        assertEquals(AppText.Resource(R.string.media_couldnt_open), state.toast?.title)
+        assertFalse(state.toast?.copyable == true)
+        assertTrue(state.toast?.diagnosticReport.isNullOrBlank())
+    }
+
+    @Test
+    fun operationalMediaLaunchFailureKeepsActionableReport() {
+        val state = appState()
+
+        state.presentMediaLaunchFailure(
+            R.string.media_couldnt_open,
+            "MEDIA_LIBRARY_URL_OPEN",
+            SecurityException("private platform detail"),
+        )
+
+        assertTrue(state.toast?.copyable == true)
+        assertTrue(state.toast?.diagnosticReport?.contains("operation=MEDIA_LIBRARY_URL_OPEN") == true)
+        assertFalse(
+            state.toast
+                ?.diagnosticReport
+                .orEmpty()
+                .contains("private platform detail"),
+        )
+    }
+
+    @Test
+    fun shareAndUrlFlowsUseTheCapabilityAwarePresenter() {
+        val mediaLibrarySource = source("src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt")
+        val mediaViewerSource = source("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt")
+
+        assertTrue(mediaLibrarySource.contains("\"MEDIA_LIBRARY_FILE_SHARE\""))
+        assertTrue(mediaLibrarySource.contains("\"MEDIA_LIBRARY_URL_OPEN\""))
+        assertEquals(2, Regex("appState\\.presentMediaLaunchFailure\\(").findAll(mediaLibrarySource).count())
+        assertTrue(mediaViewerSource.contains("\"MEDIA_VIEWER_IMAGE_SHARE\""))
+        assertTrue(mediaViewerSource.contains("appState.presentMediaLaunchFailure("))
     }
 
     @Test

@@ -2,7 +2,9 @@ package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarVisuals
+import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.NoticeTier
+import dev.ipf.whitenoise.android.state.privacySafeErrorPresentation
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.snackbarShowsCopyAffordance
 import org.junit.Assert.assertEquals
@@ -78,6 +80,30 @@ class SnackbarCopyAffordanceTest {
         assertEquals(SnackbarDuration.Indefinite, error.duration)
         assertEquals("operation=SAVE\nerror=CONNECTIVITY", error.copyText)
         assertTrue(error.withDismissAction)
+    }
+
+    @Test
+    fun migratedFailureShowsDiagnosticCopy() {
+        val presentation =
+            privacySafeErrorPresentation(
+                operationCode = "MEDIA_LIBRARY_FILE_OPEN",
+                throwable = java.io.IOException("token=private https://user:pass@example.test"),
+                message = AppText.Plain("Couldn't open this file."),
+                appVersion = "test",
+                androidVersion = "test",
+                occurredAtUtc = "2026-08-15T12:00:00Z",
+            )
+        val visuals =
+            ToastSnackbarVisuals(
+                message = (presentation.message as AppText.Plain).value,
+                copyable = true,
+                copyText = presentation.report,
+            )
+
+        assertTrue(snackbarShowsCopyAffordance(visuals))
+        assertTrue(visuals.copyText?.contains("operation=MEDIA_LIBRARY_FILE_OPEN") == true)
+        assertFalse(visuals.copyText?.contains("user:pass") == true)
+        assertFalse(visuals.copyText?.contains("private") == true)
     }
 
     private fun fakeVisuals(actionLabel: String?): SnackbarVisuals =
