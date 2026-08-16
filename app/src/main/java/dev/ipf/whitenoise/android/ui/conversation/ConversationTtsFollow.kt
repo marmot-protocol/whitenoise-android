@@ -391,29 +391,19 @@ internal class ConversationTtsFollowPolicy private constructor(
                     val restoredSessionId = restored[0] as Long?
                     val restoredTarget =
                         restoredSessionId?.let { targetSessionId ->
-                            val messageIdHex = restored.getOrNull(3) as? String
-                            val sentenceIndex = restored.getOrNull(4) as? Int
-                            val sentenceCount = restored.getOrNull(5) as? Int
-                            val projectionId = restored.getOrNull(6) as? String
-                            val timelineAt = restored.getOrNull(7) as? Long
-                            if (
-                                messageIdHex != null &&
-                                sentenceIndex != null &&
-                                sentenceCount != null &&
-                                projectionId != null &&
-                                timelineAt != null
-                            ) {
-                                ConversationTtsFollowTarget(
-                                    sessionId = targetSessionId,
-                                    messageIdHex = messageIdHex,
-                                    sentenceIndex = sentenceIndex,
-                                    sentenceCount = sentenceCount,
-                                    projectionId = projectionId,
-                                    timelineAt = timelineAt.toULong(),
-                                )
-                            } else {
-                                null
-                            }
+                            val messageIdHex = restored.getOrNull(3) as? String ?: return@let null
+                            val sentenceIndex = restored.getOrNull(4) as? Int ?: return@let null
+                            val sentenceCount = restored.getOrNull(5) as? Int ?: return@let null
+                            val projectionId = restored.getOrNull(6) as? String ?: return@let null
+                            val timelineAt = restored.getOrNull(7) as? Long ?: return@let null
+                            ConversationTtsFollowTarget(
+                                sessionId = targetSessionId,
+                                messageIdHex = messageIdHex,
+                                sentenceIndex = sentenceIndex,
+                                sentenceCount = sentenceCount,
+                                projectionId = projectionId,
+                                timelineAt = timelineAt.toULong(),
+                            )
                         }
                     ConversationTtsFollowPolicy(
                         sessionId = restoredSessionId,
