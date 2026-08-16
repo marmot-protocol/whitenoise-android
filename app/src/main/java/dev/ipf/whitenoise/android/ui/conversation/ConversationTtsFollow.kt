@@ -362,12 +362,25 @@ internal class ConversationTtsFollowPolicy private constructor(
     companion object {
         val Saver: Saver<ConversationTtsFollowPolicy, Any> =
             listSaver(
-                save = { listOf(it.sessionId, it.isFollowEnabled) },
+                save = {
+                    listOf(
+                        it.sessionId,
+                        it.isFollowEnabled,
+                        it.activeDirection == TtsFollowDirection.Reverse,
+                    )
+                },
                 restore = { restored ->
                     ConversationTtsFollowPolicy(
                         sessionId = restored[0] as Long?,
                         initialFollowEnabled = restored[1] as Boolean,
-                    )
+                    ).apply {
+                        activeDirection =
+                            if (restored.getOrNull(2) == true) {
+                                TtsFollowDirection.Reverse
+                            } else {
+                                TtsFollowDirection.Forward
+                            }
+                    }
                 },
             )
     }

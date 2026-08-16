@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.ui.geometry.Rect
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsState
@@ -13,6 +14,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationTtsFollowPolicyTest {
+    private val saveableScope = SaverScope { true }
+
     @Test
     fun eachSentenceIsClaimedOnceAndWordProgressDoesNotCreateAnotherScroll() {
         val policy = ConversationTtsFollowPolicy()
@@ -120,6 +123,34 @@ class ConversationTtsFollowPolicyTest {
         assertEquals(
             ConversationTtsFollowRequest(earlier.followTarget(), TtsFollowDirection.Reverse),
             policy.claimPendingRequest(),
+        )
+    }
+
+    @Test
+    fun restoredReverseTargetKeepsBottomAnchorForOversizedSentence() {
+        val policy = ConversationTtsFollowPolicy()
+        val later = speaking(sessionId = 1, sentenceIndex = 2)
+        policy.observe(later, ownsSession = true)
+        policy.claimPendingRequest()
+
+        val earlier = speaking(sessionId = 1, sentenceIndex = 1)
+        policy.observe(earlier, ownsSession = true)
+        assertEquals(TtsFollowDirection.Reverse, policy.claimPendingRequest()?.direction)
+
+        val saved = with(ConversationTtsFollowPolicy.Saver) { saveableScope.save(policy) }!!
+        val restored = ConversationTtsFollowPolicy.Saver.restore(saved)!!
+        restored.observe(earlier, ownsSession = true)
+        val restoredRequest = restored.claimPendingRequest()!!
+
+        assertEquals(TtsFollowDirection.Reverse, restoredRequest.direction)
+        assertEquals(
+            TtsFollowViewportDecision.ScrollToItemOffset(100),
+            decide(
+                itemOffset = 0,
+                sentenceTop = 100,
+                sentenceBottom = 900,
+                direction = restoredRequest.direction,
+            ),
         )
     }
 
