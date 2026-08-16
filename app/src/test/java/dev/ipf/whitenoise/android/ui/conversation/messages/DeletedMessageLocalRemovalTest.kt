@@ -190,6 +190,9 @@ class DeletedMessageLocalRemovalTest {
         composeRule.waitUntil(timeoutMillis = ASYNC_TIMEOUT_MILLIS) {
             MESSAGE_ID in surface.hiddenMessageIds()
         }
+        composeRule.waitUntil(timeoutMillis = ASYNC_TIMEOUT_MILLIS) {
+            runCatching { placeholder().assertDoesNotExist() }.isSuccess
+        }
         composeRule.waitForIdle()
 
         placeholder().assertDoesNotExist()

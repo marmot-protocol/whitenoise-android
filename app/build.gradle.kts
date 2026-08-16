@@ -815,6 +815,20 @@ ktlint {
 }
 
 dependencies {
+    val bouncyCastleVersion = providers.gradleProperty("bouncycastle.version").get()
+
+    constraints {
+        testImplementation("org.bouncycastle:bcprov-jdk18on:$bouncyCastleVersion") {
+            because("CVE-2025-14813 is fixed in Bouncy Castle 1.84")
+        }
+        testImplementation("org.bouncycastle:bcpkix-jdk18on:$bouncyCastleVersion") {
+            because("keep Bouncy Castle test modules on one security-fixed release")
+        }
+        testImplementation("org.bouncycastle:bcutil-jdk18on:$bouncyCastleVersion") {
+            because("keep Bouncy Castle test modules on one security-fixed release")
+        }
+    }
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.fragment)
