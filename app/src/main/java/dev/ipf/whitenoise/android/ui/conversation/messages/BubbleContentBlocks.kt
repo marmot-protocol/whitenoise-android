@@ -6,8 +6,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -43,6 +45,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.nostrEventReferences
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -58,6 +61,8 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaPendingPlaceholder
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVisualGridBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVoiceBubble
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCards
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
@@ -401,6 +406,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     record: AppMessageRecordFfi,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    eventCardResolver: NostrEventCardResolver? = null,
     bodyText: String?,
     bodyMarkdownDocument: MarkdownDocumentFfi? = null,
     deleted: Boolean,
@@ -478,6 +484,14 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 !persistedFailure &&
                 markdownDocument.blocks.isNotEmpty() &&
                 (bodyText == record.plaintext || bodyMarkdownDocument != null)
+        val eventReferences =
+            remember(renderMarkdownBody, markdownDocument, eventCardResolver) {
+                if (renderMarkdownBody && eventCardResolver != null) {
+                    nostrEventReferences(markdownDocument)
+                } else {
+                    emptyList()
+                }
+            }
         val density = LocalDensity.current
         val lineHeightPx =
             with(density) { (MaterialTheme.typography.bodyLarge.lineHeight).toPx() }
@@ -522,7 +536,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
         val plainHighlightRange = presentedTtsLeafHighlightResolver?.invoke("plain", bodyText)
         val plainHighlightModifier =
             Modifier.ttsReadAloudHighlight(plainLayoutResult, plainHighlightRange, highlightColor)
-        val messageBody: @Composable () -> Unit = {
+        val messageTextBody: @Composable () -> Unit = {
             if (renderMarkdownBody) {
                 readAloudMessageSemantics(
                     progress = ttsReadAloudProgress,
@@ -595,7 +609,22 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 )
             }
         }
-        val selectableMessageBody: @Composable () -> Unit = { selectionWrapper(messageBody) }
+        val eventCards: @Composable () -> Unit = {
+            if (eventCardResolver != null && eventReferences.isNotEmpty()) {
+                NostrEventCards(
+                    references = eventReferences,
+                    resolver = eventCardResolver,
+                    authorDisplayName = appState::contactDisplayNameCached,
+                    contentColor = bubbleContentColor,
+                )
+            }
+        }
+        val selectableMessageBody: @Composable () -> Unit = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                selectionWrapper(messageTextBody)
+                eventCards()
+            }
+        }
         val readMoreFooter: @Composable () -> Unit = {
             Text(
                 readMoreLabel,
@@ -623,13 +652,36 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     null
                 }
             }
-        if (collapsible) {
+        val footerLastLineWidth = lastLineWidth.takeIf { eventReferences.isEmpty() }
+        if (collapsible && eventReferences.isNotEmpty()) {
+            Column(
+                modifier = bodyModifier,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                BubbleCollapsibleFooterLayout(
+                    maxBodyHeight = maxBodyHeightDp,
+                    readMore = readMoreFooter,
+                    footer = {},
+                    modifier = Modifier.fillMaxWidth(),
+                    lastLineWidth = lastLineWidth,
+                ) {
+                    selectionWrapper(messageTextBody)
+                }
+                eventCards()
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    inlineFooter()
+                }
+            }
+        } else if (collapsible) {
             BubbleCollapsibleFooterLayout(
                 maxBodyHeight = maxBodyHeightDp,
                 readMore = readMoreFooter,
                 footer = { if (hasInlineFooter) inlineFooter() },
                 modifier = bodyModifier,
-                lastLineWidth = lastLineWidth,
+                lastLineWidth = footerLastLineWidth,
             ) {
                 selectableMessageBody()
             }
@@ -637,7 +689,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             BubbleFooterLayout(
                 footer = inlineFooter,
                 modifier = bodyModifier,
-                lastLineWidth = lastLineWidth,
+                lastLineWidth = footerLastLineWidth,
             ) {
                 selectableMessageBody()
             }

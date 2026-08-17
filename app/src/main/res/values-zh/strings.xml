@@ -1436,4 +1436,16 @@
     <string name="text_attachment_preview_too_large">此文件过大，无法安全预览。请在其他应用中打开。</string>
     <string name="text_attachment_preview_invalid_encoding">此文件使用了不受支持的文本编码。请在其他应用中打开。</string>
     <string name="text_attachment_preview_binary">此文件似乎不包含可安全显示的文本。请在其他应用中打开。</string>
+    <string name="nostr_event_loading">正在加载事件…</string>
+    <string name="nostr_event_not_found">未找到事件</string>
+    <string name="nostr_event_invalid">无法验证此事件。</string>
+    <string name="nostr_event_failed">无法加载此事件。请检查网络连接后重试。</string>
+    <string name="nostr_event_open">打开事件</string>
+    <string name="nostr_event_copy">复制事件引用</string>
+    <string name="nostr_event_type_note">短文</string>
+    <string name="nostr_event_type_article">文章</string>
+    <string name="nostr_event_type_video">视频</string>
+    <string name="nostr_event_type_release">软件版本</string>
+    <string name="nostr_event_type_file">文件</string>
+    <string name="nostr_event_type_generic">事件 · 类型 %1$d</string>
 </resources>

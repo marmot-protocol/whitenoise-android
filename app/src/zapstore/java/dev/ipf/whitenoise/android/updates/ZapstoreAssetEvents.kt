@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.updates
 
+import dev.ipf.whitenoise.android.core.nostr.NostrEvent
+import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
 import java.util.Locale
 
 private const val KIND_ZAPSTORE_ASSET = 3063

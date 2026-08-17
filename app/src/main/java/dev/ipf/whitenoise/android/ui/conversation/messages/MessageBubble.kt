@@ -110,6 +110,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposer
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.reactions.CustomizeReactionsDialog
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
@@ -258,6 +259,7 @@ internal fun MessageBubble(
     item: TimelineMessage,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    eventCardResolver: NostrEventCardResolver? = null,
     documentSaveFallback: DocumentSaveFallback? = null,
     // #1206: shared composer text state so the full-screen reader's composer
     // stays in sync with the main composer instead of holding a divergent field.
@@ -1566,6 +1568,7 @@ internal fun MessageBubble(
                                     record = record,
                                     controller = controller,
                                     appState = appState,
+                                    eventCardResolver = eventCardResolver,
                                     bodyText = bodyTextToRender,
                                     bodyMarkdownDocument = editedMarkdownDocument,
                                     deleted = deleted,
@@ -1631,6 +1634,7 @@ internal fun MessageBubble(
                                     record = record,
                                     controller = controller,
                                     appState = appState,
+                                    eventCardResolver = eventCardResolver,
                                     bodyText = bodyTextToRender,
                                     bodyMarkdownDocument = editedMarkdownDocument,
                                     deleted = deleted,
@@ -1695,6 +1699,7 @@ internal fun MessageBubble(
                             record = record,
                             controller = controller,
                             appState = appState,
+                            eventCardResolver = eventCardResolver,
                             bodyText = bodyTextToRender,
                             bodyMarkdownDocument = editedMarkdownDocument,
                             deleted = deleted,

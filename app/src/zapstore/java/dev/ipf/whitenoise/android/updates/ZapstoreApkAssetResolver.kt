@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.updates
 
+import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 import org.json.JSONArray
 import org.json.JSONObject
 

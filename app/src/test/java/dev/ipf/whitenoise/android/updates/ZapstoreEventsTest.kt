@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.updates
 
+import dev.ipf.whitenoise.android.core.nostr.NostrEvent
+import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals

@@ -1,4 +1,4 @@
-package dev.ipf.whitenoise.android.updates
+package dev.ipf.whitenoise.android.core.nostr
 
 import java.math.BigInteger
 import java.util.Locale

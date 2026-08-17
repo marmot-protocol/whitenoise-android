@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.updates
 
+import dev.ipf.whitenoise.android.core.nostr.sha256
+import dev.ipf.whitenoise.android.core.nostr.toHex
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay

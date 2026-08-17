@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import java.util.Locale
 
 @Composable
@@ -36,6 +37,7 @@ internal fun TimelineRow(
     onMeasured: (itemId: String, heightPx: Int) -> Unit,
     appState: WhiteNoiseAppState,
     controller: ConversationController,
+    eventCardResolver: NostrEventCardResolver? = null,
     documentSaveFallback: DocumentSaveFallback? = null,
     composerTextState: ComposerTextState,
     highlighted: Boolean,
@@ -194,6 +196,7 @@ internal fun TimelineRow(
                     item = item,
                     controller = controller,
                     appState = appState,
+                    eventCardResolver = eventCardResolver,
                     documentSaveFallback = documentSaveFallback,
                     composerTextState = composerTextState,
                     highlighted = highlighted,

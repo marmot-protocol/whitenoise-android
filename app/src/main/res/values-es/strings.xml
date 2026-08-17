@@ -1463,4 +1463,16 @@
     <string name="text_attachment_preview_too_large">Este archivo es demasiado grande para mostrarlo de forma segura. Ábrelo en otra aplicación.</string>
     <string name="text_attachment_preview_invalid_encoding">Este archivo no usa una codificación de texto compatible. Ábrelo en otra aplicación.</string>
     <string name="text_attachment_preview_binary">Este archivo no parece contener texto seguro. Ábrelo en otra aplicación.</string>
+    <string name="nostr_event_loading">Cargando evento…</string>
+    <string name="nostr_event_not_found">Evento no encontrado</string>
+    <string name="nostr_event_invalid">No se pudo verificar este evento.</string>
+    <string name="nostr_event_failed">No se pudo cargar este evento. Comprueba tu conexión e inténtalo de nuevo.</string>
+    <string name="nostr_event_open">Abrir evento</string>
+    <string name="nostr_event_copy">Copiar referencia del evento</string>
+    <string name="nostr_event_type_note">Nota</string>
+    <string name="nostr_event_type_article">Artículo</string>
+    <string name="nostr_event_type_video">Vídeo</string>
+    <string name="nostr_event_type_release">Versión de software</string>
+    <string name="nostr_event_type_file">Archivo</string>
+    <string name="nostr_event_type_generic">Evento · Tipo %1$d</string>
 </resources>
