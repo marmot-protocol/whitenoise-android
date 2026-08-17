@@ -25,6 +25,47 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], qualifiers = "en")
 class ConversationSendRetryIntegrationTest {
     @Test
+    fun optimisticSendShowsRetentionBeforePublishCompletes() =
+        runTest {
+            lateinit var controller: ConversationController
+            controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(disappearingMessageSecs = 30uL),
+                    initialMemberSnapshot =
+                        GroupMemberSnapshot(
+                            listOf(
+                                AppGroupMemberRecordFfi(
+                                    memberIdHex = ACCOUNT_ID,
+                                    account = ACCOUNT_REF,
+                                    local = true,
+                                ),
+                            ),
+                        ),
+                    textPublisher = { _, _, _, _ ->
+                        val optimistic = controller.timeline.single()
+                        assertEquals(MessageStatus.Pending, optimistic.status)
+                        assertEquals(30uL, optimistic.record.retentionSeconds)
+                        assertEquals(null, optimistic.record.retentionExpiresAt)
+                        SendSummaryFfi(
+                            published = 1u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            controller.send("hello")
+
+            assertEquals(
+                30uL,
+                controller.timeline
+                    .single()
+                    .record.retentionSeconds,
+            )
+        }
+
+    @Test
     fun sendRetriesConnectFailureThenCommitsOneSentTimelineRow() =
         runTest {
             var attempts = 0
@@ -98,7 +139,7 @@ class ConversationSendRetryIntegrationTest {
             activeAccountRef = ACCOUNT_REF,
         )
 
-    private fun group() =
+    private fun group(disappearingMessageSecs: ULong = 0uL) =
         AppGroupRecordFfi(
             groupIdHex = GROUP_ID,
             protocolProfile = AppProtocolProfileFfi.LEGACY,
@@ -129,7 +170,7 @@ class ConversationSendRetryIntegrationTest {
                             ),
                         ),
                 ),
-            disappearingMessageSecs = 0uL,
+            disappearingMessageSecs = disappearingMessageSecs,
             archived = false,
             pendingConfirmation = false,
             unrecoverable = false,

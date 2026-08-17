@@ -7474,7 +7474,7 @@ class ConversationController(
                             listOf(MessageProjector.eventTag(it), MessageProjector.quoteTag(it))
                         }.orEmpty(),
                 sourceEpoch = null,
-                retentionSeconds = null,
+                retentionSeconds = group.disappearingMessageSecs.takeIf { it > 0uL },
                 retentionExpiresAt = null,
                 recordedAt = now,
                 receivedAt = now,
@@ -7833,7 +7833,7 @@ class ConversationController(
                     MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
                 },
             sourceEpoch = null,
-            retentionSeconds = null,
+            retentionSeconds = group.disappearingMessageSecs.takeIf { it > 0uL },
             retentionExpiresAt = null,
             recordedAt = now,
             receivedAt = now,
