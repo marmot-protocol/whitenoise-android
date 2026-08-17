@@ -1,23 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
@@ -25,138 +12,12 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.Placeable
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.MessageStatus
-import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 
 // Gap between a bubble's text and its trailing inline footer.
 private val BubbleFooterGap = 8.dp
-
-/** Legibility scrim for a footer overlaid on visual media (image/video). */
-@Composable
-private fun MediaScrimFooter(
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    Box(
-        modifier
-            .background(Color.Black.copy(alpha = ScrimAlpha.CHIP), RoundedCornerShape(percent = 50))
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-    ) {
-        content()
-    }
-}
-
-/** Time (+ outgoing status) overlaid on the bottom-right of a visual-media bubble. */
-@Composable
-internal fun BoxScope.MediaFooterOverlay(
-    timeText: String,
-    showStatus: Boolean,
-    status: MessageStatus,
-    showRetention: Boolean = false,
-) {
-    MediaScrimFooter(
-        modifier =
-            Modifier
-                .align(Alignment.BottomEnd)
-                .padding(6.dp),
-    ) {
-        MessageInlineFooter(
-            timeText = timeText,
-            color = Color.White,
-            showStatus = showStatus,
-            status = status,
-            editedLabel = null,
-            onEditedClick = null,
-            showRetention = showRetention,
-        )
-    }
-}
-
-/**
- * Bottom-end footer for a message bubble: an optional "edited" affordance, the
- * disappearing-message indicator, the time, and (outgoing only) the send-status
- * icon, in a subtle tint.
- */
-@Composable
-internal fun MessageInlineFooter(
-    timeText: String,
-    color: Color,
-    showStatus: Boolean,
-    status: MessageStatus,
-    editedLabel: String?,
-    onEditedClick: (() -> Unit)?,
-    showRetention: Boolean = false,
-    showTime: Boolean = true,
-) {
-    val spacing = 3.dp
-    val baselineIndex =
-        when {
-            showTime -> (if (editedLabel != null) 1 else 0) + (if (showRetention) 1 else 0)
-            editedLabel != null -> 0
-            else -> null
-        }
-    Layout(
-        content = {
-            if (editedLabel != null) {
-                Text(
-                    text = editedLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = color,
-                    modifier = if (onEditedClick != null) Modifier.clickable(onClick = onEditedClick) else Modifier,
-                )
-            }
-            if (showRetention) {
-                Icon(
-                    imageVector = Icons.Default.Schedule,
-                    contentDescription = stringResource(R.string.disappearing_message),
-                    modifier = Modifier.size(12.dp),
-                    tint = color.copy(alpha = 0.76f),
-                )
-            }
-            if (showTime) {
-                Text(
-                    text = timeText,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = color,
-                )
-            }
-            if (showStatus) {
-                OutgoingMessageStatusIcon(status, tint = color)
-            }
-        },
-    ) { measurables, constraints ->
-        val relaxedConstraints = constraints.copy(minWidth = 0, minHeight = 0)
-        val placeables = measurables.map { it.measure(relaxedConstraints) }
-        val gap = spacing.roundToPx()
-        val contentWidth =
-            placeables.sumOf { it.width } + gap * (placeables.size - 1).coerceAtLeast(0)
-        val width = contentWidth.coerceIn(constraints.minWidth, constraints.maxWidth)
-        val contentHeight = placeables.maxOfOrNull { it.height } ?: 0
-        val height = contentHeight.coerceIn(constraints.minHeight, constraints.maxHeight)
-        val baselinePlaceable = baselineIndex?.let(placeables::get)
-        val baselineY = baselinePlaceable?.let { (height - it.height) / 2 }
-        val baseline = baselinePlaceable?.get(FirstBaseline) ?: AlignmentLine.Unspecified
-        val alignmentLines =
-            if (baseline == AlignmentLine.Unspecified || baselineY == null) {
-                emptyMap()
-            } else {
-                mapOf<AlignmentLine, Int>(FirstBaseline to baselineY + baseline)
-            }
-
-        layout(width, height, alignmentLines) {
-            var x = 0
-            placeables.forEach { placeable ->
-                placeable.placeRelative(x, (height - placeable.height) / 2)
-                x += placeable.width + gap
-            }
-        }
-    }
-}
 
 /**
  * Lays [content] with [footer] pinned bottom-end. The footer joins the last

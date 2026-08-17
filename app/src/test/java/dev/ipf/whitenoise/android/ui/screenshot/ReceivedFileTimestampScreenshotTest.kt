@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming")
+
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.foundation.layout.Arrangement
@@ -104,89 +106,7 @@ class ReceivedFileTimestampScreenshotTest {
     @Test
     fun receivedFileTimestampGallery() {
         composeRule.setContent {
-            WhiteNoiseTheme {
-                Surface {
-                    Column(
-                        modifier = Modifier.width(360.dp).padding(16.dp).testTag(TAG),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        Text("File", style = MaterialTheme.typography.labelMedium)
-                        FileCard(
-                            reference = reference("release-notes.pdf", "application/pdf"),
-                            transferState = AttachmentTransferState.Remote,
-                            timestampText = SINGLE_TIME,
-                        )
-
-                        Text("Sent file", style = MaterialTheme.typography.labelMedium)
-                        FileCard(
-                            reference = reference("design-spec.pdf", "application/pdf"),
-                            transferState = AttachmentTransferState.Available,
-                            timestampText = SENT_TIME,
-                            showStatus = true,
-                            status = MessageStatus.Sent,
-                        )
-
-                        Text("File with caption", style = MaterialTheme.typography.labelMedium)
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fileBubbleWidth(),
-                        ) {
-                            Column {
-                                MediaFileBubbleContent(
-                                    reference = reference("roadmap.xlsx", SPREADSHEET_MIME),
-                                    presentation = resolveAttachmentPresentation(SPREADSHEET_MIME, "roadmap.xlsx"),
-                                    transferState = AttachmentTransferState.Downloading,
-                                    timestampText = CAPTION_TIME,
-                                )
-                                Text(
-                                    text = "Updated milestones",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                )
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                                    contentAlignment = Alignment.CenterEnd,
-                                ) {
-                                    MessageInlineFooter(
-                                        timeText = CAPTION_TIME,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        showStatus = false,
-                                        status = MessageStatus.Received,
-                                        editedLabel = "edited",
-                                        onEditedClick = null,
-                                        showTime = false,
-                                    )
-                                }
-                            }
-                        }
-
-                        Text("File group", style = MaterialTheme.typography.labelMedium)
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            FileCard(
-                                reference = reference("resolving-manifest.json", "application/json"),
-                                transferState = AttachmentTransferState.Resolving,
-                                timestampText = null,
-                            )
-                            FileCard(
-                                reference = reference("expired-cache.bin", "application/octet-stream"),
-                                transferState = AttachmentTransferState.NotRetained,
-                                timestampText = null,
-                            )
-                            FileCard(
-                                reference = reference("failed-export.zip", "application/zip"),
-                                transferState = AttachmentTransferState.Failed,
-                                timestampText = null,
-                            )
-                            FileCard(
-                                reference = reference("available-notes.txt", "text/plain"),
-                                transferState = AttachmentTransferState.Available,
-                                timestampText = GROUP_TIME,
-                            )
-                        }
-                    }
-                }
-            }
+            ReceivedFileTimestampGallery()
         }
 
         composeRule.onAllNodesWithText(SINGLE_TIME).assertCountEquals(1)
@@ -199,6 +119,100 @@ class ReceivedFileTimestampScreenshotTest {
         composeRule.onAllNodesWithContentDescription("Tap to retry").assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Sent").assertCountEquals(1)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/received_file_timestamp_light.png")
+    }
+
+    @Composable
+    private fun ReceivedFileTimestampGallery() {
+        WhiteNoiseTheme {
+            Surface {
+                Column(
+                    modifier = Modifier.width(360.dp).padding(16.dp).testTag(TAG),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Text("File", style = MaterialTheme.typography.labelMedium)
+                    FileCard(
+                        reference = reference("release-notes.pdf", "application/pdf"),
+                        transferState = AttachmentTransferState.Remote,
+                        timestampText = SINGLE_TIME,
+                    )
+                    Text("Sent file", style = MaterialTheme.typography.labelMedium)
+                    FileCard(
+                        reference = reference("design-spec.pdf", "application/pdf"),
+                        transferState = AttachmentTransferState.Available,
+                        timestampText = SENT_TIME,
+                        showStatus = true,
+                        status = MessageStatus.Sent,
+                    )
+                    Text("File with caption", style = MaterialTheme.typography.labelMedium)
+                    CaptionedFileCard()
+                    Text("File group", style = MaterialTheme.typography.labelMedium)
+                    FileGroup()
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun CaptionedFileCard() {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fileBubbleWidth(),
+        ) {
+            Column {
+                MediaFileBubbleContent(
+                    reference = reference("roadmap.xlsx", SPREADSHEET_MIME),
+                    presentation = resolveAttachmentPresentation(SPREADSHEET_MIME, "roadmap.xlsx"),
+                    transferState = AttachmentTransferState.Downloading,
+                    timestampText = CAPTION_TIME,
+                )
+                Text(
+                    text = "Updated milestones",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    MessageInlineFooter(
+                        timeText = CAPTION_TIME,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        showStatus = false,
+                        status = MessageStatus.Received,
+                        editedLabel = "edited",
+                        onEditedClick = null,
+                        showTime = false,
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun FileGroup() {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            FileCard(
+                reference = reference("resolving-manifest.json", "application/json"),
+                transferState = AttachmentTransferState.Resolving,
+                timestampText = null,
+            )
+            FileCard(
+                reference = reference("expired-cache.bin", "application/octet-stream"),
+                transferState = AttachmentTransferState.NotRetained,
+                timestampText = null,
+            )
+            FileCard(
+                reference = reference("failed-export.zip", "application/zip"),
+                transferState = AttachmentTransferState.Failed,
+                timestampText = null,
+            )
+            FileCard(
+                reference = reference("available-notes.txt", "text/plain"),
+                transferState = AttachmentTransferState.Available,
+                timestampText = GROUP_TIME,
+            )
+        }
     }
 
     @Test
