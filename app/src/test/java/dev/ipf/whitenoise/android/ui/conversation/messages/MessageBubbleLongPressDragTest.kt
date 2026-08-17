@@ -13,8 +13,10 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
@@ -28,13 +30,18 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -54,6 +61,60 @@ class MessageBubbleLongPressDragTest {
     val composeRule = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+    @Test
+    @Suppress("LongMethod") // The real MessageBubble host requires its full interaction contract.
+    fun receivedUncaptionedFileUsesOnlyTheFileCardTimestamp() {
+        val appState = appState()
+        val controller = ConversationController(appState = appState, initialGroup = group())
+        val item = receivedFileTimelineMessage()
+        val composerTextState = ComposerTextState(TextFieldValue(""))
+        var timestampText = ""
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                timestampText = rememberedMessageBubbleTime(item.record.recordedAt)
+                MessageBubble(
+                    item = item,
+                    controller = controller,
+                    appState = appState,
+                    composerTextState = composerTextState,
+                    highlighted = false,
+                    selectionMode = false,
+                    textSelectionMode = false,
+                    onTextSelectionModeChange = {},
+                    onTextSelectionBoundsChange = {},
+                    batchSelectable = true,
+                    selected = false,
+                    onToggleSelection = {},
+                    rangeDragActive = false,
+                    onDragSelectionStart = {},
+                    onDragSelection = { false },
+                    onDragSelectionEnd = {},
+                    onDragSelectionCancel = {},
+                    quickReactionEmojis = emptyList(),
+                    recentEmojis = emptyList(),
+                    onEmojiUsed = {},
+                    isActionMenuOpen = false,
+                    onActionMenuOpenChange = {},
+                    onQuickReactionsSave = {},
+                    onQuickReactionsReset = {},
+                    onReplyPreviewClick = {},
+                    composerGate = ComposerGate.COMPOSER,
+                    inviteMutationInFlight = false,
+                    onJoinInvite = {},
+                    onDeclineInvite = {},
+                    mentionCandidates = emptyList(),
+                    mentionPickerEnabled = false,
+                )
+            }
+        }
+
+        composeRule.runOnIdle { assertTrue(timestampText.isNotBlank()) }
+        composeRule
+            .onAllNodesWithText(timestampText, useUnmergedTree = true)
+            .assertCountEquals(1)
+    }
 
     @Test
     @Suppress("LongMethod") // The real MessageBubble host requires its full interaction contract.
@@ -390,6 +451,60 @@ class MessageBubbleLongPressDragTest {
                     receivedAt = 1uL,
                 ),
             status = MessageStatus.Received,
+        )
+    }
+
+    private fun receivedFileTimelineMessage(): TimelineMessage {
+        val record =
+            timelineMessage().record.copy(
+                plaintext = "",
+                sourceEpoch = 1uL,
+            )
+        val media =
+            MediaAttachmentReferenceFfi(
+                locators = listOf(MediaLocatorFfi("blossom-v1", "https://media.example/release-notes.pdf")),
+                ciphertextSha256 = "a".repeat(64),
+                plaintextSha256 = "b".repeat(64),
+                nonceHex = "c".repeat(24),
+                fileName = "release-notes.pdf",
+                mediaType = "application/pdf",
+                version = EncryptedMediaVersionFfi.V1,
+                sourceEpoch = 1uL,
+                dim = null,
+                thumbhash = null,
+            )
+        val projected =
+            TimelineMessageRecordFfi(
+                messageIdHex = record.messageIdHex,
+                sourceMessageIdHex = record.messageIdHex,
+                direction = record.direction,
+                groupIdHex = record.groupIdHex,
+                sender = record.sender,
+                plaintext = record.plaintext,
+                contentTokens = record.contentTokens,
+                kind = record.kind,
+                tags = record.tags,
+                timelineAt = record.recordedAt,
+                receivedAt = record.receivedAt,
+                replyToMessageIdHex = null,
+                replyPreview = null,
+                mediaJson = null,
+                media = listOf(media),
+                agentTextStreamJson = null,
+                groupSystem = null,
+                reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
+                deleted = false,
+                deletedByMessageIdHex = null,
+                invalidationStatus = null,
+                sourceEpoch = record.sourceEpoch,
+                retentionSeconds = null,
+                retentionExpiresAt = null,
+            )
+        return TimelineMessage(
+            id = "msg:${record.messageIdHex}",
+            record = record,
+            status = MessageStatus.Received,
+            projected = projected,
         )
     }
 
