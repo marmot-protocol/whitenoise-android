@@ -2,15 +2,18 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -27,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.retentionIndicatorVisible
+import dev.ipf.whitenoise.android.state.MessageStatus
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -130,6 +134,26 @@ internal fun retentionIndicatorPresentation(
 }
 
 /**
+ * Reserves only layout space while authoritative indicator input is unavailable: for a projected
+ * retained record awaiting account binding, or an unconfirmed outgoing message in a retained group.
+ * The engine projection remains authoritative for whether an indicator is drawn and when it begins.
+ */
+internal fun shouldReserveRetentionIndicatorSpace(
+    input: RetentionIndicatorInput?,
+    projectedRetentionSeconds: ULong?,
+    mine: Boolean,
+    status: MessageStatus,
+    groupRetentionSeconds: ULong,
+): Boolean {
+    if (input != null) return false
+    val unconfirmedOutgoing =
+        mine &&
+            (status == MessageStatus.Pending || status == MessageStatus.Failed) &&
+            groupRetentionSeconds > 0uL
+    return retentionIndicatorVisible(projectedRetentionSeconds) || unconfirmedOutgoing
+}
+
+/**
  * Drives one composed retained row. Lazy-list disposal cancels this loop, so off-screen rows do
  * not keep clocks alive and no expiry state is persisted outside the engine projection.
  */
@@ -153,18 +177,36 @@ internal fun rememberRetentionIndicatorPresentation(
     nowEpochMillis: () -> Long = System::currentTimeMillis,
 ): RetentionIndicatorPresentation {
     if (input == null) return RetentionIndicatorPresentation.Hidden
-    val initial = retentionIndicatorPresentation(input, nowEpochMillis())
-    val currentClock by rememberUpdatedState(nowEpochMillis)
-    val presentation by
-        produceState(initialValue = initial, key1 = input) {
-            runRetentionIndicatorTicker(
-                input = input,
-                nowEpochMillis = { currentClock() },
-                waitMillis = { delay(it) },
-                emit = { value = it },
-            )
-        }
-    return presentation
+    return key(input) {
+        val initial = retentionIndicatorPresentation(input, nowEpochMillis())
+        val currentClock by rememberUpdatedState(nowEpochMillis)
+        val presentation by
+            produceState(initialValue = initial) {
+                runRetentionIndicatorTicker(
+                    input = input,
+                    nowEpochMillis = { currentClock() },
+                    waitMillis = { delay(it) },
+                    emit = { value = it },
+                )
+            }
+        presentation
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming") // Compose UI entry point.
+internal fun MessageRetentionIndicatorSlot(
+    presentation: RetentionIndicatorPresentation,
+    color: Color,
+    reserveSpace: Boolean = false,
+) {
+    if (!reserveSpace && presentation is RetentionIndicatorPresentation.Hidden) return
+    Box(
+        modifier = Modifier.size(RetentionIndicatorSize),
+        contentAlignment = Alignment.Center,
+    ) {
+        MessageRetentionIndicator(presentation, color)
+    }
 }
 
 @Composable
@@ -180,7 +222,7 @@ internal fun MessageRetentionIndicator(
             Icon(
                 imageVector = Icons.Outlined.Timer,
                 contentDescription = label,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(RetentionIndicatorSize),
                 tint = color.copy(alpha = 0.76f),
             )
         is RetentionIndicatorPresentation.Running ->
@@ -229,7 +271,7 @@ private fun RetentionProgressRing(
     Canvas(
         modifier =
             Modifier
-                .size(14.dp)
+                .size(RetentionIndicatorSize)
                 .semantics {
                     contentDescription = label
                     stateDescription = expiryState
@@ -288,3 +330,4 @@ internal const val MILLIS_PER_DAY = 24L * MILLIS_PER_HOUR
 private const val MIN_REFRESH_DELAY_MILLIS = 250L
 private const val FULL_CIRCLE_DEGREES = 360f
 private val MAX_EPOCH_SECONDS = Long.MAX_VALUE.toULong() / MILLIS_PER_SECOND.toULong()
+private val RetentionIndicatorSize = 14.dp

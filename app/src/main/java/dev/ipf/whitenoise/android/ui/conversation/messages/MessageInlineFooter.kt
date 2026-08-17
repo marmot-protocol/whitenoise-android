@@ -43,6 +43,7 @@ internal fun BoxScope.MediaFooterOverlay(
     showStatus: Boolean,
     status: MessageStatus,
     retention: RetentionIndicatorInput? = null,
+    reserveRetentionSpace: Boolean = false,
 ) {
     MediaScrimFooter(
         modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp),
@@ -55,6 +56,7 @@ internal fun BoxScope.MediaFooterOverlay(
             editedLabel = null,
             onEditedClick = null,
             retention = retention,
+            reserveRetentionSpace = reserveRetentionSpace,
         )
     }
 }
@@ -70,11 +72,13 @@ internal fun MessageInlineFooter(
     onEditedClick: (() -> Unit)?,
     retention: RetentionIndicatorInput? = null,
     retentionClockMillis: () -> Long = System::currentTimeMillis,
+    reserveRetentionSpace: Boolean = false,
     showTime: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val retentionPresentation = rememberRetentionIndicatorPresentation(retention, retentionClockMillis)
-    val showRetention = retentionPresentation !is RetentionIndicatorPresentation.Hidden
+    val showRetention =
+        reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden
     val baselineIndex = footerBaselineIndex(showTime, editedLabel != null, showRetention)
     Layout(
         modifier = modifier,
@@ -87,6 +91,7 @@ internal fun MessageInlineFooter(
                 editedLabel = editedLabel,
                 onEditedClick = onEditedClick,
                 retentionPresentation = retentionPresentation,
+                reserveRetentionSpace = reserveRetentionSpace,
                 showTime = showTime,
             )
         },
@@ -125,6 +130,7 @@ private fun MessageInlineFooterItems(
     editedLabel: String?,
     onEditedClick: (() -> Unit)?,
     retentionPresentation: RetentionIndicatorPresentation,
+    reserveRetentionSpace: Boolean,
     showTime: Boolean,
 ) {
     editedLabel?.let {
@@ -135,8 +141,8 @@ private fun MessageInlineFooterItems(
             modifier = if (onEditedClick != null) Modifier.clickable(onClick = onEditedClick) else Modifier,
         )
     }
-    if (retentionPresentation !is RetentionIndicatorPresentation.Hidden) {
-        MessageRetentionIndicator(retentionPresentation, color)
+    if (reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden) {
+        MessageRetentionIndicatorSlot(retentionPresentation, color, reserveRetentionSpace)
     }
     if (showTime) {
         Text(timeText, style = MaterialTheme.typography.labelSmall, color = color)

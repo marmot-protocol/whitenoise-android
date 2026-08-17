@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import dev.ipf.whitenoise.android.state.MessageStatus
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -8,6 +9,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -29,6 +31,73 @@ class MessageRetentionIndicatorTest {
         assertNull(input(deleted = true))
 
         assertEquals(60uL, input()?.durationSeconds)
+    }
+
+    @Test
+    fun retentionSpaceIsReservedOnlyForProjectedOrUnconfirmedRetainedMessages() {
+        assertTrue(
+            shouldReserveRetentionIndicatorSpace(
+                input = null,
+                projectedRetentionSeconds = null,
+                mine = true,
+                status = MessageStatus.Pending,
+                groupRetentionSeconds = 60uL,
+            ),
+        )
+        assertTrue(
+            shouldReserveRetentionIndicatorSpace(
+                input = null,
+                projectedRetentionSeconds = null,
+                mine = true,
+                status = MessageStatus.Failed,
+                groupRetentionSeconds = 60uL,
+            ),
+        )
+        assertTrue(
+            shouldReserveRetentionIndicatorSpace(
+                input = null,
+                projectedRetentionSeconds = 60uL,
+                mine = false,
+                status = MessageStatus.Received,
+                groupRetentionSeconds = 0uL,
+            ),
+        )
+        assertFalse(
+            shouldReserveRetentionIndicatorSpace(
+                input = input(),
+                projectedRetentionSeconds = 60uL,
+                mine = true,
+                status = MessageStatus.Pending,
+                groupRetentionSeconds = 60uL,
+            ),
+        )
+        assertFalse(
+            shouldReserveRetentionIndicatorSpace(
+                input = null,
+                projectedRetentionSeconds = null,
+                mine = false,
+                status = MessageStatus.Pending,
+                groupRetentionSeconds = 60uL,
+            ),
+        )
+        assertFalse(
+            shouldReserveRetentionIndicatorSpace(
+                input = null,
+                projectedRetentionSeconds = null,
+                mine = true,
+                status = MessageStatus.Sent,
+                groupRetentionSeconds = 60uL,
+            ),
+        )
+        assertFalse(
+            shouldReserveRetentionIndicatorSpace(
+                input = null,
+                projectedRetentionSeconds = null,
+                mine = true,
+                status = MessageStatus.Pending,
+                groupRetentionSeconds = 0uL,
+            ),
+        )
     }
 
     @Test

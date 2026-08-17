@@ -2,12 +2,17 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import android.text.format.DateUtils
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -120,6 +125,69 @@ class MessageRetentionIndicatorComposeTest {
     }
 
     @Test
+    fun reservedPendingSlotKeepsFooterWidthWhenTheProjectionArrives() {
+        var retention: RetentionIndicatorInput? by mutableStateOf(null)
+        var reserveSpace by mutableStateOf(true)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MessageInlineFooter(
+                    timeText = "12:34",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    showStatus = true,
+                    status = if (retention == null) MessageStatus.Pending else MessageStatus.Sent,
+                    editedLabel = null,
+                    onEditedClick = null,
+                    retention = retention,
+                    reserveRetentionSpace = reserveSpace,
+                    retentionClockMillis = { 150_000L },
+                    modifier = Modifier.testTag(FOOTER_TAG),
+                )
+            }
+        }
+
+        val label = context.getString(R.string.disappearing_message)
+        val pendingBounds = composeRule.onNodeWithTag(FOOTER_TAG).getUnclippedBoundsInRoot()
+        val pendingWidth = pendingBounds.right - pendingBounds.left
+        composeRule.onNodeWithContentDescription(label).assertDoesNotExist()
+
+        composeRule.runOnIdle {
+            retention = input(expiresAtEpochSeconds = 200uL)
+            reserveSpace = false
+        }
+
+        val sentBounds = composeRule.onNodeWithTag(FOOTER_TAG).getUnclippedBoundsInRoot()
+        val sentWidth = sentBounds.right - sentBounds.left
+        assertEquals(pendingWidth, sentWidth)
+        composeRule.onNodeWithContentDescription(label).assertExists()
+    }
+
+    @Test
+    fun projectionIdentityChangesNeverExposeThePreviousPresentation() {
+        var retention by mutableStateOf(input(expiresAtEpochSeconds = 200uL))
+        val observed = mutableListOf<RetentionIndicatorPresentation>()
+        composeRule.setContent {
+            val presentation =
+                rememberRetentionIndicatorPresentation(
+                    input = retention,
+                    nowEpochMillis = { 150_000L },
+                )
+            SideEffect { observed += presentation }
+        }
+        composeRule.waitForIdle()
+        assertTrue(observed.isNotEmpty())
+        assertTrue(observed.all { it is RetentionIndicatorPresentation.Running })
+
+        composeRule.runOnIdle {
+            observed.clear()
+            retention = retention.copy(sourceEpoch = 2uL, expiresAtEpochSeconds = null)
+        }
+        composeRule.waitForIdle()
+
+        assertTrue(observed.isNotEmpty())
+        assertTrue(observed.all { it is RetentionIndicatorPresentation.Waiting })
+    }
+
+    @Test
     fun latestProjectionPromotesWaitingToRunningAndDeletionRemovesTheClock() {
         var retention: RetentionIndicatorInput? by mutableStateOf(input(expiresAtEpochSeconds = null))
         composeRule.setContent {
@@ -162,6 +230,7 @@ class MessageRetentionIndicatorComposeTest {
         )
 
     private companion object {
+        const val FOOTER_TAG = "retention-footer"
         val testControllerKey = Any()
     }
 }

@@ -31,6 +31,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -62,6 +63,8 @@ internal fun MediaFileBubble(
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Received,
+    retention: RetentionIndicatorInput? = null,
+    reserveRetentionSpace: Boolean = false,
 ) {
     val context = LocalContext.current
     val openAttachment = rememberAttachmentOpener()
@@ -178,6 +181,8 @@ internal fun MediaFileBubble(
             timestampText = timestampText,
             showStatus = showStatus,
             status = status,
+            retention = retention,
+            reserveRetentionSpace = reserveRetentionSpace,
         )
     }
     if (readerOpen && textCandidate != null) {
@@ -300,6 +305,8 @@ internal fun PendingFilePill(
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Pending,
+    retention: RetentionIndicatorInput? = null,
+    reserveRetentionSpace: Boolean = false,
 ) {
     val presentation = remember(mediaType, fileName) { resolveAttachmentPresentation(mediaType, fileName) }
     Surface(
@@ -331,6 +338,8 @@ internal fun PendingFilePill(
             trailingMetadataText = timestampText ?: statusLabel,
             trailingMetadataIsError = failed && timestampText == null,
             trailingStatus = status.takeIf { showStatus },
+            retention = retention,
+            reserveRetentionSpace = reserveRetentionSpace,
             loadingDescription = statusLabel,
             transferDirection = FileTransferDirection.Upload,
         )
