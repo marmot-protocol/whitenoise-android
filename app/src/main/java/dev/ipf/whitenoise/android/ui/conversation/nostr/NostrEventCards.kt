@@ -114,11 +114,16 @@ internal fun NostrEventCard(
         border = BorderStroke(1.dp, contentColor.copy(alpha = 0.22f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            EventCardBody(state, authorDisplayName, contentColor, onRetry)
-            Spacer(Modifier.height(6.dp))
-            EventCardActions(contentColor, copyDescription, openDescription, onCopy, onOpen)
-        }
+        EventCardBody(
+            state = state,
+            authorDisplayName = authorDisplayName,
+            contentColor = contentColor,
+            copyDescription = copyDescription,
+            openDescription = openDescription,
+            onRetry = onRetry,
+            onCopy = onCopy,
+            onOpen = onOpen,
+        )
     }
 }
 
@@ -127,7 +132,11 @@ private fun EventCardBody(
     state: NostrEventCardState,
     authorDisplayName: (String) -> String,
     contentColor: Color,
+    copyDescription: String,
+    openDescription: String,
     onRetry: () -> Unit,
+    onCopy: () -> Unit,
+    onOpen: () -> Unit,
 ) {
     when (state) {
         NostrEventCardState.Loading ->
@@ -135,15 +144,51 @@ private fun EventCardBody(
                 text = stringResource(R.string.nostr_event_loading),
                 contentColor = contentColor,
                 progress = true,
+                copyDescription = copyDescription,
+                openDescription = openDescription,
+                onCopy = onCopy,
+                onOpen = onOpen,
             )
         NostrEventCardState.NotFound ->
-            EventCardFailure(stringResource(R.string.nostr_event_not_found), contentColor, onRetry)
+            EventCardFailure(
+                text = stringResource(R.string.nostr_event_not_found),
+                contentColor = contentColor,
+                copyDescription = copyDescription,
+                openDescription = openDescription,
+                onRetry = onRetry,
+                onCopy = onCopy,
+                onOpen = onOpen,
+            )
         NostrEventCardState.Invalid ->
-            EventCardFailure(stringResource(R.string.nostr_event_invalid), contentColor, onRetry)
+            EventCardFailure(
+                text = stringResource(R.string.nostr_event_invalid),
+                contentColor = contentColor,
+                copyDescription = copyDescription,
+                openDescription = openDescription,
+                onRetry = onRetry,
+                onCopy = onCopy,
+                onOpen = onOpen,
+            )
         NostrEventCardState.Failed ->
-            EventCardFailure(stringResource(R.string.nostr_event_failed), contentColor, onRetry)
+            EventCardFailure(
+                text = stringResource(R.string.nostr_event_failed),
+                contentColor = contentColor,
+                copyDescription = copyDescription,
+                openDescription = openDescription,
+                onRetry = onRetry,
+                onCopy = onCopy,
+                onOpen = onOpen,
+            )
         is NostrEventCardState.Loaded ->
-            LoadedEventCard(state.card, authorDisplayName, contentColor)
+            LoadedEventCard(
+                card = state.card,
+                authorDisplayName = authorDisplayName,
+                contentColor = contentColor,
+                copyDescription = copyDescription,
+                openDescription = openDescription,
+                onCopy = onCopy,
+                onOpen = onOpen,
+            )
     }
 }
 
@@ -155,11 +200,7 @@ private fun EventCardActions(
     onCopy: () -> Unit,
     onOpen: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Row {
         IconButton(onClick = onCopy, modifier = Modifier.size(48.dp)) {
             Icon(
                 Icons.Outlined.ContentCopy,
@@ -184,10 +225,16 @@ private fun LoadedEventCard(
     card: NostrEventCardModel,
     authorDisplayName: (String) -> String,
     contentColor: Color,
+    copyDescription: String,
+    openDescription: String,
+    onCopy: () -> Unit,
+    onOpen: () -> Unit,
 ) {
-    LoadedEventHeader(card, authorDisplayName, contentColor)
-    LoadedEventSummary(card.summary, contentColor)
-    LoadedEventMetadata(card.metadata, contentColor)
+    Column(Modifier.padding(start = 12.dp, top = 8.dp, end = 4.dp, bottom = 8.dp)) {
+        LoadedEventHeader(card, authorDisplayName, contentColor, copyDescription, openDescription, onCopy, onOpen)
+        LoadedEventSummary(card.summary, contentColor)
+        LoadedEventMetadata(card.metadata, contentColor)
+    }
 }
 
 @Composable
@@ -195,6 +242,10 @@ private fun LoadedEventHeader(
     card: NostrEventCardModel,
     authorDisplayName: (String) -> String,
     contentColor: Color,
+    copyDescription: String,
+    openDescription: String,
+    onCopy: () -> Unit,
+    onOpen: () -> Unit,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -232,13 +283,17 @@ private fun LoadedEventHeader(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Text(
-                text = eventByline(card, authorDisplayName),
-                style = MaterialTheme.typography.labelMedium,
-                color = contentColor.copy(alpha = 0.78f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = eventByline(card, authorDisplayName),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = contentColor.copy(alpha = 0.78f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                EventCardActions(contentColor, copyDescription, openDescription, onCopy, onOpen)
+            }
         }
     }
 }
@@ -282,8 +337,13 @@ private fun EventCardStatus(
     text: String,
     contentColor: Color,
     progress: Boolean,
+    copyDescription: String,
+    openDescription: String,
+    onCopy: () -> Unit,
+    onOpen: () -> Unit,
 ) {
     Row(
+        modifier = Modifier.padding(start = 12.dp, top = 4.dp, end = 4.dp, bottom = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -294,7 +354,13 @@ private fun EventCardStatus(
                 strokeWidth = 2.dp,
             )
         }
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = contentColor)
+        Text(
+            text = text,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = contentColor,
+        )
+        EventCardActions(contentColor, copyDescription, openDescription, onCopy, onOpen)
     }
 }
 
@@ -302,36 +368,50 @@ private fun EventCardStatus(
 private fun EventCardFailure(
     text: String,
     contentColor: Color,
+    copyDescription: String,
+    openDescription: String,
     onRetry: () -> Unit,
+    onCopy: () -> Unit,
+    onOpen: () -> Unit,
 ) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
+        modifier = Modifier.padding(start = 8.dp, top = 4.dp, end = 4.dp, bottom = 4.dp),
     ) {
-        Icon(
-            Icons.Outlined.ErrorOutline,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = contentColor,
-        )
-        Text(
-            text = text,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            color = contentColor,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-        )
-        IconButton(
-            onClick = onRetry,
-            modifier = Modifier.size(48.dp),
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Icons.Outlined.Refresh,
-                contentDescription = stringResource(R.string.retry),
-                modifier = Modifier.size(18.dp),
+                Icons.Outlined.ErrorOutline,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
                 tint = contentColor,
             )
+            Text(
+                text = text,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = contentColor,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            IconButton(
+                onClick = onRetry,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    Icons.Outlined.Refresh,
+                    contentDescription = stringResource(R.string.retry),
+                    modifier = Modifier.size(18.dp),
+                    tint = contentColor,
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            EventCardActions(contentColor, copyDescription, openDescription, onCopy, onOpen)
         }
     }
 }

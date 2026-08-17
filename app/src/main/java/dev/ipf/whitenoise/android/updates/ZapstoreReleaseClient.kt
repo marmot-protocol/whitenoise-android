@@ -97,7 +97,9 @@ class ZapstoreReleaseClient internal constructor(
     }
 }
 
-private fun Throwable.hasRelayTimeoutCause(): Boolean = generateSequence(this) { it.cause }.any { it is NostrRelayTimeoutException }
+private fun Throwable.hasRelayTimeoutCause(): Boolean = causes().any { it is NostrRelayTimeoutException }
+
+private fun Throwable.causes(): Sequence<Throwable> = generateSequence(this) { it.cause }
 
 internal object ZapstoreEvents {
     /**
