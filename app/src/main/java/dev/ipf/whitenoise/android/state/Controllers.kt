@@ -1312,9 +1312,6 @@ private fun timelineRecordContentEqual(
         a.deleted == b.deleted &&
         a.deletedByMessageIdHex == b.deletedByMessageIdHex &&
         a.invalidationStatus == b.invalidationStatus &&
-        a.sourceEpoch == b.sourceEpoch &&
-        a.retentionSeconds == b.retentionSeconds &&
-        a.retentionExpiresAt == b.retentionExpiresAt &&
         a.reactions == b.reactions
 
 private fun markdownDocumentsRenderEqual(
@@ -1906,21 +1903,6 @@ internal fun optimisticMessageIdForProjection(
                 projected.tags.filterNot { it.values.firstOrNull() == "p" }
         }?.record
         ?.messageIdHex
-}
-
-/**
- * Keeps the retention affordance stable while an optimistic send hands off to the engine's
- * intermediate pending projection. The final outer projection remains authoritative: once it
- * has a source message id, a missing duration is respected instead of being filled locally.
- */
-internal fun preservePendingProjectionRetention(
-    projected: AppMessageRecordFfi,
-    sourceMessageIdHex: String?,
-    fallbackRetentionSeconds: ULong?,
-): AppMessageRecordFfi {
-    val fallback = fallbackRetentionSeconds?.takeIf { it > 0uL } ?: return projected
-    if (sourceMessageIdHex != null || projected.retentionSeconds != null) return projected
-    return projected.copy(retentionSeconds = fallback)
 }
 
 private fun isSendableOptimisticStatus(
@@ -7492,7 +7474,7 @@ class ConversationController(
                             listOf(MessageProjector.eventTag(it), MessageProjector.quoteTag(it))
                         }.orEmpty(),
                 sourceEpoch = null,
-                retentionSeconds = group.disappearingMessageSecs.takeIf { it > 0uL },
+                retentionSeconds = null,
                 retentionExpiresAt = null,
                 recordedAt = now,
                 receivedAt = now,
@@ -7851,7 +7833,7 @@ class ConversationController(
                     MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
                 },
             sourceEpoch = null,
-            retentionSeconds = group.disappearingMessageSecs.takeIf { it > 0uL },
+            retentionSeconds = null,
             retentionExpiresAt = null,
             recordedAt = now,
             receivedAt = now,
@@ -10618,8 +10600,6 @@ class ConversationController(
         if (existing != null && stillProjected && timelineRecordsRenderEqual(existing, record)) {
             return TimelineProjector.toAppMessageRecord(record)
         }
-        val displayedRetentionSeconds =
-            previousItemId?.let { itemId -> timelineItemsById[itemId]?.record?.retentionSeconds }
         if (previousItemId != null) {
             timelineItemsById.remove(previousItemId)
             timelineOrder.remove(previousItemId)
@@ -10649,9 +10629,10 @@ class ConversationController(
             }
         }
         pendingProjectionsAwaitingBridge.remove(record.messageIdHex)
+        val actionRecord = draftAction
         if (
             record.invalidationStatus != null &&
-            failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, draftAction) != null
+            failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, actionRecord) != null
         ) {
             timelineRecords.remove(record.messageIdHex)
             projectedMessageIds.remove(record.messageIdHex)
@@ -10660,35 +10641,18 @@ class ConversationController(
                 timelineItemsById.remove(previousItemId)
                 timelineOrder.remove(previousItemId)
             }
-            return draftAction
+            return actionRecord
         }
         if (
             record.sourceMessageIdHex == null &&
             record.invalidationStatus == null &&
-            failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, draftAction) != null
+            failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, actionRecord) != null
         ) {
             timelineRecords[record.messageIdHex] = record
             projectedMessageIds.add(record.messageIdHex)
-            messageById[record.messageIdHex] = draftAction
-            return draftAction
+            messageById[record.messageIdHex] = actionRecord
+            return actionRecord
         }
-        val reconciledOptimisticId =
-            optimisticMessageIdForProjection(
-                optimisticMessages.values,
-                draftAction,
-                allowDelayedProjection = allowDelayedProjection,
-            ).takeIf { reconcileOptimistic }
-        val optimisticRetentionSeconds =
-            reconciledOptimisticId
-                ?.let { optimisticId -> optimisticMessages["msg:$optimisticId"] }
-                ?.record
-                ?.retentionSeconds
-        val actionRecord =
-            preservePendingProjectionRetention(
-                projected = draftAction,
-                sourceMessageIdHex = record.sourceMessageIdHex,
-                fallbackRetentionSeconds = optimisticRetentionSeconds ?: displayedRetentionSeconds,
-            )
         if (record.invalidationStatus == null) {
             invalidatedProjectionIdsMatchingMessage(timelineRecords, actionRecord)
                 .filterNot { it == record.messageIdHex }
@@ -10702,24 +10666,29 @@ class ConversationController(
             actionRecord,
             displayedProjectedStreamItemIds,
         )
-        reconciledOptimisticId?.let { optimisticId ->
-            preserveOptimisticDisplayPosition(record.messageIdHex, optimisticId)
-            val optimisticKey = "msg:$optimisticId"
-            // Hand off own-sent media bytes from the pending optimistic to
-            // the projection's cache key BEFORE the bubble's LaunchedEffect
-            // can fire and ask Blossom for them. Without this, the projected
-            // bubble starts rendering, finds the thumbnail/plaintext caches
-            // empty for the confirmed messageIdHex, and triggers an FFI
-            // downloadMedia round-trip — re-downloading bytes we literally
-            // just uploaded.
-            handoffOwnMediaCacheOnReconcile(optimisticKey, record.messageIdHex)
-            optimisticMessages.remove(optimisticKey)
-            messageById.remove(optimisticId)
-            // The engine echo just flipped this pending bubble to a
-            // projected record. If we're tracing this send, this is the
-            // "self-echo drives the sent flip" path (issue #913).
-            traceEchoReconcile(optimisticId)
-        }
+        optimisticMessageIdForProjection(
+            optimisticMessages.values,
+            actionRecord,
+            allowDelayedProjection = allowDelayedProjection,
+        )?.takeIf { reconcileOptimistic }
+            ?.let { optimisticId ->
+                preserveOptimisticDisplayPosition(record.messageIdHex, optimisticId)
+                val optimisticKey = "msg:$optimisticId"
+                // Hand off own-sent media bytes from the pending optimistic to
+                // the projection's cache key BEFORE the bubble's LaunchedEffect
+                // can fire and ask Blossom for them. Without this, the projected
+                // bubble starts rendering, finds the thumbnail/plaintext caches
+                // empty for the confirmed messageIdHex, and triggers an FFI
+                // downloadMedia round-trip — re-downloading bytes we literally
+                // just uploaded.
+                handoffOwnMediaCacheOnReconcile(optimisticKey, record.messageIdHex)
+                optimisticMessages.remove(optimisticKey)
+                messageById.remove(optimisticId)
+                // The engine echo just flipped this pending bubble to a
+                // projected record. If we're tracing this send, this is the
+                // "self-echo drives the sent flip" path (issue #913).
+                traceEchoReconcile(optimisticId)
+            }
         messageById[record.messageIdHex] = actionRecord
         val item = timelineMessageFromProjection(record, actionRecord)
         timelineItemsById[item.id] = item

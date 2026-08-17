@@ -30,20 +30,6 @@ class TimelineRecordRenderEqualityTest {
     }
 
     @Test
-    fun retentionProjectionChangesInvalidateRenderedRecord() {
-        val pending = record()
-
-        assertFalse(timelineRecordsRenderEqual(pending, record().copy(retentionSeconds = 30uL)))
-        assertFalse(
-            timelineRecordsRenderEqual(
-                pending,
-                record().copy(retentionSeconds = 30uL, retentionExpiresAt = 60uL),
-            ),
-        )
-        assertFalse(timelineRecordsRenderEqual(pending, record().copy(sourceEpoch = 2uL)))
-    }
-
-    @Test
     fun markdownHydrationInvalidatesRenderedRecord() {
         val withoutTokens = record()
         val withTokens =
