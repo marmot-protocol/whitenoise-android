@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -52,7 +50,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -122,6 +119,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachme
 import dev.ipf.whitenoise.android.ui.conversation.reactions.CustomizeReactionsDialog
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
+import dev.ipf.whitenoise.android.ui.conversation.reactions.reactionSummaryAttachment
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
 import dev.ipf.whitenoise.android.ui.conversation.replies.senderTitleForReply
@@ -1989,30 +1987,17 @@ internal fun MessageBubble(
                 val tallies = controller.reactions[record.messageIdHex].orEmpty()
                 // Hide reaction tallies on a deleted message — nothing to show.
                 if (tallies.isNotEmpty() && !deleted) {
-                    val reactionChipPadding =
-                        if (mine) {
-                            PaddingValues(end = 10.dp)
-                        } else {
-                            PaddingValues(start = 10.dp)
-                        }
                     // Keep the chip tucked onto the bubble's lower edge without
                     // covering the final text line or outgoing status cluster.
                     Box(
                         modifier =
                             Modifier
                                 .align(if (mine) Alignment.End else Alignment.Start)
-                                .padding(reactionChipPadding)
-                                .layout { measurable, constraints ->
-                                    val placeable = measurable.measure(constraints)
-                                    val overlap = 6.dp.roundToPx()
-                                    val height = (placeable.height - overlap).coerceAtLeast(0)
-                                    layout(placeable.width, height) {
-                                        placeable.place(0, -overlap)
-                                    }
-                                },
+                                .reactionSummaryAttachment(outgoing = mine),
                     ) {
                         ReactionSummaryChip(
                             tallies = tallies,
+                            outgoing = mine,
                             onClick = { reactionSheetOpen = true },
                         )
                     }
