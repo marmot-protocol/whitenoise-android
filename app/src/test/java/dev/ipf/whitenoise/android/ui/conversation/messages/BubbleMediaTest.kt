@@ -54,6 +54,93 @@ class BubbleMediaTest {
         assertFalse(media.hasConfirmedMedia)
     }
 
+    @Test
+    fun fileCardOwnsFooterWhenNoVisualOverlayExists() {
+        assertTrue(
+            fileCardOwnsFooter(
+                deleted = false,
+                fileCount = 1,
+                visualOwnsFooter = false,
+            ),
+        )
+        assertTrue(
+            fileCardOwnsFooter(
+                deleted = false,
+                fileCount = 3,
+                visualOwnsFooter = false,
+            ),
+        )
+    }
+
+    @Test
+    fun fileCardDoesNotDuplicateAnotherFooterOwner() {
+        assertFalse(
+            fileCardOwnsFooter(
+                deleted = true,
+                fileCount = 1,
+                visualOwnsFooter = false,
+            ),
+        )
+        assertFalse(
+            fileCardOwnsFooter(
+                deleted = false,
+                fileCount = 0,
+                visualOwnsFooter = false,
+            ),
+        )
+        assertFalse(
+            fileCardOwnsFooter(
+                deleted = false,
+                fileCount = 1,
+                visualOwnsFooter = true,
+            ),
+        )
+    }
+
+    @Test
+    fun pendingFilePlaceholderOwnsTheOptimisticFileState() {
+        assertTrue(
+            shouldShowPendingFilePlaceholder(
+                deleted = false,
+                hasConfirmedMedia = false,
+                pendingAudioCount = 0,
+                pendingVisualCount = 0,
+                hasPendingMediaMarker = true,
+            ),
+        )
+    }
+
+    @Test
+    fun pendingFilePlaceholderNeverDuplicatesAnotherMediaRenderer() {
+        assertFalse(
+            shouldShowPendingFilePlaceholder(
+                deleted = false,
+                hasConfirmedMedia = true,
+                pendingAudioCount = 0,
+                pendingVisualCount = 0,
+                hasPendingMediaMarker = true,
+            ),
+        )
+        assertFalse(
+            shouldShowPendingFilePlaceholder(
+                deleted = false,
+                hasConfirmedMedia = false,
+                pendingAudioCount = 1,
+                pendingVisualCount = 0,
+                hasPendingMediaMarker = true,
+            ),
+        )
+        assertFalse(
+            shouldShowPendingFilePlaceholder(
+                deleted = false,
+                hasConfirmedMedia = false,
+                pendingAudioCount = 0,
+                pendingVisualCount = 1,
+                hasPendingMediaMarker = true,
+            ),
+        )
+    }
+
     private fun reference(
         fileName: String,
         mediaType: String,

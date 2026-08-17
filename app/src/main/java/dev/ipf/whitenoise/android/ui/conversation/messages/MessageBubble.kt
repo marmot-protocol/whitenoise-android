@@ -1260,6 +1260,12 @@ internal fun MessageBubble(
                         invalidationWarning == null &&
                         visualAttachments.size == 1 &&
                         mediaCaption == null
+                val confirmedFileFooterInCard =
+                    fileCardOwnsFooter(
+                        deleted = deleted,
+                        fileCount = fileAttachments.size,
+                        visualOwnsFooter = footerOnVisualMedia,
+                    )
                 // Share-message recognition (app-side rich rendering). A contact
                 // ships as a text/vcard attachment with a name/phone caption, so
                 // its card draws from the caption without fetching the blob; a
@@ -1309,11 +1315,22 @@ internal fun MessageBubble(
                         pendingVisualRefs.size == 1 &&
                         mediaCaption == null
                 val showPendingPlaceholder =
-                    !deleted &&
-                        !anyConfirmedMedia &&
-                        pendingAudio.isEmpty() &&
-                        pendingVisualRefs.isEmpty() &&
-                        mediaPendingName != null
+                    shouldShowPendingFilePlaceholder(
+                        deleted = deleted,
+                        hasConfirmedMedia = anyConfirmedMedia,
+                        pendingAudioCount = pendingAudio.size,
+                        pendingVisualCount = pendingVisualRefs.size,
+                        hasPendingMediaMarker = mediaPendingName != null,
+                    )
+                val pendingFileFooterInCard =
+                    fileCardOwnsFooter(
+                        deleted = deleted,
+                        fileCount = pendingAttachmentsForRecord.size,
+                        visualOwnsFooter = footerOnPendingVisual,
+                    ) &&
+                        showPendingPlaceholder
+                val fileFooterInCard = confirmedFileFooterInCard || pendingFileFooterInCard
+                val showOutgoingStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation)
                 // `hasMedia` decides whether this row renders a media card with
                 // an optional integrated caption, or stays a text-only bubble.
                 // Deleted and persisted-failure tombstones stay text bubbles;
@@ -1546,6 +1563,7 @@ internal fun MessageBubble(
                                         sharedUser = sharedUser,
                                         deleted = deleted,
                                         mine = mine,
+                                        showStatus = showOutgoingStatus,
                                         footerOnVisualMedia = footerOnVisualMedia,
                                         footerOnPendingVisual = footerOnPendingVisual,
                                         showPendingPlaceholder = showPendingPlaceholder,
@@ -1579,12 +1597,13 @@ internal fun MessageBubble(
                                     hasMedia = hasMedia,
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
-                                    showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
+                                    showStatus = showOutgoingStatus && !fileFooterInCard,
                                     showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
                                     editedLabel = editedLabel,
                                     onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
+                                    showTimestamp = !fileFooterInCard,
                                     invalidationWarning = invalidationWarning,
                                     mine = mine,
                                     onExpand = { if (!deleted) expandedFullView = true },
@@ -1606,6 +1625,7 @@ internal fun MessageBubble(
                                         sharedUser = sharedUser,
                                         deleted = deleted,
                                         mine = mine,
+                                        showStatus = showOutgoingStatus,
                                         footerOnVisualMedia = footerOnVisualMedia,
                                         footerOnPendingVisual = footerOnPendingVisual,
                                         showPendingPlaceholder = showPendingPlaceholder,
@@ -1642,12 +1662,13 @@ internal fun MessageBubble(
                                     hasMedia = hasMedia,
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
-                                    showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
+                                    showStatus = showOutgoingStatus && !fileFooterInCard,
                                     showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
                                     editedLabel = editedLabel,
                                     onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
+                                    showTimestamp = !fileFooterInCard,
                                     invalidationWarning = invalidationWarning,
                                     mine = mine,
                                     onExpand = { if (!deleted) expandedFullView = true },

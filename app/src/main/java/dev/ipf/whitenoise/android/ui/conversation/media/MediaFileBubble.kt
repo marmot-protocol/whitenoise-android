@@ -1,37 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.TextSnippet
-import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.Audiotrack
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Slideshow
-import androidx.compose.material.icons.filled.TableChart
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -42,34 +16,33 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onLongClick
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
+private val FileBubbleWidth = 240.dp
+
+internal fun Modifier.fileBubbleWidth(): Modifier = width(FileBubbleWidth)
+
 /**
- * Receive-side bubble for any attachment whose MIME isn't an image. Renders
- * as a tappable pill: icon (chosen by MIME family), filename, size + status.
+ * Confirmed bubble for any attachment whose MIME isn't an image. Renders
+ * as a tappable card with a transfer control, filename, and compact metadata.
  * Supported text and Markdown attachments open in a bounded, read-only
  * in-app reader. Other files join any automatic/durable fetch already in
  * flight and open a reusable FileProvider artifact in an external viewer.
@@ -86,6 +59,9 @@ internal fun MediaFileBubble(
     mine: Boolean,
     onLongPress: () -> Unit = {},
     attachedToCaption: Boolean = false,
+    timestampText: String? = null,
+    showStatus: Boolean = false,
+    status: MessageStatus = MessageStatus.Received,
 ) {
     val context = LocalContext.current
     val openAttachment = rememberAttachmentOpener()
@@ -147,7 +123,7 @@ internal fun MediaFileBubble(
         border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
         modifier =
             Modifier
-                .widthIn(max = 360.dp)
+                .fileBubbleWidth()
                 .combinedClickable(
                     enabled =
                         !openRequested &&
@@ -195,39 +171,14 @@ internal fun MediaFileBubble(
                     },
                 ),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-        ) {
-            Icon(
-                imageVector = fileIconFor(presentation.iconCategory),
-                contentDescription = attachmentTypeDescription(presentation.iconCategory),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(28.dp),
-            )
-            Column(modifier = Modifier.weight(1f, fill = false)) {
-                Text(
-                    MediaPipeline.safeDisplayName(reference.fileName),
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    attachmentTypeLabel(presentation),
-                    style = MaterialTheme.typography.labelSmall,
-                    color =
-                        if (transferState == AttachmentTransferState.Failed) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            attachmentTransferIndicator(transferState)
-        }
+        MediaFileBubbleContent(
+            reference = reference,
+            presentation = presentation,
+            transferState = transferState,
+            timestampText = timestampText,
+            showStatus = showStatus,
+            status = status,
+        )
     }
     if (readerOpen && textCandidate != null) {
         TextAttachmentReaderDialog(
@@ -316,43 +267,6 @@ private suspend fun Lifecycle.awaitResumedOrDestroyed(): Boolean =
             }
     }
 
-/** Stable-width trailing status avoids a pill-size jump when loading finishes. */
-@Composable
-internal fun attachmentTransferIndicator(transferState: AttachmentTransferState) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.size(20.dp),
-    ) {
-        when (transferState) {
-            AttachmentTransferState.Downloading ->
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            AttachmentTransferState.Failed ->
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = stringResource(R.string.media_tap_to_retry),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
-            AttachmentTransferState.Remote,
-            AttachmentTransferState.NotRetained,
-            ->
-                Icon(
-                    imageVector = Icons.Default.Download,
-                    contentDescription = stringResource(R.string.media_tap_to_download),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
-            AttachmentTransferState.Resolving,
-            AttachmentTransferState.Available,
-            -> Unit
-        }
-    }
-}
-
 internal fun shouldStartAttachmentDownload(
     transferState: AttachmentTransferState,
     policyAllowsDownload: Boolean,
@@ -362,58 +276,6 @@ internal fun shouldStartAttachmentDownload(
     transferState == AttachmentTransferState.Remote &&
         policyAllowsDownload &&
         (mine || sourceEpoch != 0uL)
-
-/** Localizes category fallbacks while stable format abbreviations stay concise. */
-@Composable
-internal fun attachmentTypeLabel(presentation: AttachmentPresentation): String =
-    presentation.formatLabel
-        ?: when (presentation.iconCategory) {
-            AttachmentIconCategory.AndroidPackage -> stringResource(R.string.attachment_type_android_package)
-            AttachmentIconCategory.Pdf -> stringResource(R.string.attachment_type_pdf)
-            AttachmentIconCategory.Archive -> stringResource(R.string.attachment_type_archive)
-            AttachmentIconCategory.Document -> stringResource(R.string.attachment_type_document)
-            AttachmentIconCategory.Spreadsheet -> stringResource(R.string.attachment_type_spreadsheet)
-            AttachmentIconCategory.Presentation -> stringResource(R.string.attachment_type_presentation)
-            AttachmentIconCategory.Text -> stringResource(R.string.attachment_type_text)
-            AttachmentIconCategory.Code -> stringResource(R.string.attachment_type_code)
-            AttachmentIconCategory.Audio -> stringResource(R.string.attachment_type_audio)
-            AttachmentIconCategory.Video -> stringResource(R.string.attachment_type_video)
-            AttachmentIconCategory.Image -> stringResource(R.string.attachment_type_image)
-            AttachmentIconCategory.Generic -> stringResource(R.string.attachment_type_file)
-        }
-
-@Composable
-internal fun attachmentTypeDescription(category: AttachmentIconCategory): String =
-    when (category) {
-        AttachmentIconCategory.AndroidPackage -> stringResource(R.string.attachment_type_android_package_description)
-        AttachmentIconCategory.Pdf -> stringResource(R.string.attachment_type_pdf_description)
-        AttachmentIconCategory.Archive -> stringResource(R.string.attachment_type_archive)
-        AttachmentIconCategory.Document -> stringResource(R.string.attachment_type_document)
-        AttachmentIconCategory.Spreadsheet -> stringResource(R.string.attachment_type_spreadsheet)
-        AttachmentIconCategory.Presentation -> stringResource(R.string.attachment_type_presentation)
-        AttachmentIconCategory.Text -> stringResource(R.string.attachment_type_text)
-        AttachmentIconCategory.Code -> stringResource(R.string.attachment_type_code_description)
-        AttachmentIconCategory.Audio -> stringResource(R.string.attachment_type_audio)
-        AttachmentIconCategory.Video -> stringResource(R.string.attachment_type_video)
-        AttachmentIconCategory.Image -> stringResource(R.string.attachment_type_image)
-        AttachmentIconCategory.Generic -> stringResource(R.string.attachment_type_file)
-    }
-
-internal fun fileIconFor(category: AttachmentIconCategory): ImageVector =
-    when (category) {
-        AttachmentIconCategory.AndroidPackage -> Icons.Default.Android
-        AttachmentIconCategory.Pdf -> Icons.Default.PictureAsPdf
-        AttachmentIconCategory.Archive -> Icons.Default.Archive
-        AttachmentIconCategory.Document -> Icons.Default.Description
-        AttachmentIconCategory.Spreadsheet -> Icons.Default.TableChart
-        AttachmentIconCategory.Presentation -> Icons.Default.Slideshow
-        AttachmentIconCategory.Text -> Icons.AutoMirrored.Filled.TextSnippet
-        AttachmentIconCategory.Code -> Icons.Default.Code
-        AttachmentIconCategory.Audio -> Icons.Default.Audiotrack
-        AttachmentIconCategory.Video -> Icons.Default.Movie
-        AttachmentIconCategory.Image -> Icons.Default.Image
-        AttachmentIconCategory.Generic -> Icons.Default.Description
-    }
 
 private fun formatFileSize(bytes: Long): String {
     if (bytes < 0L) return ""
@@ -435,6 +297,9 @@ internal fun PendingFilePill(
     statusLabel: String,
     onRetry: (() -> Unit)? = null,
     attachedToCaption: Boolean = false,
+    timestampText: String? = null,
+    showStatus: Boolean = false,
+    status: MessageStatus = MessageStatus.Pending,
 ) {
     val presentation = remember(mediaType, fileName) { resolveAttachmentPresentation(mediaType, fileName) }
     Surface(
@@ -443,7 +308,7 @@ internal fun PendingFilePill(
         border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
         modifier =
             Modifier
-                .fillMaxWidth()
+                .fileBubbleWidth()
                 .then(
                     if (failed && onRetry != null) {
                         Modifier.clickable(onClick = onRetry)
@@ -452,45 +317,22 @@ internal fun PendingFilePill(
                     },
                 ),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-        ) {
-            Icon(
-                imageVector = fileIconFor(presentation.iconCategory),
-                contentDescription = attachmentTypeDescription(presentation.iconCategory),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(28.dp),
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    MediaPipeline.safeDisplayName(fileName),
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    "${formatFileSize(sizeBytes)} · $statusLabel",
-                    style = MaterialTheme.typography.labelSmall,
-                    color =
-                        if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (failed) {
-                Icon(
-                    Icons.Default.Refresh,
-                    contentDescription = stringResource(R.string.retry),
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp),
-                )
-            } else {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        FileBubbleContent(
+            fileName = fileName,
+            presentation = presentation,
+            transferState =
+                if (failed) {
+                    AttachmentTransferState.Failed
+                } else {
+                    AttachmentTransferState.Downloading
+                },
+            metadataText = if (failed && timestampText != null) statusLabel else formatFileSize(sizeBytes),
+            metadataIsError = failed && timestampText != null,
+            trailingMetadataText = timestampText ?: statusLabel,
+            trailingMetadataIsError = failed && timestampText == null,
+            trailingStatus = status.takeIf { showStatus },
+            loadingDescription = statusLabel,
+            transferDirection = FileTransferDirection.Upload,
+        )
     }
 }

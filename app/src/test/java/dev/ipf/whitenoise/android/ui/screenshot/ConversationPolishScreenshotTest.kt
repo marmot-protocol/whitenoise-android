@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
-import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTransferIndicator
+import dev.ipf.whitenoise.android.ui.conversation.media.FileTransferControl
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeDescription
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
@@ -112,6 +112,11 @@ class ConversationPolishScreenshotTest {
     @Test
     fun attachmentTransferStatesLight() {
         captureAttachmentTransferStates("attachment_transfer_states_light", dark = false, amoled = false)
+    }
+
+    @Test
+    fun attachmentTransferStatesDark() {
+        captureAttachmentTransferStates("attachment_transfer_states_dark", dark = true, amoled = false)
     }
 
     @Test
@@ -265,7 +270,10 @@ class ConversationPolishScreenshotTest {
                                     style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.weight(1f),
                                 )
-                                attachmentTransferIndicator(state)
+                                FileTransferControl(
+                                    presentation = resolveAttachmentPresentation("application/pdf", "sample.pdf"),
+                                    transferState = state,
+                                )
                             }
                         }
                     }

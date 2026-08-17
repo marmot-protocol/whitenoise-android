@@ -90,3 +90,17 @@ internal fun bubbleMedia(
         pendingVisuals = pendingVisuals,
     )
 }
+
+/** Keeps optimistic file chrome exclusive with confirmed, audio, and visual media renderers. */
+internal fun shouldShowPendingFilePlaceholder(
+    deleted: Boolean,
+    hasConfirmedMedia: Boolean,
+    pendingAudioCount: Int,
+    pendingVisualCount: Int,
+    hasPendingMediaMarker: Boolean,
+): Boolean =
+    !deleted &&
+        !hasConfirmedMedia &&
+        pendingAudioCount == 0 &&
+        pendingVisualCount == 0 &&
+        hasPendingMediaMarker

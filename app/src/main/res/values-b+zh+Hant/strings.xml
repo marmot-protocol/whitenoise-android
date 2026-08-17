@@ -777,6 +777,8 @@
     <string name="media_upload_failed">上傳失敗</string>
     <string name="media_tap_to_retry">輕觸以重試</string>
     <string name="media_tap_to_download">輕觸以下載</string>
+    <string name="media_preparing_download">準備下載</string>
+    <string name="media_downloading">正在下載</string>
     <string name="media_save">儲存</string>
     <string name="media_saved">已儲存至相簿</string>
     <string name="media_save_failed">無法儲存圖片</string>

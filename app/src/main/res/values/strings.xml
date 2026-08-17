@@ -1042,6 +1042,8 @@
     <string name="media_upload_failed">Upload failed</string>
     <string name="media_tap_to_retry">Tap to retry</string>
     <string name="media_tap_to_download">Tap to download</string>
+    <string name="media_preparing_download">Preparing download</string>
+    <string name="media_downloading">Downloading</string>
     <string name="media_save">Save</string>
     <string name="media_saved">Saved to gallery</string>
     <string name="media_save_failed">Couldn\'t save image</string>

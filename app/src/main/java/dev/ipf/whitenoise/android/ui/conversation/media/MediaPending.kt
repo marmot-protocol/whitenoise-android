@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -55,6 +56,9 @@ internal fun MediaPendingPlaceholder(
     failed: Boolean,
     onRetry: (() -> Unit)? = null,
     attachedToCaption: Boolean = false,
+    timestampText: String? = null,
+    showStatus: Boolean = false,
+    status: MessageStatus = MessageStatus.Pending,
 ) {
     val statusLabel = stringResource(if (failed) R.string.media_upload_failed else R.string.media_uploading)
     val statusColor = if (failed) MaterialTheme.colorScheme.error else Color.White
@@ -65,8 +69,9 @@ internal fun MediaPendingPlaceholder(
     // matches the post-upload layout (image grid above, file pills below).
     val allImages = pendingAttachments.isNotEmpty() && pendingAttachments.all { isImagePendingAttachment(it) }
     if (!allImages) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-            pendingAttachments.forEach { attachment ->
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            pendingAttachments.forEachIndexed { index, attachment ->
+                val ownsFooter = index == pendingAttachments.lastIndex
                 PendingFilePill(
                     fileName = attachment.fileName,
                     mediaType = attachment.mediaType,
@@ -75,6 +80,9 @@ internal fun MediaPendingPlaceholder(
                     statusLabel = statusLabel,
                     onRetry = onRetry,
                     attachedToCaption = attachedToCaption,
+                    timestampText = timestampText.takeIf { ownsFooter },
+                    showStatus = ownsFooter && showStatus,
+                    status = status,
                 )
             }
         }

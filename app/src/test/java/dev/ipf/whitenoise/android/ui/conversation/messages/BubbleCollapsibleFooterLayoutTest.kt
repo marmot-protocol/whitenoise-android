@@ -274,6 +274,62 @@ class BubbleCollapsibleFooterLayoutTest {
     }
 
     @Test
+    fun emptyFooterDoesNotReserveInlineGap() {
+        var layoutWidth = 0
+        var contentWidth = 0
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                BubbleCollapsibleFooterLayout(
+                    maxBodyHeight = 96.dp,
+                    readMore = { Text("Read More") },
+                    footer = {},
+                    modifier = Modifier.onSizeChanged { layoutWidth = it.width },
+                ) {
+                    Spacer(
+                        Modifier
+                            .size(width = 40.dp, height = 20.dp)
+                            .onSizeChanged { contentWidth = it.width },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(contentWidth, layoutWidth)
+    }
+
+    @Test
+    fun emptyFooterDoesNotReserveCollapsedRowGap() {
+        var layoutWidth = 0
+        var readMoreWidth = 0
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                BubbleCollapsibleFooterLayout(
+                    maxBodyHeight = 20.dp,
+                    readMore = {
+                        Spacer(
+                            Modifier
+                                .size(width = 40.dp, height = 12.dp)
+                                .onSizeChanged { readMoreWidth = it.width },
+                        )
+                    },
+                    footer = {},
+                    modifier = Modifier.onSizeChanged { layoutWidth = it.width },
+                ) {
+                    Column {
+                        repeat(3) { Spacer(Modifier.size(width = 10.dp, height = 20.dp)) }
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(readMoreWidth, layoutWidth)
+    }
+
+    @Test
     @OptIn(ExperimentalRoborazziApi::class)
     fun overflowingBodyIsClippedBeforeFooterRow() {
         composeRule.setContent {
