@@ -325,6 +325,45 @@
     <string name="forward_search_chats">Chats durchsuchen</string>
     <string name="forward_no_chats">Keine anderen Chats zum Weiterleiten.</string>
     <string name="forward_no_matches">Keine Chats stimmen mit der Suche uberein.</string>
+    <string name="forward_blocked_pending">Warte, bis der Anhang hochgeladen ist</string>
+    <string name="forward_blocked_failed">Versuche den Anhang erneut hochzuladen, bevor du ihn weiterleitest</string>
+    <string name="forward_blocked_malformed">Dieser Anhang kann nicht weitergeleitet werden</string>
+    <string name="forward_blocked_expired">Dieser Anhang ist abgelaufen</string>
+    <string name="forward_blocked_unavailable">Lade diesen Anhang vor dem Weiterleiten herunter</string>
+    <string name="forward_blocked_restricted">Das Weiterleiten dieses Anhangs ist nicht erlaubt</string>
+    <string name="forward_blocked_unsupported">Diese Nachricht kann nicht weitergeleitet werden</string>
+    <string name="forward_blocked_selection">Weiterleiten nicht verfügbar: %1$s</string>
+    <string name="forward_progress_title">Weiterleiten läuft</string>
+    <string name="forward_preparing_attachments">Anhänge werden vorbereitet: %1$d von %2$d</string>
+    <string name="forward_waiting">Warten</string>
+    <string name="forward_uploading_attachments">Anhänge werden hochgeladen: %1$d von %2$d</string>
+    <string name="forward_sending_messages">Nachrichten werden gesendet: %1$d von %2$d</string>
+    <string name="forward_sent">Gesendet</string>
+    <string name="forward_cancelled">Abgebrochen</string>
+    <string name="forward_cancelling">Wird abgebrochen…</string>
+    <string name="forward_failed_preparing">Anhänge konnten nicht vorbereitet werden</string>
+    <string name="forward_failed_upload">Anhänge konnten nicht hochgeladen werden</string>
+    <string name="forward_failed_publish">Nachrichten konnten nicht gesendet werden</string>
+    <string name="forward_payload_too_large">Diese Anhänge sind zusammen zu groß zum Weiterleiten</string>
+    <string name="forward_failed_expired">Der Anhang ist vor dem Weiterleiten abgelaufen</string>
+    <string name="forward_failed_session_changed">Konto gewechselt. Schließe das Fenster und versuche es erneut.</string>
+    <string name="forward_failed_after_partial">%1$s · %2$d von %3$d Nachrichten gesendet</string>
+    <plurals name="forward_completed_summary">
+        <item quantity="one">An %1$d Chat weitergeleitet</item>
+        <item quantity="other">An %1$d Chats weitergeleitet</item>
+    </plurals>
+    <string name="forward_partial_summary">An %1$d von %2$d Chats weitergeleitet</string>
+    <string name="forward_failed_summary">Weiterleiten an die ausgewählten Chats fehlgeschlagen</string>
+    <string name="forward_start_failed">Weiterleiten konnte nicht gestartet werden. Schließe das Fenster und versuche es erneut.</string>
+    <string name="forward_retry_failed">Fehlgeschlagene Chats erneut versuchen</string>
+    <plurals name="forward_attachment_count">
+        <item quantity="one">%1$d Anhang</item>
+        <item quantity="other">%1$d Anhänge</item>
+    </plurals>
+    <plurals name="forward_message_count">
+        <item quantity="one">%1$d Nachricht</item>
+        <item quantity="other">%1$d Nachrichten</item>
+    </plurals>
     <plurals name="forward_to_chats_count">
         <item quantity="one">An %1$d Chat weiterleiten</item>
         <item quantity="other">An %1$d Chats weiterleiten</item>

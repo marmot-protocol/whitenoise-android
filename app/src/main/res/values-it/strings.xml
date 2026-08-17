@@ -325,6 +325,45 @@
     <string name="forward_search_chats">Cerca chat</string>
     <string name="forward_no_chats">Nessun\'altra chat a cui inoltrare.</string>
     <string name="forward_no_matches">Nessuna chat corrisponde alla ricerca.</string>
+    <string name="forward_blocked_pending">Attendi il completamento del caricamento dell’allegato</string>
+    <string name="forward_blocked_failed">Riprova a caricare l’allegato prima di inoltrarlo</string>
+    <string name="forward_blocked_malformed">Questo allegato non può essere inoltrato</string>
+    <string name="forward_blocked_expired">Questo allegato è scaduto</string>
+    <string name="forward_blocked_unavailable">Scarica questo allegato prima di inoltrarlo</string>
+    <string name="forward_blocked_restricted">Non è consentito inoltrare questo allegato</string>
+    <string name="forward_blocked_unsupported">Questo messaggio non può essere inoltrato</string>
+    <string name="forward_blocked_selection">Inoltro non disponibile: %1$s</string>
+    <string name="forward_progress_title">Inoltro in corso</string>
+    <string name="forward_preparing_attachments">Preparazione allegati: %1$d di %2$d</string>
+    <string name="forward_waiting">In attesa</string>
+    <string name="forward_uploading_attachments">Caricamento allegati: %1$d di %2$d</string>
+    <string name="forward_sending_messages">Invio messaggi: %1$d di %2$d</string>
+    <string name="forward_sent">Inviato</string>
+    <string name="forward_cancelled">Annullato</string>
+    <string name="forward_cancelling">Annullamento…</string>
+    <string name="forward_failed_preparing">Impossibile preparare gli allegati</string>
+    <string name="forward_failed_upload">Impossibile caricare gli allegati</string>
+    <string name="forward_failed_publish">Impossibile inviare i messaggi</string>
+    <string name="forward_payload_too_large">Questi allegati sono troppo grandi per essere inoltrati insieme</string>
+    <string name="forward_failed_expired">L’allegato è scaduto prima di poter essere inoltrato</string>
+    <string name="forward_failed_session_changed">L’account è cambiato. Chiudi e riprova.</string>
+    <string name="forward_failed_after_partial">%1$s · Inviati %2$d messaggi su %3$d</string>
+    <plurals name="forward_completed_summary">
+        <item quantity="one">Inoltrato a %1$d chat</item>
+        <item quantity="other">Inoltrato a %1$d chat</item>
+    </plurals>
+    <string name="forward_partial_summary">Inoltrato a %1$d chat su %2$d</string>
+    <string name="forward_failed_summary">Impossibile inoltrare alle chat selezionate</string>
+    <string name="forward_start_failed">Impossibile avviare l’inoltro. Chiudi e riprova.</string>
+    <string name="forward_retry_failed">Riprova le chat non riuscite</string>
+    <plurals name="forward_attachment_count">
+        <item quantity="one">%1$d allegato</item>
+        <item quantity="other">%1$d allegati</item>
+    </plurals>
+    <plurals name="forward_message_count">
+        <item quantity="one">%1$d messaggio</item>
+        <item quantity="other">%1$d messaggi</item>
+    </plurals>
     <plurals name="forward_to_chats_count">
         <item quantity="one">Inoltra a %1$d chat</item>
         <item quantity="other">Inoltra a %1$d chat</item>

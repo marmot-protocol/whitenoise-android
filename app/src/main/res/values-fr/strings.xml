@@ -325,6 +325,45 @@
     <string name="forward_search_chats">Rechercher des discussions</string>
     <string name="forward_no_chats">Aucune autre discussion vers laquelle transferer.</string>
     <string name="forward_no_matches">Aucune discussion ne correspond a votre recherche.</string>
+    <string name="forward_blocked_pending">Attendez la fin du téléversement de la pièce jointe</string>
+    <string name="forward_blocked_failed">Réessayez de téléverser la pièce jointe avant de la transférer</string>
+    <string name="forward_blocked_malformed">Impossible de transférer cette pièce jointe</string>
+    <string name="forward_blocked_expired">Cette pièce jointe a expiré</string>
+    <string name="forward_blocked_unavailable">Téléchargez cette pièce jointe avant de la transférer</string>
+    <string name="forward_blocked_restricted">Le transfert de cette pièce jointe n’est pas autorisé</string>
+    <string name="forward_blocked_unsupported">Impossible de transférer ce message</string>
+    <string name="forward_blocked_selection">Transfert indisponible : %1$s</string>
+    <string name="forward_progress_title">Transfert en cours</string>
+    <string name="forward_preparing_attachments">Préparation des pièces jointes : %1$d sur %2$d</string>
+    <string name="forward_waiting">En attente</string>
+    <string name="forward_uploading_attachments">Téléversement des pièces jointes : %1$d sur %2$d</string>
+    <string name="forward_sending_messages">Envoi des messages : %1$d sur %2$d</string>
+    <string name="forward_sent">Envoyé</string>
+    <string name="forward_cancelled">Annulé</string>
+    <string name="forward_cancelling">Annulation…</string>
+    <string name="forward_failed_preparing">Impossible de préparer les pièces jointes</string>
+    <string name="forward_failed_upload">Impossible de téléverser les pièces jointes</string>
+    <string name="forward_failed_publish">Impossible d’envoyer les messages</string>
+    <string name="forward_payload_too_large">Ces pièces jointes sont trop volumineuses pour être transférées ensemble</string>
+    <string name="forward_failed_expired">La pièce jointe a expiré avant de pouvoir être transférée</string>
+    <string name="forward_failed_session_changed">Le compte a changé. Fermez et réessayez.</string>
+    <string name="forward_failed_after_partial">%1$s · %2$d messages envoyés sur %3$d</string>
+    <plurals name="forward_completed_summary">
+        <item quantity="one">Transféré vers %1$d discussion</item>
+        <item quantity="other">Transféré vers %1$d discussions</item>
+    </plurals>
+    <string name="forward_partial_summary">Transféré vers %1$d discussions sur %2$d</string>
+    <string name="forward_failed_summary">Impossible de transférer vers les discussions sélectionnées</string>
+    <string name="forward_start_failed">Impossible de démarrer le transfert. Fermez et réessayez.</string>
+    <string name="forward_retry_failed">Réessayer pour les discussions en échec</string>
+    <plurals name="forward_attachment_count">
+        <item quantity="one">%1$d pièce jointe</item>
+        <item quantity="other">%1$d pièces jointes</item>
+    </plurals>
+    <plurals name="forward_message_count">
+        <item quantity="one">%1$d message à transférer</item>
+        <item quantity="other">%1$d messages à transférer</item>
+    </plurals>
     <plurals name="forward_to_chats_count">
         <item quantity="one">Transferer vers %1$d discussion</item>
         <item quantity="other">Transferer vers %1$d discussions</item>
