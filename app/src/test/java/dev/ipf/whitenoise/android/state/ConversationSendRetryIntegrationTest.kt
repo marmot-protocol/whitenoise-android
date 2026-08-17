@@ -50,7 +50,7 @@ class ConversationSendRetryIntegrationTest {
                         assertEquals(GROUP_ID, groupIdHex)
                         assertEquals("hello", text)
                         if (attempts == 1) {
-                            throw MarmotKitException.Publish("connect relay timed out")
+                            throw MarmotKitException.Publish("connect relay failed")
                         }
                         SendSummaryFfi(
                             published = 1u,

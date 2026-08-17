@@ -1664,8 +1664,10 @@ internal fun streamFinalDisplayPosition(
  * String-matched on the FFI error message + cause chain because the UniFFI
  * surface flattens these into [dev.ipf.marmotkit.MarmotKitException.Publish] /
  * `.Runtime` without a typed connectivity code. Keep the matched phrases in sync
- * with the transport-nostr-adapter connect-phase reasons (`connect relay timed
- * out`, `connection refused`, `connection reset`, `no relay endpoints`).
+ * with the transport-nostr-adapter connect-phase reasons (`connect relay
+ * failed`, `connect relay timed out`, `connection refused`, `connection reset`,
+ * `no relay endpoints`). `connect relay failed` is MDK's privacy-redacted form
+ * for an underlying SDK connection error.
  * Under-matching reverts to fail-fast (the message just isn't auto-retried);
  * over-matching risks duplicate sends, so the predicate is deliberately narrow.
  */
@@ -1678,7 +1680,8 @@ internal fun isTransientRelaySendError(throwable: Throwable): Boolean {
     // Connect-phase only: the transport raises these before it ever calls
     // `send_event_to`, so the event provably never reached a relay and a
     // re-send cannot duplicate it.
-    return ("connect relay" in text && ("timed out" in text || "timeout" in text)) ||
+    return ("connect relay failed" in text) ||
+        ("connect relay" in text && ("timed out" in text || "timeout" in text)) ||
         ("connection refused" in text) ||
         ("connection reset" in text) ||
         ("no relay endpoints" in text)
