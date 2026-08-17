@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.messages.MediaCaptionFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
+import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
@@ -217,6 +218,31 @@ class MessageBubbleChromeScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_bubble_reactions_amoled_rtl.png")
     }
 
+    @Test
+    fun disappearingFootersLargeFontRtl() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1.6f) {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                    Surface(color = Color.Black) {
+                        Column(
+                            modifier = Modifier.width(320.dp).padding(16.dp).testTag(TAG),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            DirectionalBubble(text = "رسالة واردة", time = "١٢:٣٤", mine = false)
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                DirectionalBubble(text = "رسالة صادرة", time = "١٢:٣٥", mine = true)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/message_bubble_retention_amoled_large_rtl.png")
+    }
+
     private fun render(darkTheme: Boolean) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme) {
@@ -231,6 +257,8 @@ class MessageBubbleChromeScreenshotTest {
                             status = MessageStatus.Sent,
                             editedLabel = "edited",
                             onEditedClick = null,
+                            retention = retentionInput("light-active", expiresAtEpochSeconds = 200uL),
+                            retentionClockMillis = { 150_000L },
                         )
                         MessageInlineFooter(
                             timeText = "12:35",
@@ -239,6 +267,7 @@ class MessageBubbleChromeScreenshotTest {
                             status = MessageStatus.Failed,
                             editedLabel = null,
                             onEditedClick = null,
+                            retention = retentionInput("light-waiting", expiresAtEpochSeconds = null),
                         )
                         ReplyPreviewCard(
                             senderTitle = "Alex",
@@ -341,10 +370,16 @@ private fun DirectionalBubble(
     ) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             Text(text)
-            Text(
-                text = time,
-                style = MaterialTheme.typography.labelSmall,
+            MessageInlineFooter(
+                timeText = time,
                 color = messageBubbleTimestampColor(mine = mine, deleted = false),
+                showStatus = mine,
+                status = if (mine) MessageStatus.Sent else MessageStatus.Received,
+                editedLabel = null,
+                onEditedClick = null,
+                retention = retentionInput(if (mine) "outgoing" else "incoming", expiresAtEpochSeconds = 200uL),
+                retentionClockMillis = { 150_000L },
+                modifier = Modifier.align(Alignment.End),
             )
         }
     }
@@ -387,5 +422,20 @@ private fun AmoledReactionBubble(
     }
 }
 
+private fun retentionInput(
+    messageIdHex: String,
+    expiresAtEpochSeconds: ULong?,
+): RetentionIndicatorInput =
+    RetentionIndicatorInput(
+        controllerKey = screenshotControllerKey,
+        accountRef = "personal",
+        groupIdHex = "group",
+        messageIdHex = messageIdHex,
+        sourceEpoch = 1uL,
+        durationSeconds = 100uL,
+        expiresAtEpochSeconds = expiresAtEpochSeconds,
+    )
+
 private const val CUSTOM_AMOLED_ARGB = 0xFFFFC107L
 private const val OUTGOING_CUSTOM_AMOLED_ARGB = 0xFF9C27B0L
+private val screenshotControllerKey = Any()
