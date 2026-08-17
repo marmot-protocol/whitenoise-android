@@ -3,12 +3,10 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -23,7 +21,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
 import androidx.compose.material3.MaterialTheme
@@ -42,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -97,7 +93,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
-import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
@@ -118,8 +113,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOut
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.reactions.CustomizeReactionsDialog
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionDetailsSheet
-import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
-import dev.ipf.whitenoise.android.ui.conversation.reactions.reactionSummaryAttachment
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
 import dev.ipf.whitenoise.android.ui.conversation.replies.senderTitleForReply
@@ -706,6 +699,8 @@ internal fun MessageBubble(
             isDm = controller.isDm,
             mine = mine,
         )
+    val tallies = controller.reactions[record.messageIdHex].orEmpty()
+    val showReactionSummary = tallies.isNotEmpty() && !deleted
     // Match the timestamp to the bubble's visual cue. AMOLED uses the same
     // directional accent as the border; other themes keep their paired M3
     // on-color tokens.
@@ -1144,34 +1139,27 @@ internal fun MessageBubble(
                 if (mine) Spacer(Modifier.weight(1f))
             }
             if (reserveSenderAvatarSlot) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(32.dp)
-                            .align(Alignment.Bottom),
-                ) {
-                    if (showSenderAvatar) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .clip(CircleShape)
-                                    .clickable(enabled = !textSelectionMode) {
-                                        appState.presentProfile(appState.npub(record.sender))
-                                    },
-                        ) {
-                            Avatar(
-                                title = appState.displayName(record.sender),
-                                seed = record.sender,
-                                size = 32.dp,
-                                pictureUrl = appState.avatarUrl(record.sender),
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.width(8.dp))
+                MessageSenderAvatarSlot(
+                    showSenderAvatar = showSenderAvatar,
+                    title = appState.displayName(record.sender),
+                    seed = record.sender,
+                    pictureUrl = appState.avatarUrl(record.sender),
+                    enabled = !textSelectionMode,
+                    alignToBubbleBottom = showReactionSummary,
+                    onClick = { appState.presentProfile(appState.npub(record.sender)) },
+                )
             }
             Column(
-                modifier = Modifier.widthIn(max = bubbleColumnMaxWidth),
+                modifier =
+                    Modifier
+                        .widthIn(max = bubbleColumnMaxWidth)
+                        .then(
+                            if (reserveSenderAvatarSlot && showReactionSummary) {
+                                Modifier.alignBy(MessageBubbleBottomAlignmentLine)
+                            } else {
+                                Modifier
+                            },
+                        ),
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
                 // Resolved before the content column so its presence can pick
@@ -1984,23 +1972,13 @@ internal fun MessageBubble(
                         onDismissRequest = { deleteDialogOpen = false },
                     )
                 }
-                val tallies = controller.reactions[record.messageIdHex].orEmpty()
                 // Hide reaction tallies on a deleted message — nothing to show.
-                if (tallies.isNotEmpty() && !deleted) {
-                    // Keep the chip tucked onto the bubble's lower edge without
-                    // covering the final text line or outgoing status cluster.
-                    Box(
-                        modifier =
-                            Modifier
-                                .align(if (mine) Alignment.End else Alignment.Start)
-                                .reactionSummaryAttachment(outgoing = mine),
-                    ) {
-                        ReactionSummaryChip(
-                            tallies = tallies,
-                            outgoing = mine,
-                            onClick = { reactionSheetOpen = true },
-                        )
-                    }
+                if (showReactionSummary) {
+                    MessageReactionSummary(
+                        tallies = tallies,
+                        mine = mine,
+                        onClick = { reactionSheetOpen = true },
+                    )
                 }
                 if (reactionSheetOpen) {
                     val participants =

@@ -82,9 +82,9 @@ class ReactionSummaryChipAmoledStyleTest {
             assertEquals(expectedContent, selectedContent)
             assertEquals(expectedContent, unselectedContent)
             assertEquals(2.dp, requireNotNull(outgoingSelectedBorder).width)
-            assertEquals(1.5.dp, requireNotNull(outgoingUnselectedBorder).width)
+            assertEquals(1.dp, requireNotNull(outgoingUnselectedBorder).width)
             assertEquals(2.dp, requireNotNull(incomingSelectedBorder).width)
-            assertEquals(1.5.dp, requireNotNull(incomingUnselectedBorder).width)
+            assertEquals(1.dp, requireNotNull(incomingUnselectedBorder).width)
             assertEquals(expectedSentAccent, borderColor(outgoingSelectedBorder))
             assertEquals(expectedSentAccent, borderColor(outgoingUnselectedBorder))
             assertEquals(expectedReceivedAccent, borderColor(incomingSelectedBorder))
@@ -94,12 +94,13 @@ class ReactionSummaryChipAmoledStyleTest {
     }
 
     @Test
-    fun standardDarkReactionChipKeepsExistingStyling() {
+    fun standardDarkReactionChipDistinguishesSelectionWithoutChangingPalette() {
         var mineContainer = Color.Unspecified
         var notMineContainer = Color.Unspecified
         var mineContent = Color.Unspecified
         var notMineContent = Color.Unspecified
         var mineBorder: BorderStroke? = null
+        var notMineBorder: BorderStroke? = null
         var expectedMineContainer = Color.Unspecified
         var expectedNotMineContainer = Color.Unspecified
         var expectedMineContent = Color.Unspecified
@@ -114,6 +115,7 @@ class ReactionSummaryChipAmoledStyleTest {
                 val mineContentValue = reactionSummaryChipContentColor(selected = true)
                 val notMineContentValue = reactionSummaryChipContentColor(selected = false)
                 val mineBorderValue = reactionSummaryChipBorder(outgoing = true, selected = true)
+                val notMineBorderValue = reactionSummaryChipBorder(outgoing = true, selected = false)
 
                 SideEffect {
                     mineContainer = mineContainerValue
@@ -121,6 +123,7 @@ class ReactionSummaryChipAmoledStyleTest {
                     mineContent = mineContentValue
                     notMineContent = notMineContentValue
                     mineBorder = mineBorderValue
+                    notMineBorder = notMineBorderValue
                     expectedMineContainer = colorScheme.secondaryContainer
                     expectedNotMineContainer = colorScheme.surfaceContainerHigh
                     expectedMineContent = colorScheme.onSecondaryContainer
@@ -135,8 +138,10 @@ class ReactionSummaryChipAmoledStyleTest {
             assertEquals(expectedNotMineContainer, notMineContainer)
             assertEquals(expectedMineContent, mineContent)
             assertEquals(expectedNotMineContent, notMineContent)
-            assertEquals(1.5.dp, requireNotNull(mineBorder).width)
+            assertEquals(2.dp, requireNotNull(mineBorder).width)
+            assertEquals(1.dp, requireNotNull(notMineBorder).width)
             assertEquals(expectedBorderColor, borderColor(mineBorder))
+            assertEquals(expectedBorderColor, borderColor(notMineBorder))
         }
     }
 

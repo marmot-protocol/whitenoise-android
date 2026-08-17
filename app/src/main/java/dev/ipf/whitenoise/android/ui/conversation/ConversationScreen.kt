@@ -2251,12 +2251,10 @@ internal fun ConversationScreen(
     }
 
     // Reacting to the last message grows its bubble height (a reaction chip) but
-    // doesn't change any timeline id, so the append-follow above never sees it
-    // and the grown bubble pushes its own bottom up off the composer. When the
-    // user is already at the bottom, re-assert the bottom so the bubble + chip
-    // stay flush. Keyed on the last rendered message's reaction tally; mutating
-    // an earlier (non-last) message leaves this key unchanged, so a react while
-    // reading history never hijacks the scroll position.
+    // doesn't change any timeline id, so the append-follow above never sees it.
+    // Settle against the row's final measured height instead of assuming the
+    // chip is complete after one frame. The coordinator owns cancellation and
+    // refuses this correction while the user is reading history.
     LaunchedEffect(
         controller,
         renderedTimeline
@@ -2266,9 +2264,22 @@ internal fun ConversationScreen(
             ?.let { controller.reactions[it] },
     ) {
         if (initialTimelineAnchored && renderedTimeline.isNotEmpty()) {
-            scrollCoordinator.followTailIfAllowed(
+            val lastMessageId = renderedTimeline.last().record.messageIdHex
+            scrollCoordinator.settleTailAfterLayoutChange(
                 resolveTailIndex = { currentTailIndex },
-                reason = ConversationScrollReason.ReactionLayout,
+                captureLayout = {
+                    val layoutInfo = listState.layoutInfo
+                    val tailInfo =
+                        layoutInfo.visibleItemsInfo.firstOrNull { visible ->
+                            visible.index == currentTailIndex
+                        }
+                    ConversationTailLayout(
+                        lastRowHeightPx = navigationState.timelineItemHeightsPx[lastMessageId],
+                        tailOffsetPx = tailInfo?.offset,
+                        tailSizePx = tailInfo?.size,
+                        viewportEndOffsetPx = layoutInfo.viewportEndOffset,
+                    )
+                },
             )
         }
     }

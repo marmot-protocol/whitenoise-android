@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -99,10 +98,8 @@ internal fun reactionSummaryChipBorder(
         } else {
             null
         }
-    return when {
-        amoledAccent != null -> BorderStroke(if (selected) 2.dp else 1.5.dp, amoledAccent)
-        else -> BorderStroke(1.5.dp, colorScheme.surface)
-    }
+    val outlineWidth = if (selected) 2.dp else 1.dp
+    return BorderStroke(outlineWidth, amoledAccent ?: colorScheme.surface)
 }
 
 @Composable
@@ -145,7 +142,8 @@ internal fun ReactionSummaryChip(
     Surface(
         modifier =
             Modifier
-                // Expose the current-user state to TalkBack as well as the visible check.
+                // Keep the current-user state available to accessibility services;
+                // the thicker selected outline provides the non-color visual cue.
                 .semantics { this.selected = selected }
                 .clip(RoundedCornerShape(percent = 50))
                 .clickable(role = Role.Button, onClick = onClick, onClickLabel = viewReactorsLabel),
@@ -177,14 +175,6 @@ internal fun ReactionSummaryChip(
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     softWrap = false,
-                )
-            }
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = reactionSummaryChipContentColor(selected = true),
                 )
             }
         }

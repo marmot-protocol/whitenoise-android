@@ -499,6 +499,76 @@ class ConversationScrollCoordinatorTest {
         }
 
     @Test
+    fun reactionTailSettleWaitsForDelayedRowMeasurementAndStableGeometry() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            var frame = 0
+            var lastRowHeight = 48
+
+            val settled =
+                coordinator.settleTailAfterLayoutChange(
+                    resolveTailIndex = { 50 },
+                    captureLayout = {
+                        ConversationTailLayout(
+                            lastRowHeightPx = lastRowHeight,
+                            tailOffsetPx = 420,
+                            tailSizePx = 4,
+                            viewportEndOffsetPx = 424,
+                        )
+                    },
+                    awaitFrame = {
+                        frame++
+                        if (frame == 6) lastRowHeight = 76
+                    },
+                )
+
+            assertTrue(settled)
+            assertEquals(8, frame)
+            assertEquals(9, writer.writes.size)
+            assertTrue(writer.writes.all { it == ScrollWrite.Snap(50, 0) })
+        }
+
+    @Test
+    fun userGestureCancelsReactionTailSettleBeforeAnotherCorrection() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val frames = Channel<Unit>(Channel.UNLIMITED)
+            val started = CompletableDeferred<Unit>()
+            var settleResult = true
+            val settle =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    settleResult =
+                        coordinator.settleTailAfterLayoutChange(
+                            resolveTailIndex = { 50 },
+                            captureLayout = {
+                                ConversationTailLayout(
+                                    lastRowHeightPx = 76,
+                                    tailOffsetPx = 420,
+                                    tailSizePx = 4,
+                                    viewportEndOffsetPx = 424,
+                                )
+                            },
+                            awaitFrame = {
+                                started.complete(Unit)
+                                frames.receive()
+                            },
+                        )
+                }
+            started.await()
+            assertEquals(listOf(ScrollWrite.Snap(50, 0)), writer.writes)
+
+            coordinator.onUserGestureStarted(anchor(messageId = "reader", listIndex = 10, pixelOffset = 24))
+            repeat(8) { frames.trySend(Unit) }
+            settle.join()
+
+            assertFalse(settleResult)
+            assertEquals(listOf(ScrollWrite.Snap(50, 0)), writer.writes)
+            assertEquals(ConversationScrollMode.ReadingHistory("reader", 24), coordinator.mode)
+        }
+
+    @Test
     fun userGestureCancelsOnlyTheInFlightCommandAndLeavesItsCallerAlive() =
         runTest {
             val writer = RecordingScrollWriter()
