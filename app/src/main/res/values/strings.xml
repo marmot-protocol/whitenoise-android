@@ -1652,4 +1652,7 @@
     <string name="nostr_event_type_release">Software release</string>
     <string name="nostr_event_type_file">File</string>
     <string name="nostr_event_type_generic">Event · Kind %1$d</string>
+    <string name="composer_resize">Drag to resize message composer</string>
+    <string name="composer_expand_full_screen">Expand message composer</string>
+    <string name="composer_collapse">Collapse message composer</string>
 </resources>

@@ -13,13 +13,18 @@ import androidx.compose.foundation.content.TransferableContent
 import androidx.compose.foundation.content.consume
 import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.content.hasMediaType
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -28,7 +33,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloseFullscreen
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -57,10 +64,13 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreInterceptKeyBeforeSoftKeyboard
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -71,6 +81,7 @@ import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
@@ -117,10 +128,20 @@ internal fun ComposerPill(
     preImeBackEnabled: Boolean = false,
     onPreImeBack: () -> Unit = {},
     overlayBackRegistrar: ComposerOverlayBackRegistrar? = null,
+    expansionMode: ComposerExpansionMode = ComposerExpansionMode.Automatic,
+    onExpansionToggle: () -> Unit = {},
+    onHeightDrag: (Float) -> Unit = {},
+    onHeightDragStopped: () -> Unit = {},
+    trailingAction: (@Composable RowScope.() -> Unit)? = null,
+    inputContentVisible: Boolean = true,
+    onMultilineControlsChanged: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val resizeComposerDescription = stringResource(R.string.composer_resize)
     val latestOnPasteImageUris by rememberUpdatedState(onPasteImageUris)
     val latestOnPreImeBack by rememberUpdatedState(onPreImeBack)
+    val latestOnHeightDrag by rememberUpdatedState(onHeightDrag)
+    val latestOnHeightDragStopped by rememberUpdatedState(onHeightDragStopped)
     var composerFocused by remember { mutableStateOf(false) }
     val backDispatcher = LocalView.current.findOnBackInvokedDispatcher()
     // Gesture/predictive Back reaches the IME before the activity's ordinary
@@ -234,30 +255,39 @@ internal fun ComposerPill(
                 }
             }
         }
+    val hasAttachmentAction =
+        onPickFromGallery != null ||
+            onPickDocument != null ||
+            hasCameraCapture ||
+            hasLocationShare ||
+            hasUserShare ||
+            hasContactShare
+    var multilineControls by remember { mutableStateOf(false) }
+    val expandedLayout = multilineControls || expansionMode != ComposerExpansionMode.Automatic
+    val compactTrailingReserve =
+        4.dp +
+            (if (hasAttachmentAction) 36.dp else 0.dp) +
+            (if (trailingAction != null) 44.dp else 0.dp)
+
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(22.dp),
         border = amoledSurfaceBorderStroke(),
         modifier = modifier,
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
             modifier =
                 Modifier
                     .heightIn(min = 44.dp)
-                    .padding(start = 4.dp, end = 4.dp),
+                    .then(if (expansionMode == ComposerExpansionMode.Automatic) Modifier else Modifier.fillMaxHeight()),
         ) {
-            TextEntryEmojiAction(
-                pickerOpen = emojiPickerOpen,
-                enabled = true,
-                onClick = onEmojiPickerToggle,
-                togglesKeyboard = true,
-            )
             Box(
                 modifier =
                     Modifier
-                        .weight(1f)
-                        .padding(vertical = 10.dp),
+                        .fillMaxWidth()
+                        .then(if (expansionMode == ComposerExpansionMode.Automatic) Modifier else Modifier.fillMaxHeight())
+                        .alpha(if (inputContentVisible) 1f else 0f)
+                        .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
             ) {
                 BasicTextField(
                     value = textFieldValue,
@@ -265,7 +295,13 @@ internal fun ComposerPill(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .contentReceiver(pasteImageReceiver)
+                            .then(if (expansionMode == ComposerExpansionMode.Automatic) Modifier else Modifier.fillMaxHeight())
+                            .padding(
+                                start = if (expandedLayout) 12.dp else 44.dp,
+                                top = if (expandedLayout) 48.dp else 10.dp,
+                                end = if (expandedLayout) 12.dp else compactTrailingReserve,
+                                bottom = if (expandedLayout) 48.dp else 10.dp,
+                            ).contentReceiver(pasteImageReceiver)
                             .onPreInterceptKeyBeforeSoftKeyboard { event ->
                                 when (
                                     composerPreImeBackAction(
@@ -314,6 +350,7 @@ internal fun ComposerPill(
                         LocalTextStyle.current.copy(
                             color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 16.sp,
+                            textDirection = TextDirection.ContentOrLtr,
                         ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     visualTransformation = mentionVisualTransformation,
@@ -332,38 +369,138 @@ internal fun ComposerPill(
                                 },
                         ),
                     keyboardActions = KeyboardActions(onSend = { onImeSend() }),
-                    maxLines = 5,
+                    maxLines = Int.MAX_VALUE,
+                    onTextLayout = { layout ->
+                        val nextMultilineControls =
+                            when {
+                                multilineControls && layout.lineCount <= 1 -> false
+                                !multilineControls && layout.lineCount >= 3 -> true
+                                else -> multilineControls
+                            }
+                        if (nextMultilineControls != multilineControls) {
+                            multilineControls = nextMultilineControls
+                            onMultilineControlsChanged(nextMultilineControls)
+                        }
+                    },
                 )
                 if (textFieldValue.text.isEmpty()) {
                     Text(
                         stringResource(R.string.message),
                         style = LocalTextStyle.current.copy(fontSize = 16.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier =
+                            Modifier.padding(
+                                start = if (expandedLayout) 12.dp else 44.dp,
+                                top = if (expandedLayout) 48.dp else 10.dp,
+                            ),
                     )
                 }
             }
-            if (onPickFromGallery != null ||
-                onPickDocument != null ||
-                hasCameraCapture ||
-                hasLocationShare ||
-                hasUserShare ||
-                hasContactShare
+
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 4.dp, bottom = 4.dp)
+                        .alpha(if (inputContentVisible) 1f else 0f)
+                        .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
             ) {
-                IconButton(
-                    onClick = onAttachmentsToggle,
-                    modifier = Modifier.size(36.dp),
+                TextEntryEmojiAction(
+                    pickerOpen = emojiPickerOpen,
+                    enabled = true,
+                    onClick = onEmojiPickerToggle,
+                    togglesKeyboard = true,
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .height(44.dp)
+                        .padding(end = 0.dp),
+            ) {
+                if (hasAttachmentAction) {
+                    IconButton(
+                        onClick = onAttachmentsToggle,
+                        enabled = inputContentVisible,
+                        modifier =
+                            Modifier
+                                .size(36.dp)
+                                .alpha(if (inputContentVisible) 1f else 0f)
+                                .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                    ) {
+                        // Swap the glyph on open (X) the way the emoji toggle swaps
+                        // to a keyboard, so sighted users get a visual cue, not just
+                        // a changed content description.
+                        Icon(
+                            if (attachmentSheetOpen) Icons.Default.Close else Icons.Default.AttachFile,
+                            contentDescription =
+                                stringResource(
+                                    if (attachmentSheetOpen) R.string.close else R.string.attach_options,
+                                ),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+                trailingAction?.invoke(this)
+            }
+
+            if (expandedLayout && inputContentVisible) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .width(96.dp)
+                            .height(48.dp)
+                            .pointerInput(Unit) {
+                                detectVerticalDragGestures(
+                                    onVerticalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        latestOnHeightDrag(dragAmount)
+                                    },
+                                    onDragEnd = { latestOnHeightDragStopped() },
+                                    onDragCancel = { latestOnHeightDragStopped() },
+                                )
+                            }.semantics {
+                                contentDescription = resizeComposerDescription
+                            },
                 ) {
-                    // Swap the glyph on open (X) the way the emoji toggle swaps
-                    // to a keyboard, so sighted users get a visual cue, not just
-                    // a changed content description.
+                    Box(
+                        Modifier
+                            .width(36.dp)
+                            .height(4.dp)
+                            .background(
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                RoundedCornerShape(2.dp),
+                            ),
+                    )
+                }
+                IconButton(
+                    onClick = onExpansionToggle,
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .size(48.dp),
+                ) {
                     Icon(
-                        if (attachmentSheetOpen) Icons.Default.Close else Icons.Default.AttachFile,
+                        if (expansionMode == ComposerExpansionMode.FullScreen) {
+                            Icons.Default.CloseFullscreen
+                        } else {
+                            Icons.Default.OpenInFull
+                        },
                         contentDescription =
                             stringResource(
-                                if (attachmentSheetOpen) R.string.close else R.string.attach_options,
+                                if (expansionMode == ComposerExpansionMode.FullScreen) {
+                                    R.string.composer_collapse
+                                } else {
+                                    R.string.composer_expand_full_screen
+                                },
                             ),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }
