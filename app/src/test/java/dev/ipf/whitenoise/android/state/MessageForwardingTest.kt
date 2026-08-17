@@ -160,6 +160,54 @@ class MessageForwardingTest {
         }
 
     @Test
+    fun releaseWhileUploadingCancelsAndClearsRetainedPlaintext() =
+        runTest {
+            val uploadGate = CompletableDeferred<Unit>()
+            val retained = byteArrayOf(7, 8, 9)
+            val transport = RecordingForwardTransport(uploadGate = uploadGate, materializedBytes = retained)
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(mediaPayload("media", null, "photo.jpg")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            session.start()
+            runCurrent()
+            session.release()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Cancelled, session.state.value.phase)
+            assertTrue(retained.contentEquals(byteArrayOf(0, 0, 0)))
+            assertTrue(transport.published.isEmpty())
+        }
+
+    @Test
+    fun materializationUsesTheSameBoundedFanoutAsTargetWork() =
+        runTest {
+            val materializeGate = CompletableDeferred<Unit>()
+            val transport = RecordingForwardTransport(materializeGate = materializeGate)
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(mediaPayload("media", null, "one.bin", "two.bin", "three.bin")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                    targetFanout = 2,
+                )
+
+            session.start()
+            runCurrent()
+
+            assertEquals(2, transport.materializedIndices.size)
+            materializeGate.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(3, transport.materializedIndices.size)
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+        }
+
+    @Test
     fun oversizedMaterializedBatchFailsBeforeAnyUpload() =
         runTest {
             val transport = RecordingForwardTransport(materializedByteCount = 4)
@@ -304,6 +352,7 @@ class MessageForwardingTest {
         private val failUploadOnceFor: MutableSet<String> = mutableSetOf(),
         private val failPublishOnceFor: MutableSet<String> = mutableSetOf(),
         private val uploadGate: CompletableDeferred<Unit>? = null,
+        private val materializeGate: CompletableDeferred<Unit>? = null,
         private val materializedByteCount: Int = 1,
         private val materializedBytes: ByteArray? = null,
         private val onUpload: () -> Unit = {},
@@ -320,6 +369,7 @@ class MessageForwardingTest {
             source: ForwardAttachmentSource,
         ): PendingAttachment {
             materializedIndices += source.attachmentIndex
+            materializeGate?.await()
             return PendingAttachment(
                 plaintextBytes =
                     materializedBytes

@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions") // One action surface owns menu, picker, progress, and button projections.
+
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.border
@@ -127,6 +129,8 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import java.util.Locale
 
+private const val FORWARD_TARGET_ID_PREFIX_LENGTH = 12
+
 @Composable
 internal fun MessageActionMenu(
     expanded: Boolean,
@@ -166,7 +170,17 @@ internal fun MessageActionMenu(
     val explainedForwardBlock = forwardBlockedReason?.takeUnless { it == ForwardBlockedReason.Unsupported }
     val showForwardAction = canForward || explainedForwardBlock != null
     val actionKinds =
-        remember(canReply, canEdit, canSelect, canSelectText, canCopyText, canSpeak, showForwardAction, canSave, canInfo) {
+        remember(
+            canReply,
+            canEdit,
+            canSelect,
+            canSelectText,
+            canCopyText,
+            canSpeak,
+            showForwardAction,
+            canSave,
+            canInfo,
+        ) {
             messageActionKinds(
                 canReply = canReply,
                 canEdit = canEdit,
@@ -573,6 +587,7 @@ private fun LazyListScope.forwardFolderSection(
 }
 
 @Composable
+@Suppress("FunctionNaming", "LongMethod") // Exhaustive operation phases stay beside their progress semantics.
 internal fun ForwardProgressContent(
     snapshot: ForwardOperationSnapshot,
     targetTitles: Map<String, String>,
@@ -635,7 +650,7 @@ internal fun ForwardProgressContent(
                     progress = progress,
                     title =
                         targetTitles[progress.groupIdHex.lowercase(Locale.ROOT)]
-                            ?: progress.groupIdHex.take(12),
+                            ?: progress.groupIdHex.take(FORWARD_TARGET_ID_PREFIX_LENGTH),
                 )
             }
         }
@@ -643,6 +658,8 @@ internal fun ForwardProgressContent(
 }
 
 @Composable
+@Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
+// The exhaustive phase projection keeps icon, label, and accessibility state synchronized.
 private fun ForwardTargetProgressRow(
     progress: ForwardTargetProgress,
     title: String,
@@ -733,6 +750,8 @@ private fun ForwardTargetProgressRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
+// Picker, immutable target snapshot, and retry lifecycle intentionally share one sheet owner.
 internal fun ForwardMessageSheet(
     appState: WhiteNoiseAppState,
     body: String,

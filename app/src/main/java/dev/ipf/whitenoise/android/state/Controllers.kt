@@ -4674,7 +4674,9 @@ class ChatsController private constructor(
      */
     fun forwardTargets(): List<ChatListItem> =
         sortChatListItems(
-            currentProjectedItems().filterNot { it.group.pendingConfirmation },
+            currentProjectedItems().filter { item ->
+                isEligibleForwardTarget(item, appState.activeAccount?.accountIdHex)
+            },
         )
 
     private fun foldChatRow(
@@ -5986,6 +5988,11 @@ class ChatsController private constructor(
         }
     }
 }
+
+internal fun isEligibleForwardTarget(
+    item: ChatListItem,
+    activeAccountIdHex: String?,
+): Boolean = !item.group.pendingConfirmation && !item.removedFromGroup(activeAccountIdHex)
 
 /**
  * Parse [text] into the same Markdown AST the Rust core attaches to projected

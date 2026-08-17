@@ -698,11 +698,10 @@ internal fun MessageBubble(
             isActionMenuOpen,
             forwardNowSeconds,
         ) {
+            val failedCommittedMessage =
+                persistedFailure && !MessageProjector.isPendingMedia(record)
             if (
-                deleted ||
-                invalidated ||
-                persistedFailure &&
-                !MessageProjector.isPendingMedia(record)
+                deleted || invalidated || failedCommittedMessage
             ) {
                 ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
             } else if (persistedFailure) {

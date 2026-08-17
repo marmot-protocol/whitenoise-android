@@ -3026,8 +3026,8 @@ class WhiteNoiseAppState private constructor(
             MessageProjector
                 .normalizeForwardTargets(targetGroupIds)
                 .filterNot { target -> sourceGroupIds.any { it.equals(target, ignoreCase = true) } }
-        val account = activeAccountRef?.takeIf(String::isNotBlank) ?: return null
-        if (messages.isEmpty() || targets.isEmpty()) return null
+        val account = activeAccountRef?.takeIf(String::isNotBlank)
+        if (account == null || messages.isEmpty() || targets.isEmpty()) return null
         val sessionEpoch = mediaUploadSessionEpoch()
 
         fun requireCurrentAccount() {

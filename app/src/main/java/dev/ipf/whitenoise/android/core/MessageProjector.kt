@@ -418,53 +418,78 @@ object MessageProjector {
         cachedAttachmentIndices: Set<Int> = emptySet(),
         nowSeconds: ULong,
     ): ForwardEligibility {
-        if (message.kind != KindChat || streamId(message) != null) {
-            return ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
-        }
-        if (isPendingMedia(message)) {
-            return ForwardEligibility.Blocked(ForwardBlockedReason.PendingAttachment)
-        }
-        if (message.retentionExpiresAt?.takeIf { it > 0uL }?.let { it <= nowSeconds } == true) {
-            return ForwardEligibility.Blocked(ForwardBlockedReason.ExpiredAttachment)
-        }
-
         val mediaTagCount = message.tags.count { it.values.firstOrNull() == ImetaTag }
         val carriesMedia = mediaTagCount > 0 || mediaReferences.isNotEmpty()
-        if (!carriesMedia) {
-            val body =
-                forwardableText(message, editedText)
-                    ?: return ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
-            return ForwardEligibility.Eligible(
+        val initialBlock = forwardInitialBlockReason(message, nowSeconds)
+        return when {
+            initialBlock != null -> ForwardEligibility.Blocked(initialBlock)
+            carriesMedia ->
+                forwardMediaEligibility(
+                    message = message,
+                    mediaReferences = mediaReferences,
+                    mediaTagCount = mediaTagCount,
+                    editedText = editedText,
+                    cachedAttachmentIndices = cachedAttachmentIndices,
+                )
+            else -> forwardTextEligibility(message, editedText)
+        }
+    }
+
+    private fun forwardInitialBlockReason(
+        message: AppMessageRecordFfi,
+        nowSeconds: ULong,
+    ): ForwardBlockedReason? =
+        when {
+            message.kind != KindChat || streamId(message) != null -> ForwardBlockedReason.Unsupported
+            isPendingMedia(message) -> ForwardBlockedReason.PendingAttachment
+            message.retentionExpiresAt
+                ?.takeIf { it > 0uL }
+                ?.let { it <= nowSeconds } == true -> ForwardBlockedReason.ExpiredAttachment
+            else -> null
+        }
+
+    private fun forwardTextEligibility(
+        message: AppMessageRecordFfi,
+        editedText: String?,
+    ): ForwardEligibility {
+        val payload =
+            forwardableText(message, editedText)?.let { body ->
                 ForwardMessagePayload.Text(
                     sourceGroupIdHex = message.groupIdHex,
                     sourceMessageIdHex = message.messageIdHex,
                     text = body,
-                ),
-            )
-        }
-
-        if (message.tags.any { it.values.firstOrNull() in RestrictedMediaForwardingTags }) {
-            return ForwardEligibility.Blocked(ForwardBlockedReason.RestrictedAttachment)
-        }
-        if (mediaReferences.isEmpty() || mediaReferences.size != mediaTagCount) {
-            return ForwardEligibility.Blocked(ForwardBlockedReason.MalformedAttachment)
-        }
-        if (
-            mediaReferences.withIndex().any { (index, reference) ->
-                reference.sourceEpoch != 0uL &&
-                    reference.locators.isEmpty() &&
-                    index !in cachedAttachmentIndices
+                )
             }
-        ) {
-            return ForwardEligibility.Blocked(ForwardBlockedReason.UnavailableAttachment)
-        }
+        return payload?.let(ForwardEligibility::Eligible)
+            ?: ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
+    }
 
-        val caption = mediaCaption(message, editedText ?: message.plaintext)
+    private fun forwardMediaEligibility(
+        message: AppMessageRecordFfi,
+        mediaReferences: List<MediaAttachmentReferenceFfi>,
+        mediaTagCount: Int,
+        editedText: String?,
+        cachedAttachmentIndices: Set<Int>,
+    ): ForwardEligibility {
+        val blockedReason =
+            when {
+                message.tags.any { it.values.firstOrNull() in RestrictedMediaForwardingTags } ->
+                    ForwardBlockedReason.RestrictedAttachment
+                mediaReferences.isEmpty() || mediaReferences.size != mediaTagCount ->
+                    ForwardBlockedReason.MalformedAttachment
+                mediaReferences.withIndex().any { (index, reference) ->
+                    reference.sourceEpoch != 0uL &&
+                        reference.locators.isEmpty() &&
+                        index !in cachedAttachmentIndices
+                } -> ForwardBlockedReason.UnavailableAttachment
+                else -> null
+            }
+        if (blockedReason != null) return ForwardEligibility.Blocked(blockedReason)
         return ForwardEligibility.Eligible(
             ForwardMessagePayload.Media(
                 sourceGroupIdHex = message.groupIdHex,
                 sourceMessageIdHex = message.messageIdHex,
-                caption = caption,
+                caption = mediaCaption(message, editedText ?: message.plaintext),
                 attachments =
                     mediaReferences.mapIndexed { index, reference ->
                         ForwardAttachmentSource(index, reference)

@@ -12,6 +12,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@Suppress("LargeClass") // Projection invariants share the same record/tag fixture vocabulary.
 class MessageProjectorTest {
     @Test
     fun reactedToMessageIdReadsEventTagOnKindSeven() {

@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions") // Cohesive batch-selection policy and projections share one model boundary.
+
 package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
@@ -225,11 +227,8 @@ internal fun batchForwardBodies(items: List<BatchMessageActionItem>): List<Strin
 
 /** Atomic ordered forward batch: one unsupported selection disables the entire operation. */
 internal fun batchForwardPayloads(items: List<BatchMessageActionItem>): List<ForwardMessagePayload> {
-    if (items.isEmpty()) return emptyList()
-    return items.map { item ->
-        if (item.forwardBlockedReason != null) return emptyList()
-        item.forwardPayload ?: return emptyList()
-    }
+    val incomplete = items.any { it.forwardBlockedReason != null || it.forwardPayload == null }
+    return if (incomplete) emptyList() else items.map { requireNotNull(it.forwardPayload) }
 }
 
 internal data class BatchSelectionActionAvailability(

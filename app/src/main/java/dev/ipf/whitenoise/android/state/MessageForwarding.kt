@@ -142,7 +142,9 @@ internal suspend fun materializeForwardAttachment(
     )
 }
 
-internal class ForwardPayloadTooLargeException : IllegalArgumentException("forward payload exceeds the retained-byte limit")
+private const val FORWARD_PAYLOAD_TOO_LARGE_MESSAGE = "forward payload exceeds the retained-byte limit"
+
+internal class ForwardPayloadTooLargeException : IllegalArgumentException(FORWARD_PAYLOAD_TOO_LARGE_MESSAGE)
 
 internal class ForwardAttachmentExpiredException : IllegalStateException("forward attachment expired")
 
@@ -161,7 +163,9 @@ internal class ForwardSession(
     private val transport: ForwardTransport,
     private val maxRetainedBytes: Long = ConversationController.MEDIA_RETAINED_MAX_BYTES,
     private val targetFanout: Int = 2,
-    private val clockSeconds: () -> ULong = { (System.currentTimeMillis() / 1_000L).toULong() },
+    private val clockSeconds: () -> ULong = {
+        (System.currentTimeMillis() / MILLIS_PER_SECOND).toULong()
+    },
     private val onFailure: (targetGroupIdHex: String?, stage: ForwardFailureStage, throwable: Throwable) -> Unit =
         { _, _, _ -> },
 ) {
@@ -174,7 +178,12 @@ internal class ForwardSession(
     private val _state =
         MutableStateFlow(
             ForwardOperationSnapshot(
-                phase = if (totalAttachments > 0) ForwardOperationPhase.Preparing else ForwardOperationPhase.Running,
+                phase =
+                    if (totalAttachments > 0) {
+                        ForwardOperationPhase.Preparing
+                    } else {
+                        ForwardOperationPhase.Running
+                    },
                 preparedAttachments = 0,
                 totalAttachments = totalAttachments,
                 targets =
@@ -234,7 +243,12 @@ internal class ForwardSession(
         if (failedTargets.isEmpty()) return
         _state.update { snapshot ->
             snapshot.copy(
-                phase = if (preparedMessages == null) ForwardOperationPhase.Preparing else ForwardOperationPhase.Running,
+                phase =
+                    if (preparedMessages == null) {
+                        ForwardOperationPhase.Preparing
+                    } else {
+                        ForwardOperationPhase.Running
+                    },
                 targets =
                     snapshot.targets.map { target ->
                         if (target.groupIdHex in failedTargets) {
@@ -266,6 +280,8 @@ internal class ForwardSession(
         }
     }
 
+    // Transport implementations may surface any non-cancellation runtime failure.
+    @Suppress("TooGenericExceptionCaught")
     private fun launchAttempt(targets: List<String>) {
         val job =
             scope.launch {
@@ -313,43 +329,76 @@ internal class ForwardSession(
         }
     }
 
-    private suspend fun materializeMessages(): List<PreparedForwardMessage> {
-        var retainedBytes = 0L
-        var preparedAttachmentCount = 0
-        val prepared =
-            messages.map { message ->
-                currentCoroutineContext().ensureActive()
-                when (message) {
-                    is ForwardMessagePayload.Text -> PreparedForwardMessage.Text(message.text)
-                    is ForwardMessagePayload.Media -> {
-                        ensureNotExpired(message.expiresAtSeconds)
-                        val attachments =
-                            message.attachments.map { source ->
-                                currentCoroutineContext().ensureActive()
-                                val attachment =
-                                    transport.materialize(
-                                        sourceGroupIdHex = message.sourceGroupIdHex,
-                                        sourceMessageIdHex = message.sourceMessageIdHex,
-                                        source = source,
+    // Structured fan-out and synchronized byte accounting must share one cancellation scope.
+    @Suppress("LongMethod")
+    private suspend fun materializeMessages(): List<PreparedForwardMessage> =
+        coroutineScope {
+            var retainedBytes = 0L
+            var preparedAttachmentCount = 0
+            val accountingLock = Any()
+            val materializationGate = Semaphore(targetFanout)
+            val prepared =
+                messages
+                    .map { message ->
+                        async {
+                            currentCoroutineContext().ensureActive()
+                            when (message) {
+                                is ForwardMessagePayload.Text -> PreparedForwardMessage.Text(message.text)
+                                is ForwardMessagePayload.Media -> {
+                                    ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
+                                    val attachments =
+                                        message.attachments
+                                            .map { source ->
+                                                async {
+                                                    materializationGate.withPermit {
+                                                        currentCoroutineContext().ensureActive()
+                                                        val attachment =
+                                                            transport.materialize(
+                                                                sourceGroupIdHex = message.sourceGroupIdHex,
+                                                                sourceMessageIdHex = message.sourceMessageIdHex,
+                                                                source = source,
+                                                            )
+                                                        val preparedCount =
+                                                            synchronized(accountingLock) {
+                                                                if (attachment.plaintextBytes.isEmpty()) {
+                                                                    throw IllegalStateException(
+                                                                        "materialized attachment is empty",
+                                                                    )
+                                                                }
+                                                                retainedPlaintextBuffers += attachment.plaintextBytes
+                                                                retainedBytes += attachment.plaintextBytes.size
+                                                                if (retainedBytes > maxRetainedBytes) {
+                                                                    throw ForwardPayloadTooLargeException()
+                                                                }
+                                                                preparedAttachmentCount += 1
+                                                                preparedAttachmentCount
+                                                            }
+                                                        _state.update { snapshot ->
+                                                            snapshot.copy(
+                                                                preparedAttachments =
+                                                                    maxOf(
+                                                                        snapshot.preparedAttachments,
+                                                                        preparedCount,
+                                                                    ),
+                                                            )
+                                                        }
+                                                        attachment
+                                                    }
+                                                }
+                                            }.awaitAll()
+                                    ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
+                                    PreparedForwardMessage.Media(
+                                        message.caption,
+                                        attachments,
+                                        message.expiresAtSeconds,
                                     )
-                                retainedPlaintextBuffers += attachment.plaintextBytes
-                                if (attachment.plaintextBytes.isEmpty()) {
-                                    throw IllegalStateException("materialized attachment is empty")
                                 }
-                                retainedBytes += attachment.plaintextBytes.size
-                                if (retainedBytes > maxRetainedBytes) throw ForwardPayloadTooLargeException()
-                                preparedAttachmentCount += 1
-                                _state.update { it.copy(preparedAttachments = preparedAttachmentCount) }
-                                attachment
                             }
-                        ensureNotExpired(message.expiresAtSeconds)
-                        PreparedForwardMessage.Media(message.caption, attachments, message.expiresAtSeconds)
-                    }
-                }
-            }
-        preparedMessages = prepared
-        return prepared
-    }
+                        }
+                    }.awaitAll()
+            preparedMessages = prepared
+            prepared
+        }
 
     private suspend fun runTargets(
         targetIds: List<String>,
@@ -366,6 +415,8 @@ internal class ForwardSession(
             }.awaitAll()
     }
 
+    // Each destination converts all non-cancellation transport failures into retry state.
+    @Suppress("TooGenericExceptionCaught")
     private suspend fun processTarget(
         targetGroupIdHex: String,
         prepared: List<PreparedForwardMessage>,
@@ -373,24 +424,26 @@ internal class ForwardSession(
         var failureStage = ForwardFailureStage.Upload
         try {
             val targetReferences = uploadedReferencesByTarget.getOrPut(targetGroupIdHex) { mutableMapOf() }
-            updateTarget(targetGroupIdHex) { it.copy(phase = ForwardTargetPhase.Uploading, failureStage = null) }
+            updateForwardTarget(_state, targetGroupIdHex) {
+                it.copy(phase = ForwardTargetPhase.Uploading, failureStage = null)
+            }
             prepared.forEachIndexed { messageIndex, message ->
                 currentCoroutineContext().ensureActive()
                 if (message !is PreparedForwardMessage.Media || messageIndex in targetReferences) return@forEachIndexed
-                ensureNotExpired(message.expiresAtSeconds)
+                ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
                 val references = transport.upload(targetGroupIdHex, message)
                 if (references.size != message.attachments.size) {
                     throw IllegalStateException("forward upload returned the wrong attachment count")
                 }
                 targetReferences[messageIndex] = references
-                updateTarget(targetGroupIdHex) { progress ->
+                updateForwardTarget(_state, targetGroupIdHex) { progress ->
                     progress.copy(uploadedAttachments = targetReferences.values.sumOf { it.size })
                 }
             }
 
             currentCoroutineContext().ensureActive()
             failureStage = ForwardFailureStage.Publish
-            updateTarget(targetGroupIdHex) { it.copy(phase = ForwardTargetPhase.Sending) }
+            updateForwardTarget(_state, targetGroupIdHex) { it.copy(phase = ForwardTargetPhase.Sending) }
             transport.publishBatch(
                 targetGroupIdHex = targetGroupIdHex,
                 messages = prepared,
@@ -398,15 +451,15 @@ internal class ForwardSession(
                 startIndex = publishedMessageCountByTarget.getValue(targetGroupIdHex),
                 onBeforeMessagePublished = { messageIndex ->
                     (prepared[messageIndex] as? PreparedForwardMessage.Media)?.let { message ->
-                        ensureNotExpired(message.expiresAtSeconds)
+                        ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
                     }
                 },
             ) { publishedIndex ->
                 val publishedCount = publishedIndex + 1
                 publishedMessageCountByTarget[targetGroupIdHex] = publishedCount
-                updateTarget(targetGroupIdHex) { it.copy(sentMessages = publishedCount) }
+                updateForwardTarget(_state, targetGroupIdHex) { it.copy(sentMessages = publishedCount) }
             }
-            updateTarget(targetGroupIdHex) {
+            updateForwardTarget(_state, targetGroupIdHex) {
                 it.copy(
                     phase = ForwardTargetPhase.Completed,
                     sentMessages = totalMessageCount,
@@ -419,7 +472,9 @@ internal class ForwardSession(
             if (failure is ForwardAttachmentExpiredException) failureStage = ForwardFailureStage.Expired
             if (failure is ForwardSessionInvalidatedException) failureStage = ForwardFailureStage.SessionChanged
             onFailure(targetGroupIdHex, failureStage, failure)
-            updateTarget(targetGroupIdHex) { it.copy(phase = ForwardTargetPhase.Failed, failureStage = failureStage) }
+            updateForwardTarget(_state, targetGroupIdHex) {
+                it.copy(phase = ForwardTargetPhase.Failed, failureStage = failureStage)
+            }
         }
     }
 
@@ -458,27 +513,38 @@ internal class ForwardSession(
         }
     }
 
-    private fun updateTarget(
-        groupIdHex: String,
-        transform: (ForwardTargetProgress) -> ForwardTargetProgress,
-    ) {
-        _state.update { snapshot ->
-            snapshot.copy(
-                targets = snapshot.targets.map { if (it.groupIdHex == groupIdHex) transform(it) else it },
-            )
-        }
-    }
-
-    private fun ensureNotExpired(expiresAtSeconds: ULong?) {
-        if (expiresAtSeconds?.takeIf { it > 0uL }?.let { it <= clockSeconds() } == true) {
-            throw ForwardAttachmentExpiredException()
-        }
-    }
-
     private fun clearSensitiveState() {
         retainedPlaintextBuffers.forEach { it.fill(0) }
         retainedPlaintextBuffers.clear()
         preparedMessages = null
         uploadedReferencesByTarget.clear()
+    }
+
+    private companion object {
+        const val MILLIS_PER_SECOND = 1_000L
+    }
+}
+
+private fun ensureForwardAttachmentNotExpired(
+    expiresAtSeconds: ULong?,
+    clockSeconds: () -> ULong,
+) {
+    if (expiresAtSeconds?.takeIf { it > 0uL }?.let { it <= clockSeconds() } == true) {
+        throw ForwardAttachmentExpiredException()
+    }
+}
+
+private fun updateForwardTarget(
+    state: MutableStateFlow<ForwardOperationSnapshot>,
+    groupIdHex: String,
+    transform: (ForwardTargetProgress) -> ForwardTargetProgress,
+) {
+    state.update { snapshot ->
+        snapshot.copy(
+            targets =
+                snapshot.targets.map { target ->
+                    if (target.groupIdHex == groupIdHex) transform(target) else target
+                },
+        )
     }
 }
