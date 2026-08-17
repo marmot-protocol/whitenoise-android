@@ -20,6 +20,32 @@ import java.security.MessageDigest
 private const val CONVERSATION_SHORTCUT_LABEL_MAX_LENGTH = 24
 private const val TAG = "ConversationSettings"
 
+internal fun notificationChannelSettingsIntent(
+    context: Context,
+    channelId: String,
+): Intent =
+    if (channelId.isNotBlank()) {
+        Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    } else {
+        appNotificationSettingsIntent(context)
+    }
+
+internal fun openNotificationChannelSettings(
+    context: Context,
+    channel: NotificationChannelSpec,
+) {
+    val opened =
+        context.tryStartActivity(notificationChannelSettingsIntent(context, channel.id)) ||
+            context.tryStartActivity(appNotificationSettingsIntent(context)) ||
+            context.tryStartActivity(appDetailsSettingsIntent(context))
+    if (!opened) {
+        Toast.makeText(context, R.string.toast_notification_settings_unavailable, Toast.LENGTH_SHORT).show()
+    }
+}
+
 internal fun conversationShortcutId(
     accountRef: String,
     groupIdHex: String,
@@ -76,8 +102,9 @@ internal fun openConversationNotificationSettings(
                     avatarUrl = conversationAvatarUrl,
                 )
             } ?: conversationTitle
-        // Create all typed children before asking Android to resolve this
-        // shortcut beneath the requested parent channel.
+        // Keep the required message child available for Android's People UI.
+        // Optional event children are created only for the requested custom
+        // target below; merely opening an inherited row must not create them.
         ConversationNotificationChannels.ensureConversationChannels(
             context = context,
             conversationShortcutId = shortcutId,
@@ -114,11 +141,7 @@ internal fun openConversationNotificationSettings(
     if (context.tryStartActivity(preferred)) return
     if (preferred.action != Settings.ACTION_APP_NOTIFICATION_SETTINGS && context.tryStartActivity(appNotificationSettingsIntent(context))) return
 
-    val appDetailsIntent =
-        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-            .setData(Uri.fromParts("package", context.packageName, null))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    if (context.tryStartActivity(appDetailsIntent)) return
+    if (context.tryStartActivity(appDetailsSettingsIntent(context))) return
 
     Toast.makeText(context, R.string.toast_notification_settings_unavailable, Toast.LENGTH_SHORT).show()
 }
@@ -212,6 +235,11 @@ internal fun conversationSettingsShortcut(
 private fun appNotificationSettingsIntent(context: Context): Intent =
     Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
         .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+private fun appDetailsSettingsIntent(context: Context): Intent =
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+        .setData(Uri.fromParts("package", context.packageName, null))
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
 private fun Context.tryStartActivity(intent: Intent): Boolean = runCatching { startActivity(intent) }.isSuccess

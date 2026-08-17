@@ -107,10 +107,7 @@ class LocalNotificationPresenter(
     private val shortcutAccessClock = AtomicLong()
     private val tapTokens = NotificationTapTokens.create(context)
     private val conversationVibrationPreferences = ConversationVibrationPreferences(context)
-
-    // Conversation channels we've already created in this process, so the hot
-    // post path skips the get-or-create Binder round-trip after the first post.
-    private val ensuredConversationChannels = ConcurrentHashMap.newKeySet<String>()
+    private val conversationNotificationRouting = ConversationNotificationRouting(context)
 
     fun ensureChannels() {
         NotificationChannels.ensureChannels(context)
@@ -348,11 +345,9 @@ class LocalNotificationPresenter(
                 notificationContent.notificationId,
             )
             if (!isPostStillAllowed()) return@withRegisteredShow false
-            // Every non-redacted notification with a conversation target posts on
-            // the child of its typed parent (messages, mentions, reactions,
-            // invites, or agent activity), so that chat's native per-type settings
-            // apply. Messaging cards additionally carry/publish the shortcut used
-            // by Android's People UI; plain cards still use the child channel.
+            // Ordinary messages keep their required People/conversation child.
+            // Other event types inherit the stable global channel until this
+            // chat has an explicit or legacy custom override.
             val channelShortcutId =
                 if (!redactContent) {
                     conversationShortcutId(update.accountRef, update.groupIdHex)
@@ -370,12 +365,14 @@ class LocalNotificationPresenter(
                     ConversationVibrationPattern.SYSTEM_DEFAULT
                 }
             val channelId =
-                if (channelShortcutId != null) {
-                    withContext(Dispatchers.Default) {
-                        ensureConversationChannel(decision.channelId, channelShortcutId, vibrationPattern)
-                    } ?: decision.channelId
-                } else {
-                    decision.channelId
+                withContext(Dispatchers.Default) {
+                    conversationNotificationRouting
+                        .resolveForPost(
+                            channel = NotificationChannelSpec.forUpdate(update),
+                            conversationShortcutId = channelShortcutId,
+                            conversationTitle = conversationTitleOverride,
+                            primaryVibrationPattern = vibrationPattern,
+                        ).channelId
                 }
             val builder =
                 NotificationCompat
@@ -1331,33 +1328,6 @@ class LocalNotificationPresenter(
             builder.setCategories(setOf(CONVERSATION_SHARE_TARGET_CATEGORY))
         }
         return builder.build()
-    }
-
-    private fun ensureConversationChannel(
-        parentChannelId: String,
-        conversationShortcutId: String,
-        vibrationPattern: ConversationVibrationPattern,
-    ): String? {
-        val conversationChannelId =
-            ConversationNotificationChannels.conversationChannelId(
-                parentChannelId,
-                conversationShortcutId,
-                vibrationPattern,
-            )
-        if (conversationChannelId in ensuredConversationChannels) {
-            val manager = context.getSystemService(NotificationManager::class.java)
-            if (manager?.getNotificationChannel(conversationChannelId) != null) return conversationChannelId
-            ensuredConversationChannels.remove(conversationChannelId)
-        }
-        val created =
-            ConversationNotificationChannels.ensureConversationChannel(
-                context = context,
-                parentChannelId = parentChannelId,
-                conversationShortcutId = conversationShortcutId,
-                vibrationPattern = vibrationPattern,
-            )
-        if (created != null) ensuredConversationChannels.add(created)
-        return created
     }
 
     private fun pruneConversationShortcutsBeforePublish(shortcutId: String) {

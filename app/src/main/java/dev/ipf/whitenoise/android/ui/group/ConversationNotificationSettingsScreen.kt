@@ -1,5 +1,8 @@
+@file:Suppress("FunctionNaming") // Compose UI entry points intentionally use PascalCase.
+
 package dev.ipf.whitenoise.android.ui.group
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,9 +30,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,26 +46,37 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.notifications.AndroidNotificationSettingsTarget
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationCategorySetting
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationScope
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.EffectiveConversationVibration
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.notifications.NotificationConversationDescriptor
+import dev.ipf.whitenoise.android.notifications.OverridableConversationNotificationCategory
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.openConversationNotificationSettings
+import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val MILLIS_PER_SECOND = 1_000L
 private val MUTE_ROW_MIN_HEIGHT = 56.dp
 internal const val MUTE_SWITCH_ROW_TAG = "conversation-mute-switch-row"
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Suppress("FunctionNaming", "LongMethod") // Compose screen owns one cohesive settings surface.
+@Suppress("LongMethod") // Compose screen owns one cohesive settings surface.
 @Composable
 internal fun ConversationNotificationSettingsScreen(
     appState: WhiteNoiseAppState,
@@ -147,6 +163,12 @@ internal fun ConversationNotificationSettingsScreen(
                 modifier = Modifier.padding(top = Dimens.spaceSm),
             )
             SectionHeader(stringResource(R.string.notification_categories))
+            Text(
+                text = stringResource(R.string.conversation_notification_categories_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceXs),
+            )
             NotificationCategoriesSection(
                 appState = appState,
                 groupIdHex = groupIdHex,
@@ -159,7 +181,6 @@ internal fun ConversationNotificationSettingsScreen(
     }
 }
 
-@Suppress("FunctionNaming")
 @Composable
 private fun NotificationCategoriesSection(
     appState: WhiteNoiseAppState,
@@ -169,28 +190,138 @@ private fun NotificationCategoriesSection(
     isDm: Boolean,
     primaryVibrationPattern: ConversationVibrationPattern,
 ) {
+    val routing = appState.conversationNotificationRouting
+    val routingState by routing.state.collectAsStateWithLifecycle()
+    val accountRef = appState.activeAccountRef
+    val shortcutId = remember(accountRef, groupIdHex) { accountRef?.let { conversationShortcutId(it, groupIdHex) } }
+    val descriptor =
+        remember(shortcutId, isDm, conversationTitle, primaryVibrationPattern) {
+            shortcutId?.let {
+                NotificationConversationDescriptor(
+                    shortcutId = it,
+                    isDm = isDm,
+                    title = conversationTitle,
+                    primaryVibrationPattern = primaryVibrationPattern,
+                )
+            }
+        }
+    var settings by remember(shortcutId) { mutableStateOf<List<ConversationNotificationCategorySetting>>(emptyList()) }
+    LaunchedEffect(descriptor, routingState) {
+        settings =
+            if (descriptor == null) {
+                emptyList()
+            } else {
+                withContext(Dispatchers.Default) { routing.settings(descriptor) }
+            }
+    }
+    if (descriptor == null || accountRef == null || settings.isEmpty()) {
+        NotificationCategoriesLoadingRow()
+        return
+    }
+    LoadedNotificationCategories(
+        appState = appState,
+        routing = routing,
+        descriptor = descriptor,
+        accountRef = accountRef,
+        groupIdHex = groupIdHex,
+        conversationAvatarUrl = conversationAvatarUrl,
+        settings = settings,
+    )
+}
+
+@Composable
+private fun NotificationCategoriesLoadingRow() {
+    SettingsActionRow(
+        icon = Icons.Default.Settings,
+        title = stringResource(R.string.notification_categories_loading),
+        inProgress = true,
+    )
+}
+
+@Composable
+private fun LoadedNotificationCategories(
+    appState: WhiteNoiseAppState,
+    routing: ConversationNotificationRouting,
+    descriptor: NotificationConversationDescriptor,
+    accountRef: String,
+    groupIdHex: String,
+    conversationAvatarUrl: String?,
+    settings: List<ConversationNotificationCategorySetting>,
+) {
     val context = LocalContext.current
-    ConversationNotificationChannels.relevantParents(isDm).forEach { parent ->
-        SettingsActionRow(
-            icon = Icons.Default.Settings,
-            title = notificationChannelTitle(parent),
-            value = stringResource(R.string.customize_sound_vibration),
-            onClick =
-                appState.activeAccountRef?.let { accountRef ->
-                    {
-                        openConversationNotificationSettings(
-                            context = context,
-                            accountRef = accountRef,
-                            groupIdHex = groupIdHex,
-                            isDm = isDm,
-                            parent = parent,
-                            conversationTitle = conversationTitle,
-                            conversationAvatarUrl = conversationAvatarUrl,
-                            primaryVibrationPattern = primaryVibrationPattern,
+    val coroutineScope = rememberCoroutineScope()
+    var pendingChannel by remember(descriptor.shortcutId) { mutableStateOf<NotificationChannelSpec?>(null) }
+    ConversationNotificationCategoriesList(
+        settings = settings,
+        pendingChannel = pendingChannel,
+        onOpen = { setting ->
+            openCategorySettings(
+                context,
+                setting,
+                descriptor,
+                accountRef,
+                groupIdHex,
+                conversationAvatarUrl,
+            )
+        },
+        onScopeChange = { setting, useCustom ->
+            val category =
+                OverridableConversationNotificationCategory.from(setting.channel)
+                    ?: return@ConversationNotificationCategoriesList
+            pendingChannel = setting.channel
+            coroutineScope.launch {
+                val requestedScope =
+                    if (useCustom) {
+                        ConversationNotificationScope.CUSTOM_FOR_THIS_CHAT
+                    } else {
+                        ConversationNotificationScope.USE_GLOBAL_DEFAULT
+                    }
+                val result =
+                    withContext(Dispatchers.Default) {
+                        routing.setScope(descriptor, category, requestedScope)
+                    }
+                pendingChannel = null
+                result.onFailure { appState.present(R.string.toast_notification_scope_update_failed) }
+                result.onSuccess { updatedSetting ->
+                    if (useCustom) {
+                        openCategorySettings(
+                            context,
+                            updatedSetting,
+                            descriptor,
+                            accountRef,
+                            groupIdHex,
+                            conversationAvatarUrl,
                         )
                     }
-                },
-        )
+                }
+            }
+        },
+    )
+}
+
+private fun openCategorySettings(
+    context: Context,
+    setting: ConversationNotificationCategorySetting,
+    descriptor: NotificationConversationDescriptor,
+    accountRef: String,
+    groupIdHex: String,
+    conversationAvatarUrl: String?,
+) {
+    when (setting.settingsTarget) {
+        is AndroidNotificationSettingsTarget.Global ->
+            openNotificationChannelSettings(context, setting.channel)
+
+        is AndroidNotificationSettingsTarget.Conversation ->
+            openConversationNotificationSettings(
+                context = context,
+                accountRef = accountRef,
+                groupIdHex = groupIdHex,
+                isDm = descriptor.isDm,
+                parent = setting.channel,
+                conversationTitle = descriptor.title,
+                conversationAvatarUrl = conversationAvatarUrl,
+                primaryVibrationPattern = descriptor.primaryVibrationPattern,
+            )
     }
 }
 
@@ -262,19 +393,5 @@ internal fun notificationModeLabel(mode: ChatNotifyMode): String =
             ChatNotifyMode.ALL -> R.string.notify_all_messages
             ChatNotifyMode.MENTIONS_ONLY -> R.string.notify_only_mentions
             ChatNotifyMode.NONE -> R.string.notify_nothing
-        },
-    )
-
-@Composable
-private fun notificationChannelTitle(parent: NotificationChannelSpec): String =
-    stringResource(
-        when (parent) {
-            NotificationChannelSpec.DIRECT_MESSAGES -> R.string.notification_channel_direct_messages
-            NotificationChannelSpec.GROUP_MESSAGES -> R.string.notification_channel_group_messages
-            NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions
-            NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions
-            NotificationChannelSpec.INVITES -> R.string.notification_channel_invites
-            NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
-            NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
         },
     )

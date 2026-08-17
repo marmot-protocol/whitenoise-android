@@ -35,6 +35,16 @@ class ConversationNotificationSettingsTest {
     }
 
     @Test
+    fun globalIntentTargetsTheExactChannelWithoutConversationScope() {
+        val intent = notificationChannelSettingsIntent(context, NotificationChannelSpec.REACTIONS.id)
+
+        assertEquals(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS, intent.action)
+        assertEquals(context.packageName, intent.getStringExtra(Settings.EXTRA_APP_PACKAGE))
+        assertEquals(NotificationChannelSpec.REACTIONS.id, intent.getStringExtra(Settings.EXTRA_CHANNEL_ID))
+        assertNull(intent.getStringExtra(Settings.EXTRA_CONVERSATION_ID))
+    }
+
+    @Test
     fun api30IntentTargetsTheConversationShortcut() {
         val intent =
             conversationNotificationSettingsIntent(
@@ -86,7 +96,7 @@ class ConversationNotificationSettingsTest {
     }
 
     @Test
-    fun openDeepLinksWithTheGroupParentAndCreatesItsConversationChannels() {
+    fun openDeepLinksWithTheGroupParentAndCreatesOnlyItsMessageChannel() {
         val app = RuntimeEnvironment.getApplication()
         val manager = app.getSystemService(NotificationManager::class.java)
         NotificationChannels.ensureChannels(app)
@@ -99,9 +109,15 @@ class ConversationNotificationSettingsTest {
         assertEquals(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS, started.action)
         assertEquals(expectedChannelId, started.getStringExtra(Settings.EXTRA_CHANNEL_ID))
         assertEquals(shortcutId, started.getStringExtra(Settings.EXTRA_CONVERSATION_ID))
-        // Multi-parent: both the message and mention conversation channels were created.
         assertNotNull(manager.getNotificationChannel(expectedChannelId))
-        assertNotNull(manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.MENTIONS.id, shortcutId)))
+        assertNull(
+            manager.getNotificationChannel(
+                ConversationNotificationChannels.conversationChannelId(
+                    NotificationChannelSpec.MENTIONS.id,
+                    shortcutId,
+                ),
+            ),
+        )
     }
 
     @Test
