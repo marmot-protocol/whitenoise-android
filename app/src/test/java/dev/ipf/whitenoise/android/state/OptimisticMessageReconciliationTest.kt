@@ -10,6 +10,41 @@ import org.junit.Test
 
 class OptimisticMessageReconciliationTest {
     @Test
+    fun pendingProjectionKeepsOptimisticRetentionUntilOuterProjectionArrives() {
+        val projected = message("confirmed")
+
+        assertEquals(
+            30uL,
+            preservePendingProjectionRetention(
+                projected = projected,
+                sourceMessageIdHex = null,
+                fallbackRetentionSeconds = 30uL,
+            ).retentionSeconds,
+        )
+        assertNull(
+            preservePendingProjectionRetention(
+                projected = projected,
+                sourceMessageIdHex = "outer-message-id",
+                fallbackRetentionSeconds = 30uL,
+            ).retentionSeconds,
+        )
+    }
+
+    @Test
+    fun pendingProjectionNeverOverridesAnEngineRetentionValue() {
+        val projected = message("confirmed").copy(retentionSeconds = 60uL)
+
+        assertEquals(
+            60uL,
+            preservePendingProjectionRetention(
+                projected = projected,
+                sourceMessageIdHex = null,
+                fallbackRetentionSeconds = 30uL,
+            ).retentionSeconds,
+        )
+    }
+
+    @Test
     fun matchingPendingMessageIsReconciledWhenProjectionArrives() {
         val pending = timelineMessage("temp", MessageStatus.Pending)
 
