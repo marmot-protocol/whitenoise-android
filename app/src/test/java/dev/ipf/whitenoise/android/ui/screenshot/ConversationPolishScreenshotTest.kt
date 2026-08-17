@@ -115,6 +115,11 @@ class ConversationPolishScreenshotTest {
     }
 
     @Test
+    fun attachmentTransferStatesDark() {
+        captureAttachmentTransferStates("attachment_transfer_states_dark", dark = true, amoled = false)
+    }
+
+    @Test
     fun attachmentTransferStatesAmoled() {
         captureAttachmentTransferStates("attachment_transfer_states_amoled", dark = true, amoled = true)
     }

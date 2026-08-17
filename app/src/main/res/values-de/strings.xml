@@ -791,6 +791,8 @@
     <string name="media_upload_failed">Upload fehlgeschlagen</string>
     <string name="media_tap_to_retry">Zum Wiederholen tippen</string>
     <string name="media_tap_to_download">Zum Herunterladen tippen</string>
+    <string name="media_preparing_download">Download wird vorbereitet</string>
+    <string name="media_downloading">Wird heruntergeladen</string>
     <string name="media_save">Speichern</string>
     <string name="media_saved">In Galerie gespeichert</string>
     <string name="media_save_failed">Bild konnte nicht gespeichert werden</string>

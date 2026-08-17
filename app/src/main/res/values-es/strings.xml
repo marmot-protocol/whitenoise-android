@@ -791,6 +791,8 @@
     <string name="media_upload_failed">Error al subir</string>
     <string name="media_tap_to_retry">Toca para reintentar</string>
     <string name="media_tap_to_download">Toca para descargar</string>
+    <string name="media_preparing_download">Preparando descarga</string>
+    <string name="media_downloading">Descargando</string>
     <string name="media_save">Guardar</string>
     <string name="media_saved">Guardado en la galería</string>
     <string name="media_save_failed">No se pudo guardar la imagen</string>
