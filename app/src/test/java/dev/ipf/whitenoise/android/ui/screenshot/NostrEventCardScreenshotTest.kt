@@ -10,11 +10,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCard
@@ -111,24 +116,57 @@ class NostrEventCardScreenshotTest {
         capture("nostr_event_cards_states_amoled")
     }
 
+    @Test
+    fun fileAndFallbackStatesLargeRtl() {
+        render(
+            darkTheme = false,
+            fontScale = 1.5f,
+            layoutDirection = LayoutDirection.Rtl,
+        ) {
+            EventBubble(
+                NostrEventCardState.Loaded(
+                    card(
+                        NostrEventCardKind.File,
+                        1_063,
+                        "خطة المشروع.pdf",
+                        "ملف عام مشترك مع تفاصيل كافية للتعرّف عليه.",
+                        listOf("2.4 MB", "PDF"),
+                    ),
+                ),
+                mine = false,
+            )
+            EventBubble(NostrEventCardState.Invalid, mine = true)
+            EventBubble(NostrEventCardState.NotFound, mine = false)
+        }
+        capture("nostr_event_cards_file_states_large_rtl")
+    }
+
     private fun render(
         darkTheme: Boolean,
         amoled: Boolean = false,
+        fontScale: Float = 1f,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         content: @Composable () -> Unit,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
-                Surface {
-                    Column(
-                        modifier =
-                            Modifier
-                                .width(360.dp)
-                                .background(MaterialTheme.colorScheme.surface)
-                                .padding(16.dp)
-                                .testTag(TAG),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        content()
+                val density = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalDensity provides Density(density.density, fontScale),
+                    LocalLayoutDirection provides layoutDirection,
+                ) {
+                    Surface {
+                        Column(
+                            modifier =
+                                Modifier
+                                    .width(360.dp)
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .padding(16.dp)
+                                    .testTag(TAG),
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            content()
+                        }
                     }
                 }
             }

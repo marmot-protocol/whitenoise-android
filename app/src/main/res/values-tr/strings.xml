@@ -1469,7 +1469,7 @@
     <string name="nostr_event_copy">Etkinlik referansını kopyala</string>
     <string name="nostr_event_type_note">Not</string>
     <string name="nostr_event_type_article">Makale</string>
-    <string name="nostr_event_type_video">Video içeriği</string>
+    <string name="nostr_event_type_video">Video</string>
     <string name="nostr_event_type_release">Yazılım sürümü</string>
     <string name="nostr_event_type_file">Dosya</string>
     <string name="nostr_event_type_generic">Etkinlik · Tür %1$d</string>

@@ -1473,6 +1473,6 @@
     <string name="nostr_event_type_article">Artigo</string>
     <string name="nostr_event_type_video">Vídeo</string>
     <string name="nostr_event_type_release">Versão de software</string>
-    <string name="nostr_event_type_file">Ficheiro</string>
+    <string name="nostr_event_type_file">Arquivo</string>
     <string name="nostr_event_type_generic">Evento · Tipo %1$d</string>
 </resources>

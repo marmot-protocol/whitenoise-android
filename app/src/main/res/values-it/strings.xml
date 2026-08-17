@@ -1471,7 +1471,7 @@
     <string name="nostr_event_copy">Copia riferimento evento</string>
     <string name="nostr_event_type_note">Nota</string>
     <string name="nostr_event_type_article">Articolo</string>
-    <string name="nostr_event_type_video">Filmato</string>
+    <string name="nostr_event_type_video">Video</string>
     <string name="nostr_event_type_release">Versione software</string>
     <string name="nostr_event_type_file">File multimediale</string>
     <string name="nostr_event_type_generic">Evento · Tipo %1$d</string>

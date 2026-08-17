@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.updates
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
 import dev.ipf.whitenoise.android.core.nostr.NostrRelayQueryClient
+import dev.ipf.whitenoise.android.core.nostr.NostrRelayTimeoutException
 import kotlinx.coroutines.CancellationException
 import okhttp3.OkHttpClient
 import okhttp3.WebSocket
@@ -13,11 +14,13 @@ import java.util.concurrent.TimeUnit
 
 private const val KIND_ZAPSTORE_RELEASE = 30063
 
-class ZapstoreReleaseClient(
-    private val httpClient: WebSocket.Factory = defaultHttpClient(),
-    private val relayUrl: String = ZAPSTORE_RELAY,
+class ZapstoreReleaseClient internal constructor(
+    private val httpClient: WebSocket.Factory,
+    private val relayUrl: String,
     private val publisherPubkey: String = ZAPSTORE_PUBLISHER_PUBKEY,
 ) {
+    constructor() : this(defaultHttpClient(), ZAPSTORE_RELAY, ZAPSTORE_PUBLISHER_PUBKEY)
+
     private val relayQueryClient = NostrRelayQueryClient(httpClient, maxConcurrentSockets = 1)
 
     suspend fun fetchLatest(
@@ -63,14 +66,12 @@ class ZapstoreReleaseClient(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: IOException) {
-            var currentCause: Throwable? = error
-            var timedOut = false
-            while (currentCause != null && !timedOut) {
-                timedOut = currentCause.message?.contains("timed out", ignoreCase = true) == true
-                currentCause = currentCause.cause
-            }
             throw IOException(
-                if (timedOut) "Zapstore relay request timed out" else "Zapstore relay request failed",
+                if (error.hasRelayTimeoutCause()) {
+                    "Zapstore relay request timed out"
+                } else {
+                    "Zapstore relay request failed"
+                },
                 error,
             )
         }
@@ -95,6 +96,8 @@ class ZapstoreReleaseClient(
                 .build()
     }
 }
+
+private fun Throwable.hasRelayTimeoutCause(): Boolean = generateSequence(this) { it.cause }.any { it is NostrRelayTimeoutException }
 
 internal object ZapstoreEvents {
     /**

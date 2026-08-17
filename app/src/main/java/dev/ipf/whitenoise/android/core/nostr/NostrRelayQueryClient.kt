@@ -33,6 +33,11 @@ internal data class NostrRelayQueryResult(
     val failedRelayCount: Int,
 )
 
+internal class NostrRelayTimeoutException(
+    message: String,
+    cause: Throwable? = null,
+) : IOException(message, cause)
+
 /**
  * Small, bounded public-event query primitive shared by app features. Every
  * endpoint gets one exact, finite subscription that closes at EOSE, failure,
@@ -66,14 +71,14 @@ internal class NostrRelayQueryClient(
                         async(start = CoroutineStart.UNDISPATCHED) {
                             try {
                                 Result.success(
-                                    socketPermits.withPermit {
-                                        withTimeout(timeoutMillis) {
+                                    withTimeout(timeoutMillis) {
+                                        socketPermits.withPermit {
                                             queryRelay(relayUrl, JSONObject(filterJson), eventLimit)
                                         }
                                     },
                                 )
                             } catch (timeout: TimeoutCancellationException) {
-                                Result.failure(IOException("Relay request timed out", timeout))
+                                Result.failure(NostrRelayTimeoutException("Relay request timed out", timeout))
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
                             } catch (error: IOException) {

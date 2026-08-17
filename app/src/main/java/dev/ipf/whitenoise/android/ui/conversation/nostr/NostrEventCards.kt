@@ -160,7 +160,7 @@ private fun EventCardActions(
         horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onCopy, modifier = Modifier.size(40.dp)) {
+        IconButton(onClick = onCopy, modifier = Modifier.size(48.dp)) {
             Icon(
                 Icons.Outlined.ContentCopy,
                 contentDescription = copyDescription,
@@ -168,7 +168,7 @@ private fun EventCardActions(
                 tint = contentColor.copy(alpha = 0.8f),
             )
         }
-        IconButton(onClick = onOpen, modifier = Modifier.size(40.dp)) {
+        IconButton(onClick = onOpen, modifier = Modifier.size(48.dp)) {
             Icon(
                 Icons.AutoMirrored.Outlined.OpenInNew,
                 contentDescription = openDescription,
@@ -324,7 +324,7 @@ private fun EventCardFailure(
         )
         IconButton(
             onClick = onRetry,
-            modifier = Modifier.size(40.dp),
+            modifier = Modifier.size(48.dp),
         ) {
             Icon(
                 Icons.Outlined.Refresh,

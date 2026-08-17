@@ -131,6 +131,26 @@ class NostrEventReferenceTest {
         )
     }
 
+    @Test
+    fun documentWalkDoesNotScanCodeBlocks() {
+        val nevent = encode("nevent", tlv(0, List(32) { 5 }))
+        val document =
+            MarkdownDocumentFfi(
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.CodeBlock(
+                            kind = dev.ipf.marmotkit.MarkdownCodeBlockKindFfi.FENCED,
+                            info = "",
+                            content = nevent,
+                        ),
+                    ),
+                truncated = false,
+                blankLinesBefore = byteArrayOf(0),
+            )
+
+        assertEquals(emptyList<NostrEventReferenceOccurrence>(), nostrEventReferences(document))
+    }
+
     private fun tlv(
         type: Int,
         value: List<Int>,

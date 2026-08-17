@@ -4,6 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -122,10 +123,39 @@ class NostrRelayQueryClientTest {
                     .mapNotNull(Throwable::message)
                     .toList()
             assertTrue(causeMessages.contains("Relay request timed out"))
+            assertTrue(generateSequence<Throwable>(error) { it.cause }.any { it is NostrRelayTimeoutException })
             assertEquals(0, factory.socket.closeCalls.get())
             assertEquals(1, factory.socket.cancelCalls.get())
         } finally {
             close(httpClient, relay.server)
+        }
+    }
+
+    @Test
+    fun socketPermitWaitCountsAgainstEachRelayTimeout() {
+        val relays = List(4) { silentRelay() }
+        val httpClient = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).build()
+        try {
+            val error =
+                assertThrows(IOException::class.java) {
+                    runBlocking {
+                        withTimeout(400) {
+                            NostrRelayQueryClient(httpClient, maxConcurrentSockets = 1)
+                                .query(
+                                    relayUrls = relays.map { it.server.webSocketUrl() },
+                                    filter = JSONObject().put("kinds", JSONArray().put(1)),
+                                    timeoutMillis = 100,
+                                )
+                        }
+                    }
+                }
+
+            assertEquals("Public relay query failed", error.message)
+            assertTrue(generateSequence<Throwable>(error) { it.cause }.any { it is NostrRelayTimeoutException })
+        } finally {
+            httpClient.connectionPool.evictAll()
+            httpClient.dispatcher.executorService.shutdownNow()
+            relays.forEach { it.server.shutdown() }
         }
     }
 

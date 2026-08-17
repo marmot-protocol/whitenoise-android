@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.PlayCircleOutline
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
@@ -38,10 +39,12 @@ internal fun NostrEventCardKind.label(eventKind: Int): String =
         NostrEventCardKind.Generic -> stringResource(R.string.nostr_event_type_generic, eventKind)
     }
 
+@Composable
 internal fun eventByline(
     card: NostrEventCardModel,
     authorDisplayName: (String) -> String,
 ): String {
+    val locale = LocalConfiguration.current.locales[0]
     val author =
         authorDisplayName(card.authorPubkeyHex).takeIf(String::isNotBlank)
             ?: IdentityFormatter.short(card.authorPubkeyHex)
@@ -49,6 +52,7 @@ internal fun eventByline(
         runCatching {
             DateTimeFormatter
                 .ofLocalizedDate(FormatStyle.MEDIUM)
+                .withLocale(locale)
                 .format(Instant.ofEpochSecond(card.createdAt).atZone(ZoneId.systemDefault()))
         }.getOrNull()
     return listOfNotNull(author, date).joinToString(" · ")
