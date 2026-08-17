@@ -44,7 +44,7 @@ class TransientRelaySendErrorTest {
             val result =
                 retryTransientRelaySend { attempt ->
                     attempts = attempt
-                    if (attempt == 1) throw MarmotKitException.Publish("connect relay timed out")
+                    if (attempt == 1) throw MarmotKitException.Publish("connect relay failed")
                     "sent"
                 }
 
@@ -102,6 +102,15 @@ class TransientRelaySendErrorTest {
     @Test
     fun connectRelayTimedOutIsTransient() {
         assertTrue(isTransientRelaySendError(RuntimeException("connect relay timed out")))
+    }
+
+    @Test
+    fun connectRelayFailureFromMdkIsTransient() {
+        assertTrue(
+            isTransientRelaySendError(
+                MarmotKitException.Publish("connect relay failed"),
+            ),
+        )
     }
 
     @Test
@@ -206,7 +215,7 @@ class TransientRelaySendErrorTest {
     fun notificationReplyOutcomeTreatsConnectGapAsRetryable() {
         assertEquals(
             NotificationReplySendOutcome.RetryableFailure,
-            notificationReplySendFailureOutcome(RuntimeException("connect relay timed out")),
+            notificationReplySendFailureOutcome(MarmotKitException.Publish("connect relay failed")),
         )
     }
 
