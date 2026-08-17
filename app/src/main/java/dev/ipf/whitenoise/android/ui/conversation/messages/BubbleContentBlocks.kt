@@ -73,12 +73,11 @@ internal fun ttsBodyIsCollapsed(
     maxBodyHeightPx: Int,
 ): Boolean = collapseEnabled && (measuredBodyHeightPx == null || measuredBodyHeightPx > maxBodyHeightPx)
 
-internal fun receivedFileOwnsTimestamp(
+internal fun fileCardOwnsFooter(
     deleted: Boolean,
-    mine: Boolean,
     fileCount: Int,
-    visualOwnsTimestamp: Boolean,
-): Boolean = !deleted && !mine && fileCount > 0 && !visualOwnsTimestamp
+    visualOwnsFooter: Boolean,
+): Boolean = !deleted && fileCount > 0 && !visualOwnsFooter
 
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
@@ -93,6 +92,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     sharedUser: SharedUser?,
     deleted: Boolean,
     mine: Boolean,
+    showStatus: Boolean,
     footerOnVisualMedia: Boolean,
     footerOnPendingVisual: Boolean,
     showPendingPlaceholder: Boolean,
@@ -191,15 +191,15 @@ internal fun ColumnScope.BubbleMediaBlocks(
         }
     }
     if (!deleted && bubbleMedia.files.isNotEmpty()) {
-        val fileOwnsTimestamp =
-            receivedFileOwnsTimestamp(
+        val fileOwnsFooter =
+            fileCardOwnsFooter(
                 deleted = deleted,
-                mine = mine,
                 fileCount = bubbleMedia.files.size,
-                visualOwnsTimestamp = footerOnVisualMedia,
+                visualOwnsFooter = footerOnVisualMedia,
             )
-        val fileTimestamp = if (fileOwnsTimestamp) rememberedMessageBubbleTime(record.recordedAt) else null
+        val fileTimestamp = if (fileOwnsFooter) rememberedMessageBubbleTime(record.recordedAt) else null
         bubbleMedia.files.forEachIndexed { filePosition, entry ->
+            val isFooterOwner = fileOwnsFooter && filePosition == bubbleMedia.files.lastIndex
             MediaFileBubble(
                 messageIdHex = record.messageIdHex,
                 attachmentIndex = entry.index,
@@ -211,7 +211,9 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 senderDisplayName = appState.displayName(record.sender),
                 onLongPress = onMediaLongPress,
                 attachedToCaption = attachedToCaption,
-                timestampText = fileTimestamp.takeIf { filePosition == bubbleMedia.files.lastIndex },
+                timestampText = fileTimestamp.takeIf { isFooterOwner },
+                showStatus = isFooterOwner && showStatus,
+                status = item.status,
             )
         }
     }
@@ -301,10 +303,19 @@ internal fun ColumnScope.BubbleMediaBlocks(
         }
     }
     if (showPendingPlaceholder) {
+        val pendingFileOwnsFooter =
+            fileCardOwnsFooter(
+                deleted = deleted,
+                fileCount = controller.pendingAttachmentsList(record.messageIdHex).size,
+                visualOwnsFooter = footerOnPendingVisual,
+            )
         MediaPendingPlaceholder(
             pendingAttachments = controller.pendingAttachmentsList(record.messageIdHex),
             failed = item.status == MessageStatus.Failed,
             attachedToCaption = attachedToCaption,
+            timestampText = rememberedMessageBubbleTime(record.recordedAt).takeIf { pendingFileOwnsFooter },
+            showStatus = pendingFileOwnsFooter && showStatus,
+            status = item.status,
             onRetry =
                 if (mine && item.status == MessageStatus.Failed) {
                     { appState.launchMutation { controller.retryFailedSend(item) } }

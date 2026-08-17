@@ -64,6 +64,9 @@ class ReceivedFileTimestampScreenshotTest {
                             sizeBytes = 48_213L,
                             failed = false,
                             statusLabel = "Uploading",
+                            timestampText = SINGLE_TIME,
+                            showStatus = true,
+                            status = MessageStatus.Pending,
                         )
                     }
                     Surface(
@@ -91,6 +94,9 @@ class ReceivedFileTimestampScreenshotTest {
             .onAllNodesWithContentDescription("Uploading", useUnmergedTree = true)
             .assertCountEquals(1)
         composeRule
+            .onAllNodesWithContentDescription("Sending", useUnmergedTree = true)
+            .assertCountEquals(1)
+        composeRule
             .onAllNodesWithContentDescription("Tap to download", useUnmergedTree = true)
             .assertCountEquals(1)
     }
@@ -109,6 +115,15 @@ class ReceivedFileTimestampScreenshotTest {
                             reference = reference("release-notes.pdf", "application/pdf"),
                             transferState = AttachmentTransferState.Remote,
                             timestampText = SINGLE_TIME,
+                        )
+
+                        Text("Sent file", style = MaterialTheme.typography.labelMedium)
+                        FileCard(
+                            reference = reference("design-spec.pdf", "application/pdf"),
+                            transferState = AttachmentTransferState.Available,
+                            timestampText = SENT_TIME,
+                            showStatus = true,
+                            status = MessageStatus.Sent,
                         )
 
                         Text("File with caption", style = MaterialTheme.typography.labelMedium)
@@ -175,12 +190,14 @@ class ReceivedFileTimestampScreenshotTest {
         }
 
         composeRule.onAllNodesWithText(SINGLE_TIME).assertCountEquals(1)
+        composeRule.onAllNodesWithText(SENT_TIME).assertCountEquals(1)
         composeRule.onAllNodesWithText(CAPTION_TIME).assertCountEquals(1)
         composeRule.onAllNodesWithText(GROUP_TIME).assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Tap to download").assertCountEquals(2)
         composeRule.onAllNodesWithContentDescription("Preparing download").assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Downloading").assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Tap to retry").assertCountEquals(1)
+        composeRule.onAllNodesWithContentDescription("Sent").assertCountEquals(1)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/received_file_timestamp_light.png")
     }
 
@@ -214,11 +231,45 @@ class ReceivedFileTimestampScreenshotTest {
             .captureRoboImage("src/test/snapshots/received_file_timestamp_dark_large_rtl.png")
     }
 
+    @Test
+    fun sentFileTimestampLargeRtl() {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalDensity provides Density(density = 1f, fontScale = 1.6f),
+                LocalLayoutDirection provides LayoutDirection.Rtl,
+            ) {
+                WhiteNoiseTheme(darkTheme = true) {
+                    Surface(modifier = Modifier.padding(16.dp).testTag(SENT_RTL_TAG)) {
+                        FileCard(
+                            reference =
+                                reference(
+                                    "quarterly-roadmap-with-a-very-long-filename.pdf",
+                                    "application/pdf",
+                                ),
+                            transferState = AttachmentTransferState.Available,
+                            timestampText = SENT_RTL_TIME,
+                            showStatus = true,
+                            status = MessageStatus.Sent,
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onAllNodesWithText(SENT_RTL_TIME).assertCountEquals(1)
+        composeRule.onAllNodesWithContentDescription("Sent").assertCountEquals(1)
+        composeRule
+            .onNodeWithTag(SENT_RTL_TAG)
+            .captureRoboImage("src/test/snapshots/sent_file_timestamp_dark_large_rtl.png")
+    }
+
     @Composable
     private fun FileCard(
         reference: MediaAttachmentReferenceFfi,
         transferState: AttachmentTransferState,
         timestampText: String?,
+        showStatus: Boolean = false,
+        status: MessageStatus = MessageStatus.Received,
     ) {
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant,
@@ -230,6 +281,8 @@ class ReceivedFileTimestampScreenshotTest {
                 presentation = resolveAttachmentPresentation(reference.mediaType, reference.fileName),
                 transferState = transferState,
                 timestampText = timestampText,
+                showStatus = showStatus,
+                status = status,
             )
         }
     }
@@ -253,10 +306,13 @@ class ReceivedFileTimestampScreenshotTest {
     private companion object {
         const val TAG = "received-file-timestamp-gallery"
         const val SINGLE_TIME = "10:01 AM"
-        const val CAPTION_TIME = "10:02 AM"
-        const val GROUP_TIME = "10:03 AM"
+        const val SENT_TIME = "10:02 AM"
+        const val CAPTION_TIME = "10:03 AM"
+        const val GROUP_TIME = "10:04 AM"
         const val RTL_TAG = "received-file-timestamp-rtl"
-        const val RTL_TIME = "10:04 AM"
+        const val RTL_TIME = "10:05 AM"
+        const val SENT_RTL_TAG = "sent-file-timestamp-rtl"
+        const val SENT_RTL_TIME = "10:06 AM"
         const val SPREADSHEET_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         const val SENDING_CARD_TAG = "sending-file-card"
         const val RECEIVED_CARD_TAG = "received-file-card"

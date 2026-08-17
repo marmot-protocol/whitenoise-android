@@ -55,57 +55,44 @@ class BubbleMediaTest {
     }
 
     @Test
-    fun receivedFileOwnsTimestampWhenNoVisualOverlayExists() {
+    fun fileCardOwnsFooterWhenNoVisualOverlayExists() {
         assertTrue(
-            receivedFileOwnsTimestamp(
+            fileCardOwnsFooter(
                 deleted = false,
-                mine = false,
                 fileCount = 1,
-                visualOwnsTimestamp = false,
+                visualOwnsFooter = false,
             ),
         )
         assertTrue(
-            receivedFileOwnsTimestamp(
+            fileCardOwnsFooter(
                 deleted = false,
-                mine = false,
                 fileCount = 3,
-                visualOwnsTimestamp = false,
+                visualOwnsFooter = false,
             ),
         )
     }
 
     @Test
-    fun receivedFileDoesNotDuplicateAnotherTimestampOwner() {
+    fun fileCardDoesNotDuplicateAnotherFooterOwner() {
         assertFalse(
-            receivedFileOwnsTimestamp(
-                deleted = false,
-                mine = true,
-                fileCount = 1,
-                visualOwnsTimestamp = false,
-            ),
-        )
-        assertFalse(
-            receivedFileOwnsTimestamp(
+            fileCardOwnsFooter(
                 deleted = true,
-                mine = false,
                 fileCount = 1,
-                visualOwnsTimestamp = false,
+                visualOwnsFooter = false,
             ),
         )
         assertFalse(
-            receivedFileOwnsTimestamp(
+            fileCardOwnsFooter(
                 deleted = false,
-                mine = false,
                 fileCount = 0,
-                visualOwnsTimestamp = false,
+                visualOwnsFooter = false,
             ),
         )
         assertFalse(
-            receivedFileOwnsTimestamp(
+            fileCardOwnsFooter(
                 deleted = false,
-                mine = false,
                 fileCount = 1,
-                visualOwnsTimestamp = true,
+                visualOwnsFooter = true,
             ),
         )
     }

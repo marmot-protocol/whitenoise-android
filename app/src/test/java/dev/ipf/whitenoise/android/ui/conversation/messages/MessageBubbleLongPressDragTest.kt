@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -35,6 +36,7 @@ import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -63,56 +65,22 @@ class MessageBubbleLongPressDragTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
     @Test
-    @Suppress("LongMethod") // The real MessageBubble host requires its full interaction contract.
     fun receivedUncaptionedFileUsesOnlyTheFileCardTimestamp() {
-        val appState = appState()
-        val controller = ConversationController(appState = appState, initialGroup = group())
-        val item = receivedFileTimelineMessage()
-        val composerTextState = ComposerTextState(TextFieldValue(""))
-        var timestampText = ""
-
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                timestampText = rememberedMessageBubbleTime(item.record.recordedAt)
-                MessageBubble(
-                    item = item,
-                    controller = controller,
-                    appState = appState,
-                    composerTextState = composerTextState,
-                    highlighted = false,
-                    selectionMode = false,
-                    textSelectionMode = false,
-                    onTextSelectionModeChange = {},
-                    onTextSelectionBoundsChange = {},
-                    batchSelectable = true,
-                    selected = false,
-                    onToggleSelection = {},
-                    rangeDragActive = false,
-                    onDragSelectionStart = {},
-                    onDragSelection = { false },
-                    onDragSelectionEnd = {},
-                    onDragSelectionCancel = {},
-                    quickReactionEmojis = emptyList(),
-                    recentEmojis = emptyList(),
-                    onEmojiUsed = {},
-                    isActionMenuOpen = false,
-                    onActionMenuOpenChange = {},
-                    onQuickReactionsSave = {},
-                    onQuickReactionsReset = {},
-                    onReplyPreviewClick = {},
-                    composerGate = ComposerGate.COMPOSER,
-                    inviteMutationInFlight = false,
-                    onJoinInvite = {},
-                    onDeclineInvite = {},
-                    mentionCandidates = emptyList(),
-                    mentionPickerEnabled = false,
-                )
-            }
-        }
-
-        composeRule.runOnIdle { assertTrue(timestampText.isNotBlank()) }
+        val timestampText = renderFileMessage(fileTimelineMessage(mine = false))
         composeRule
             .onAllNodesWithText(timestampText, useUnmergedTree = true)
+            .assertCountEquals(1)
+    }
+
+    @Test
+    fun sentUncaptionedFileUsesOnlyTheFileCardTimestampAndStatus() {
+        val timestampText = renderFileMessage(fileTimelineMessage(mine = true))
+
+        composeRule
+            .onAllNodesWithText(timestampText, useUnmergedTree = true)
+            .assertCountEquals(1)
+        composeRule
+            .onAllNodesWithContentDescription(context.getString(R.string.sent), useUnmergedTree = true)
             .assertCountEquals(1)
     }
 
@@ -425,6 +393,56 @@ class MessageBubbleLongPressDragTest {
             activeAccountRef = ACCOUNT_REF,
         )
 
+    @Suppress("LongMethod") // The real MessageBubble host requires its full interaction contract.
+    private fun renderFileMessage(item: TimelineMessage): String {
+        val appState = appState()
+        val controller = ConversationController(appState = appState, initialGroup = group())
+        val composerTextState = ComposerTextState(TextFieldValue(""))
+        var timestampText = ""
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                timestampText = rememberedMessageBubbleTime(item.record.recordedAt)
+                MessageBubble(
+                    item = item,
+                    controller = controller,
+                    appState = appState,
+                    composerTextState = composerTextState,
+                    highlighted = false,
+                    selectionMode = false,
+                    textSelectionMode = false,
+                    onTextSelectionModeChange = {},
+                    onTextSelectionBoundsChange = {},
+                    batchSelectable = true,
+                    selected = false,
+                    onToggleSelection = {},
+                    rangeDragActive = false,
+                    onDragSelectionStart = {},
+                    onDragSelection = { false },
+                    onDragSelectionEnd = {},
+                    onDragSelectionCancel = {},
+                    quickReactionEmojis = emptyList(),
+                    recentEmojis = emptyList(),
+                    onEmojiUsed = {},
+                    isActionMenuOpen = false,
+                    onActionMenuOpenChange = {},
+                    onQuickReactionsSave = {},
+                    onQuickReactionsReset = {},
+                    onReplyPreviewClick = {},
+                    composerGate = ComposerGate.COMPOSER,
+                    inviteMutationInFlight = false,
+                    onJoinInvite = {},
+                    onDeclineInvite = {},
+                    mentionCandidates = emptyList(),
+                    mentionPickerEnabled = false,
+                )
+            }
+        }
+
+        composeRule.runOnIdle { assertTrue(timestampText.isNotBlank()) }
+        return timestampText
+    }
+
     private fun timelineMessage(index: Int = 0): TimelineMessage {
         val messageId = (5 + index).toString(16).padStart(2, '0') + "00".repeat(31)
         return TimelineMessage(
@@ -454,9 +472,11 @@ class MessageBubbleLongPressDragTest {
         )
     }
 
-    private fun receivedFileTimelineMessage(): TimelineMessage {
+    private fun fileTimelineMessage(mine: Boolean): TimelineMessage {
         val record =
             timelineMessage().record.copy(
+                direction = if (mine) "sent" else "received",
+                sender = if (mine) ACCOUNT_ID else SENDER_ID,
                 plaintext = "",
                 sourceEpoch = 1uL,
             )
@@ -503,7 +523,7 @@ class MessageBubbleLongPressDragTest {
         return TimelineMessage(
             id = "msg:${record.messageIdHex}",
             record = record,
-            status = MessageStatus.Received,
+            status = if (mine) MessageStatus.Sent else MessageStatus.Received,
             projected = projected,
         )
     }

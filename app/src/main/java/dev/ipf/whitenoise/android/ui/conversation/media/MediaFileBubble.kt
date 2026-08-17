@@ -66,7 +66,9 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingMessageStatusIcon
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -76,6 +78,8 @@ private val FileBubbleWidth = 240.dp
 private val FileTransferControlSize = 48.dp
 private val FileTransferControlSurfaceSize = 40.dp
 private val FileTrailingMetadataMaxWidth = 96.dp
+private val FileTrailingMetadataWithStatusMaxWidth = 112.dp
+private val FileTimestampWithStatusMaxWidth = 92.dp
 
 internal fun Modifier.fileBubbleWidth(): Modifier = width(FileBubbleWidth)
 
@@ -104,6 +108,8 @@ internal fun MediaFileBubble(
     onLongPress: () -> Unit = {},
     attachedToCaption: Boolean = false,
     timestampText: String? = null,
+    showStatus: Boolean = false,
+    status: MessageStatus = MessageStatus.Received,
 ) {
     val context = LocalContext.current
     val openAttachment = rememberAttachmentOpener()
@@ -218,6 +224,8 @@ internal fun MediaFileBubble(
             presentation = presentation,
             transferState = transferState,
             timestampText = timestampText,
+            showStatus = showStatus,
+            status = status,
         )
     }
     if (readerOpen && textCandidate != null) {
@@ -270,6 +278,8 @@ internal fun MediaFileBubbleContent(
     presentation: AttachmentPresentation,
     transferState: AttachmentTransferState,
     timestampText: String? = null,
+    showStatus: Boolean = false,
+    status: MessageStatus = MessageStatus.Received,
 ) {
     FileBubbleContent(
         fileName = reference.fileName,
@@ -279,6 +289,7 @@ internal fun MediaFileBubbleContent(
         metadataIsError = transferState == AttachmentTransferState.Failed,
         trailingMetadataText = timestampText,
         trailingMetadataIsError = false,
+        trailingStatus = status.takeIf { showStatus },
         loadingDescription = stringResource(R.string.media_downloading),
         transferDirection = FileTransferDirection.Download,
     )
@@ -298,6 +309,7 @@ private fun FileBubbleContent(
     metadataIsError: Boolean,
     trailingMetadataText: String?,
     trailingMetadataIsError: Boolean,
+    trailingStatus: MessageStatus?,
     loadingDescription: String,
     transferDirection: FileTransferDirection,
 ) {
@@ -338,21 +350,50 @@ private fun FileBubbleContent(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                trailingMetadataText?.let { trailingText ->
-                    Text(
-                        text = trailingText,
-                        style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.ContentOrLtr),
-                        color =
-                            if (trailingMetadataIsError) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        textAlign = TextAlign.End,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = FileTrailingMetadataMaxWidth),
-                    )
+                if (trailingMetadataText != null || trailingStatus != null) {
+                    val trailingColor =
+                        if (trailingMetadataIsError) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        modifier =
+                            Modifier.widthIn(
+                                max =
+                                    if (trailingStatus == null) {
+                                        FileTrailingMetadataMaxWidth
+                                    } else {
+                                        FileTrailingMetadataWithStatusMaxWidth
+                                    },
+                            ),
+                    ) {
+                        trailingMetadataText?.let { trailingText ->
+                            Text(
+                                text = trailingText,
+                                style =
+                                    MaterialTheme.typography.labelSmall.copy(
+                                        textDirection = TextDirection.ContentOrLtr,
+                                    ),
+                                color = trailingColor,
+                                textAlign = TextAlign.End,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier =
+                                    Modifier.widthIn(
+                                        max =
+                                            if (trailingStatus == null) {
+                                                FileTrailingMetadataMaxWidth
+                                            } else {
+                                                FileTimestampWithStatusMaxWidth
+                                            },
+                                    ),
+                            )
+                        }
+                        trailingStatus?.let { OutgoingMessageStatusIcon(it, tint = trailingColor) }
+                    }
                 }
             }
         }
@@ -585,6 +626,9 @@ internal fun PendingFilePill(
     statusLabel: String,
     onRetry: (() -> Unit)? = null,
     attachedToCaption: Boolean = false,
+    timestampText: String? = null,
+    showStatus: Boolean = false,
+    status: MessageStatus = MessageStatus.Pending,
 ) {
     val presentation = remember(mediaType, fileName) { resolveAttachmentPresentation(mediaType, fileName) }
     Surface(
@@ -611,10 +655,11 @@ internal fun PendingFilePill(
                 } else {
                     AttachmentTransferState.Downloading
                 },
-            metadataText = formatFileSize(sizeBytes),
-            metadataIsError = false,
-            trailingMetadataText = statusLabel,
-            trailingMetadataIsError = failed,
+            metadataText = if (failed && timestampText != null) statusLabel else formatFileSize(sizeBytes),
+            metadataIsError = failed && timestampText != null,
+            trailingMetadataText = timestampText ?: statusLabel,
+            trailingMetadataIsError = failed && timestampText == null,
+            trailingStatus = status.takeIf { showStatus },
             loadingDescription = statusLabel,
             transferDirection = FileTransferDirection.Upload,
         )
