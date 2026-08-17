@@ -107,7 +107,7 @@ class MessageForwardingTest {
     @Test
     fun publishOnlyRetryReusesTargetUploadsAndResumesAtFirstUnpublishedMessage() =
         runTest {
-            val transport = RecordingForwardTransport(failPublishOnceFor = mutableSetOf("target"))
+            val transport = RecordingForwardTransport(failPublishUncertainOnceFor = mutableSetOf("target"))
             val session =
                 ForwardSession(
                     scope = this,
@@ -132,9 +132,87 @@ class MessageForwardingTest {
             advanceUntilIdle()
 
             assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
-            assertEquals(listOf(0, 1), transport.publishStartIndices)
+            assertEquals(listOf(0, 2), transport.publishStartIndices)
+            assertEquals(listOf("target"), transport.convergenceTargets)
             assertEquals(listOf("target" to 0, "target" to 1), transport.published)
             assertEquals(1, transport.uploadTargets.size)
+        }
+
+    @Test
+    fun failedConvergenceNeverResendsAnUncertainMessage() =
+        runTest {
+            val transport =
+                RecordingForwardTransport(
+                    failPublishUncertainOnceFor = mutableSetOf("target"),
+                    recoverPendingPublish = false,
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(textPayload("first", "first"), textPayload("second", "second")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceUntilIdle()
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
+            assertEquals(listOf(0), transport.publishStartIndices)
+            assertEquals(listOf("target"), transport.convergenceTargets)
+            assertEquals(listOf("target" to 0), transport.published)
+        }
+
+    @Test
+    fun provenPreCommitFailureRetriesTheSameIndexWithoutConvergence() =
+        runTest {
+            val transport = RecordingForwardTransport(failPublishBeforeCommitOnceFor = mutableSetOf("target"))
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(textPayload("first", "first"), textPayload("second", "second")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceUntilIdle()
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            assertEquals(listOf(0, 1), transport.publishStartIndices)
+            assertTrue(transport.convergenceTargets.isEmpty())
+            assertEquals(listOf("target" to 0, "target" to 1), transport.published)
+        }
+
+    @Test
+    fun missingPendingCommitEvidenceNeverConvergesOrResends() =
+        runTest {
+            val transport =
+                RecordingForwardTransport(
+                    failPublishUncertainOnceFor = mutableSetOf("target"),
+                    uncertainPendingMessageId = null,
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(textPayload("first", "first"), textPayload("second", "second")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceUntilIdle()
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
+            assertEquals(listOf(0), transport.publishStartIndices)
+            assertTrue(transport.convergenceTargets.isEmpty())
+            assertEquals(listOf("target" to 0), transport.published)
         }
 
     @Test
@@ -350,16 +428,20 @@ class MessageForwardingTest {
 
     private class RecordingForwardTransport(
         private val failUploadOnceFor: MutableSet<String> = mutableSetOf(),
-        private val failPublishOnceFor: MutableSet<String> = mutableSetOf(),
+        private val failPublishUncertainOnceFor: MutableSet<String> = mutableSetOf(),
+        private val failPublishBeforeCommitOnceFor: MutableSet<String> = mutableSetOf(),
         private val uploadGate: CompletableDeferred<Unit>? = null,
         private val materializeGate: CompletableDeferred<Unit>? = null,
         private val materializedByteCount: Int = 1,
         private val materializedBytes: ByteArray? = null,
         private val onUpload: () -> Unit = {},
+        private val recoverPendingPublish: Boolean = true,
+        private val uncertainPendingMessageId: String? = "pending-forward",
     ) : ForwardTransport {
         val materializedIndices = mutableListOf<Int>()
         val uploadTargets = mutableListOf<String>()
         val publishStartIndices = mutableListOf<Int>()
+        val convergenceTargets = mutableListOf<String>()
         val published = mutableListOf<Pair<String, Int>>()
         val publishedMediaHashes = mutableMapOf<String, List<String>>()
 
@@ -409,7 +491,16 @@ class MessageForwardingTest {
             for (index in startIndex until messages.size) {
                 currentCoroutineContext().ensureActive()
                 onBeforeMessagePublished(index)
-                if (index == 1 && failPublishOnceFor.remove(targetGroupIdHex)) error("publish failed")
+                if (index == 1 && failPublishBeforeCommitOnceFor.remove(targetGroupIdHex)) {
+                    throw ForwardPublishNotCommittedException(IllegalStateException("publish rejected"))
+                }
+                if (index == 1 && failPublishUncertainOnceFor.remove(targetGroupIdHex)) {
+                    throw ForwardPublishUncertainException(
+                        messageIndex = index,
+                        pendingMessageIdHex = uncertainPendingMessageId,
+                        cause = IllegalStateException("publish failed"),
+                    )
+                }
                 val message = messages[index]
                 if (message is PreparedForwardMessage.Media) {
                     publishedMediaHashes[targetGroupIdHex] =
@@ -418,6 +509,15 @@ class MessageForwardingTest {
                 published += targetGroupIdHex to index
                 onMessagePublished(index)
             }
+        }
+
+        override suspend fun recoverPendingPublish(
+            targetGroupIdHex: String,
+            pendingMessageIdHex: String,
+        ): Boolean {
+            convergenceTargets += targetGroupIdHex
+            if (recoverPendingPublish) published += targetGroupIdHex to 1
+            return recoverPendingPublish
         }
     }
 

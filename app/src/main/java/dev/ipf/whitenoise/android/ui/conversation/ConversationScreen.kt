@@ -3307,13 +3307,6 @@ internal fun ConversationScreen(
     if (batchForwardSheetOpen && batchSelectionUi.forwardPayloads.isNotEmpty()) {
         ForwardMessageSheet(
             appState = appState,
-            body =
-                batchSelectionUi.forwardPayloads.joinToString("\n") { payload ->
-                    when (payload) {
-                        is ForwardMessagePayload.Text -> payload.text
-                        is ForwardMessagePayload.Media -> payload.caption.orEmpty()
-                    }
-                },
             messageCount = batchSelectionUi.forwardPayloads.size,
             attachmentCount =
                 batchSelectionUi.forwardPayloads.sumOf { payload ->

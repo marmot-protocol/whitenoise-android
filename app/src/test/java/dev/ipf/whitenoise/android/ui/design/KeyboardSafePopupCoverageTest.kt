@@ -200,17 +200,15 @@ class KeyboardSafePopupCoverageTest {
     }
 
     @Test
-    fun forwardMessageSheetRemainsModalBottomSheet() {
-        val body = messageActionsSource().readText().functionBody("ForwardMessageSheet")
+    fun forwardMessagePickerUsesItsOwnFullScreenDialog() {
+        val body = forwardPickerSource().readText().functionBody("ForwardMessagePickerFullScreen")
 
         assertTrue(
-            "ForwardMessageSheet intentionally keeps a focusable search field in ModalBottomSheet",
-            "ModalBottomSheet(" in body &&
-                "FlowSearchField(" in body &&
-                ".onFocusChanged { searchFocused = it.isFocused }" in body,
+            "ForwardMessagePicker must own a full-screen modal window",
+            "Dialog(" in body && "usePlatformDefaultWidth = false" in body,
         )
         assertFalse(
-            "ForwardMessageSheet must not migrate to KeyboardSafePopup",
+            "ForwardMessagePicker must not use a popup overlay",
             "KeyboardSafePopup(" in body,
         )
     }
@@ -218,6 +216,8 @@ class KeyboardSafePopupCoverageTest {
     private fun keyboardSafePopupSource(): File = sourceFile("ui/design/KeyboardSafePopup.kt")
 
     private fun messageActionsSource(): File = sourceFile("ui/conversation/messages/MessageActions.kt")
+
+    private fun forwardPickerSource(): File = sourceFile("ui/conversation/messages/ForwardMessagePicker.kt")
 
     private fun positionSource(): File = sourceFile("ui/conversation/messages/MessageActionMenuPositionProvider.kt")
 

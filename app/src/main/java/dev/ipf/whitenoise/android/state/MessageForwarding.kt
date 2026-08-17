@@ -118,6 +118,17 @@ internal interface ForwardTransport {
         onBeforeMessagePublished: (messageIndex: Int) -> Unit,
         onMessagePublished: (messageIndex: Int) -> Unit,
     )
+
+    /**
+     * Drive an MDK commit whose previous publish result was ambiguous. Returning
+     * false means no pending commit was recovered; callers must not mint a new
+     * event automatically because the previous event may already be visible to
+     * another member.
+     */
+    suspend fun recoverPendingPublish(
+        targetGroupIdHex: String,
+        pendingMessageIdHex: String,
+    ): Boolean
 }
 
 /** Resolves optimistic metadata before any source bytes cross into a forward session. */
@@ -149,6 +160,20 @@ internal class ForwardPayloadTooLargeException : IllegalArgumentException(FORWAR
 internal class ForwardAttachmentExpiredException : IllegalStateException("forward attachment expired")
 
 internal class ForwardSessionInvalidatedException : IllegalStateException("forward session account changed")
+
+internal class ForwardPublishUncertainException(
+    val messageIndex: Int,
+    val pendingMessageIdHex: String?,
+    cause: Throwable,
+) : IllegalStateException("forward publish result is uncertain", cause)
+
+internal class ForwardPublishNotCommittedException(
+    cause: Throwable,
+) : IllegalStateException("forward publish failed before a local commit", cause)
+
+private const val FORWARD_PUBLISH_RECOVERY_UNAVAILABLE = "forward pending publish could not be recovered"
+
+internal class ForwardPublishRecoveryUnavailableException : IllegalStateException(FORWARD_PUBLISH_RECOVERY_UNAVAILABLE)
 
 /**
  * One retryable fan-out operation. Plaintext is materialized once, while every
@@ -202,6 +227,8 @@ internal class ForwardSession(
     private val retainedPlaintextBuffers = mutableListOf<ByteArray>()
     private val uploadedReferencesByTarget = mutableMapOf<String, MutableMap<Int, List<MediaAttachmentReferenceFfi>>>()
     private val publishedMessageCountByTarget = normalizedTargets.associateWithTo(mutableMapOf()) { 0 }
+    private val uncertainPublishIndexByTarget = mutableMapOf<String, Int>()
+    private val uncertainPendingMessageIdByTarget = mutableMapOf<String, String?>()
     private var activeJob: Job? = null
     private var released = false
     private var started = false
@@ -264,6 +291,7 @@ internal class ForwardSession(
 
     fun cancel() {
         val job = activeJob?.takeIf(Job::isActive) ?: return
+        if (_state.value.targets.any { it.phase == ForwardTargetPhase.Sending || it.sentMessages > 0 }) return
         _state.update { it.copy(phase = ForwardOperationPhase.Cancelling) }
         job.cancel(CancellationException("forward cancelled"))
     }
@@ -416,7 +444,7 @@ internal class ForwardSession(
     }
 
     // Each destination converts all non-cancellation transport failures into retry state.
-    @Suppress("TooGenericExceptionCaught")
+    @Suppress("LongMethod", "ThrowsCount", "TooGenericExceptionCaught")
     private suspend fun processTarget(
         targetGroupIdHex: String,
         prepared: List<PreparedForwardMessage>,
@@ -444,6 +472,20 @@ internal class ForwardSession(
             currentCoroutineContext().ensureActive()
             failureStage = ForwardFailureStage.Publish
             updateForwardTarget(_state, targetGroupIdHex) { it.copy(phase = ForwardTargetPhase.Sending) }
+            uncertainPublishIndexByTarget[targetGroupIdHex]?.let { uncertainIndex ->
+                val pendingMessageIdHex = uncertainPendingMessageIdByTarget[targetGroupIdHex]
+                if (
+                    pendingMessageIdHex == null ||
+                    !transport.recoverPendingPublish(targetGroupIdHex, pendingMessageIdHex)
+                ) {
+                    throw ForwardPublishRecoveryUnavailableException()
+                }
+                val recoveredCount = uncertainIndex + 1
+                publishedMessageCountByTarget[targetGroupIdHex] = recoveredCount
+                uncertainPublishIndexByTarget.remove(targetGroupIdHex)
+                uncertainPendingMessageIdByTarget.remove(targetGroupIdHex)
+                updateForwardTarget(_state, targetGroupIdHex) { it.copy(sentMessages = recoveredCount) }
+            }
             transport.publishBatch(
                 targetGroupIdHex = targetGroupIdHex,
                 messages = prepared,
@@ -469,6 +511,10 @@ internal class ForwardSession(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (failure: Exception) {
+            if (failure is ForwardPublishUncertainException) {
+                uncertainPublishIndexByTarget[targetGroupIdHex] = failure.messageIndex
+                uncertainPendingMessageIdByTarget[targetGroupIdHex] = failure.pendingMessageIdHex
+            }
             if (failure is ForwardAttachmentExpiredException) failureStage = ForwardFailureStage.Expired
             if (failure is ForwardSessionInvalidatedException) failureStage = ForwardFailureStage.SessionChanged
             onFailure(targetGroupIdHex, failureStage, failure)
@@ -518,6 +564,8 @@ internal class ForwardSession(
         retainedPlaintextBuffers.clear()
         preparedMessages = null
         uploadedReferencesByTarget.clear()
+        uncertainPublishIndexByTarget.clear()
+        uncertainPendingMessageIdByTarget.clear()
     }
 
     private companion object {

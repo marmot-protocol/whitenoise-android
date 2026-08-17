@@ -33,6 +33,21 @@ class ForwardProductionBoundaryCoverageTest {
         assertTrue("onMessagePublished(messageIndex)" in body)
     }
 
+    @Test
+    fun uncertainPublishUsesConvergenceAndTheAppScopeOwnsCompletion() {
+        val body = appStateSource().readText().functionBody("startForwardMessages")
+
+        assertTrue("forwardProjectionRecords(targetGroupIdHex, message, references)" in body)
+        assertTrue("pendingMessageIdHex = newProjection.messageIdHex" in body)
+        assertTrue("ForwardPublishNotCommittedException(failure)" in body)
+        assertTrue("retryGroupConvergence(account, targetGroupIdHex)" in body)
+        assertTrue("it.messageIdHex == pendingMessageIdHex" in body)
+        assertTrue("delivered.sourceMessageIdHex != null" in body)
+        assertTrue("mutationsScope.launch" in body)
+        assertTrue("session.state.first { !it.isActive }" in body)
+        assertTrue("session.release()" in body)
+    }
+
     private fun appStateSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),

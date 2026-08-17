@@ -65,4 +65,13 @@ class ForwardFolderRowsTest {
             ),
         )
     }
+
+    @Test
+    fun repeatedRowTapsAlwaysToggleTheSameChat() {
+        var selected = emptyList<String>()
+        repeat(10) { tap ->
+            selected = toggleForwardTargetSelection(selected, "CHAT-A")
+            assertEquals(if (tap % 2 == 0) listOf("chat-a") else emptyList(), selected)
+        }
+    }
 }

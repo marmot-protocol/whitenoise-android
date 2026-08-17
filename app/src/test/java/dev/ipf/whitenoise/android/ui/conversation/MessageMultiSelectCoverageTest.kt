@@ -85,7 +85,7 @@ class MessageMultiSelectCoverageTest {
     }
 
     @Test
-    fun forwardingKeepsSelectionAliveUntilProgressSheetCloses() {
+    fun forwardingClearsSelectionThroughThePickerDismissalBoundary() {
         val source = source("ConversationScreen.kt").replace(Regex("\\s+"), " ")
         val forwardSheet = source.substringAfter("if (batchForwardSheetOpen").substringBefore("batchInfoSelection?.let")
 

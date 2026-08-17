@@ -125,11 +125,17 @@ internal fun ContactRow(
                 .fillMaxWidth()
                 .heightIn(min = 64.dp)
                 .let {
-                    if (onClick != null) {
+                    if (onClick != null && onLongClick != null) {
                         it.combinedClickable(
                             enabled = enabled,
                             role = Role.Button,
                             onLongClick = onLongClick,
+                            onClick = onClick,
+                        )
+                    } else if (onClick != null) {
+                        it.clickable(
+                            enabled = enabled,
+                            role = Role.Button,
                             onClick = onClick,
                         )
                     } else {

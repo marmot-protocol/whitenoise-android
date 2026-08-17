@@ -59,10 +59,11 @@ class KeyboardPreservingBottomSheetCoverageTest {
     }
 
     @Test
-    fun forwardSheetKeepsItsFocusableModalForSearch() {
-        val body = messageActionsSource().readText().functionBody("ForwardMessageSheet")
+    fun forwardPickerUsesAFullScreenDialogInsteadOfASheet() {
+        val body = forwardPickerSource().readText()
 
-        assertTrue("the forward flow still needs a focusable ModalBottomSheet for its search field", "ModalBottomSheet(" in body)
+        assertTrue("the forward flow should own a full-screen Dialog", "Dialog(" in body)
+        assertFalse("the forward flow should not use a draggable sheet", "ModalBottomSheet(" in body)
     }
 
     private fun appSheetsSource(): File = source("ui/design/AppSheets.kt")
@@ -71,7 +72,7 @@ class KeyboardPreservingBottomSheetCoverageTest {
 
     private fun messageFullScreenSource(): File = source("ui/conversation/messages/MessageFullScreen.kt")
 
-    private fun messageActionsSource(): File = source("ui/conversation/messages/MessageActions.kt")
+    private fun forwardPickerSource(): File = source("ui/conversation/messages/ForwardMessagePicker.kt")
 
     private fun source(relativePath: String): File =
         listOf(

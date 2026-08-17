@@ -1991,18 +1991,13 @@ internal fun MessageBubble(
                 if (forwardSheetOpen && !deleted && forwardPayload != null) {
                     ForwardMessageSheet(
                         appState = appState,
-                        body =
-                            when (forwardPayload) {
-                                is ForwardMessagePayload.Text -> forwardPayload.text
-                                is ForwardMessagePayload.Media -> forwardPayload.caption.orEmpty()
-                            },
                         attachmentCount =
                             (forwardPayload as? ForwardMessagePayload.Media)?.attachments?.size ?: 0,
                         originGroupIdHex = record.groupIdHex,
                         onDismiss = { forwardSheetOpen = false },
                         onForward = { targetGroupIds ->
                             if (deleted) {
-                                null
+                                false
                             } else {
                                 appState.startForwardMessages(targetGroupIds, listOf(forwardPayload))
                             }
