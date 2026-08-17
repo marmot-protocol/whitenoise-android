@@ -1034,6 +1034,8 @@ class LocalizationResourceTest {
                         "attachment_type_audio",
                         "attachment_type_video",
                         "attachment_type_file",
+                        // "Video" is also the established Italian event-card term.
+                        "nostr_event_type_video",
                     ),
                 "values-pt" to
                     setOf(
@@ -1051,6 +1053,7 @@ class LocalizationResourceTest {
                         "media_counted_format",
                         // "Video" is the standard Turkish media-type term.
                         "attachment_type_video",
+                        "nostr_event_type_video",
                     ),
             )
     }
