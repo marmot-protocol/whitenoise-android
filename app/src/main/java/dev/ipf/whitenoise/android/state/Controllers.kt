@@ -4675,7 +4675,10 @@ class ChatsController private constructor(
     fun forwardTargets(): List<ChatListItem> =
         sortChatListItems(
             currentProjectedItems().filter { item ->
-                isEligibleForwardTarget(item, appState.activeAccount?.accountIdHex)
+                isEligibleForwardTarget(
+                    item = item,
+                    activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
+                )
             },
         )
 
