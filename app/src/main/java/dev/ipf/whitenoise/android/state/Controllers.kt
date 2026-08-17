@@ -1638,12 +1638,17 @@ internal fun streamFinalDisplayPosition(
  * first event but whose ack was lost/late would receive a second, distinct
  * event and peers would see a duplicate user message (adversarial review of
  * PR #299). The deliberately EXCLUDED post-send / ambiguous reasons are:
+ *   - `send event failed`             — `send_event_to` returned an SDK error;
+ *                                        the redacted reason cannot prove the
+ *                                        frame was never accepted.
  *   - `send event timed out`          — `send_event_to` was called; the frame
  *                                        may have landed, only the OK ack timed
  *                                        out (transport-nostr-adapter
  *                                        `sdk_client.rs` "send event timed out").
  *   - `relay did not acknowledge event` — the relay returned the event in
  *                                        `output.failed`; it WAS transmitted.
+ *   - `relay rejected event (...)`    — also returned by `output.failed` after
+ *                                        the relay received the event.
  *   - `publish timed out after Ns: accepted X of required Y` /
  *     `insufficient publish acknowledgements: accepted X of required Y`
  *                                      — the same string is emitted whether
@@ -1677,6 +1682,23 @@ internal fun isTransientRelaySendError(throwable: Throwable): Boolean {
             .joinToString(separator = "\n") { error ->
                 listOfNotNull(error.message, error.javaClass.simpleName).joinToString(" ")
             }.lowercase()
+    // MDK collapses per-relay failure summaries with semicolons. A batch can
+    // therefore contain a connect-phase failure alongside a reason produced
+    // only after send_event_to was called. The connect substring must not make
+    // that mixed, potentially delivered outcome eligible for an automatic
+    // high-level resend.
+    if (
+        listOf(
+            "send event failed",
+            "send event timed out",
+            "relay did not acknowledge event",
+            "relay rejected event",
+            "publish timed out after",
+            "insufficient publish acknowledgements",
+        ).any(text::contains)
+    ) {
+        return false
+    }
     // Connect-phase only: the transport raises these before it ever calls
     // `send_event_to`, so the event provably never reached a relay and a
     // re-send cannot duplicate it.
