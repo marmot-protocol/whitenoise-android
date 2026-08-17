@@ -21,6 +21,9 @@ import kotlin.math.abs
 
 private const val MAX_ANIMATED_SCROLL_ITEMS = 10
 private const val MAX_TARGET_REPOSITION_ATTEMPTS = 3
+private const val DEFAULT_TAIL_LAYOUT_SETTLE_FRAMES = 8
+private const val MIN_TAIL_LAYOUT_SETTLE_FRAMES = 4
+private const val REQUIRED_STABLE_TAIL_LAYOUT_FRAMES = 2
 
 /** The durable reading intent behind the conversation's transient list geometry. */
 internal sealed interface ConversationScrollMode {
@@ -140,6 +143,21 @@ internal data class ConversationInitialAnchorLayout(
 ) {
     val isReady: Boolean
         get() = viewportHeight > 0 && targetItemSize != null
+}
+
+/** Measured tail geometry used to settle same-row height changes. */
+internal data class ConversationTailLayout(
+    val lastRowHeightPx: Int?,
+    val tailOffsetPx: Int?,
+    val tailSizePx: Int?,
+    val viewportEndOffsetPx: Int,
+) {
+    val isReady: Boolean
+        get() =
+            lastRowHeightPx != null &&
+                tailOffsetPx != null &&
+                tailSizePx != null &&
+                viewportEndOffsetPx > 0
 }
 
 /**
@@ -422,6 +440,64 @@ internal class ConversationScrollCoordinator(
             repeat(frameCount.coerceAtLeast(1)) {
                 awaitFrame()
                 scrollToItem(resolveTailIndex(), 0)
+            }
+        }
+    }
+
+    /**
+     * Keeps the physical tail pinned while an existing last row is remeasured.
+     *
+     * Reaction projections can arrive before their chip's final Compose
+     * measurement. A single next-frame scroll can therefore use the old list
+     * extent. This bounded settle follows the tail until the measured row and
+     * spacer geometry remain stable, then applies one final correction. The
+     * coordinator's normal command ownership makes the chase cancellable by a
+     * drag, navigation, conversation replacement, or disposal.
+     */
+    suspend fun settleTailAfterLayoutChange(
+        resolveTailIndex: () -> Int,
+        captureLayout: () -> ConversationTailLayout,
+        reason: ConversationScrollReason = ConversationScrollReason.ReactionLayout,
+        maxSettleFrames: Int = DEFAULT_TAIL_LAYOUT_SETTLE_FRAMES,
+        awaitFrame: suspend () -> Unit = { withFrameNanos { } },
+    ): Boolean {
+        if (!isFollowingTail || mode !is ConversationScrollMode.FollowingTail) return false
+        return programmaticJump(
+            targetMessageId = null,
+            reason = reason,
+            resultingMode = ConversationScrollMode.FollowingTail,
+        ) {
+            var previousLayout: ConversationTailLayout? = null
+            var baselineRowHeightPx = captureLayout().lastRowHeightPx
+            var observedRowHeightChange = false
+            var stableFrames = 0
+            var frame = 0
+            scrollToItem(resolveTailIndex(), 0)
+            while (frame < maxSettleFrames.coerceAtLeast(1)) {
+                awaitFrame()
+                val currentLayout = captureLayout()
+                val currentRowHeightPx = currentLayout.lastRowHeightPx
+                if (baselineRowHeightPx == null) {
+                    baselineRowHeightPx = currentRowHeightPx
+                } else if (currentRowHeightPx != null && currentRowHeightPx != baselineRowHeightPx) {
+                    observedRowHeightChange = true
+                }
+                stableFrames =
+                    if (currentLayout.isReady && currentLayout == previousLayout) {
+                        stableFrames + 1
+                    } else {
+                        0
+                    }
+                previousLayout = currentLayout
+                scrollToItem(resolveTailIndex(), 0)
+                frame++
+                if (
+                    observedRowHeightChange &&
+                    frame >= MIN_TAIL_LAYOUT_SETTLE_FRAMES &&
+                    stableFrames >= REQUIRED_STABLE_TAIL_LAYOUT_FRAMES
+                ) {
+                    break
+                }
             }
         }
     }
