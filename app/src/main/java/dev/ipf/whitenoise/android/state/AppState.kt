@@ -38,6 +38,8 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
+import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
@@ -75,6 +77,7 @@ import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
 import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
+import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemCopy
@@ -3004,6 +3007,144 @@ class WhiteNoiseAppState private constructor(
         shareShortcutPublisher.publish(accountRef, chats) { item ->
             chatListItemDisplayTitle(item, this, titleCopy)
         }
+    }
+
+    /**
+     * Start one ordered text/media forward operation. Source attachments are
+     * materialized through their original group, while every destination gets
+     * a separate upload before its batch acquires the destination commit lock.
+     */
+    internal fun startForwardMessages(
+        targetGroupIds: List<String>,
+        messages: List<ForwardMessagePayload>,
+    ): ForwardSession? {
+        val sourceGroupIds =
+            messages
+                .map(ForwardMessagePayload::sourceGroupIdHex)
+                .filter(String::isNotBlank)
+        val targets =
+            MessageProjector
+                .normalizeForwardTargets(targetGroupIds)
+                .filterNot { target -> sourceGroupIds.any { it.equals(target, ignoreCase = true) } }
+        val account = activeAccountRef?.takeIf(String::isNotBlank) ?: return null
+        if (messages.isEmpty() || targets.isEmpty()) return null
+        val sessionEpoch = mediaUploadSessionEpoch()
+
+        fun requireCurrentAccount() {
+            if (activeAccountRef != account || mediaUploadSessionEpoch() != sessionEpoch) {
+                throw ForwardSessionInvalidatedException()
+            }
+        }
+
+        val transport =
+            object : ForwardTransport {
+                override suspend fun materialize(
+                    sourceGroupIdHex: String,
+                    sourceMessageIdHex: String,
+                    source: dev.ipf.whitenoise.android.core.ForwardAttachmentSource,
+                ): PendingAttachment {
+                    requireCurrentAccount()
+                    val request =
+                        AttachmentTransferRequest(
+                            accountRef = account,
+                            groupIdHex = sourceGroupIdHex,
+                            messageIdHex = sourceMessageIdHex,
+                            attachmentIndex = source.attachmentIndex,
+                        )
+                    return materializeForwardAttachment(
+                        source = source,
+                        resolveAuthoritativeReference = {
+                            requireCurrentAccount()
+                            resolveAttachmentReference(request).also { requireCurrentAccount() }
+                        },
+                        downloadPlaintext = { reference ->
+                            requireCurrentAccount()
+                            downloadAttachmentPlaintext(request, reference).also { requireCurrentAccount() }
+                        },
+                    )
+                }
+
+                override suspend fun upload(
+                    targetGroupIdHex: String,
+                    message: PreparedForwardMessage.Media,
+                ): List<MediaAttachmentReferenceFfi> {
+                    requireCurrentAccount()
+                    val uploaded =
+                        marmotIo {
+                            uploadMedia(
+                                account,
+                                targetGroupIdHex,
+                                MediaUploadRequestFfi(
+                                    attachments =
+                                        message.attachments.map { attachment ->
+                                            MediaUploadAttachmentRequestFfi(
+                                                fileName = attachment.fileName,
+                                                mediaType = attachment.mediaType,
+                                                plaintext = attachment.plaintextBytes,
+                                                dim = attachment.dim,
+                                                thumbhash = attachment.thumbhash,
+                                            )
+                                        },
+                                    caption = message.caption,
+                                    send = false,
+                                    blossomServer = null,
+                                ),
+                            ).attachments.map { it.reference }
+                        }
+                    requireCurrentAccount()
+                    return uploaded
+                }
+
+                override suspend fun publishBatch(
+                    targetGroupIdHex: String,
+                    messages: List<PreparedForwardMessage>,
+                    uploadedReferences: Map<Int, List<MediaAttachmentReferenceFfi>>,
+                    startIndex: Int,
+                    onBeforeMessagePublished: (messageIndex: Int) -> Unit,
+                    onMessagePublished: (messageIndex: Int) -> Unit,
+                ) {
+                    requireCurrentAccount()
+                    withGroupCommitLock(account, targetGroupIdHex) {
+                        for (messageIndex in startIndex until messages.size) {
+                            currentCoroutineContext().ensureActive()
+                            onBeforeMessagePublished(messageIndex)
+                            requireCurrentAccount()
+                            when (val message = messages[messageIndex]) {
+                                is PreparedForwardMessage.Text ->
+                                    marmotIo { sendText(account, targetGroupIdHex, message.text) }
+                                is PreparedForwardMessage.Media -> {
+                                    val references =
+                                        uploadedReferences[messageIndex]
+                                            ?: error("missing destination media references")
+                                    marmotIo {
+                                        sendMediaAttachments(
+                                            account,
+                                            targetGroupIdHex,
+                                            references,
+                                            message.caption,
+                                        )
+                                    }
+                                }
+                            }
+                            onMessagePublished(messageIndex)
+                        }
+                    }
+                }
+            }
+
+        return ForwardSession(
+            scope = mutationsScope,
+            messages = messages,
+            targetGroupIds = targets,
+            transport = transport,
+            onFailure = { targetGroupIdHex, stage, throwable ->
+                Log.w(
+                    "DMMessageForward",
+                    "forward failed stage=$stage target=${targetGroupIdHex?.take(8).orEmpty()}",
+                    throwable,
+                )
+            },
+        ).also(ForwardSession::start)
     }
 
     /**

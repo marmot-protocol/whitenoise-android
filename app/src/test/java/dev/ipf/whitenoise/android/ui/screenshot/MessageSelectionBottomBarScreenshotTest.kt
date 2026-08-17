@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.ui.conversation.BatchSelectionActionAvailability
 import dev.ipf.whitenoise.android.ui.conversation.MessageSelectionBottomBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -47,10 +48,27 @@ class MessageSelectionBottomBarScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_selection_bottom_bar_narrow_large_text_light.png")
     }
 
+    @Test
+    fun pendingAttachmentExplainsDisabledForward() {
+        render(
+            width = 360.dp,
+            fontScale = 1f,
+            darkTheme = true,
+            canForward = false,
+            forwardBlockedReason = ForwardBlockedReason.PendingAttachment,
+        )
+
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/message_selection_bottom_bar_forward_pending_dark.png")
+    }
+
     private fun render(
         width: Dp,
         fontScale: Float,
         darkTheme: Boolean,
+        canForward: Boolean = true,
+        forwardBlockedReason: ForwardBlockedReason? = null,
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -68,12 +86,13 @@ class MessageSelectionBottomBarScreenshotTest {
                             availability =
                                 BatchSelectionActionAvailability(
                                     canCopy = true,
-                                    canForward = true,
+                                    canForward = canForward,
                                     canSave = true,
                                     canReply = true,
                                     canInfo = true,
                                     canDelete = true,
                                 ),
+                            forwardBlockedReason = forwardBlockedReason,
                             onCopy = {},
                             onForward = {},
                             onSave = {},

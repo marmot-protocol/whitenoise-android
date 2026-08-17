@@ -30,22 +30,28 @@ import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -53,12 +59,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
@@ -73,8 +82,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -83,12 +96,19 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ForwardFailureStage
+import dev.ipf.whitenoise.android.state.ForwardOperationPhase
+import dev.ipf.whitenoise.android.state.ForwardOperationSnapshot
+import dev.ipf.whitenoise.android.state.ForwardSession
+import dev.ipf.whitenoise.android.state.ForwardTargetPhase
+import dev.ipf.whitenoise.android.state.ForwardTargetProgress
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
@@ -118,6 +138,7 @@ internal fun MessageActionMenu(
     canDelete: Boolean,
     canEdit: Boolean,
     canForward: Boolean,
+    forwardBlockedReason: ForwardBlockedReason? = null,
     canSelect: Boolean,
     canCopyText: Boolean,
     canSpeak: Boolean,
@@ -142,8 +163,10 @@ internal fun MessageActionMenu(
     if (!expanded) return
 
     val density = LocalDensity.current
+    val explainedForwardBlock = forwardBlockedReason?.takeUnless { it == ForwardBlockedReason.Unsupported }
+    val showForwardAction = canForward || explainedForwardBlock != null
     val actionKinds =
-        remember(canReply, canEdit, canSelect, canSelectText, canCopyText, canSpeak, canForward, canSave, canInfo) {
+        remember(canReply, canEdit, canSelect, canSelectText, canCopyText, canSpeak, showForwardAction, canSave, canInfo) {
             messageActionKinds(
                 canReply = canReply,
                 canEdit = canEdit,
@@ -151,7 +174,7 @@ internal fun MessageActionMenu(
                 canSelectText = canSelectText,
                 canCopyText = canCopyText,
                 canSpeak = canSpeak,
-                canForward = canForward,
+                canForward = showForwardAction,
                 canSave = canSave,
                 canInfo = canInfo,
             )
@@ -163,6 +186,7 @@ internal fun MessageActionMenu(
         }
     val textMeasurer = rememberTextMeasurer()
     val actionTextStyle = MaterialTheme.typography.titleMedium
+    val actionSupportingTextStyle = MaterialTheme.typography.bodySmall
     val minimumActionCellWidth =
         remember(labeledActions, actionTextStyle, density, textMeasurer) {
             with(density) {
@@ -175,7 +199,15 @@ internal fun MessageActionMenu(
         }
     val actionRowHeight =
         with(density) {
-            maxOf(48.dp, actionTextStyle.lineHeight.toDp() + 16.dp)
+            maxOf(
+                if (explainedForwardBlock == null) 48.dp else 64.dp,
+                actionTextStyle.lineHeight.toDp() +
+                    if (explainedForwardBlock == null) {
+                        16.dp
+                    } else {
+                        actionSupportingTextStyle.lineHeight.toDp() * 2 + 16.dp
+                    },
+            )
         }
     val reactionRowHeight = 48.dp
     // Position from the frozen message bounds, not a screen corner. Centering
@@ -355,6 +387,12 @@ internal fun MessageActionMenu(
                                     rowActions.forEach { (kind, label) ->
                                         MessageActionButton(
                                             label = label,
+                                            supportingLabel =
+                                                if (kind == MessageActionKind.Forward) {
+                                                    explainedForwardBlock?.let { forwardBlockedReasonLabel(it) }
+                                                } else {
+                                                    null
+                                                },
                                             icon = {
                                                 if (kind == null) {
                                                     Icon(
@@ -381,6 +419,7 @@ internal fun MessageActionMenu(
                                                 }
                                             },
                                             modifier = Modifier.weight(1f),
+                                            enabled = kind != MessageActionKind.Forward || canForward,
                                             isDestructive = kind == null,
                                             minimumHeight = actionRowHeight,
                                         )
@@ -397,6 +436,18 @@ internal fun MessageActionMenu(
         }
     }
 }
+
+@Composable
+internal fun forwardBlockedReasonLabel(reason: ForwardBlockedReason): String =
+    when (reason) {
+        ForwardBlockedReason.PendingAttachment -> stringResource(R.string.forward_blocked_pending)
+        ForwardBlockedReason.FailedAttachment -> stringResource(R.string.forward_blocked_failed)
+        ForwardBlockedReason.MalformedAttachment -> stringResource(R.string.forward_blocked_malformed)
+        ForwardBlockedReason.ExpiredAttachment -> stringResource(R.string.forward_blocked_expired)
+        ForwardBlockedReason.UnavailableAttachment -> stringResource(R.string.forward_blocked_unavailable)
+        ForwardBlockedReason.RestrictedAttachment -> stringResource(R.string.forward_blocked_restricted)
+        ForwardBlockedReason.Unsupported -> stringResource(R.string.forward_blocked_unsupported)
+    }
 
 @Composable
 @Suppress("FunctionNaming")
@@ -420,7 +471,7 @@ private fun MessageActionIcon(kind: MessageActionKind) {
  * Chat-picker sheet for forwarding a message into one or more other chats
  * (issue #390). Multi-select, searchable, recent-first. Confirming fans the
  * message out to every selected chat as an independent fresh send (see
- * [WhiteNoiseAppState.forwardText]) — each target is re-encrypted under its own
+ * [WhiteNoiseAppState.startForwardMessages]) — each target is re-encrypted under its own
  * group state, with no source-group key reuse and no original-sender / source
  * attribution carried across the boundary.
  *
@@ -521,18 +572,194 @@ private fun LazyListScope.forwardFolderSection(
     }
 }
 
+@Composable
+internal fun ForwardProgressContent(
+    snapshot: ForwardOperationSnapshot,
+    targetTitles: Map<String, String>,
+    modifier: Modifier = Modifier,
+) {
+    val summary =
+        when (snapshot.phase) {
+            ForwardOperationPhase.Completed ->
+                pluralStringResource(
+                    R.plurals.forward_completed_summary,
+                    snapshot.completedTargets,
+                    snapshot.completedTargets,
+                )
+            ForwardOperationPhase.PartialFailure,
+            ->
+                stringResource(
+                    R.string.forward_partial_summary,
+                    snapshot.completedTargets,
+                    snapshot.targets.size,
+                )
+            ForwardOperationPhase.Failed -> stringResource(R.string.forward_failed_summary)
+            ForwardOperationPhase.Cancelled -> stringResource(R.string.forward_cancelled)
+            ForwardOperationPhase.Cancelling -> stringResource(R.string.forward_cancelling)
+            else -> stringResource(R.string.forward_progress_title)
+        }
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = summary,
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(horizontal = Dimens.spaceLg).semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        if (snapshot.phase == ForwardOperationPhase.Preparing && snapshot.totalAttachments > 0) {
+            LinearProgressIndicator(
+                progress = {
+                    snapshot.preparedAttachments.toFloat() / snapshot.totalAttachments.toFloat()
+                },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+            )
+            Text(
+                text =
+                    stringResource(
+                        R.string.forward_preparing_attachments,
+                        snapshot.preparedAttachments,
+                        snapshot.totalAttachments,
+                    ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+            )
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
+            contentPadding = PaddingValues(bottom = 4.dp),
+        ) {
+            items(snapshot.targets, key = ForwardTargetProgress::groupIdHex) { progress ->
+                ForwardTargetProgressRow(
+                    progress = progress,
+                    title =
+                        targetTitles[progress.groupIdHex.lowercase(Locale.ROOT)]
+                            ?: progress.groupIdHex.take(12),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ForwardTargetProgressRow(
+    progress: ForwardTargetProgress,
+    title: String,
+) {
+    val supportingText =
+        when (progress.phase) {
+            ForwardTargetPhase.Waiting -> stringResource(R.string.forward_waiting)
+            ForwardTargetPhase.Uploading ->
+                stringResource(
+                    R.string.forward_uploading_attachments,
+                    progress.uploadedAttachments,
+                    progress.totalAttachments,
+                )
+            ForwardTargetPhase.Sending ->
+                stringResource(
+                    R.string.forward_sending_messages,
+                    progress.sentMessages,
+                    progress.totalMessages,
+                )
+            ForwardTargetPhase.Completed -> stringResource(R.string.forward_sent)
+            ForwardTargetPhase.Cancelled -> stringResource(R.string.forward_cancelled)
+            ForwardTargetPhase.Failed -> {
+                val failure =
+                    when (progress.failureStage) {
+                        ForwardFailureStage.Upload -> stringResource(R.string.forward_failed_upload)
+                        ForwardFailureStage.Publish -> stringResource(R.string.forward_failed_publish)
+                        ForwardFailureStage.PayloadTooLarge -> stringResource(R.string.forward_payload_too_large)
+                        ForwardFailureStage.Expired -> stringResource(R.string.forward_failed_expired)
+                        ForwardFailureStage.SessionChanged -> stringResource(R.string.forward_failed_session_changed)
+                        ForwardFailureStage.Materialize,
+                        null,
+                        -> stringResource(R.string.forward_failed_preparing)
+                    }
+                if (progress.sentMessages > 0) {
+                    stringResource(
+                        R.string.forward_failed_after_partial,
+                        failure,
+                        progress.sentMessages,
+                        progress.totalMessages,
+                    )
+                } else {
+                    failure
+                }
+            }
+        }
+    ListItem(
+        modifier =
+            Modifier.semantics {
+                liveRegion = LiveRegionMode.Polite
+                stateDescription = supportingText
+            },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        headlineContent = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = { Text(supportingText, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        leadingContent = {
+            when (progress.phase) {
+                ForwardTargetPhase.Uploading,
+                ForwardTargetPhase.Sending,
+                -> CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                ForwardTargetPhase.Completed ->
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                ForwardTargetPhase.Failed ->
+                    Icon(
+                        Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                ForwardTargetPhase.Cancelled ->
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                ForwardTargetPhase.Waiting ->
+                    Icon(
+                        Icons.Default.Schedule,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+            }
+        },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ForwardMessageSheet(
     appState: WhiteNoiseAppState,
     body: String,
+    messageCount: Int = 1,
+    attachmentCount: Int = 0,
     originGroupIdHex: String,
     onDismiss: () -> Unit,
-    onForward: (List<String>) -> Unit,
+    onForward: (List<String>) -> ForwardSession?,
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     var query by remember { mutableStateOf("") }
     val selected = remember { mutableStateListOf<String>() }
+    var activeSession by remember { mutableStateOf<ForwardSession?>(null) }
+    var startFailed by remember { mutableStateOf(false) }
+    val operationSnapshot =
+        activeSession?.let { session ->
+            val snapshot by session.state.collectAsState()
+            snapshot
+        }
+    DisposableEffect(activeSession) {
+        val session = activeSession
+        onDispose { session?.release() }
+    }
+    val dismissSheet = {
+        activeSession?.release()
+        onDismiss()
+    }
     // Snapshot the forward targets once when the sheet opens. The chat list is
     // a live projection, but a picker that re-sorts under the user's finger as
     // a background send confirms would shuffle rows mid-selection; a stable
@@ -544,6 +771,10 @@ internal fun ForwardMessageSheet(
     val titledTargets =
         remember(targets, groupTitleCopy) {
             targets.map { it to chatListItemDisplayTitle(it, appState, groupTitleCopy) }
+        }
+    val targetTitles =
+        remember(titledTargets) {
+            titledTargets.associate { (item, title) -> item.group.groupIdHex.lowercase(Locale.ROOT) to title }
         }
     // Folders as bulk-select shortcuts: one row per custom folder with at
     // least two valid targets (a 0-1 chat folder is a no-op as a bulk
@@ -565,7 +796,16 @@ internal fun ForwardMessageSheet(
         }
     // Opens at half height with a drag up to full — a long chat list stays
     // reachable without the sheet swallowing the conversation behind it.
-    val sheetState = rememberModalBottomSheetState()
+    val operationBlocksDismiss =
+        operationSnapshot?.phase == ForwardOperationPhase.Preparing ||
+            operationSnapshot?.phase == ForwardOperationPhase.Running
+    val operationBlocksDismissState = rememberUpdatedState(operationBlocksDismiss)
+    val sheetState =
+        rememberModalBottomSheetState(
+            confirmValueChange = { target ->
+                target != SheetValue.Hidden || !operationBlocksDismissState.value
+            },
+        )
     var searchFocused by remember { mutableStateOf(false) }
     val expanded = sheetState.currentValue == SheetValue.Expanded || sheetState.targetValue == SheetValue.Expanded
     val targetListMaxHeight = if (expanded) 420.dp else 152.dp
@@ -578,7 +818,9 @@ internal fun ForwardMessageSheet(
             resolveMentionsInPlaintext(body) { appState.mentionDisplayName(it) }
         }
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            if (!operationBlocksDismiss) dismissSheet()
+        },
         sheetState = sheetState,
         containerColor = amoledSheetContainerColor(),
     ) {
@@ -589,7 +831,9 @@ internal fun ForwardMessageSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                stringResource(R.string.forward_to),
+                stringResource(
+                    if (operationSnapshot == null) R.string.forward_to else R.string.forward_progress_title,
+                ),
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
@@ -606,72 +850,129 @@ internal fun ForwardMessageSheet(
                 // names so the confirmation reads like the bubble (#615/#1090).
                 // The forwarded text stays the verbatim `body` — onForward
                 // never sees this string.
-                Text(
-                    forwardPreviewText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                )
-            }
-            FlowSearchField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = stringResource(R.string.forward_search_chats),
-                modifier =
-                    Modifier
-                        .padding(horizontal = Dimens.spaceLg)
-                        .onFocusChanged { searchFocused = it.isFocused },
-            )
-            // A query that matches only a folder name must still surface that
-            // folder row, so emptiness is judged across chats AND folders.
-            val visibleFolderRows = visibleForwardFolderRows(folderBulkRows, query)
-            LazyColumn(
-                modifier =
-                    Modifier
-                        .heightIn(max = targetListMaxHeight)
-                        .fillMaxWidth(),
-                contentPadding = PaddingValues(bottom = Dimens.spaceLg),
-            ) {
-                if (forwardPickerHasNoRows(targets.isEmpty(), filtered.isEmpty(), visibleFolderRows.isEmpty())) {
-                    item {
-                        Text(
-                            stringResource(
-                                if (targets.isEmpty()) R.string.forward_no_chats else R.string.forward_no_matches,
-                            ),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                        )
-                    }
-                } else {
-                    forwardFolderSection(visibleFolderRows, selected)
-                    if (filtered.isNotEmpty()) item { SectionHeader(stringResource(R.string.recent_chats)) }
-                    items(filtered, key = { (item, _) -> item.group.groupIdHex }) { (item, title) ->
-                        val groupId = item.group.groupIdHex.lowercase(Locale.ROOT)
-                        val isSelected = selected.contains(groupId)
-                        val avatarAccount = forwardTargetAvatarAccount(item)
-                        // Group rows preview the other members' names, mirroring
-                        // the chat-list mental model; direct chats need none.
-                        val membersPreview =
-                            remember(item, appState.profileRevisionForCompose) {
-                                forwardTargetMembersPreview(item, activeAccountIdHex) { memberIdHex ->
-                                    appState.contactDisplayNameCached(memberIdHex)
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Text(
+                        text =
+                            forwardPreviewText.takeIf(String::isNotBlank)
+                                ?: pluralStringResource(
+                                    R.plurals.forward_attachment_count,
+                                    attachmentCount,
+                                    attachmentCount,
+                                ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (messageCount > 1 || (attachmentCount > 0 && forwardPreviewText.isNotBlank())) {
+                        val detail =
+                            buildList {
+                                if (messageCount > 1) {
+                                    add(
+                                        pluralStringResource(
+                                            R.plurals.forward_message_count,
+                                            messageCount,
+                                            messageCount,
+                                        ),
+                                    )
                                 }
-                            }
-                        ContactRow(
-                            title = title,
-                            subtitle = membersPreview,
-                            avatarSeed = avatarAccount ?: item.group.groupIdHex,
-                            avatarUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
-                            avatarImage = rememberEncryptedGroupAvatar(appState, item.group),
-                            onClick = {
-                                if (isSelected) selected.remove(groupId) else selected.add(groupId)
-                            },
-                            trailing = { SelectionIndicator(selected = isSelected) },
+                                if (attachmentCount > 0) {
+                                    add(
+                                        pluralStringResource(
+                                            R.plurals.forward_attachment_count,
+                                            attachmentCount,
+                                            attachmentCount,
+                                        ),
+                                    )
+                                }
+                            }.joinToString(" · ")
+                        Text(
+                            text = detail,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
+            }
+            if (operationSnapshot == null) {
+                FlowSearchField(
+                    value = query,
+                    onValueChange = {
+                        query = it
+                        startFailed = false
+                    },
+                    placeholder = stringResource(R.string.forward_search_chats),
+                    modifier =
+                        Modifier
+                            .padding(horizontal = Dimens.spaceLg)
+                            .onFocusChanged { searchFocused = it.isFocused },
+                )
+                // A query that matches only a folder name must still surface that
+                // folder row, so emptiness is judged across chats AND folders.
+                val visibleFolderRows = visibleForwardFolderRows(folderBulkRows, query)
+                LazyColumn(
+                    modifier =
+                        Modifier
+                            .heightIn(max = targetListMaxHeight)
+                            .fillMaxWidth(),
+                    contentPadding = PaddingValues(bottom = Dimens.spaceLg),
+                ) {
+                    if (forwardPickerHasNoRows(targets.isEmpty(), filtered.isEmpty(), visibleFolderRows.isEmpty())) {
+                        item {
+                            Text(
+                                stringResource(
+                                    if (targets.isEmpty()) R.string.forward_no_chats else R.string.forward_no_matches,
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                            )
+                        }
+                    } else {
+                        forwardFolderSection(visibleFolderRows, selected)
+                        if (filtered.isNotEmpty()) item { SectionHeader(stringResource(R.string.recent_chats)) }
+                        items(filtered, key = { (item, _) -> item.group.groupIdHex }) { (item, title) ->
+                            val groupId = item.group.groupIdHex.lowercase(Locale.ROOT)
+                            val isSelected = selected.contains(groupId)
+                            val avatarAccount = forwardTargetAvatarAccount(item)
+                            // Group rows preview the other members' names, mirroring
+                            // the chat-list mental model; direct chats need none.
+                            val membersPreview =
+                                remember(item, appState.profileRevisionForCompose) {
+                                    forwardTargetMembersPreview(item, activeAccountIdHex) { memberIdHex ->
+                                        appState.contactDisplayNameCached(memberIdHex)
+                                    }
+                                }
+                            ContactRow(
+                                title = title,
+                                subtitle = membersPreview,
+                                avatarSeed = avatarAccount ?: item.group.groupIdHex,
+                                avatarUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
+                                avatarImage = rememberEncryptedGroupAvatar(appState, item.group),
+                                onClick = {
+                                    startFailed = false
+                                    if (isSelected) selected.remove(groupId) else selected.add(groupId)
+                                },
+                                trailing = { SelectionIndicator(selected = isSelected) },
+                            )
+                        }
+                    }
+                }
+            } else {
+                ForwardProgressContent(
+                    snapshot = operationSnapshot,
+                    targetTitles = targetTitles,
+                )
+            }
+            if (operationSnapshot == null && startFailed) {
+                Text(
+                    text = stringResource(R.string.forward_start_failed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier =
+                        Modifier
+                            .padding(horizontal = Dimens.spaceLg)
+                            .semantics { liveRegion = LiveRegionMode.Polite },
+                )
             }
 
             Surface(
@@ -682,34 +983,71 @@ internal fun ForwardMessageSheet(
                         .fillMaxWidth()
                         .imePadding(),
             ) {
-                Button(
-                    onClick = {
-                        onForward(forwardRecipientGroupIds(selected, originGroupIdHex))
-                        onDismiss()
-                    },
-                    enabled = selected.isNotEmpty(),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Dimens.spaceLg, vertical = 12.dp),
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.Forward,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        if (selected.isEmpty()) {
-                            stringResource(R.string.forward)
-                        } else {
-                            pluralStringResource(
-                                R.plurals.forward_to_chats_count,
-                                selected.size,
-                                selected.size,
+                when {
+                    operationSnapshot == null ->
+                        Button(
+                            onClick = {
+                                val session = onForward(forwardRecipientGroupIds(selected, originGroupIdHex))
+                                activeSession = session
+                                startFailed = session == null
+                            },
+                            enabled = selected.isNotEmpty(),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Dimens.spaceLg, vertical = 12.dp),
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Forward,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
                             )
-                        },
-                    )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                if (selected.isEmpty()) {
+                                    stringResource(R.string.forward)
+                                } else {
+                                    pluralStringResource(
+                                        R.plurals.forward_to_chats_count,
+                                        selected.size,
+                                        selected.size,
+                                    )
+                                },
+                            )
+                        }
+                    operationSnapshot.phase == ForwardOperationPhase.Cancelling ->
+                        TextButton(
+                            onClick = dismissSheet,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = 12.dp),
+                        ) {
+                            Text(stringResource(R.string.close))
+                        }
+                    operationSnapshot.isActive ->
+                        TextButton(
+                            onClick = { activeSession?.cancel() },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = 12.dp),
+                        ) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                    operationSnapshot.canRetry ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            OutlinedButton(onClick = dismissSheet, modifier = Modifier.weight(1f)) {
+                                Text(stringResource(R.string.close))
+                            }
+                            Button(onClick = { activeSession?.retryFailed() }, modifier = Modifier.weight(1f)) {
+                                Text(stringResource(R.string.forward_retry_failed))
+                            }
+                        }
+                    else ->
+                        Button(
+                            onClick = dismissSheet,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = 12.dp),
+                        ) {
+                            Text(stringResource(R.string.close))
+                        }
                 }
             }
         }
@@ -742,14 +1080,17 @@ private fun EmojiActionButton(
 @Composable
 internal fun MessageActionButton(
     label: String,
+    supportingLabel: String? = null,
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     isDestructive: Boolean = false,
     minimumHeight: Dp = 48.dp,
 ) {
     TextButton(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.fillMaxWidth().heightIn(min = minimumHeight),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         colors =
@@ -760,6 +1101,7 @@ internal fun MessageActionButton(
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     },
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
     ) {
         Row(
@@ -769,12 +1111,22 @@ internal fun MessageActionButton(
         ) {
             icon()
             Spacer(Modifier.width(8.dp))
-            Text(
-                label,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Column {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (supportingLabel != null) {
+                    Text(
+                        supportingLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }

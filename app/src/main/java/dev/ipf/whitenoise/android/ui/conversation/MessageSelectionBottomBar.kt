@@ -36,6 +36,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ForwardBlockedReason
+import dev.ipf.whitenoise.android.ui.conversation.messages.forwardBlockedReasonLabel
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,6 +45,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 @Suppress("FunctionNaming", "LongMethod")
 internal fun MessageSelectionBottomBar(
     availability: BatchSelectionActionAvailability,
+    forwardBlockedReason: ForwardBlockedReason? = null,
     onCopy: () -> Unit,
     onForward: () -> Unit,
     onSave: () -> Unit,
@@ -65,59 +68,73 @@ internal fun MessageSelectionBottomBar(
         border = amoledSurfaceBorderStroke(),
         tonalElevation = 3.dp,
     ) {
-        BoxWithConstraints(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
-        ) {
-            val barWidthPx = with(density) { maxWidth.roundToPx() }
-            val maxActionsPerRow =
-                remember(barWidthPx, actionSlotPx) {
-                    (barWidthPx / actionSlotPx).coerceAtLeast(1)
-                }
-            val rows =
-                remember(offered, maxActionsPerRow) {
-                    messageSelectionBarActionRows(
-                        offered = offered,
-                        maxActionsPerRow = maxActionsPerRow,
-                    )
-                }
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.Center,
+        Column(modifier = Modifier.fillMaxWidth()) {
+            if (!availability.canForward && forwardBlockedReason != null) {
+                Text(
+                    text =
+                        stringResource(
+                            R.string.forward_blocked_selection,
+                            forwardBlockedReasonLabel(forwardBlockedReason),
+                        ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp),
+                )
+            }
+            BoxWithConstraints(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
             ) {
-                rows.forEach { row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        row.actions.forEach { action ->
-                            SelectionActionIconButton(
-                                action = action,
-                                availability = availability,
-                                onCopy = onCopy,
-                                onForward = onForward,
-                                onSave = onSave,
-                                onReply = onReply,
-                                onInfo = onInfo,
-                            )
-                        }
-                        if (row.includesDelete) {
-                            Spacer(modifier = Modifier.weight(1f))
-                            SelectionTooltipIconButton(
-                                label = deleteLabel,
-                                onClick = onDelete,
-                                enabled = availability.canDelete,
-                                colors =
-                                    IconButtonDefaults.iconButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.error,
-                                    ),
-                            ) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = deleteLabel,
+                val barWidthPx = with(density) { maxWidth.roundToPx() }
+                val maxActionsPerRow =
+                    remember(barWidthPx, actionSlotPx) {
+                        (barWidthPx / actionSlotPx).coerceAtLeast(1)
+                    }
+                val rows =
+                    remember(offered, maxActionsPerRow) {
+                        messageSelectionBarActionRows(
+                            offered = offered,
+                            maxActionsPerRow = maxActionsPerRow,
+                        )
+                    }
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    rows.forEach { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            row.actions.forEach { action ->
+                                SelectionActionIconButton(
+                                    action = action,
+                                    availability = availability,
+                                    onCopy = onCopy,
+                                    onForward = onForward,
+                                    onSave = onSave,
+                                    onReply = onReply,
+                                    onInfo = onInfo,
                                 )
+                            }
+                            if (row.includesDelete) {
+                                Spacer(modifier = Modifier.weight(1f))
+                                SelectionTooltipIconButton(
+                                    label = deleteLabel,
+                                    onClick = onDelete,
+                                    enabled = availability.canDelete,
+                                    colors =
+                                        IconButtonDefaults.iconButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.error,
+                                        ),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = deleteLabel,
+                                    )
+                                }
                             }
                         }
                     }

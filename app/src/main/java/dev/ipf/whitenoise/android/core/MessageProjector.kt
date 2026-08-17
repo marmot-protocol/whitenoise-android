@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
+import java.util.Locale
 
 data class ReactionTally(
     val emoji: String,
@@ -148,6 +149,7 @@ object MessageProjector {
     private const val StreamTag = "stream"
     private const val StreamStartTag = "stream-start"
     private const val StreamHashTag = "stream-hash"
+    private val RestrictedMediaForwardingTags = setOf("view_once", "view-once")
 
     fun displayBody(
         message: AppMessageRecordFfi,
@@ -337,7 +339,11 @@ object MessageProjector {
      * [WhiteNoiseAppState.forwardText] so the de-dupe/blank rules are unit
      * testable without the FFI send path.
      */
-    fun normalizeForwardTargets(targetGroupIds: List<String>): List<String> = targetGroupIds.filter { it.isNotBlank() }.distinct()
+    fun normalizeForwardTargets(targetGroupIds: List<String>): List<String> =
+        targetGroupIds
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .distinctBy { it.lowercase(Locale.ROOT) }
 
     /**
      * Whether [message] is a plain user-authored text message that v1 forwarding
@@ -400,6 +406,75 @@ object MessageProjector {
     }
 
     /**
+     * Build the complete source payload for forwarding without permitting a
+     * malformed album to degrade into its caption or a valid-looking subset.
+     * The typed media projection is authoritative, while the raw imeta count
+     * proves that no malformed attachment was dropped during projection.
+     */
+    internal fun forwardEligibility(
+        message: AppMessageRecordFfi,
+        mediaReferences: List<MediaAttachmentReferenceFfi>,
+        editedText: String? = null,
+        cachedAttachmentIndices: Set<Int> = emptySet(),
+        nowSeconds: ULong,
+    ): ForwardEligibility {
+        if (message.kind != KindChat || streamId(message) != null) {
+            return ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
+        }
+        if (isPendingMedia(message)) {
+            return ForwardEligibility.Blocked(ForwardBlockedReason.PendingAttachment)
+        }
+        if (message.retentionExpiresAt?.takeIf { it > 0uL }?.let { it <= nowSeconds } == true) {
+            return ForwardEligibility.Blocked(ForwardBlockedReason.ExpiredAttachment)
+        }
+
+        val mediaTagCount = message.tags.count { it.values.firstOrNull() == ImetaTag }
+        val carriesMedia = mediaTagCount > 0 || mediaReferences.isNotEmpty()
+        if (!carriesMedia) {
+            val body =
+                forwardableText(message, editedText)
+                    ?: return ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
+            return ForwardEligibility.Eligible(
+                ForwardMessagePayload.Text(
+                    sourceGroupIdHex = message.groupIdHex,
+                    sourceMessageIdHex = message.messageIdHex,
+                    text = body,
+                ),
+            )
+        }
+
+        if (message.tags.any { it.values.firstOrNull() in RestrictedMediaForwardingTags }) {
+            return ForwardEligibility.Blocked(ForwardBlockedReason.RestrictedAttachment)
+        }
+        if (mediaReferences.isEmpty() || mediaReferences.size != mediaTagCount) {
+            return ForwardEligibility.Blocked(ForwardBlockedReason.MalformedAttachment)
+        }
+        if (
+            mediaReferences.withIndex().any { (index, reference) ->
+                reference.sourceEpoch != 0uL &&
+                    reference.locators.isEmpty() &&
+                    index !in cachedAttachmentIndices
+            }
+        ) {
+            return ForwardEligibility.Blocked(ForwardBlockedReason.UnavailableAttachment)
+        }
+
+        val caption = mediaCaption(message, editedText ?: message.plaintext)
+        return ForwardEligibility.Eligible(
+            ForwardMessagePayload.Media(
+                sourceGroupIdHex = message.groupIdHex,
+                sourceMessageIdHex = message.messageIdHex,
+                caption = caption,
+                attachments =
+                    mediaReferences.mapIndexed { index, reference ->
+                        ForwardAttachmentSource(index, reference)
+                    },
+                expiresAtSeconds = message.retentionExpiresAt,
+            ),
+        )
+    }
+
+    /**
      * Plain text copied by multi-select. Unlike forwarding, media records are
      * accepted when they carry a user-authored caption; filename and media-type
      * fallbacks are never copied. Reactions, system events, and agent streams
@@ -458,7 +533,7 @@ object MessageProjector {
 
     private fun isMedia(message: AppMessageRecordFfi): Boolean = message.kind == KindChat && message.tags.any { it.values.firstOrNull() == ImetaTag }
 
-    private fun isPendingMedia(message: AppMessageRecordFfi): Boolean =
+    internal fun isPendingMedia(message: AppMessageRecordFfi): Boolean =
         message.kind == KindChat && message.tags.any { it.values.firstOrNull() == PendingMediaTag }
 
     private fun pendingMediaPlaceholder(message: AppMessageRecordFfi): String? {

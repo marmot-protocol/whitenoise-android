@@ -52,7 +52,8 @@ class ForwardMessageSheetCoverageTest {
             "mention resolution should rerun for body/profile changes, not every search-field recomposition",
             "remember(body, appState.profileRevisionForCompose) { resolveMentionsInPlaintext(body)" in body,
         )
-        assertTrue("Text( forwardPreviewText," in body)
+        assertTrue("forwardPreviewText.takeIf(String::isNotBlank)" in body)
+        assertTrue("pluralStringResource( R.plurals.forward_attachment_count" in body)
     }
 
     @Test
