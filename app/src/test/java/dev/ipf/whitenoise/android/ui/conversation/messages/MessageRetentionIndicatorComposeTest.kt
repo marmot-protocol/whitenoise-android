@@ -65,9 +65,37 @@ class MessageRetentionIndicatorComposeTest {
                 context.resources.configuration.locales[0],
                 remainingMillis = 50_000L,
                 expiryLabel = expiry,
+                expiredLabel = context.getString(R.string.disappearing_message_expired),
             ),
             stateDescription,
         )
+    }
+
+    @Test
+    fun expiredCountdownExposesLocalizedExpiredState() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MessageInlineFooter(
+                    timeText = "12:34",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    showStatus = false,
+                    status = MessageStatus.Received,
+                    editedLabel = null,
+                    onEditedClick = null,
+                    retention = input(expiresAtEpochSeconds = 200uL),
+                    retentionClockMillis = { 250_000L },
+                )
+            }
+        }
+
+        val stateDescription =
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.disappearing_message))
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.StateDescription]
+
+        assertTrue(stateDescription.contains(context.getString(R.string.disappearing_message_expired)))
+        assertTrue("expired semantics must not announce a future zero duration", "in 0" !in stateDescription)
     }
 
     @Test

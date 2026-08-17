@@ -9,9 +9,10 @@ internal fun formatRetentionExpiryState(
     locale: Locale,
     remainingMillis: Long,
     expiryLabel: String,
+    expiredLabel: String,
 ): String =
     ListFormatter.getInstance(locale).format(
-        formatRetentionRemaining(locale, remainingMillis),
+        if (remainingMillis <= 0L) expiredLabel else formatRetentionRemaining(locale, remainingMillis),
         expiryLabel,
     )
 
@@ -19,21 +20,21 @@ internal fun formatRetentionRemaining(
     locale: Locale,
     remainingMillis: Long,
 ): String {
+    require(remainingMillis > 0L) { "Relative retention time requires a positive duration" }
     val formatter = RelativeDateTimeFormatter.getInstance(locale)
-    val boundedMillis = remainingMillis.coerceAtLeast(0L)
     val (count, unit) =
         when {
-            boundedMillis >= MILLIS_PER_DAY ->
-                roundedUpDuration(boundedMillis, MILLIS_PER_DAY) to
+            remainingMillis >= MILLIS_PER_DAY ->
+                roundedUpDuration(remainingMillis, MILLIS_PER_DAY) to
                     RelativeDateTimeFormatter.RelativeUnit.DAYS
-            boundedMillis >= MILLIS_PER_HOUR ->
-                roundedUpDuration(boundedMillis, MILLIS_PER_HOUR) to
+            remainingMillis >= MILLIS_PER_HOUR ->
+                roundedUpDuration(remainingMillis, MILLIS_PER_HOUR) to
                     RelativeDateTimeFormatter.RelativeUnit.HOURS
-            boundedMillis >= MILLIS_PER_MINUTE ->
-                roundedUpDuration(boundedMillis, MILLIS_PER_MINUTE) to
+            remainingMillis >= MILLIS_PER_MINUTE ->
+                roundedUpDuration(remainingMillis, MILLIS_PER_MINUTE) to
                     RelativeDateTimeFormatter.RelativeUnit.MINUTES
             else ->
-                roundedUpDuration(boundedMillis, MILLIS_PER_SECOND) to
+                roundedUpDuration(remainingMillis, MILLIS_PER_SECOND) to
                     RelativeDateTimeFormatter.RelativeUnit.SECONDS
         }
     return formatter.format(

@@ -197,6 +197,7 @@ private fun RunningRetentionIndicator(
 ) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
+    val expiredLabel = stringResource(R.string.disappearing_message_expired)
     val timezoneId = TimeZone.getDefault().id
     val expiry =
         remember(locale, timezoneId, presentation.expiresAtEpochMillis) {
@@ -210,8 +211,8 @@ private fun RunningRetentionIndicator(
             )
         }
     val expiryState =
-        remember(locale, presentation.remainingMillis, expiry) {
-            formatRetentionExpiryState(locale, presentation.remainingMillis, expiry)
+        remember(locale, presentation.remainingMillis, expiry, expiredLabel) {
+            formatRetentionExpiryState(locale, presentation.remainingMillis, expiry, expiredLabel)
         }
     RetentionProgressRing(presentation.remainingFraction, color, label, expiryState)
 }

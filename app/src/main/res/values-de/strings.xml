@@ -1121,6 +1121,7 @@
     <string name="shared_media_voice_failed">Sprachnachricht konnte nicht abgespielt werden</string>
     <string name="disappearing_messages">Verschwindende Nachrichten</string>
     <string name="disappearing_message">Verschwindende Nachricht</string>
+    <string name="disappearing_message_expired">Abgelaufen</string>
     <string name="disappearing_off">Aus</string>
     <string name="disappearing_1_day">1 Tag</string>
     <string name="disappearing_7_days">7 Tage</string>
