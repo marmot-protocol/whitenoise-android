@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.ReactionTally
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleBottomAlignmentLine
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageReactionSummary
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSenderAvatarSlot
@@ -112,9 +114,13 @@ class MessageReactionAlignmentScreenshotTest {
                 seed = "alex",
                 pictureUrl = null,
                 enabled = true,
+                alignToBubbleBottom = true,
                 onClick = {},
             )
-            Column(modifier = Modifier.width(220.dp), horizontalAlignment = Alignment.Start) {
+            Column(
+                modifier = Modifier.widthIn(max = 220.dp).alignBy(MessageBubbleBottomAlignmentLine),
+                horizontalAlignment = Alignment.Start,
+            ) {
                 ReactionBubble(text = "Can you review the file?", mine = false)
                 MessageReactionSummary(
                     tallies = listOf(ReactionTally(emoji = "👍", count = 2, mine = true)),
@@ -133,7 +139,7 @@ class MessageReactionAlignmentScreenshotTest {
             modifier = Modifier.align(Alignment.End),
         )
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            Column(modifier = Modifier.width(220.dp), horizontalAlignment = Alignment.End) {
+            Column(modifier = Modifier.widthIn(max = 220.dp), horizontalAlignment = Alignment.End) {
                 ReactionBubble(text = "Looks good to me", mine = true)
                 MessageReactionSummary(
                     tallies = listOf(ReactionTally(emoji = "❤️", count = 3, mine = false)),

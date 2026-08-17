@@ -699,6 +699,8 @@ internal fun MessageBubble(
             isDm = controller.isDm,
             mine = mine,
         )
+    val tallies = controller.reactions[record.messageIdHex].orEmpty()
+    val showReactionSummary = tallies.isNotEmpty() && !deleted
     // Match the timestamp to the bubble's visual cue. AMOLED uses the same
     // directional accent as the border; other themes keep their paired M3
     // on-color tokens.
@@ -1143,11 +1145,21 @@ internal fun MessageBubble(
                     seed = record.sender,
                     pictureUrl = appState.avatarUrl(record.sender),
                     enabled = !textSelectionMode,
+                    alignToBubbleBottom = showReactionSummary,
                     onClick = { appState.presentProfile(appState.npub(record.sender)) },
                 )
             }
             Column(
-                modifier = Modifier.widthIn(max = bubbleColumnMaxWidth),
+                modifier =
+                    Modifier
+                        .widthIn(max = bubbleColumnMaxWidth)
+                        .then(
+                            if (reserveSenderAvatarSlot && showReactionSummary) {
+                                Modifier.alignBy(MessageBubbleBottomAlignmentLine)
+                            } else {
+                                Modifier
+                            },
+                        ),
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
                 // Resolved before the content column so its presence can pick
@@ -1960,9 +1972,8 @@ internal fun MessageBubble(
                         onDismissRequest = { deleteDialogOpen = false },
                     )
                 }
-                val tallies = controller.reactions[record.messageIdHex].orEmpty()
                 // Hide reaction tallies on a deleted message — nothing to show.
-                if (tallies.isNotEmpty() && !deleted) {
+                if (showReactionSummary) {
                     MessageReactionSummary(
                         tallies = tallies,
                         mine = mine,

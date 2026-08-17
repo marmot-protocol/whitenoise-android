@@ -16,11 +16,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
+
+internal val MessageBubbleBottomAlignmentLine = HorizontalAlignmentLine { old, new -> minOf(old, new) }
 
 @Composable
 internal fun RowScope.MessageSenderAvatarSlot(
@@ -29,13 +32,20 @@ internal fun RowScope.MessageSenderAvatarSlot(
     seed: String,
     pictureUrl: String?,
     enabled: Boolean,
+    alignToBubbleBottom: Boolean,
     onClick: () -> Unit,
 ) {
+    val avatarAlignment =
+        if (alignToBubbleBottom) {
+            Modifier.alignBy { it.measuredHeight }
+        } else {
+            Modifier.align(Alignment.Bottom)
+        }
     Box(
         modifier =
             Modifier
                 .size(32.dp)
-                .align(Alignment.Top),
+                .then(avatarAlignment),
     ) {
         if (showSenderAvatar) {
             Box(
@@ -79,7 +89,11 @@ internal fun ColumnScope.MessageReactionSummary(
                     val placeable = measurable.measure(constraints)
                     val overlap = 6.dp.roundToPx()
                     val height = (placeable.height - overlap).coerceAtLeast(0)
-                    layout(placeable.width, height) {
+                    layout(
+                        width = placeable.width,
+                        height = height,
+                        alignmentLines = mapOf(MessageBubbleBottomAlignmentLine to 0),
+                    ) {
                         placeable.place(0, -overlap)
                     }
                 },
