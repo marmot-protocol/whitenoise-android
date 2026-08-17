@@ -114,6 +114,20 @@ class TransientRelaySendErrorTest {
     }
 
     @Test
+    fun mixedConnectAndPostSendFailuresAreNotTransient() {
+        listOf(
+            "connect relay failed; send event failed",
+            "connect relay timed out; send event timed out",
+            "relay did not acknowledge event; connect relay failed",
+            "relay rejected event (blocked); connect relay failed",
+            "connect relay failed; publish timed out after 30s: accepted 0 of required 2",
+            "connect relay failed; insufficient publish acknowledgements: accepted 0 of required 2",
+        ).forEach { reason ->
+            assertFalse(reason, isTransientRelaySendError(MarmotKitException.Publish(reason)))
+        }
+    }
+
+    @Test
     fun connectionRefusedAndResetAreTransient() {
         assertTrue(isTransientRelaySendError(RuntimeException("Connection refused")))
         assertTrue(isTransientRelaySendError(RuntimeException("connection reset by peer")))
