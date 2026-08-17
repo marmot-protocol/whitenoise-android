@@ -17,6 +17,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -195,7 +196,7 @@ private fun RunningRetentionIndicator(
     label: String,
 ) {
     val context = LocalContext.current
-    val locale = context.resources.configuration.locales[0]
+    val locale = LocalConfiguration.current.locales[0]
     val timezoneId = TimeZone.getDefault().id
     val expiry =
         remember(locale, timezoneId, presentation.expiresAtEpochMillis) {
