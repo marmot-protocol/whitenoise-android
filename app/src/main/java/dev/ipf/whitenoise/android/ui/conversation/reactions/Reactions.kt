@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,12 +15,14 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -41,10 +44,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,39 +65,63 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
-import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 
+internal fun Modifier.reactionSummaryAttachment(outgoing: Boolean): Modifier =
+    padding(
+        if (outgoing) {
+            PaddingValues(end = REACTION_BUBBLE_EDGE_INSET)
+        } else {
+            PaddingValues(start = REACTION_BUBBLE_EDGE_INSET)
+        },
+    ).layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        val overlap = REACTION_BUBBLE_OVERLAP.roundToPx()
+        val height = (placeable.height - overlap).coerceAtLeast(0)
+        layout(placeable.width, height) {
+            placeable.place(0, -overlap)
+        }
+    }
+
 @Composable
-internal fun reactionSummaryChipBorder(mine: Boolean): BorderStroke {
+internal fun reactionSummaryChipBorder(
+    outgoing: Boolean,
+    selected: Boolean,
+): BorderStroke {
     val colorScheme = MaterialTheme.colorScheme
-    val amoledAccent = amoledDirectionalAccentColor(mine)
+    val amoledAccent =
+        if (isAmoledSurfaceTheme()) {
+            if (outgoing) colorScheme.inversePrimary else colorScheme.onSurface.copy(alpha = 0.7f)
+        } else {
+            null
+        }
     return when {
-        amoledAccent != null -> BorderStroke(2.dp, amoledAccent)
+        amoledAccent != null -> BorderStroke(if (selected) 2.dp else 1.5.dp, amoledAccent)
         else -> BorderStroke(1.5.dp, colorScheme.surface)
     }
 }
 
 @Composable
-internal fun reactionSummaryChipContainerColor(mine: Boolean): Color {
+internal fun reactionSummaryChipContainerColor(selected: Boolean): Color {
     val colorScheme = MaterialTheme.colorScheme
     return when {
+        isAmoledSurfaceTheme() && selected -> colorScheme.onSurface.copy(alpha = 0.1f).compositeOver(Color.Black)
         isAmoledSurfaceTheme() -> Color.Black
-        mine -> colorScheme.secondaryContainer
+        selected -> colorScheme.secondaryContainer
         else -> colorScheme.surfaceContainerHigh
     }
 }
 
 @Composable
-internal fun reactionSummaryChipContentColor(mine: Boolean): Color {
+internal fun reactionSummaryChipContentColor(selected: Boolean): Color {
     val colorScheme = MaterialTheme.colorScheme
     return when {
         isAmoledSurfaceTheme() -> colorScheme.onSurface
-        mine -> colorScheme.onSecondaryContainer
+        selected -> colorScheme.onSecondaryContainer
         else -> colorScheme.onSurface
     }
 }
@@ -107,33 +135,57 @@ internal fun reactionSummaryChipContentColor(mine: Boolean): Color {
 @Composable
 internal fun ReactionSummaryChip(
     tallies: List<ReactionTally>,
+    outgoing: Boolean,
     onClick: () -> Unit,
 ) {
-    val mine = tallies.any { it.mine }
-    val total = tallies.sumOf { it.count }
+    val selected = tallies.any { it.mine }
+    val total = tallies.sumOf { it.count.toLong() }
     val emojis = tallies.take(MAX_VISIBLE_REACTIONS).joinToString(separator = "") { it.emoji }
     val viewReactorsLabel = stringResource(R.string.view_reactors)
     Surface(
         modifier =
             Modifier
-                // Expose the "you reacted" state to TalkBack, not just via color.
-                .semantics { selected = mine }
+                // Expose the current-user state to TalkBack as well as the visible check.
+                .semantics { this.selected = selected }
                 .clip(RoundedCornerShape(percent = 50))
                 .clickable(role = Role.Button, onClick = onClick, onClickLabel = viewReactorsLabel),
         shape = RoundedCornerShape(percent = 50),
-        color = reactionSummaryChipContainerColor(mine),
-        contentColor = reactionSummaryChipContentColor(mine),
-        border = reactionSummaryChipBorder(mine),
-        tonalElevation = 1.dp,
+        color = reactionSummaryChipContainerColor(selected),
+        contentColor = reactionSummaryChipContentColor(selected),
+        border = reactionSummaryChipBorder(outgoing = outgoing, selected = selected),
+        tonalElevation = if (isAmoledSurfaceTheme()) 0.dp else 1.dp,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            modifier =
+                Modifier
+                    .heightIn(min = 28.dp)
+                    .widthIn(min = 40.dp)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(emojis, style = MaterialTheme.typography.labelLarge)
+            Text(
+                text = emojis,
+                modifier = Modifier.weight(1f, fill = false),
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                softWrap = false,
+            )
             if (total > 1) {
-                Text(total.toString(), style = MaterialTheme.typography.labelMedium)
+                Text(
+                    text = total.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = reactionSummaryChipContentColor(selected = true),
+                )
             }
         }
     }
@@ -380,3 +432,5 @@ internal fun CustomizeReactionsDialog(
 // Distinct emojis shown in the consolidated reaction pill; the total count
 // still reflects every reaction beyond them.
 private const val MAX_VISIBLE_REACTIONS = 4
+private val REACTION_BUBBLE_EDGE_INSET = 6.dp
+private val REACTION_BUBBLE_OVERLAP = 6.dp

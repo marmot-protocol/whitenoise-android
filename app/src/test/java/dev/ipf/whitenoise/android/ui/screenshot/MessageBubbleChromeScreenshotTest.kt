@@ -9,18 +9,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.messages.MediaCaptionFrame
@@ -31,6 +37,8 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleTimestampColor
 import dev.ipf.whitenoise.android.ui.conversation.messages.replyPreviewAccentArgb
+import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
+import dev.ipf.whitenoise.android.ui.conversation.reactions.reactionSummaryAttachment
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.settings.FontSizePreviewBubble
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -89,6 +97,124 @@ class MessageBubbleChromeScreenshotTest {
         composeRule
             .onNodeWithTag(TAG)
             .captureRoboImage("src/test/snapshots/message_bubble_chrome_amoled.png")
+    }
+
+    @Test
+    fun reactionSummariesAmoledRepresentativeStates() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Surface(color = Color.Black) {
+                    Column(
+                        modifier = Modifier.width(360.dp).padding(16.dp).testTag(TAG),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        AmoledReactionBubble(
+                            text = "Incoming · one reaction",
+                            time = "12:40",
+                            outgoing = false,
+                            tallies = listOf(ReactionTally("👍", 1, mine = false)),
+                        )
+                        AmoledReactionBubble(
+                            text = "Outgoing · one reaction",
+                            time = "12:41",
+                            outgoing = true,
+                            tallies = listOf(ReactionTally("❤️", 1, mine = false)),
+                        )
+                        AmoledReactionBubble(
+                            text = "Incoming · you reacted",
+                            time = "12:42",
+                            outgoing = false,
+                            tallies = listOf(ReactionTally("😂", 1, mine = true)),
+                        )
+                        AmoledReactionBubble(
+                            text = "Outgoing · you reacted",
+                            time = "12:43",
+                            outgoing = true,
+                            tallies = listOf(ReactionTally("🎉", 1, mine = true)),
+                        )
+                        AmoledReactionBubble(
+                            text = "Several people reacted",
+                            time = "12:44",
+                            outgoing = false,
+                            tallies =
+                                listOf(
+                                    ReactionTally("👍", 8, mine = false),
+                                    ReactionTally("❤️", 5, mine = false),
+                                    ReactionTally("😂", 3, mine = false),
+                                ),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/message_bubble_reactions_amoled.png")
+    }
+
+    @Test
+    fun reactionSummaryAmoledLargeFontNarrowWidth() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1.6f) {
+                Surface(color = Color.Black) {
+                    Column(
+                        modifier = Modifier.width(280.dp).padding(12.dp).testTag(TAG),
+                    ) {
+                        AmoledReactionBubble(
+                            text = "Maximum visible reactions",
+                            time = "12:45",
+                            outgoing = true,
+                            tallies =
+                                listOf(
+                                    ReactionTally("👍", 9_990, mine = true),
+                                    ReactionTally("❤️", 4, mine = false),
+                                    ReactionTally("😂", 3, mine = false),
+                                    ReactionTally("🎉", 2, mine = false),
+                                    ReactionTally("😮", 1, mine = false),
+                                ),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/message_bubble_reactions_amoled_large_font_narrow.png")
+    }
+
+    @Test
+    fun reactionSummariesAmoledRtlAttachment() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                    Surface(color = Color.Black) {
+                        Column(
+                            modifier = Modifier.width(360.dp).padding(16.dp).testTag(TAG),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            AmoledReactionBubble(
+                                text = "رسالة واردة",
+                                time = "12:46",
+                                outgoing = false,
+                                tallies = listOf(ReactionTally("👍", 2, mine = false)),
+                            )
+                            AmoledReactionBubble(
+                                text = "رسالة صادرة",
+                                time = "12:47",
+                                outgoing = true,
+                                tallies = listOf(ReactionTally("❤️", 3, mine = true)),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/message_bubble_reactions_amoled_rtl.png")
     }
 
     private fun render(darkTheme: Boolean) {
@@ -219,6 +345,43 @@ private fun DirectionalBubble(
                 text = time,
                 style = MaterialTheme.typography.labelSmall,
                 color = messageBubbleTimestampColor(mine = mine, deleted = false),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AmoledReactionBubble(
+    text: String,
+    time: String,
+    outgoing: Boolean,
+    tallies: List<ReactionTally>,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = if (outgoing) Alignment.End else Alignment.Start,
+    ) {
+        Surface(
+            modifier = Modifier.widthIn(max = 260.dp),
+            color = Color.Black,
+            contentColor = Color.White,
+            shape = RoundedCornerShape(18.dp),
+            border = messageBubbleBorder(highlighted = false, mine = outgoing),
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
+                Text(text)
+                Text(
+                    text = time,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = messageBubbleTimestampColor(mine = outgoing, deleted = false),
+                )
+            }
+        }
+        Box(modifier = Modifier.reactionSummaryAttachment(outgoing = outgoing)) {
+            ReactionSummaryChip(
+                tallies = tallies,
+                outgoing = outgoing,
+                onClick = {},
             )
         }
     }
