@@ -54,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
@@ -134,6 +135,7 @@ internal fun ComposerPill(
     onHeightDragStopped: () -> Unit = {},
     trailingAction: (@Composable RowScope.() -> Unit)? = null,
     inputContentVisible: Boolean = true,
+    inputFocusEnabled: Boolean = true,
     onMultilineControlsChanged: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -268,6 +270,12 @@ internal fun ComposerPill(
         4.dp +
             (if (hasAttachmentAction) 36.dp else 0.dp) +
             (if (trailingAction != null) 44.dp else 0.dp)
+    val expandedHeightModifier =
+        if (expansionMode == ComposerExpansionMode.Automatic) {
+            Modifier
+        } else {
+            Modifier.fillMaxHeight()
+        }
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -279,13 +287,13 @@ internal fun ComposerPill(
             modifier =
                 Modifier
                     .heightIn(min = 44.dp)
-                    .then(if (expansionMode == ComposerExpansionMode.Automatic) Modifier else Modifier.fillMaxHeight()),
+                    .then(expandedHeightModifier),
         ) {
             Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .then(if (expansionMode == ComposerExpansionMode.Automatic) Modifier else Modifier.fillMaxHeight())
+                        .then(expandedHeightModifier)
                         .alpha(if (inputContentVisible) 1f else 0f)
                         .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
             ) {
@@ -295,13 +303,14 @@ internal fun ComposerPill(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .then(if (expansionMode == ComposerExpansionMode.Automatic) Modifier else Modifier.fillMaxHeight())
+                            .then(expandedHeightModifier)
                             .padding(
                                 start = if (expandedLayout) 12.dp else 44.dp,
                                 top = if (expandedLayout) 48.dp else 10.dp,
                                 end = if (expandedLayout) 12.dp else compactTrailingReserve,
                                 bottom = if (expandedLayout) 48.dp else 10.dp,
-                            ).contentReceiver(pasteImageReceiver)
+                            ).focusProperties { canFocus = inputFocusEnabled }
+                            .contentReceiver(pasteImageReceiver)
                             .onPreInterceptKeyBeforeSoftKeyboard { event ->
                                 when (
                                     composerPreImeBackAction(

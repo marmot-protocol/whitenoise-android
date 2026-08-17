@@ -86,7 +86,9 @@ class ComposerBarScreenshotTest {
         renderLongComposer(darkTheme = true, largeRtl = true)
         composeRule.onNodeWithContentDescription("Expand message composer").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag(LONG_TAG).captureRoboImage("src/test/snapshots/composer_bar_full_screen_large_rtl.png")
+        composeRule
+            .onNodeWithTag(LONG_TAG)
+            .captureRoboImage("src/test/snapshots/composer_bar_full_screen_large_rtl.png")
     }
 
     @Test

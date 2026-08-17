@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -10,6 +12,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -23,7 +27,10 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOverlayBackRegistrar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -69,7 +76,10 @@ class ComposerExpansionBehaviorTest {
                 .onNodeWithTag(TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot.height
-        assertTrue("collapse should return to the measured auto-grow height", abs(collapsedHeight - automaticHeight) <= 1f)
+        assertTrue(
+            "collapse should return to the measured auto-grow height",
+            abs(collapsedHeight - automaticHeight) <= 1f,
+        )
         composeRule.onNodeWithText(draft).assertExists()
     }
 
@@ -77,11 +87,11 @@ class ComposerExpansionBehaviorTest {
     fun multilineControlsShareTheBottomEdgeInReadingOrder() {
         render(longDraft())
 
-        val emoji = composeRule.onNodeWithContentDescription(app.getString(R.string.open_emoji_picker)).fetchSemanticsNode().boundsInRoot
-        val attach = composeRule.onNodeWithContentDescription(app.getString(R.string.attach_options)).fetchSemanticsNode().boundsInRoot
-        val send = composeRule.onNodeWithContentDescription(app.getString(R.string.send)).fetchSemanticsNode().boundsInRoot
-        val resize = composeRule.onNodeWithContentDescription(app.getString(R.string.composer_resize)).fetchSemanticsNode().boundsInRoot
-        val expand = composeRule.onNodeWithContentDescription(app.getString(R.string.composer_expand_full_screen)).fetchSemanticsNode().boundsInRoot
+        val emoji = composerControlBounds(R.string.open_emoji_picker)
+        val attach = composerControlBounds(R.string.attach_options)
+        val send = composerControlBounds(R.string.send)
+        val resize = composerControlBounds(R.string.composer_resize)
+        val expand = composerControlBounds(R.string.composer_expand_full_screen)
 
         assertTrue(emoji.center.x < attach.center.x)
         assertTrue(attach.center.x < send.center.x)
@@ -143,7 +153,40 @@ class ComposerExpansionBehaviorTest {
         composeRule.onNodeWithText(longDraft()).assertExists()
     }
 
-    private fun render(draft: String) {
+    @Test
+    fun backFromFocusedFullScreenCollapsesAndClearsFocus() {
+        var overlayCallback: OnBackInvokedCallback? = null
+        var overlayPriority: Int? = null
+        val registrar =
+            ComposerOverlayBackRegistrar { priority, callback ->
+                overlayPriority = priority
+                overlayCallback = callback
+                { if (overlayCallback === callback) overlayCallback = null }
+            }
+        val draft = longDraft()
+        render(draft, registrar)
+        val editor = composeRule.onNodeWithText(draft)
+
+        editor.performClick()
+        editor.assertIsFocused()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.composer_expand_full_screen)).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.composer_collapse)).assertExists()
+        assertEquals(OnBackInvokedDispatcher.PRIORITY_OVERLAY, overlayPriority)
+
+        composeRule.runOnIdle { checkNotNull(overlayCallback).onBackInvoked() }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithContentDescription(app.getString(R.string.composer_collapse)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.composer_expand_full_screen)).assertExists()
+        assertNull("losing focus must release the overlay callback", overlayCallback)
+        editor.assertIsNotFocused()
+    }
+
+    private fun render(
+        draft: String,
+        overlayBackRegistrar: ComposerOverlayBackRegistrar? = null,
+    ) {
         var value by mutableStateOf(TextFieldValue(draft))
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -158,6 +201,7 @@ class ComposerExpansionBehaviorTest {
                             onPickDocument = {},
                             initialDraft = value,
                             onDraftChange = { value = it },
+                            overlayBackRegistrar = overlayBackRegistrar,
                             modifier = Modifier.testTag(TAG),
                         )
                     }
@@ -166,6 +210,12 @@ class ComposerExpansionBehaviorTest {
         }
         composeRule.waitForIdle()
     }
+
+    private fun composerControlBounds(contentDescriptionRes: Int) =
+        composeRule
+            .onNodeWithContentDescription(app.getString(contentDescriptionRes))
+            .fetchSemanticsNode()
+            .boundsInRoot
 
     private fun longDraft(): String =
         "A thoughtful long message starts here.\n" +

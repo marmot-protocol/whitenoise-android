@@ -362,6 +362,9 @@ internal fun ComposerBar(
     // Hoisted so the conversation screen can dismiss the sheet on an outside
     // tap; defaults to a private instance for other call sites.
     attachmentSheetState: ComposerAttachmentSheetState = rememberComposerAttachmentSheetState(),
+    // Injectable only for deterministic pre-IME Back behavior tests; production
+    // uses the view's platform dispatcher.
+    overlayBackRegistrar: ComposerOverlayBackRegistrar? = null,
 ) {
     val actionColors = accountActionColors(appState)
     val configuration = LocalConfiguration.current
@@ -380,8 +383,15 @@ internal fun ComposerBar(
         ) {
             mutableStateOf(ComposerExpansionState())
         }
-    var composerUsesMultilineControls by remember(draftKey, configuration.orientation, configuration.fontScale) { mutableStateOf(false) }
-    var automaticComposerHeightPx by remember(draftKey, configuration.orientation, configuration.fontScale) { mutableFloatStateOf(0f) }
+    var dismissInputAfterCollapse by remember(draftKey) { mutableStateOf(false) }
+    var composerUsesMultilineControls by
+        remember(draftKey, configuration.orientation, configuration.fontScale) {
+            mutableStateOf(false)
+        }
+    var automaticComposerHeightPx by
+        remember(draftKey, configuration.orientation, configuration.fontScale) {
+            mutableFloatStateOf(0f)
+        }
     var customInputPaneHeightPx by remember(configuration.orientation) { mutableFloatStateOf(0f) }
     // Field state is a TextFieldValue (not a bare String) so the caret can
     // be positioned at the end of the prefilled body on edit-entry, and so
@@ -429,6 +439,16 @@ internal fun ComposerBar(
     // editing — the edit effect above already owns focus then.
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
+    LaunchedEffect(dismissInputAfterCollapse) {
+        if (dismissInputAfterCollapse) {
+            // The expanded/automatic modifier swap can replace the focus node.
+            // Clear focus after that recomposition so it cannot be restored by
+            // the layout transition triggered by the same Back callback.
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+            dismissInputAfterCollapse = false
+        }
+    }
     val imeInsets = WindowInsets.ime
     val imeTargetInsets = WindowInsets.imeAnimationTarget
     val navigationInsets = WindowInsets.navigationBars
@@ -940,7 +960,11 @@ internal fun ComposerBar(
                     }
                 val mentionMatches =
                     remember(mentionQuery?.query, mentionCandidates) {
-                        if (mentionQuery == null) emptyList() else MentionComposer.filter(mentionQuery.query, mentionCandidates)
+                        if (mentionQuery == null) {
+                            emptyList()
+                        } else {
+                            MentionComposer.filter(mentionQuery.query, mentionCandidates)
+                        }
                     }
                 if (mentionQuery != null && mentionMatches.isNotEmpty()) {
                     val openQuery = mentionQuery
@@ -948,7 +972,11 @@ internal fun ComposerBar(
                         candidates = mentionMatches,
                         onPick = { candidate ->
                             val insertion = MentionComposer.insertMention(textFieldValue.text, openQuery, candidate)
-                            val updated = TextFieldValue(text = insertion.text, selection = TextRange(insertion.selection))
+                            val updated =
+                                TextFieldValue(
+                                    text = insertion.text,
+                                    selection = TextRange(insertion.selection),
+                                )
                             applyComposerFieldValue(updated)
                             runCatching { composerFocus.requestFocus() }
                             composerEmojiPickerOpen = false
@@ -1017,6 +1045,7 @@ internal fun ComposerBar(
                         onPreImeBack = {
                             if (composerExpansion.mode != ComposerExpansionMode.Automatic) {
                                 composerExpansion = collapseComposer(composerExpansion)
+                                dismissInputAfterCollapse = true
                                 onBottomInputChanged()
                             } else if (onComposerPreImeBack != null) {
                                 onComposerPreImeBack()
@@ -1060,11 +1089,15 @@ internal fun ComposerBar(
                                 )
                             onBottomInputChanged()
                         },
+                        overlayBackRegistrar = overlayBackRegistrar,
                         inputContentVisible = !isRecordingVoice,
+                        inputFocusEnabled = !dismissInputAfterCollapse,
                         trailingAction =
                             if (expandedControlLayout) {
                                 {
-                                    Spacer(Modifier.width(if (showMicButton && voiceRecordingController.locked) 84.dp else 44.dp))
+                                    val width =
+                                        if (showMicButton && voiceRecordingController.locked) 84.dp else 44.dp
+                                    Spacer(Modifier.width(width))
                                 }
                             } else {
                                 null
