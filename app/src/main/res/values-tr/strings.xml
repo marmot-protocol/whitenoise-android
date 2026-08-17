@@ -1557,4 +1557,7 @@
     <string name="nostr_event_type_release">Yazılım sürümü</string>
     <string name="nostr_event_type_file">Dosya</string>
     <string name="nostr_event_type_generic">Etkinlik · Tür %1$d</string>
+    <string name="composer_resize">Mesaj alanını yeniden boyutlandırmak için sürükleyin</string>
+    <string name="composer_expand_full_screen">Mesaj alanını genişlet</string>
+    <string name="composer_collapse">Mesaj alanını daralt</string>
 </resources>

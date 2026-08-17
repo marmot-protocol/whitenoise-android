@@ -1532,4 +1532,7 @@
     <string name="nostr_event_type_release">軟體版本</string>
     <string name="nostr_event_type_file">檔案</string>
     <string name="nostr_event_type_generic">事件 · 類型 %1$d</string>
+    <string name="composer_resize">拖曳以調整訊息編輯器大小</string>
+    <string name="composer_expand_full_screen">展開訊息編輯器</string>
+    <string name="composer_collapse">收合訊息編輯器</string>
 </resources>

@@ -1559,4 +1559,7 @@
     <string name="nostr_event_type_release">Versão de software</string>
     <string name="nostr_event_type_file">Arquivo</string>
     <string name="nostr_event_type_generic">Evento · Tipo %1$d</string>
+    <string name="composer_resize">Arraste para redimensionar o campo de mensagem</string>
+    <string name="composer_expand_full_screen">Expandir campo de mensagem</string>
+    <string name="composer_collapse">Recolher campo de mensagem</string>
 </resources>

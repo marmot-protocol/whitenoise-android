@@ -1559,4 +1559,7 @@
     <string name="nostr_event_type_release">Version logicielle</string>
     <string name="nostr_event_type_file">Fichier</string>
     <string name="nostr_event_type_generic">Événement · Type %1$d</string>
+    <string name="composer_resize">Faites glisser pour redimensionner le champ de message</string>
+    <string name="composer_expand_full_screen">Agrandir le champ de message</string>
+    <string name="composer_collapse">Réduire le champ de message</string>
 </resources>
