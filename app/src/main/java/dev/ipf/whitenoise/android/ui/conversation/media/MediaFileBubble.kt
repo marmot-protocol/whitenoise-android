@@ -11,16 +11,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TextSnippet
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PictureAsPdf
@@ -49,7 +52,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -67,9 +72,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
+private val FileBubbleWidth = 240.dp
+private val FileTransferControlSize = 48.dp
+private val FileTransferControlSurfaceSize = 40.dp
+private val FileTrailingMetadataMaxWidth = 96.dp
+
+internal fun Modifier.fileBubbleWidth(): Modifier = width(FileBubbleWidth)
+
+internal enum class FileTransferDirection {
+    Download,
+    Upload,
+}
+
 /**
- * Receive-side bubble for any attachment whose MIME isn't an image. Renders
- * as a tappable pill: icon (chosen by MIME family), filename, size + status.
+ * Confirmed bubble for any attachment whose MIME isn't an image. Renders
+ * as a tappable card with a transfer control, filename, and compact metadata.
  * Supported text and Markdown attachments open in a bounded, read-only
  * in-app reader. Other files join any automatic/durable fetch already in
  * flight and open a reusable FileProvider artifact in an external viewer.
@@ -86,6 +103,7 @@ internal fun MediaFileBubble(
     mine: Boolean,
     onLongPress: () -> Unit = {},
     attachedToCaption: Boolean = false,
+    timestampText: String? = null,
 ) {
     val context = LocalContext.current
     val openAttachment = rememberAttachmentOpener()
@@ -147,7 +165,7 @@ internal fun MediaFileBubble(
         border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
         modifier =
             Modifier
-                .widthIn(max = 360.dp)
+                .fileBubbleWidth()
                 .combinedClickable(
                     enabled =
                         !openRequested &&
@@ -195,39 +213,12 @@ internal fun MediaFileBubble(
                     },
                 ),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-        ) {
-            Icon(
-                imageVector = fileIconFor(presentation.iconCategory),
-                contentDescription = attachmentTypeDescription(presentation.iconCategory),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(28.dp),
-            )
-            Column(modifier = Modifier.weight(1f, fill = false)) {
-                Text(
-                    MediaPipeline.safeDisplayName(reference.fileName),
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    attachmentTypeLabel(presentation),
-                    style = MaterialTheme.typography.labelSmall,
-                    color =
-                        if (transferState == AttachmentTransferState.Failed) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            attachmentTransferIndicator(transferState)
-        }
+        MediaFileBubbleContent(
+            reference = reference,
+            presentation = presentation,
+            transferState = transferState,
+            timestampText = timestampText,
+        )
     }
     if (readerOpen && textCandidate != null) {
         TextAttachmentReaderDialog(
@@ -269,6 +260,102 @@ internal fun MediaFileBubble(
             },
             onDismiss = { readerOpen = false },
         )
+    }
+}
+
+/** File-card presentation kept separate from transfer/lifecycle ownership for deterministic UI coverage. */
+@Composable
+internal fun MediaFileBubbleContent(
+    reference: MediaAttachmentReferenceFfi,
+    presentation: AttachmentPresentation,
+    transferState: AttachmentTransferState,
+    timestampText: String? = null,
+) {
+    FileBubbleContent(
+        fileName = reference.fileName,
+        presentation = presentation,
+        transferState = transferState,
+        metadataText = attachmentTypeLabel(presentation),
+        metadataIsError = transferState == AttachmentTransferState.Failed,
+        trailingMetadataText = timestampText,
+        trailingMetadataIsError = false,
+        loadingDescription = stringResource(R.string.media_downloading),
+        transferDirection = FileTransferDirection.Download,
+    )
+}
+
+/**
+ * Shared chrome for optimistic outgoing files and confirmed incoming files.
+ * Keeping the control slot and both text rows identical prevents the card from
+ * resizing when an upload is reconciled with its confirmed message.
+ */
+@Composable
+private fun FileBubbleContent(
+    fileName: String,
+    presentation: AttachmentPresentation,
+    transferState: AttachmentTransferState,
+    metadataText: String,
+    metadataIsError: Boolean,
+    trailingMetadataText: String?,
+    trailingMetadataIsError: Boolean,
+    loadingDescription: String,
+    transferDirection: FileTransferDirection,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        FileTransferControl(
+            presentation = presentation,
+            transferState = transferState,
+            loadingDescription = loadingDescription,
+            direction = transferDirection,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = MediaPipeline.safeDisplayName(fileName),
+                style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.ContentOrLtr),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = metadataText,
+                    style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.ContentOrLtr),
+                    color =
+                        if (metadataIsError) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                trailingMetadataText?.let { trailingText ->
+                    Text(
+                        text = trailingText,
+                        style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.ContentOrLtr),
+                        color =
+                            if (trailingMetadataIsError) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = FileTrailingMetadataMaxWidth),
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -316,39 +403,102 @@ private suspend fun Lifecycle.awaitResumedOrDestroyed(): Boolean =
             }
     }
 
-/** Stable-width trailing status avoids a pill-size jump when loading finishes. */
+/** One fixed control slot keeps every transfer state the same size and exposes one clear affordance. */
 @Composable
-internal fun attachmentTransferIndicator(transferState: AttachmentTransferState) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.size(20.dp),
-    ) {
+internal fun FileTransferControl(
+    presentation: AttachmentPresentation,
+    transferState: AttachmentTransferState,
+    loadingDescription: String = stringResource(R.string.media_downloading),
+    direction: FileTransferDirection = FileTransferDirection.Download,
+) {
+    val containerColor =
         when (transferState) {
-            AttachmentTransferState.Downloading ->
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            AttachmentTransferState.Failed ->
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = stringResource(R.string.media_tap_to_retry),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
             AttachmentTransferState.Remote,
             AttachmentTransferState.NotRetained,
-            ->
-                Icon(
-                    imageVector = Icons.Default.Download,
-                    contentDescription = stringResource(R.string.media_tap_to_download),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
             AttachmentTransferState.Resolving,
-            AttachmentTransferState.Available,
-            -> Unit
+            AttachmentTransferState.Downloading,
+            -> MaterialTheme.colorScheme.primaryContainer
+            AttachmentTransferState.Failed -> MaterialTheme.colorScheme.errorContainer
+            AttachmentTransferState.Available -> MaterialTheme.colorScheme.surfaceContainerHighest
+        }
+    val contentColor =
+        when (transferState) {
+            AttachmentTransferState.Remote,
+            AttachmentTransferState.NotRetained,
+            AttachmentTransferState.Resolving,
+            AttachmentTransferState.Downloading,
+            -> MaterialTheme.colorScheme.onPrimaryContainer
+            AttachmentTransferState.Failed -> MaterialTheme.colorScheme.onErrorContainer
+            AttachmentTransferState.Available -> MaterialTheme.colorScheme.onSurfaceVariant
+        }
+    val stateDescription =
+        when (transferState) {
+            AttachmentTransferState.Resolving -> stringResource(R.string.media_preparing_download)
+            AttachmentTransferState.Downloading -> loadingDescription
+            AttachmentTransferState.Failed -> stringResource(R.string.media_tap_to_retry)
+            AttachmentTransferState.Remote,
+            AttachmentTransferState.NotRetained,
+            -> stringResource(R.string.media_tap_to_download)
+            AttachmentTransferState.Available -> attachmentTypeDescription(presentation.iconCategory)
+        }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier =
+            Modifier
+                .size(FileTransferControlSize)
+                .semantics(mergeDescendants = true) { contentDescription = stateDescription },
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = containerColor,
+            contentColor = contentColor,
+            border = if (transferState == AttachmentTransferState.Available) amoledSurfaceBorderStroke() else null,
+            modifier = Modifier.size(FileTransferControlSurfaceSize),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                when (transferState) {
+                    AttachmentTransferState.Resolving,
+                    AttachmentTransferState.Downloading,
+                    -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(FileTransferControlSurfaceSize),
+                            strokeWidth = 2.5.dp,
+                            color = contentColor,
+                        )
+                        Icon(
+                            imageVector =
+                                if (direction == FileTransferDirection.Upload) {
+                                    Icons.Default.ArrowUpward
+                                } else {
+                                    Icons.Default.ArrowDownward
+                                },
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    AttachmentTransferState.Failed ->
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(21.dp),
+                        )
+                    AttachmentTransferState.Remote,
+                    AttachmentTransferState.NotRetained,
+                    ->
+                        Icon(
+                            imageVector = Icons.Default.ArrowDownward,
+                            contentDescription = null,
+                            modifier = Modifier.size(21.dp),
+                        )
+                    AttachmentTransferState.Available ->
+                        Icon(
+                            imageVector = fileIconFor(presentation.iconCategory),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                        )
+                }
+            }
         }
     }
 }
@@ -443,7 +593,7 @@ internal fun PendingFilePill(
         border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
         modifier =
             Modifier
-                .fillMaxWidth()
+                .fileBubbleWidth()
                 .then(
                     if (failed && onRetry != null) {
                         Modifier.clickable(onClick = onRetry)
@@ -452,45 +602,21 @@ internal fun PendingFilePill(
                     },
                 ),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-        ) {
-            Icon(
-                imageVector = fileIconFor(presentation.iconCategory),
-                contentDescription = attachmentTypeDescription(presentation.iconCategory),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(28.dp),
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    MediaPipeline.safeDisplayName(fileName),
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    "${formatFileSize(sizeBytes)} · $statusLabel",
-                    style = MaterialTheme.typography.labelSmall,
-                    color =
-                        if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (failed) {
-                Icon(
-                    Icons.Default.Refresh,
-                    contentDescription = stringResource(R.string.retry),
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp),
-                )
-            } else {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        FileBubbleContent(
+            fileName = fileName,
+            presentation = presentation,
+            transferState =
+                if (failed) {
+                    AttachmentTransferState.Failed
+                } else {
+                    AttachmentTransferState.Downloading
+                },
+            metadataText = formatFileSize(sizeBytes),
+            metadataIsError = false,
+            trailingMetadataText = statusLabel,
+            trailingMetadataIsError = failed,
+            loadingDescription = statusLabel,
+            transferDirection = FileTransferDirection.Upload,
+        )
     }
 }

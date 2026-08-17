@@ -91,9 +91,15 @@ internal fun MessageInlineFooter(
     editedLabel: String?,
     onEditedClick: (() -> Unit)?,
     showRetention: Boolean = false,
+    showTime: Boolean = true,
 ) {
     val spacing = 3.dp
-    val timeIndex = (if (editedLabel != null) 1 else 0) + (if (showRetention) 1 else 0)
+    val baselineIndex =
+        when {
+            showTime -> (if (editedLabel != null) 1 else 0) + (if (showRetention) 1 else 0)
+            editedLabel != null -> 0
+            else -> null
+        }
     Layout(
         content = {
             if (editedLabel != null) {
@@ -112,11 +118,13 @@ internal fun MessageInlineFooter(
                     tint = color.copy(alpha = 0.76f),
                 )
             }
-            Text(
-                text = timeText,
-                style = MaterialTheme.typography.labelSmall,
-                color = color,
-            )
+            if (showTime) {
+                Text(
+                    text = timeText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = color,
+                )
+            }
             if (showStatus) {
                 OutgoingMessageStatusIcon(status, tint = color)
             }
@@ -130,14 +138,14 @@ internal fun MessageInlineFooter(
         val width = contentWidth.coerceIn(constraints.minWidth, constraints.maxWidth)
         val contentHeight = placeables.maxOfOrNull { it.height } ?: 0
         val height = contentHeight.coerceIn(constraints.minHeight, constraints.maxHeight)
-        val timePlaceable = placeables[timeIndex]
-        val timeY = (height - timePlaceable.height) / 2
-        val timeBaseline = timePlaceable[FirstBaseline]
+        val baselinePlaceable = baselineIndex?.let(placeables::get)
+        val baselineY = baselinePlaceable?.let { (height - it.height) / 2 }
+        val baseline = baselinePlaceable?.get(FirstBaseline) ?: AlignmentLine.Unspecified
         val alignmentLines =
-            if (timeBaseline == AlignmentLine.Unspecified) {
+            if (baseline == AlignmentLine.Unspecified || baselineY == null) {
                 emptyMap()
             } else {
-                mapOf<AlignmentLine, Int>(FirstBaseline to timeY + timeBaseline)
+                mapOf<AlignmentLine, Int>(FirstBaseline to baselineY + baseline)
             }
 
         layout(width, height, alignmentLines) {
@@ -189,8 +197,9 @@ private fun MeasureScope.layoutMeasuredBubbleFooter(
     lastLineWidth: Int?,
     gap: Int,
 ): MeasureResult {
+    val effectiveGap = if (footer.width == 0 && footer.height == 0) 0 else gap
     val lastRight = (lastLineWidth ?: content.width).coerceIn(0, content.width)
-    val inline = lastRight + gap + footer.width <= constraints.maxWidth
+    val inline = lastRight + effectiveGap + footer.width <= constraints.maxWidth
     if (inline) {
         val width =
             bubbleFooterInlineWidth(
@@ -199,7 +208,7 @@ private fun MeasureScope.layoutMeasuredBubbleFooter(
                 footerWidth = footer.width,
                 minWidth = constraints.minWidth,
                 maxWidth = constraints.maxWidth,
-                gap = gap,
+                gap = effectiveGap,
             )
         return layout(width, content.height) {
             content.place(0, 0)
@@ -247,7 +256,7 @@ internal fun BubbleCollapsibleFooterLayout(
                 },
             ) { content() }
             readMore()
-            footer()
+            Box { footer() }
         },
     ) { measurables, constraints ->
         val maxBodyHeightPx = maxBodyHeight.roundToPx()
@@ -302,6 +311,7 @@ private fun MeasureScope.layoutCollapsedBubbleFooter(
     visibleContentHeight: Int,
     gap: Int,
 ): MeasureResult {
+    val effectiveGap = if (footer.width == 0 && footer.height == 0) 0 else gap
     val width =
         bubbleCollapsedFooterWidth(
             contentWidth = content.width,
@@ -309,14 +319,14 @@ private fun MeasureScope.layoutCollapsedBubbleFooter(
             footerWidth = footer.width,
             minWidth = constraints.minWidth,
             maxWidth = constraints.maxWidth,
-            gap = gap,
+            gap = effectiveGap,
         )
     val rowFits =
         collapsedFooterFitsOnOneRow(
             containerWidth = width,
             readMoreWidth = readMore.width,
             footerWidth = footer.width,
-            gap = gap,
+            gap = effectiveGap,
         )
     if (rowFits) {
         val rowMetrics =

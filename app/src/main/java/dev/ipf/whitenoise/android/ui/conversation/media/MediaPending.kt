@@ -65,7 +65,7 @@ internal fun MediaPendingPlaceholder(
     // matches the post-upload layout (image grid above, file pills below).
     val allImages = pendingAttachments.isNotEmpty() && pendingAttachments.all { isImagePendingAttachment(it) }
     if (!allImages) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             pendingAttachments.forEach { attachment ->
                 PendingFilePill(
                     fileName = attachment.fileName,

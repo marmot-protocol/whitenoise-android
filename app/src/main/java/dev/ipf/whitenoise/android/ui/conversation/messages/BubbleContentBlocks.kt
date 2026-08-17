@@ -73,6 +73,13 @@ internal fun ttsBodyIsCollapsed(
     maxBodyHeightPx: Int,
 ): Boolean = collapseEnabled && (measuredBodyHeightPx == null || measuredBodyHeightPx > maxBodyHeightPx)
 
+internal fun receivedFileOwnsTimestamp(
+    deleted: Boolean,
+    mine: Boolean,
+    fileCount: Int,
+    visualOwnsTimestamp: Boolean,
+): Boolean = !deleted && !mine && fileCount > 0 && !visualOwnsTimestamp
+
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun ColumnScope.BubbleMediaBlocks(
@@ -184,7 +191,15 @@ internal fun ColumnScope.BubbleMediaBlocks(
         }
     }
     if (!deleted && bubbleMedia.files.isNotEmpty()) {
-        bubbleMedia.files.forEach { entry ->
+        val fileOwnsTimestamp =
+            receivedFileOwnsTimestamp(
+                deleted = deleted,
+                mine = mine,
+                fileCount = bubbleMedia.files.size,
+                visualOwnsTimestamp = footerOnVisualMedia,
+            )
+        val fileTimestamp = if (fileOwnsTimestamp) rememberedMessageBubbleTime(record.recordedAt) else null
+        bubbleMedia.files.forEachIndexed { filePosition, entry ->
             MediaFileBubble(
                 messageIdHex = record.messageIdHex,
                 attachmentIndex = entry.index,
@@ -196,6 +211,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 senderDisplayName = appState.displayName(record.sender),
                 onLongPress = onMediaLongPress,
                 attachedToCaption = attachedToCaption,
+                timestampText = fileTimestamp.takeIf { filePosition == bubbleMedia.files.lastIndex },
             )
         }
     }
@@ -332,6 +348,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     onEditedClick: (() -> Unit)?,
     footerOnVisualMedia: Boolean,
     footerOnPendingVisual: Boolean,
+    showTimestamp: Boolean = true,
     invalidationWarning: String?,
     mine: Boolean,
     onExpand: () -> Unit,
@@ -345,8 +362,10 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             showRetention = showRetention,
             editedLabel = editedLabel,
             onEditedClick = onEditedClick,
+            showTime = showTimestamp,
         )
     }
+    val hasInlineFooter = showTimestamp || showStatus || showRetention || editedLabel != null
     var lastLineLayout by
         remember(record.messageIdHex, bodyText) {
             mutableStateOf<TextLayoutResult?>(null)
@@ -509,13 +528,13 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             BubbleCollapsibleFooterLayout(
                 maxBodyHeight = maxBodyHeightDp,
                 readMore = readMoreFooter,
-                footer = inlineFooter,
+                footer = { if (hasInlineFooter) inlineFooter() },
                 modifier = bodyModifier,
                 lastLineWidth = lastLineWidth,
             ) {
                 selectableMessageBody()
             }
-        } else {
+        } else if (hasInlineFooter) {
             BubbleFooterLayout(
                 footer = inlineFooter,
                 modifier = bodyModifier,
@@ -523,8 +542,12 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             ) {
                 selectableMessageBody()
             }
+        } else {
+            Box(modifier = bodyModifier) {
+                selectableMessageBody()
+            }
         }
-    } else if (!footerOnVisualMedia && !footerOnPendingVisual) {
+    } else if (!footerOnVisualMedia && !footerOnPendingVisual && hasInlineFooter) {
         Box(modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start)) {
             inlineFooter()
         }

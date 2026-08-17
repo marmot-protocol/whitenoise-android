@@ -1260,6 +1260,13 @@ internal fun MessageBubble(
                         invalidationWarning == null &&
                         visualAttachments.size == 1 &&
                         mediaCaption == null
+                val receivedFileTimestampInCard =
+                    receivedFileOwnsTimestamp(
+                        deleted = deleted,
+                        mine = mine,
+                        fileCount = fileAttachments.size,
+                        visualOwnsTimestamp = footerOnVisualMedia,
+                    )
                 // Share-message recognition (app-side rich rendering). A contact
                 // ships as a text/vcard attachment with a name/phone caption, so
                 // its card draws from the caption without fetching the blob; a
@@ -1309,11 +1316,13 @@ internal fun MessageBubble(
                         pendingVisualRefs.size == 1 &&
                         mediaCaption == null
                 val showPendingPlaceholder =
-                    !deleted &&
-                        !anyConfirmedMedia &&
-                        pendingAudio.isEmpty() &&
-                        pendingVisualRefs.isEmpty() &&
-                        mediaPendingName != null
+                    shouldShowPendingFilePlaceholder(
+                        deleted = deleted,
+                        hasConfirmedMedia = anyConfirmedMedia,
+                        pendingAudioCount = pendingAudio.size,
+                        pendingVisualCount = pendingVisualRefs.size,
+                        hasPendingMediaMarker = mediaPendingName != null,
+                    )
                 // `hasMedia` decides whether this row renders a media card with
                 // an optional integrated caption, or stays a text-only bubble.
                 // Deleted and persisted-failure tombstones stay text bubbles;
@@ -1585,6 +1594,7 @@ internal fun MessageBubble(
                                     onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
+                                    showTimestamp = !receivedFileTimestampInCard,
                                     invalidationWarning = invalidationWarning,
                                     mine = mine,
                                     onExpand = { if (!deleted) expandedFullView = true },
@@ -1648,6 +1658,7 @@ internal fun MessageBubble(
                                     onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
+                                    showTimestamp = !receivedFileTimestampInCard,
                                     invalidationWarning = invalidationWarning,
                                     mine = mine,
                                     onExpand = { if (!deleted) expandedFullView = true },
