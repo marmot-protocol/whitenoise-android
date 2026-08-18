@@ -44,19 +44,25 @@ internal fun NostrEventCardKind.label(eventKind: Int): String =
 internal fun eventByline(
     card: NostrEventCardModel,
     authorDisplayName: (String) -> String,
-): String {
+): String = listOf(eventAuthorLabel(card, authorDisplayName), eventDateLabel(card.createdAt)).joinToString(" · ")
+
+internal fun eventAuthorLabel(
+    card: NostrEventCardModel,
+    authorDisplayName: (String) -> String,
+): String =
+    card.authorMetadata?.displayName
+        ?: authorDisplayName(card.authorPubkeyHex).takeIf(String::isNotBlank)
+        ?: IdentityFormatter.short(card.authorPubkeyHex)
+
+@Composable
+internal fun eventDateLabel(createdAt: Long): String {
     val locale = LocalConfiguration.current.locales[0]
-    val author =
-        authorDisplayName(card.authorPubkeyHex).takeIf(String::isNotBlank)
-            ?: IdentityFormatter.short(card.authorPubkeyHex)
-    val date =
-        runCatching {
-            DateTimeFormatter
-                .ofLocalizedDate(FormatStyle.MEDIUM)
-                .withLocale(locale)
-                .format(Instant.ofEpochSecond(card.createdAt).atZone(ZoneId.systemDefault()))
-        }.getOrNull()
-    return listOfNotNull(author, date).joinToString(" · ")
+    return runCatching {
+        DateTimeFormatter
+            .ofLocalizedDate(FormatStyle.MEDIUM)
+            .withLocale(locale)
+            .format(Instant.ofEpochSecond(createdAt).atZone(ZoneId.systemDefault()))
+    }.getOrDefault("")
 }
 
 internal data class EventCardPrimaryAction(

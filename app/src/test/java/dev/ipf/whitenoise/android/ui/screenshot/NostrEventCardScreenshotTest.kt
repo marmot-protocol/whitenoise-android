@@ -227,6 +227,7 @@ class NostrEventCardScreenshotTest {
                 NostrEventCard(
                     state = state,
                     authorDisplayName = { "Alex" },
+                    referenceLabel = "nevent1qqs8f4…6da8fv0",
                     contentColor = content,
                     onRetry = {},
                     onCopy = {},

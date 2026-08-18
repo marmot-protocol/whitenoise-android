@@ -45,6 +45,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.messageContainsOnlyNostrEventReferences
 import dev.ipf.whitenoise.android.core.nostrEventReferences
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -493,6 +494,11 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     emptyList()
                 }
             }
+        val showMessageTextBody =
+            !messageContainsOnlyNostrEventReferences(
+                message = bodyText,
+                references = eventReferences,
+            )
         val density = LocalDensity.current
         val lineHeightPx =
             with(density) { (MaterialTheme.typography.bodyLarge.lineHeight).toPx() }
@@ -625,7 +631,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
         }
         val selectableMessageBody: @Composable () -> Unit = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                selectionWrapper(messageTextBody)
+                if (showMessageTextBody) selectionWrapper(messageTextBody)
                 eventCards()
             }
         }
@@ -657,7 +663,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 }
             }
         val footerLastLineWidth = lastLineWidth.takeIf { eventReferences.isEmpty() }
-        if (collapsible && eventReferences.isNotEmpty()) {
+        if (collapsible && eventReferences.isNotEmpty() && showMessageTextBody) {
             Column(
                 modifier = bodyModifier,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -679,7 +685,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     inlineFooter()
                 }
             }
-        } else if (collapsible) {
+        } else if (collapsible && showMessageTextBody) {
             BubbleCollapsibleFooterLayout(
                 maxBodyHeight = maxBodyHeightDp,
                 readMore = readMoreFooter,

@@ -19,6 +19,29 @@ internal data class NostrEventReferenceOccurrence(
 @Suppress("MaxLineLength")
 internal fun nostrEventReferences(document: MarkdownDocumentFfi): List<NostrEventReferenceOccurrence> = NostrEventReferenceCollector().collect(document)
 
+/**
+ * True only when every non-whitespace token in the authored message is one of
+ * the event pointers represented by a card. Embedded references remain in the
+ * Markdown body so hiding the duplicate preview never removes surrounding
+ * prose or a meaningful link label.
+ */
+internal fun messageContainsOnlyNostrEventReferences(
+    message: String,
+    references: List<NostrEventReferenceOccurrence>,
+): Boolean {
+    if (references.isEmpty()) return false
+    val authored = references.mapTo(HashSet()) { it.authoredReference.normalizedNostrReference() }
+    val tokens = message.trim().split(WHITESPACE).filter(String::isNotBlank)
+    return tokens.isNotEmpty() && tokens.all { it.normalizedNostrReference() in authored }
+}
+
+private fun String.normalizedNostrReference(): String {
+    val trimmed = trim()
+    return trimmed.removePrefixIgnoringCase("nostr:").lowercase()
+}
+
+private fun String.removePrefixIgnoringCase(prefix: String): String = if (startsWith(prefix, ignoreCase = true)) substring(prefix.length) else this
+
 private class NostrEventReferenceCollector {
     val references = LinkedHashMap<String, NostrEventReferenceOccurrence>()
 
@@ -120,6 +143,7 @@ private fun MarkdownNostrHrpFfi.isPublicEventHrp(): Boolean =
 
 private const val MAX_MARKDOWN_DESTINATION_LENGTH = 8_192
 private const val MAX_EVENT_REFERENCES_PER_MESSAGE = 3
+private val WHITESPACE = Regex("\\s+")
 private const val NIP19_BODY_CHARS = "ac-hj-np-z02-9"
 private val NIP19_EVENT_SEGMENT =
     Regex(

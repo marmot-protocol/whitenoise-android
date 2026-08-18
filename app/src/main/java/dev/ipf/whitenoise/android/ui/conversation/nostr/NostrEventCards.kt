@@ -6,9 +6,7 @@ import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
@@ -51,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
+import dev.ipf.whitenoise.android.ui.common.Avatar
 import kotlinx.coroutines.launch
 
 @Composable
@@ -68,8 +66,8 @@ internal fun NostrEventCards(
     var articleCard by remember(resolver) { mutableStateOf<NostrEventCardModel?>(null) }
     var videoCard by remember(resolver) { mutableStateOf<NostrEventCardModel?>(null) }
     Column(
-        modifier = modifier.widthIn(min = 220.dp, max = 320.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         references.take(MAX_CARDS_PER_MESSAGE).forEach { occurrence ->
             key(occurrence.reference.stableId) {
@@ -121,6 +119,7 @@ private fun ResolvedNostrEventCard(
     NostrEventCard(
         state = state,
         authorDisplayName = authorDisplayName,
+        referenceLabel = compactEventReference(authoredReference),
         contentColor = contentColor,
         onRetry = { resolver.retry(occurrence.reference, flow) },
         onCopy = {
@@ -154,6 +153,7 @@ internal fun NostrEventCard(
     onRetry: () -> Unit,
     onCopy: () -> Unit,
     onOpen: (NostrEventCardModel?) -> Unit,
+    referenceLabel: String? = null,
 ) {
     val openDescription = stringResource(R.string.nostr_event_open)
     val copyDescription = stringResource(R.string.nostr_event_copy)
@@ -167,6 +167,7 @@ internal fun NostrEventCard(
         EventCardBody(
             state = state,
             authorDisplayName = authorDisplayName,
+            referenceLabel = referenceLabel,
             contentColor = contentColor,
             copyDescription = copyDescription,
             openDescription = openDescription,
@@ -181,6 +182,7 @@ internal fun NostrEventCard(
 private fun EventCardBody(
     state: NostrEventCardState,
     authorDisplayName: (String) -> String,
+    referenceLabel: String?,
     contentColor: Color,
     copyDescription: String,
     openDescription: String,
@@ -192,6 +194,7 @@ private fun EventCardBody(
         NostrEventCardState.Loading ->
             EventCardStatus(
                 text = stringResource(R.string.nostr_event_loading),
+                referenceLabel = referenceLabel,
                 contentColor = contentColor,
                 progress = true,
                 copyDescription = copyDescription,
@@ -202,6 +205,7 @@ private fun EventCardBody(
         NostrEventCardState.NotFound ->
             EventCardFailure(
                 text = stringResource(R.string.nostr_event_not_found),
+                referenceLabel = referenceLabel,
                 contentColor = contentColor,
                 copyDescription = copyDescription,
                 openDescription = openDescription,
@@ -212,6 +216,7 @@ private fun EventCardBody(
         NostrEventCardState.Invalid ->
             EventCardFailure(
                 text = stringResource(R.string.nostr_event_invalid),
+                referenceLabel = referenceLabel,
                 contentColor = contentColor,
                 copyDescription = copyDescription,
                 openDescription = openDescription,
@@ -222,6 +227,7 @@ private fun EventCardBody(
         NostrEventCardState.Failed ->
             EventCardFailure(
                 text = stringResource(R.string.nostr_event_failed),
+                referenceLabel = referenceLabel,
                 contentColor = contentColor,
                 copyDescription = copyDescription,
                 openDescription = openDescription,
@@ -233,6 +239,7 @@ private fun EventCardBody(
             LoadedEventCard(
                 card = state.card,
                 authorDisplayName = authorDisplayName,
+                referenceLabel = referenceLabel,
                 contentColor = contentColor,
                 copyDescription = copyDescription,
                 onCopy = onCopy,
@@ -274,13 +281,14 @@ private fun EventCardActions(
 private fun LoadedEventCard(
     card: NostrEventCardModel,
     authorDisplayName: (String) -> String,
+    referenceLabel: String?,
     contentColor: Color,
     copyDescription: String,
     onCopy: () -> Unit,
     onOpen: () -> Unit,
 ) {
     val primaryAction = card.primaryAction()
-    Column(Modifier.padding(start = 12.dp, top = 8.dp, end = 4.dp, bottom = 8.dp)) {
+    Column(Modifier.padding(start = 10.dp, top = 6.dp, end = 4.dp, bottom = 7.dp)) {
         LoadedEventHeader(
             card = card,
             authorDisplayName = authorDisplayName,
@@ -291,8 +299,20 @@ private fun LoadedEventCard(
             onCopy = onCopy,
             onOpen = onOpen,
         )
+        card.title?.takeIf(String::isNotBlank)?.let { title ->
+            Spacer(Modifier.height(3.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = contentColor,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         LoadedEventSummary(card.summary, contentColor)
         LoadedEventMetadata(card.metadata, contentColor)
+        EventReferenceLabel(referenceLabel, contentColor)
     }
 }
 
@@ -307,61 +327,55 @@ private fun LoadedEventHeader(
     onCopy: () -> Unit,
     onOpen: () -> Unit,
 ) {
+    val author = eventAuthorLabel(card, authorDisplayName)
+    val kindAndDate = listOf(card.kind.label(card.eventKind), eventDateLabel(card.createdAt)).filter(String::isNotBlank)
     Row(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(36.dp)
-                    .background(contentColor.copy(alpha = 0.1f), RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = card.kind.icon(),
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(22.dp),
-            )
-        }
+        Avatar(
+            title = author,
+            seed = card.authorPubkeyHex,
+            size = 32.dp,
+            pictureUrl = card.authorMetadata?.pictureUrl,
+        )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = card.kind.label(card.eventKind),
-                style = MaterialTheme.typography.labelSmall,
-                color = contentColor.copy(alpha = 0.72f),
+                text = author,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            card.title?.takeIf(String::isNotBlank)?.let { title ->
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = contentColor,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = card.kind.icon(),
+                    contentDescription = null,
+                    tint = contentColor.copy(alpha = 0.66f),
+                    modifier = Modifier.size(14.dp),
                 )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = eventByline(card, authorDisplayName),
+                    text = kindAndDate.joinToString(" · "),
                     modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = contentColor.copy(alpha = 0.78f),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = contentColor.copy(alpha = 0.66f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                EventCardActions(
-                    contentColor = contentColor,
-                    copyDescription = copyDescription,
-                    openDescription = openDescription,
-                    onCopy = onCopy,
-                    onOpen = onOpen,
-                    openIcon = openIcon,
-                )
             }
         }
+        EventCardActions(
+            contentColor = contentColor,
+            copyDescription = copyDescription,
+            openDescription = openDescription,
+            onCopy = onCopy,
+            onOpen = onOpen,
+            openIcon = openIcon,
+        )
     }
 }
 
@@ -371,12 +385,12 @@ private fun LoadedEventSummary(
     contentColor: Color,
 ) {
     summary?.takeIf(String::isNotBlank)?.let {
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         Text(
             text = it,
             style = MaterialTheme.typography.bodyMedium,
             color = contentColor,
-            maxLines = 4,
+            maxLines = 3,
             overflow = TextOverflow.Ellipsis,
         )
     }
@@ -388,7 +402,7 @@ private fun LoadedEventMetadata(
     contentColor: Color,
 ) {
     if (metadata.isNotEmpty()) {
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(3.dp))
         Text(
             text = metadata.joinToString(" · "),
             style = MaterialTheme.typography.labelSmall,
@@ -400,8 +414,26 @@ private fun LoadedEventMetadata(
 }
 
 @Composable
+private fun EventReferenceLabel(
+    referenceLabel: String?,
+    contentColor: Color,
+) {
+    referenceLabel?.takeIf(String::isNotBlank)?.let { reference ->
+        Spacer(Modifier.height(3.dp))
+        Text(
+            text = reference,
+            style = MaterialTheme.typography.labelSmall,
+            color = contentColor.copy(alpha = 0.52f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
 private fun EventCardStatus(
     text: String,
+    referenceLabel: String?,
     contentColor: Color,
     progress: Boolean,
     copyDescription: String,
@@ -409,31 +441,34 @@ private fun EventCardStatus(
     onCopy: () -> Unit,
     onOpen: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.padding(start = 12.dp, top = 4.dp, end = 4.dp, bottom = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (progress) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
+    Column(modifier = Modifier.padding(start = 10.dp, top = 4.dp, end = 4.dp, bottom = 6.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (progress) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = contentColor,
+                    strokeWidth = 2.dp,
+                )
+            }
+            Text(
+                text = text,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
                 color = contentColor,
-                strokeWidth = 2.dp,
             )
+            EventCardActions(contentColor, copyDescription, openDescription, onCopy, onOpen)
         }
-        Text(
-            text = text,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            color = contentColor,
-        )
-        EventCardActions(contentColor, copyDescription, openDescription, onCopy, onOpen)
+        EventReferenceLabel(referenceLabel, contentColor)
     }
 }
 
 @Composable
 private fun EventCardFailure(
     text: String,
+    referenceLabel: String?,
     contentColor: Color,
     copyDescription: String,
     openDescription: String,
@@ -474,13 +509,21 @@ private fun EventCardFailure(
                 )
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
+        EventReferenceLabel(referenceLabel, contentColor)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             EventCardActions(contentColor, copyDescription, openDescription, onCopy, onOpen)
         }
     }
 }
 
+internal fun compactEventReference(authoredReference: String): String {
+    val trimmed = authoredReference.trim()
+    val normalized = if (trimmed.startsWith("nostr:", ignoreCase = true)) trimmed.substring(6) else trimmed
+    if (normalized.length <= COMPACT_REFERENCE_LENGTH) return normalized
+    return "${normalized.take(COMPACT_REFERENCE_PREFIX)}…${normalized.takeLast(COMPACT_REFERENCE_SUFFIX)}"
+}
+
 private const val MAX_CARDS_PER_MESSAGE = 3
+private const val COMPACT_REFERENCE_LENGTH = 28
+private const val COMPACT_REFERENCE_PREFIX = 14
+private const val COMPACT_REFERENCE_SUFFIX = 7

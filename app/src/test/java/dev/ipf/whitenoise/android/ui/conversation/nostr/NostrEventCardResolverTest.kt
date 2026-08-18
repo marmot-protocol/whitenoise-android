@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import dev.ipf.whitenoise.android.core.NostrEventReference
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -27,9 +28,13 @@ class NostrEventCardResolverTest {
                     verificationDispatcher = UnconfinedTestDispatcher(testScheduler),
                     relayProvider = { listOf("wss://relay.example") },
                     fetchEvents = { _, exactFilter ->
-                        queryCount += 1
-                        filter = exactFilter
-                        listOf(event(id = "b".repeat(64)), event(id = requested, kind = 1, content = "Hello"))
+                        if (exactFilter.has("ids")) {
+                            queryCount += 1
+                            filter = exactFilter
+                            listOf(event(id = "b".repeat(64)), event(id = requested, kind = 1, content = "Hello"))
+                        } else {
+                            emptyList()
+                        }
                     },
                     verifyEvent = { true },
                 )
@@ -180,9 +185,13 @@ class NostrEventCardResolverTest {
                     parentScope = this,
                     verificationDispatcher = UnconfinedTestDispatcher(testScheduler),
                     relayProvider = { listOf("wss://relay.example") },
-                    fetchEvents = { _, _ ->
-                        queryCount += 1
-                        listOf(event(requested, pubkey = "b".repeat(64), kind = 1))
+                    fetchEvents = { _, filter ->
+                        if (filter.has("ids")) {
+                            queryCount += 1
+                            listOf(event(requested, pubkey = "b".repeat(64), kind = 1))
+                        } else {
+                            emptyList()
+                        }
                     },
                     verifyEvent = { true },
                 )
@@ -217,12 +226,16 @@ class NostrEventCardResolverTest {
                     verificationDispatcher = UnconfinedTestDispatcher(testScheduler),
                     relayProvider = { listOf("wss://relay.example") },
                     fetchEvents = { _, exactFilter ->
-                        filter = exactFilter
-                        listOf(
-                            event(higherId, author, 30_023, 9, listOf(listOf("d", "entry"))),
-                            event(lowerId, author, 30_023, 9, listOf(listOf("d", "entry"))),
-                            event("0".repeat(64), author, 30_023, 10, listOf(listOf("d", "other"))),
-                        )
+                        if (exactFilter.has("#d")) {
+                            filter = exactFilter
+                            listOf(
+                                event(higherId, author, 30_023, 9, listOf(listOf("d", "entry"))),
+                                event(lowerId, author, 30_023, 9, listOf(listOf("d", "entry"))),
+                                event("0".repeat(64), author, 30_023, 10, listOf(listOf("d", "other"))),
+                            )
+                        } else {
+                            emptyList()
+                        }
                     },
                     verifyEvent = { true },
                 )
@@ -262,6 +275,58 @@ class NostrEventCardResolverTest {
             runCurrent()
 
             assertEquals(NostrEventCardState.Invalid, state.value)
+            resolver.close()
+        }
+
+    @Test
+    fun verifiedKindZeroMetadataEnrichesTheCardWithoutBlockingTheEvent() =
+        runTest {
+            val requested = "a".repeat(64)
+            val author = "c".repeat(64)
+            val metadataStarted = CompletableDeferred<Unit>()
+            val releaseMetadata = CompletableDeferred<Unit>()
+            var metadataFilter: JSONObject? = null
+            val resolver =
+                NostrEventCardResolver(
+                    parentScope = this,
+                    verificationDispatcher = UnconfinedTestDispatcher(testScheduler),
+                    relayProvider = { listOf("wss://relay.example") },
+                    fetchEvents = { _, filter ->
+                        if (filter.has("ids")) {
+                            listOf(event(requested, pubkey = author, content = "Hello"))
+                        } else {
+                            metadataFilter = filter
+                            metadataStarted.complete(Unit)
+                            releaseMetadata.await()
+                            listOf(
+                                event(
+                                    id = "d".repeat(64),
+                                    pubkey = author,
+                                    kind = 0,
+                                    createdAt = 2,
+                                    content =
+                                        "{\"display_name\":\"  Alice   Rivers  \"," +
+                                            "\"picture\":\" https://cdn.example/alice.jpg \"}",
+                                ),
+                            )
+                        }
+                    },
+                    verifyEvent = { true },
+                )
+
+            val state = resolver.state(NostrEventReference.Event(requested))
+            metadataStarted.await()
+
+            assertEquals(null, (state.value as NostrEventCardState.Loaded).card.authorMetadata)
+            releaseMetadata.complete(Unit)
+            runCurrent()
+
+            val metadata = (state.value as NostrEventCardState.Loaded).card.authorMetadata
+            assertEquals("Alice Rivers", metadata?.displayName)
+            assertEquals("https://cdn.example/alice.jpg", metadata?.pictureUrl)
+            assertEquals(author, metadataFilter?.getJSONArray("authors")?.getString(0))
+            assertEquals(0L, metadataFilter?.getJSONArray("kinds")?.getLong(0))
+            assertEquals(1, metadataFilter?.getInt("limit"))
             resolver.close()
         }
 
@@ -437,8 +502,12 @@ class NostrEventCardResolverTest {
                         listOf("wss://relay.example")
                     },
                     fetchEvents = { _, filter ->
-                        queries += 1
-                        listOf(event(filter.getJSONArray("ids").getString(0), content = "resolved"))
+                        if (filter.has("ids")) {
+                            queries += 1
+                            listOf(event(filter.getJSONArray("ids").getString(0), content = "resolved"))
+                        } else {
+                            emptyList()
+                        }
                     },
                     verifyEvent = { true },
                     maxEntries = 2,
@@ -473,9 +542,13 @@ class NostrEventCardResolverTest {
                     parentScope = this,
                     verificationDispatcher = UnconfinedTestDispatcher(testScheduler),
                     relayProvider = { listOf("wss://relay.example") },
-                    fetchEvents = { _, _ ->
-                        queries += 1
-                        listOf(event(requested, content = "See $nested"))
+                    fetchEvents = { _, filter ->
+                        if (filter.has("ids")) {
+                            queries += 1
+                            listOf(event(requested, content = "See $nested"))
+                        } else {
+                            emptyList()
+                        }
                     },
                     verifyEvent = { true },
                 )

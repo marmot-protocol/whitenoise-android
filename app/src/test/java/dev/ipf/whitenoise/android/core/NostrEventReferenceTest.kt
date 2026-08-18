@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -166,6 +167,24 @@ class NostrEventReferenceTest {
             )
 
         assertEquals(emptyList<NostrEventReferenceOccurrence>(), nostrEventReferences(document))
+    }
+
+    @Test
+    fun standaloneEventReferencesCanMoveIntoCardsWithoutHidingProse() {
+        val nevent = "nevent1qqspreviewreference"
+        val references =
+            listOf(
+                NostrEventReferenceOccurrence(
+                    reference = NostrEventReference.Event("a".repeat(64)),
+                    authoredReference = nevent,
+                ),
+            )
+
+        assertTrue(messageContainsOnlyNostrEventReferences(nevent, references))
+        assertTrue(messageContainsOnlyNostrEventReferences("nostr:$nevent", references))
+        assertTrue(messageContainsOnlyNostrEventReferences("NOSTR:$nevent", references))
+        assertFalse(messageContainsOnlyNostrEventReferences("Read $nevent", references))
+        assertFalse(messageContainsOnlyNostrEventReferences("[$nevent](https://example.com)", references))
     }
 
     private fun tlv(

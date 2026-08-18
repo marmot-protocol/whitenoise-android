@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.core.NostrEventReference
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
 import dev.ipf.whitenoise.android.core.nostr.NostrRelayQueryClient
@@ -50,6 +51,12 @@ internal data class NostrEventCardModel(
     val readerBody: String? = null,
     val mediaUrl: String? = null,
     val mediaMimeType: String? = null,
+    val authorMetadata: NostrEventAuthorMetadata? = null,
+)
+
+internal data class NostrEventAuthorMetadata(
+    val displayName: String?,
+    val pictureUrl: String?,
 )
 
 internal sealed interface NostrEventCardState {
@@ -129,27 +136,59 @@ internal class NostrEventCardResolver(
         state: MutableStateFlow<NostrEventCardState>,
         refreshRelays: Boolean = false,
     ) {
-        val result =
+        val relaysAndResult =
             try {
                 val relays = relays(reference, refreshRelays)
-                if (relays.isEmpty()) {
-                    NostrEventCardState.Failed
-                } else {
-                    resolveFromRelays(reference, relays)
-                }
+                relays to
+                    if (relays.isEmpty()) {
+                        NostrEventCardState.Failed
+                    } else {
+                        resolveFromRelays(reference, relays)
+                    }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                NostrEventCardState.Failed
+                emptyList<String>() to NostrEventCardState.Failed
             }
+        val (relays, result) = relaysAndResult
         val currentJob = coroutineContext[Job]
+        if (result !is NostrEventCardState.Loaded) {
+            publishResolvedState(reference, state, currentJob, result, complete = true)
+            return
+        }
+
+        // Do not hold the card behind a second relay round trip. The verified
+        // event is useful immediately; Kind 0 metadata enriches it in place.
+        if (!publishResolvedState(reference, state, currentJob, result, complete = false)) return
+        val enriched =
+            try {
+                resolveAuthorMetadata(result.card.authorPubkeyHex, relays)?.let { metadata ->
+                    result.copy(card = result.card.copy(authorMetadata = metadata))
+                } ?: result
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                result
+            }
+        publishResolvedState(reference, state, currentJob, enriched, complete = true)
+    }
+
+    private fun publishResolvedState(
+        reference: NostrEventReference,
+        state: MutableStateFlow<NostrEventCardState>,
+        currentJob: Job?,
+        value: NostrEventCardState,
+        complete: Boolean,
+    ): Boolean =
         synchronized(lock) {
-            if (jobs[reference.stableId] === currentJob && states[reference.stableId] === state) {
-                state.value = result
-                jobs.remove(reference.stableId)
+            if (jobs[reference.stableId] !== currentJob || states[reference.stableId] !== state) {
+                false
+            } else {
+                state.value = value
+                if (complete) jobs.remove(reference.stableId)
+                true
             }
         }
-    }
 
     private suspend fun relays(
         reference: NostrEventReference,
@@ -189,6 +228,24 @@ internal class NostrEventCardResolver(
                 events.isNotEmpty() -> NostrEventCardState.Invalid
                 else -> NostrEventCardState.NotFound
             }
+        }
+    }
+
+    private suspend fun resolveAuthorMetadata(
+        authorPubkeyHex: String,
+        relays: List<String>,
+    ): NostrEventAuthorMetadata? {
+        val events = fetchEvents(relays, authorMetadataFilter(authorPubkeyHex))
+        return withContext(verificationDispatcher) {
+            events
+                .asSequence()
+                .filter(verifyEvent)
+                .filter { event -> event.kind == KIND_PROFILE_METADATA && event.pubkey.equals(authorPubkeyHex, true) }
+                .sortedWith(
+                    compareByDescending<NostrEvent> { it.createdAt }
+                        .thenBy { it.id.lowercase(Locale.ROOT) },
+                ).firstOrNull()
+                ?.toAuthorMetadata()
         }
     }
 
@@ -272,6 +329,24 @@ private fun NostrEventReference.exactFilter(): JSONObject =
                 .put("limit", EVENT_CARD_QUERY_LIMIT)
     }
 
+private fun authorMetadataFilter(authorPubkeyHex: String): JSONObject =
+    JSONObject()
+        .put("authors", JSONArray().put(authorPubkeyHex))
+        .put("kinds", JSONArray().put(KIND_PROFILE_METADATA))
+        .put("limit", PROFILE_METADATA_QUERY_LIMIT)
+
+private fun NostrEvent.toAuthorMetadata(): NostrEventAuthorMetadata? {
+    val profile = runCatching { JSONObject(content) }.getOrNull() ?: return null
+    val displayName =
+        ProfileSanitizer.displayName(profile.opt("display_name") as? String)
+            ?: ProfileSanitizer.displayName(profile.opt("name") as? String)
+    val pictureUrl = ProfileSanitizer.protocolImageUrl(profile.opt("picture") as? String)
+    return NostrEventAuthorMetadata(
+        displayName = displayName,
+        pictureUrl = pictureUrl,
+    ).takeIf { it.displayName != null || it.pictureUrl != null }
+}
+
 private fun NostrEventReference.matches(event: NostrEvent): Boolean =
     when (this) {
         is NostrEventReference.Event ->
@@ -285,3 +360,5 @@ private fun NostrEventReference.matches(event: NostrEvent): Boolean =
 private const val MAX_PUBLIC_EVENT_RELAYS = 4
 private const val EXACT_EVENT_QUERY_LIMIT = 1
 private const val EVENT_CARD_QUERY_LIMIT = 8
+private const val PROFILE_METADATA_QUERY_LIMIT = 1
+private const val KIND_PROFILE_METADATA = 0

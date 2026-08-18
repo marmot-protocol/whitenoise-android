@@ -43,7 +43,9 @@ class NostrEventCardTest {
             }
         }
 
-        composeRule.onNodeWithText(string(R.string.nostr_event_type_note)).assertIsDisplayed()
+        composeRule
+            .onNodeWithText(string(R.string.nostr_event_type_note), substring = true)
+            .assertIsDisplayed()
         composeRule.onNodeWithText("A short referenced note").assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.nostr_event_copy)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.nostr_event_open)).performClick()
@@ -119,6 +121,36 @@ class NostrEventCardTest {
 
         composeRule.onNodeWithContentDescription(string(R.string.nostr_event_read_article)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.nostr_event_play_video)).assertIsDisplayed()
+    }
+
+    @Test
+    fun kindZeroAuthorAndCompactReferenceAreShownInsideTheCard() {
+        val reference = "nevent1" + "q".repeat(48) + "ending1"
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventCard(
+                    state =
+                        NostrEventCardState.Loaded(
+                            noteCard().copy(
+                                authorMetadata =
+                                    NostrEventAuthorMetadata(
+                                        displayName = "Alice Rivers",
+                                        pictureUrl = null,
+                                    ),
+                            ),
+                        ),
+                    authorDisplayName = { "Local fallback" },
+                    referenceLabel = compactEventReference(reference),
+                    contentColor = Color.Black,
+                    onRetry = {},
+                    onCopy = {},
+                    onOpen = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Alice Rivers").assertIsDisplayed()
+        composeRule.onNodeWithText("nevent1qqqqqqq…ending1").assertIsDisplayed()
     }
 
     private fun string(resId: Int): String =
