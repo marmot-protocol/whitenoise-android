@@ -370,7 +370,7 @@ internal fun composerEmojiPaneRestoreStep(
 internal fun composerKeyboardRestoreTimeoutClearsFocus(currentImeHeight: Dp): Boolean = currentImeHeight == 0.dp
 
 @Composable
-private fun EmojiPickerContent(
+internal fun EmojiPickerContent(
     onEmojiPicked: (String) -> Unit,
     modifier: Modifier = Modifier,
     purpose: EmojiPickerPurpose = EmojiPickerPurpose.USE,
@@ -382,6 +382,7 @@ private fun EmojiPickerContent(
     searchStartsOpen: Boolean = false,
     searchFieldAlwaysVisible: Boolean = false,
     onSearchActiveChange: (Boolean) -> Unit = {},
+    selectionEnabled: Boolean = true,
 ) {
     val context = LocalContext.current
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -455,6 +456,7 @@ private fun EmojiPickerContent(
     }
 
     fun pick(emoji: String) {
+        if (!selectionEnabled) return
         if (purpose == EmojiPickerPurpose.USE) {
             onEmojiUsed(emoji)
         }
@@ -528,7 +530,11 @@ private fun EmojiPickerContent(
                             EmojiSectionHeader(stringResource(R.string.emoji_category_this_message))
                         }
                         items(messageReactions, key = { "message-reaction:$it" }) { emoji ->
-                            EmojiSearchResultCell(emoji = emoji, onClick = { pick(emoji) })
+                            EmojiSearchResultCell(
+                                emoji = emoji,
+                                enabled = selectionEnabled,
+                                onClick = { pick(emoji) },
+                            )
                         }
                     }
                     if (recents.isNotEmpty()) {
@@ -536,7 +542,11 @@ private fun EmojiPickerContent(
                             EmojiSectionHeader(stringResource(R.string.emoji_category_recent))
                         }
                         items(recents, key = { "recent:$it" }) { emoji ->
-                            EmojiSearchResultCell(emoji = emoji, onClick = { pick(emoji) })
+                            EmojiSearchResultCell(
+                                emoji = emoji,
+                                enabled = selectionEnabled,
+                                onClick = { pick(emoji) },
+                            )
                         }
                     }
                     for (group in 0 until EmojiData.GroupCount) {
@@ -546,7 +556,11 @@ private fun EmojiPickerContent(
                             EmojiSectionHeader(stringResource(emojiGroupTitleRes(group)))
                         }
                         items(groupEmoji, key = { it.emoji }) { entry ->
-                            EmojiSearchResultCell(emoji = entry.emoji, onClick = { pick(entry.emoji) })
+                            EmojiSearchResultCell(
+                                emoji = entry.emoji,
+                                enabled = selectionEnabled,
+                                onClick = { pick(entry.emoji) },
+                            )
                         }
                     }
                 }
@@ -554,6 +568,7 @@ private fun EmojiPickerContent(
                 EmojiSearchResultsGrid(
                     results = searchResults,
                     onEmojiPicked = { pick(it) },
+                    selectionEnabled = selectionEnabled,
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 )
             }
@@ -647,6 +662,7 @@ private fun EmojiSearchField(
 private fun EmojiSearchResultsGrid(
     results: List<EmojiEntry>,
     onEmojiPicked: (String) -> Unit,
+    selectionEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     if (results.isEmpty()) {
@@ -668,6 +684,7 @@ private fun EmojiSearchResultsGrid(
         items(results, key = { it.emoji }) { entry ->
             EmojiSearchResultCell(
                 emoji = entry.emoji,
+                enabled = selectionEnabled,
                 onClick = { onEmojiPicked(entry.emoji) },
             )
         }
@@ -677,6 +694,7 @@ private fun EmojiSearchResultsGrid(
 @Composable
 private fun EmojiSearchResultCell(
     emoji: String,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
     BoxWithConstraints(
@@ -685,7 +703,7 @@ private fun EmojiSearchResultCell(
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(CircleShape)
-                .clickable(onClick = onClick),
+                .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         val fontScale = LocalDensity.current.fontScale

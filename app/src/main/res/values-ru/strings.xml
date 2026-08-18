@@ -939,6 +939,17 @@
     <string name="group_image_search_privacy">Веб-поиск передаёт ваш запрос и IP-адрес DuckDuckGo и серверам изображений.</string>
     <string name="group_image_search_apply">Использовать это изображение</string>
     <string name="group_image_choose_photo">Выбрать из фотографий</string>
+    <string name="group_image_choose_emoji">Создать из эмодзи</string>
+    <string name="group_image_source_emoji">Эмодзи</string>
+    <string name="group_image_source_photos">Фото</string>
+    <string name="group_image_emoji_title">Изображение группы из эмодзи</string>
+    <string name="group_image_emoji_hint">Выберите один или два эмодзи. Все участники увидят одно и то же изображение.</string>
+    <string name="group_image_emoji_private">Доступно только внутри группы. В приглашениях по-прежнему используется публичный аватар.</string>
+    <string name="group_image_emoji_none_selected">Эмодзи не выбраны</string>
+    <string name="group_image_emoji_limit">Можно выбрать не более двух эмодзи.</string>
+    <string name="group_image_emoji_unsupported">Этот эмодзи нельзя отобразить на данном устройстве.</string>
+    <string name="group_image_emoji_preview_description">Предпросмотр изображения группы с %1$s</string>
+    <string name="group_image_emoji_use">Использовать изображение из эмодзи</string>
     <string name="toast_couldnt_upload_group_image">Не удалось загрузить фото группы.</string>
     <string name="group_image_search_enter_query">Введите поисковый запрос.</string>
     <string name="group_image_search_unavailable">Поиск изображений временно недоступен.</string>

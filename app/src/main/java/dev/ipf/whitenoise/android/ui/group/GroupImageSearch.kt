@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -34,6 +35,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
@@ -104,6 +106,58 @@ internal const val IMAGE_SEARCH_BANNER_PREVIEW_TAG = "image_search_banner_previe
 internal const val IMAGE_SEARCH_RESULTS_TAG = "image_search_results"
 internal const val IMAGE_SEARCH_ACTIONS_TAG = "image_search_actions"
 private const val IMAGE_SEARCH_BANNER_ASPECT_RATIO = 3f
+
+@Composable
+private fun ImageSourceButton(
+    label: String,
+    accessibilityLabel: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    enabled: Boolean,
+    loading: Boolean = false,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier =
+            modifier
+                .height(52.dp)
+                .semantics { contentDescription = accessibilityLabel },
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
 
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
@@ -217,6 +271,7 @@ internal fun ImageSearchSheet(
     applyInFlight: Boolean,
     onApply: (String?) -> Unit,
     onPickPhoto: ((Uri) -> Unit)? = null,
+    onPickEmoji: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     previewPresentation: ImagePreviewPresentation = ImagePreviewPresentation.Avatar,
     choosePhotoLabel: String? = null,
@@ -270,6 +325,9 @@ internal fun ImageSearchSheet(
     val badResponseRes = R.string.group_image_search_bad_response
     val noResultsRes = R.string.group_image_search_no_results
     val resolvedChoosePhotoLabel = choosePhotoLabel ?: stringResource(R.string.group_image_choose_photo)
+    val resolvedChooseEmojiLabel = stringResource(R.string.group_image_choose_emoji)
+    val emojiSourceLabel = stringResource(R.string.group_image_source_emoji)
+    val photoSourceLabel = stringResource(R.string.group_image_source_photos)
     val resolvedRemoveImageLabel = removeImageLabel ?: stringResource(R.string.group_image_search_remove)
     val resolvedApplyImageLabel = applyImageLabel ?: stringResource(R.string.group_image_search_apply)
 
@@ -353,7 +411,43 @@ internal fun ImageSearchSheet(
                     subtitle = stringResource(subtitleRes),
                     presentation = previewPresentation,
                 )
-                if (onPickPhoto != null) {
+                if (onPickEmoji != null && onPickPhoto != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        ImageSourceButton(
+                            label = emojiSourceLabel,
+                            accessibilityLabel = resolvedChooseEmojiLabel,
+                            icon = Icons.Default.EmojiEmotions,
+                            enabled = !applyInFlight,
+                            onClick = onPickEmoji,
+                            modifier = Modifier.weight(1f),
+                        )
+                        ImageSourceButton(
+                            label = photoSourceLabel,
+                            accessibilityLabel = resolvedChoosePhotoLabel,
+                            icon = Icons.Default.PhotoLibrary,
+                            enabled = !applyInFlight,
+                            loading = applyInFlight && pendingAction == GroupImageAction.PickPhoto,
+                            onClick = {
+                                photoPicker.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                } else if (onPickEmoji != null) {
+                    ImageSourceButton(
+                        label = emojiSourceLabel,
+                        accessibilityLabel = resolvedChooseEmojiLabel,
+                        icon = Icons.Default.EmojiEmotions,
+                        enabled = !applyInFlight,
+                        onClick = onPickEmoji,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else if (onPickPhoto != null) {
                     Button(
                         onClick = {
                             photoPicker.launch(

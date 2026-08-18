@@ -69,6 +69,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberImageUploadPreview
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
 import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerDialog
+import dev.ipf.whitenoise.android.ui.group.GroupEmojiImagePickerSheet
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
@@ -225,6 +226,7 @@ internal fun NewGroupSetupScreen(
     var retentionSecs by rememberSaveable { mutableLongStateOf(0L) }
     var showRetentionPicker by remember { mutableStateOf(false) }
     var showImagePicker by remember { mutableStateOf(false) }
+    var showGroupEmojiImagePicker by remember { mutableStateOf(false) }
     var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
     var imageDraft by remember { mutableStateOf<ImageUploadDraft?>(null) }
     var imagePreparing by remember { mutableStateOf(false) }
@@ -576,7 +578,24 @@ internal fun NewGroupSetupScreen(
                     GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
                 }
             },
+            onPickEmoji = {
+                showImagePicker = false
+                showGroupEmojiImagePicker = true
+            },
             onDismiss = { if (!imagePreparing) showImagePicker = false },
+        )
+    }
+
+    if (showGroupEmojiImagePicker) {
+        GroupEmojiImagePickerSheet(
+            applyInFlight = imagePreparing,
+            recentEmojis = recentEmojiRecentsOwner.recents,
+            onEmojiUsed = recentEmojiRecentsOwner::onEmojiUsed,
+            onApply = { draft ->
+                imageDraft = draft
+                showGroupEmojiImagePicker = false
+            },
+            onDismiss = { if (!imagePreparing) showGroupEmojiImagePicker = false },
         )
     }
 
