@@ -217,6 +217,24 @@ class ChatListFilterChipsTest {
     }
 
     @Test
+    fun pendingFolderChipHasNoProgressSemanticsOrLoadingDescription() {
+        render(
+            chips =
+                listOf(
+                    chip(folderId = WORK_ID, label = "Work", pending = true),
+                ),
+        )
+
+        assertFolderChipAccessibleLabel(WORK_ID, "Work")
+        assertFalse(
+            semanticsSubtreeContains(
+                tag = chatListFilterChipTag(WORK_ID),
+                property = SemanticsProperties.ProgressBarRangeInfo,
+            ),
+        )
+    }
+
+    @Test
     fun allChipExposesAccessibleShortTapThatClearsSelection() {
         var selected: String? = WORK_ID
         render(
@@ -237,11 +255,13 @@ class ChatListFilterChipsTest {
         label: String,
         systemKind: SystemFolderKind? = null,
         trailingCount: Int = 0,
+        pending: Boolean = false,
     ) = ChatFolderChipModel(
         folderId = folderId,
         systemKind = systemKind,
         customLabel = label,
         trailingCount = trailingCount,
+        pending = pending,
     )
 
     private fun assertFilterChipRole(tag: String) {
@@ -279,6 +299,19 @@ class ChatListFilterChipsTest {
                     .fetchSemanticsNode(),
             )
         assertEquals(1, actionableCount)
+    }
+
+    private fun semanticsSubtreeContains(
+        tag: String,
+        property: androidx.compose.ui.semantics.SemanticsPropertyKey<*>,
+    ): Boolean {
+        fun contains(node: SemanticsNode): Boolean = node.config.contains(property) || node.children.any(::contains)
+
+        return contains(
+            composeRule
+                .onNodeWithTag(tag, useUnmergedTree = true)
+                .fetchSemanticsNode(),
+        )
     }
 
     private fun countActionableSemanticsNodes(root: SemanticsNode): Int {
