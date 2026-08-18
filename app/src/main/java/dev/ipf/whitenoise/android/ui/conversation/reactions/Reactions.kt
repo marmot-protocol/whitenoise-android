@@ -90,11 +90,13 @@ internal fun Modifier.reactionSummaryAttachment(outgoing: Boolean): Modifier =
 internal fun reactionSummaryChipBorder(
     outgoing: Boolean,
     selected: Boolean,
+    customAmoledBorderColor: Color? = null,
 ): BorderStroke {
     val colorScheme = MaterialTheme.colorScheme
     val amoledAccent =
         if (isAmoledSurfaceTheme()) {
-            if (outgoing) colorScheme.inversePrimary else colorScheme.onSurface.copy(alpha = 0.7f)
+            customAmoledBorderColor
+                ?: if (outgoing) colorScheme.inversePrimary else colorScheme.onSurface.copy(alpha = 0.7f)
         } else {
             null
         }
@@ -133,6 +135,7 @@ internal fun reactionSummaryChipContentColor(selected: Boolean): Color {
 internal fun ReactionSummaryChip(
     tallies: List<ReactionTally>,
     outgoing: Boolean,
+    customAmoledBorderColor: Color? = null,
     onClick: () -> Unit,
 ) {
     val selected = tallies.any { it.mine }
@@ -150,7 +153,12 @@ internal fun ReactionSummaryChip(
         shape = RoundedCornerShape(percent = 50),
         color = reactionSummaryChipContainerColor(selected),
         contentColor = reactionSummaryChipContentColor(selected),
-        border = reactionSummaryChipBorder(outgoing = outgoing, selected = selected),
+        border =
+            reactionSummaryChipBorder(
+                outgoing = outgoing,
+                selected = selected,
+                customAmoledBorderColor = customAmoledBorderColor,
+            ),
         tonalElevation = if (isAmoledSurfaceTheme()) 0.dp else 1.dp,
     ) {
         Row(
