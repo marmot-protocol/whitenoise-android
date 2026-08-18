@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.ui.conversation.hasSentMessageAfterUnreadBound
 import dev.ipf.whitenoise.android.ui.conversation.loadConversationTimelineToNewest
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationEntryUnreadSnapshot
 import dev.ipf.whitenoise.android.ui.conversation.resolveConversationEntryUnreadMessageId
+import dev.ipf.whitenoise.android.ui.conversation.shouldCommitConversationInitialAnchor
 import dev.ipf.whitenoise.android.ui.conversation.shouldShowConversationEntryUnreadDivider
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -151,6 +152,28 @@ class ConversationEntryUnreadSnapshotTest {
         assertEquals(
             ConversationEntryUnreadSnapshot(count = 2, firstUnreadMessageId = "first-unread"),
             snapshot[0],
+        )
+    }
+
+    @Test
+    fun provisionalOpenWaitsForProjectionBeforeInitialAnchor() {
+        assertEquals(
+            false,
+            shouldCommitConversationInitialAnchor(
+                hasRenderedTimeline = true,
+                projectionAvailable = false,
+                initialTimelineAnchored = false,
+                hasScrollRestore = false,
+            ),
+        )
+        assertEquals(
+            true,
+            shouldCommitConversationInitialAnchor(
+                hasRenderedTimeline = true,
+                projectionAvailable = true,
+                initialTimelineAnchored = false,
+                hasScrollRestore = false,
+            ),
         )
     }
 

@@ -507,12 +507,13 @@ internal fun ConversationScreen(
     // or a fresh notification-open request starts a distinct entry session.
     val entryUnreadSessionIdentity = remember(controller, notificationOpenRequestId) { controller to notificationOpenRequestId }
     val projectedEntryUnreadCount = chat.unreadCount.coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
+    val entryProjectionAvailable = chat.projection != null
     val entryUnreadSnapshot =
         rememberConversationEntryUnreadSnapshot(
             controllerIdentity = entryUnreadSessionIdentity,
             projectionUnread = projectedEntryUnreadCount,
             projectionFirstUnreadMessageId = chat.projection?.firstUnreadMessageIdHex,
-            projectionAvailable = chat.projection != null,
+            projectionAvailable = entryProjectionAvailable,
             timeline = controller.timeline,
             readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
         )
@@ -2167,8 +2168,20 @@ internal fun ConversationScreen(
         initialTimelineAnchored = true
         navigationState.lastFollowedLatestId = restoredRendered.lastOrNull()?.id
     }
-    LaunchedEffect(controller, renderedTimeline.isNotEmpty(), notificationOpenRequestId) {
-        if (renderedTimeline.isEmpty() || initialTimelineAnchored || scrollRestore != null) {
+    LaunchedEffect(
+        controller,
+        renderedTimeline.isNotEmpty(),
+        notificationOpenRequestId,
+        entryProjectionAvailable,
+    ) {
+        if (
+            !shouldCommitConversationInitialAnchor(
+                hasRenderedTimeline = renderedTimeline.isNotEmpty(),
+                projectionAvailable = entryProjectionAvailable,
+                initialTimelineAnchored = initialTimelineAnchored,
+                hasScrollRestore = scrollRestore != null,
+            )
+        ) {
             return@LaunchedEffect
         }
 

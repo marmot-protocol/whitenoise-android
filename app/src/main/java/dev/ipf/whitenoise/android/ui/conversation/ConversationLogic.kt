@@ -92,6 +92,17 @@ internal fun conversationReadAnchorCandidateIndex(
     highestVisibleTimelineIndex: Int,
 ): Int = if (initialTimelineAnchored) highestVisibleTimelineIndex else -1
 
+internal fun shouldCommitConversationInitialAnchor(
+    hasRenderedTimeline: Boolean,
+    projectionAvailable: Boolean,
+    initialTimelineAnchored: Boolean,
+    hasScrollRestore: Boolean,
+): Boolean =
+    hasRenderedTimeline &&
+        projectionAvailable &&
+        !initialTimelineAnchored &&
+        !hasScrollRestore
+
 private data class ConversationEntryUnreadProjection(
     val count: Int,
     val firstUnreadMessageId: String?,
