@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
@@ -14,10 +15,11 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
+import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.ui.chats.AvatarScreenshotFixtures
-import dev.ipf.whitenoise.android.ui.common.encryptedGroupAvatarCacheKey
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -84,6 +86,22 @@ class ChatListFirstFrameAvatarPublicationTest {
         }
 
     @Test
+    fun locallyDecodedDmFallbackAvatarIsAttachedBeforeItemsPublish() =
+        runTest {
+            val image = AvatarScreenshotFixtures.distinctAvatarBitmap(Color.RED)
+            val appState = appState(profileReader = { peerProfile() })
+            appState.warmProfilePresentationsBlocking(listOf(PEER_ID))
+            AvatarImageLoader.putCached(PEER_AVATAR, image)
+
+            val controller = bindDmController(appState)
+
+            val seed = controller.items.single().firstFrameAvatar
+            assertEquals(ChatListAvatarSource.FALLBACK_URL, seed?.source)
+            assertEquals(PEER_AVATAR, seed?.key)
+            assertSame(image, seed?.image)
+        }
+
+    @Test
     fun networkMissPublishesWithoutWaitingForAvatarFetch() =
         runTest {
             val releaseFetch = CompletableDeferred<Unit>()
@@ -99,6 +117,20 @@ class ChatListFirstFrameAvatarPublicationTest {
             releaseFetch.complete(Unit)
         }
 
+    private fun bindDmController(appState: WhiteNoiseAppState): ChatsController {
+        val controller =
+            ChatsController(
+                appState = appState,
+                initialAccountRef = ACCOUNT_REF,
+                memberSnapshotLoader = { _, _ -> dmMembers() },
+            )
+        controller.setChatListVisible(false)
+        controller.applyChatListRow(dmRow())
+        controller.applyLocalGroupDetails(unnamedDmGroup(), dmMembers())
+        controller.setChatListVisible(true)
+        return controller
+    }
+
     private fun bindController(group: AppGroupRecordFfi): ChatsController {
         val controller =
             ChatsController(
@@ -113,7 +145,7 @@ class ChatListFirstFrameAvatarPublicationTest {
         return controller
     }
 
-    private fun appState(): WhiteNoiseAppState {
+    private fun appState(profileReader: suspend (String) -> UserProfileMetadataFfi? = { null }): WhiteNoiseAppState {
         val context = ApplicationProvider.getApplicationContext<Context>()
         return WhiteNoiseAppState(
             context = context,
@@ -121,6 +153,7 @@ class ChatListFirstFrameAvatarPublicationTest {
             accountIdHexResolver = { ACCOUNT_ID },
             accounts = listOf(activeAccount()),
             activeAccountRef = ACCOUNT_REF,
+            profileReader = profileReader,
         )
     }
 
@@ -132,6 +165,47 @@ class ChatListFirstFrameAvatarPublicationTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+        )
+
+    private fun dmRow() =
+        chatRow(
+            avatarUrl = null,
+            imageHashHex = null,
+        ).copy(
+            groupName = "",
+            title = "Alice",
+            conversationKind = ChatConversationKindFfi.DIRECT,
+        )
+
+    private fun unnamedDmGroup() =
+        group().copy(
+            name = "",
+            avatarUrl = null,
+            imageHashHex = null,
+        )
+
+    private fun dmMembers() =
+        listOf(
+            AppGroupMemberRecordFfi(
+                memberIdHex = ACCOUNT_ID,
+                account = ACCOUNT_REF,
+                local = true,
+            ),
+            AppGroupMemberRecordFfi(
+                memberIdHex = PEER_ID,
+                account = null,
+                local = false,
+            ),
+        )
+
+    private fun peerProfile() =
+        UserProfileMetadataFfi(
+            name = "alice",
+            displayName = PEER_NAME,
+            about = null,
+            picture = PEER_AVATAR,
+            nip05 = null,
+            lud16 = null,
         )
 
     private fun chatRow(
@@ -242,5 +316,8 @@ class ChatListFirstFrameAvatarPublicationTest {
         val IMAGE_HASH = "77".repeat(32)
         const val LEGACY_AVATAR_URL = "https://groups.example/avatar.jpg"
         const val MISS_AVATAR_URL = "https://groups.example/missing.jpg"
+        val PEER_ID = "22".repeat(32)
+        const val PEER_NAME = "Alice"
+        const val PEER_AVATAR = "https://profiles.example/alice.jpg"
     }
 }

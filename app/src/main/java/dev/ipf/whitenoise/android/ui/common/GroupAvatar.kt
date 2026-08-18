@@ -9,31 +9,10 @@ import androidx.compose.ui.unit.Dp
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
 import dev.ipf.whitenoise.android.state.ChatListAvatarSource
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-
-internal fun encryptedGroupAvatarCacheKey(
-    accountRef: String,
-    groupIdHex: String,
-    imageHashHex: String,
-): String = "$accountRef|${groupIdHex.lowercase()}|${imageHashHex.lowercase()}"
-
-internal fun encryptedGroupAvatarCacheKey(
-    accountRef: String?,
-    group: AppGroupRecordFfi,
-): String? {
-    val hash =
-        group.imageHashHex
-            ?.takeIf { !group.pendingConfirmation && group.avatarUrl.isNullOrBlank() }
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-    return if (accountRef != null && hash != null) {
-        encryptedGroupAvatarCacheKey(accountRef, group.groupIdHex, hash)
-    } else {
-        null
-    }
-}
 
 @Composable
 internal fun rememberEncryptedGroupAvatar(

@@ -21,13 +21,13 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
+import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
 import dev.ipf.whitenoise.android.state.ChatListAvatarSource
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Before

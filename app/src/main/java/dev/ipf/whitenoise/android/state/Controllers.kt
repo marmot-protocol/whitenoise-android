@@ -75,6 +75,7 @@ import dev.ipf.whitenoise.android.core.StreamDebugEventFormatter
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.core.aggregateEdits
+import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
@@ -86,13 +87,11 @@ import dev.ipf.whitenoise.android.media.REMOVE_GROUP_IMAGE_MUTATION_KEY
 import dev.ipf.whitenoise.android.media.classifyGroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.mutationKey
 import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
-import dev.ipf.whitenoise.android.ui.chats.chatListItemAvatarAccount
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
 import dev.ipf.whitenoise.android.ui.chats.newchat.existingDirectChatFromProvenance
 import dev.ipf.whitenoise.android.ui.chats.newchat.rankedDirectChatCandidates
 import dev.ipf.whitenoise.android.ui.chats.newchat.resolveExistingDirectChatCandidates
-import dev.ipf.whitenoise.android.ui.common.encryptedGroupAvatarCacheKey
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -5560,7 +5559,10 @@ class ChatsController private constructor(
             }
         }
 
-        val fallbackUrl = chatListItemAvatarAccount(item)?.let { appState.avatarUrl(it) }
+        val fallbackUrl =
+            GroupProjector
+                .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
+                ?.let { appState.avatarUrl(it) }
         return fallbackUrl?.let { url ->
             AvatarImageLoader.peek(url)?.let { image ->
                 ChatListAvatarSeed(ChatListAvatarSource.FALLBACK_URL, url, image)
