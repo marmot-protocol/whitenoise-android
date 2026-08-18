@@ -463,6 +463,32 @@ class ConversationNotificationChannelsTest {
     }
 
     @Test
+    fun ensureWithoutTitlePreservesExistingCustomChannelCopy() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-custom-copy-preserved"
+        val convId =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context = context,
+                parentChannelId = "reactions_v2",
+                conversationShortcutId = shortcut,
+                conversationTitle = "Green Orca",
+            )!!
+
+        ConversationNotificationChannels.ensureConversationChannel(
+            context = context,
+            parentChannelId = "reactions_v2",
+            conversationShortcutId = shortcut,
+        )
+
+        val preserved = manager.getNotificationChannel(convId)
+        assertEquals("Green Orca · Reactions (custom)", preserved.name.toString())
+        assertEquals(
+            "Custom Reactions alert behavior for Green Orca",
+            preserved.description,
+        )
+    }
+
+    @Test
     fun ensureIsIdempotentAndReturnsTheSameChannelId() {
         NotificationChannels.ensureChannels(context)
         val shortcut = "conversation-idempotent"

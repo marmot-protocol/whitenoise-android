@@ -172,6 +172,7 @@ object ConversationNotificationChannels {
             vibrationPattern = vibrationPattern,
             sourceVibrationPattern = sourceVibrationPattern,
             baseName = baseName,
+            usesCustomScope = usesCustomScope,
             customDisplayName = customDisplayName,
             customDescription = customDescription,
         )
@@ -185,6 +186,7 @@ object ConversationNotificationChannels {
         vibrationPattern: ConversationVibrationPattern,
         sourceVibrationPattern: ConversationVibrationPattern,
         baseName: String?,
+        usesCustomScope: Boolean,
         customDisplayName: String?,
         customDescription: String?,
     ): String? {
@@ -208,7 +210,14 @@ object ConversationNotificationChannels {
                 existing.name = displayName
                 republish = true
             }
-            if (displayDescription != null && existing.description != displayDescription) {
+            if (
+                shouldRefreshDescription(
+                    existing = existing.description,
+                    updated = displayDescription,
+                    usesCustomScope = usesCustomScope,
+                    conversationTitle = conversationTitle,
+                )
+            ) {
                 existing.description = displayDescription
                 republish = true
             }
@@ -267,6 +276,16 @@ object ConversationNotificationChannels {
             ?.takeIf(String::isNotEmpty)
             ?.let { "$it · $parentName" }
             ?: parentName
+
+    private fun shouldRefreshDescription(
+        existing: String?,
+        updated: String?,
+        usesCustomScope: Boolean,
+        conversationTitle: String?,
+    ): Boolean =
+        updated != null &&
+            existing != updated &&
+            (!usesCustomScope || !conversationTitle.isNullOrBlank() || existing == null)
 
     // Clone the parent's importance and alerting defaults onto the conversation
     // channel at creation time; the user can then diverge per conversation from
