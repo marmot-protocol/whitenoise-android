@@ -9,6 +9,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -144,7 +145,7 @@ class MessageForwardingTest {
             val transport =
                 RecordingForwardTransport(
                     failPublishUncertainOnceFor = mutableSetOf("target"),
-                    recoverPendingPublish = false,
+                    defaultRecoveryResult = ForwardPublishRecoveryResult.Unavailable,
                 )
             val session =
                 ForwardSession(
@@ -189,12 +190,19 @@ class MessageForwardingTest {
         }
 
     @Test
-    fun missingPendingCommitEvidenceNeverConvergesOrResends() =
+    fun missingPendingCommitEvidenceRemainsRetryableUntilEvidenceRecovers() =
         runTest {
             val transport =
                 RecordingForwardTransport(
                     failPublishUncertainOnceFor = mutableSetOf("target"),
                     uncertainPendingMessageId = null,
+                    recoveryResults =
+                        ArrayDeque(
+                            listOf(
+                                ForwardPublishRecoveryResult.Unavailable,
+                                ForwardPublishRecoveryResult.Published,
+                            ),
+                        ),
                 )
             val session =
                 ForwardSession(
@@ -210,9 +218,56 @@ class MessageForwardingTest {
             advanceUntilIdle()
 
             assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
-            assertEquals(listOf(0), transport.publishStartIndices)
-            assertTrue(transport.convergenceTargets.isEmpty())
-            assertEquals(listOf("target" to 0), transport.published)
+            assertTrue(session.state.value.canRetry)
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            assertEquals(listOf(0, 2), transport.publishStartIndices)
+            assertEquals(listOf("target", "target"), transport.convergenceTargets)
+            assertEquals(listOf("target" to 0, "target" to 1), transport.published)
+        }
+
+    @Test
+    fun materializationRetryFailurePreservesAmbiguousPublishEvidence() =
+        runTest {
+            val transport =
+                RecordingForwardTransport(
+                    failPublishUncertainOnceFor = mutableSetOf("target"),
+                    failMaterializeOnCall = 2,
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages =
+                        listOf(
+                            textPayload("first", "first"),
+                            mediaPayload("second", "caption", "photo.jpg"),
+                        ),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceUntilIdle()
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
+            assertEquals(
+                ForwardFailureStage.Materialize,
+                session.state.value.targets
+                    .single()
+                    .failureStage,
+            )
+            assertTrue(session.state.value.canRetry)
+
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            assertEquals(listOf("target" to 0, "target" to 1), transport.published)
+            assertEquals(listOf("target"), transport.convergenceTargets)
         }
 
     @Test
@@ -407,10 +462,37 @@ class MessageForwardingTest {
         }
 
     @Test
-    fun completedSessionClearsRetainedPlaintext() =
+    fun completedSessionClearsRetainedPlaintextAndPreservesMediaMetadata() =
         runTest {
             val retained = byteArrayOf(4, 5, 6)
             val transport = RecordingForwardTransport(materializedBytes = retained)
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(mediaPayload("media", "source caption", "photo.jpg")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            assertTrue(retained.contentEquals(byteArrayOf(0, 0, 0)))
+            assertEquals(listOf("source caption"), transport.publishedMediaCaptions.getValue("target"))
+            assertEquals(listOf("photo.jpg"), transport.publishedMediaFileNames.getValue("target"))
+            assertEquals(listOf("application/octet-stream"), transport.publishedMediaTypes.getValue("target"))
+        }
+
+    @Test
+    fun retriableFailureClearsPlaintextBeforeRetry() =
+        runTest {
+            val retained = byteArrayOf(7, 8, 9)
+            val transport =
+                RecordingForwardTransport(
+                    failUploadOnceFor = mutableSetOf("target"),
+                    materializedBytes = retained,
+                )
             val session =
                 ForwardSession(
                     scope = this,
@@ -422,7 +504,8 @@ class MessageForwardingTest {
             session.start()
             advanceUntilIdle()
 
-            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
+            assertTrue(session.state.value.canRetry)
             assertTrue(retained.contentEquals(byteArrayOf(0, 0, 0)))
         }
 
@@ -496,6 +579,44 @@ class MessageForwardingTest {
         }
 
     @Test
+    fun operationOwnerAutomaticallyRetriesOnceWithoutDuplicatePublish() =
+        runTest {
+            val terminalSnapshots = mutableListOf<ForwardOperationSnapshot>()
+            val transport = RecordingForwardTransport(failUploadOnceFor = mutableSetOf("target"))
+            val owner =
+                ForwardOperationOwner(
+                    scope = this,
+                    automaticRetryAttempts = 1,
+                    retryDelayMillis = { 1_000L },
+                    onTerminal = terminalSnapshots::add,
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(mediaPayload("media", "caption", "photo.jpg")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            assertTrue(owner.start(session))
+            runCurrent()
+            assertEquals(ForwardOperationPhase.Failed, owner.state.value?.phase)
+
+            advanceTimeBy(999L)
+            runCurrent()
+            assertEquals(1, transport.uploadTargets.size)
+
+            advanceTimeBy(1L)
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, owner.state.value?.phase)
+            assertEquals(2, transport.uploadTargets.size)
+            assertEquals(listOf("target" to 0), transport.published)
+            assertEquals(listOf(ForwardOperationPhase.Completed), terminalSnapshots.map { it.phase })
+            owner.release()
+        }
+
+    @Test
     fun operationCannotBeCancelledAfterPublishingBegins() =
         runTest {
             val snapshot =
@@ -523,10 +644,12 @@ class MessageForwardingTest {
         private val failPublishBeforeCommitOnceFor: MutableSet<String> = mutableSetOf(),
         private val uploadGate: CompletableDeferred<Unit>? = null,
         private val materializeGate: CompletableDeferred<Unit>? = null,
+        private val failMaterializeOnCall: Int? = null,
         private val materializedByteCount: Int = 1,
         private val materializedBytes: ByteArray? = null,
         private val onUpload: () -> Unit = {},
-        private val recoverPendingPublish: Boolean = true,
+        private val recoveryResults: ArrayDeque<ForwardPublishRecoveryResult> = ArrayDeque(),
+        private val defaultRecoveryResult: ForwardPublishRecoveryResult = ForwardPublishRecoveryResult.Published,
         private val uncertainPendingMessageId: String? = "pending-forward",
     ) : ForwardTransport {
         val materializedIndices = mutableListOf<Int>()
@@ -535,6 +658,10 @@ class MessageForwardingTest {
         val convergenceTargets = mutableListOf<String>()
         val published = mutableListOf<Pair<String, Int>>()
         val publishedMediaHashes = mutableMapOf<String, List<String>>()
+        val publishedMediaCaptions = mutableMapOf<String, List<String?>>()
+        val publishedMediaFileNames = mutableMapOf<String, List<String>>()
+        val publishedMediaTypes = mutableMapOf<String, List<String>>()
+        private var materializeCallCount = 0
 
         override suspend fun materialize(
             sourceGroupIdHex: String,
@@ -543,6 +670,8 @@ class MessageForwardingTest {
         ): PendingAttachment {
             materializedIndices += source.attachmentIndex
             materializeGate?.await()
+            materializeCallCount += 1
+            if (materializeCallCount == failMaterializeOnCall) error("materialize failed")
             return PendingAttachment(
                 plaintextBytes =
                     materializedBytes
@@ -587,8 +716,12 @@ class MessageForwardingTest {
                 }
                 if (index == 1 && failPublishUncertainOnceFor.remove(targetGroupIdHex)) {
                     throw ForwardPublishUncertainException(
-                        messageIndex = index,
-                        pendingMessageIdHex = uncertainPendingMessageId,
+                        evidence =
+                            ForwardPublishRecoveryEvidence(
+                                messageIndex = index,
+                                knownMessageIdsBefore = emptySet(),
+                                pendingMessageIdHex = uncertainPendingMessageId,
+                            ),
                         cause = IllegalStateException("publish failed"),
                     )
                 }
@@ -596,6 +729,9 @@ class MessageForwardingTest {
                 if (message is PreparedForwardMessage.Media) {
                     publishedMediaHashes[targetGroupIdHex] =
                         uploadedReferences.getValue(index).map(MediaAttachmentReferenceFfi::ciphertextSha256)
+                    publishedMediaCaptions[targetGroupIdHex] = listOf(message.caption)
+                    publishedMediaFileNames[targetGroupIdHex] = message.attachments.map(PendingAttachment::fileName)
+                    publishedMediaTypes[targetGroupIdHex] = message.attachments.map(PendingAttachment::mediaType)
                 }
                 published += targetGroupIdHex to index
                 onMessagePublished(index)
@@ -604,11 +740,16 @@ class MessageForwardingTest {
 
         override suspend fun recoverPendingPublish(
             targetGroupIdHex: String,
-            pendingMessageIdHex: String,
-        ): Boolean {
+            message: PreparedForwardMessage,
+            uploadedReferences: List<MediaAttachmentReferenceFfi>,
+            evidence: ForwardPublishRecoveryEvidence,
+        ): ForwardPublishRecoveryResult {
             convergenceTargets += targetGroupIdHex
-            if (recoverPendingPublish) published += targetGroupIdHex to 1
-            return recoverPendingPublish
+            val result = recoveryResults.removeFirstOrNull() ?: defaultRecoveryResult
+            if (result == ForwardPublishRecoveryResult.Published) {
+                published += targetGroupIdHex to evidence.messageIndex
+            }
+            return result
         }
     }
 

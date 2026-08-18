@@ -74,6 +74,8 @@ class ForwardMessageSheetCoverageTest {
 
         assertTrue("forwardTargetsLoading" in content)
         assertTrue("forwardTargetsError" in content)
+        assertTrue("forwardTargetsRevision" in content)
+        assertTrue("remember(targetRevision, originGroupIdHex)" in content)
         assertTrue("ErrorContent(" in targetList && "InlineErrorBanner(" in targetList)
         assertTrue("appState::retryForwardTargets" in targetList)
         assertTrue("Modifier.semantics { this.selected = selected }" in targetRow)

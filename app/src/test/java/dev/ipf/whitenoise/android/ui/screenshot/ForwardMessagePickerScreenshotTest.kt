@@ -1,8 +1,13 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.conversation.messages.FORWARD_CHAT_PICKER_SCREEN_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessagePickerContent
@@ -28,6 +33,36 @@ class ForwardMessagePickerScreenshotTest {
 
     @Test
     fun multiMessageMediaPickerDark() {
+        renderPicker(
+            fontScale = 1f,
+            layoutDirection = LayoutDirection.Ltr,
+            snapshotPath = "src/test/snapshots/forward_message_picker_dark.png",
+        )
+    }
+
+    @Test
+    fun multiMessageMediaPickerLargeFont() {
+        renderPicker(
+            fontScale = 1.6f,
+            layoutDirection = LayoutDirection.Ltr,
+            snapshotPath = "src/test/snapshots/forward_message_picker_large_font.png",
+        )
+    }
+
+    @Test
+    fun multiMessageMediaPickerRtl() {
+        renderPicker(
+            fontScale = 1f,
+            layoutDirection = LayoutDirection.Rtl,
+            snapshotPath = "src/test/snapshots/forward_message_picker_rtl.png",
+        )
+    }
+
+    private fun renderPicker(
+        fontScale: Float,
+        layoutDirection: LayoutDirection,
+        snapshotPath: String,
+    ) {
         val chats = (0 until 8).map { index -> hexId(0x20 + index) to hexId(0x40 + index) }
         val profiles =
             chats
@@ -41,23 +76,29 @@ class ForwardMessagePickerScreenshotTest {
             )
 
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true) {
-                Surface {
-                    ForwardMessagePickerContent(
-                        appState = appState,
-                        messageCount = 11,
-                        attachmentCount = 11,
-                        originGroupIdHex = "ff".repeat(32),
-                        onDismiss = {},
-                        onForward = { true },
-                    )
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale),
+                LocalLayoutDirection provides layoutDirection,
+            ) {
+                WhiteNoiseTheme(darkTheme = true) {
+                    Surface {
+                        ForwardMessagePickerContent(
+                            appState = appState,
+                            messageCount = 11,
+                            attachmentCount = 11,
+                            originGroupIdHex = "ff".repeat(32),
+                            onDismiss = {},
+                            onForward = { true },
+                        )
+                    }
                 }
             }
         }
 
         composeRule
             .onNodeWithTag(FORWARD_CHAT_PICKER_SCREEN_TEST_TAG)
-            .captureRoboImage("src/test/snapshots/forward_message_picker_dark.png")
+            .captureRoboImage(snapshotPath)
     }
 
     private fun hexId(byte: Int): String = byte.toString(16).padStart(2, '0').repeat(32)

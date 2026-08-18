@@ -728,6 +728,11 @@ internal fun ConversationScreen(
             renderedTimeline.map { it.id to it.record.messageIdHex }
         }
     val mediaCacheRevision by appState.mediaCacheRevision.collectAsState()
+    val forwardEligibilityExpiries =
+        remember(renderedTimeline) {
+            renderedTimeline.mapNotNull { it.record.retentionExpiresAt?.takeIf { expiry -> expiry > 0uL } }
+        }
+    val eligibilityNowSeconds = rememberForwardEligibilityNowSeconds(forwardEligibilityExpiries)
     val selectableMessageProjections =
         remember(
             renderedTimeline,
@@ -739,8 +744,8 @@ internal fun ConversationScreen(
             controller.isSelfAdmin,
             controller.canSendMessages,
             mediaCacheRevision,
+            eligibilityNowSeconds,
         ) {
-            val eligibilityNowSeconds = (System.currentTimeMillis() / 1000L).toULong()
             renderedTimeline
                 .mapNotNull { item ->
                     val record = item.record

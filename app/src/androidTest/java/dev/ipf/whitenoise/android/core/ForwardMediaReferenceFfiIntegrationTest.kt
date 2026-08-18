@@ -77,6 +77,7 @@ class ForwardMediaReferenceFfiIntegrationTest {
                         assertArrayEquals(fixture.plaintext, download.plaintext)
                     }
 
+                    val destinationReferencesByGroup = mutableMapOf<String, List<MediaAttachmentReferenceFfi>>()
                     destinationGroups.forEach { destinationGroup ->
                         val destinationUpload =
                             marmot.uploadMedia(
@@ -99,6 +100,7 @@ class ForwardMediaReferenceFfiIntegrationTest {
                                 ),
                             )
                         val destinationReferences = destinationUpload.attachments.map { it.reference }
+                        destinationReferencesByGroup[destinationGroup] = destinationReferences
 
                         assertFreshDestinationReferences(sourceReferences, destinationReferences)
                         val send =
@@ -148,6 +150,22 @@ class ForwardMediaReferenceFfiIntegrationTest {
                             wrongGroupFailure,
                         )
                     }
+
+                    val destinationAReferences = destinationReferencesByGroup.getValue(destinationGroups[0])
+                    val destinationBReferences = destinationReferencesByGroup.getValue(destinationGroups[1])
+                    assertFreshDestinationReferences(destinationAReferences, destinationBReferences)
+                    assertReferencesCannotCrossDestinationGroups(
+                        marmot = marmot,
+                        accountRef = account.label,
+                        references = destinationAReferences,
+                        wrongGroupIdHex = destinationGroups[1],
+                    )
+                    assertReferencesCannotCrossDestinationGroups(
+                        marmot = marmot,
+                        accountRef = account.label,
+                        references = destinationBReferences,
+                        wrongGroupIdHex = destinationGroups[0],
+                    )
                 }
             } finally {
                 accountRef?.let { ephemeralAccount ->
@@ -164,6 +182,24 @@ class ForwardMediaReferenceFfiIntegrationTest {
                 }
             }
         }
+
+    private suspend fun assertReferencesCannotCrossDestinationGroups(
+        marmot: Marmot,
+        accountRef: String,
+        references: List<MediaAttachmentReferenceFfi>,
+        wrongGroupIdHex: String,
+    ) {
+        references.forEach { reference ->
+            val wrongGroupFailure =
+                runCatching {
+                    marmot.downloadMedia(accountRef, wrongGroupIdHex, reference)
+                }.exceptionOrNull()
+            assertNotNull(
+                "A forwarded reference must not decrypt with another destination group's media secret",
+                wrongGroupFailure,
+            )
+        }
+    }
 
     private fun assertFreshDestinationReferences(
         source: List<MediaAttachmentReferenceFfi>,

@@ -56,7 +56,7 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.util.Locale
 
 internal const val FORWARD_OPERATION_STATUS_TEST_TAG = "forward-operation-status"
-private const val FORWARD_TARGET_TITLE_FALLBACK_LENGTH = 12
+internal const val FORWARD_TARGET_TITLE_FALLBACK_LENGTH = 12
 
 @Composable
 @Suppress("FunctionNaming")
@@ -68,8 +68,15 @@ internal fun ForwardOperationStatusHost(
     val current = snapshot ?: return
     val titleCopy = rememberGroupTitleCopy()
     val targetIds = current.targets.map(ForwardTargetProgress::groupIdHex)
+    val targetRevision = appState.forwardTargetsRevision
     val titles =
-        remember(targetIds, appState.forwardTargetMembersRevision, appState.profileRevisionForCompose, titleCopy) {
+        remember(
+            targetIds,
+            targetRevision,
+            appState.forwardTargetMembersRevision,
+            appState.profileRevisionForCompose,
+            titleCopy,
+        ) {
             val itemsById =
                 appState.forwardTargets().associateBy { item ->
                     item.group.groupIdHex.lowercase(Locale.ROOT)
@@ -94,7 +101,6 @@ internal fun ForwardOperationStatusHost(
  * Compact, non-modal forwarding activity strip. Navigation remains usable while
  * the optional details sheet exposes the exact per-target transfer/send state.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming")
 internal fun ForwardOperationStatus(
@@ -114,6 +120,42 @@ internal fun ForwardOperationStatus(
             label = "forwardOperationProgress",
         )
 
+    ForwardOperationStatusBar(
+        snapshot = snapshot,
+        summary = summary,
+        animatedProgress = animatedProgress,
+        onDetails = { detailsVisible = true },
+        onRetry = onRetry,
+        onDismiss = onDismiss,
+        modifier = modifier,
+    )
+
+    if (detailsVisible) {
+        ForwardOperationDetailsSheet(
+            snapshot = snapshot,
+            targetTitles = targetTitles,
+            onClose = { detailsVisible = false },
+            onCancel = onCancel,
+            onRetry = onRetry,
+            onDismiss = {
+                detailsVisible = false
+                onDismiss()
+            },
+        )
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun ForwardOperationStatusBar(
+    snapshot: ForwardOperationSnapshot,
+    summary: String,
+    animatedProgress: Float,
+    onDetails: () -> Unit,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier,
+) {
     Surface(
         tonalElevation = 3.dp,
         modifier =
@@ -122,62 +164,8 @@ internal fun ForwardOperationStatus(
                 .statusBarsPadding()
                 .semantics { liveRegion = LiveRegionMode.Polite },
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .heightIn(min = 48.dp)
-                            .testTag(FORWARD_OPERATION_STATUS_TEST_TAG)
-                            .clickable(
-                                role = Role.Button,
-                                onClickLabel = stringResource(R.string.details),
-                                onClick = { detailsVisible = true },
-                            ).padding(start = Dimens.spaceLg, end = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    ForwardOperationStatusIcon(snapshot)
-                    Text(
-                        text = summary,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (snapshot.isActive && snapshot.targets.size > 1) {
-                        Text(
-                            text = "${snapshot.completedTargets}/${snapshot.targets.size}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (snapshot.isActive) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                if (snapshot.canRetry) {
-                    TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
-                }
-                if (!snapshot.isActive) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = stringResource(R.string.dismiss),
-                        )
-                    }
-                }
-            }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            ForwardOperationStatusRow(snapshot, summary, onDetails, onRetry, onDismiss)
             if (snapshot.isActive) {
                 LinearProgressIndicator(
                     progress = { animatedProgress },
@@ -186,27 +174,89 @@ internal fun ForwardOperationStatus(
             }
         }
     }
+}
 
-    if (detailsVisible) {
-        ModalBottomSheet(onDismissRequest = { detailsVisible = false }) {
-            ForwardProgressContent(
-                snapshot = snapshot,
-                targetTitles = targetTitles,
-                modifier = Modifier.fillMaxWidth(),
+@Composable
+@Suppress("FunctionNaming")
+private fun ForwardOperationStatusRow(
+    snapshot: ForwardOperationSnapshot,
+    summary: String,
+    onDetails: () -> Unit,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
+                    .testTag(FORWARD_OPERATION_STATUS_TEST_TAG)
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = stringResource(R.string.details),
+                        onClick = onDetails,
+                    ).padding(start = Dimens.spaceLg, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ForwardOperationStatusIcon(snapshot)
+            Text(
+                text = summary,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            ForwardOperationActions(
-                snapshot = snapshot,
-                onDetails = { detailsVisible = false },
-                detailsLabel = stringResource(R.string.close),
-                onCancel = onCancel,
-                onRetry = onRetry,
-                onDismiss = {
-                    detailsVisible = false
-                    onDismiss()
-                },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = 12.dp),
-            )
+            if (snapshot.isActive && snapshot.targets.size > 1) {
+                Text(
+                    text = "${snapshot.completedTargets}/${snapshot.targets.size}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (snapshot.isActive) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
+        if (snapshot.canRetry) TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+        if (!snapshot.isActive) {
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+@Suppress("FunctionNaming")
+private fun ForwardOperationDetailsSheet(
+    snapshot: ForwardOperationSnapshot,
+    targetTitles: Map<String, String>,
+    onClose: () -> Unit,
+    onCancel: () -> Unit,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onClose) {
+        ForwardProgressContent(snapshot, targetTitles, Modifier.fillMaxWidth())
+        ForwardOperationActions(
+            snapshot = snapshot,
+            onDetails = onClose,
+            detailsLabel = stringResource(R.string.close),
+            onCancel = onCancel,
+            onRetry = onRetry,
+            onDismiss = onDismiss,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = 12.dp),
+        )
     }
 }
 

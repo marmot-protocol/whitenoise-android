@@ -128,16 +128,13 @@ internal interface ForwardTransport {
         onMessagePublished: (messageIndex: Int) -> Unit,
     )
 
-    /**
-     * Drive an MDK commit whose previous publish result was ambiguous. Returning
-     * false means no pending commit was recovered; callers must not mint a new
-     * event automatically because the previous event may already be visible to
-     * another member.
-     */
+    /** Resolve an ambiguous publish without minting a duplicate event. */
     suspend fun recoverPendingPublish(
         targetGroupIdHex: String,
-        pendingMessageIdHex: String,
-    ): Boolean
+        message: PreparedForwardMessage,
+        uploadedReferences: List<MediaAttachmentReferenceFfi>,
+        evidence: ForwardPublishRecoveryEvidence,
+    ): ForwardPublishRecoveryResult
 }
 
 /** Resolves optimistic metadata before any source bytes cross into a forward session. */
@@ -171,9 +168,20 @@ internal class ForwardAttachmentExpiredException : IllegalStateException("forwar
 
 internal class ForwardSessionInvalidatedException : IllegalStateException("forward session account changed")
 
-internal class ForwardPublishUncertainException(
+internal data class ForwardPublishRecoveryEvidence(
     val messageIndex: Int,
+    val knownMessageIdsBefore: Set<String>,
     val pendingMessageIdHex: String?,
+)
+
+internal enum class ForwardPublishRecoveryResult {
+    Published,
+    NotCommitted,
+    Unavailable,
+}
+
+internal class ForwardPublishUncertainException(
+    val evidence: ForwardPublishRecoveryEvidence,
     cause: Throwable,
 ) : IllegalStateException("forward publish result is uncertain", cause)
 
@@ -185,11 +193,65 @@ private const val FORWARD_PUBLISH_RECOVERY_UNAVAILABLE = "forward pending publis
 
 internal class ForwardPublishRecoveryUnavailableException : IllegalStateException(FORWARD_PUBLISH_RECOVERY_UNAVAILABLE)
 
+private class ForwardMaterializationAccounting(
+    private val retainedPlaintextBuffers: MutableList<ByteArray>,
+    private val maxRetainedBytes: Long,
+) {
+    private val lock = Any()
+    private var retainedBytes = 0L
+    private var preparedAttachmentCount = 0
+
+    fun retain(attachment: PendingAttachment): Int =
+        synchronized(lock) {
+            if (attachment.plaintextBytes.isEmpty()) {
+                throw IllegalStateException("materialized attachment is empty")
+            }
+            retainedPlaintextBuffers += attachment.plaintextBytes
+            retainedBytes += attachment.plaintextBytes.size
+            if (retainedBytes > maxRetainedBytes) throw ForwardPayloadTooLargeException()
+            preparedAttachmentCount += 1
+            preparedAttachmentCount
+        }
+}
+
+private suspend fun materializeForwardMediaMessage(
+    message: ForwardMessagePayload.Media,
+    materializationGate: Semaphore,
+    accounting: ForwardMaterializationAccounting,
+    transport: ForwardTransport,
+    clockSeconds: () -> ULong,
+    onAttachmentPrepared: (Int) -> Unit,
+): PreparedForwardMessage.Media =
+    coroutineScope {
+        ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
+        val attachments =
+            message.attachments
+                .map { source ->
+                    async {
+                        materializationGate.withPermit {
+                            currentCoroutineContext().ensureActive()
+                            val attachment =
+                                transport.materialize(
+                                    sourceGroupIdHex = message.sourceGroupIdHex,
+                                    sourceMessageIdHex = message.sourceMessageIdHex,
+                                    source = source,
+                                )
+                            onAttachmentPrepared(accounting.retain(attachment))
+                            attachment
+                        }
+                    }
+                }.awaitAll()
+        ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
+        PreparedForwardMessage.Media(message.caption, attachments, message.expiresAtSeconds)
+    }
+
 /**
  * One retryable fan-out operation. Plaintext is materialized once, while every
  * destination owns a separate uploaded-reference map. A retry resumes at that
  * destination's first unpublished message and can never reuse another chat's
- * references or duplicate an already-successful publish.
+ * references or duplicate an already-successful publish. The injected scope,
+ * [runTargets], and its child coroutines must stay on one thread because the
+ * per-target maps are intentionally confined rather than synchronized.
  */
 internal class ForwardSession(
     private val scope: CoroutineScope,
@@ -237,8 +299,7 @@ internal class ForwardSession(
     private val retainedPlaintextBuffers = mutableListOf<ByteArray>()
     private val uploadedReferencesByTarget = mutableMapOf<String, MutableMap<Int, List<MediaAttachmentReferenceFfi>>>()
     private val publishedMessageCountByTarget = normalizedTargets.associateWithTo(mutableMapOf()) { 0 }
-    private val uncertainPublishIndexByTarget = mutableMapOf<String, Int>()
-    private val uncertainPendingMessageIdByTarget = mutableMapOf<String, String?>()
+    private val uncertainPublishByTarget = mutableMapOf<String, ForwardPublishRecoveryEvidence>()
     private var activeJob: Job? = null
     private var released = false
     private var started = false
@@ -312,9 +373,9 @@ internal class ForwardSession(
         val job = activeJob
         if (job?.isActive == true) {
             cancel()
-            job.invokeOnCompletion { clearSensitiveState() }
+            job.invokeOnCompletion { clearSessionState(clearRetryState = true) }
         } else {
-            clearSensitiveState()
+            clearSessionState(clearRetryState = true)
         }
     }
 
@@ -345,7 +406,7 @@ internal class ForwardSession(
                                 },
                         )
                     }
-                    clearSensitiveState()
+                    clearSessionState(clearRetryState = true)
                     throw cancellation
                 } catch (tooLarge: ForwardPayloadTooLargeException) {
                     onFailure(null, ForwardFailureStage.PayloadTooLarge, tooLarge)
@@ -368,12 +429,9 @@ internal class ForwardSession(
     }
 
     // Structured fan-out and synchronized byte accounting must share one cancellation scope.
-    @Suppress("LongMethod")
     private suspend fun materializeMessages(): List<PreparedForwardMessage> =
         coroutineScope {
-            var retainedBytes = 0L
-            var preparedAttachmentCount = 0
-            val accountingLock = Any()
+            val accounting = ForwardMaterializationAccounting(retainedPlaintextBuffers, maxRetainedBytes)
             val materializationGate = Semaphore(targetFanout)
             val prepared =
                 messages
@@ -382,55 +440,21 @@ internal class ForwardSession(
                             currentCoroutineContext().ensureActive()
                             when (message) {
                                 is ForwardMessagePayload.Text -> PreparedForwardMessage.Text(message.text)
-                                is ForwardMessagePayload.Media -> {
-                                    ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
-                                    val attachments =
-                                        message.attachments
-                                            .map { source ->
-                                                async {
-                                                    materializationGate.withPermit {
-                                                        currentCoroutineContext().ensureActive()
-                                                        val attachment =
-                                                            transport.materialize(
-                                                                sourceGroupIdHex = message.sourceGroupIdHex,
-                                                                sourceMessageIdHex = message.sourceMessageIdHex,
-                                                                source = source,
-                                                            )
-                                                        val preparedCount =
-                                                            synchronized(accountingLock) {
-                                                                if (attachment.plaintextBytes.isEmpty()) {
-                                                                    throw IllegalStateException(
-                                                                        "materialized attachment is empty",
-                                                                    )
-                                                                }
-                                                                retainedPlaintextBuffers += attachment.plaintextBytes
-                                                                retainedBytes += attachment.plaintextBytes.size
-                                                                if (retainedBytes > maxRetainedBytes) {
-                                                                    throw ForwardPayloadTooLargeException()
-                                                                }
-                                                                preparedAttachmentCount += 1
-                                                                preparedAttachmentCount
-                                                            }
-                                                        _state.update { snapshot ->
-                                                            snapshot.copy(
-                                                                preparedAttachments =
-                                                                    maxOf(
-                                                                        snapshot.preparedAttachments,
-                                                                        preparedCount,
-                                                                    ),
-                                                            )
-                                                        }
-                                                        attachment
-                                                    }
-                                                }
-                                            }.awaitAll()
-                                    ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
-                                    PreparedForwardMessage.Media(
-                                        message.caption,
-                                        attachments,
-                                        message.expiresAtSeconds,
-                                    )
-                                }
+                                is ForwardMessagePayload.Media ->
+                                    materializeForwardMediaMessage(
+                                        message = message,
+                                        materializationGate = materializationGate,
+                                        accounting = accounting,
+                                        transport = transport,
+                                        clockSeconds = clockSeconds,
+                                    ) { preparedCount ->
+                                        _state.update { snapshot ->
+                                            snapshot.copy(
+                                                preparedAttachments =
+                                                    maxOf(snapshot.preparedAttachments, preparedCount),
+                                            )
+                                        }
+                                    }
                             }
                         }
                     }.awaitAll()
@@ -482,19 +506,25 @@ internal class ForwardSession(
             currentCoroutineContext().ensureActive()
             failureStage = ForwardFailureStage.Publish
             updateForwardTarget(_state, targetGroupIdHex) { it.copy(phase = ForwardTargetPhase.Sending) }
-            uncertainPublishIndexByTarget[targetGroupIdHex]?.let { uncertainIndex ->
-                val pendingMessageIdHex = uncertainPendingMessageIdByTarget[targetGroupIdHex]
-                if (
-                    pendingMessageIdHex == null ||
-                    !transport.recoverPendingPublish(targetGroupIdHex, pendingMessageIdHex)
-                ) {
-                    throw ForwardPublishRecoveryUnavailableException()
+            uncertainPublishByTarget[targetGroupIdHex]?.let { evidence ->
+                val message = prepared[evidence.messageIndex]
+                val recovery =
+                    transport.recoverPendingPublish(
+                        targetGroupIdHex = targetGroupIdHex,
+                        message = message,
+                        uploadedReferences = targetReferences[evidence.messageIndex].orEmpty(),
+                        evidence = evidence,
+                    )
+                when (recovery) {
+                    ForwardPublishRecoveryResult.Published -> {
+                        val recoveredCount = evidence.messageIndex + 1
+                        publishedMessageCountByTarget[targetGroupIdHex] = recoveredCount
+                        uncertainPublishByTarget.remove(targetGroupIdHex)
+                        updateForwardTarget(_state, targetGroupIdHex) { it.copy(sentMessages = recoveredCount) }
+                    }
+                    ForwardPublishRecoveryResult.NotCommitted -> uncertainPublishByTarget.remove(targetGroupIdHex)
+                    ForwardPublishRecoveryResult.Unavailable -> throw ForwardPublishRecoveryUnavailableException()
                 }
-                val recoveredCount = uncertainIndex + 1
-                publishedMessageCountByTarget[targetGroupIdHex] = recoveredCount
-                uncertainPublishIndexByTarget.remove(targetGroupIdHex)
-                uncertainPendingMessageIdByTarget.remove(targetGroupIdHex)
-                updateForwardTarget(_state, targetGroupIdHex) { it.copy(sentMessages = recoveredCount) }
             }
             transport.publishBatch(
                 targetGroupIdHex = targetGroupIdHex,
@@ -522,8 +552,7 @@ internal class ForwardSession(
             throw cancellation
         } catch (failure: Exception) {
             if (failure is ForwardPublishUncertainException) {
-                uncertainPublishIndexByTarget[targetGroupIdHex] = failure.messageIndex
-                uncertainPendingMessageIdByTarget[targetGroupIdHex] = failure.pendingMessageIdHex
+                uncertainPublishByTarget[targetGroupIdHex] = failure.evidence
             }
             if (failure is ForwardAttachmentExpiredException) failureStage = ForwardFailureStage.Expired
             if (failure is ForwardSessionInvalidatedException) failureStage = ForwardFailureStage.SessionChanged
@@ -547,13 +576,18 @@ internal class ForwardSession(
                     },
             )
         }
-        if (_state.value.phase == ForwardOperationPhase.Completed || !_state.value.canRetry) {
-            clearSensitiveState()
-        }
+        clearSessionState(
+            clearRetryState =
+                _state.value.phase == ForwardOperationPhase.Completed || !_state.value.canRetry,
+        )
     }
 
     private fun failMaterialization(stage: ForwardFailureStage) {
-        clearSensitiveState()
+        // A retry may be re-materializing source bytes for an earlier ambiguous
+        // publish. Preserve destination references and recovery evidence across
+        // another transient materialization failure so a later retry cannot
+        // duplicate that uncertain message.
+        clearSessionState(clearRetryState = stage != ForwardFailureStage.Materialize)
         _state.update { snapshot ->
             snapshot.copy(
                 phase = ForwardOperationPhase.Failed,
@@ -569,13 +603,14 @@ internal class ForwardSession(
         }
     }
 
-    private fun clearSensitiveState() {
+    private fun clearSessionState(clearRetryState: Boolean) {
         retainedPlaintextBuffers.forEach { it.fill(0) }
         retainedPlaintextBuffers.clear()
         preparedMessages = null
-        uploadedReferencesByTarget.clear()
-        uncertainPublishIndexByTarget.clear()
-        uncertainPendingMessageIdByTarget.clear()
+        if (clearRetryState) {
+            uploadedReferencesByTarget.clear()
+            uncertainPublishByTarget.clear()
+        }
     }
 
     private companion object {

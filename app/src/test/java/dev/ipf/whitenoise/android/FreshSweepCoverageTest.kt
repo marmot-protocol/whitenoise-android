@@ -23,6 +23,7 @@ class FreshSweepCoverageTest {
 
         assertTrue("deletions must invalidate projections", "controller.deletedMessageIds" in projectionsBlock)
         assertTrue("edits must invalidate projections", "controller.editsByTarget" in projectionsBlock)
+        assertTrue("retention expiry must invalidate projections", "eligibilityNowSeconds" in projectionsBlock)
         assertTrue("copy text must be projected once per timeline change", "MessageProjector.copyableText" in projectionsBlock)
         assertTrue("forward text must be projected once per timeline change", "MessageProjector.forwardableText" in projectionsBlock)
         assertTrue(

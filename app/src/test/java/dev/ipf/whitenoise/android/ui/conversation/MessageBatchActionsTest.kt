@@ -14,12 +14,30 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import java.io.IOException
 
 class MessageBatchActionsTest {
+    @Test
+    fun forwardEligibilityRefreshesAtTheNextRetentionBoundary() {
+        assertEquals(
+            500L,
+            forwardEligibilityRefreshDelayMillis(
+                retentionExpiries = listOf(99uL, 101uL, 120uL),
+                nowMillis = 100_500L,
+            ),
+        )
+        assertNull(
+            forwardEligibilityRefreshDelayMillis(
+                retentionExpiries = listOf(99uL, 100uL),
+                nowMillis = 100_500L,
+            ),
+        )
+    }
+
     @Test
     fun submissionGuardRejectsRecompositionDoubleSubmitUntilCompletion() {
         val guard = BatchDeleteSubmissionGuard()

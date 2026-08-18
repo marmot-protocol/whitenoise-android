@@ -43,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
@@ -55,12 +56,16 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.text.BidiFormatter
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
@@ -138,10 +143,13 @@ internal fun ForwardMessagePickerContent(
     val targetLoading = appState.forwardTargetsLoading
     val targetError = appState.forwardTargetsError
     val memberRevision = appState.forwardTargetMembersRevision
+    val targetRevision = appState.forwardTargetsRevision
     val targets =
-        appState
-            .forwardTargets()
-            .filterNot { it.group.groupIdHex.equals(originGroupIdHex, ignoreCase = true) }
+        remember(targetRevision, originGroupIdHex) {
+            appState
+                .forwardTargets()
+                .filterNot { it.group.groupIdHex.equals(originGroupIdHex, ignoreCase = true) }
+        }
     val targetIds = remember(targets) { targets.mapTo(hashSetOf()) { it.group.groupIdHex.lowercase(Locale.ROOT) } }
     LaunchedEffect(targetLoading, targetIds) {
         if (!targetLoading) {
@@ -270,13 +278,15 @@ private fun ForwardSelectionSummary(
     attachmentCount: Int,
     modifier: Modifier = Modifier,
 ) {
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val bidiFormatter = remember(rtl) { BidiFormatter.Builder(rtl).build() }
     val summary =
         buildList {
             add(pluralStringResource(R.plurals.forward_message_count, messageCount, messageCount))
             if (attachmentCount > 0) {
                 add(pluralStringResource(R.plurals.forward_attachment_count, attachmentCount, attachmentCount))
             }
-        }.joinToString(" · ")
+        }.joinToString(" · ") { bidiFormatter.unicodeWrap(it) }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
@@ -293,9 +303,9 @@ private fun ForwardTargetList(
     appState: WhiteNoiseAppState,
     targets: List<ChatListItem>,
     filteredTargets: List<Pair<ChatListItem, String>>,
-    visibleFolderRows: List<Pair<dev.ipf.whitenoise.android.state.ChatFolder, List<String>>>,
+    visibleFolderRows: List<Pair<ChatFolder, List<String>>>,
     targetLoading: Boolean,
-    targetError: dev.ipf.whitenoise.android.state.ErrorPresentation?,
+    targetError: ErrorPresentation?,
     selected: List<String>,
     onSelectionChange: (List<String>) -> Unit,
     modifier: Modifier = Modifier,

@@ -107,8 +107,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import java.util.Locale
 
-private const val FORWARD_TARGET_ID_PREFIX_LENGTH = 12
-
 @Composable
 internal fun MessageActionMenu(
     expanded: Boolean,
@@ -628,7 +626,7 @@ internal fun ForwardProgressContent(
                     progress = progress,
                     title =
                         targetTitles[progress.groupIdHex.lowercase(Locale.ROOT)]
-                            ?: progress.groupIdHex.take(FORWARD_TARGET_ID_PREFIX_LENGTH),
+                            ?: progress.groupIdHex.take(FORWARD_TARGET_TITLE_FALLBACK_LENGTH),
                 )
             }
         }
@@ -696,7 +694,6 @@ private fun ForwardTargetProgressRow(
     ListItem(
         modifier =
             Modifier.semantics {
-                liveRegion = LiveRegionMode.Polite
                 stateDescription = supportingText
             },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
