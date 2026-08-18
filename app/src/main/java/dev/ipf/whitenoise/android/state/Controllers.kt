@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AgentStreamSubscription
 import dev.ipf.marmotkit.AgentStreamUpdateFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -59,6 +60,7 @@ import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
 import dev.ipf.whitenoise.android.core.EditState
+import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.LeaveAction
@@ -84,11 +86,13 @@ import dev.ipf.whitenoise.android.media.REMOVE_GROUP_IMAGE_MUTATION_KEY
 import dev.ipf.whitenoise.android.media.classifyGroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.mutationKey
 import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
+import dev.ipf.whitenoise.android.ui.chats.chatListItemAvatarAccount
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
 import dev.ipf.whitenoise.android.ui.chats.newchat.existingDirectChatFromProvenance
 import dev.ipf.whitenoise.android.ui.chats.newchat.rankedDirectChatCandidates
 import dev.ipf.whitenoise.android.ui.chats.newchat.resolveExistingDirectChatCandidates
+import dev.ipf.whitenoise.android.ui.common.encryptedGroupAvatarCacheKey
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -120,6 +124,18 @@ import java.util.UUID
 import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 
+enum class ChatListAvatarSource {
+    LEGACY_URL,
+    ENCRYPTED_GROUP,
+    FALLBACK_URL,
+}
+
+data class ChatListAvatarSeed(
+    val source: ChatListAvatarSource,
+    val key: String,
+    val image: ImageBitmap,
+)
+
 data class ChatListItem(
     val group: AppGroupRecordFfi,
     val latest: AppMessageRecordFfi?,
@@ -138,6 +154,13 @@ data class ChatListItem(
     val presentationMemberCount: Int = memberCount,
     val presentationActiveAccountIsSoleMember: Boolean = false,
     val projection: ChatListRowFfi? = null,
+    /**
+     * Bounded snapshot of decoded pixels that were already in a presentation
+     * loader when this row was published. Holding the hit on the immutable row
+     * closes the publication-to-composition eviction race without starting or
+     * waiting for network/decode work.
+     */
+    val firstFrameAvatar: ChatListAvatarSeed? = null,
     /**
      * Markdown AST for the last-message preview line, parsed off-main by
      * [ChatsController] from the same plaintext [projectedPreviewText]
@@ -5521,6 +5544,30 @@ class ChatsController private constructor(
         item.latest?.sender?.let(appState::preWarmProfileAvatar)
     }
 
+    @Suppress("ReturnCount") // Mirrors [GroupAvatar] URL-over-encrypted precedence with early exits.
+    private fun firstFrameAvatarSeed(item: ChatListItem): ChatListAvatarSeed? {
+        val legacyUrl = ProfileSanitizer.protocolImageUrl(item.group.avatarUrl)
+        if (legacyUrl != null) {
+            return AvatarImageLoader.peek(legacyUrl)?.let { image ->
+                ChatListAvatarSeed(ChatListAvatarSource.LEGACY_URL, legacyUrl, image)
+            }
+        }
+
+        val encryptedCacheKey = encryptedGroupAvatarCacheKey(accountRef, item.group)
+        if (encryptedCacheKey != null) {
+            GroupAvatarImageLoader.peek(encryptedCacheKey)?.let { image ->
+                return ChatListAvatarSeed(ChatListAvatarSource.ENCRYPTED_GROUP, encryptedCacheKey, image)
+            }
+        }
+
+        val fallbackUrl = chatListItemAvatarAccount(item)?.let { appState.avatarUrl(it) }
+        return fallbackUrl?.let { url ->
+            AvatarImageLoader.peek(url)?.let { image ->
+                ChatListAvatarSeed(ChatListAvatarSource.FALLBACK_URL, url, image)
+            }
+        }
+    }
+
     /**
      * Called by the shell when a conversation is foregrounded (`false`) or the
      * chat list is back on screen (`true`). The subscription stays alive either
@@ -5659,13 +5706,26 @@ class ChatsController private constructor(
             sortChatListItems(projected) { item ->
                 accountRef?.let { appState.draftStore.draftedAtSecondsFor(it, item.group.groupIdHex) }
             }
-        items = all.filter { !it.group.archived }
-        archivedItems = all.filter { it.group.archived }
+        val visible =
+            all.filter { !it.group.archived }.mapIndexed { index, item ->
+                item.copy(
+                    firstFrameAvatar =
+                        if (index < CHAT_LIST_AVATAR_WARM_ROWS) {
+                            firstFrameAvatarSeed(item)
+                        } else {
+                            null
+                        },
+                )
+            }
+        val archived = all.filter { it.group.archived }.map { it.copy(firstFrameAvatar = null) }
+        val avatarWarmTargets = visible.take(CHAT_LIST_AVATAR_WARM_ROWS)
+        items = visible
+        archivedItems = archived
         // Limit speculative network work to the recent visible conversations the
         // user is likely to receive from next. The app-state notification stream
         // independently warms each ingested sender/conversation on cold UI-less
         // process starts.
-        items.take(NOTIFICATION_AVATAR_PREWARM_CONVERSATIONS).forEach(::preWarmNotificationAvatars)
+        avatarWarmTargets.forEach(::preWarmNotificationAvatars)
         chatsDebug { "recompute visible=${items.size} archived=${archivedItems.size} total=${all.size}" }
         // For any group we don't yet have members cached for, fan out a
         // one-shot members fetch so unnamed titles and the profile sheet's
@@ -6174,7 +6234,7 @@ private const val LIVE_TIMELINE_WINDOW_CAP = 200
 private const val CHAT_LIST_RECOMPUTE_DEBOUNCE_MS = 16L
 private const val GROUP_HYDRATION_RETRY_DELAY_MS = 750L
 private const val MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY = 64
-private const val NOTIFICATION_AVATAR_PREWARM_CONVERSATIONS = 24
+private const val CHAT_LIST_AVATAR_WARM_ROWS = 24
 
 // Chat-list message-body search (issue #290). [SEARCH_FANOUT] caps the number
 // of per-chat `timelineMessages` FFI queries running at once so a large chat

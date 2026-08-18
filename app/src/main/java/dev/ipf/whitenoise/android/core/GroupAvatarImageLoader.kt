@@ -48,6 +48,18 @@ internal object GroupAvatarImageLoader {
             synchronized(lock) { cache.get(it) }
         }
 
+    /** Test-only injection for deterministic first-frame composition coverage. */
+    internal fun putCached(
+        key: String,
+        image: ImageBitmap,
+    ) {
+        val cacheKey = key.trim()
+        if (cacheKey.isEmpty()) return
+        synchronized(lock) {
+            cache.put(cacheKey, image)
+        }
+    }
+
     suspend fun load(
         key: String,
         fetchBytes: suspend () -> ByteArray,
