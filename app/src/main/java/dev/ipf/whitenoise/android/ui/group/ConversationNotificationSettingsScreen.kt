@@ -282,18 +282,6 @@ private fun LoadedNotificationCategories(
                     }
                 pendingChannel = null
                 result.onFailure { appState.present(R.string.toast_notification_scope_update_failed) }
-                result.onSuccess { updatedSetting ->
-                    if (useCustom) {
-                        openCategorySettings(
-                            context,
-                            updatedSetting,
-                            descriptor,
-                            accountRef,
-                            groupIdHex,
-                            conversationAvatarUrl,
-                        )
-                    }
-                }
             }
         },
     )

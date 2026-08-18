@@ -85,12 +85,13 @@ class NotificationScopeSettingsScreenshotTest {
         composeRule.runOnIdle {
             assertEquals(NotificationChannelSpec.REACTIONS, opened)
             assertFalse(toggled != null)
+            opened = null
         }
 
         composeRule.onNodeWithContentDescription("Custom Reactions for this chat").performClick()
         composeRule.runOnIdle {
             assertEquals(NotificationChannelSpec.REACTIONS to true, toggled)
-            assertTrue(opened == NotificationChannelSpec.REACTIONS)
+            assertTrue(opened == null)
         }
     }
 

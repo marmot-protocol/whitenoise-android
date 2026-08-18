@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.app.Notification
 import android.app.NotificationChannel
+import android.app.NotificationChannelGroup
 import android.app.NotificationManager
 import android.content.Context
 import dev.ipf.whitenoise.android.R
@@ -18,8 +19,16 @@ import dev.ipf.whitenoise.android.R
  * stable once published.
  */
 object NotificationChannels {
+    internal const val GLOBAL_DEFAULTS_GROUP_ID = "global_notification_defaults"
+
     fun ensureChannels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        manager.createNotificationChannelGroup(
+            NotificationChannelGroup(
+                GLOBAL_DEFAULTS_GROUP_ID,
+                context.getString(R.string.notification_channel_group_global_defaults),
+            ),
+        )
         NotificationChannelSpec.entries.forEach { spec ->
             manager.createNotificationChannel(buildChannel(context, spec))
         }
@@ -34,6 +43,7 @@ object NotificationChannels {
             context.getString(spec.globalNameRes()),
             spec.importance.toAndroidImportance(),
         ).apply {
+            group = GLOBAL_DEFAULTS_GROUP_ID
             description = context.getString(spec.globalDescriptionRes())
             // Every channel stays private on the lockscreen so a redacted public
             // version is shown instead of the body. Only the message channels opt

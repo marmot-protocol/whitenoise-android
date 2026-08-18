@@ -283,7 +283,6 @@ object ConversationNotificationChannels {
     ): NotificationChannel =
         NotificationChannel(conversationChannelId, displayName, source.importance).apply {
             setConversationId(parentChannelId, conversationShortcutId)
-            group = source.group
             description = displayDescription
             setShowBadge(source.canShowBadge())
             setSound(source.sound, source.audioAttributes)

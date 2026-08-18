@@ -32,8 +32,19 @@ class ConversationNotificationChannelsTest {
         NotificationChannels.ensureChannels(context)
 
         assertEquals(
+            "Global defaults",
+            manager.notificationChannelGroups
+                .single { it.id == NotificationChannels.GLOBAL_DEFAULTS_GROUP_ID }
+                .name
+                .toString(),
+        )
+        assertEquals(
             "Reactions · Default for all chats",
             manager.getNotificationChannel(NotificationChannelSpec.REACTIONS.id).name.toString(),
+        )
+        assertEquals(
+            NotificationChannels.GLOBAL_DEFAULTS_GROUP_ID,
+            manager.getNotificationChannel(NotificationChannelSpec.REACTIONS.id).group,
         )
         assertEquals(
             "App updates · App-wide",
@@ -65,6 +76,7 @@ class ConversationNotificationChannelsTest {
         assertEquals(customSound, refreshed.sound)
         assertFalse(refreshed.shouldVibrate())
         assertFalse(refreshed.canShowBadge())
+        assertEquals(NotificationChannels.GLOBAL_DEFAULTS_GROUP_ID, refreshed.group)
     }
 
     @Test
@@ -345,6 +357,7 @@ class ConversationNotificationChannelsTest {
         assertNotNull(groupChannel)
         assertEquals("messages_group", groupChannel!!.parentChannelId)
         assertEquals(shortcut, groupChannel.conversationId)
+        assertNull(groupChannel.group)
         assertNull(mentionChannel)
         assertNull(conversationChannel("reactions_v2", shortcut))
         assertNull(conversationChannel("invites_v2", shortcut))

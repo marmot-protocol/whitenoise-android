@@ -613,6 +613,7 @@
     <string name="notification_channel_agent_activity">代理活動</string>
     <string name="notification_channel_agent_activity_description">工具進度和代理狀態更新</string>
     <string name="notification_channel_direct_messages_default">私訊 · 所有聊天的預設設定</string>
+    <string name="notification_channel_group_global_defaults">全域預設設定</string>
     <string name="notification_channel_direct_messages_default_description">私訊的預設 Android 提醒方式</string>
     <string name="notification_channel_group_messages_default">群組訊息 · 所有聊天的預設設定</string>
     <string name="notification_channel_group_messages_default_description">群組訊息的預設 Android 提醒方式</string>

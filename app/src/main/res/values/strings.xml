@@ -849,6 +849,7 @@
     <string name="notification_channel_direct_messages">Direct messages</string>
     <string name="notification_channel_direct_messages_description">One-to-one conversation messages</string>
     <string name="notification_channel_direct_messages_default">Direct messages · Default for all chats</string>
+    <string name="notification_channel_group_global_defaults">Global defaults</string>
     <string name="notification_channel_direct_messages_default_description">Default Android alert behavior for one-to-one messages</string>
     <string name="notification_channel_group_messages">Group messages</string>
     <string name="notification_channel_group_messages_description">Group conversation messages</string>

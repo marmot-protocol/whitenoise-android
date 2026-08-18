@@ -624,6 +624,7 @@
     <string name="notification_channel_agent_activity">Ajan etkinliği</string>
     <string name="notification_channel_agent_activity_description">Araç ilerlemesi ve ajan durumu güncellemeleri</string>
     <string name="notification_channel_direct_messages_default">Doğrudan mesajlar · Tüm sohbetler için varsayılan</string>
+    <string name="notification_channel_group_global_defaults">Genel varsayılanlar</string>
     <string name="notification_channel_direct_messages_default_description">Doğrudan mesajlar için varsayılan Android uyarı davranışı</string>
     <string name="notification_channel_group_messages_default">Grup mesajları · Tüm sohbetler için varsayılan</string>
     <string name="notification_channel_group_messages_default_description">Grup mesajları için varsayılan Android uyarı davranışı</string>

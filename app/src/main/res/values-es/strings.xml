@@ -624,6 +624,7 @@
     <string name="notification_channel_agent_activity">Actividad del agente</string>
     <string name="notification_channel_agent_activity_description">Progreso de herramientas y actualizaciones del estado del agente</string>
     <string name="notification_channel_direct_messages_default">Mensajes directos · Predeterminado para todos los chats</string>
+    <string name="notification_channel_group_global_defaults">Valores predeterminados globales</string>
     <string name="notification_channel_direct_messages_default_description">Comportamiento predeterminado de alertas de Android para mensajes directos</string>
     <string name="notification_channel_group_messages_default">Mensajes de grupo · Predeterminado para todos los chats</string>
     <string name="notification_channel_group_messages_default_description">Comportamiento predeterminado de alertas de Android para mensajes de grupo</string>

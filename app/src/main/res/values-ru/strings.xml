@@ -656,6 +656,7 @@
     <string name="notification_channel_agent_activity">Активность агента</string>
     <string name="notification_channel_agent_activity_description">Ход выполнения инструментов и обновления статуса агента</string>
     <string name="notification_channel_direct_messages_default">Личные сообщения · По умолчанию для всех чатов</string>
+    <string name="notification_channel_group_global_defaults">Общие настройки по умолчанию</string>
     <string name="notification_channel_direct_messages_default_description">Стандартные уведомления Android для личных сообщений</string>
     <string name="notification_channel_group_messages_default">Групповые сообщения · По умолчанию для всех чатов</string>
     <string name="notification_channel_group_messages_default_description">Стандартные уведомления Android для групповых сообщений</string>
