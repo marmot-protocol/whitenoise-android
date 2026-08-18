@@ -81,7 +81,9 @@ class NotificationScopeSettingsScreenshotTest {
         composeRule.onNodeWithContentDescription("Custom Mentions for this chat").assertIsOn()
         composeRule.onNodeWithContentDescription("Custom Reactions for this chat").assertIsOff()
 
-        composeRule.onNodeWithTag("open-conversation-notification-reactions_v2").performClick()
+        composeRule
+            .onNodeWithTag("open-conversation-notification-${NotificationChannelSpec.REACTIONS.id}")
+            .performClick()
         composeRule.runOnIdle {
             assertEquals(NotificationChannelSpec.REACTIONS, opened)
             assertFalse(toggled != null)

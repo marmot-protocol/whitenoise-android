@@ -166,11 +166,7 @@ class ConversationNotificationRoutingTest {
         routing.setScope(descriptor, category, ConversationNotificationScope.USE_GLOBAL_DEFAULT).getOrThrow()
 
         assertNotNull(manager.getNotificationChannel(childId))
-        val restarted =
-            ConversationNotificationRouting(
-                context,
-                ConversationNotificationRoutingPreferences(context, preferences),
-            )
+        val restarted = restartRouting()
         val route =
             restarted.resolveForPost(
                 channel = category.channel,
@@ -202,11 +198,7 @@ class ConversationNotificationRoutingTest {
                 conversationTitle = descriptor.title,
                 primaryVibrationPattern = descriptor.primaryVibrationPattern,
             )
-        val restarted =
-            ConversationNotificationRouting(
-                context,
-                ConversationNotificationRoutingPreferences(context, preferences),
-            )
+        val restarted = restartRouting()
         val second =
             restarted.resolveForPost(
                 channel = category.channel,
@@ -282,6 +274,12 @@ class ConversationNotificationRoutingTest {
             secondRows.single { it.channel == category.channel }.scope,
         )
     }
+
+    private fun restartRouting(): ConversationNotificationRouting =
+        ConversationNotificationRouting(
+            context,
+            ConversationNotificationRoutingPreferences(context, preferences),
+        )
 
     private fun descriptor(
         shortcutId: String,

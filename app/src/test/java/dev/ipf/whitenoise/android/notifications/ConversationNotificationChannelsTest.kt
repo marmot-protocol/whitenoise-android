@@ -352,18 +352,18 @@ class ConversationNotificationChannelsTest {
 
         ConversationNotificationChannels.ensureConversationChannels(context, shortcut, isDm = false)
 
-        val groupChannel = manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("messages_group", shortcut))
-        val mentionChannel = manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("mentions", shortcut))
+        val groupChannel = conversationChannel(NotificationChannelSpec.GROUP_MESSAGES.id, shortcut)
+        val mentionChannel = conversationChannel(NotificationChannelSpec.MENTIONS.id, shortcut)
         assertNotNull(groupChannel)
-        assertEquals("messages_group", groupChannel!!.parentChannelId)
+        assertEquals(NotificationChannelSpec.GROUP_MESSAGES.id, groupChannel!!.parentChannelId)
         assertEquals(shortcut, groupChannel.conversationId)
         assertNull(groupChannel.group)
         assertNull(mentionChannel)
-        assertNull(conversationChannel("reactions_v2", shortcut))
-        assertNull(conversationChannel("invites_v2", shortcut))
-        assertNull(conversationChannel("agent_activity_v1", shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.REACTIONS.id, shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.INVITES.id, shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.AGENT_ACTIVITY.id, shortcut))
         // A group conversation never receives on the DM parent, so no DM child.
-        assertNull(manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("messages_dm", shortcut)))
+        assertNull(conversationChannel(ConversationNotificationChannels.primaryMessageParent(isDm = true).id, shortcut))
     }
 
     @Test
@@ -373,16 +373,12 @@ class ConversationNotificationChannelsTest {
 
         ConversationNotificationChannels.ensureConversationChannels(context, shortcut, isDm = true)
 
-        assertNotNull(manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("messages_dm", shortcut)))
-        assertNull(
-            manager.getNotificationChannel(
-                ConversationNotificationChannels.conversationChannelId("mentions", shortcut),
-            ),
-        )
-        assertNull(conversationChannel("reactions_v2", shortcut))
-        assertNull(conversationChannel("invites_v2", shortcut))
-        assertNull(conversationChannel("agent_activity_v1", shortcut))
-        assertNull(manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("messages_group", shortcut)))
+        assertNotNull(conversationChannel(ConversationNotificationChannels.primaryMessageParent(isDm = true).id, shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.MENTIONS.id, shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.REACTIONS.id, shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.INVITES.id, shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.AGENT_ACTIVITY.id, shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.GROUP_MESSAGES.id, shortcut))
     }
 
     @Test

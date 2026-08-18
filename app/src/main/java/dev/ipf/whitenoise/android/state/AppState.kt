@@ -1688,7 +1688,7 @@ class WhiteNoiseAppState private constructor(
     // otherwise an older successful hide can publish after a newer hide or wipe.
     private val hiddenMessageMutationMutex = Mutex()
     internal val conversationVibrationPreferences = ConversationVibrationPreferences(appContext)
-    internal val conversationNotificationRouting = ConversationNotificationRouting(appContext)
+    internal val conversationNotificationRouting by lazy { ConversationNotificationRouting(appContext) }
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
     private val inviteNotificationIdentityRefreshStore = GroupInviteNotificationIdentityRefreshStore()
     private val appUpdateRepository = AppUpdateRepository(appContext)
@@ -9222,6 +9222,9 @@ class WhiteNoiseAppState private constructor(
             // Wipe pre-encryption cache entries promptly after upgrade without doing
             // directory I/O in this main-thread constructor.
             mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
+            // Load the persisted per-chat channel scopes before the settings UI
+            // can request them, without blocking the main-thread constructor.
+            mutationsScope.launch(Dispatchers.IO) { conversationNotificationRouting }
             if (requireAppUnlock) {
                 // Pre-warm the Keystore-backed unlock timestamp off-main so the
                 // first foreground lock evaluation is a cache hit. Assigned on

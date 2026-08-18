@@ -107,7 +107,11 @@ class LocalNotificationPresenter(
     private val shortcutAccessClock = AtomicLong()
     private val tapTokens = NotificationTapTokens.create(context)
     private val conversationVibrationPreferences = ConversationVibrationPreferences(context)
-    private val conversationNotificationRouting = ConversationNotificationRouting(context)
+
+    // First used from show()'s Default-dispatcher routing block, so defer the
+    // SharedPreferences-backed construction instead of adding disk-backed work
+    // to AppState's main-thread initialization.
+    private val conversationNotificationRouting by lazy { ConversationNotificationRouting(context) }
 
     fun ensureChannels() {
         NotificationChannels.ensureChannels(context)

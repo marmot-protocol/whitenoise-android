@@ -116,24 +116,28 @@ internal class ConversationNotificationRouting(
             }
 
             ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE -> {
-                val category = requireNotNull(OverridableConversationNotificationCategory.from(channel))
-                val scope = effectiveScope(conversationShortcutId, category)
-                val child =
-                    if (scope == ConversationNotificationScope.CUSTOM_FOR_THIS_CHAT) {
-                        ConversationNotificationChannels.ensureConversationChannel(
-                            context = appContext,
-                            parentChannelId = channel.id,
-                            conversationShortcutId = conversationShortcutId,
-                            conversationTitle = conversationTitle,
-                        )
-                    } else {
-                        null
-                    }
-                ConversationNotificationPostRoute(
-                    channelId = child ?: channel.id,
-                    scope = scope,
-                    conversationShortcutId = conversationShortcutId,
-                )
+                val category = OverridableConversationNotificationCategory.from(channel)
+                if (category == null) {
+                    globalRoute(channel, conversationShortcutId)
+                } else {
+                    val scope = effectiveScope(conversationShortcutId, category)
+                    val child =
+                        if (scope == ConversationNotificationScope.CUSTOM_FOR_THIS_CHAT) {
+                            ConversationNotificationChannels.ensureConversationChannel(
+                                context = appContext,
+                                parentChannelId = channel.id,
+                                conversationShortcutId = conversationShortcutId,
+                                conversationTitle = conversationTitle,
+                            )
+                        } else {
+                            null
+                        }
+                    ConversationNotificationPostRoute(
+                        channelId = child ?: channel.id,
+                        scope = scope,
+                        conversationShortcutId = conversationShortcutId,
+                    )
+                }
             }
 
             ConversationChannelPolicy.GLOBAL_ONLY -> globalRoute(channel, conversationShortcutId)
