@@ -13,8 +13,25 @@ class FuzzFramingTest {
     @Test
     fun consumeFramedString_legacySeedConsumesEntirePayload() {
         val payload = """{"pubkey":"abc","id":"deadbeef","sig":"abc"}"""
-        val provider = providerFromBytes(payload.encodeToByteArray())
-        val framed = provider.consumeFramedString()
+        val provider = providerFromBytes(payload.encodeToByteArray() + byteArrayOf(1))
+        val framed = provider.consumeDirectOrFramedString()
+        assertEquals(payload, framed.value)
+        assertTrue(framed.consumedAllRemaining)
+        assertEquals(0, provider.remainingBytes())
+    }
+
+    @Test
+    fun consumeFramedString_longLegacyJsonConsumesEntirePayload() {
+        val payload =
+            buildString {
+                append('{')
+                repeat(150) {
+                    append('a')
+                }
+                append('}')
+            }
+        val provider = providerFromBytes(payload.encodeToByteArray() + byteArrayOf(1))
+        val framed = provider.consumeDirectOrFramedString()
         assertEquals(payload, framed.value)
         assertTrue(framed.consumedAllRemaining)
         assertEquals(0, provider.remainingBytes())
@@ -26,13 +43,14 @@ class FuzzFramingTest {
         val second = "pubkey"
         val bytes =
             byteArrayOf(
-                first.length.toByte(),
                 *first.encodeToByteArray(),
-                second.length.toByte(),
                 *second.encodeToByteArray(),
+                second.length.toByte(),
+                first.length.toByte(),
+                0,
             )
         val provider = providerFromBytes(bytes)
-        val firstField = provider.consumeFramedString()
+        val firstField = provider.consumeDirectOrFramedString()
         assertEquals(first, firstField.value)
         assertFalse(firstField.consumedAllRemaining)
         val secondField = provider.consumeFramedString()
@@ -46,13 +64,14 @@ class FuzzFramingTest {
         val expectedPubkey = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         val bytes =
             byteArrayOf(
-                eventJson.length.toByte(),
                 *eventJson.encodeToByteArray(),
-                expectedPubkey.length.toByte(),
                 *expectedPubkey.encodeToByteArray(),
+                expectedPubkey.length.toByte(),
+                eventJson.length.toByte(),
+                0,
             )
         val provider = providerFromBytes(bytes)
-        val eventField = provider.consumeFramedString()
+        val eventField = provider.consumeDirectOrFramedString()
         val expectedField = provider.consumeFramedString()
         assertNotNull(signedEventPubkeyMismatchReason(eventField.value, expectedField.value))
     }
@@ -63,19 +82,14 @@ class FuzzFramingTest {
         val provider =
             providerFromBytes(
                 byteArrayOf(
-                    hexKey.length.toByte(),
                     *hexKey.encodeToByteArray(),
-                    1,
+                    0xFF.toByte(),
                     0,
                 ),
             )
-        val rawField = provider.consumeFramedString()
-        assertFalse(rawField.consumedAllRemaining)
-        val allowHex = provider.consumeBoolean()
-        val nullRaw = provider.consumeBoolean()
-        assertTrue(allowHex)
-        assertFalse(nullRaw)
-        val plausible = RecipientReference.plausibleClipboardInput(rawField.value, allowHexPublicKey = allowHex)
+        val rawField = provider.consumeDirectOrFramedString()
+        assertEquals(hexKey, rawField.value)
+        val plausible = RecipientReference.plausibleClipboardInput(rawField.value, allowHexPublicKey = true)
         assertEquals(hexKey, plausible)
     }
 }

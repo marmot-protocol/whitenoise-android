@@ -133,28 +133,25 @@ class Nip55SignerProtocolFuzzTest {
     }
 
     private fun fuzzSignedEventPubkeyHelpers(data: FuzzedDataProvider) {
-        val eventJson =
-            if (data.remainingBytes() == 0) {
-                data.consumeBoundedUtf8()
-            } else {
-                data.consumeFramedString().value
-            }
+        val eventField = data.consumeDirectOrFramedString()
+        val eventJson = eventField.value
         val expectedPubkey =
-            if (data.remainingBytes() == 0) {
+            if (eventField.consumedAllRemaining || data.remainingBytes() == 0) {
                 ""
             } else {
                 data.consumeFramedString().value
             }
-        val handledPackage = consumeOptionalFramedString(data)
-        val echoedPackage = consumeOptionalFramedString(data)
+        val expectedPackageName =
+            if (eventField.consumedAllRemaining) {
+                "com.example.signer"
+            } else {
+                consumeOptionalFramedString(data)?.takeIf { it.isNotBlank() } ?: "com.example.signer"
+            }
+        val handledPackage = if (eventField.consumedAllRemaining) null else consumeOptionalFramedString(data)
+        val echoedPackage = if (eventField.consumedAllRemaining) null else consumeOptionalFramedString(data)
 
-        signedEventPubkey(eventJson)
-        signedEventPubkeyMismatchReason(eventJson, expectedPubkey)
-        signerPackageEchoMismatchReason(echoedPackage, handledPackage ?: "com.example.signer")
-        trustedSignerPackageFailureReason(handledPackage, echoedPackage)
-
-        val mismatch = signedEventPubkeyMismatchReason(eventJson, expectedPubkey)
         val pubkey = signedEventPubkey(eventJson)
+        val mismatch = signedEventPubkeyMismatchReason(eventJson, expectedPubkey)
         if (pubkey != null && expectedPubkey.isNotBlank()) {
             if (pubkey.equals(expectedPubkey, ignoreCase = true)) {
                 FuzzAssertions.assertNull("matching pubkey must not report mismatch", mismatch)
@@ -172,9 +169,9 @@ class Nip55SignerProtocolFuzzTest {
             )
         }
 
-        if (!echoedPackage.isNullOrBlank() && !handledPackage.isNullOrBlank()) {
-            val echoMismatch = signerPackageEchoMismatchReason(echoedPackage, handledPackage)
-            if (echoedPackage == handledPackage) {
+        if (!echoedPackage.isNullOrBlank()) {
+            val echoMismatch = signerPackageEchoMismatchReason(echoedPackage, expectedPackageName)
+            if (echoedPackage == expectedPackageName) {
                 FuzzAssertions.assertNull("matching signer package must not report mismatch", echoMismatch)
             } else {
                 FuzzAssertions.assertTrue(
@@ -183,11 +180,32 @@ class Nip55SignerProtocolFuzzTest {
                 )
             }
         }
+        val expectedPackageFailure = trustedSignerPackageFailureReason(handledPackage, expectedPackageName)
         if (handledPackage.isNullOrBlank()) {
             FuzzAssertions.assertTrue(
                 "missing handled signer package must fail trusted validation",
-                trustedSignerPackageFailureReason(handledPackage, echoedPackage) == "missing handled signer package",
+                expectedPackageFailure == "missing handled signer package",
             )
+        } else if (handledPackage == expectedPackageName) {
+            FuzzAssertions.assertNull("matching handled package must pass trusted validation", expectedPackageFailure)
+        } else {
+            FuzzAssertions.assertEquals(
+                "handled package mismatch must fail trusted validation",
+                "signer package mismatch",
+                expectedPackageFailure,
+            )
+        }
+
+        if (!handledPackage.isNullOrBlank()) {
+            val trustedEchoFailure = trustedSignerPackageFailureReason(handledPackage, echoedPackage)
+            if (echoedPackage == handledPackage) {
+                FuzzAssertions.assertNull("matching handled and echoed packages must pass trusted validation", trustedEchoFailure)
+            } else if (!echoedPackage.isNullOrBlank()) {
+                FuzzAssertions.assertTrue(
+                    "echoed package mismatch must fail trusted validation",
+                    trustedEchoFailure == "signer package mismatch",
+                )
+            }
         }
     }
 

@@ -32,12 +32,22 @@ class IdentityReferenceFuzzTest {
     }
 
     private fun fuzzProfileLinkParse(data: FuzzedDataProvider) {
-        val raw = data.consumeParserInput()
+        val raw =
+            if (data.remainingBytes() > 0 && data.consumeBoolean()) {
+                data.consumeParserInput()
+            } else {
+                ""
+            }
         ProfileLink.parse(if (raw.isNotEmpty()) raw else buildProfileInput(data))
     }
 
     private fun fuzzRecipientNormalize(data: FuzzedDataProvider) {
-        val raw = data.consumeParserInput()
+        val raw =
+            if (data.remainingBytes() > 0 && data.consumeBoolean()) {
+                data.consumeParserInput()
+            } else {
+                ""
+            }
         val input = if (raw.isNotEmpty()) raw else buildProfileInput(data)
         val normalized = RecipientReference.normalize(input)
 
@@ -57,10 +67,12 @@ class IdentityReferenceFuzzTest {
     }
 
     private fun fuzzRecipientTokenize(data: FuzzedDataProvider) {
-        val raw = data.consumeParserInput()
-        if (raw.isNotEmpty()) {
-            RecipientReference.tokenize(raw)
-            return
+        if (data.remainingBytes() > 0 && data.consumeBoolean()) {
+            val raw = data.consumeParserInput()
+            if (raw.isNotEmpty()) {
+                RecipientReference.tokenize(raw)
+                return
+            }
         }
 
         val tokenCount = data.consumeBoundedElementCount()
@@ -88,7 +100,7 @@ class IdentityReferenceFuzzTest {
             return
         }
 
-        val rawField = data.consumeFramedString()
+        val rawField = data.consumeDirectOrFramedString()
         if (rawField.consumedAllRemaining) {
             exercisePlausibleClipboard(rawField.value.ifBlank { null }, allowHexPublicKey = false)
             return

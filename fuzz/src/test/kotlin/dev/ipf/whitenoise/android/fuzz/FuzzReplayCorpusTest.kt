@@ -38,4 +38,14 @@ class FuzzReplayCorpusTest {
             "syncFuzzReplayCorpus must merge regression-only overlay_replay_probe.input",
         )
     }
+
+    @Test
+    fun mergedReplayResourcesIncludeJunitPlatformProperties() {
+        val properties =
+            Path.of("build/fuzz-replay-corpus/junit-platform.properties")
+        assertTrue(
+            Files.isRegularFile(properties),
+            "syncFuzzReplayCorpus must preserve non-corpus test resources such as junit-platform.properties",
+        )
+    }
 }

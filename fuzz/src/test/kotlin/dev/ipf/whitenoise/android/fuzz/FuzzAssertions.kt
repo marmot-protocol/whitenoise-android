@@ -25,10 +25,10 @@ object FuzzAssertions {
         Assertions.assertNull(value, message)
     }
 
-    fun assertEquals(
+    fun <T> assertEquals(
         message: String,
-        expected: Any?,
-        actual: Any?,
+        expected: T,
+        actual: T,
     ) {
         Assertions.assertTrue(expected == actual, message)
     }

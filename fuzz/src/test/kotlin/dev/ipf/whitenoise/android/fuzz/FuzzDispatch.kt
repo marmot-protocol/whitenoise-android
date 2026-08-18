@@ -42,7 +42,12 @@ enum class Nip55Subtarget {
     }
 }
 
-/** Consumes exactly one input byte mapped evenly onto 0..count-1. */
+/**
+ * Consumes one selector byte mapped onto `0..count-1`.
+ *
+ * Jazzer reads [FuzzedDataProvider.consumeByte] from the end of the remaining input, so
+ * checked-in seed corpora store the selector as the final byte.
+ */
 fun FuzzedDataProvider.consumeSubtarget(count: Int): Int {
     val id = consumeByte().toInt() and 0xFF
     return id % count

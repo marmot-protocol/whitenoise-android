@@ -13,23 +13,26 @@ class FuzzDispatchTest {
     }
 
     @Test
-    fun consumeSubtarget_mapsEveryByteEvenly() {
+    fun consumeSubtarget_readsSelectorFromEndOfInput() {
+        val payload = byteArrayOf('e'.code.toByte(), 'v'.code.toByte(), 't'.code.toByte())
+        val provider = ByteArrayFuzzedDataProvider(payload + byteArrayOf(4))
+        assertEquals(1, provider.consumeSubtarget(ZapstoreSubtarget.COUNT))
+        assertEquals(3, provider.remainingBytes())
+    }
+
+    @Test
+    fun consumeSubtarget_mapsEverySelectorByte() {
         val counts = IntArray(ZapstoreSubtarget.COUNT)
-        for (byte in 0..255) {
-            val id = subtargetIdFromByte(byte, ZapstoreSubtarget.COUNT)
+        for (selector in 0..255) {
+            val provider = ByteArrayFuzzedDataProvider(byteArrayOf(selector.toByte()))
+            val id = provider.consumeSubtarget(ZapstoreSubtarget.COUNT)
             counts[id]++
         }
         val expectedPerBucket = 256 / ZapstoreSubtarget.COUNT
         val remainder = 256 % ZapstoreSubtarget.COUNT
         counts.forEachIndexed { index, observed ->
             val expected = expectedPerBucket + if (index < remainder) 1 else 0
-            assertEquals(expected, observed, "byte bucket $index")
+            assertEquals(expected, observed, "selector bucket $index")
         }
     }
 }
-
-/** Mirrors [FuzzedDataProvider.consumeSubtarget] without needing a live fuzz input. */
-internal fun subtargetIdFromByte(
-    byte: Int,
-    count: Int,
-): Int = (byte and 0xFF) % count

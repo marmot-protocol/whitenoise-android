@@ -112,7 +112,9 @@ val fuzzReplayOverlayProbe =
 
 val syncFuzzReplayCorpus =
     tasks.register<Sync>("syncFuzzReplayCorpus") {
-        from(layout.projectDirectory.file("src/test/resources/fuzz-grammar.dict"))
+        from(layout.projectDirectory.dir("src/test/resources")) {
+            exclude("dev/ipf/whitenoise/android/fuzz/*FuzzTestInputs/**")
+        }
         fuzzCampaignTargets.forEach { target ->
             val classSimpleName = target.testClass.substringAfterLast('.')
             val destination =
@@ -175,7 +177,10 @@ tasks.register<Test>("replayFuzzRegression") {
                         file.name == "TEST-dev.ipf.whitenoise.android.fuzz.ZapstoreProtocolFuzzTest.xml"
                 }.toList()
         if (zapstoreReports.isEmpty()) {
-            return@doLast
+            error(
+                "replayFuzzRegression did not produce " +
+                    "TEST-dev.ipf.whitenoise.android.fuzz.ZapstoreProtocolFuzzTest.xml",
+            )
         }
         val overlayProbeListed =
             zapstoreReports.any { xml ->
@@ -216,33 +221,33 @@ fun org.gradle.api.tasks.JavaExec.configureFuzzCampaign(target: FuzzCampaignTarg
     val corpusDir =
         layout.buildDirectory
             .dir("cifuzz-corpus/${target.taskName}")
-            .get()
-            .asFile
-    val evolvingCorpusDir = corpusDir.resolve("generated")
     val seedCorpusDir = layout.projectDirectory.dir(target.seedCorpusPath).asFile
-    corpusDir.mkdirs()
-    evolvingCorpusDir.mkdirs()
-    workingDir = corpusDir
+    workingDir = corpusDir.get().asFile
     val maxHeap = project.findProperty("fuzzMaxHeap")?.toString() ?: "2g"
     jvmArgs = listOf("-Xmx$maxHeap")
-    val jazzerArgs =
-        mutableListOf(
-            "--target_class=${target.testClass}",
-            "--target_method=${target.methodName}",
-            "-max_len=$fuzzMaxLen",
-            fuzzJobsApplied,
-            fuzzWorkersApplied,
-            evolvingCorpusDir.absolutePath,
-            seedCorpusDir.absolutePath,
-        )
-    val totalRuns = project.findProperty("fuzzRuns")?.toString()?.takeIf { it.isNotBlank() }
-    if (totalRuns != null) {
-        jazzerArgs += "-runs=$totalRuns"
-    } else {
-        val maxDuration = project.findProperty("fuzzMaxDuration")?.toString() ?: "3m"
-        jazzerArgs += "-max_total_time=${durationToSeconds(maxDuration)}"
+    doFirst {
+        val corpusRoot = corpusDir.get().asFile
+        corpusRoot.mkdirs()
+        val evolvingCorpusDir = corpusRoot.resolve("generated").apply { mkdirs() }
+        val totalRuns = project.findProperty("fuzzRuns")?.toString()?.takeIf { it.isNotBlank() }
+        val jazzerArgs =
+            mutableListOf(
+                "--target_class=${target.testClass}",
+                "--target_method=${target.methodName}",
+                "-max_len=$fuzzMaxLen",
+                fuzzJobsApplied,
+                fuzzWorkersApplied,
+                evolvingCorpusDir.absolutePath,
+                seedCorpusDir.absolutePath,
+            )
+        if (totalRuns != null) {
+            jazzerArgs += "-runs=$totalRuns"
+        } else {
+            val maxDuration = project.findProperty("fuzzMaxDuration")?.toString() ?: "3m"
+            jazzerArgs += "-max_total_time=${durationToSeconds(maxDuration)}"
+        }
+        args = jazzerArgs
     }
-    args = jazzerArgs
 }
 
 val fuzzTriageSelfCheckTarget =
@@ -267,41 +272,43 @@ tasks.register<JavaExec>("fuzzMinimizeCrash") {
     dependsOn(tasks.testClasses)
     mainClass.set("com.code_intelligence.jazzer.Jazzer")
     classpath = sourceSets.test.get().runtimeClasspath
-    val minimizeTask =
-        project.findProperty("fuzzMinimizeTask")?.toString()
-            ?: error("Set -PfuzzMinimizeTask to a :fuzz JavaExec task name (for example fuzzIdentityReference)")
-    val minimizeInput =
-        project.findProperty("fuzzMinimizeInput")?.toString()
-            ?: error("Set -PfuzzMinimizeInput to the crash artifact path")
-    val minimizeOutputDir =
-        project.findProperty("fuzzMinimizeOutputDir")?.toString()
-            ?: error("Set -PfuzzMinimizeOutputDir to the minimization output directory")
-    val target =
-        (listOf(fuzzTriageSelfCheckTarget) + fuzzCampaignTargets)
-            .firstOrNull { it.taskName == minimizeTask }
-            ?: error("Unknown fuzz minimize task: $minimizeTask")
-    val minimizeInputFile =
-        rootProject
-            .file(minimizeInput)
-            .absoluteFile
-    val outputDir =
-        rootProject
-            .file(minimizeOutputDir)
-            .absoluteFile
-            .apply { mkdirs() }
-    workingDir = outputDir
     val maxHeap = project.findProperty("fuzzMaxHeap")?.toString() ?: "2g"
     jvmArgs = listOf("-Xmx$maxHeap")
-    args =
-        listOf(
-            "--target_class=${target.testClass}",
-            "--target_method=${target.methodName}",
-            "-max_len=$fuzzMaxLen",
-            "-max_total_time=30",
-            "-minimize_crash=1",
-            "-exact_artifact_path=${outputDir.resolve("minimized-crash")}",
-            minimizeInputFile.absolutePath,
-        )
+    doFirst {
+        val minimizeTask =
+            project.findProperty("fuzzMinimizeTask")?.toString()
+                ?: error("Set -PfuzzMinimizeTask to a :fuzz JavaExec task name (for example fuzzIdentityReference)")
+        val minimizeInput =
+            project.findProperty("fuzzMinimizeInput")?.toString()
+                ?: error("Set -PfuzzMinimizeInput to the crash artifact path")
+        val minimizeOutputDir =
+            project.findProperty("fuzzMinimizeOutputDir")?.toString()
+                ?: error("Set -PfuzzMinimizeOutputDir to the minimization output directory")
+        val target =
+            (listOf(fuzzTriageSelfCheckTarget) + fuzzCampaignTargets)
+                .firstOrNull { it.taskName == minimizeTask }
+                ?: error("Unknown fuzz minimize task: $minimizeTask")
+        val minimizeInputFile =
+            rootProject
+                .file(minimizeInput)
+                .absoluteFile
+        val outputDir =
+            rootProject
+                .file(minimizeOutputDir)
+                .absoluteFile
+                .apply { mkdirs() }
+        workingDir = outputDir
+        args =
+            listOf(
+                "--target_class=${target.testClass}",
+                "--target_method=${target.methodName}",
+                "-max_len=$fuzzMaxLen",
+                "-max_total_time=30",
+                "-minimize_crash=1",
+                "-exact_artifact_path=${outputDir.resolve("minimized-crash")}",
+                minimizeInputFile.absolutePath,
+            )
+    }
 }
 
 tasks.register<Exec>("fuzzScheduledDryRun") {

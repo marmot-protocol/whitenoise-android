@@ -15,14 +15,15 @@ data class FramedString(
  * - `0x01..0xFE`: next N bytes (capped by remaining input and [maxBytes])
  * - `0xFF`: all remaining bytes (explicit direct payload)
  *
- * Legacy checked-in seeds omit an explicit `0xFF` prefix: when the length byte is
- * greater than the bytes still available after it, the tag byte is treated as the
- * first payload byte (for example JSON starting with `{`).
+ * Length tags are integral values, so Jazzer consumes them from the end of the input
+ * while field bytes are consumed from the start. Multi-field inputs therefore store
+ * their tags at the end in reverse field order.
  */
 fun FuzzedDataProvider.consumeFramedString(maxBytes: Int = FuzzBounds.MAX_STRING_BYTES): FramedString {
     if (remainingBytes() == 0) {
         return FramedString("", consumedAllRemaining = false)
     }
+
     val tag = consumeByte()
     val available = remainingBytes()
     return when (val tagValue = tag.toInt() and 0xFF) {
@@ -31,22 +32,28 @@ fun FuzzedDataProvider.consumeFramedString(maxBytes: Int = FuzzBounds.MAX_STRING
             val bytes = consumeRemainingAsBytes().bounded(maxBytes)
             FramedString(bytes.decodeToString(throwOnInvalidSequence = false), consumedAllRemaining = true)
         }
-        else ->
-            if (tagValue > available) {
-                val bytes = byteArrayOf(tag) + consumeRemainingAsBytes()
-                val bounded = bytes.bounded(maxBytes)
-                FramedString(
-                    value = bounded.decodeToString(throwOnInvalidSequence = false),
-                    consumedAllRemaining = true,
-                )
-            } else {
-                val len = minOf(tagValue, available, maxBytes)
-                val bytes = consumeBytes(len)
-                FramedString(
-                    value = bytes.decodeToString(throwOnInvalidSequence = false),
-                    consumedAllRemaining = remainingBytes() == 0,
-                )
-            }
+        else -> {
+            val len = minOf(tagValue, available, maxBytes)
+            val bytes = consumeBytes(len)
+            FramedString(
+                value = bytes.decodeToString(throwOnInvalidSequence = false),
+                consumedAllRemaining = remainingBytes() == 0,
+            )
+        }
+    }
+}
+
+/** Selects an unprefixed direct payload before interpreting any framing tag. */
+fun FuzzedDataProvider.consumeDirectOrFramedString(maxBytes: Int = FuzzBounds.MAX_STRING_BYTES): FramedString {
+    val direct = remainingBytes() > 0 && consumeBoolean()
+    return if (direct) {
+        val bytes = consumeRemainingAsBytes().bounded(maxBytes)
+        FramedString(
+            value = bytes.decodeToString(throwOnInvalidSequence = false),
+            consumedAllRemaining = true,
+        )
+    } else {
+        consumeFramedString(maxBytes)
     }
 }
 

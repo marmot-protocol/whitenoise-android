@@ -35,11 +35,10 @@ class FuzzJsonStructureTest {
     fun withinBounds_acceptsDepthAtLimit() {
         val nested =
             buildString {
-                repeat(FuzzBounds.MAX_DEPTH - 1) {
+                repeat(FuzzBounds.MAX_DEPTH) {
                     append('[')
                 }
-                append('1')
-                repeat(FuzzBounds.MAX_DEPTH - 1) {
+                repeat(FuzzBounds.MAX_DEPTH) {
                     append(']')
                 }
             }
@@ -59,12 +58,36 @@ class FuzzJsonStructureTest {
     }
 
     @Test
-    fun withinBounds_rejectsMalformedUnclosedString() {
-        assertFalse(FuzzJsonStructure.withinBounds("""{"key":"unterminated"""))
+    fun withinBounds_acceptsMalformedUnclosedString() {
+        assertTrue(FuzzJsonStructure.withinBounds("""{"key":"unterminated"""))
+        assertFalse(FuzzJsonStructure.scan("""{"key":"unterminated""").recognized)
     }
 
     @Test
-    fun withinBounds_rejectsMalformedTrailingComma() {
-        assertFalse(FuzzJsonStructure.withinBounds("""{"a":1,}"""))
+    fun withinBounds_acceptsMalformedTrailingComma() {
+        assertTrue(FuzzJsonStructure.withinBounds("""{"a":1,}"""))
+        assertFalse(FuzzJsonStructure.scan("""{"a":1,}""").recognized)
+    }
+
+    @Test
+    fun withinBounds_acceptsLenientPlainAndUnrecognizedInput() {
+        assertTrue(FuzzJsonStructure.withinBounds("not json at all"))
+        assertTrue(FuzzJsonStructure.withinBounds("  "))
+        assertFalse(FuzzJsonStructure.scan("not json at all").recognized)
+    }
+
+    @Test
+    fun withinBounds_stillRejectsLimitsAfterSyntaxBecomesUnrecognized() {
+        val tooDeep = "not-json " + "[".repeat(FuzzBounds.MAX_DEPTH + 1)
+        val tooMany = "[" + List(FuzzBounds.MAX_COLLECTION_ELEMENTS + 1) { "bare" }.joinToString(",") + "]"
+
+        assertFalse(FuzzJsonStructure.withinBounds(tooDeep))
+        assertFalse(FuzzJsonStructure.withinBounds(tooMany))
+    }
+
+    @Test
+    fun withinBounds_rejectsInputSizeOverLimit() {
+        assertTrue(FuzzJsonStructure.withinBounds("x".repeat(FuzzBounds.MAX_STRING_BYTES)))
+        assertFalse(FuzzJsonStructure.withinBounds("x".repeat(FuzzBounds.MAX_STRING_BYTES + 1)))
     }
 }

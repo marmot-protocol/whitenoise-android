@@ -65,9 +65,11 @@ class ZapstoreProtocolFuzzTest {
     }
 
     private fun fuzzRelayEnvelopeFrames(data: FuzzedDataProvider) {
-        val directFrame = data.consumeParserInput()
-        if (directFrame.isNotEmpty()) {
-            exerciseRelayFrame(directFrame, "dm-update-test")
+        if (data.remainingBytes() > 0 && data.consumeBoolean()) {
+            val directFrame = data.consumeParserInput()
+            if (directFrame.isNotEmpty()) {
+                exerciseRelayFrame(directFrame, "dm-update-test")
+            }
             return
         }
 
@@ -107,14 +109,16 @@ class ZapstoreProtocolFuzzTest {
     }
 
     private fun fuzzRelayEnvelopeSequence(data: FuzzedDataProvider) {
-        val directFrames = data.consumeParserInput()
-        if (directFrames.isNotEmpty()) {
-            val subscriptionId = "dm-update-test"
-            directFrames
-                .lineSequence()
-                .filter { it.isNotBlank() }
-                .take(FuzzBounds.MAX_FRAMES)
-                .forEach { frameText -> exerciseRelayFrame(frameText, subscriptionId) }
+        if (data.remainingBytes() > 0 && data.consumeBoolean()) {
+            val directFrames = data.consumeParserInput()
+            if (directFrames.isNotEmpty()) {
+                val subscriptionId = "dm-update-test"
+                directFrames
+                    .lineSequence()
+                    .filter { it.isNotBlank() }
+                    .take(FuzzBounds.MAX_FRAMES)
+                    .forEach { frameText -> exerciseRelayFrame(frameText, subscriptionId) }
+            }
             return
         }
 
@@ -122,16 +126,23 @@ class ZapstoreProtocolFuzzTest {
         val frames = buildFrameSequence(data, subscriptionId)
         var events = 0
         var terminal = false
+        var sawTerminalFrame = false
 
         frames.forEach { frameText ->
             val message = NostrRelayFrames.parseMessage(frameText) ?: return@forEach
             if (NostrRelayFrames.parseEventForSubscription(message, subscriptionId) != null) {
                 events++
             }
+            val frameType = NostrRelayFrames.frameType(message)
+            if ((frameType == "EOSE" || frameType == "CLOSED") &&
+                NostrRelayFrames.subscriptionId(message) == subscriptionId
+            ) {
+                sawTerminalFrame = true
+            }
             if (NostrRelayFrames.isTerminalForSubscription(message, subscriptionId)) {
                 terminal = true
             }
-            if (NostrRelayFrames.frameType(message) == "EVENT" &&
+            if (frameType == "EVENT" &&
                 NostrRelayFrames.subscriptionId(message) != subscriptionId
             ) {
                 FuzzAssertions.assertNull(
@@ -141,8 +152,8 @@ class ZapstoreProtocolFuzzTest {
             }
         }
 
-        if (frames.any { it.contains("EOSE") && it.contains(subscriptionId) }) {
-            FuzzAssertions.assertTrue("EOSE frame must mark subscription terminal", terminal)
+        if (sawTerminalFrame) {
+            FuzzAssertions.assertTrue("terminal frame must mark subscription terminal", terminal)
         }
     }
 
