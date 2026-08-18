@@ -79,7 +79,6 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ReplySwipeGesture
 import dev.ipf.whitenoise.android.core.TimelineInvalidationPresentation
 import dev.ipf.whitenoise.android.core.TimelineProjector
-import dev.ipf.whitenoise.android.core.retentionIndicatorVisible
 import dev.ipf.whitenoise.android.core.timelineInvalidationPresentation
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
@@ -1588,7 +1587,7 @@ internal fun MessageBubble(
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
-                                    showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
+                                    retentionOwnedByFileCard = fileFooterInCard,
                                     editedLabel = editedLabel,
                                     onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
@@ -1653,7 +1652,7 @@ internal fun MessageBubble(
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
-                                    showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
+                                    retentionOwnedByFileCard = fileFooterInCard,
                                     editedLabel = editedLabel,
                                     onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
@@ -1717,7 +1716,7 @@ internal fun MessageBubble(
                             bubbleContentColor = bubbleContentColor,
                             timestampColor = timestampColor,
                             showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
-                            showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
+                            retentionOwnedByFileCard = false,
                             editedLabel = editedLabel,
                             onEditedClick = onEditedClick,
                             footerOnVisualMedia = footerOnVisualMedia,

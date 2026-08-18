@@ -2294,6 +2294,7 @@ class WhiteNoiseAppState private constructor(
     private val timelineTimestampOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
     private val optimisticSendPositionPreservesByConversation =
         mutableMapOf<String, OptimisticSendPositionPreserves>()
+    private val retentionAtSendByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
 
     // Retained-upload bytes survive screen disposal so a user who navigates
     // out of a chat mid-send and returns sees the pending bubble still carry
@@ -2646,6 +2647,15 @@ class WhiteNoiseAppState private constructor(
             }
         }
 
+    internal fun retentionAtSend(
+        accountRef: String?,
+        groupIdHex: String,
+    ): MutableMap<String, ULong> =
+        synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            retentionAtSendByConversation.getOrPut(key) { mutableMapOf() }
+        }
+
     internal fun retainedMediaUploads(
         accountRef: String?,
         groupIdHex: String,
@@ -2730,6 +2740,7 @@ class WhiteNoiseAppState private constructor(
         timelineOrderOverridesByConversation.remove(staleKey)
         timelineTimestampOverridesByConversation.remove(staleKey)
         optimisticSendPositionPreservesByConversation.remove(staleKey)
+        retentionAtSendByConversation.remove(staleKey)
         retainedMediaUploadsByConversation.remove(staleKey)
         activeUploadKeysByConversation.remove(staleKey)
         pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
@@ -4514,6 +4525,8 @@ class WhiteNoiseAppState private constructor(
             timelineTimestampOverridesByConversation.clear()
             optimisticSendPositionPreservesByConversation.values.forEach { it.clear() }
             optimisticSendPositionPreservesByConversation.clear()
+            retentionAtSendByConversation.values.forEach { it.clear() }
+            retentionAtSendByConversation.clear()
         }
         // Cancel any in-flight downloads (their Deferred holds the plaintext
         // result) and drop the index so the next session starts cold.

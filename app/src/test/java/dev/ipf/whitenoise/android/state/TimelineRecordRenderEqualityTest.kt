@@ -50,6 +50,18 @@ class TimelineRecordRenderEqualityTest {
         assertFalse(timelineRecordsRenderEqual(withoutTokens, withTokens))
     }
 
+    @Test
+    fun authoritativeRetentionProjectionInvalidatesRenderedRecord() {
+        val waiting = record()
+        val running =
+            record().copy(
+                retentionSeconds = 60uL,
+                retentionExpiresAt = 120uL,
+            )
+
+        assertFalse(timelineRecordsRenderEqual(waiting, running))
+    }
+
     private fun record() =
         TimelineMessageRecordFfi(
             messageIdHex = "message",

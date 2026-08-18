@@ -1171,6 +1171,7 @@
     <string name="shared_media_voice_failed">Не удалось воспроизвести голосовое сообщение</string>
     <string name="disappearing_messages">Исчезающие сообщения</string>
     <string name="disappearing_message">Исчезающее сообщение</string>
+    <string name="disappearing_message_expired">Срок истёк</string>
     <string name="disappearing_off">Выключено</string>
     <string name="disappearing_1_day">1 день</string>
     <string name="disappearing_7_days">7 дней</string>

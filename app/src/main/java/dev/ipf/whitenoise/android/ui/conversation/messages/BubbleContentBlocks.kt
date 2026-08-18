@@ -43,7 +43,6 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.retentionIndicatorVisible
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -94,7 +93,8 @@ internal fun VisualMediaFooterFrame(
     timeText: String,
     showStatus: Boolean,
     status: MessageStatus,
-    showRetention: Boolean,
+    retention: RetentionIndicatorInput?,
+    reserveRetentionSpace: Boolean,
     content: @Composable BoxScope.() -> Unit,
 ) {
     Box {
@@ -104,7 +104,8 @@ internal fun VisualMediaFooterFrame(
                 timeText = timeText,
                 showStatus = showStatus,
                 status = status,
-                showRetention = showRetention,
+                retention = retention,
+                reserveRetentionSpace = reserveRetentionSpace,
             )
         }
     }
@@ -130,6 +131,22 @@ internal fun ColumnScope.BubbleMediaBlocks(
     onMediaLongPress: () -> Unit,
     attachedToCaption: Boolean,
 ) {
+    val retentionInput =
+        record.retentionIndicatorInput(
+            controllerKey = controller,
+            accountRef = controller.boundAccountRef,
+            deleted = deleted,
+            retentionAtSendSeconds = item.retentionAtSendSeconds,
+        )
+    val reserveRetentionSpace =
+        !deleted &&
+            shouldReserveRetentionIndicatorSpace(
+                input = retentionInput,
+                projectedRetentionSeconds = record.retentionSeconds,
+                mine = mine,
+                status = item.status,
+                groupRetentionSeconds = controller.group.disappearingMessageSecs,
+            )
     if (sharedLocation != null) {
         val shareContext = LocalContext.current
         LocationMessageBubble(
@@ -167,7 +184,8 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 timeText = rememberedMessageBubbleTime(record.recordedAt),
                 showStatus = mine,
                 status = item.status,
-                showRetention = retentionIndicatorVisible(record.retentionSeconds),
+                retention = retentionInput,
+                reserveRetentionSpace = reserveRetentionSpace,
             ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                     MediaVideoBubble(
@@ -199,7 +217,8 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 timeText = rememberedMessageBubbleTime(record.recordedAt),
                 showStatus = mine,
                 status = item.status,
-                showRetention = retentionIndicatorVisible(record.retentionSeconds),
+                retention = retentionInput,
+                reserveRetentionSpace = reserveRetentionSpace,
             ) {
                 MediaVisualGridBubble(
                     item = item,
@@ -251,6 +270,8 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 timestampText = fileTimestamp.takeIf { isFooterOwner },
                 showStatus = isFooterOwner && showStatus,
                 status = item.status,
+                retention = retentionInput.takeIf { isFooterOwner },
+                reserveRetentionSpace = isFooterOwner && reserveRetentionSpace,
             )
         }
     }
@@ -294,7 +315,8 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 timeText = rememberedMessageBubbleTime(record.recordedAt),
                 showStatus = true,
                 status = item.status,
-                showRetention = retentionIndicatorVisible(record.retentionSeconds),
+                retention = retentionInput,
+                reserveRetentionSpace = reserveRetentionSpace,
             ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                     MediaVideoBubble(
@@ -330,7 +352,8 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 timeText = rememberedMessageBubbleTime(record.recordedAt),
                 showStatus = true,
                 status = item.status,
-                showRetention = retentionIndicatorVisible(record.retentionSeconds),
+                retention = retentionInput,
+                reserveRetentionSpace = reserveRetentionSpace,
             ) {
                 MediaVisualGridBubble(
                     item = item,
@@ -359,6 +382,8 @@ internal fun ColumnScope.BubbleMediaBlocks(
             timestampText = rememberedMessageBubbleTime(record.recordedAt).takeIf { pendingFileOwnsFooter },
             showStatus = pendingFileOwnsFooter && showStatus,
             status = item.status,
+            retention = retentionInput.takeIf { pendingFileOwnsFooter },
+            reserveRetentionSpace = pendingFileOwnsFooter && reserveRetentionSpace,
             onRetry =
                 if (mine && item.status == MessageStatus.Failed) {
                     { appState.launchMutation { controller.retryFailedSend(item) } }
@@ -397,7 +422,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     bubbleContentColor: Color,
     timestampColor: Color,
     showStatus: Boolean,
-    showRetention: Boolean,
+    retentionOwnedByFileCard: Boolean = false,
     editedLabel: String?,
     onEditedClick: (() -> Unit)?,
     footerOnVisualMedia: Boolean,
@@ -407,19 +432,39 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     mine: Boolean,
     onExpand: () -> Unit,
 ) {
+    val retentionInput =
+        record
+            .retentionIndicatorInput(
+                controllerKey = controller,
+                accountRef = controller.boundAccountRef,
+                deleted = deleted,
+                retentionAtSendSeconds = item.retentionAtSendSeconds,
+            ).takeUnless { retentionOwnedByFileCard }
+    val reserveRetentionSpace =
+        !retentionOwnedByFileCard &&
+            !deleted &&
+            shouldReserveRetentionIndicatorSpace(
+                input = retentionInput,
+                projectedRetentionSeconds = record.retentionSeconds,
+                mine = mine,
+                status = item.status,
+                groupRetentionSeconds = controller.group.disappearingMessageSecs,
+            )
     val inlineFooter: @Composable () -> Unit = {
         MessageInlineFooter(
             timeText = rememberedMessageBubbleTime(record.recordedAt),
             color = timestampColor,
             showStatus = showStatus,
             status = item.status,
-            showRetention = showRetention,
+            retention = retentionInput,
+            reserveRetentionSpace = reserveRetentionSpace,
             editedLabel = editedLabel,
             onEditedClick = onEditedClick,
             showTime = showTimestamp,
         )
     }
-    val hasInlineFooter = showTimestamp || showStatus || showRetention || editedLabel != null
+    val hasInlineFooter =
+        showTimestamp || showStatus || retentionInput != null || reserveRetentionSpace || editedLabel != null
     var lastLineLayout by
         remember(record.messageIdHex, bodyText) {
             mutableStateOf<TextLayoutResult?>(null)

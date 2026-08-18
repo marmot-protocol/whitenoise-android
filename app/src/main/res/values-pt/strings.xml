@@ -1123,6 +1123,7 @@
     <string name="shared_media_voice_failed">Não foi possível reproduzir a mensagem de voz</string>
     <string name="disappearing_messages">Mensagens temporárias</string>
     <string name="disappearing_message">Mensagem temporária</string>
+    <string name="disappearing_message_expired">Expirado</string>
     <string name="disappearing_off">Desativado</string>
     <string name="disappearing_1_day">1 dia</string>
     <string name="disappearing_7_days">7 dias</string>

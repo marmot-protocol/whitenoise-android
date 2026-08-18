@@ -49,13 +49,19 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageRetentionIndicatorSlot
 import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingMessageStatusIcon
+import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
+import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorPresentation
+import dev.ipf.whitenoise.android.ui.conversation.messages.rememberRetentionIndicatorPresentation
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 private val FileTransferControlSize = 48.dp
 private val FileTransferControlSurfaceSize = 40.dp
 private val FileTrailingMetadataMaxWidth = 96.dp
 private val FileTrailingMetadataWithStatusMaxWidth = 112.dp
+private val FileTrailingMetadataWithRetentionMaxWidth = 113.dp
+private val FileTrailingMetadataWithRetentionAndStatusMaxWidth = 132.dp
 private val FileTimestampWithStatusMaxWidth = 92.dp
 
 internal enum class FileTransferDirection {
@@ -72,6 +78,9 @@ internal fun MediaFileBubbleContent(
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Received,
+    retention: RetentionIndicatorInput? = null,
+    reserveRetentionSpace: Boolean = false,
+    retentionClockMillis: () -> Long = System::currentTimeMillis,
 ) {
     FileBubbleContent(
         fileName = reference.fileName,
@@ -82,6 +91,9 @@ internal fun MediaFileBubbleContent(
         trailingMetadataText = timestampText,
         trailingMetadataIsError = false,
         trailingStatus = status.takeIf { showStatus },
+        retention = retention,
+        reserveRetentionSpace = reserveRetentionSpace,
+        retentionClockMillis = retentionClockMillis,
         loadingDescription = stringResource(R.string.media_downloading),
         transferDirection = FileTransferDirection.Download,
     )
@@ -98,9 +110,13 @@ internal fun FileBubbleContent(
     trailingMetadataText: String?,
     trailingMetadataIsError: Boolean,
     trailingStatus: MessageStatus?,
+    retention: RetentionIndicatorInput? = null,
+    reserveRetentionSpace: Boolean = false,
+    retentionClockMillis: () -> Long = System::currentTimeMillis,
     loadingDescription: String,
     transferDirection: FileTransferDirection,
 ) {
+    val retentionPresentation = rememberRetentionIndicatorPresentation(retention, retentionClockMillis)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -124,6 +140,8 @@ internal fun FileBubbleContent(
                 trailingMetadataText = trailingMetadataText,
                 trailingMetadataIsError = trailingMetadataIsError,
                 trailingStatus = trailingStatus,
+                retentionPresentation = retentionPresentation,
+                reserveRetentionSpace = reserveRetentionSpace,
             )
         }
     }
@@ -136,6 +154,8 @@ private fun FileMetadataRow(
     trailingMetadataText: String?,
     trailingMetadataIsError: Boolean,
     trailingStatus: MessageStatus?,
+    retentionPresentation: RetentionIndicatorPresentation,
+    reserveRetentionSpace: Boolean,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -155,8 +175,18 @@ private fun FileMetadataRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        if (trailingMetadataText != null || trailingStatus != null) {
-            FileTrailingMetadata(trailingMetadataText, trailingMetadataIsError, trailingStatus)
+        val hasRetentionMetadata =
+            reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden
+        val hasTrailingMetadata =
+            trailingMetadataText != null || trailingStatus != null || hasRetentionMetadata
+        if (hasTrailingMetadata) {
+            FileTrailingMetadata(
+                text = trailingMetadataText,
+                isError = trailingMetadataIsError,
+                status = trailingStatus,
+                retentionPresentation = retentionPresentation,
+                reserveRetentionSpace = reserveRetentionSpace,
+            )
         }
     }
 }
@@ -166,16 +196,33 @@ private fun FileTrailingMetadata(
     text: String?,
     isError: Boolean,
     status: MessageStatus?,
+    retentionPresentation: RetentionIndicatorPresentation,
+    reserveRetentionSpace: Boolean,
 ) {
     val color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+    val showRetention =
+        reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         modifier =
             Modifier.widthIn(
-                max = if (status == null) FileTrailingMetadataMaxWidth else FileTrailingMetadataWithStatusMaxWidth,
+                max =
+                    when {
+                        showRetention && status != null -> FileTrailingMetadataWithRetentionAndStatusMaxWidth
+                        showRetention -> FileTrailingMetadataWithRetentionMaxWidth
+                        status != null -> FileTrailingMetadataWithStatusMaxWidth
+                        else -> FileTrailingMetadataMaxWidth
+                    },
             ),
     ) {
+        if (showRetention) {
+            MessageRetentionIndicatorSlot(
+                presentation = retentionPresentation,
+                color = color,
+                reserveSpace = reserveRetentionSpace,
+            )
+        }
         text?.let {
             Text(
                 text = it,

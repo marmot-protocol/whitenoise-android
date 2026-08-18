@@ -68,10 +68,50 @@ class DisappearingReadAnchorTest {
         )
     }
 
+    @Test
+    fun groupSystemHistoryNeverParticipatesInLocalMessageExpiry() {
+        val groupSystem =
+            message(
+                direction = "received",
+                id = "retention-change",
+                timelineAt = 100uL,
+                kind = 1210uL,
+            )
+        val expiredAtSendTime =
+            DisappearingMessageSweep.LocalExpiryRow(
+                timelineAtSeconds = groupSystem.recordedAt,
+            )
+
+        assertFalse(shouldApplyLocalDisappearingExpiry(groupSystem))
+        assertFalse(
+            isTimelineRecordLocallyExpired(
+                nowMillis = 1_000_000L,
+                disappearingMessageSecs = 60uL,
+                record = groupSystem,
+                row = expiredAtSendTime,
+            ),
+        )
+    }
+
+    @Test
+    fun ordinaryMessagesKeepTheirExistingLocalExpiryBehavior() {
+        val chatMessage = message(direction = "received", id = "chat-message", timelineAt = 100uL)
+
+        assertTrue(
+            isTimelineRecordLocallyExpired(
+                nowMillis = 1_000_000L,
+                disappearingMessageSecs = 60uL,
+                record = chatMessage,
+                row = DisappearingMessageSweep.LocalExpiryRow(timelineAtSeconds = chatMessage.recordedAt),
+            ),
+        )
+    }
+
     private fun message(
         direction: String,
         id: String,
         timelineAt: ULong,
+        kind: ULong = 9uL,
     ): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = id,
@@ -85,7 +125,7 @@ class DisappearingReadAnchorTest {
                     blocks = emptyList(),
                     blankLinesBefore = ByteArray(0),
                 ),
-            kind = 9uL,
+            kind = kind,
             tags = emptyList(),
             sourceEpoch = null,
             retentionSeconds = null,

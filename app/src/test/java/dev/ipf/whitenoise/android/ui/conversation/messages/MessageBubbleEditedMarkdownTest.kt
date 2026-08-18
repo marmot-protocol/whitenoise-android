@@ -455,7 +455,6 @@ private fun EditedMarkdownDisplayHarness(
                 bubbleContentColor = MaterialTheme.colorScheme.onSurface,
                 timestampColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 showStatus = false,
-                showRetention = false,
                 editedLabel = null,
                 onEditedClick = null,
                 footerOnVisualMedia = false,

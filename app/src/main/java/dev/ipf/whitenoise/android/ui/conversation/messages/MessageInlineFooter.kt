@@ -7,11 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,9 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 
@@ -48,7 +42,8 @@ internal fun BoxScope.MediaFooterOverlay(
     timeText: String,
     showStatus: Boolean,
     status: MessageStatus,
-    showRetention: Boolean = false,
+    retention: RetentionIndicatorInput? = null,
+    reserveRetentionSpace: Boolean = false,
 ) {
     MediaScrimFooter(
         modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp),
@@ -60,7 +55,8 @@ internal fun BoxScope.MediaFooterOverlay(
             status = status,
             editedLabel = null,
             onEditedClick = null,
-            showRetention = showRetention,
+            retention = retention,
+            reserveRetentionSpace = reserveRetentionSpace,
         )
     }
 }
@@ -74,11 +70,18 @@ internal fun MessageInlineFooter(
     status: MessageStatus,
     editedLabel: String?,
     onEditedClick: (() -> Unit)?,
-    showRetention: Boolean = false,
+    retention: RetentionIndicatorInput? = null,
+    retentionClockMillis: () -> Long = System::currentTimeMillis,
+    reserveRetentionSpace: Boolean = false,
     showTime: Boolean = true,
+    modifier: Modifier = Modifier,
 ) {
+    val retentionPresentation = rememberRetentionIndicatorPresentation(retention, retentionClockMillis)
+    val showRetention =
+        reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden
     val baselineIndex = footerBaselineIndex(showTime, editedLabel != null, showRetention)
     Layout(
+        modifier = modifier,
         content = {
             MessageInlineFooterItems(
                 timeText = timeText,
@@ -87,7 +90,8 @@ internal fun MessageInlineFooter(
                 status = status,
                 editedLabel = editedLabel,
                 onEditedClick = onEditedClick,
-                showRetention = showRetention,
+                retentionPresentation = retentionPresentation,
+                reserveRetentionSpace = reserveRetentionSpace,
                 showTime = showTime,
             )
         },
@@ -125,7 +129,8 @@ private fun MessageInlineFooterItems(
     status: MessageStatus,
     editedLabel: String?,
     onEditedClick: (() -> Unit)?,
-    showRetention: Boolean,
+    retentionPresentation: RetentionIndicatorPresentation,
+    reserveRetentionSpace: Boolean,
     showTime: Boolean,
 ) {
     editedLabel?.let {
@@ -136,13 +141,8 @@ private fun MessageInlineFooterItems(
             modifier = if (onEditedClick != null) Modifier.clickable(onClick = onEditedClick) else Modifier,
         )
     }
-    if (showRetention) {
-        Icon(
-            imageVector = Icons.Default.Schedule,
-            contentDescription = stringResource(R.string.disappearing_message),
-            modifier = Modifier.size(12.dp),
-            tint = color.copy(alpha = 0.76f),
-        )
+    if (reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden) {
+        MessageRetentionIndicatorSlot(retentionPresentation, color, reserveRetentionSpace)
     }
     if (showTime) {
         Text(timeText, style = MaterialTheme.typography.labelSmall, color = color)

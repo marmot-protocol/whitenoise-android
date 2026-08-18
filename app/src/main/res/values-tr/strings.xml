@@ -1121,6 +1121,7 @@
     <string name="shared_media_voice_failed">Sesli mesaj oynatılamadı</string>
     <string name="disappearing_messages">Kaybolan mesajlar</string>
     <string name="disappearing_message">Kaybolan mesaj</string>
+    <string name="disappearing_message_expired">Süresi doldu</string>
     <string name="disappearing_off">Kapalı</string>
     <string name="disappearing_1_day">1 gün</string>
     <string name="disappearing_7_days">7 gün</string>
