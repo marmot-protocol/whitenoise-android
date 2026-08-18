@@ -22,7 +22,10 @@ class FreshSweepCoverageTest {
         val selectableBlock = block.substring(selectableStart)
         val rememberStart = projectionsBlock.indexOf("remember(")
         val rememberEnd = projectionsBlock.indexOf(") {", rememberStart)
-        assertTrue("selectable projections remember inputs must be present", rememberStart >= 0 && rememberEnd > rememberStart)
+        assertTrue(
+            "selectable projections remember inputs must be present",
+            rememberStart >= 0 && rememberEnd > rememberStart,
+        )
         val rememberInputs = projectionsBlock.substring(rememberStart, rememberEnd)
 
         assertTrue("deletions must invalidate projections", "controller.deletedMessageIds" in projectionsBlock)
