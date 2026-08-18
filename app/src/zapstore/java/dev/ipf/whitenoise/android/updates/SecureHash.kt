@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.updates
 
+import dev.ipf.whitenoise.android.core.nostr.hexToBytes
+
 /** Constant-time byte-array equality for digest comparisons. */
 internal fun constantTimeEquals(
     left: ByteArray,

@@ -169,6 +169,8 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDia
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInfoSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
+import dev.ipf.whitenoise.android.ui.conversation.nostr.publicEventCardRelays
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.PickContactPhoneRow
@@ -1144,6 +1146,16 @@ internal fun ConversationScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
+    val eventCardResolver =
+        remember(controller, appState, appState.activeAccountRef, appState.runtimeGeneration) {
+            NostrEventCardResolver(
+                parentScope = scope,
+                relayProvider = appState::publicEventCardRelays,
+            )
+        }
+    DisposableEffect(eventCardResolver) {
+        onDispose(eventCardResolver::close)
+    }
 
     fun revealSentMessage(targetIndex: Int? = null) {
         scope.launch {
@@ -3095,6 +3107,7 @@ internal fun ConversationScreen(
                                     },
                                     appState = appState,
                                     controller = controller,
+                                    eventCardResolver = eventCardResolver,
                                     documentSaveFallback = documentSaveFallback,
                                     composerTextState = composerTextState,
                                     highlighted = messageId == navigationState.highlightedMessageId,

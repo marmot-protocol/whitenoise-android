@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudProgress
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -67,6 +68,7 @@ internal fun TimelineRowMessageBubble(
     item: TimelineMessage,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    eventCardResolver: NostrEventCardResolver? = null,
     documentSaveFallback: DocumentSaveFallback? = null,
     composerTextState: ComposerTextState,
     highlighted: Boolean,
@@ -113,6 +115,7 @@ internal fun TimelineRowMessageBubble(
         item = item,
         controller = controller,
         appState = appState,
+        eventCardResolver = eventCardResolver,
         documentSaveFallback = documentSaveFallback,
         composerTextState = composerTextState,
         highlighted = highlighted,

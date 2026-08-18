@@ -1564,4 +1564,19 @@
     <string name="text_attachment_preview_too_large">Файл слишком велик для безопасного предпросмотра. Откройте его в другом приложении.</string>
     <string name="text_attachment_preview_invalid_encoding">Файл использует неподдерживаемую кодировку текста. Откройте его в другом приложении.</string>
     <string name="text_attachment_preview_binary">Похоже, файл не содержит безопасного текста. Откройте его в другом приложении.</string>
+    <string name="nostr_event_loading">Загрузка события…</string>
+    <string name="nostr_event_not_found">Событие не найдено</string>
+    <string name="nostr_event_invalid">Не удалось проверить это событие.</string>
+    <string name="nostr_event_failed">Не удалось загрузить это событие. Проверьте подключение и повторите попытку.</string>
+    <string name="nostr_event_open">Открыть событие</string>
+    <string name="nostr_event_read_article">Читать статью</string>
+    <string name="nostr_event_play_video">Воспроизвести видео</string>
+    <string name="nostr_video_playback_failed">Не удалось воспроизвести видео.</string>
+    <string name="nostr_event_copy">Копировать ссылку на событие</string>
+    <string name="nostr_event_type_note">Заметка</string>
+    <string name="nostr_event_type_article">Статья</string>
+    <string name="nostr_event_type_video">Видео</string>
+    <string name="nostr_event_type_release">Выпуск ПО</string>
+    <string name="nostr_event_type_file">Файл</string>
+    <string name="nostr_event_type_generic">Событие · Тип %1$d</string>
 </resources>

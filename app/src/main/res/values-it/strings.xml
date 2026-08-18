@@ -1502,4 +1502,19 @@
     <string name="text_attachment_preview_too_large">Questo file è troppo grande per un’anteprima sicura. Aprilo in un’altra app.</string>
     <string name="text_attachment_preview_invalid_encoding">Questo file non usa una codifica di testo supportata. Aprilo in un’altra app.</string>
     <string name="text_attachment_preview_binary">Questo file non sembra contenere testo sicuro. Aprilo in un’altra app.</string>
+    <string name="nostr_event_loading">Caricamento evento…</string>
+    <string name="nostr_event_not_found">Evento non trovato</string>
+    <string name="nostr_event_invalid">Impossibile verificare questo evento.</string>
+    <string name="nostr_event_failed">Impossibile caricare questo evento. Controlla la connessione e riprova.</string>
+    <string name="nostr_event_open">Apri evento</string>
+    <string name="nostr_event_read_article">Leggi articolo</string>
+    <string name="nostr_event_play_video">Riproduci video</string>
+    <string name="nostr_video_playback_failed">Impossibile riprodurre questo video.</string>
+    <string name="nostr_event_copy">Copia riferimento evento</string>
+    <string name="nostr_event_type_note">Nota</string>
+    <string name="nostr_event_type_article">Articolo</string>
+    <string name="nostr_event_type_video">Video</string>
+    <string name="nostr_event_type_release">Versione software</string>
+    <string name="nostr_event_type_file">File multimediale</string>
+    <string name="nostr_event_type_generic">Evento · Tipo %1$d</string>
 </resources>

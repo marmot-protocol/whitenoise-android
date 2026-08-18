@@ -1,147 +1,194 @@
 package dev.ipf.whitenoise.android.core
 
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
+
+private const val HRP_NPUB = "npub"
+private const val HRP_NPROFILE = "nprofile"
+private const val HRP_NOTE = "note"
+private const val HRP_NEVENT = "nevent"
+private const val HRP_NADDR = "naddr"
+private const val TLV_SPECIAL = 0
+private const val TLV_RELAY = 1
+private const val TLV_AUTHOR = 2
+private const val TLV_KIND = 3
+private const val HASH_BYTES = 32
+private const val KIND_BYTES = 4
+private const val BITS_PER_BYTE = 8
+private const val NIBBLE_BITS = 4
+private const val NIBBLE_MASK = 0x0f
+private val HEX_CHARS = "0123456789abcdef".toCharArray()
+
 /**
- * Minimal NIP-19 Bech32 decoder for profile mentions and QR scan validation.
+ * Shared NIP-19 Bech32/TLV decoder for profile mentions, QR validation, and
+ * public event references.
  *
  * Rust's current `accountIdHex` FFI helper normalizes npub/hex but not nprofile
  * TLVs. Android needs the embedded type-0 pubkey so pasted nprofile mentions can
  * use the same profile-cache and roster-membership paths as npub mentions (#1017),
  * and so QR scans can reject checksum-invalid npub/nprofile payloads without
- * duplicating a second Bech32 implementation. Relay TLVs are deliberately
- * ignored here; profile fetching still flows through the app's existing
- * relay/profile cache machinery.
+ * duplicating a second Bech32 implementation. Event-reference relay TLVs are
+ * retained as untrusted metadata and must be validated again immediately before
+ * callers dial them.
+ * The temporary Kotlin extensions remain in the #1584 / MDK #959 migration
+ * scope and can be removed when the generated API provides these forms.
  */
 internal object NostrProfileReference {
-    private const val HRP_NPUB = "npub"
-    private const val HRP_NPROFILE = "nprofile"
-    private const val TLV_PUBKEY = 0
-    private const val PUBKEY_BYTES = 32
-    private const val BECH32_CHECKSUM_VALUES = 6
-    private const val BECH32_SEPARATOR = '1'
-    private const val BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
-    private val BECH32_GENERATORS = intArrayOf(0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
-    private val HEX_CHARS = "0123456789abcdef".toCharArray()
-
     fun accountIdHex(reference: String): String? {
-        val decoded = decodeBech32(reference.trim()) ?: return null
+        val decoded = NostrBech32Codec.decode(reference.trim()) ?: return null
         if (decoded.hrp != HRP_NPROFILE) return null
-        val payload = convertBits(decoded.data, fromBits = 5, toBits = 8, pad = false) ?: return null
-        return firstPubkeyTlvHex(payload)
+        val payload =
+            NostrBech32Codec.convertBits(
+                decoded.data,
+                fromBits = 5,
+                toBits = BITS_PER_BYTE,
+                pad = false,
+            ) ?: return null
+        return NostrTlvCodec.unique(payload, TLV_SPECIAL, HASH_BYTES)?.toHexString()
     }
 
     fun isValidNpub(reference: String): Boolean {
-        val decoded = decodeBech32(reference.trim()) ?: return false
+        val decoded = NostrBech32Codec.decode(reference.trim()) ?: return false
         if (decoded.hrp != HRP_NPUB) return false
         return pubkeyHex(decoded.data) != null
     }
 
-    private fun pubkeyHex(data: List<Int>): String? {
-        val payload = convertBits(data, fromBits = 5, toBits = 8, pad = false) ?: return null
-        if (payload.size != PUBKEY_BYTES) return null
-        return payload.toHexString()
-    }
-
-    private fun firstPubkeyTlvHex(payload: List<Int>): String? {
-        var offset = 0
-        var pubkeyHex: String? = null
-        while (offset < payload.size) {
-            if (offset + 2 > payload.size) return null
-            val type = payload[offset]
-            val length = payload[offset + 1]
-            offset += 2
-            if (offset + length > payload.size) return null
-            if (type == TLV_PUBKEY) {
-                if (length != PUBKEY_BYTES || pubkeyHex != null) return null
-                pubkeyHex = payload.subList(offset, offset + PUBKEY_BYTES).toHexString()
-            }
-            offset += length
-        }
-        return pubkeyHex
-    }
-
-    private data class Bech32Decoded(
-        val hrp: String,
-        val data: List<Int>,
-    )
-
-    private fun decodeBech32(raw: String): Bech32Decoded? {
-        if (raw.isEmpty()) return null
-        if (raw.any { it.code < 33 || it.code > 126 }) return null
-        val hasLower = raw.any { it in 'a'..'z' }
-        val hasUpper = raw.any { it in 'A'..'Z' }
-        if (hasLower && hasUpper) return null
-
-        val normalized = raw.lowercase()
-        val separator = normalized.lastIndexOf(BECH32_SEPARATOR)
-        if (separator < 1) return null
-        if (separator + 1 + BECH32_CHECKSUM_VALUES > normalized.length) return null
-
-        val hrp = normalized.substring(0, separator)
-        val values =
-            normalized
-                .substring(separator + 1)
-                .map { BECH32_CHARSET.indexOf(it) }
-                .takeIf { values -> values.all { it >= 0 } }
-                ?: return null
-        if (!verifyChecksum(hrp, values)) return null
-        return Bech32Decoded(hrp = hrp, data = values.dropLast(BECH32_CHECKSUM_VALUES))
-    }
-
-    private fun verifyChecksum(
-        hrp: String,
-        values: List<Int>,
-    ): Boolean = bech32Polymod(hrpExpand(hrp) + values) == 1
-
-    private fun hrpExpand(hrp: String): List<Int> = hrp.map { it.code shr 5 } + listOf(0) + hrp.map { it.code and 31 }
-
-    private fun bech32Polymod(values: List<Int>): Int {
-        var checksum = 1
-        for (value in values) {
-            val top = checksum ushr 25
-            checksum = ((checksum and 0x1ffffff) shl 5) xor value
-            for (i in BECH32_GENERATORS.indices) {
-                if (((top ushr i) and 1) != 0) {
-                    checksum = checksum xor BECH32_GENERATORS[i]
-                }
-            }
-        }
-        return checksum
-    }
-
-    private fun convertBits(
-        values: List<Int>,
-        fromBits: Int,
-        toBits: Int,
-        pad: Boolean,
-    ): List<Int>? {
-        var accumulator = 0
-        var bits = 0
-        val maxValue = (1 shl toBits) - 1
-        val maxAccumulator = (1 shl (fromBits + toBits - 1)) - 1
-        val result = mutableListOf<Int>()
-        for (value in values) {
-            if (value < 0 || (value ushr fromBits) != 0) return null
-            accumulator = ((accumulator shl fromBits) or value) and maxAccumulator
-            bits += fromBits
-            while (bits >= toBits) {
-                bits -= toBits
-                result += (accumulator ushr bits) and maxValue
-            }
-        }
-        if (pad) {
-            if (bits > 0) result += (accumulator shl (toBits - bits)) and maxValue
-        } else {
-            if (bits >= fromBits) return null
-            if (((accumulator shl (toBits - bits)) and maxValue) != 0) return null
-        }
-        return result
-    }
-
-    private fun List<Int>.toHexString(): String =
-        buildString(size * 2) {
-            for (byte in this@toHexString) {
-                append(HEX_CHARS[(byte ushr 4) and 0x0f])
-                append(HEX_CHARS[byte and 0x0f])
+    /** Strictly decode a public event pointer; private-key and profile forms return null. */
+    fun eventReference(reference: String): NostrEventReference? =
+        decodeEventPayload(reference)?.let { (hrp, payload) ->
+            when (hrp) {
+                HRP_NOTE ->
+                    payload
+                        .takeIf { it.size == HASH_BYTES }
+                        ?.toHexString()
+                        ?.let(NostrEventReference::Event)
+                HRP_NEVENT -> decodeEventPointer(payload)
+                HRP_NADDR -> decodeAddressPointer(payload)
+                else -> null
             }
         }
 }
+
+private fun decodeEventPayload(reference: String): Pair<String, List<Int>>? =
+    NostrBech32Codec.decode(reference.trim())?.let { decoded ->
+        NostrBech32Codec
+            .convertBits(decoded.data, fromBits = 5, toBits = BITS_PER_BYTE, pad = false)
+            ?.let { payload -> decoded.hrp to payload }
+    }
+
+private fun pubkeyHex(data: List<Int>): String? =
+    NostrBech32Codec
+        .convertBits(data, fromBits = 5, toBits = BITS_PER_BYTE, pad = false)
+        ?.takeIf { it.size == HASH_BYTES }
+        ?.toHexString()
+
+@Suppress("MaxLineLength")
+private fun decodeEventPointer(payload: List<Int>): NostrEventReference.Event? = NostrTlvCodec.parse(payload)?.let(::decodeEventFields)
+
+private fun decodeEventFields(fields: Map<Int, List<List<Int>>>): NostrEventReference.Event? {
+    val id = NostrTlvCodec.unique(fields, TLV_SPECIAL, HASH_BYTES)?.toHexString()
+    val authorValid = NostrTlvCodec.optionalFieldIsValid(fields, TLV_AUTHOR, HASH_BYTES)
+    val kindValid = NostrTlvCodec.optionalFieldIsValid(fields, TLV_KIND, KIND_BYTES)
+    val author = NostrTlvCodec.optionalUnique(fields, TLV_AUTHOR, HASH_BYTES)?.toHexString()
+    val kindBytes = NostrTlvCodec.optionalUnique(fields, TLV_KIND, KIND_BYTES)
+    val kind = kindBytes?.toUIntBigEndian()?.takeIf { it <= Int.MAX_VALUE.toUInt() }
+    val validKind = kindBytes == null || kind != null
+    val relayHints = fields.relayHints()
+    return id
+        ?.takeIf { authorValid && kindValid && validKind }
+        ?.let { eventId ->
+            NostrEventReference.Event(
+                eventIdHex = eventId,
+                authorPubkeyHex = author,
+                kind = kind,
+                relayHints = relayHints,
+            )
+        }
+}
+
+private fun decodeAddressPointer(payload: List<Int>): NostrEventReference.Address? =
+    NostrTlvCodec.parse(payload)?.let { fields ->
+        val identifier = NostrTlvCodec.unique(fields, TLV_SPECIAL)?.decodeUtf8Identifier()
+        val author = NostrTlvCodec.unique(fields, TLV_AUTHOR, HASH_BYTES)?.toHexString()
+        val kind =
+            NostrTlvCodec
+                .unique(fields, TLV_KIND, KIND_BYTES)
+                ?.toUIntBigEndian()
+                ?.takeIf { it <= Int.MAX_VALUE.toUInt() }
+        if (identifier != null && author != null && kind != null) {
+            NostrEventReference.Address(
+                kind = kind,
+                authorPubkeyHex = author,
+                identifier = identifier,
+                relayHints = fields.relayHints(),
+            )
+        } else {
+            null
+        }
+    }
+
+private fun NostrTlvFields.relayHints(): List<String> =
+    this[TLV_RELAY]
+        .orEmpty()
+        .asSequence()
+        .mapNotNull { it.decodeUtf8Text() }
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .distinct()
+        .take(MAX_RELAY_HINTS)
+        .toList()
+
+private fun List<Int>.decodeUtf8Identifier(): String? =
+    decodeUtf8Text()?.takeUnless { identifier ->
+        identifier.any { it == '\u0000' || it.isISOControl() }
+    }
+
+private fun List<Int>.decodeUtf8Text(): String? =
+    runCatching {
+        Charsets.UTF_8
+            .newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT)
+            .decode(ByteBuffer.wrap(map(Int::toByte).toByteArray()))
+            .toString()
+    }.getOrNull()?.takeUnless { text -> text.any(Char::isISOControl) }
+
+private fun List<Int>.toHexString(): String =
+    buildString(size * 2) {
+        for (byte in this@toHexString) {
+            append(HEX_CHARS[(byte ushr NIBBLE_BITS) and NIBBLE_MASK])
+            append(HEX_CHARS[byte and NIBBLE_MASK])
+        }
+    }
+
+private fun List<Int>.toUIntBigEndian(): UInt? {
+    if (size != KIND_BYTES) return null
+    var result = 0u
+    for (byte in this) result = (result shl BITS_PER_BYTE) or byte.toUInt()
+    return result
+}
+
+internal sealed interface NostrEventReference {
+    val stableId: String
+    val relayHints: List<String>
+
+    data class Event(
+        val eventIdHex: String,
+        val authorPubkeyHex: String? = null,
+        val kind: UInt? = null,
+        override val relayHints: List<String> = emptyList(),
+    ) : NostrEventReference {
+        override val stableId: String = "event:$eventIdHex"
+    }
+
+    data class Address(
+        val kind: UInt,
+        val authorPubkeyHex: String,
+        val identifier: String,
+        override val relayHints: List<String> = emptyList(),
+    ) : NostrEventReference {
+        override val stableId: String = "address:$kind:$authorPubkeyHex:$identifier"
+    }
+}
+
+private const val MAX_RELAY_HINTS = 4

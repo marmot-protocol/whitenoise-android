@@ -1,4 +1,4 @@
-package dev.ipf.whitenoise.android.updates
+package dev.ipf.whitenoise.android.core.nostr
 
 import org.json.JSONArray
 import org.json.JSONObject
@@ -48,14 +48,26 @@ internal data class NostrEvent(
     companion object {
         fun fromJson(json: JSONObject): NostrEvent? {
             val tags = json.optJSONArray("tags") ?: return null
+            val createdAt =
+                (json.opt("created_at") as? Number)
+                    ?.toString()
+                    ?.toLongOrNull()
+                    ?.takeIf { it >= 0 }
+                    ?: return null
+            val kindLong =
+                (json.opt("kind") as? Number)
+                    ?.toString()
+                    ?.toLongOrNull()
+                    ?.takeIf { it in 0..Int.MAX_VALUE }
+                    ?: return null
             return NostrEvent(
-                id = json.optString("id").lowercase(Locale.US).takeIf { it.isHex(64) } ?: return null,
-                pubkey = json.optString("pubkey").lowercase(Locale.US).takeIf { it.isHex(64) } ?: return null,
-                createdAt = json.optLong("created_at"),
-                kind = json.optInt("kind"),
-                tags = tags.toStringLists(),
-                content = json.optString("content"),
-                sig = json.optString("sig").lowercase(Locale.US).takeIf { it.isHex(128) } ?: return null,
+                id = (json.opt("id") as? String)?.lowercase(Locale.US)?.takeIf { it.isHex(64) } ?: return null,
+                pubkey = (json.opt("pubkey") as? String)?.lowercase(Locale.US)?.takeIf { it.isHex(64) } ?: return null,
+                createdAt = createdAt,
+                kind = kindLong.toInt(),
+                tags = tags.toStringListsOrNull() ?: return null,
+                content = json.opt("content") as? String ?: return null,
+                sig = (json.opt("sig") as? String)?.lowercase(Locale.US)?.takeIf { it.isHex(128) } ?: return null,
             )
         }
     }
@@ -110,14 +122,14 @@ private fun StringBuilder.appendNostrJsonString(value: String) {
 
 private fun String.isHex(expectedLength: Int): Boolean = length == expectedLength && all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
 
-private fun JSONArray.toStringLists(): List<List<String>> =
+private fun JSONArray.toStringListsOrNull(): List<List<String>>? =
     buildList {
         for (index in 0 until length()) {
-            val tagArray = optJSONArray(index) ?: continue
+            val tagArray = optJSONArray(index) ?: return null
             add(
                 buildList {
                     for (tagIndex in 0 until tagArray.length()) {
-                        add(tagArray.optString(tagIndex))
+                        add(tagArray.opt(tagIndex) as? String ?: return null)
                     }
                 },
             )

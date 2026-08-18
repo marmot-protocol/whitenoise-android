@@ -1475,4 +1475,19 @@
     <string name="text_attachment_preview_too_large">此檔案過大，無法安全預覽。請在其他應用程式中開啟。</string>
     <string name="text_attachment_preview_invalid_encoding">此檔案使用了不支援的文字編碼。請在其他應用程式中開啟。</string>
     <string name="text_attachment_preview_binary">此檔案似乎不包含可安全顯示的文字。請在其他應用程式中開啟。</string>
+    <string name="nostr_event_loading">正在載入事件…</string>
+    <string name="nostr_event_not_found">找不到事件</string>
+    <string name="nostr_event_invalid">無法驗證此事件。</string>
+    <string name="nostr_event_failed">無法載入此事件。請檢查網路連線後再試一次。</string>
+    <string name="nostr_event_open">開啟事件</string>
+    <string name="nostr_event_read_article">閱讀文章</string>
+    <string name="nostr_event_play_video">播放影片</string>
+    <string name="nostr_video_playback_failed">無法播放此影片。</string>
+    <string name="nostr_event_copy">複製事件參照</string>
+    <string name="nostr_event_type_note">貼文</string>
+    <string name="nostr_event_type_article">文章</string>
+    <string name="nostr_event_type_video">影片</string>
+    <string name="nostr_event_type_release">軟體版本</string>
+    <string name="nostr_event_type_file">檔案</string>
+    <string name="nostr_event_type_generic">事件 · 類型 %1$d</string>
 </resources>

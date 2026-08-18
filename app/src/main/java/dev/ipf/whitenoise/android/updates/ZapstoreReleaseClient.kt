@@ -1,30 +1,28 @@
 package dev.ipf.whitenoise.android.updates
 
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeout
+import dev.ipf.whitenoise.android.core.nostr.NostrEvent
+import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
+import dev.ipf.whitenoise.android.core.nostr.NostrRelayQueryClient
+import dev.ipf.whitenoise.android.core.nostr.NostrRelayTimeoutException
+import kotlinx.coroutines.CancellationException
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
 import okhttp3.WebSocket
-import okhttp3.WebSocketListener
-import okio.ByteString
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
-import java.util.UUID
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 private const val KIND_ZAPSTORE_RELEASE = 30063
 
-class ZapstoreReleaseClient(
-    private val httpClient: WebSocket.Factory = defaultHttpClient(),
-    private val relayUrl: String = ZAPSTORE_RELAY,
+class ZapstoreReleaseClient internal constructor(
+    private val httpClient: WebSocket.Factory,
+    private val relayUrl: String,
     private val publisherPubkey: String = ZAPSTORE_PUBLISHER_PUBKEY,
 ) {
+    constructor() : this(defaultHttpClient(), ZAPSTORE_RELAY, ZAPSTORE_PUBLISHER_PUBKEY)
+
+    private val relayQueryClient = NostrRelayQueryClient(httpClient, maxConcurrentSockets = 1)
+
     suspend fun fetchLatest(
         appId: String = AppUpdateConstants.WHITENOISE_ZAPSTORE_APP_ID,
         installedVersion: String? = null,
@@ -58,101 +56,24 @@ class ZapstoreReleaseClient(
         timeoutMillis: Long = FETCH_TIMEOUT_MS,
     ): List<NostrEvent> =
         try {
-            withTimeout(timeoutMillis) {
-                suspendCancellableCoroutine { continuation ->
-                    val subscriptionId = "dm-update-${UUID.randomUUID()}"
-                    val completed = AtomicBoolean(false)
-                    val events = mutableListOf<NostrEvent>()
-                    lateinit var socket: WebSocket
-
-                    fun finish(result: Result<List<NostrEvent>>) {
-                        if (!completed.compareAndSet(false, true)) return
-                        runCatching { socket.close(1000, "done") }
-                        // A timeout can cancel the continuation before onFailure
-                        // fires from socket.cancel(); don't resume it after that.
-                        if (!continuation.isActive) return
-                        result
-                            .onSuccess { continuation.resume(it) }
-                            .onFailure { continuation.resumeWithException(it) }
-                    }
-
-                    val listener =
-                        object : WebSocketListener() {
-                            override fun onOpen(
-                                webSocket: WebSocket,
-                                response: Response,
-                            ) {
-                                val request = JSONArray().put("REQ").put(subscriptionId).put(filter)
-                                webSocket.send(request.toString())
-                            }
-
-                            override fun onMessage(
-                                webSocket: WebSocket,
-                                text: String,
-                            ) {
-                                val message = runCatching { JSONArray(text) }.getOrNull() ?: return
-                                when (message.optString(0)) {
-                                    "EVENT" -> {
-                                        if (message.optString(1) != subscriptionId) return
-                                        val event =
-                                            message
-                                                .optJSONObject(2)
-                                                ?.let { json -> runCatching { NostrEvent.fromJson(json) }.getOrNull() }
-                                                ?: return
-                                        events += event
-                                    }
-
-                                    "EOSE" -> {
-                                        if (message.optString(1) == subscriptionId) finish(Result.success(events.toList()))
-                                    }
-
-                                    "CLOSED" -> {
-                                        if (message.optString(1) == subscriptionId) finish(Result.success(events.toList()))
-                                    }
-
-                                    "NOTICE" -> Unit
-                                }
-                            }
-
-                            override fun onMessage(
-                                webSocket: WebSocket,
-                                bytes: ByteString,
-                            ) = Unit
-
-                            override fun onFailure(
-                                webSocket: WebSocket,
-                                t: Throwable,
-                                response: Response?,
-                            ) {
-                                finish(Result.failure(IOException("Zapstore relay request failed", t)))
-                            }
-
-                            override fun onClosing(
-                                webSocket: WebSocket,
-                                code: Int,
-                                reason: String,
-                            ) {
-                                finish(Result.success(events.toList()))
-                            }
-
-                            override fun onClosed(
-                                webSocket: WebSocket,
-                                code: Int,
-                                reason: String,
-                            ) {
-                                finish(Result.success(events.toList()))
-                            }
-                        }
-
-                    socket = httpClient.newWebSocket(Request.Builder().url(relayUrl).build(), listener)
-                    continuation.invokeOnCancellation {
-                        if (!completed.compareAndSet(false, true)) return@invokeOnCancellation
-                        runCatching { socket.cancel() }
-                    }
-                }
-            }
-        } catch (error: TimeoutCancellationException) {
-            throw IOException("Zapstore relay request timed out", error)
+            relayQueryClient
+                .query(
+                    relayUrls = listOf(relayUrl),
+                    filter = filter,
+                    timeoutMillis = timeoutMillis,
+                    maxEvents = RELEASE_QUERY_LIMIT,
+                ).events
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: IOException) {
+            throw IOException(
+                if (error.hasRelayTimeoutCause()) {
+                    "Zapstore relay request timed out"
+                } else {
+                    "Zapstore relay request failed"
+                },
+                error,
+            )
         }
 
     companion object {
@@ -175,6 +96,10 @@ class ZapstoreReleaseClient(
                 .build()
     }
 }
+
+private fun Throwable.hasRelayTimeoutCause(): Boolean = causes().any { it is NostrRelayTimeoutException }
+
+private fun Throwable.causes(): Sequence<Throwable> = generateSequence(this) { it.cause }
 
 internal object ZapstoreEvents {
     /**

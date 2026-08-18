@@ -1595,4 +1595,19 @@
     <string name="text_attachment_preview_too_large">This file is too large to preview safely. Open it in another app.</string>
     <string name="text_attachment_preview_invalid_encoding">This file doesn’t use a supported text encoding. Open it in another app.</string>
     <string name="text_attachment_preview_binary">This file doesn’t appear to contain safe text. Open it in another app.</string>
+    <string name="nostr_event_loading">Loading event…</string>
+    <string name="nostr_event_not_found">Event not found</string>
+    <string name="nostr_event_invalid">This event couldn’t be verified.</string>
+    <string name="nostr_event_failed">Couldn’t load this event. Check your connection and try again.</string>
+    <string name="nostr_event_open">Open event</string>
+    <string name="nostr_event_read_article">Read article</string>
+    <string name="nostr_event_play_video">Play video</string>
+    <string name="nostr_video_playback_failed">Couldn’t play this video.</string>
+    <string name="nostr_event_copy">Copy event reference</string>
+    <string name="nostr_event_type_note">Note</string>
+    <string name="nostr_event_type_article">Article</string>
+    <string name="nostr_event_type_video">Video</string>
+    <string name="nostr_event_type_release">Software release</string>
+    <string name="nostr_event_type_file">File</string>
+    <string name="nostr_event_type_generic">Event · Kind %1$d</string>
 </resources>

@@ -1500,4 +1500,19 @@
     <string name="text_attachment_preview_too_large">Diese Datei ist zu groß für eine sichere Vorschau. Öffne sie in einer anderen App.</string>
     <string name="text_attachment_preview_invalid_encoding">Diese Datei verwendet keine unterstützte Textkodierung. Öffne sie in einer anderen App.</string>
     <string name="text_attachment_preview_binary">Diese Datei scheint keinen sicheren Text zu enthalten. Öffne sie in einer anderen App.</string>
+    <string name="nostr_event_loading">Ereignis wird geladen…</string>
+    <string name="nostr_event_not_found">Ereignis nicht gefunden</string>
+    <string name="nostr_event_invalid">Dieses Ereignis konnte nicht verifiziert werden.</string>
+    <string name="nostr_event_failed">Dieses Ereignis konnte nicht geladen werden. Prüfe deine Verbindung und versuche es erneut.</string>
+    <string name="nostr_event_open">Ereignis öffnen</string>
+    <string name="nostr_event_read_article">Artikel lesen</string>
+    <string name="nostr_event_play_video">Video abspielen</string>
+    <string name="nostr_video_playback_failed">Dieses Video konnte nicht abgespielt werden.</string>
+    <string name="nostr_event_copy">Ereignisreferenz kopieren</string>
+    <string name="nostr_event_type_note">Notiz</string>
+    <string name="nostr_event_type_article">Artikel</string>
+    <string name="nostr_event_type_video">Videobeitrag</string>
+    <string name="nostr_event_type_release">Softwareversion</string>
+    <string name="nostr_event_type_file">Datei</string>
+    <string name="nostr_event_type_generic">Ereignis · Typ %1$d</string>
 </resources>

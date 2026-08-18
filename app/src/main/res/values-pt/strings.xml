@@ -1502,4 +1502,19 @@
     <string name="text_attachment_preview_too_large">Este arquivo é grande demais para uma prévia segura. Abra-o em outro aplicativo.</string>
     <string name="text_attachment_preview_invalid_encoding">Este arquivo não usa uma codificação de texto compatível. Abra-o em outro aplicativo.</string>
     <string name="text_attachment_preview_binary">Este arquivo não parece conter texto seguro. Abra-o em outro aplicativo.</string>
+    <string name="nostr_event_loading">Carregando evento…</string>
+    <string name="nostr_event_not_found">Evento não encontrado</string>
+    <string name="nostr_event_invalid">Não foi possível verificar este evento.</string>
+    <string name="nostr_event_failed">Não foi possível carregar este evento. Verifique sua conexão e tente novamente.</string>
+    <string name="nostr_event_open">Abrir evento</string>
+    <string name="nostr_event_read_article">Ler artigo</string>
+    <string name="nostr_event_play_video">Reproduzir vídeo</string>
+    <string name="nostr_video_playback_failed">Não foi possível reproduzir este vídeo.</string>
+    <string name="nostr_event_copy">Copiar referência do evento</string>
+    <string name="nostr_event_type_note">Nota</string>
+    <string name="nostr_event_type_article">Artigo</string>
+    <string name="nostr_event_type_video">Vídeo</string>
+    <string name="nostr_event_type_release">Versão de software</string>
+    <string name="nostr_event_type_file">Arquivo</string>
+    <string name="nostr_event_type_generic">Evento · Tipo %1$d</string>
 </resources>
