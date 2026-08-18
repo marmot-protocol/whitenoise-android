@@ -505,7 +505,10 @@ internal fun ConversationScreen(
     // Capture the unread boundary at chat open. Stays fixed for this controller
     // so the divider doesn't move as messages are marked read. A new controller
     // or a fresh notification-open request starts a distinct entry session.
-    val entryUnreadSessionIdentity = remember(controller, notificationOpenRequestId) { controller to notificationOpenRequestId }
+    val entryUnreadSessionIdentity =
+        remember(controller, notificationOpenRequestId) {
+            controller to notificationOpenRequestId
+        }
     val projectedEntryUnreadCount = chat.unreadCount.coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
     val entryProjectionAvailable = chat.projection != null
     val entryUnreadSnapshot =

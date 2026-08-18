@@ -88,6 +88,7 @@ internal fun visualMediaOwnsFooter(
 ): Boolean = !deleted && !hasInvalidationWarning && visualCount > 0 && !hasCaption
 
 @Composable
+@Suppress("FunctionNaming") // Compose UI entry point.
 internal fun VisualMediaFooterFrame(
     showFooter: Boolean,
     timeText: String,

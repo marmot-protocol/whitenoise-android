@@ -295,9 +295,19 @@ class ConversationEntryUnreadSnapshotTest {
             assertEquals(1, loads)
         }
 
-    private fun received(id: String): TimelineMessage = message(id = id, direction = "received", status = MessageStatus.Received)
+    private fun received(id: String): TimelineMessage =
+        message(
+            id = id,
+            direction = "received",
+            status = MessageStatus.Received,
+        )
 
-    private fun sent(id: String): TimelineMessage = message(id = id, direction = "sent", status = MessageStatus.Sent)
+    private fun sent(id: String): TimelineMessage =
+        message(
+            id = id,
+            direction = "sent",
+            status = MessageStatus.Sent,
+        )
 
     private fun message(
         id: String,
