@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -435,23 +434,54 @@ class ChatListHeadReorderAnimationTest {
             .top
 }
 
+private fun headDemotionTargetIndex(
+    itemIds: List<String>,
+    pinnedCount: Int?,
+    demotion: ChatListHeadDemotion?,
+    applied: Boolean,
+): Int? =
+    demotion
+        ?.takeIf { applied }
+        ?.viewportAnchor
+        ?.let { itemIds.indexOf(it.chatId) }
+        ?.takeIf { it >= 0 }
+        ?.let { rowIndex -> rowIndex + if (pinnedCount != null && rowIndex >= pinnedCount) 1 else 0 }
+
 @Composable
-private fun ChatListHeadReorderMotionHarness(
+internal fun ChatListHeadReorderMotionHarness(
     itemIds: List<String>,
     listState: LazyListState,
     rowHeight: Dp,
     datasetKey: ChatListDatasetKey = ChatListDatasetKey(false, null, ""),
     contentRevision: Int = 0,
+    pinnedCount: Int? = null,
+    userHeadDemotion: ChatListHeadDemotion? = null,
+    userHeadDemotionSettled: Boolean = false,
+    onUserHeadDemotionConsumed: (ChatListHeadDemotion) -> Unit = {},
+    onHeadScrollCorrectionStarted: () -> Unit = {},
     onOpen: (String) -> Unit = {},
     onRowsComposed: (List<String>, Boolean) -> Unit = { _, _ -> },
 ) {
     var scrollCorrectionInProgress by remember { mutableStateOf(false) }
+    val viewportGeneration = rememberChatListUserGestureGeneration(listState)
+    val pinnedOrder = pinnedCount?.let(itemIds::take).orEmpty()
+    val userHeadDemotionTargetIndex =
+        headDemotionTargetIndex(itemIds, pinnedCount, userHeadDemotion, userHeadDemotionSettled)
     ChatListActiveHeadScrollEffect(
         listState = listState,
         activeHeadId = itemIds.firstOrNull(),
+        pinnedOrder = pinnedOrder,
         datasetKey = datasetKey,
         isActiveList = true,
-        onHeadReorderInProgressChange = { scrollCorrectionInProgress = it },
+        userHeadDemotion = userHeadDemotion,
+        userHeadDemotionSettled = userHeadDemotionSettled,
+        userHeadDemotionTargetIndex = userHeadDemotionTargetIndex,
+        viewportGeneration = viewportGeneration,
+        onUserHeadDemotionConsumed = onUserHeadDemotionConsumed,
+        onHeadReorderInProgressChange = {
+            if (it && !scrollCorrectionInProgress) onHeadScrollCorrectionStarted()
+            scrollCorrectionInProgress = it
+        },
     )
     val headReorderInProgress =
         rememberChatListHeadReorderGate(
@@ -468,23 +498,30 @@ private fun ChatListHeadReorderMotionHarness(
         modifier = Modifier.testTag(CHAT_LIST_HEAD_REORDER_LIST_TAG),
         state = listState,
     ) {
-        itemsIndexed(itemIds, key = { _, id -> id }) { targetIndex, id ->
-            Box(modifier = chatListRowMotion(targetIndex)) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(rowHeight)
-                            .clickable(enabled = interactionsEnabled) { onOpen(id) }
-                            .testTag(chatListHeadReorderRowTag(id)),
-                ) {
-                    Text("$id-$contentRevision")
+        itemIds.forEachIndexed { targetIndex, id ->
+            if (targetIndex == pinnedCount) {
+                item(key = CHAT_LIST_PINNED_BOUNDARY_KEY) {
+                    ChatListPinnedBoundary()
+                }
+            }
+            item(key = id) {
+                Box(modifier = chatListRowMotion(targetIndex)) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(rowHeight)
+                                .clickable(enabled = interactionsEnabled) { onOpen(id) }
+                                .testTag(chatListHeadReorderRowTag(id)),
+                    ) {
+                        Text("$id-$contentRevision")
+                    }
                 }
             }
         }
     }
 }
 
-private fun chatListHeadReorderRowTag(id: String): String = "chat-list-head-row-$id"
+internal fun chatListHeadReorderRowTag(id: String): String = "chat-list-head-row-$id"
 
-private const val CHAT_LIST_HEAD_REORDER_LIST_TAG = "chat-list-head"
+internal const val CHAT_LIST_HEAD_REORDER_LIST_TAG = "chat-list-head"
