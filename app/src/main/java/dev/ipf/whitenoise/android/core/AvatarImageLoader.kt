@@ -222,6 +222,19 @@ object AvatarImageLoader {
         return synchronized(lock) { cache.get(key) }
     }
 
+    /** Test-only injection for deterministic first-frame composition coverage. */
+    internal fun putCached(
+        url: String,
+        image: ImageBitmap,
+    ) {
+        val key = url.trim()
+        if (key.isEmpty()) return
+        synchronized(lock) {
+            cache.put(key, image)
+            failureExpiresAt.remove(key)
+        }
+    }
+
     /** Android-bitmap view of [peek], for non-Compose consumers (notification icons). */
     fun peekBitmap(url: String?): android.graphics.Bitmap? = peek(url)?.asAndroidBitmap()
 

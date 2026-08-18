@@ -9,13 +9,10 @@ import androidx.compose.ui.unit.Dp
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
+import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
+import dev.ipf.whitenoise.android.state.ChatListAvatarSource
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-
-internal fun encryptedGroupAvatarCacheKey(
-    accountRef: String,
-    groupIdHex: String,
-    imageHashHex: String,
-): String = "$accountRef|${groupIdHex.lowercase()}|${imageHashHex.lowercase()}"
 
 @Composable
 internal fun rememberEncryptedGroupAvatar(
@@ -23,17 +20,7 @@ internal fun rememberEncryptedGroupAvatar(
     group: AppGroupRecordFfi,
     accountRef: String? = appState.activeAccountRef,
 ): ImageBitmap? {
-    val hash =
-        group.imageHashHex
-            ?.takeIf { !group.pendingConfirmation && group.avatarUrl.isNullOrBlank() }
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-    val cacheKey =
-        if (accountRef != null && hash != null) {
-            encryptedGroupAvatarCacheKey(accountRef, group.groupIdHex, hash)
-        } else {
-            null
-        }
+    val cacheKey = encryptedGroupAvatarCacheKey(accountRef, group)
     val image by key(cacheKey) {
         produceState(GroupAvatarImageLoader.peek(cacheKey)) {
             if (value == null && cacheKey != null && accountRef != null) {
@@ -62,14 +49,37 @@ internal fun GroupAvatar(
     seed: String,
     size: Dp,
     fallbackPictureUrl: String? = null,
+    firstFrameAvatar: ChatListAvatarSeed? = null,
 ) {
     val legacyUrl = ProfileSanitizer.protocolImageUrl(group.avatarUrl)
-    val encryptedImage = rememberEncryptedGroupAvatar(appState, group)
+    val encryptedCacheKey = encryptedGroupAvatarCacheKey(appState.activeAccountRef, group)
+    val loadedEncryptedImage = rememberEncryptedGroupAvatar(appState, group)
+    val encryptedImage =
+        firstFrameAvatar
+            ?.takeIf {
+                it.source == ChatListAvatarSource.ENCRYPTED_GROUP &&
+                    it.key == encryptedCacheKey
+            }?.image
+            ?: loadedEncryptedImage
+    val seededUrlImage =
+        when (firstFrameAvatar?.source) {
+            ChatListAvatarSource.LEGACY_URL ->
+                firstFrameAvatar.image.takeIf { firstFrameAvatar.key == legacyUrl }
+            ChatListAvatarSource.FALLBACK_URL ->
+                firstFrameAvatar.image.takeIf {
+                    legacyUrl == null &&
+                        firstFrameAvatar.key == fallbackPictureUrl &&
+                        encryptedImage == null
+                }
+            ChatListAvatarSource.ENCRYPTED_GROUP,
+            null,
+            -> null
+        }
     Avatar(
         title = title,
         seed = seed,
         size = size,
         pictureUrl = legacyUrl ?: fallbackPictureUrl?.takeIf { encryptedImage == null },
-        picture = encryptedImage,
+        picture = seededUrlImage ?: encryptedImage,
     )
 }

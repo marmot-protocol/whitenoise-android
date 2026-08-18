@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.core
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.whitenoise.android.media.ByteSizeLruCache
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.REMOTE_PROFILE_IMAGE_MAX_BYTES
@@ -18,6 +19,28 @@ import kotlinx.coroutines.sync.withPermit
 internal const val GROUP_AVATAR_MAX_PAYLOAD_BYTES = REMOTE_PROFILE_IMAGE_MAX_BYTES
 
 internal fun isGroupAvatarPayloadAccepted(bytes: ByteArray): Boolean = bytes.size <= GROUP_AVATAR_MAX_PAYLOAD_BYTES
+
+internal fun encryptedGroupAvatarCacheKey(
+    accountRef: String,
+    groupIdHex: String,
+    imageHashHex: String,
+): String = "$accountRef|${groupIdHex.lowercase()}|${imageHashHex.lowercase()}"
+
+internal fun encryptedGroupAvatarCacheKey(
+    accountRef: String?,
+    group: AppGroupRecordFfi,
+): String? {
+    val hash =
+        group.imageHashHex
+            ?.takeIf { !group.pendingConfirmation && group.avatarUrl.isNullOrBlank() }
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+    return if (accountRef != null && hash != null) {
+        encryptedGroupAvatarCacheKey(accountRef, group.groupIdHex, hash)
+    } else {
+        null
+    }
+}
 
 /**
  * Bounded decoded-bitmap cache for MDK group images. MDK remains the source of
@@ -47,6 +70,18 @@ internal object GroupAvatarImageLoader {
         key?.let {
             synchronized(lock) { cache.get(it) }
         }
+
+    /** Test-only injection for deterministic first-frame composition coverage. */
+    internal fun putCached(
+        key: String,
+        image: ImageBitmap,
+    ) {
+        val cacheKey = key.trim()
+        if (cacheKey.isEmpty()) return
+        synchronized(lock) {
+            cache.put(cacheKey, image)
+        }
+    }
 
     suspend fun load(
         key: String,
