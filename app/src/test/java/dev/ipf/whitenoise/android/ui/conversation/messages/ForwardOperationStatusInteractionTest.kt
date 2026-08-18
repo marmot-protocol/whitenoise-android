@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import dev.ipf.whitenoise.android.state.ForwardOperationPhase
@@ -26,7 +28,7 @@ class ForwardOperationStatusInteractionTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun activeForwardExposesDetailsAndCancellationWithoutBlockingNavigation() {
+    fun activeForwardKeepsCancellationInsideTappableDetails() {
         var cancellations = 0
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -64,12 +66,13 @@ class ForwardOperationStatusInteractionTest {
         }
 
         composeRule.onNodeWithText("Forwarding").assertIsDisplayed()
-        composeRule.onNodeWithText("Cancel").assertIsDisplayed().performClick()
-        composeRule.runOnIdle { assertEquals(1, cancellations) }
+        composeRule.onNodeWithText("Cancel").assertDoesNotExist()
 
-        composeRule.onNodeWithText("Details").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag(FORWARD_OPERATION_STATUS_TEST_TAG).performClick()
         composeRule.onNodeWithText("Family").assertIsDisplayed()
         composeRule.onNodeWithText("Design team").assertIsDisplayed()
+        composeRule.onNodeWithText("Cancel").assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertEquals(1, cancellations) }
     }
 
     @Test
@@ -115,7 +118,7 @@ class ForwardOperationStatusInteractionTest {
 
         composeRule.onNodeWithText("Cancel").assertDoesNotExist()
         composeRule.onNodeWithText("Retry").assertIsDisplayed().performClick()
-        composeRule.onNodeWithText("Dismiss").assertIsDisplayed().performClick()
+        composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed().performClick()
         composeRule.runOnIdle {
             assertEquals(1, retries)
             assertEquals(1, dismissals)

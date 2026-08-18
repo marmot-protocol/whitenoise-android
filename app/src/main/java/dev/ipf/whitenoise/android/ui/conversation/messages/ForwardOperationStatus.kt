@@ -1,12 +1,25 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Forward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -20,13 +33,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
@@ -74,8 +91,8 @@ internal fun ForwardOperationStatusHost(
 }
 
 /**
- * Persistent, non-modal forwarding chrome. Navigation remains usable while the
- * optional details sheet exposes the exact per-target transfer/send state.
+ * Compact, non-modal forwarding activity strip. Navigation remains usable while
+ * the optional details sheet exposes the exact per-target transfer/send state.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,36 +107,83 @@ internal fun ForwardOperationStatus(
 ) {
     var detailsVisible by rememberSaveable { mutableStateOf(false) }
     val summary = forwardOperationSummary(snapshot)
+    val animatedProgress by
+        animateFloatAsState(
+            targetValue = forwardOperationProgress(snapshot),
+            animationSpec = tween(durationMillis = 200),
+            label = "forwardOperationProgress",
+        )
 
     Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        shadowElevation = 3.dp,
+        tonalElevation = 3.dp,
         modifier =
             modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .testTag(FORWARD_OPERATION_STATUS_TEST_TAG)
+                .statusBarsPadding()
                 .semantics { liveRegion = LiveRegionMode.Polite },
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(summary, style = MaterialTheme.typography.titleSmall)
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .testTag(FORWARD_OPERATION_STATUS_TEST_TAG)
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel = stringResource(R.string.details),
+                                onClick = { detailsVisible = true },
+                            ).padding(start = Dimens.spaceLg, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    ForwardOperationStatusIcon(snapshot)
+                    Text(
+                        text = summary,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (snapshot.isActive && snapshot.targets.size > 1) {
+                        Text(
+                            text = "${snapshot.completedTargets}/${snapshot.targets.size}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (snapshot.isActive) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (snapshot.canRetry) {
+                    TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+                }
+                if (!snapshot.isActive) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.dismiss),
+                        )
+                    }
+                }
+            }
             if (snapshot.isActive) {
                 LinearProgressIndicator(
-                    progress = { forwardOperationProgress(snapshot) },
-                    modifier = Modifier.fillMaxWidth(),
+                    progress = { animatedProgress },
+                    modifier = Modifier.fillMaxWidth().clearAndSetSemantics {},
                 )
             }
-            ForwardOperationActions(
-                snapshot = snapshot,
-                onDetails = { detailsVisible = true },
-                onCancel = onCancel,
-                onRetry = onRetry,
-                onDismiss = onDismiss,
-            )
         }
     }
 
@@ -143,6 +207,46 @@ internal fun ForwardOperationStatus(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = 12.dp),
             )
         }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun ForwardOperationStatusIcon(snapshot: ForwardOperationSnapshot) {
+    when (snapshot.phase) {
+        ForwardOperationPhase.Preparing,
+        ForwardOperationPhase.Running,
+        ForwardOperationPhase.Cancelling,
+        ->
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.Forward,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        ForwardOperationPhase.Completed ->
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        ForwardOperationPhase.PartialFailure,
+        ForwardOperationPhase.Failed,
+        ->
+            Icon(
+                imageVector = Icons.Default.ErrorOutline,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.error,
+            )
+        ForwardOperationPhase.Cancelled ->
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
     }
 }
 

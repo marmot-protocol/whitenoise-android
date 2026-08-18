@@ -1420,6 +1420,7 @@ internal fun operationalNpub(
 private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
 private const val FORWARD_BACKGROUND_RETRY_ATTEMPTS = 3
 private const val FORWARD_BACKGROUND_RETRY_DELAY_MS = 1_000L
+private const val FORWARD_TERMINAL_STATUS_DURATION_MS = 2_000L
 
 internal fun appStateScopeExceptionHandler(
     report: (Throwable) -> Unit = { throwable ->
@@ -2375,12 +2376,13 @@ class WhiteNoiseAppState private constructor(
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
     private val mutationsScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    private var forwardTerminalDismissGeneration = 0L
     private val forwardOperationOwner =
         ForwardOperationOwner(
             scope = mutationsScope,
             automaticRetryAttempts = FORWARD_BACKGROUND_RETRY_ATTEMPTS,
             retryDelayMillis = { attempt -> FORWARD_BACKGROUND_RETRY_DELAY_MS shl attempt },
-            onTerminal = ::presentForwardTerminal,
+            onTerminal = ::scheduleForwardTerminalDismiss,
         )
     internal val activeForwardOperation: StateFlow<ForwardOperationSnapshot?> = forwardOperationOwner.state
     private val draftWriter =
@@ -3276,41 +3278,32 @@ class WhiteNoiseAppState private constructor(
                 },
             )
         // The app-scoped owner mirrors live per-target state into the global
-        // non-modal progress surface and retains terminal failures for explicit
+        // non-modal activity strip and retains terminal failures for explicit
         // retry/dismiss. Its bounded retries preserve the same safe recovery
         // boundary as the session: uncertain publishes converge, never resend.
         val started = forwardOperationOwner.start(session)
-        if (started) {
-            presentTransient(R.string.forward_progress_title)
-        } else {
+        if (!started) {
             session.release()
         }
         return started
     }
 
-    private fun presentForwardTerminal(snapshot: ForwardOperationSnapshot) {
-        when (snapshot.phase) {
-            ForwardOperationPhase.Completed ->
-                presentTransient(
-                    AppText.Resource(
-                        R.string.toast_forwarded_to_chats,
-                        listOf(snapshot.completedTargets.toString()),
-                    ),
-                )
-            ForwardOperationPhase.PartialFailure ->
-                presentTransient(
-                    AppText.Resource(
-                        R.string.toast_forwarded_partial,
-                        listOf(snapshot.completedTargets.toString()),
-                    ),
-                )
-            ForwardOperationPhase.Failed -> presentTransient(R.string.toast_forward_failed)
-            ForwardOperationPhase.Cancelled,
-            ForwardOperationPhase.Cancelling,
-            -> presentTransient(R.string.forward_cancelled)
-            ForwardOperationPhase.Preparing,
-            ForwardOperationPhase.Running,
-            -> Unit
+    private fun scheduleForwardTerminalDismiss(snapshot: ForwardOperationSnapshot) {
+        if (
+            snapshot.phase != ForwardOperationPhase.Completed &&
+            snapshot.phase != ForwardOperationPhase.Cancelled
+        ) {
+            return
+        }
+        val dismissGeneration = ++forwardTerminalDismissGeneration
+        mutationsScope.launch {
+            delay(FORWARD_TERMINAL_STATUS_DURATION_MS)
+            if (
+                forwardTerminalDismissGeneration == dismissGeneration &&
+                activeForwardOperation.value == snapshot
+            ) {
+                dismissActiveForwardOperation()
+            }
         }
     }
 

@@ -6,15 +6,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +52,8 @@ import dev.ipf.whitenoise.android.ui.settings.WipeProgressSheet
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -87,11 +92,25 @@ internal fun GlobalTransientNotice(
 internal fun ShellTransientNoticeLayout(
     notice: TransientNotice?,
     modifier: Modifier = Modifier,
+    persistentTopContent: @Composable () -> Unit = {},
+    persistentTopContentConsumesStatusBars: Boolean = false,
     persistentBottomContent: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     Column(modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxWidth().weight(1f)) {
+        persistentTopContent()
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .then(
+                    if (persistentTopContentConsumesStatusBars) {
+                        Modifier.consumeWindowInsets(WindowInsets.statusBars)
+                    } else {
+                        Modifier
+                    },
+                ),
+        ) {
             content()
         }
         persistentBottomContent()
@@ -120,6 +139,10 @@ fun WhiteNoiseApp(
     // can read it; child screens mutate via [LocalSnackbarBottomInset].
     val snackbarBottomInset = remember { mutableStateOf(0.dp) }
     val snackbarContentInset = remember { mutableStateOf(0.dp) }
+    val forwardOperationVisible by
+        remember(appState) {
+            appState.activeForwardOperation.map { it != null }.distinctUntilChanged()
+        }.collectAsState(initial = false)
     val toast = appState.toast
     val transientNotice = appState.transientNotice
     val context = LocalContext.current
@@ -218,7 +241,8 @@ fun WhiteNoiseApp(
                         AppPhase.Ready ->
                             ShellTransientNoticeLayout(
                                 notice = transientNotice,
-                                persistentBottomContent = { ForwardOperationStatusHost(appState) },
+                                persistentTopContent = { ForwardOperationStatusHost(appState) },
+                                persistentTopContentConsumesStatusBars = forwardOperationVisible,
                             ) {
                                 MainShell(
                                     appState = appState,
