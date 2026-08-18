@@ -5509,6 +5509,7 @@ class ChatsController private constructor(
             state.orderedGroupIds
                 .withIndex()
                 .associate { (index, id) -> id.lowercase() to index.toUInt() }
+        var changed = false
         chatRowsByGroup.keys.toList().forEach { key ->
             val position = positionByGroup[key]
             val optimisticState = optimisticChatListPreviewByGroup[key]
@@ -5521,6 +5522,8 @@ class ChatsController private constructor(
                 } else {
                     row
                 }
+            if (updated == row) return@forEach
+            changed = true
             if (optimisticState == null) {
                 chatRowsByGroup[key] = updated
             } else {
@@ -5528,7 +5531,7 @@ class ChatsController private constructor(
                 materializeOptimisticChatListPreview(key, optimisticState)
             }
         }
-        scheduleRecompute()
+        if (changed) scheduleRecompute()
     }
 
     private fun requestGroupProfiles(group: AppGroupRecordFfi) {

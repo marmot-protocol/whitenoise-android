@@ -54,6 +54,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
@@ -423,6 +424,10 @@ internal fun ChatsScreen(
             }
         }
     }
+    val chatListState = key(showArchived) { rememberLazyListState() }
+    val userGestureGeneration = rememberChatListUserGestureGeneration(chatListState)
+    var programmaticViewportGeneration by remember(chatListState) { mutableLongStateOf(0L) }
+    val viewportGeneration = userGestureGeneration + programmaticViewportGeneration
     val visibleItems =
         // Keyed on the trimmed query: leading/trailing-space edits change
         // nothing the filter can see, so they must not re-run the O(n) pass.
@@ -438,6 +443,7 @@ internal fun ChatsScreen(
         }
     val visibleChatIds = remember(visibleItems) { visibleItems.map { it.id }.toSet() }
     val orderedVisibleChatIds = remember(visibleItems) { visibleItems.map { it.id } }
+    val visiblePinnedOrder = remember(visibleItems) { visibleItems.filter { it.pinned() }.map { it.id } }
     val pinnedBoundary =
         remember(visibleItems, showArchived) {
             pinnedBoundaryIndex(
@@ -445,6 +451,36 @@ internal fun ChatsScreen(
                 showArchived = showArchived,
             )
         }
+    var nextHeadDemotionTransactionId by remember { mutableLongStateOf(0L) }
+    var pendingHeadDemotion by
+        remember(
+            appState.activeAccountRef,
+            appState.runtimeGeneration,
+            showArchived,
+            selectedFolderId,
+            trimmedQuery,
+        ) {
+            mutableStateOf<ChatListHeadDemotion?>(null)
+        }
+    val pendingHeadDemotionTarget =
+        pendingHeadDemotion?.viewportAnchor?.let { anchor ->
+            visibleItems.firstOrNull { it.id == anchor.chatId }
+        }
+    val pendingHeadDemotionSettled =
+        pendingHeadDemotion != null &&
+            visibleItems.none { it.id == pendingHeadDemotion?.chatId && it.pinned() }
+    val pendingHeadDemotionTargetIndex =
+        pendingHeadDemotionTarget
+            ?.let { visibleItems.indexOf(it) }
+            ?.let { rowIndex ->
+                val inlineErrorItems =
+                    if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
+                chatListHeadDemotionTargetIndex(
+                    rowIndex = rowIndex,
+                    pinnedBoundaryIndex = pinnedBoundary,
+                    leadingItemCount = inlineErrorItems,
+                )
+            }
 
     fun openGroupFromVisibleList(
         item: ChatListItem,
@@ -557,8 +593,30 @@ internal fun ChatsScreen(
     fun toggleChatPin(item: ChatListItem) {
         if (item.group.archived) return
         val nextPinned = !item.pinned()
+        val headDemotion =
+            if (!nextPinned && !showArchived && visibleItems.firstOrNull()?.id == item.id) {
+                nextHeadDemotionTransactionId += 1L
+                ChatListHeadDemotion(
+                    chatId = item.id,
+                    transactionId = nextHeadDemotionTransactionId,
+                    viewportAnchor = chatListState.chatListViewportAnchor(visibleChatIds),
+                    viewportGeneration = viewportGeneration,
+                )
+            } else {
+                null
+            }
+        if (headDemotion != null) {
+            pendingHeadDemotion = headDemotion
+        } else if (nextPinned && pendingHeadDemotion?.chatId == item.id) {
+            pendingHeadDemotion = null
+        }
         clearSelection()
-        appState.launchMutation { controller.setPinned(item, nextPinned) }
+        appState.launchMutation {
+            val succeeded = controller.setPinned(item, nextPinned)
+            if (!succeeded && pendingHeadDemotion == headDemotion) {
+                pendingHeadDemotion = null
+            }
+        }
     }
 
     fun movePinnedChat(
@@ -587,8 +645,9 @@ internal fun ChatsScreen(
             showArchived = showArchived,
             folderId = selectedFolderId,
             query = trimmedQuery,
+            accountRef = appState.activeAccountRef,
+            runtimeGeneration = appState.runtimeGeneration,
         )
-    val chatListState = key(showArchived) { rememberLazyListState() }
     var headScrollCorrectionInProgress by remember(chatListDatasetKey) { mutableStateOf(false) }
     val density = LocalDensity.current
     val dragEdgeThresholdPx = with(density) { 56.dp.toPx() }
@@ -654,6 +713,7 @@ internal fun ChatsScreen(
     }
 
     LaunchedEffect(dragAnchorChatId, chatListState) {
+        var autoScrollActive = false
         while (dragAnchorChatId != null) {
             withFrameNanos { }
             val pointerWindowY = dragPointerWindowY ?: continue
@@ -667,8 +727,14 @@ internal fun ChatsScreen(
                     maxStep = dragMaxScrollStepPx,
                 )
             if (scrollDelta != 0f) {
+                if (chatListAutoScrollSessionStarts(autoScrollActive, scrollDelta)) {
+                    programmaticViewportGeneration += 1L
+                }
+                autoScrollActive = true
                 chatListState.scrollBy(scrollDelta)
                 updateChatDragSelection(pointerWindowY)
+            } else {
+                autoScrollActive = false
             }
         }
     }
@@ -721,6 +787,7 @@ internal fun ChatsScreen(
                 isActiveList = !showArchived,
             )
         ) {
+            programmaticViewportGeneration += 1L
             chatListState.scrollToItem(0)
         }
         onConversationReturnHeadHandled()
@@ -728,9 +795,20 @@ internal fun ChatsScreen(
     ChatListActiveHeadScrollEffect(
         listState = chatListState,
         activeHeadId = activeHeadId,
+        pinnedOrder = visiblePinnedOrder,
         datasetKey = chatListDatasetKey,
         isActiveList = !showArchived,
-        onHeadReorderInProgressChange = { headScrollCorrectionInProgress = it },
+        userHeadDemotion = pendingHeadDemotion,
+        userHeadDemotionSettled = pendingHeadDemotionSettled,
+        userHeadDemotionTargetIndex = pendingHeadDemotionTargetIndex,
+        viewportGeneration = viewportGeneration,
+        onUserHeadDemotionConsumed = { consumed ->
+            if (pendingHeadDemotion == consumed) pendingHeadDemotion = null
+        },
+        onHeadReorderInProgressChange = { inProgress ->
+            if (inProgress && !headScrollCorrectionInProgress) programmaticViewportGeneration += 1L
+            headScrollCorrectionInProgress = inProgress
+        },
     )
     val headReorderInProgress =
         rememberChatListHeadReorderGate(
@@ -1222,6 +1300,7 @@ internal fun ChatsScreen(
                                 .semantics { contentDescription = scrollToTopLabel }
                                 .clickable(role = Role.Button) {
                                     scope.launch {
+                                        programmaticViewportGeneration += 1L
                                         // For a very deep scroll, animating every row to
                                         // the top is a multi-second crawl. Snap to a
                                         // near-top index first, then animate the final
