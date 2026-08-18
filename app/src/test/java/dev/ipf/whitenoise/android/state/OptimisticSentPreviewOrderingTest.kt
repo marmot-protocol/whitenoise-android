@@ -21,6 +21,7 @@ import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -881,6 +882,29 @@ class OptimisticSentPreviewPendingRetirementTest {
 @Config(sdk = [36], qualifiers = "en")
 class OptimisticSentPreviewMetadataTest {
     @Test
+    fun matchingAuthoritativePinRedeliveryDoesNotRefoldBackingRows() {
+        val controller =
+            controllerWithRows(
+                row("chat-a", "Alpha", 20uL),
+                row("chat-b", "Zulu", 10uL),
+            )
+
+        controller.setChatListVisible(false)
+        applyPinState(controller, listOf("chat-b"))
+        val normalizedRows = backingRows(controller)
+
+        applyPinState(controller, listOf("chat-b"))
+        val redeliveredRows = backingRows(controller)
+
+        assertEquals(normalizedRows.keys, redeliveredRows.keys)
+        normalizedRows.forEach { (groupId, normalizedRow) ->
+            assertSame(normalizedRow, redeliveredRows.getValue(groupId))
+        }
+        controller.setChatListVisible(true)
+        assertEquals(listOf("chat-b", "chat-a"), controller.items.map { it.id })
+    }
+
+    @Test
     fun pinUpdateDuringPendingSendSurvivesRollback() {
         val controller =
             controllerWithRows(
@@ -971,6 +995,15 @@ private fun applyPinState(
         .apply { isAccessible = true }
         .invoke(controller, ChatPinStateFfi(orderedGroupIds))
 }
+
+@Suppress("UNCHECKED_CAST")
+private fun backingRows(controller: ChatsController): Map<String, ChatListRowFfi> =
+    (
+        ChatsController::class.java
+            .getDeclaredField("chatRowsByGroup")
+            .apply { isAccessible = true }
+            .get(controller) as Map<String, ChatListRowFfi>
+    ).toMap()
 
 private fun removeAndRestoreChatRow(
     controller: ChatsController,
