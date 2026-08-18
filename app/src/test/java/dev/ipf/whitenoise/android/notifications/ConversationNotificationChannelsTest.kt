@@ -373,7 +373,12 @@ class ConversationNotificationChannelsTest {
 
         ConversationNotificationChannels.ensureConversationChannels(context, shortcut, isDm = true)
 
-        assertNotNull(conversationChannel(ConversationNotificationChannels.primaryMessageParent(isDm = true).id, shortcut))
+        assertNotNull(
+            conversationChannel(
+                ConversationNotificationChannels.primaryMessageParent(isDm = true).id,
+                shortcut,
+            ),
+        )
         assertNull(conversationChannel(NotificationChannelSpec.MENTIONS.id, shortcut))
         assertNull(conversationChannel(NotificationChannelSpec.REACTIONS.id, shortcut))
         assertNull(conversationChannel(NotificationChannelSpec.INVITES.id, shortcut))
