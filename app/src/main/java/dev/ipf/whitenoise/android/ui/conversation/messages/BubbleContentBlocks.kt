@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -79,6 +80,35 @@ internal fun fileCardOwnsFooter(
     visualOwnsFooter: Boolean,
 ): Boolean = !deleted && fileCount > 0 && !visualOwnsFooter
 
+internal fun visualMediaOwnsFooter(
+    deleted: Boolean,
+    hasInvalidationWarning: Boolean,
+    visualCount: Int,
+    hasCaption: Boolean,
+): Boolean = !deleted && !hasInvalidationWarning && visualCount > 0 && !hasCaption
+
+@Composable
+internal fun VisualMediaFooterFrame(
+    showFooter: Boolean,
+    timeText: String,
+    showStatus: Boolean,
+    status: MessageStatus,
+    showRetention: Boolean,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Box {
+        content()
+        if (showFooter) {
+            MediaFooterOverlay(
+                timeText = timeText,
+                showStatus = showStatus,
+                status = status,
+                showRetention = showRetention,
+            )
+        }
+    }
+}
+
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun ColumnScope.BubbleMediaBlocks(
@@ -131,7 +161,13 @@ internal fun ColumnScope.BubbleMediaBlocks(
     if (!deleted && bubbleMedia.visuals.isNotEmpty()) {
         if (bubbleMedia.visuals.size == 1) {
             val entry = bubbleMedia.visuals.first()
-            Box {
+            VisualMediaFooterFrame(
+                showFooter = footerOnVisualMedia,
+                timeText = rememberedMessageBubbleTime(record.recordedAt),
+                showStatus = mine,
+                status = item.status,
+                showRetention = retentionIndicatorVisible(record.retentionSeconds),
+            ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                     MediaVideoBubble(
                         messageIdHex = record.messageIdHex,
@@ -155,25 +191,25 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         attachedToCaption = attachedToCaption,
                     )
                 }
-                if (footerOnVisualMedia) {
-                    MediaFooterOverlay(
-                        timeText = rememberedMessageBubbleTime(record.recordedAt),
-                        showStatus = mine,
-                        status = item.status,
-                        showRetention = retentionIndicatorVisible(record.retentionSeconds),
-                    )
-                }
             }
         } else {
-            MediaVisualGridBubble(
-                item = item,
-                attachments = bubbleMedia.visuals,
-                controller = controller,
-                appState = appState,
-                mine = mine,
-                onLongPress = onMediaLongPress,
-                attachedToCaption = attachedToCaption,
-            )
+            VisualMediaFooterFrame(
+                showFooter = footerOnVisualMedia,
+                timeText = rememberedMessageBubbleTime(record.recordedAt),
+                showStatus = mine,
+                status = item.status,
+                showRetention = retentionIndicatorVisible(record.retentionSeconds),
+            ) {
+                MediaVisualGridBubble(
+                    item = item,
+                    attachments = bubbleMedia.visuals,
+                    controller = controller,
+                    appState = appState,
+                    mine = mine,
+                    onLongPress = onMediaLongPress,
+                    attachedToCaption = attachedToCaption,
+                )
+            }
         }
     }
     if (!deleted && bubbleMedia.audio.isNotEmpty()) {
@@ -252,7 +288,13 @@ internal fun ColumnScope.BubbleMediaBlocks(
         }
         if (bubbleMedia.pendingVisuals.size == 1) {
             val entry = bubbleMedia.pendingVisuals.first()
-            Box {
+            VisualMediaFooterFrame(
+                showFooter = footerOnPendingVisual,
+                timeText = rememberedMessageBubbleTime(record.recordedAt),
+                showStatus = true,
+                status = item.status,
+                showRetention = retentionIndicatorVisible(record.retentionSeconds),
+            ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                     MediaVideoBubble(
                         messageIdHex = record.messageIdHex,
@@ -280,26 +322,26 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         attachedToCaption = attachedToCaption,
                     )
                 }
-                if (footerOnPendingVisual) {
-                    MediaFooterOverlay(
-                        timeText = rememberedMessageBubbleTime(record.recordedAt),
-                        showStatus = true,
-                        status = item.status,
-                        showRetention = retentionIndicatorVisible(record.retentionSeconds),
-                    )
-                }
             }
         } else {
-            MediaVisualGridBubble(
-                item = item,
-                attachments = bubbleMedia.pendingVisuals,
-                controller = controller,
-                appState = appState,
-                mine = true,
-                onLongPress = onMediaLongPress,
-                uploading = !uploadFailed,
-                attachedToCaption = attachedToCaption,
-            )
+            VisualMediaFooterFrame(
+                showFooter = footerOnPendingVisual,
+                timeText = rememberedMessageBubbleTime(record.recordedAt),
+                showStatus = true,
+                status = item.status,
+                showRetention = retentionIndicatorVisible(record.retentionSeconds),
+            ) {
+                MediaVisualGridBubble(
+                    item = item,
+                    attachments = bubbleMedia.pendingVisuals,
+                    controller = controller,
+                    appState = appState,
+                    mine = true,
+                    onLongPress = onMediaLongPress,
+                    uploading = !uploadFailed,
+                    attachedToCaption = attachedToCaption,
+                )
+            }
         }
     }
     if (showPendingPlaceholder) {

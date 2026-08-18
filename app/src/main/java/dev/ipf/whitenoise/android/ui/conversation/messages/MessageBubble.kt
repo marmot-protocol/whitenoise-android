@@ -1238,14 +1238,16 @@ internal fun MessageBubble(
                         message = record,
                         body = editState?.latestText ?: record.plaintext,
                     )
-                // An uncaptioned single image/video carries the footer
-                // overlaid on its bottom-right; a caption (if any) takes
-                // it instead via the text path below.
+                // An uncaptioned visual message carries the footer over the
+                // bottom-right media tile. For an album that is the last visible
+                // image/video; a caption (if any) owns the footer instead.
                 val footerOnVisualMedia =
-                    !deleted &&
-                        invalidationWarning == null &&
-                        visualAttachments.size == 1 &&
-                        mediaCaption == null
+                    visualMediaOwnsFooter(
+                        deleted = deleted,
+                        hasInvalidationWarning = invalidationWarning != null,
+                        visualCount = visualAttachments.size,
+                        hasCaption = mediaCaption != null,
+                    )
                 val confirmedFileFooterInCard =
                     fileCardOwnsFooter(
                         deleted = deleted,
@@ -1295,11 +1297,13 @@ internal fun MessageBubble(
                         }
                     }
                 val footerOnPendingVisual =
-                    !deleted &&
-                        invalidationWarning == null &&
-                        !anyConfirmedMedia &&
-                        pendingVisualRefs.size == 1 &&
-                        mediaCaption == null
+                    !anyConfirmedMedia &&
+                        visualMediaOwnsFooter(
+                            deleted = deleted,
+                            hasInvalidationWarning = invalidationWarning != null,
+                            visualCount = pendingVisualRefs.size,
+                            hasCaption = mediaCaption != null,
+                        )
                 val showPendingPlaceholder =
                     shouldShowPendingFilePlaceholder(
                         deleted = deleted,

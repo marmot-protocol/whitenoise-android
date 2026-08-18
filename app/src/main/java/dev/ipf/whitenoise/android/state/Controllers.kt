@@ -9865,6 +9865,19 @@ class ConversationController(
     }
 
     /**
+     * Page the exact chat-list first-unread boundary into the initial window.
+     * Unlike interactive reply navigation, entry positioning must not silently
+     * substitute a newer row after an arbitrary page cap. The subscription
+     * loader's no-progress and exhaustion guards still bound this traversal.
+     */
+    suspend fun loadConversationEntryUnreadMessageAvailable(messageIdHex: String): Boolean {
+        while (!timelineRecords.containsKey(messageIdHex) && hasMoreBefore) {
+            if (!loadOlderPage()) break
+        }
+        return timelineRecords.containsKey(messageIdHex)
+    }
+
+    /**
      * Move the subscription-owned bounded window toward [match] until that
      * exhaustive local-search result is present or the relevant side of local
      * history is exhausted. Timestamp + id let traversal page in either

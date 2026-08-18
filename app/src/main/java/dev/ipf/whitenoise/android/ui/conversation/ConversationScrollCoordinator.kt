@@ -661,22 +661,29 @@ internal suspend fun ConversationScrollCoordinator.jumpToUnreadOrNewest(
     pendingUnreadMessageId: String?,
     resolveUnreadIndex: () -> Int?,
     isUnreadTopAligned: () -> Boolean,
+    prepareTail: suspend () -> Boolean = { true },
     resolveTailIndex: () -> Int,
 ): ConversationJumpToNewestOutcome {
-    suspend fun jumpToTail(): ConversationJumpToNewestOutcome =
-        if (
+    suspend fun jumpToTail(): ConversationJumpToNewestOutcome {
+        var tailPrepared = false
+        val completed =
             programmaticJump(
                 targetMessageId = null,
                 reason = ConversationScrollReason.UnreadTail,
                 resultingMode = ConversationScrollMode.FollowingTail,
             ) {
+                tailPrepared = prepareTail()
+                if (!tailPrepared) {
+                    throw CancellationException("Conversation newest edge was not available")
+                }
                 animateScrollToItem(resolveTailIndex())
             }
-        ) {
+        return if (completed && tailPrepared) {
             ConversationJumpToNewestOutcome.Tail
         } else {
             ConversationJumpToNewestOutcome.Cancelled
         }
+    }
 
     val targetMessageId = pendingUnreadMessageId ?: return jumpToTail()
     val initialTargetIndex = resolveUnreadIndex() ?: return jumpToTail()
