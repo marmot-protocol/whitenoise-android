@@ -2537,6 +2537,27 @@ internal fun isDisappearingSendTimeExpiryDeferred(
     return true
 }
 
+/**
+ * Group-system rows are durable history about the conversation itself, including the event that
+ * announces a retention change. Applying the current message window to those rows hides an old
+ * retention event on controller recreation, then a session read anchor can make it reappear after
+ * the next send. All other projected row kinds retain their existing expiry behavior.
+ */
+internal fun shouldApplyLocalDisappearingExpiry(record: AppMessageRecordFfi): Boolean = !MessageProjector.isGroupSystem(record)
+
+internal fun isTimelineRecordLocallyExpired(
+    nowMillis: Long,
+    disappearingMessageSecs: ULong,
+    record: AppMessageRecordFfi,
+    row: DisappearingMessageSweep.LocalExpiryRow,
+): Boolean =
+    shouldApplyLocalDisappearingExpiry(record) &&
+        DisappearingMessageSweep.isLocallyExpired(
+            nowMillis = nowMillis,
+            disappearingMessageSecs = disappearingMessageSecs,
+            row = row,
+        )
+
 internal fun firstMessageOrder(messageIds: Iterable<String>): Map<String, Int> =
     buildMap {
         messageIds.forEachIndexed { index, messageId -> putIfAbsent(messageId, index) }
@@ -6970,7 +6991,9 @@ class ConversationController(
                 timelineOrder.mapNotNull { timelineItemsById[it]?.record }.forEach(::add)
             }
         val messageOrder = firstMessageOrder(records.map { it.messageIdHex })
-        return records.map { localExpiryRow(it, messageOrder) }
+        return records
+            .filter(::shouldApplyLocalDisappearingExpiry)
+            .map { localExpiryRow(it, messageOrder) }
     }
 
     private fun localExpiryRow(
@@ -11071,9 +11094,10 @@ class ConversationController(
                     if (record.direction == "sent") {
                         readAnchoredAtSeconds.putIfAbsent(record.messageIdHex, nowSeconds)
                     }
-                    !DisappearingMessageSweep.isLocallyExpired(
+                    !isTimelineRecordLocallyExpired(
                         nowMillis = nowMillis,
                         disappearingMessageSecs = window,
+                        record = record,
                         row = localExpiryRow(record, messageOrder),
                     )
                 }
