@@ -131,10 +131,10 @@ internal class ByteArrayFuzzedDataProvider(
         min: Float,
         max: Float,
     ): Float {
-        if (min >= max) {
-            return min
-        }
-        return min + (consumeByte().toInt() and 0xFF) / 255f * (max - min)
+        require(min <= max) { "min must be <= max" }
+        if (min == max) return min
+        val fraction = (consumeByte().toInt() and 0xFF) / 255.0
+        return interpolateFinite(min.toDouble(), max.toDouble(), fraction).toFloat().coerceIn(min, max)
     }
 
     override fun consumeProbabilityFloat(): Float = (consumeByte().toInt() and 0xFF) / 255f
@@ -147,10 +147,10 @@ internal class ByteArrayFuzzedDataProvider(
         min: Double,
         max: Double,
     ): Double {
-        if (min >= max) {
-            return min
-        }
-        return min + (consumeByte().toInt() and 0xFF) / 255.0 * (max - min)
+        require(min <= max) { "min must be <= max" }
+        if (min == max) return min
+        val fraction = (consumeByte().toInt() and 0xFF) / 255.0
+        return interpolateFinite(min, max, fraction).coerceIn(min, max)
     }
 
     override fun consumeProbabilityDouble(): Double = (consumeByte().toInt() and 0xFF) / 255.0
@@ -197,5 +197,16 @@ internal class ByteArrayFuzzedDataProvider(
             for (byte in this@decodeTo7BitAscii) {
                 append((byte.toInt() and 0x7F).toChar())
             }
+        }
+
+    private fun interpolateFinite(
+        min: Double,
+        max: Double,
+        fraction: Double,
+    ): Double =
+        if (min < 0.0 && max > 0.0) {
+            min * (1.0 - fraction) + max * fraction
+        } else {
+            min + (max - min) * fraction
         }
 }

@@ -138,14 +138,15 @@ object FuzzJsonStructure {
         var maxMembersSeen = 0
 
         fun scanValue(depth: Int): ScanResult {
-            if (depth > FuzzBounds.MAX_DEPTH) {
-                return overLimit(depth)
-            }
-            maxDepthSeen = maxOf(maxDepthSeen, depth)
             skipWhitespace()
             if (index >= text.length) {
                 return withinBoundsUnrecognized(depth)
             }
+            val startsContainer = text[index] == '{' || text[index] == '['
+            if (startsContainer && depth > FuzzBounds.MAX_DEPTH) {
+                return overLimit(depth)
+            }
+            maxDepthSeen = maxOf(maxDepthSeen, depth.coerceAtMost(FuzzBounds.MAX_DEPTH))
             return when (text[index]) {
                 '{' -> scanObject(depth)
                 '[' -> scanArray(depth)

@@ -46,6 +46,15 @@ class FuzzJsonStructureTest {
     }
 
     @Test
+    fun withinBounds_acceptsScalarInsideDeepestPermittedContainer() {
+        val nested =
+            "[".repeat(FuzzBounds.MAX_DEPTH) +
+                "0" +
+                "]".repeat(FuzzBounds.MAX_DEPTH)
+        assertTrue(FuzzJsonStructure.withinBounds(nested))
+    }
+
+    @Test
     fun withinBounds_rejectsCollectionOverLimit() {
         val elements = (1..FuzzBounds.MAX_COLLECTION_ELEMENTS + 1).joinToString(",")
         assertFalse(FuzzJsonStructure.withinBounds("[$elements]"))

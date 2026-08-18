@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.fuzz
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ByteArrayFuzzedDataProviderTest {
@@ -57,5 +58,41 @@ class ByteArrayFuzzedDataProviderTest {
         val provider = ByteArrayFuzzedDataProvider(bytes)
         assertEquals("x\u0000y", provider.consumeRemainingAsAsciiString())
         assertEquals(0, provider.remainingBytes())
+    }
+
+    @Test
+    fun regularFloatingPointRangesRejectInvalidBounds() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ByteArrayFuzzedDataProvider(byteArrayOf(1)).consumeRegularFloat(1f, -1f)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ByteArrayFuzzedDataProvider(byteArrayOf(1)).consumeRegularDouble(1.0, -1.0)
+        }
+    }
+
+    @Test
+    fun regularFloatingPointRangesHandleFiniteOppositeExtrema() {
+        val floatValue =
+            ByteArrayFuzzedDataProvider(byteArrayOf(0x80.toByte()))
+                .consumeRegularFloat(-Float.MAX_VALUE, Float.MAX_VALUE)
+        assertTrue(floatValue.isFinite())
+        assertTrue(floatValue in -Float.MAX_VALUE..Float.MAX_VALUE)
+
+        val doubleValue =
+            ByteArrayFuzzedDataProvider(byteArrayOf(0x80.toByte()))
+                .consumeRegularDouble(-Double.MAX_VALUE, Double.MAX_VALUE)
+        assertTrue(doubleValue.isFinite())
+        assertTrue(doubleValue in -Double.MAX_VALUE..Double.MAX_VALUE)
+    }
+
+    @Test
+    fun regularFloatingPointEqualBoundsDoNotConsumeInput() {
+        val floatProvider = ByteArrayFuzzedDataProvider(byteArrayOf(1))
+        assertEquals(7f, floatProvider.consumeRegularFloat(7f, 7f))
+        assertEquals(1, floatProvider.remainingBytes())
+
+        val doubleProvider = ByteArrayFuzzedDataProvider(byteArrayOf(1))
+        assertEquals(7.0, doubleProvider.consumeRegularDouble(7.0, 7.0))
+        assertEquals(1, doubleProvider.remainingBytes())
     }
 }
