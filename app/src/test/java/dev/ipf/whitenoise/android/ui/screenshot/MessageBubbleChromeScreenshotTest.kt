@@ -113,24 +113,28 @@ class MessageBubbleChromeScreenshotTest {
                             text = "Incoming · one reaction",
                             time = "12:40",
                             outgoing = false,
+                            customArgb = CUSTOM_AMOLED_ARGB,
                             tallies = listOf(ReactionTally("👍", 1, mine = false)),
                         )
                         AmoledReactionBubble(
                             text = "Outgoing · one reaction",
                             time = "12:41",
                             outgoing = true,
+                            customArgb = OUTGOING_CUSTOM_AMOLED_ARGB,
                             tallies = listOf(ReactionTally("❤️", 1, mine = false)),
                         )
                         AmoledReactionBubble(
                             text = "Incoming · you reacted",
                             time = "12:42",
                             outgoing = false,
+                            customArgb = CUSTOM_AMOLED_ARGB,
                             tallies = listOf(ReactionTally("😂", 1, mine = true)),
                         )
                         AmoledReactionBubble(
                             text = "Outgoing · you reacted",
                             time = "12:43",
                             outgoing = true,
+                            customArgb = OUTGOING_CUSTOM_AMOLED_ARGB,
                             tallies = listOf(ReactionTally("🎉", 1, mine = true)),
                         )
                         AmoledReactionBubble(
@@ -166,6 +170,7 @@ class MessageBubbleChromeScreenshotTest {
                             text = "Maximum visible reactions",
                             time = "12:45",
                             outgoing = true,
+                            customArgb = OUTGOING_CUSTOM_AMOLED_ARGB,
                             tallies =
                                 listOf(
                                     ReactionTally("👍", 9_990, mine = true),
@@ -199,6 +204,7 @@ class MessageBubbleChromeScreenshotTest {
                                 text = "رسالة واردة",
                                 time = "12:46",
                                 outgoing = false,
+                                customArgb = CUSTOM_AMOLED_ARGB,
                                 tallies = listOf(ReactionTally("👍", 2, mine = false)),
                             )
                             AmoledReactionBubble(
@@ -390,18 +396,26 @@ private fun AmoledReactionBubble(
     text: String,
     time: String,
     outgoing: Boolean,
+    customArgb: Long? = null,
     tallies: List<ReactionTally>,
 ) {
+    val presentation =
+        messageBubblePresentation(
+            deleted = false,
+            mine = outgoing,
+            customArgb = customArgb,
+        )
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (outgoing) Alignment.End else Alignment.Start,
     ) {
-        Surface(
+        MessageBubbleFrame(
+            presentation = presentation,
+            highlighted = false,
+            mine = outgoing,
+            mentionedSelf = false,
+            mentionedYouLabel = "Mentioned you",
             modifier = Modifier.widthIn(max = 260.dp),
-            color = Color.Black,
-            contentColor = Color.White,
-            shape = RoundedCornerShape(18.dp),
-            border = messageBubbleBorder(highlighted = false, mine = outgoing),
         ) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
                 Text(text)
@@ -416,6 +430,7 @@ private fun AmoledReactionBubble(
             ReactionSummaryChip(
                 tallies = tallies,
                 outgoing = outgoing,
+                customAmoledBorderColor = presentation.borderOverrideArgb?.let(::colorFromArgb),
                 onClick = {},
             )
         }

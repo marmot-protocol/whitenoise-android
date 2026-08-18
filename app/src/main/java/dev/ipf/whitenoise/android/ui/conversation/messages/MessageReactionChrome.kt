@@ -70,6 +70,7 @@ internal fun RowScope.MessageSenderAvatarSlot(
 internal fun ColumnScope.MessageReactionSummary(
     tallies: List<ReactionTally>,
     mine: Boolean,
+    bubbleBorderOverrideArgb: Long? = null,
     onClick: () -> Unit,
 ) {
     val reactionChipPadding =
@@ -101,6 +102,7 @@ internal fun ColumnScope.MessageReactionSummary(
         ReactionSummaryChip(
             tallies = tallies,
             outgoing = mine,
+            customAmoledBorderColor = bubbleBorderOverrideArgb?.let(::colorFromArgb),
             onClick = onClick,
         )
     }

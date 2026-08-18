@@ -2025,6 +2025,7 @@ internal fun MessageBubble(
                     MessageReactionSummary(
                         tallies = tallies,
                         mine = mine,
+                        bubbleBorderOverrideArgb = bubblePresentation.borderOverrideArgb,
                         onClick = { reactionSheetOpen = true },
                     )
                 }

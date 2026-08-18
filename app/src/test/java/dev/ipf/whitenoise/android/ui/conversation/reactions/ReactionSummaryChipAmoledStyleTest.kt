@@ -94,6 +94,45 @@ class ReactionSummaryChipAmoledStyleTest {
     }
 
     @Test
+    fun customAmoledBubbleBorderOverridesDirectionalFallbackForBothSides() {
+        val customBorder = Color(0xFFFFC107)
+        var outgoingSelected: BorderStroke? = null
+        var outgoingUnselected: BorderStroke? = null
+        var incomingSelected: BorderStroke? = null
+        var incomingUnselected: BorderStroke? = null
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                val outgoingSelectedValue =
+                    reactionSummaryChipBorder(true, true, customBorder)
+                val outgoingUnselectedValue =
+                    reactionSummaryChipBorder(true, false, customBorder)
+                val incomingSelectedValue =
+                    reactionSummaryChipBorder(false, true, customBorder)
+                val incomingUnselectedValue =
+                    reactionSummaryChipBorder(false, false, customBorder)
+                SideEffect {
+                    outgoingSelected = outgoingSelectedValue
+                    outgoingUnselected = outgoingUnselectedValue
+                    incomingSelected = incomingSelectedValue
+                    incomingUnselected = incomingUnselectedValue
+                }
+            }
+        }
+
+        composeRule.runOnIdle {
+            assertEquals(customBorder, borderColor(outgoingSelected))
+            assertEquals(customBorder, borderColor(outgoingUnselected))
+            assertEquals(customBorder, borderColor(incomingSelected))
+            assertEquals(customBorder, borderColor(incomingUnselected))
+            assertEquals(2.dp, requireNotNull(outgoingSelected).width)
+            assertEquals(1.dp, requireNotNull(outgoingUnselected).width)
+            assertEquals(2.dp, requireNotNull(incomingSelected).width)
+            assertEquals(1.dp, requireNotNull(incomingUnselected).width)
+        }
+    }
+
+    @Test
     fun standardDarkReactionChipDistinguishesSelectionWithoutChangingPalette() {
         var mineContainer = Color.Unspecified
         var notMineContainer = Color.Unspecified
@@ -114,8 +153,19 @@ class ReactionSummaryChipAmoledStyleTest {
                 val notMineContainerValue = reactionSummaryChipContainerColor(selected = false)
                 val mineContentValue = reactionSummaryChipContentColor(selected = true)
                 val notMineContentValue = reactionSummaryChipContentColor(selected = false)
-                val mineBorderValue = reactionSummaryChipBorder(outgoing = true, selected = true)
-                val notMineBorderValue = reactionSummaryChipBorder(outgoing = true, selected = false)
+                val ignoredCustomBorder = Color.Magenta
+                val mineBorderValue =
+                    reactionSummaryChipBorder(
+                        outgoing = true,
+                        selected = true,
+                        customAmoledBorderColor = ignoredCustomBorder,
+                    )
+                val notMineBorderValue =
+                    reactionSummaryChipBorder(
+                        outgoing = true,
+                        selected = false,
+                        customAmoledBorderColor = ignoredCustomBorder,
+                    )
 
                 SideEffect {
                     mineContainer = mineContainerValue
