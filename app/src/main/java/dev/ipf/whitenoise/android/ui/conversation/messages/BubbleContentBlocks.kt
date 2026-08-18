@@ -136,6 +136,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
             controllerKey = controller,
             accountRef = controller.boundAccountRef,
             deleted = deleted,
+            retentionAtSendSeconds = item.retentionAtSendSeconds,
         )
     val reserveRetentionSpace =
         !deleted &&
@@ -437,6 +438,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 controllerKey = controller,
                 accountRef = controller.boundAccountRef,
                 deleted = deleted,
+                retentionAtSendSeconds = item.retentionAtSendSeconds,
             ).takeUnless { retentionOwnedByFileCard }
     val reserveRetentionSpace =
         !retentionOwnedByFileCard &&

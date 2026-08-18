@@ -125,9 +125,8 @@ class MessageRetentionIndicatorComposeTest {
     }
 
     @Test
-    fun reservedPendingSlotKeepsFooterWidthWhenTheProjectionArrives() {
-        var retention: RetentionIndicatorInput? by mutableStateOf(null)
-        var reserveSpace by mutableStateOf(true)
+    fun pendingTimerKeepsFooterWidthWhenAuthoritativeProjectionArrives() {
+        var retention: RetentionIndicatorInput? by mutableStateOf(input(expiresAtEpochSeconds = null))
         composeRule.setContent {
             WhiteNoiseTheme {
                 MessageInlineFooter(
@@ -138,7 +137,6 @@ class MessageRetentionIndicatorComposeTest {
                     editedLabel = null,
                     onEditedClick = null,
                     retention = retention,
-                    reserveRetentionSpace = reserveSpace,
                     retentionClockMillis = { 150_000L },
                     modifier = Modifier.testTag(FOOTER_TAG),
                 )
@@ -148,17 +146,41 @@ class MessageRetentionIndicatorComposeTest {
         val label = context.getString(R.string.disappearing_message)
         val pendingBounds = composeRule.onNodeWithTag(FOOTER_TAG).getUnclippedBoundsInRoot()
         val pendingWidth = pendingBounds.right - pendingBounds.left
-        composeRule.onNodeWithContentDescription(label).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(label).assertExists()
 
         composeRule.runOnIdle {
             retention = input(expiresAtEpochSeconds = 200uL)
-            reserveSpace = false
         }
 
         val sentBounds = composeRule.onNodeWithTag(FOOTER_TAG).getUnclippedBoundsInRoot()
         val sentWidth = sentBounds.right - sentBounds.left
         assertEquals(pendingWidth, sentWidth)
         composeRule.onNodeWithContentDescription(label).assertExists()
+    }
+
+    @Test
+    fun pendingRetentionTimerAndDeliveryClockRemainVisibleTogether() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MessageInlineFooter(
+                    timeText = "12:34",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    showStatus = true,
+                    status = MessageStatus.Pending,
+                    editedLabel = null,
+                    onEditedClick = null,
+                    retention = null,
+                    reserveRetentionSpace = true,
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.disappearing_message))
+            .assertExists()
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.sending))
+            .assertExists()
     }
 
     @Test

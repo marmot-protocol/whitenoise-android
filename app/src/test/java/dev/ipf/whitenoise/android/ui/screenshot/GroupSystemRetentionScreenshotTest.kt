@@ -96,7 +96,8 @@ class GroupSystemRetentionScreenshotTest {
             groupIdHex = GROUP_ID,
             sender = ACCOUNT_ID,
             plaintext =
-                """{"v":1,"system_type":"disappearing_timer_changed","data":{"old_retention_seconds":0,"new_retention_seconds":300}}""",
+                """{"v":1,"system_type":"disappearing_timer_changed","data":""" +
+                    """{"old_retention_seconds":0,"new_retention_seconds":300}}""",
             contentTokens =
                 MarkdownDocumentFfi(
                     truncated = false,

@@ -27,10 +27,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.retentionIndicatorVisible
-import dev.ipf.whitenoise.android.state.MessageStatus
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -58,48 +55,6 @@ internal sealed interface RetentionIndicatorPresentation {
         val expiresAtEpochMillis: Long,
         val refreshAfterMillis: Long?,
     ) : RetentionIndicatorPresentation
-}
-
-internal fun AppMessageRecordFfi.retentionIndicatorInput(
-    controllerKey: Any,
-    accountRef: String?,
-    deleted: Boolean,
-): RetentionIndicatorInput? =
-    retentionIndicatorInput(
-        controllerKey = controllerKey,
-        accountRef = accountRef,
-        groupIdHex = groupIdHex,
-        messageIdHex = messageIdHex,
-        sourceEpoch = sourceEpoch,
-        durationSeconds = retentionSeconds,
-        expiresAtEpochSeconds = retentionExpiresAt,
-        deleted = deleted,
-    )
-
-internal fun retentionIndicatorInput(
-    controllerKey: Any,
-    accountRef: String?,
-    groupIdHex: String,
-    messageIdHex: String,
-    sourceEpoch: ULong?,
-    durationSeconds: ULong?,
-    expiresAtEpochSeconds: ULong?,
-    deleted: Boolean,
-): RetentionIndicatorInput? {
-    val duration = durationSeconds?.takeIf { retentionIndicatorVisible(it) }
-    return if (accountRef == null || duration == null || deleted) {
-        null
-    } else {
-        RetentionIndicatorInput(
-            controllerKey = controllerKey,
-            accountRef = accountRef,
-            groupIdHex = groupIdHex,
-            messageIdHex = messageIdHex,
-            sourceEpoch = sourceEpoch,
-            durationSeconds = duration,
-            expiresAtEpochSeconds = expiresAtEpochSeconds,
-        )
-    }
 }
 
 internal fun retentionIndicatorPresentation(
@@ -131,26 +86,6 @@ internal fun retentionIndicatorPresentation(
             )
         }
     }
-}
-
-/**
- * Reserves only layout space while authoritative indicator input is unavailable: for a projected
- * retained record awaiting account binding, or an unconfirmed outgoing message in a retained group.
- * The engine projection remains authoritative for whether an indicator is drawn and when it begins.
- */
-internal fun shouldReserveRetentionIndicatorSpace(
-    input: RetentionIndicatorInput?,
-    projectedRetentionSeconds: ULong?,
-    mine: Boolean,
-    status: MessageStatus,
-    groupRetentionSeconds: ULong,
-): Boolean {
-    if (input != null) return false
-    val unconfirmedOutgoing =
-        mine &&
-            (status == MessageStatus.Pending || status == MessageStatus.Failed) &&
-            groupRetentionSeconds > 0uL
-    return retentionIndicatorVisible(projectedRetentionSeconds) || unconfirmedOutgoing
 }
 
 /**
@@ -200,12 +135,18 @@ internal fun MessageRetentionIndicatorSlot(
     color: Color,
     reserveSpace: Boolean = false,
 ) {
-    if (!reserveSpace && presentation is RetentionIndicatorPresentation.Hidden) return
+    val visiblePresentation =
+        if (reserveSpace && presentation is RetentionIndicatorPresentation.Hidden) {
+            RetentionIndicatorPresentation.Waiting
+        } else {
+            presentation
+        }
+    if (visiblePresentation is RetentionIndicatorPresentation.Hidden) return
     Box(
         modifier = Modifier.size(RetentionIndicatorSize),
         contentAlignment = Alignment.Center,
     ) {
-        MessageRetentionIndicator(presentation, color)
+        MessageRetentionIndicator(visiblePresentation, color)
     }
 }
 

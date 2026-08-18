@@ -1274,6 +1274,12 @@ data class TimelineMessage(
     val status: MessageStatus,
     val projected: TimelineMessageRecordFfi? = null,
     val timelineOrder: ULong = 0uL,
+    /**
+     * Immutable presentation hint captured from the group when this local send was accepted.
+     * It keeps the waiting timer visible until MarmotKit projects the authoritative retention
+     * duration and expiry; it is never used to calculate or enforce expiration.
+     */
+    val retentionAtSendSeconds: ULong? = null,
 )
 
 /**
@@ -1312,6 +1318,8 @@ private fun timelineRecordContentEqual(
         a.deleted == b.deleted &&
         a.deletedByMessageIdHex == b.deletedByMessageIdHex &&
         a.invalidationStatus == b.invalidationStatus &&
+        a.retentionSeconds == b.retentionSeconds &&
+        a.retentionExpiresAt == b.retentionExpiresAt &&
         a.reactions == b.reactions
 
 private fun markdownDocumentsRenderEqual(
@@ -1349,6 +1357,7 @@ internal fun retainFailedOptimisticTextSend(
     optimistic: AppMessageRecordFfi,
     timelineOrder: ULong,
 ) {
+    val retentionAtSendSeconds = optimisticMessages[key]?.retentionAtSendSeconds
     messageById[optimistic.messageIdHex] = optimistic
     optimisticMessages[key] =
         TimelineMessage(
@@ -1356,6 +1365,7 @@ internal fun retainFailedOptimisticTextSend(
             optimistic,
             MessageStatus.Failed,
             timelineOrder = timelineOrder,
+            retentionAtSendSeconds = retentionAtSendSeconds,
         )
 }
 
@@ -2039,6 +2049,7 @@ internal fun reconcileSuccessfulTextSend(
     projectedMessageIds: Set<String>,
     timelineOrder: ULong,
 ): SuccessfulTextSendReconciliation {
+    val retentionAtSendSeconds = optimisticMessages[optimisticKey]?.retentionAtSendSeconds
     val hasConfirmedId = summaryMessageIds.isNotEmpty()
     val awaitingEcho =
         textSendAwaitingEchoConfirmation(
@@ -2065,6 +2076,7 @@ internal fun reconcileSuccessfulTextSend(
                 confirmed,
                 MessageStatus.Sent,
                 timelineOrder = timelineOrder,
+                retentionAtSendSeconds = retentionAtSendSeconds,
             )
     }
     return SuccessfulTextSendReconciliation(confirmedId, confirmed, awaitingEcho, insertedSent)
@@ -6621,6 +6633,8 @@ class ConversationController(
     // the overrides so a replacement controller can finish the cleanup.
     private val optimisticSendPositionPreserves =
         appState.optimisticSendPositionPreserves(conversationAccountRef, initialGroup.groupIdHex)
+    private val retentionAtSendByMessageId =
+        appState.retentionAtSend(conversationAccountRef, initialGroup.groupIdHex)
     private val preservedTimelinePositionOverrideIds = mutableSetOf<String>()
     private val durableStreamPositionOverrideIds = mutableSetOf<String>()
 
@@ -6985,16 +6999,17 @@ class ConversationController(
         )
 
     private fun foregroundSweepExpiryRows(): List<DisappearingMessageSweep.LocalExpiryRow> {
-        val records =
-            buildList {
-                optimisticMessages.values.forEach { add(it.record) }
-                timelineOrder.mapNotNull { timelineItemsById[it]?.record }.forEach(::add)
-            }
+        val records = foregroundSweepExpiryRecords()
         val messageOrder = firstMessageOrder(records.map { it.messageIdHex })
         return records
-            .filter(::shouldApplyLocalDisappearingExpiry)
             .map { localExpiryRow(it, messageOrder) }
     }
+
+    private fun foregroundSweepExpiryRecords(): List<AppMessageRecordFfi> =
+        buildList {
+            optimisticMessages.values.forEach { add(it.record) }
+            timelineOrder.mapNotNull { timelineItemsById[it]?.record }.forEach(::add)
+        }.filter(::shouldApplyLocalDisappearingExpiry)
 
     private fun localExpiryRow(
         record: AppMessageRecordFfi,
@@ -7313,7 +7328,18 @@ class ConversationController(
             projectedMessageIds.add(confirmedId)
             val projectedAction = TimelineProjector.toAppMessageRecord(projected)
             messageById[confirmedId] = projectedAction
-            val projectedItem = timelineMessageFromProjection(projected, projectedAction)
+            val projectedItem =
+                timelineMessageFromProjection(
+                    record = projected,
+                    actionRecord = projectedAction,
+                    retentionAtSendSeconds =
+                        retentionAtSendForProjection(
+                            messageId = confirmedId,
+                            projectedRetentionSeconds = projectedAction.retentionSeconds,
+                            optimisticMessageId = confirmedId,
+                            previousSnapshot = optimisticMessages["msg:$confirmedId"]?.retentionAtSendSeconds,
+                        ),
+                )
             if (projectedItem.id !in timelineItemsById) {
                 insertTimelineItemId(projectedItem.id)
             }
@@ -7479,6 +7505,7 @@ class ConversationController(
         val tempId = UUID.randomUUID().toString()
         rememberSendTrace(tempId, trace, traceStartMs)
         val now = nowSeconds()
+        val retentionAtSendSeconds = rememberRetentionAtSend(tempId, group.disappearingMessageSecs)
         val optimistic =
             AppMessageRecordFfi(
                 messageIdHex = tempId,
@@ -7510,6 +7537,7 @@ class ConversationController(
                 optimistic,
                 MessageStatus.Pending,
                 timelineOrder = optimisticOrder,
+                retentionAtSendSeconds = retentionAtSendSeconds,
             )
         messageById[tempId] = optimistic
         publishTimelineFromIndexes()
@@ -7582,6 +7610,7 @@ class ConversationController(
                     projectedMessageIds = projectedMessageIds,
                     timelineOrder = optimisticOrder,
                 )
+            transferRetentionAtSend(tempId, reconciliation.confirmedId)
             appState.commitOptimisticSentPreview(
                 groupIdHex = group.groupIdHex,
                 optimisticMessageIdHex = tempId,
@@ -7623,6 +7652,7 @@ class ConversationController(
                 rollbackOptimisticChatListPreview(tempId)
                 optimisticMessages.remove(optimisticKey)
                 messageById.remove(tempId)
+                retentionAtSendByMessageId.remove(tempId)
                 forgetSendTrace(tempId)
                 publishTimelineFromIndexes()
                 markActiveAccountRemovedFromMembers(account)
@@ -7803,6 +7833,7 @@ class ConversationController(
         val tempId = UUID.randomUUID().toString()
         val key = "msg:$tempId"
         val now = nowSeconds()
+        val retentionAtSendSeconds = rememberRetentionAtSend(tempId, group.disappearingMessageSecs)
         val trimmedCaption = caption?.trim()?.takeIf { it.isNotBlank() }
         val placeholderName =
             if (attachments.size == 1) {
@@ -7831,6 +7862,7 @@ class ConversationController(
                 optimistic,
                 MessageStatus.Pending,
                 timelineOrder = optimisticOrder,
+                retentionAtSendSeconds = retentionAtSendSeconds,
             )
         messageById[tempId] = optimistic
         publishTimelineFromIndexes()
@@ -7887,6 +7919,7 @@ class ConversationController(
         order: ULong,
         optimistic: AppMessageRecordFfi,
     ) {
+        val retentionAtSendSeconds = optimisticMessages[key]?.retentionAtSendSeconds
         val uploadJob = appState.trackInFlightMediaUpload(conversationAccountRef, group.groupIdHex, key)
         try {
             if (
@@ -7899,6 +7932,7 @@ class ConversationController(
             ) {
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
+                retentionAtSendByMessageId.remove(tempId)
                 retainedMediaUploads.remove(key)
                 activeUploadKeys.remove(key)
                 publishTimelineFromIndexes()
@@ -7909,7 +7943,14 @@ class ConversationController(
                     // Bytes are gone (evicted under cap, or process death) — can't
                     // retry without a re-attach. Leave the bubble Failed and drop
                     // the in-flight marker so a future dispose can clean up.
-                    optimisticMessages[key] = TimelineMessage(key, optimistic, MessageStatus.Failed, timelineOrder = order)
+                    optimisticMessages[key] =
+                        TimelineMessage(
+                            key,
+                            optimistic,
+                            MessageStatus.Failed,
+                            timelineOrder = order,
+                            retentionAtSendSeconds = retentionAtSendSeconds,
+                        )
                     activeUploadKeys.remove(key)
                     publishTimelineFromIndexes()
                     appState.present(R.string.toast_reattach_to_retry_media)
@@ -7957,6 +7998,7 @@ class ConversationController(
                 if (discardedDuringRetry.remove(key)) {
                     optimisticMessages.remove(key)
                     messageById.remove(tempId)
+                    retentionAtSendByMessageId.remove(tempId)
                     retainedMediaUploads.remove(key)
                     activeUploadKeys.remove(key)
                     publishTimelineFromIndexes()
@@ -7978,6 +8020,7 @@ class ConversationController(
                         }
                     }
                 val confirmedId = summary.messageIds.firstOrNull() ?: tempId
+                transferRetentionAtSend(tempId, confirmedId)
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
                 // INVARIANT: the discard re-check must run BEFORE any cache mutation
@@ -8076,6 +8119,7 @@ class ConversationController(
                                 confirmedRecord,
                                 MessageStatus.Sent,
                                 timelineOrder = order,
+                                retentionAtSendSeconds = retentionAtSendSeconds,
                             )
                         // Register the bridge through the same tracked preserve path
                         // as text sends so orphan cleanup can release its overrides
@@ -8120,6 +8164,7 @@ class ConversationController(
                 if (discardedDuringRetry.remove(key)) {
                     optimisticMessages.remove(key)
                     messageById.remove(tempId)
+                    retentionAtSendByMessageId.remove(tempId)
                     retainedMediaUploads.remove(key)
                     activeUploadKeys.remove(key)
                     publishTimelineFromIndexes()
@@ -8131,6 +8176,7 @@ class ConversationController(
                         optimistic,
                         MessageStatus.Failed,
                         timelineOrder = order,
+                        retentionAtSendSeconds = retentionAtSendSeconds,
                     )
                 // Failed bubble shown but bytes are retained for a possible
                 // retry — KEEP the key in `activeUploadKeys` so a screen
@@ -8825,10 +8871,8 @@ class ConversationController(
             val mediaOrder = retriedTimelineOrder(current.timelineOrder) { nextOptimisticTimelineOrder() }
             val mediaTempId = current.record.messageIdHex
             optimisticMessages[key] =
-                TimelineMessage(
-                    key,
-                    current.record,
-                    MessageStatus.Pending,
+                current.copy(
+                    status = MessageStatus.Pending,
                     timelineOrder = mediaOrder,
                 )
             // Re-mark this slot as "in flight" — if the previous attempt's
@@ -8848,10 +8892,9 @@ class ConversationController(
         val order = retriedTimelineOrder(current.timelineOrder) { nextOptimisticTimelineOrder() }
         discardedDuringRetry.remove(key)
         optimisticMessages[key] =
-            TimelineMessage(
-                key,
-                refreshedRecord,
-                MessageStatus.Pending,
+            current.copy(
+                record = refreshedRecord,
+                status = MessageStatus.Pending,
                 timelineOrder = order,
             )
         messageById[tempId] = refreshedRecord
@@ -8869,6 +8912,7 @@ class ConversationController(
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
                 }
+                transferRetentionAtSend(tempId, committedProjection.messageIdHex)
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
                 val projectedAction = TimelineProjector.toAppMessageRecord(committedProjection)
@@ -8897,6 +8941,7 @@ class ConversationController(
                 // User discarded mid-flight; drop the result entirely.
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
+                retentionAtSendByMessageId.remove(tempId)
                 publishTimelineFromIndexes()
                 return
             }
@@ -8911,6 +8956,7 @@ class ConversationController(
                     projectedMessageIds = projectedMessageIds,
                     timelineOrder = order,
                 )
+            transferRetentionAtSend(tempId, reconciliation.confirmedId)
             invalidatedProjectionIdsMatchingMessage(timelineRecords, reconciliation.confirmed)
                 .forEach(::removeProjectedRecord)
             publishTimelineFromIndexes()
@@ -8925,14 +8971,14 @@ class ConversationController(
                 // User discarded mid-flight; don't restore the Failed bubble.
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
+                retentionAtSendByMessageId.remove(tempId)
                 publishTimelineFromIndexes()
                 return
             }
             optimisticMessages[key] =
-                TimelineMessage(
-                    key,
-                    refreshedRecord,
-                    MessageStatus.Failed,
+                current.copy(
+                    record = refreshedRecord,
+                    status = MessageStatus.Failed,
                     timelineOrder = order,
                 )
             suppressProjectedTimelineItems(
@@ -8981,6 +9027,7 @@ class ConversationController(
         rollbackOptimisticChatListPreview(tempId)
         optimisticMessages.remove(key)
         messageById.remove(tempId)
+        retentionAtSendByMessageId.remove(tempId)
         // Free any retained attachment bytes for a discarded media send.
         retainedMediaUploads.remove(key)
         activeUploadKeys.remove(key)
@@ -10153,6 +10200,10 @@ class ConversationController(
 
     internal fun testActiveStreamIds(): Set<String> = activeStreamIds.toSet()
 
+    internal fun testForegroundSweepExpiryMessageIds(): List<String> {
+        return foregroundSweepExpiryRecords().map { it.messageIdHex }
+    }
+
     /**
      * Resolved reply target as (sender pubkey, display body). Returns the raw
      * sender — not a display name — so the caller can cache this projection in
@@ -10266,6 +10317,7 @@ class ConversationController(
         }
         pruneReadAnchorsToWindow()
         pruneConfirmedOptimisticMessages()
+        pruneRetentionAtSendToWindow()
         pruneConfirmedOptimisticReactions()
         pruneMessageOverlaysToWindow()
         recomputeReactions()
@@ -10387,6 +10439,7 @@ class ConversationController(
         // after loadOlder(), deliberately-loaded history is preserved and only
         // post-pagination live Upserts are trimmed (#1163 / #537).
         trimLiveTimelineWindow(LIVE_TIMELINE_WINDOW_CAP)
+        pruneRetentionAtSendToWindow()
         // Live Upsert/Projection batches add to messageById but never trim it;
         // prune to the (now-bounded) window + optimistic records so it doesn't
         // grow unbounded for an actively-watched conversation (#373).
@@ -10623,6 +10676,8 @@ class ConversationController(
         if (existing != null && stillProjected && timelineRecordsRenderEqual(existing, record)) {
             return TimelineProjector.toAppMessageRecord(record)
         }
+        var retentionAtSendSeconds =
+            previousItemId?.let { itemId -> timelineItemsById[itemId]?.retentionAtSendSeconds }
         if (previousItemId != null) {
             timelineItemsById.remove(previousItemId)
             timelineOrder.remove(previousItemId)
@@ -10689,31 +10744,44 @@ class ConversationController(
             actionRecord,
             displayedProjectedStreamItemIds,
         )
-        optimisticMessageIdForProjection(
-            optimisticMessages.values,
-            actionRecord,
-            allowDelayedProjection = allowDelayedProjection,
-        )?.takeIf { reconcileOptimistic }
-            ?.let { optimisticId ->
-                preserveOptimisticDisplayPosition(record.messageIdHex, optimisticId)
-                val optimisticKey = "msg:$optimisticId"
-                // Hand off own-sent media bytes from the pending optimistic to
-                // the projection's cache key BEFORE the bubble's LaunchedEffect
-                // can fire and ask Blossom for them. Without this, the projected
-                // bubble starts rendering, finds the thumbnail/plaintext caches
-                // empty for the confirmed messageIdHex, and triggers an FFI
-                // downloadMedia round-trip — re-downloading bytes we literally
-                // just uploaded.
-                handoffOwnMediaCacheOnReconcile(optimisticKey, record.messageIdHex)
-                optimisticMessages.remove(optimisticKey)
-                messageById.remove(optimisticId)
-                // The engine echo just flipped this pending bubble to a
-                // projected record. If we're tracing this send, this is the
-                // "self-echo drives the sent flip" path (issue #913).
-                traceEchoReconcile(optimisticId)
-            }
+        val reconciledOptimisticId =
+            optimisticMessageIdForProjection(
+                optimisticMessages.values,
+                actionRecord,
+                allowDelayedProjection = allowDelayedProjection,
+            ).takeIf { reconcileOptimistic }
+        retentionAtSendSeconds =
+            retentionAtSendForProjection(
+                messageId = record.messageIdHex,
+                projectedRetentionSeconds = actionRecord.retentionSeconds,
+                optimisticMessageId = reconciledOptimisticId,
+                previousSnapshot = retentionAtSendSeconds,
+            )
+        reconciledOptimisticId?.let { optimisticId ->
+            preserveOptimisticDisplayPosition(record.messageIdHex, optimisticId)
+            val optimisticKey = "msg:$optimisticId"
+            // Hand off own-sent media bytes from the pending optimistic to
+            // the projection's cache key BEFORE the bubble's LaunchedEffect
+            // can fire and ask Blossom for them. Without this, the projected
+            // bubble starts rendering, finds the thumbnail/plaintext caches
+            // empty for the confirmed messageIdHex, and triggers an FFI
+            // downloadMedia round-trip — re-downloading bytes we literally
+            // just uploaded.
+            handoffOwnMediaCacheOnReconcile(optimisticKey, record.messageIdHex)
+            optimisticMessages.remove(optimisticKey)
+            messageById.remove(optimisticId)
+            // The engine echo just flipped this pending bubble to a
+            // projected record. If we're tracing this send, this is the
+            // "self-echo drives the sent flip" path (issue #913).
+            traceEchoReconcile(optimisticId)
+        }
         messageById[record.messageIdHex] = actionRecord
-        val item = timelineMessageFromProjection(record, actionRecord)
+        val item =
+            timelineMessageFromProjection(
+                record = record,
+                actionRecord = actionRecord,
+                retentionAtSendSeconds = retentionAtSendSeconds,
+            )
         timelineItemsById[item.id] = item
         insertTimelineItemId(item.id)
         return actionRecord
@@ -10729,6 +10797,47 @@ class ConversationController(
         optimisticSendPositionPreserves.add(projectedId)
         localTimelineOrderOverrides[projectedId] = optimistic.timelineOrder
         localTimelineTimestampOverrides[projectedId] = optimistic.record.recordedAt
+    }
+
+    private fun rememberRetentionAtSend(
+        messageId: String,
+        retentionSeconds: ULong?,
+    ): ULong? =
+        retentionSeconds?.takeIf { it > 0uL }?.also { snapshot ->
+            retentionAtSendByMessageId[messageId] = snapshot
+        }
+
+    private fun transferRetentionAtSend(
+        fromMessageId: String,
+        toMessageId: String,
+    ): ULong? {
+        if (fromMessageId == toMessageId) return retentionAtSendByMessageId[toMessageId]
+        val snapshot = retentionAtSendByMessageId.remove(fromMessageId) ?: retentionAtSendByMessageId[toMessageId]
+        if (snapshot != null) retentionAtSendByMessageId[toMessageId] = snapshot
+        return snapshot
+    }
+
+    private fun retentionAtSendForProjection(
+        messageId: String,
+        projectedRetentionSeconds: ULong?,
+        optimisticMessageId: String?,
+        previousSnapshot: ULong?,
+    ): ULong? {
+        val optimisticSnapshot =
+            optimisticMessageId?.let { optimisticId ->
+                retentionAtSendByMessageId[optimisticId]
+                    ?: optimisticMessages["msg:$optimisticId"]?.retentionAtSendSeconds
+            }
+        if (optimisticMessageId != null && optimisticMessageId != messageId) {
+            retentionAtSendByMessageId.remove(optimisticMessageId)
+        }
+        if (projectedRetentionSeconds != null) {
+            retentionAtSendByMessageId.remove(messageId)
+            return null
+        }
+        val snapshot = retentionAtSendByMessageId[messageId] ?: optimisticSnapshot ?: previousSnapshot
+        if (snapshot != null) retentionAtSendByMessageId[messageId] = snapshot
+        return snapshot
     }
 
     private fun applyDurableStreamPositions(positions: Map<String, StreamFinalDisplayPosition>) {
@@ -10774,9 +10883,14 @@ class ConversationController(
     private fun refreshProjectedTimelinePosition(messageId: String) {
         val projected = timelineRecords[messageId] ?: return
         val itemId = projectedItemId(projected)
-        if (itemId !in timelineItemsById) return
+        val currentItem = timelineItemsById[itemId] ?: return
         val actionRecord = TimelineProjector.toAppMessageRecord(projected)
-        timelineItemsById[itemId] = timelineMessageFromProjection(projected, actionRecord)
+        timelineItemsById[itemId] =
+            timelineMessageFromProjection(
+                record = projected,
+                actionRecord = actionRecord,
+                retentionAtSendSeconds = currentItem.retentionAtSendSeconds,
+            )
         timelineOrder.remove(itemId)
         insertTimelineItemId(itemId)
     }
@@ -10875,6 +10989,7 @@ class ConversationController(
         preservedTimelinePositionOverrideIds.remove(messageIdHex)
         optimisticSendPositionPreserves.remove(messageIdHex)
         durableStreamPositionOverrideIds.remove(messageIdHex)
+        retentionAtSendByMessageId.remove(messageIdHex)
         readAnchoredAtSeconds.remove(messageIdHex)
         deletedMessageIds = deletedMessageIds - messageIdHex
         optimisticReactionChanges.entries.removeAll { (_, change) -> change.targetMessageId == messageIdHex }
@@ -10915,6 +11030,13 @@ class ConversationController(
         readAnchoredAtSeconds.keys.retainAll(retained)
     }
 
+    private fun pruneRetentionAtSendToWindow() {
+        if (retentionAtSendByMessageId.isEmpty()) return
+        val retained = HashSet(timelineRecords.keys)
+        optimisticMessages.values.forEach { retained.add(it.record.messageIdHex) }
+        retentionAtSendByMessageId.keys.retainAll(retained)
+    }
+
     // Drop optimistic edits whose target message has left the window (no longer
     // in timelineRecords nor backed by an optimistic record). The status-based
     // prune in publishTimelineFromIndexesInternal can't fire once aggregated[target]
@@ -10949,6 +11071,7 @@ class ConversationController(
     private fun timelineMessageFromProjection(
         record: TimelineMessageRecordFfi,
         actionRecord: AppMessageRecordFfi = TimelineProjector.toAppMessageRecord(record),
+        retentionAtSendSeconds: ULong? = null,
     ): TimelineMessage {
         val streamId = MessageProjector.streamId(actionRecord).takeIf { MessageProjector.isStreamStart(actionRecord) }
         val displayRecord =
@@ -10973,6 +11096,7 @@ class ConversationController(
                 },
             projected = record,
             timelineOrder = localTimelineOrderOverrides[record.messageIdHex] ?: 0uL,
+            retentionAtSendSeconds = retentionAtSendSeconds.takeIf { actionRecord.retentionSeconds == null },
         )
     }
 

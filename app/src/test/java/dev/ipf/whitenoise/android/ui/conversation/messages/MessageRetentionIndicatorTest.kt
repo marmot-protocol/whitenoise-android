@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,7 +36,38 @@ class MessageRetentionIndicatorTest {
     }
 
     @Test
-    fun retentionSpaceIsReservedOnlyForProjectedOrUnconfirmedRetainedMessages() {
+    fun sendTimeHintFillsOnlyTheMissingAuthoritativeProjection() {
+        val waiting =
+            record(retentionSeconds = null).retentionIndicatorInput(
+                controllerKey = testControllerKey,
+                accountRef = "personal",
+                deleted = false,
+                retentionAtSendSeconds = 30uL,
+            )
+        val explicitlyDisabled =
+            record(retentionSeconds = 0uL).retentionIndicatorInput(
+                controllerKey = testControllerKey,
+                accountRef = "personal",
+                deleted = false,
+                retentionAtSendSeconds = 30uL,
+            )
+        val authoritative =
+            record(retentionSeconds = 60uL, retentionExpiresAt = 120uL).retentionIndicatorInput(
+                controllerKey = testControllerKey,
+                accountRef = "personal",
+                deleted = false,
+                retentionAtSendSeconds = 30uL,
+            )
+
+        assertEquals(30uL, waiting?.durationSeconds)
+        assertNull(waiting?.expiresAtEpochSeconds)
+        assertNull(explicitlyDisabled)
+        assertEquals(60uL, authoritative?.durationSeconds)
+        assertEquals(120uL, authoritative?.expiresAtEpochSeconds)
+    }
+
+    @Test
+    fun retentionSpaceIsReservedForProjectedOrUnconfirmedRetainedMessages() {
         assertTrue(
             shouldReserveRetentionIndicatorSpace(
                 input = null,
@@ -62,6 +95,10 @@ class MessageRetentionIndicatorTest {
                 groupRetentionSeconds = 0uL,
             ),
         )
+    }
+
+    @Test
+    fun retentionSpaceIsNotReservedWithoutAVisibleRetentionHint() {
         assertFalse(
             shouldReserveRetentionIndicatorSpace(
                 input = input(),
@@ -236,6 +273,30 @@ class MessageRetentionIndicatorTest {
         assertEquals(200_000L, running.expiresAtEpochMillis)
         return running
     }
+
+    private fun record(
+        retentionSeconds: ULong?,
+        retentionExpiresAt: ULong? = null,
+    ) = AppMessageRecordFfi(
+        messageIdHex = "message-a",
+        direction = "sent",
+        groupIdHex = "group-a",
+        sender = "alice",
+        plaintext = "hello",
+        contentTokens =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blocks = emptyList(),
+                blankLinesBefore = ByteArray(0),
+            ),
+        kind = 9uL,
+        tags = emptyList(),
+        sourceEpoch = null,
+        retentionSeconds = retentionSeconds,
+        retentionExpiresAt = retentionExpiresAt,
+        recordedAt = 1uL,
+        receivedAt = 1uL,
+    )
 
     private companion object {
         val testControllerKey = Any()

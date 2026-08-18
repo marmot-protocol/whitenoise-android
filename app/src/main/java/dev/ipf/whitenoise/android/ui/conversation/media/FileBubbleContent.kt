@@ -175,12 +175,11 @@ private fun FileMetadataRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        if (
-            trailingMetadataText != null ||
-            trailingStatus != null ||
-            reserveRetentionSpace ||
-            retentionPresentation !is RetentionIndicatorPresentation.Hidden
-        ) {
+        val hasRetentionMetadata =
+            reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden
+        val hasTrailingMetadata =
+            trailingMetadataText != null || trailingStatus != null || hasRetentionMetadata
+        if (hasTrailingMetadata) {
             FileTrailingMetadata(
                 text = trailingMetadataText,
                 isError = trailingMetadataIsError,
