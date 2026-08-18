@@ -444,8 +444,13 @@ private fun headDemotionTargetIndex(
         ?.takeIf { applied }
         ?.viewportAnchor
         ?.let { itemIds.indexOf(it.chatId) }
-        ?.takeIf { it >= 0 }
-        ?.let { rowIndex -> rowIndex + if (pinnedCount != null && rowIndex >= pinnedCount) 1 else 0 }
+        ?.let { rowIndex ->
+            chatListHeadDemotionTargetIndex(
+                rowIndex = rowIndex,
+                pinnedBoundaryIndex = pinnedCount,
+                leadingItemCount = 0,
+            )
+        }
 
 @Composable
 internal fun ChatListHeadReorderMotionHarness(

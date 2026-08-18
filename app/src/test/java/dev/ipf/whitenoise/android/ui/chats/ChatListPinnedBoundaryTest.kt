@@ -50,47 +50,54 @@ class ChatListPinnedBoundaryTest {
 
     @Test
     fun pinnedBoundaryLight() {
-        captureBoundary(darkTheme = false, amoled = false, themeName = "light")
+        captureRows(
+            darkTheme = false,
+            amoled = false,
+            snapshotName = "chat_list_pinned_boundary_light",
+            pinnedTitles = listOf("Pinned project", "Pinned friends"),
+            unpinnedTitles = listOf("Recent conversation"),
+        )
     }
 
     @Test
     fun pinnedBoundaryDark() {
-        captureBoundary(darkTheme = true, amoled = false, themeName = "dark")
+        captureRows(
+            darkTheme = true,
+            amoled = false,
+            snapshotName = "chat_list_pinned_boundary_dark",
+            pinnedTitles = listOf("Pinned project", "Pinned friends"),
+            unpinnedTitles = listOf("Recent conversation"),
+        )
     }
 
     @Test
     fun pinnedBoundaryAmoled() {
-        captureBoundary(darkTheme = true, amoled = true, themeName = "amoled")
+        captureRows(
+            darkTheme = true,
+            amoled = true,
+            snapshotName = "chat_list_pinned_boundary_amoled",
+            pinnedTitles = listOf("Pinned project", "Pinned friends"),
+            unpinnedTitles = listOf("Recent conversation"),
+        )
     }
 
     @Test
     fun unpinnedHeadSettledLight() {
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false, amoled = false) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth().testTag(SCREENSHOT_TAG),
-                    color = MaterialTheme.colorScheme.surface,
-                ) {
-                    Column {
-                        PreviewRow("Pinned friends", pinned = true)
-                        ChatListPinnedBoundary()
-                        PreviewRow("Formerly pinned", pinned = false)
-                        PreviewRow("Recent conversation", pinned = false)
-                    }
-                }
-            }
-        }
-
-        composeRule.onNodeWithTag(CHAT_LIST_PINNED_BOUNDARY_TAG).assertIsDisplayed()
-        composeRule
-            .onNodeWithTag(SCREENSHOT_TAG)
-            .captureRoboImage("src/test/snapshots/chat_list_unpinned_head_settled_light.png")
+        captureRows(
+            darkTheme = false,
+            amoled = false,
+            snapshotName = "chat_list_unpinned_head_settled_light",
+            pinnedTitles = listOf("Pinned friends"),
+            unpinnedTitles = listOf("Formerly pinned", "Recent conversation"),
+        )
     }
 
-    private fun captureBoundary(
+    private fun captureRows(
         darkTheme: Boolean,
         amoled: Boolean,
-        themeName: String,
+        snapshotName: String,
+        pinnedTitles: List<String>,
+        unpinnedTitles: List<String>,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
@@ -99,10 +106,9 @@ class ChatListPinnedBoundaryTest {
                     color = MaterialTheme.colorScheme.surface,
                 ) {
                     Column {
-                        PreviewRow("Pinned project", pinned = true)
-                        PreviewRow("Pinned friends", pinned = true)
+                        pinnedTitles.forEach { PreviewRow(it, pinned = true) }
                         ChatListPinnedBoundary()
-                        PreviewRow("Recent conversation", pinned = false)
+                        unpinnedTitles.forEach { PreviewRow(it, pinned = false) }
                     }
                 }
             }
@@ -111,7 +117,7 @@ class ChatListPinnedBoundaryTest {
         composeRule.onNodeWithTag(CHAT_LIST_PINNED_BOUNDARY_TAG).assertIsDisplayed()
         composeRule
             .onNodeWithTag(SCREENSHOT_TAG)
-            .captureRoboImage("src/test/snapshots/chat_list_pinned_boundary_$themeName.png")
+            .captureRoboImage("src/test/snapshots/$snapshotName.png")
     }
 
     private companion object {

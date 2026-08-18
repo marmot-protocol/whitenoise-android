@@ -472,12 +472,14 @@ internal fun ChatsScreen(
     val pendingHeadDemotionTargetIndex =
         pendingHeadDemotionTarget
             ?.let { visibleItems.indexOf(it) }
-            ?.takeIf { it >= 0 }
             ?.let { rowIndex ->
                 val inlineErrorItems =
                     if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
-                val boundaryItems = if (pinnedBoundary != null && rowIndex >= pinnedBoundary) 1 else 0
-                inlineErrorItems + rowIndex + boundaryItems
+                chatListHeadDemotionTargetIndex(
+                    rowIndex = rowIndex,
+                    pinnedBoundaryIndex = pinnedBoundary,
+                    leadingItemCount = inlineErrorItems,
+                )
             }
 
     fun openGroupFromVisibleList(
@@ -711,6 +713,7 @@ internal fun ChatsScreen(
     }
 
     LaunchedEffect(dragAnchorChatId, chatListState) {
+        var autoScrollActive = false
         while (dragAnchorChatId != null) {
             withFrameNanos { }
             val pointerWindowY = dragPointerWindowY ?: continue
@@ -724,9 +727,14 @@ internal fun ChatsScreen(
                     maxStep = dragMaxScrollStepPx,
                 )
             if (scrollDelta != 0f) {
-                programmaticViewportGeneration += 1L
+                if (chatListAutoScrollSessionStarts(autoScrollActive, scrollDelta)) {
+                    programmaticViewportGeneration += 1L
+                }
+                autoScrollActive = true
                 chatListState.scrollBy(scrollDelta)
                 updateChatDragSelection(pointerWindowY)
+            } else {
+                autoScrollActive = false
             }
         }
     }

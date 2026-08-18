@@ -30,6 +30,58 @@ class ChatListHeadDemotionTest {
     private val rowHeight = 48.dp
 
     @Test
+    fun autoScrollViewportGenerationAdvancesOnlyWhenSessionStarts() {
+        val scrollDeltas = listOf(18f, 18f, 18f, 0f, -18f, -18f, 0f)
+        var autoScrollActive = false
+        var generationAdvances = 0
+
+        scrollDeltas.forEach { scrollDelta ->
+            if (chatListAutoScrollSessionStarts(autoScrollActive, scrollDelta)) {
+                generationAdvances += 1
+            }
+            autoScrollActive = scrollDelta != 0f
+        }
+
+        assertEquals(2, generationAdvances)
+    }
+
+    @Test
+    fun headDemotionTargetIndexIncludesLeadingSyntheticItemsAndBoundary() {
+        assertEquals(
+            1,
+            chatListHeadDemotionTargetIndex(
+                rowIndex = 0,
+                pinnedBoundaryIndex = 1,
+                leadingItemCount = 1,
+            ),
+        )
+        assertEquals(
+            3,
+            chatListHeadDemotionTargetIndex(
+                rowIndex = 1,
+                pinnedBoundaryIndex = 1,
+                leadingItemCount = 1,
+            ),
+        )
+        assertEquals(
+            3,
+            chatListHeadDemotionTargetIndex(
+                rowIndex = 2,
+                pinnedBoundaryIndex = null,
+                leadingItemCount = 1,
+            ),
+        )
+        assertEquals(
+            null,
+            chatListHeadDemotionTargetIndex(
+                rowIndex = -1,
+                pinnedBoundaryIndex = 1,
+                leadingItemCount = 1,
+            ),
+        )
+    }
+
+    @Test
     @Suppress("LongMethod")
     fun unpinVisibleHeadPreservesAnchorWithoutHeadScrollCorrection() {
         val tail = (0 until 20).map { "E$it" }

@@ -39,6 +39,23 @@ internal fun LazyItemScope.chatListRowMotion(targetIndex: Int): Modifier =
 
 internal fun chatListTargetZIndex(targetIndex: Int): Float = -targetIndex.toFloat()
 
+internal fun chatListAutoScrollSessionStarts(
+    autoScrollWasActive: Boolean,
+    scrollDelta: Float,
+): Boolean = !autoScrollWasActive && scrollDelta != 0f
+
+internal fun chatListHeadDemotionTargetIndex(
+    rowIndex: Int,
+    pinnedBoundaryIndex: Int?,
+    leadingItemCount: Int,
+): Int? =
+    rowIndex
+        .takeIf { it >= 0 }
+        ?.let { index ->
+            val boundaryItems = if (pinnedBoundaryIndex != null && index >= pinnedBoundaryIndex) 1 else 0
+            leadingItemCount + index + boundaryItems
+        }
+
 internal data class ChatListDatasetKey(
     val showArchived: Boolean,
     val folderId: String?,
