@@ -40,7 +40,12 @@ private fun String.normalizedNostrReference(): String {
     return trimmed.removePrefixIgnoringCase("nostr:").lowercase()
 }
 
-private fun String.removePrefixIgnoringCase(prefix: String): String = if (startsWith(prefix, ignoreCase = true)) substring(prefix.length) else this
+private fun String.removePrefixIgnoringCase(prefix: String): String =
+    if (startsWith(prefix, ignoreCase = true)) {
+        substring(prefix.length)
+    } else {
+        this
+    }
 
 private class NostrEventReferenceCollector {
     val references = LinkedHashMap<String, NostrEventReferenceOccurrence>()
