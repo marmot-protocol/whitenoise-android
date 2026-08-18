@@ -1370,6 +1370,25 @@ internal fun retainFailedOptimisticTextSend(
 }
 
 /**
+ * Keep a local send-time retention hint only while it can bridge an actual
+ * optimistic handoff or the conversation still has retention enabled. A null
+ * authoritative projection after retention is disabled must retire any
+ * remembered hint instead of re-seeding it from the previous UI row.
+ */
+internal fun retentionHintForProjection(
+    projectedRetentionSeconds: ULong?,
+    currentGroupRetentionSeconds: ULong,
+    optimisticSnapshot: ULong?,
+    rememberedSnapshot: ULong?,
+): ULong? =
+    when {
+        projectedRetentionSeconds != null -> null
+        optimisticSnapshot != null -> optimisticSnapshot
+        currentGroupRetentionSeconds == 0uL -> null
+        else -> rememberedSnapshot
+    }
+
+/**
  * Trim [messageById] to the records still referenced by the loaded window
  * ([windowIds]) or by in-flight [optimisticMessages], dropping projected records
  * that have scrolled out of the window.
@@ -7337,7 +7356,6 @@ class ConversationController(
                             messageId = confirmedId,
                             projectedRetentionSeconds = projectedAction.retentionSeconds,
                             optimisticMessageId = confirmedId,
-                            previousSnapshot = optimisticMessages["msg:$confirmedId"]?.retentionAtSendSeconds,
                         ),
                 )
             if (projectedItem.id !in timelineItemsById) {
@@ -10753,7 +10771,6 @@ class ConversationController(
                 messageId = record.messageIdHex,
                 projectedRetentionSeconds = actionRecord.retentionSeconds,
                 optimisticMessageId = reconciledOptimisticId,
-                previousSnapshot = retentionAtSendSeconds,
             )
         reconciledOptimisticId?.let { optimisticId ->
             preserveOptimisticDisplayPosition(record.messageIdHex, optimisticId)
@@ -10819,7 +10836,6 @@ class ConversationController(
         messageId: String,
         projectedRetentionSeconds: ULong?,
         optimisticMessageId: String?,
-        previousSnapshot: ULong?,
     ): ULong? {
         val optimisticSnapshot =
             optimisticMessageId?.let { optimisticId ->
@@ -10829,12 +10845,18 @@ class ConversationController(
         if (optimisticMessageId != null && optimisticMessageId != messageId) {
             retentionAtSendByMessageId.remove(optimisticMessageId)
         }
-        if (projectedRetentionSeconds != null) {
+        val snapshot =
+            retentionHintForProjection(
+                projectedRetentionSeconds = projectedRetentionSeconds,
+                currentGroupRetentionSeconds = group.disappearingMessageSecs,
+                optimisticSnapshot = optimisticSnapshot,
+                rememberedSnapshot = retentionAtSendByMessageId[messageId],
+            )
+        if (snapshot == null) {
             retentionAtSendByMessageId.remove(messageId)
-            return null
+        } else {
+            retentionAtSendByMessageId[messageId] = snapshot
         }
-        val snapshot = retentionAtSendByMessageId[messageId] ?: optimisticSnapshot ?: previousSnapshot
-        if (snapshot != null) retentionAtSendByMessageId[messageId] = snapshot
         return snapshot
     }
 

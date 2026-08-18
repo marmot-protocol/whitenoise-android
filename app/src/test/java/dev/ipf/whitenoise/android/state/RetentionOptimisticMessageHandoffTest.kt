@@ -7,6 +7,58 @@ import org.junit.Test
 
 class RetentionOptimisticMessageHandoffTest {
     @Test
+    fun explicitNullProjectionClearsRememberedHintAfterRetentionIsDisabled() {
+        assertEquals(
+            null,
+            retentionHintForProjection(
+                projectedRetentionSeconds = null,
+                currentGroupRetentionSeconds = 0uL,
+                optimisticSnapshot = null,
+                rememberedSnapshot = 30uL,
+            ),
+        )
+    }
+
+    @Test
+    fun activeRetentionKeepsPendingProjectionHintAcrossRefresh() {
+        assertEquals(
+            30uL,
+            retentionHintForProjection(
+                projectedRetentionSeconds = null,
+                currentGroupRetentionSeconds = 30uL,
+                optimisticSnapshot = null,
+                rememberedSnapshot = 30uL,
+            ),
+        )
+    }
+
+    @Test
+    fun optimisticHandoffKeepsHintUntilGroupStateRefreshSettles() {
+        assertEquals(
+            30uL,
+            retentionHintForProjection(
+                projectedRetentionSeconds = null,
+                currentGroupRetentionSeconds = 0uL,
+                optimisticSnapshot = 30uL,
+                rememberedSnapshot = 30uL,
+            ),
+        )
+    }
+
+    @Test
+    fun authoritativeRetentionProjectionRetiresLocalHint() {
+        assertEquals(
+            null,
+            retentionHintForProjection(
+                projectedRetentionSeconds = 30uL,
+                currentGroupRetentionSeconds = 30uL,
+                optimisticSnapshot = 30uL,
+                rememberedSnapshot = 30uL,
+            ),
+        )
+    }
+
+    @Test
     fun confirmedIdTransitionPreservesTheSendTimeRetentionHint() {
         val tempId = "temp-retained"
         val key = "msg:$tempId"
