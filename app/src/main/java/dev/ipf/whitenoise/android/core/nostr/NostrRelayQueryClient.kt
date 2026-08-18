@@ -116,6 +116,7 @@ internal class NostrRelayQueryClient(
         suspendCancellableCoroutine { continuation ->
             val subscriptionId = "public-event-${UUID.randomUUID()}"
             val completed = AtomicBoolean(false)
+            val endOfStoredEvents = AtomicBoolean(false)
             val events = LinkedHashMap<String, NostrEvent>()
             val socket = AtomicReference<WebSocket?>()
 
@@ -124,6 +125,15 @@ internal class NostrRelayQueryClient(
                 runCatching { socket.get()?.close(NORMAL_CLOSE_CODE, "done") }
                 if (!continuation.isActive) return
                 result.onSuccess { continuation.resume(it) }.onFailure { continuation.resumeWithException(it) }
+            }
+
+            fun finishOnClose(reason: String) {
+                val collected = events.values.toList()
+                if (endOfStoredEvents.get() || collected.isNotEmpty()) {
+                    finish(Result.success(collected))
+                } else {
+                    finish(Result.failure(IOException("Relay closed before EOSE: $reason")))
+                }
             }
 
             val listener =
@@ -158,9 +168,14 @@ internal class NostrRelayQueryClient(
                                             }
                                         }
                                     }
-                                    "EOSE", "CLOSED" ->
+                                    "EOSE" ->
                                         if (message.optString(1) == subscriptionId) {
+                                            endOfStoredEvents.set(true)
                                             finish(Result.success(events.values.toList()))
+                                        }
+                                    "CLOSED" ->
+                                        if (message.optString(1) == subscriptionId) {
+                                            finishOnClose(message.optString(2))
                                         }
                                     "NOTICE" -> Unit
                                 }
@@ -186,7 +201,7 @@ internal class NostrRelayQueryClient(
                         code: Int,
                         reason: String,
                     ) {
-                        finish(Result.success(events.values.toList()))
+                        finishOnClose(reason)
                     }
 
                     override fun onClosed(
@@ -194,7 +209,7 @@ internal class NostrRelayQueryClient(
                         code: Int,
                         reason: String,
                     ) {
-                        finish(Result.success(events.values.toList()))
+                        finishOnClose(reason)
                     }
                 }
 

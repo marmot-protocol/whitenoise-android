@@ -1,4 +1,5 @@
 @file:Suppress("FunctionNaming")
+@file:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
@@ -41,12 +42,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -212,7 +215,6 @@ private fun NostrArticleReaderBody(
     }
 }
 
-@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 internal fun NostrVideoPlayerDialog(
     mediaUrl: String,
@@ -251,6 +253,7 @@ private fun rememberNostrVideoPlayer(
     onPlaybackFailed: () -> Unit,
 ): ExoPlayer {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val player =
         remember(mediaUrl, mediaMimeType) {
             ExoPlayer
@@ -274,6 +277,14 @@ private fun rememberNostrVideoPlayer(
                 }
         }
     DisposableEffect(player) { onDispose { player.release() } }
+    DisposableEffect(lifecycleOwner, player) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) player.pause()
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     LaunchedEffect(player) {
         VoicePlaybackController.pause()
         player.prepare()

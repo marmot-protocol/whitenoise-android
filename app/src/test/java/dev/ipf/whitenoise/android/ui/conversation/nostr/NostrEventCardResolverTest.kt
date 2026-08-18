@@ -246,7 +246,7 @@ class NostrEventCardResolverTest {
 
         assertEquals(NostrEventCardKind.Article, article.kind)
         assertEquals(160, article.title?.length)
-        assertEquals(160, article.summary?.length)
+        assertEquals(420, article.summary?.length)
         assertEquals("# Full article\n\nReadable body", article.readerBody)
         assertEquals(listOf("2:05", "1920x1080"), video.metadata)
         assertEquals("https://cdn.example/video.mp4", video.mediaUrl)

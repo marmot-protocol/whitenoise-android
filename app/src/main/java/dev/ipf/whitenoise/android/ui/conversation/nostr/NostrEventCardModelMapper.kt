@@ -7,7 +7,7 @@ internal fun NostrEvent.toCardModel(): NostrEventCardModel {
     val cardKind = cardKind()
     val videoMetadata = takeIf { cardKind == NostrEventCardKind.Video }?.videoMetadata()
     val tagTitle = firstSafeTag("title") ?: firstSafeTag("name")
-    val tagSummary = firstSafeTag("summary") ?: firstSafeTag("description")
+    val tagSummary = firstSafeExcerptTag("summary") ?: firstSafeExcerptTag("description")
     return NostrEventCardModel(
         kind = cardKind,
         eventIdHex = id,
@@ -56,7 +56,7 @@ private fun NostrEvent.cardSummary(
     tagSummary: String?,
 ): String =
     if (cardKind == NostrEventCardKind.Release) {
-        firstSafeTag("changelog") ?: tagSummary ?: content.safeExcerpt()
+        firstSafeExcerptTag("changelog") ?: tagSummary ?: content.safeExcerpt()
     } else {
         tagSummary ?: content.safeExcerpt()
     }
@@ -83,12 +83,16 @@ private fun NostrEvent.cardMetadata(
 @Suppress("MaxLineLength")
 private fun NostrEvent.firstSafeTag(name: String): String? = firstTagValue(name)?.safeField()?.takeIf(String::isNotBlank)
 
-internal fun String.safeField(): String =
+@Suppress("MaxLineLength")
+private fun NostrEvent.firstSafeExcerptTag(name: String): String? = firstTagValue(name)?.safeExcerpt()?.takeIf(String::isNotBlank)
+
+private fun String.sanitizedText(): String =
     filterNot { it == '\u0000' || (it.isISOControl() && !it.isWhitespace()) }
         .trim()
-        .take(MAX_FIELD_CHARS)
 
-private fun String.safeExcerpt(): String = safeField().take(MAX_EXCERPT_CHARS)
+internal fun String.safeField(): String = sanitizedText().take(MAX_FIELD_CHARS)
+
+private fun String.safeExcerpt(): String = sanitizedText().take(MAX_EXCERPT_CHARS)
 
 private fun String.safeReaderBody(): String =
     ProfileSanitizer

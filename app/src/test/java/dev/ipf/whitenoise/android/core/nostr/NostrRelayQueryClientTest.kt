@@ -101,6 +101,33 @@ class NostrRelayQueryClientTest {
     }
 
     @Test
+    fun closedBeforeEoseWithoutEventsReportsFailure() {
+        val server = closedRelay()
+        val httpClient = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).build()
+        try {
+            val error =
+                assertThrows(IOException::class.java) {
+                    runBlocking {
+                        NostrRelayQueryClient(httpClient).query(
+                            relayUrls = listOf(server.webSocketUrl()),
+                            filter = JSONObject().put("kinds", JSONArray().put(1)),
+                            timeoutMillis = 2_000,
+                        )
+                    }
+                }
+
+            assertEquals("Public relay query failed", error.message)
+            assertTrue(
+                generateSequence<Throwable>(error) { it.cause }
+                    .mapNotNull(Throwable::message)
+                    .any { it.contains("rate-limited") },
+            )
+        } finally {
+            close(httpClient, server)
+        }
+    }
+
+    @Test
     fun timeoutCancelsTheSocketAndReportsFailure() {
         val relay = silentRelay()
         val httpClient = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).build()
@@ -211,6 +238,40 @@ class NostrRelayQueryClientTest {
                             val request = JSONArray(text)
                             if (request.optString(0) == "REQ") {
                                 webSocket.send(JSONArray().put("EOSE").put(request.getString(1)).toString())
+                            }
+                        }
+
+                        override fun onClosing(
+                            webSocket: WebSocket,
+                            code: Int,
+                            reason: String,
+                        ) {
+                            webSocket.close(code, reason)
+                        }
+                    },
+                ),
+            )
+        }
+
+    private fun closedRelay(): MockWebServer =
+        MockWebServer().apply {
+            start()
+            enqueue(
+                MockResponse().withWebSocketUpgrade(
+                    object : WebSocketListener() {
+                        override fun onMessage(
+                            webSocket: WebSocket,
+                            text: String,
+                        ) {
+                            val request = JSONArray(text)
+                            if (request.optString(0) == "REQ") {
+                                webSocket.send(
+                                    JSONArray()
+                                        .put("CLOSED")
+                                        .put(request.getString(1))
+                                        .put("rate-limited")
+                                        .toString(),
+                                )
                             }
                         }
 
