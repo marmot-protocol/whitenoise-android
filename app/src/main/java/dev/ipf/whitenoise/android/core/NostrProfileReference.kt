@@ -9,6 +9,7 @@ private const val HRP_NOTE = "note"
 private const val HRP_NEVENT = "nevent"
 private const val HRP_NADDR = "naddr"
 private const val TLV_SPECIAL = 0
+private const val TLV_RELAY = 1
 private const val TLV_AUTHOR = 2
 private const val TLV_KIND = 3
 private const val HASH_BYTES = 32
@@ -27,7 +28,8 @@ private val HEX_CHARS = "0123456789abcdef".toCharArray()
  * use the same profile-cache and roster-membership paths as npub mentions (#1017),
  * and so QR scans can reject checksum-invalid npub/nprofile payloads without
  * duplicating a second Bech32 implementation. Event-reference relay TLVs are
- * decoded only as untrusted metadata; callers deliberately do not dial them.
+ * retained as untrusted metadata and must be validated again immediately before
+ * callers dial them.
  * The temporary Kotlin extensions remain in the #1584 / MDK #959 migration
  * scope and can be removed when the generated API provides these forms.
  */
@@ -91,10 +93,16 @@ private fun decodeEventFields(fields: Map<Int, List<List<Int>>>): NostrEventRefe
     val kindBytes = NostrTlvCodec.optionalUnique(fields, TLV_KIND, KIND_BYTES)
     val kind = kindBytes?.toUIntBigEndian()?.takeIf { it <= Int.MAX_VALUE.toUInt() }
     val validKind = kindBytes == null || kind != null
+    val relayHints = fields.relayHints()
     return id
         ?.takeIf { authorValid && kindValid && validKind }
         ?.let { eventId ->
-            NostrEventReference.Event(eventIdHex = eventId, authorPubkeyHex = author, kind = kind)
+            NostrEventReference.Event(
+                eventIdHex = eventId,
+                authorPubkeyHex = author,
+                kind = kind,
+                relayHints = relayHints,
+            )
         }
 }
 
@@ -108,13 +116,34 @@ private fun decodeAddressPointer(payload: List<Int>): NostrEventReference.Addres
                 ?.toUIntBigEndian()
                 ?.takeIf { it <= Int.MAX_VALUE.toUInt() }
         if (identifier != null && author != null && kind != null) {
-            NostrEventReference.Address(kind = kind, authorPubkeyHex = author, identifier = identifier)
+            NostrEventReference.Address(
+                kind = kind,
+                authorPubkeyHex = author,
+                identifier = identifier,
+                relayHints = fields.relayHints(),
+            )
         } else {
             null
         }
     }
 
+private fun NostrTlvFields.relayHints(): List<String> =
+    this[TLV_RELAY]
+        .orEmpty()
+        .asSequence()
+        .mapNotNull { it.decodeUtf8Text() }
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .distinct()
+        .take(MAX_RELAY_HINTS)
+        .toList()
+
 private fun List<Int>.decodeUtf8Identifier(): String? =
+    decodeUtf8Text()?.takeUnless { identifier ->
+        identifier.any { it == '\u0000' || it.isISOControl() }
+    }
+
+private fun List<Int>.decodeUtf8Text(): String? =
     runCatching {
         Charsets.UTF_8
             .newDecoder()
@@ -122,9 +151,7 @@ private fun List<Int>.decodeUtf8Identifier(): String? =
             .onUnmappableCharacter(CodingErrorAction.REPORT)
             .decode(ByteBuffer.wrap(map(Int::toByte).toByteArray()))
             .toString()
-    }.getOrNull()?.takeUnless { identifier ->
-        identifier.any { it == '\u0000' || it.isISOControl() }
-    }
+    }.getOrNull()?.takeUnless { text -> text.any(Char::isISOControl) }
 
 private fun List<Int>.toHexString(): String =
     buildString(size * 2) {
@@ -143,11 +170,13 @@ private fun List<Int>.toUIntBigEndian(): UInt? {
 
 internal sealed interface NostrEventReference {
     val stableId: String
+    val relayHints: List<String>
 
     data class Event(
         val eventIdHex: String,
         val authorPubkeyHex: String? = null,
         val kind: UInt? = null,
+        override val relayHints: List<String> = emptyList(),
     ) : NostrEventReference {
         override val stableId: String = "event:$eventIdHex"
     }
@@ -156,7 +185,10 @@ internal sealed interface NostrEventReference {
         val kind: UInt,
         val authorPubkeyHex: String,
         val identifier: String,
+        override val relayHints: List<String> = emptyList(),
     ) : NostrEventReference {
         override val stableId: String = "address:$kind:$authorPubkeyHex:$identifier"
     }
 }
+
+private const val MAX_RELAY_HINTS = 4

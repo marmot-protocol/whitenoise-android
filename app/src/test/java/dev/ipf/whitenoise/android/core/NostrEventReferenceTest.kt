@@ -40,11 +40,21 @@ class NostrEventReferenceTest {
         val expectedAuthor = author.hex()
         assertEquals(NostrEventReference.Event(expectedId), NostrProfileReference.eventReference(note))
         assertEquals(
-            NostrEventReference.Event(expectedId, expectedAuthor, 1u),
+            NostrEventReference.Event(
+                expectedId,
+                expectedAuthor,
+                1u,
+                relayHints = listOf("wss://ignored.example"),
+            ),
             NostrProfileReference.eventReference(nevent),
         )
         assertEquals(
-            NostrEventReference.Address(30_023u, expectedAuthor, "article-id"),
+            NostrEventReference.Address(
+                30_023u,
+                expectedAuthor,
+                "article-id",
+                relayHints = listOf("wss://ignored.example"),
+            ),
             NostrProfileReference.eventReference(naddr),
         )
     }

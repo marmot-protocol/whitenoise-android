@@ -20,7 +20,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -68,6 +70,7 @@ internal sealed interface NostrEventCardState {
 internal class NostrEventCardResolver(
     parentScope: CoroutineScope,
     private val relayProvider: suspend () -> List<String>,
+    private val relayHintProvider: suspend (List<String>) -> List<String> = ::safePublicEventRelayHints,
     private val fetchEvents: suspend (List<String>, JSONObject) -> List<NostrEvent> = defaultNostrEventQuery(),
     private val verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
     private val maxEntries: Int = MAX_RESOLVED_ENTRIES,
@@ -76,6 +79,7 @@ internal class NostrEventCardResolver(
     private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob(parentScope.coroutineContext[Job]))
     private val lock = Any()
     private val relayLock = Mutex()
+    private val relayHintPermits = Semaphore(MAX_CONCURRENT_HINT_RESOLUTIONS)
     private val states = LinkedHashMap<String, MutableStateFlow<NostrEventCardState>>(16, 0.75f, true)
     private val jobs = HashMap<String, Job>()
     private var cachedRelays: List<String>? = null
@@ -127,7 +131,7 @@ internal class NostrEventCardResolver(
     ) {
         val result =
             try {
-                val relays = relays(refreshRelays)
+                val relays = relays(reference, refreshRelays)
                 if (relays.isEmpty()) {
                     NostrEventCardState.Failed
                 } else {
@@ -147,7 +151,20 @@ internal class NostrEventCardResolver(
         }
     }
 
-    private suspend fun relays(refresh: Boolean): List<String> =
+    private suspend fun relays(
+        reference: NostrEventReference,
+        refresh: Boolean,
+    ): List<String> {
+        val hintedRelays =
+            if (reference.relayHints.isEmpty()) {
+                emptyList()
+            } else {
+                relayHintPermits.withPermit { relayHintProvider(reference.relayHints) }
+            }
+        return (hintedRelays + managedRelays(refresh)).distinct().take(MAX_QUERY_RELAYS)
+    }
+
+    private suspend fun managedRelays(refresh: Boolean): List<String> =
         relayLock.withLock {
             if (refresh) cachedRelays = null
             cachedRelays ?: relayProvider().take(MAX_QUERY_RELAYS).also { cachedRelays = it }
@@ -201,6 +218,7 @@ internal class NostrEventCardResolver(
     private companion object {
         const val MAX_RESOLVED_ENTRIES = 64
         const val MAX_QUERY_RELAYS = 4
+        const val MAX_CONCURRENT_HINT_RESOLUTIONS = 3
     }
 }
 
@@ -218,9 +236,23 @@ internal suspend fun WhiteNoiseAppState.publicEventCardRelays(): List<String> {
             lists.defaultRelays + lists.nip65.relays + lists.bootstrapRelays + MarmotClient.bootstrapRelays
         }
     return withContext(Dispatchers.IO) {
-        normalizeRelayUrls(candidates)
+        normalizeRelayUrls(candidates, allowExternalRelayHosts = true)
             .asSequence()
             .filter(::relayUrlPassesResolveTimeCheck)
+            .take(MAX_PUBLIC_EVENT_RELAYS)
+            .toList()
+    }
+}
+
+internal suspend fun safePublicEventRelayHints(
+    hints: List<String>,
+    passesResolveTimeCheck: (String) -> Boolean = ::relayUrlPassesResolveTimeCheck,
+): List<String> {
+    if (hints.isEmpty()) return emptyList()
+    return withContext(Dispatchers.IO) {
+        normalizeRelayUrls(hints, allowExternalRelayHosts = true)
+            .asSequence()
+            .filter(passesResolveTimeCheck)
             .take(MAX_PUBLIC_EVENT_RELAYS)
             .toList()
     }

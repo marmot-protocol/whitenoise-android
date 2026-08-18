@@ -21,11 +21,33 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import java.io.IOException
+import java.net.InetAddress
+import java.net.UnknownHostException
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class NostrRelayQueryClientTest {
+    @Test
+    fun publicRelayDnsRejectsUnsafeHostsAndRebindingAnswers() {
+        val publicAddress = InetAddress.getByAddress(byteArrayOf(8, 8, 8, 8))
+        val privateAddress = InetAddress.getByAddress(byteArrayOf(10, 0, 0, 1))
+
+        assertEquals(
+            listOf(publicAddress),
+            PublicRelayDns { listOf(publicAddress) }.lookup("relay.example"),
+        )
+        assertThrows(UnknownHostException::class.java) {
+            PublicRelayDns { listOf(publicAddress) }.lookup("127.0.0.1")
+        }
+        assertThrows(UnknownHostException::class.java) {
+            PublicRelayDns { listOf(privateAddress) }.lookup("rebind.example")
+        }
+        assertThrows(UnknownHostException::class.java) {
+            PublicRelayDns { listOf(publicAddress, privateAddress) }.lookup("mixed.example")
+        }
+    }
+
     @Test
     fun endpointCapLimitsOneQueryToFourConfiguredRelays() {
         val servers = List(5) { eoseRelay() }
@@ -122,6 +144,29 @@ class NostrRelayQueryClientTest {
                     .mapNotNull(Throwable::message)
                     .any { it.contains("rate-limited") },
             )
+        } finally {
+            close(httpClient, server)
+        }
+    }
+
+    @Test
+    fun reachingTheEventLimitCompletesWithoutWaitingForEose() {
+        val eventId = "a".repeat(64)
+        val server = eventOnlyRelay(eventId)
+        val httpClient = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).build()
+        try {
+            val result =
+                runBlocking {
+                    NostrRelayQueryClient(httpClient).query(
+                        relayUrls = listOf(server.webSocketUrl()),
+                        filter = JSONObject().put("ids", JSONArray().put(eventId)),
+                        timeoutMillis = 2_000,
+                        maxEvents = 1,
+                    )
+                }
+
+            assertEquals(listOf(eventId), result.events.map(NostrEvent::id))
+            assertEquals(1, result.completedRelayCount)
         } finally {
             close(httpClient, server)
         }
@@ -270,6 +315,49 @@ class NostrRelayQueryClientTest {
                                         .put("CLOSED")
                                         .put(request.getString(1))
                                         .put("rate-limited")
+                                        .toString(),
+                                )
+                            }
+                        }
+
+                        override fun onClosing(
+                            webSocket: WebSocket,
+                            code: Int,
+                            reason: String,
+                        ) {
+                            webSocket.close(code, reason)
+                        }
+                    },
+                ),
+            )
+        }
+
+    private fun eventOnlyRelay(eventId: String): MockWebServer =
+        MockWebServer().apply {
+            start()
+            enqueue(
+                MockResponse().withWebSocketUpgrade(
+                    object : WebSocketListener() {
+                        override fun onMessage(
+                            webSocket: WebSocket,
+                            text: String,
+                        ) {
+                            val request = JSONArray(text)
+                            if (request.optString(0) == "REQ") {
+                                val event =
+                                    JSONObject()
+                                        .put("id", eventId)
+                                        .put("pubkey", "b".repeat(64))
+                                        .put("created_at", 1)
+                                        .put("kind", 1)
+                                        .put("tags", JSONArray())
+                                        .put("content", "event")
+                                        .put("sig", "c".repeat(128))
+                                webSocket.send(
+                                    JSONArray()
+                                        .put("EVENT")
+                                        .put(request.getString(1))
+                                        .put(event)
                                         .toString(),
                                 )
                             }

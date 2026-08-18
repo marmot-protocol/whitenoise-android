@@ -49,6 +49,128 @@ class NostrEventCardResolverTest {
         }
 
     @Test
+    fun validatedRelayHintsAreQueriedBeforeManagedRelaysWithinTheSharedCap() =
+        runTest {
+            val requested = "a".repeat(64)
+            var queriedRelays = emptyList<String>()
+            val hints =
+                listOf(
+                    "wss://hint-one.example",
+                    "wss://hint-two.example",
+                    "wss://ignored-after-validation.example",
+                )
+            val resolver =
+                NostrEventCardResolver(
+                    parentScope = this,
+                    verificationDispatcher = UnconfinedTestDispatcher(testScheduler),
+                    relayProvider = {
+                        listOf(
+                            "wss://managed-one.example",
+                            "wss://managed-two.example",
+                            "wss://managed-three.example",
+                        )
+                    },
+                    relayHintProvider = { rawHints ->
+                        assertEquals(hints, rawHints)
+                        rawHints.take(2)
+                    },
+                    fetchEvents = { relays, _ ->
+                        queriedRelays = relays
+                        listOf(event(requested))
+                    },
+                    verifyEvent = { true },
+                )
+
+            val state =
+                resolver.state(
+                    NostrEventReference.Event(
+                        eventIdHex = requested,
+                        relayHints = hints,
+                    ),
+                )
+            runCurrent()
+
+            assertEquals(
+                listOf(
+                    "wss://hint-one.example",
+                    "wss://hint-two.example",
+                    "wss://managed-one.example",
+                    "wss://managed-two.example",
+                ),
+                queriedRelays,
+            )
+            assertTrue(state.value is NostrEventCardState.Loaded)
+            resolver.close()
+        }
+
+    @Test
+    fun hintedRelayValidationRejectsUnsafeEndpointsBeforeDial() =
+        runTest {
+            val resolveChecked = mutableListOf<String>()
+
+            val accepted =
+                safePublicEventRelayHints(
+                    hints =
+                        listOf(
+                            "ws://public.example",
+                            "wss://127.0.0.1",
+                            "wss://user:pass@public.example",
+                            "wss://public.example:8443",
+                            "wss://safe.example",
+                            "wss://rebind.example",
+                        ),
+                    passesResolveTimeCheck = { url ->
+                        resolveChecked += url
+                        url != "wss://rebind.example"
+                    },
+                )
+
+            assertEquals(listOf("wss://safe.example"), accepted)
+            assertEquals(
+                listOf("wss://safe.example", "wss://rebind.example"),
+                resolveChecked,
+            )
+        }
+
+    @Test
+    fun relayHintResolutionConcurrencyIsBounded() =
+        runTest {
+            var activeResolutions = 0
+            var peakResolutions = 0
+            val resolver =
+                NostrEventCardResolver(
+                    parentScope = this,
+                    verificationDispatcher = UnconfinedTestDispatcher(testScheduler),
+                    relayProvider = { emptyList() },
+                    relayHintProvider = {
+                        activeResolutions += 1
+                        peakResolutions = maxOf(peakResolutions, activeResolutions)
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            activeResolutions -= 1
+                        }
+                    },
+                    fetchEvents = { _, _ -> error("must not query") },
+                )
+
+            repeat(4) { index ->
+                resolver.state(
+                    NostrEventReference.Event(
+                        eventIdHex = index.toString().repeat(64),
+                        relayHints = listOf("wss://hint-$index.example"),
+                    ),
+                )
+            }
+            runCurrent()
+
+            assertEquals(3, peakResolutions)
+            resolver.close()
+            runCurrent()
+            assertEquals(0, activeResolutions)
+        }
+
+    @Test
     fun optionalEventPointerMetadataDoesNotSplitOrRejectTheExactIdLookup() =
         runTest {
             val requested = "a".repeat(64)
@@ -255,6 +377,20 @@ class NostrEventCardResolverTest {
         assertEquals(listOf("audio/ogg", "2.0 KB"), file.metadata)
         assertEquals(NostrEventCardKind.Generic, generic.kind)
         assertEquals("body", generic.summary)
+    }
+
+    @Test
+    fun textBoundsPreserveCompleteUnicodeCodePoints() {
+        val emoji = "\uD83D\uDE00"
+        val boundedField = ("a".repeat(159) + emoji + "tail").safeField()
+        val boundedExcerpt =
+            event(
+                id = "a".repeat(64),
+                content = "b".repeat(419) + emoji + "tail",
+            ).toCardModel().summary
+
+        assertEquals("a".repeat(159) + emoji, boundedField)
+        assertEquals("b".repeat(419) + emoji, boundedExcerpt)
     }
 
     @Test

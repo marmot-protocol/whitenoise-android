@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
-import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 
 internal fun NostrEvent.toCardModel(): NostrEventCardModel {
@@ -86,28 +85,6 @@ private fun NostrEvent.firstSafeTag(name: String): String? = firstTagValue(name)
 @Suppress("MaxLineLength")
 private fun NostrEvent.firstSafeExcerptTag(name: String): String? = firstTagValue(name)?.safeExcerpt()?.takeIf(String::isNotBlank)
 
-private fun String.sanitizedText(): String =
-    filterNot { it == '\u0000' || (it.isISOControl() && !it.isWhitespace()) }
-        .trim()
-
-internal fun String.safeField(): String = sanitizedText().take(MAX_FIELD_CHARS)
-
-private fun String.safeExcerpt(): String = sanitizedText().take(MAX_EXCERPT_CHARS)
-
-private fun String.safeReaderBody(): String =
-    ProfileSanitizer
-        .stripUnsafe(this)
-        .trim()
-        .takeCodePoints(MAX_READER_BODY_CODE_POINTS)
-
-private fun String.takeCodePoints(maxCodePoints: Int): String {
-    if (codePointCount(0, length) <= maxCodePoints) return this
-    return substring(0, offsetByCodePoints(0, maxCodePoints))
-}
-
-private const val MAX_FIELD_CHARS = 160
-private const val MAX_EXCERPT_CHARS = 420
-private const val MAX_READER_BODY_CODE_POINTS = 64 * 1_024
 private const val KIND_TEXT_NOTE = 1
 private const val KIND_VIDEO = 21
 private const val KIND_SHORT_VIDEO = 22

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.core.nostr
 
+import dev.ipf.whitenoise.android.core.HostSafety
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.TimeoutCancellationException
@@ -10,6 +11,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeout
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -20,6 +22,8 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
+import java.net.InetAddress
+import java.net.UnknownHostException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -37,6 +41,22 @@ internal class NostrRelayTimeoutException(
     message: String,
     cause: Throwable? = null,
 ) : IOException(message, cause)
+
+/** Resolve at connection time and reject every answer set containing a non-public address. */
+internal class PublicRelayDns(
+    private val systemLookup: (String) -> List<InetAddress> = Dns.SYSTEM::lookup,
+) : Dns {
+    override fun lookup(hostname: String): List<InetAddress> {
+        if (HostSafety.isPrivateOrLoopbackHost(hostname)) {
+            throw UnknownHostException("Unsafe relay host")
+        }
+        val addresses = systemLookup(hostname)
+        if (addresses.isEmpty() || addresses.any(HostSafety::isPrivateOrLoopbackAddress)) {
+            throw UnknownHostException("Unsafe relay address")
+        }
+        return addresses
+    }
+}
 
 /**
  * Small, bounded public-event query primitive shared by app features. Every
@@ -163,7 +183,10 @@ internal class NostrRelayQueryClient(
                                         if (belongsToSubscription && events.size < maxEvents) {
                                             message.readEvent()?.let { event ->
                                                 if (event.content.length <= MAX_EVENT_CONTENT_CHARS) {
-                                                    events.putIfAbsent(event.id, event)
+                                                    val added = events.putIfAbsent(event.id, event) == null
+                                                    if (added && events.size >= maxEvents) {
+                                                        finish(Result.success(events.values.toList()))
+                                                    }
                                                 }
                                             }
                                         }
@@ -244,6 +267,9 @@ internal class NostrRelayQueryClient(
         val sharedDefaultHttpClient: OkHttpClient by lazy {
             OkHttpClient
                 .Builder()
+                .dns(PublicRelayDns())
+                .followRedirects(false)
+                .followSslRedirects(false)
                 .readTimeout(0, TimeUnit.MILLISECONDS)
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .build()
