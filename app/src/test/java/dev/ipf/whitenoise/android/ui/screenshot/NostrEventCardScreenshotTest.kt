@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrArticleReaderScreen
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCard
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardKind
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardModel
@@ -62,6 +63,7 @@ class NostrEventCardScreenshotTest {
                         30_023,
                         "Building calmer group conversations",
                         "A practical overview with enough detail to identify the article without expanding it inline.",
+                        readerBody = "Article body",
                     ),
                 ),
                 mine = true,
@@ -81,6 +83,7 @@ class NostrEventCardScreenshotTest {
                         "Community update",
                         "A video preview that stays text-first and never autoplays.",
                         listOf("2:05", "1920x1080"),
+                        mediaUrl = "https://cdn.example/video.mp4",
                     ),
                 ),
                 mine = false,
@@ -139,6 +142,35 @@ class NostrEventCardScreenshotTest {
             EventBubble(NostrEventCardState.NotFound, mine = false)
         }
         capture("nostr_event_cards_file_states_large_rtl")
+    }
+
+    @Test
+    fun articleReaderLight() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrArticleReaderScreen(
+                    card =
+                        card(
+                            NostrEventCardKind.Article,
+                            30_023,
+                            "Building calmer group conversations",
+                            "A practical overview of quieter, more intentional group conversations.",
+                            readerBody =
+                                "Start by making notification choices explicit. Then give every participant " +
+                                    "a clear way to focus without losing context.",
+                        ),
+                    document = null,
+                    parsing = false,
+                    authorDisplayName = { "Alex Morgan" },
+                    mentionDisplayName = { null },
+                    onNostrProfileTap = {},
+                    onDismiss = {},
+                    modifier = Modifier.testTag(TAG),
+                )
+            }
+        }
+
+        capture("nostr_article_reader_light")
     }
 
     private fun render(
@@ -210,6 +242,8 @@ class NostrEventCardScreenshotTest {
         title: String?,
         summary: String,
         metadata: List<String> = emptyList(),
+        readerBody: String? = null,
+        mediaUrl: String? = null,
     ) = NostrEventCardModel(
         kind = kind,
         eventIdHex = "a".repeat(64),
@@ -219,6 +253,8 @@ class NostrEventCardScreenshotTest {
         title = title,
         summary = summary,
         metadata = metadata,
+        readerBody = readerBody,
+        mediaUrl = mediaUrl,
     )
 
     private fun capture(name: String) = composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/$name.png")

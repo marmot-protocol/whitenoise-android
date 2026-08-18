@@ -132,30 +132,33 @@ class NostrRelayQueryClientTest {
     }
 
     @Test
-    fun socketPermitWaitCountsAgainstEachRelayTimeout() {
-        val relays = List(4) { silentRelay() }
+    fun queuedRelayGetsItsOwnSocketTimeoutAfterAcquiringPermit() {
+        val silentRelays = List(3) { silentRelay() }
+        val completingRelay = eoseRelay()
         val httpClient = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).build()
         try {
-            val error =
-                assertThrows(IOException::class.java) {
-                    runBlocking {
-                        withTimeout(400) {
-                            NostrRelayQueryClient(httpClient, maxConcurrentSockets = 1)
-                                .query(
-                                    relayUrls = relays.map { it.server.webSocketUrl() },
-                                    filter = JSONObject().put("kinds", JSONArray().put(1)),
-                                    timeoutMillis = 100,
-                                )
-                        }
+            val result =
+                runBlocking {
+                    withTimeout(1_000) {
+                        NostrRelayQueryClient(httpClient, maxConcurrentSockets = 1)
+                            .query(
+                                relayUrls =
+                                    silentRelays.map { it.server.webSocketUrl() } +
+                                        completingRelay.webSocketUrl(),
+                                filter = JSONObject().put("kinds", JSONArray().put(1)),
+                                timeoutMillis = 100,
+                            )
                     }
                 }
 
-            assertEquals("Public relay query failed", error.message)
-            assertTrue(generateSequence<Throwable>(error) { it.cause }.any { it is NostrRelayTimeoutException })
+            assertEquals(1, result.completedRelayCount)
+            assertEquals(3, result.failedRelayCount)
+            assertEquals(1, completingRelay.requestCount)
         } finally {
             httpClient.connectionPool.evictAll()
             httpClient.dispatcher.executorService.shutdownNow()
-            relays.forEach { it.server.shutdown() }
+            silentRelays.forEach { it.server.shutdown() }
+            completingRelay.shutdown()
         }
     }
 

@@ -1466,6 +1466,9 @@
     <string name="nostr_event_invalid">Bu etkinlik doğrulanamadı.</string>
     <string name="nostr_event_failed">Bu etkinlik yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="nostr_event_open">Etkinliği aç</string>
+    <string name="nostr_event_read_article">Makaleyi oku</string>
+    <string name="nostr_event_play_video">Videoyu oynat</string>
+    <string name="nostr_video_playback_failed">Bu video oynatılamadı.</string>
     <string name="nostr_event_copy">Etkinlik referansını kopyala</string>
     <string name="nostr_event_type_note">Not</string>
     <string name="nostr_event_type_article">Makale</string>

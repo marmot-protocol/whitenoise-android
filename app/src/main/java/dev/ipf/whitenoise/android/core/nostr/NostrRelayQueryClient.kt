@@ -71,8 +71,8 @@ internal class NostrRelayQueryClient(
                         async(start = CoroutineStart.UNDISPATCHED) {
                             try {
                                 Result.success(
-                                    withTimeout(timeoutMillis) {
-                                        socketPermits.withPermit {
+                                    socketPermits.withPermit {
+                                        withTimeout(timeoutMillis) {
                                             queryRelay(relayUrl, JSONObject(filterJson), eventLimit)
                                         }
                                     },

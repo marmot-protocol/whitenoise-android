@@ -45,6 +45,9 @@ internal data class NostrEventCardModel(
     val title: String?,
     val summary: String?,
     val metadata: List<String> = emptyList(),
+    val readerBody: String? = null,
+    val mediaUrl: String? = null,
+    val mediaMimeType: String? = null,
 )
 
 internal sealed interface NostrEventCardState {

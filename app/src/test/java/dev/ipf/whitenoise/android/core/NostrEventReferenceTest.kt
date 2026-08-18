@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NostrEventReferenceTest {
@@ -63,6 +64,11 @@ class NostrEventReferenceTest {
             )
         val unsupportedKind = encode("nevent", tlv(0, id) + tlv(3, uintBytes(UInt.MAX_VALUE)))
         val truncated = encode("nevent", listOf(0, 32, 1, 2, 3))
+        val validOversized =
+            encode(
+                "nevent",
+                tlv(0, id) + List(20) { index -> tlv(9, List(255) { index }) }.flatten(),
+            )
 
         assertNull(NostrProfileReference.eventReference(encode("nsec", id)))
         assertNull(NostrProfileReference.eventReference(encode("npub", id)))
@@ -73,7 +79,8 @@ class NostrEventReferenceTest {
         assertNull(NostrProfileReference.eventReference(controlCoordinate))
         assertNull(NostrProfileReference.eventReference(unsupportedKind))
         assertNull(NostrProfileReference.eventReference(truncated))
-        assertNull(NostrProfileReference.eventReference("note1" + "q".repeat(5_000)))
+        assertTrue(validOversized.length > 5_000)
+        assertNull(NostrProfileReference.eventReference(validOversized))
     }
 
     @Test

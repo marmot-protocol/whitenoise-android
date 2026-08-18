@@ -33,11 +33,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +48,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
 import kotlinx.coroutines.launch
@@ -54,46 +58,92 @@ internal fun NostrEventCards(
     references: List<NostrEventReferenceOccurrence>,
     resolver: NostrEventCardResolver,
     authorDisplayName: (String) -> String,
+    mentionDisplayName: (String) -> String?,
+    onNostrProfileTap: (String) -> Unit,
+    parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
     contentColor: Color,
     modifier: Modifier = Modifier,
 ) {
     if (references.isEmpty()) return
-    val context = LocalContext.current
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
+    var articleCard by remember(resolver) { mutableStateOf<NostrEventCardModel?>(null) }
+    var videoCard by remember(resolver) { mutableStateOf<NostrEventCardModel?>(null) }
     Column(
         modifier = modifier.widthIn(min = 220.dp, max = 320.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         references.take(MAX_CARDS_PER_MESSAGE).forEach { occurrence ->
             key(occurrence.reference.stableId) {
-                val flow = remember(resolver, occurrence.reference.stableId) { resolver.state(occurrence.reference) }
-                val state by flow.collectAsState()
-                val authoredReference = occurrence.authoredReference
-                NostrEventCard(
-                    state = state,
+                ResolvedNostrEventCard(
+                    occurrence = occurrence,
+                    resolver = resolver,
                     authorDisplayName = authorDisplayName,
                     contentColor = contentColor,
-                    onRetry = { resolver.retry(occurrence.reference, flow) },
-                    onCopy = {
-                        scope.launch {
-                            clipboard.setClipEntry(
-                                ClipEntry(ClipData.newPlainText("Nostr event", "nostr:$authoredReference")),
-                            )
-                        }
-                    },
-                    onOpen = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse("nostr:$authoredReference"))
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        }
-                    },
+                    onReadArticle = { articleCard = it },
+                    onPlayVideo = { videoCard = it },
                 )
             }
         }
     }
+    articleCard?.let { card ->
+        NostrArticleReaderDialog(
+            card = card,
+            authorDisplayName = authorDisplayName,
+            mentionDisplayName = mentionDisplayName,
+            onNostrProfileTap = onNostrProfileTap,
+            parseMarkdown = parseMarkdown,
+            onDismiss = { articleCard = null },
+        )
+    }
+    videoCard?.let { card ->
+        NostrVideoPlayerDialog(
+            mediaUrl = checkNotNull(card.mediaUrl),
+            mediaMimeType = card.mediaMimeType,
+            onDismiss = { videoCard = null },
+        )
+    }
+}
+
+@Composable
+private fun ResolvedNostrEventCard(
+    occurrence: NostrEventReferenceOccurrence,
+    resolver: NostrEventCardResolver,
+    authorDisplayName: (String) -> String,
+    contentColor: Color,
+    onReadArticle: (NostrEventCardModel) -> Unit,
+    onPlayVideo: (NostrEventCardModel) -> Unit,
+) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val flow = remember(resolver, occurrence.reference.stableId) { resolver.state(occurrence.reference) }
+    val state by flow.collectAsState()
+    val authoredReference = occurrence.authoredReference
+    NostrEventCard(
+        state = state,
+        authorDisplayName = authorDisplayName,
+        contentColor = contentColor,
+        onRetry = { resolver.retry(occurrence.reference, flow) },
+        onCopy = {
+            scope.launch {
+                clipboard.setClipEntry(
+                    ClipEntry(ClipData.newPlainText("Nostr event", "nostr:$authoredReference")),
+                )
+            }
+        },
+        onOpen = { card ->
+            when {
+                card?.kind == NostrEventCardKind.Article && !card.readerBody.isNullOrBlank() -> onReadArticle(card)
+                card?.kind == NostrEventCardKind.Video && card.mediaUrl != null -> onPlayVideo(card)
+                else ->
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse("nostr:$authoredReference"))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+            }
+        },
+    )
 }
 
 @Composable
@@ -103,7 +153,7 @@ internal fun NostrEventCard(
     contentColor: Color,
     onRetry: () -> Unit,
     onCopy: () -> Unit,
-    onOpen: () -> Unit,
+    onOpen: (NostrEventCardModel?) -> Unit,
 ) {
     val openDescription = stringResource(R.string.nostr_event_open)
     val copyDescription = stringResource(R.string.nostr_event_copy)
@@ -136,7 +186,7 @@ private fun EventCardBody(
     openDescription: String,
     onRetry: () -> Unit,
     onCopy: () -> Unit,
-    onOpen: () -> Unit,
+    onOpen: (NostrEventCardModel?) -> Unit,
 ) {
     when (state) {
         NostrEventCardState.Loading ->
@@ -147,7 +197,7 @@ private fun EventCardBody(
                 copyDescription = copyDescription,
                 openDescription = openDescription,
                 onCopy = onCopy,
-                onOpen = onOpen,
+                onOpen = { onOpen(null) },
             )
         NostrEventCardState.NotFound ->
             EventCardFailure(
@@ -157,7 +207,7 @@ private fun EventCardBody(
                 openDescription = openDescription,
                 onRetry = onRetry,
                 onCopy = onCopy,
-                onOpen = onOpen,
+                onOpen = { onOpen(null) },
             )
         NostrEventCardState.Invalid ->
             EventCardFailure(
@@ -167,7 +217,7 @@ private fun EventCardBody(
                 openDescription = openDescription,
                 onRetry = onRetry,
                 onCopy = onCopy,
-                onOpen = onOpen,
+                onOpen = { onOpen(null) },
             )
         NostrEventCardState.Failed ->
             EventCardFailure(
@@ -177,7 +227,7 @@ private fun EventCardBody(
                 openDescription = openDescription,
                 onRetry = onRetry,
                 onCopy = onCopy,
-                onOpen = onOpen,
+                onOpen = { onOpen(null) },
             )
         is NostrEventCardState.Loaded ->
             LoadedEventCard(
@@ -185,9 +235,8 @@ private fun EventCardBody(
                 authorDisplayName = authorDisplayName,
                 contentColor = contentColor,
                 copyDescription = copyDescription,
-                openDescription = openDescription,
                 onCopy = onCopy,
-                onOpen = onOpen,
+                onOpen = { onOpen(state.card) },
             )
     }
 }
@@ -199,6 +248,7 @@ private fun EventCardActions(
     openDescription: String,
     onCopy: () -> Unit,
     onOpen: () -> Unit,
+    openIcon: ImageVector = Icons.AutoMirrored.Outlined.OpenInNew,
 ) {
     Row {
         IconButton(onClick = onCopy, modifier = Modifier.size(48.dp)) {
@@ -211,7 +261,7 @@ private fun EventCardActions(
         }
         IconButton(onClick = onOpen, modifier = Modifier.size(48.dp)) {
             Icon(
-                Icons.AutoMirrored.Outlined.OpenInNew,
+                openIcon,
                 contentDescription = openDescription,
                 modifier = Modifier.size(18.dp),
                 tint = contentColor,
@@ -226,12 +276,21 @@ private fun LoadedEventCard(
     authorDisplayName: (String) -> String,
     contentColor: Color,
     copyDescription: String,
-    openDescription: String,
     onCopy: () -> Unit,
     onOpen: () -> Unit,
 ) {
+    val primaryAction = card.primaryAction()
     Column(Modifier.padding(start = 12.dp, top = 8.dp, end = 4.dp, bottom = 8.dp)) {
-        LoadedEventHeader(card, authorDisplayName, contentColor, copyDescription, openDescription, onCopy, onOpen)
+        LoadedEventHeader(
+            card = card,
+            authorDisplayName = authorDisplayName,
+            contentColor = contentColor,
+            copyDescription = copyDescription,
+            openDescription = primaryAction.description,
+            openIcon = primaryAction.icon,
+            onCopy = onCopy,
+            onOpen = onOpen,
+        )
         LoadedEventSummary(card.summary, contentColor)
         LoadedEventMetadata(card.metadata, contentColor)
     }
@@ -244,6 +303,7 @@ private fun LoadedEventHeader(
     contentColor: Color,
     copyDescription: String,
     openDescription: String,
+    openIcon: ImageVector,
     onCopy: () -> Unit,
     onOpen: () -> Unit,
 ) {
@@ -292,7 +352,14 @@ private fun LoadedEventHeader(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                EventCardActions(contentColor, copyDescription, openDescription, onCopy, onOpen)
+                EventCardActions(
+                    contentColor = contentColor,
+                    copyDescription = copyDescription,
+                    openDescription = openDescription,
+                    onCopy = onCopy,
+                    onOpen = onOpen,
+                    openIcon = openIcon,
+                )
             }
         }
     }

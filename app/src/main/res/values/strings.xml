@@ -1561,6 +1561,9 @@
     <string name="nostr_event_invalid">This event couldn’t be verified.</string>
     <string name="nostr_event_failed">Couldn’t load this event. Check your connection and try again.</string>
     <string name="nostr_event_open">Open event</string>
+    <string name="nostr_event_read_article">Read article</string>
+    <string name="nostr_event_play_video">Play video</string>
+    <string name="nostr_video_playback_failed">Couldn’t play this video.</string>
     <string name="nostr_event_copy">Copy event reference</string>
     <string name="nostr_event_type_note">Note</string>
     <string name="nostr_event_type_article">Article</string>

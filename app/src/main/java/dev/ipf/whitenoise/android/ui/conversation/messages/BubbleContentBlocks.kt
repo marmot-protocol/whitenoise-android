@@ -51,6 +51,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
@@ -615,6 +616,9 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     references = eventReferences,
                     resolver = eventCardResolver,
                     authorDisplayName = appState::contactDisplayNameCached,
+                    mentionDisplayName = appState::mentionDisplayName,
+                    onNostrProfileTap = appState::presentNostrProfile,
+                    parseMarkdown = appState::parseMarkdownOrEmpty,
                     contentColor = bubbleContentColor,
                 )
             }

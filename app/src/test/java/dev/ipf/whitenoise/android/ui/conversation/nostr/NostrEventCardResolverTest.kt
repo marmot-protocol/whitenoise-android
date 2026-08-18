@@ -218,12 +218,22 @@ class NostrEventCardResolverTest {
                 id = "a".repeat(64),
                 kind = 30_023,
                 tags = listOf(listOf("title", "T".repeat(400)), listOf("summary", "S".repeat(800))),
+                content = "# Full article\n\nReadable body",
             ).toCardModel()
         val video =
             event(
                 "b".repeat(64),
                 kind = 34_235,
-                tags = listOf(listOf("duration", "125"), listOf("dim", "1920x1080")),
+                tags =
+                    listOf(
+                        listOf(
+                            "imeta",
+                            "url https://cdn.example/video.mp4",
+                            "m video/mp4",
+                            "duration 125",
+                            "dim 1920x1080",
+                        ),
+                    ),
             ).toCardModel()
         val release = event("c".repeat(64), kind = 30_063, tags = listOf(listOf("version", "2026.8.1"))).toCardModel()
         val file =
@@ -237,11 +247,44 @@ class NostrEventCardResolverTest {
         assertEquals(NostrEventCardKind.Article, article.kind)
         assertEquals(160, article.title?.length)
         assertEquals(160, article.summary?.length)
+        assertEquals("# Full article\n\nReadable body", article.readerBody)
         assertEquals(listOf("2:05", "1920x1080"), video.metadata)
+        assertEquals("https://cdn.example/video.mp4", video.mediaUrl)
+        assertEquals("video/mp4", video.mediaMimeType)
         assertEquals(listOf("2026.8.1"), release.metadata)
         assertEquals(listOf("audio/ogg", "2.0 KB"), file.metadata)
         assertEquals(NostrEventCardKind.Generic, generic.kind)
         assertEquals("body", generic.summary)
+    }
+
+    @Test
+    fun videoPlaybackUrlAcceptsOnlyPublicDefaultPortHttps() {
+        assertEquals("https://cdn.example/video.mp4", safeNostrMediaUrl(" https://cdn.example/video.mp4 "))
+        assertEquals(null, safeNostrMediaUrl("http://cdn.example/video.mp4"))
+        assertEquals(null, safeNostrMediaUrl("https://user:pass@cdn.example/video.mp4"))
+        assertEquals(null, safeNostrMediaUrl("https://cdn.example:8443/video.mp4"))
+        assertEquals(null, safeNostrMediaUrl("https://127.0.0.1/video.mp4"))
+        assertEquals(null, safeNostrMediaUrl("https://[::1]/video.mp4"))
+    }
+
+    @Test
+    fun hlsVideoMetadataRemainsPlayableWithoutAFileExtension() {
+        val video =
+            event(
+                id = "a".repeat(64),
+                kind = 34_236,
+                tags =
+                    listOf(
+                        listOf(
+                            "imeta",
+                            "url https://media.example/watch/stream",
+                            "m application/vnd.apple.mpegurl",
+                        ),
+                    ),
+            ).toCardModel()
+
+        assertEquals("https://media.example/watch/stream", video.mediaUrl)
+        assertEquals("application/vnd.apple.mpegurl", video.mediaMimeType)
     }
 
     @Test

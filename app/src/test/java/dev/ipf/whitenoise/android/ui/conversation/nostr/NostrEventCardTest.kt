@@ -26,6 +26,7 @@ class NostrEventCardTest {
     fun loadedCardExposesCopyAndOpenActions() {
         var copies = 0
         var opens = 0
+        var openedCard: NostrEventCardModel? = null
         composeRule.setContent {
             WhiteNoiseTheme {
                 NostrEventCard(
@@ -34,7 +35,10 @@ class NostrEventCardTest {
                     contentColor = Color.Black,
                     onRetry = {},
                     onCopy = { copies++ },
-                    onOpen = { opens++ },
+                    onOpen = {
+                        opens++
+                        openedCard = it
+                    },
                 )
             }
         }
@@ -46,6 +50,7 @@ class NostrEventCardTest {
 
         assertEquals(1, copies)
         assertEquals(1, opens)
+        assertEquals(noteCard(), openedCard)
     }
 
     @Test
@@ -71,6 +76,49 @@ class NostrEventCardTest {
 
         assertEquals(1, retries)
         assertEquals(1, opens)
+    }
+
+    @Test
+    fun articleAndVideoExposeInAppActions() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventCard(
+                    state =
+                        NostrEventCardState.Loaded(
+                            noteCard().copy(
+                                kind = NostrEventCardKind.Article,
+                                eventKind = 30_023,
+                                title = "An article",
+                                readerBody = "Article body",
+                            ),
+                        ),
+                    authorDisplayName = { "Alex" },
+                    contentColor = Color.Black,
+                    onRetry = {},
+                    onCopy = {},
+                    onOpen = {},
+                )
+                NostrEventCard(
+                    state =
+                        NostrEventCardState.Loaded(
+                            noteCard().copy(
+                                kind = NostrEventCardKind.Video,
+                                eventKind = 34_235,
+                                title = "A video",
+                                mediaUrl = "https://cdn.example/video.mp4",
+                            ),
+                        ),
+                    authorDisplayName = { "Alex" },
+                    contentColor = Color.Black,
+                    onRetry = {},
+                    onCopy = {},
+                    onOpen = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_read_article)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_play_video)).assertIsDisplayed()
     }
 
     private fun string(resId: Int): String =

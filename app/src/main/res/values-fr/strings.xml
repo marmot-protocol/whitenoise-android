@@ -1468,6 +1468,9 @@
     <string name="nostr_event_invalid">Impossible de vérifier cet événement.</string>
     <string name="nostr_event_failed">Impossible de charger cet événement. Vérifiez votre connexion et réessayez.</string>
     <string name="nostr_event_open">Ouvrir l’événement</string>
+    <string name="nostr_event_read_article">Lire l’article</string>
+    <string name="nostr_event_play_video">Lire la vidéo</string>
+    <string name="nostr_video_playback_failed">Impossible de lire cette vidéo.</string>
     <string name="nostr_event_copy">Copier la référence de l’événement</string>
     <string name="nostr_event_type_note">Publication</string>
     <string name="nostr_event_type_article">Article long format</string>
