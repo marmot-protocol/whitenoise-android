@@ -9,6 +9,7 @@ import androidx.benchmark.macro.TraceSectionMetric
 internal const val OPEN_MEMBERS_TRACE = "benchmark:open-group-members"
 internal const val CREATE_GROUP_TRACE = "benchmark:create-group"
 internal const val ACCEPT_INVITE_TRACE = "benchmark:accept-invite"
+internal const val SCROLL_CONVERSATION_TRACE = "benchmark:scroll-conversation"
 
 @OptIn(ExperimentalMetricApi::class)
 internal fun journeyMetrics(sectionName: String): List<Metric> =

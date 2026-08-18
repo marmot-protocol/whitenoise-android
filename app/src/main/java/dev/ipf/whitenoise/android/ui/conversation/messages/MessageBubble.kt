@@ -406,7 +406,7 @@ internal fun MessageBubble(
     val messageTextCopy = rememberMessageTextCopy()
     val messageTextSelectionState = rememberSelectionState()
     val selectableTextLayouts =
-        remember(record.messageIdHex) { mutableStateMapOf<Any, SelectableTextLayout>() }
+        remember(record.messageIdHex) { SelectableTextLayoutRegistry() }
     val markdownLinkLayouts =
         remember(record.messageIdHex) { mutableStateMapOf<Any, MarkdownLinkTextLayout>() }
     val pendingLongPressLinkDestination = remember(record.messageIdHex) { arrayOfNulls<String>(1) }
@@ -435,21 +435,16 @@ internal fun MessageBubble(
     val selectableTextLayoutReporter =
         remember(record.messageIdHex) {
             { key: Any, layoutResult: TextLayoutResult?, coordinates: androidx.compose.ui.layout.LayoutCoordinates? ->
-                if (layoutResult != null && coordinates != null) {
-                    selectableTextLayouts[key] = SelectableTextLayout(key, layoutResult, coordinates)
-                } else {
-                    selectableTextLayouts.remove(key)
-                }
+                selectableTextLayouts.update(key, layoutResult, coordinates)
                 Unit
             }
         }
-    val selectableTextLayoutSnapshot = selectableTextLayouts.values.toList()
-    LaunchedEffect(textSelectionMode, selectableTextLayoutSnapshot, longPressWindowPosition) {
-        if (!textSelectionMode || textSelectionSeeded || selectableTextLayoutSnapshot.isEmpty()) return@LaunchedEffect
+    LaunchedEffect(textSelectionMode, longPressWindowPosition) {
+        if (!textSelectionMode || textSelectionSeeded) return@LaunchedEffect
         // Let every Markdown Text leaf report in this frame before calculating
         // the global selection offset across the SelectionContainer.
         withFrameNanos { }
-        textSelectionSeedRange(selectableTextLayouts.values, longPressWindowPosition)?.let { range ->
+        textSelectionSeedRange(selectableTextLayouts.snapshot(), longPressWindowPosition)?.let { range ->
             messageTextSelectionState.select(range)
             textSelectionSeeded = true
         }
@@ -465,8 +460,7 @@ internal fun MessageBubble(
     fun reportPlainTextLayoutIfReady() {
         val layoutResult = plainTextLayoutTracker.layoutResult ?: return
         val coordinates = plainTextLayoutTracker.coordinates ?: return
-        selectableTextLayouts[plainTextLayoutKey] =
-            SelectableTextLayout(plainTextLayoutKey, layoutResult, coordinates)
+        selectableTextLayouts.update(plainTextLayoutKey, layoutResult, coordinates)
     }
 
     val plainTextSelectionModifier =
@@ -874,7 +868,7 @@ internal fun MessageBubble(
     }
 
     fun captureActionMenuVisibleStart(pressInWindow: Offset?) {
-        val layouts = selectableTextLayouts.values.toList()
+        val layouts = selectableTextLayouts.snapshot()
         actionMenuVisibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
         actionMenuVisibleOffset =
             if (record.contentTokens.truncated) {
@@ -907,7 +901,7 @@ internal fun MessageBubble(
     // opened from a hit-tested press, start at the containing visible sentence.
     fun speakFromHere() {
         if (deleted) return
-        val layouts = selectableTextLayouts.values.toList()
+        val layouts = selectableTextLayouts.snapshot()
         val selectionActive = textSelectionMode && messageTextSelectionState.selectedTexts.isNotEmpty()
         val visibleText =
             if (selectionActive) {

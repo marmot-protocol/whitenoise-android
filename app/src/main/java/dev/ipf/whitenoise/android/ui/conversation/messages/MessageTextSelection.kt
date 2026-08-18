@@ -39,6 +39,33 @@ internal class SelectableTextLayoutTracker {
 }
 
 /**
+ * Plain holder for the selectable text leaves rendered by one message.
+ *
+ * Layout coordinates change during every scroll frame. Keeping them outside
+ * Compose snapshot state lets hit testing read the latest geometry at gesture
+ * time without invalidating the owning message bubble.
+ */
+internal class SelectableTextLayoutRegistry {
+    private val layouts = linkedMapOf<Any, SelectableTextLayout>()
+
+    fun update(
+        key: Any,
+        layoutResult: TextLayoutResult?,
+        coordinates: LayoutCoordinates?,
+    ) {
+        if (layoutResult != null && coordinates != null) {
+            layouts[key] = SelectableTextLayout(key, layoutResult, coordinates)
+        } else {
+            layouts.remove(key)
+        }
+    }
+
+    fun snapshot(): List<SelectableTextLayout> = layouts.values.toList()
+
+    fun clear() = layouts.clear()
+}
+
+/**
  * Observes taps across the whole conversation chrome without consuming child
  * gestures. A tap inside the selected bubble is left to SelectionContainer;
  * a stationary tap anywhere else (transcript, top bar, or composer) exits mode.

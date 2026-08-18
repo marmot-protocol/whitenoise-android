@@ -67,6 +67,23 @@ internal class WhiteNoiseJourneys {
         waitForTag(PerformanceTags.MEMBER_LIST, NETWORK_STATE_TIMEOUT_MS)
     }
 
+    fun scrollConversation() {
+        val x = device.displayWidth / 2
+        val top = device.displayHeight / 4
+        val bottom = device.displayHeight * 3 / 4
+        repeat(CONVERSATION_SCROLL_PASSES) {
+            check(device.swipe(x, bottom, x, top, CONVERSATION_SCROLL_STEPS)) {
+                "Failed to scroll toward older conversation messages."
+            }
+        }
+        repeat(CONVERSATION_SCROLL_PASSES) {
+            check(device.swipe(x, top, x, bottom, CONVERSATION_SCROLL_STEPS)) {
+                "Failed to scroll back toward the newest conversation messages."
+            }
+        }
+        device.waitForIdle()
+    }
+
     fun createGroup(
         prefix: String,
         suffix: Int,
@@ -230,5 +247,7 @@ internal class WhiteNoiseJourneys {
         const val NETWORK_STATE_TIMEOUT_MS = 45_000L
         const val NAVIGATION_SETTLE_TIMEOUT_MS = 2_000L
         const val INPUT_METHOD_POLL_INTERVAL_MS = 100L
+        const val CONVERSATION_SCROLL_PASSES = 4
+        const val CONVERSATION_SCROLL_STEPS = 20
     }
 }
