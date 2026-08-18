@@ -434,6 +434,45 @@
     <string name="forward_search_chats">Search chats</string>
     <string name="forward_no_chats">No other chats to forward to.</string>
     <string name="forward_no_matches">No chats match your search.</string>
+    <string name="forward_blocked_pending">Wait for the attachment to finish uploading</string>
+    <string name="forward_blocked_failed">Retry the attachment upload before forwarding</string>
+    <string name="forward_blocked_malformed">This attachment can’t be forwarded</string>
+    <string name="forward_blocked_expired">This attachment has expired</string>
+    <string name="forward_blocked_unavailable">Download this attachment before forwarding</string>
+    <string name="forward_blocked_restricted">Forwarding isn’t allowed for this attachment</string>
+    <string name="forward_blocked_unsupported">This message can’t be forwarded</string>
+    <string name="forward_blocked_selection">Forward unavailable: %1$s</string>
+    <string name="forward_progress_title">Forwarding</string>
+    <string name="forward_preparing_attachments">Preparing attachments %1$d of %2$d</string>
+    <string name="forward_waiting">Waiting</string>
+    <string name="forward_uploading_attachments">Uploading attachments %1$d of %2$d</string>
+    <string name="forward_sending_messages">Sending messages %1$d of %2$d</string>
+    <string name="forward_sent">Sent</string>
+    <string name="forward_cancelled">Cancelled</string>
+    <string name="forward_cancelling">Cancelling…</string>
+    <string name="forward_failed_preparing">Couldn\'t prepare attachments</string>
+    <string name="forward_failed_upload">Couldn\'t upload attachments</string>
+    <string name="forward_failed_publish">Couldn\'t send messages</string>
+    <string name="forward_payload_too_large">These attachments are too large to forward together</string>
+    <string name="forward_failed_expired">The attachment expired before it could be forwarded</string>
+    <string name="forward_failed_session_changed">Account changed. Close and try again.</string>
+    <string name="forward_failed_after_partial">%1$s · Sent %2$d of %3$d messages</string>
+    <plurals name="forward_completed_summary">
+        <item quantity="one">Forwarded to %1$d chat</item>
+        <item quantity="other">Forwarded to %1$d chats</item>
+    </plurals>
+    <string name="forward_partial_summary">Forwarded to %1$d of %2$d chats</string>
+    <string name="forward_failed_summary">Couldn’t forward to the selected chats</string>
+    <string name="forward_start_failed">Couldn’t start forwarding. Close and try again.</string>
+    <string name="forward_retry_failed">Retry failed chats</string>
+    <plurals name="forward_attachment_count">
+        <item quantity="one">%1$d attachment</item>
+        <item quantity="other">%1$d attachments</item>
+    </plurals>
+    <plurals name="forward_message_count">
+        <item quantity="one">%1$d message</item>
+        <item quantity="other">%1$d messages</item>
+    </plurals>
     <plurals name="forward_to_chats_count">
         <item quantity="one">Forward to %1$d chat</item>
         <item quantity="other">Forward to %1$d chats</item>

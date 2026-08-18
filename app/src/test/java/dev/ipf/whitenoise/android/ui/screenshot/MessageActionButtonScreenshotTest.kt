@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -55,6 +56,38 @@ class MessageActionButtonScreenshotTest {
     fun messageActionButtonsAmoled() {
         render(darkTheme = true, amoled = true)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/message_action_buttons_amoled.png")
+    }
+
+    @Test
+    fun blockedForwardExplainsWhy() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface(
+                    modifier = Modifier.width(328.dp).testTag(TAG),
+                    shape = RoundedCornerShape(12.dp),
+                    border = amoledSurfaceBorderStroke(),
+                ) {
+                    MessageActionButton(
+                        label = "Forward",
+                        supportingLabel = "Wait for the attachment to finish uploading",
+                        icon = {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Forward,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        },
+                        onClick = {},
+                        enabled = false,
+                        minimumHeight = 64.dp,
+                    )
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/message_action_forward_blocked_dark.png")
     }
 
     private fun render(

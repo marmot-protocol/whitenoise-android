@@ -1,7 +1,11 @@
+@file:Suppress("TooManyFunctions") // Cohesive batch-selection policy and projections share one model boundary.
+
 package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
+import dev.ipf.whitenoise.android.core.ForwardBlockedReason
+import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -24,6 +28,8 @@ internal data class BatchMessageActionItem(
      * Messages without it can only be hidden on this device.
      */
     val canDeleteForEveryone: Boolean,
+    val forwardPayload: ForwardMessagePayload? = null,
+    val forwardBlockedReason: ForwardBlockedReason? = null,
 )
 
 /**
@@ -172,6 +178,11 @@ internal fun batchForwardSheetOpenForBodies(
     forwardBodies: List<String>,
 ): Boolean = currentlyOpen && forwardBodies.isNotEmpty()
 
+internal fun batchForwardSheetOpenForPayloads(
+    currentlyOpen: Boolean,
+    forwardPayloads: List<ForwardMessagePayload>,
+): Boolean = currentlyOpen && forwardPayloads.isNotEmpty()
+
 internal fun reconcileBatchSelections(
     selected: Map<String, BatchMessageSelection>,
     selectableVisible: Map<String, BatchMessageSelection>,
@@ -214,6 +225,12 @@ internal fun batchCopyText(items: List<BatchMessageActionItem>): String {
 internal fun batchForwardBodies(items: List<BatchMessageActionItem>): List<String> =
     MessageProjector.validatedForwardTextBodies(items.map(BatchMessageActionItem::forwardableText))
 
+/** Atomic ordered forward batch: one unsupported selection disables the entire operation. */
+internal fun batchForwardPayloads(items: List<BatchMessageActionItem>): List<ForwardMessagePayload> {
+    val incomplete = items.any { it.forwardBlockedReason != null || it.forwardPayload == null }
+    return if (incomplete) emptyList() else items.map { requireNotNull(it.forwardPayload) }
+}
+
 internal data class BatchSelectionActionAvailability(
     val canCopy: Boolean,
     val canForward: Boolean,
@@ -237,11 +254,11 @@ internal fun batchSelectionActionAvailability(
             canDelete = false,
         )
     }
-    val forwardBodies = batchForwardBodies(items)
+    val forwardPayloads = batchForwardPayloads(items)
     val single = items.size == 1
     return BatchSelectionActionAvailability(
         canCopy = items.all { !it.copyableText.isNullOrBlank() },
-        canForward = forwardBodies.isNotEmpty(),
+        canForward = forwardPayloads.isNotEmpty(),
         canSave = items.all(BatchMessageActionItem::hasSaveableMedia),
         canReply = single && composerGate == ComposerGate.COMPOSER,
         canInfo = single,

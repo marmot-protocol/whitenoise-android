@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
+import java.util.Locale
 
 data class ReactionTally(
     val emoji: String,
@@ -148,6 +149,7 @@ object MessageProjector {
     private const val StreamTag = "stream"
     private const val StreamStartTag = "stream-start"
     private const val StreamHashTag = "stream-hash"
+    private val RestrictedMediaForwardingTags = setOf("view_once", "view-once")
 
     fun displayBody(
         message: AppMessageRecordFfi,
@@ -337,7 +339,11 @@ object MessageProjector {
      * [WhiteNoiseAppState.forwardText] so the de-dupe/blank rules are unit
      * testable without the FFI send path.
      */
-    fun normalizeForwardTargets(targetGroupIds: List<String>): List<String> = targetGroupIds.filter { it.isNotBlank() }.distinct()
+    fun normalizeForwardTargets(targetGroupIds: List<String>): List<String> =
+        targetGroupIds
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .distinctBy { it.lowercase(Locale.ROOT) }
 
     /**
      * Whether [message] is a plain user-authored text message that v1 forwarding
@@ -400,6 +406,100 @@ object MessageProjector {
     }
 
     /**
+     * Build the complete source payload for forwarding without permitting a
+     * malformed album to degrade into its caption or a valid-looking subset.
+     * The typed media projection is authoritative, while the raw imeta count
+     * proves that no malformed attachment was dropped during projection.
+     */
+    internal fun forwardEligibility(
+        message: AppMessageRecordFfi,
+        mediaReferences: List<MediaAttachmentReferenceFfi>,
+        editedText: String? = null,
+        cachedAttachmentIndices: Set<Int> = emptySet(),
+        nowSeconds: ULong,
+    ): ForwardEligibility {
+        val mediaTagCount = message.tags.count { it.values.firstOrNull() == ImetaTag }
+        val carriesMedia = mediaTagCount > 0 || mediaReferences.isNotEmpty()
+        val initialBlock = forwardInitialBlockReason(message, nowSeconds)
+        return when {
+            initialBlock != null -> ForwardEligibility.Blocked(initialBlock)
+            carriesMedia ->
+                forwardMediaEligibility(
+                    message = message,
+                    mediaReferences = mediaReferences,
+                    mediaTagCount = mediaTagCount,
+                    editedText = editedText,
+                    cachedAttachmentIndices = cachedAttachmentIndices,
+                )
+            else -> forwardTextEligibility(message, editedText)
+        }
+    }
+
+    private fun forwardInitialBlockReason(
+        message: AppMessageRecordFfi,
+        nowSeconds: ULong,
+    ): ForwardBlockedReason? =
+        when {
+            message.kind != KindChat || streamId(message) != null -> ForwardBlockedReason.Unsupported
+            isPendingMedia(message) -> ForwardBlockedReason.PendingAttachment
+            message.retentionExpiresAt
+                ?.takeIf { it > 0uL }
+                ?.let { it <= nowSeconds } == true -> ForwardBlockedReason.ExpiredAttachment
+            else -> null
+        }
+
+    private fun forwardTextEligibility(
+        message: AppMessageRecordFfi,
+        editedText: String?,
+    ): ForwardEligibility {
+        val payload =
+            forwardableText(message, editedText)?.let { body ->
+                ForwardMessagePayload.Text(
+                    sourceGroupIdHex = message.groupIdHex,
+                    sourceMessageIdHex = message.messageIdHex,
+                    text = body,
+                )
+            }
+        return payload?.let(ForwardEligibility::Eligible)
+            ?: ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
+    }
+
+    private fun forwardMediaEligibility(
+        message: AppMessageRecordFfi,
+        mediaReferences: List<MediaAttachmentReferenceFfi>,
+        mediaTagCount: Int,
+        editedText: String?,
+        cachedAttachmentIndices: Set<Int>,
+    ): ForwardEligibility {
+        val blockedReason =
+            when {
+                message.tags.any { it.values.firstOrNull() in RestrictedMediaForwardingTags } ->
+                    ForwardBlockedReason.RestrictedAttachment
+                mediaReferences.isEmpty() || mediaReferences.size != mediaTagCount ->
+                    ForwardBlockedReason.MalformedAttachment
+                mediaReferences.withIndex().any { (index, reference) ->
+                    reference.sourceEpoch != 0uL &&
+                        reference.locators.isEmpty() &&
+                        index !in cachedAttachmentIndices
+                } -> ForwardBlockedReason.UnavailableAttachment
+                else -> null
+            }
+        if (blockedReason != null) return ForwardEligibility.Blocked(blockedReason)
+        return ForwardEligibility.Eligible(
+            ForwardMessagePayload.Media(
+                sourceGroupIdHex = message.groupIdHex,
+                sourceMessageIdHex = message.messageIdHex,
+                caption = mediaCaption(message, editedText ?: message.plaintext),
+                attachments =
+                    mediaReferences.mapIndexed { index, reference ->
+                        ForwardAttachmentSource(index, reference)
+                    },
+                expiresAtSeconds = message.retentionExpiresAt,
+            ),
+        )
+    }
+
+    /**
      * Plain text copied by multi-select. Unlike forwarding, media records are
      * accepted when they carry a user-authored caption; filename and media-type
      * fallbacks are never copied. Reactions, system events, and agent streams
@@ -458,7 +558,7 @@ object MessageProjector {
 
     private fun isMedia(message: AppMessageRecordFfi): Boolean = message.kind == KindChat && message.tags.any { it.values.firstOrNull() == ImetaTag }
 
-    private fun isPendingMedia(message: AppMessageRecordFfi): Boolean =
+    internal fun isPendingMedia(message: AppMessageRecordFfi): Boolean =
         message.kind == KindChat && message.tags.any { it.values.firstOrNull() == PendingMediaTag }
 
     private fun pendingMediaPlaceholder(message: AppMessageRecordFfi): String? {

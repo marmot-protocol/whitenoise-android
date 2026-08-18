@@ -38,6 +38,8 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
+import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
@@ -75,6 +77,7 @@ import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
 import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
+import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemCopy
@@ -1415,6 +1418,9 @@ internal fun operationalNpub(
 ): String = cachedNpub ?: runCatching { encode(accountIdHex) }.getOrNull() ?: accountIdHex
 
 private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
+private const val FORWARD_BACKGROUND_RETRY_ATTEMPTS = 3
+private const val FORWARD_BACKGROUND_RETRY_DELAY_MS = 1_000L
+private const val FORWARD_TERMINAL_STATUS_DURATION_MS = 2_000L
 
 internal fun appStateScopeExceptionHandler(
     report: (Throwable) -> Unit = { throwable ->
@@ -2370,6 +2376,15 @@ class WhiteNoiseAppState private constructor(
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
     private val mutationsScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    private var forwardTerminalDismissGeneration = 0L
+    private val forwardOperationOwner =
+        ForwardOperationOwner(
+            scope = mutationsScope,
+            automaticRetryAttempts = FORWARD_BACKGROUND_RETRY_ATTEMPTS,
+            retryDelayMillis = { attempt -> FORWARD_BACKGROUND_RETRY_DELAY_MS shl attempt },
+            onTerminal = ::scheduleForwardTerminalDismiss,
+        )
+    internal val activeForwardOperation: StateFlow<ForwardOperationSnapshot?> = forwardOperationOwner.state
     private val draftWriter =
         CoalescingMessageDraftWriter(
             scope = mutationsScope,
@@ -2944,6 +2959,9 @@ class WhiteNoiseAppState private constructor(
     internal val forwardTargetMembersRevision: Long
         get() = chatsController?.memberSnapshotsRevision ?: 0L
 
+    internal val forwardTargetsRevision: Long
+        get() = chatsController?.forwardTargetsRevision ?: 0L
+
     internal fun requestForwardTargetMembers(groupIds: Iterable<String>) {
         chatsController?.requestMemberSnapshots(groupIds)
     }
@@ -2951,6 +2969,12 @@ class WhiteNoiseAppState private constructor(
     internal fun retryForwardTargets() {
         chatsController?.retryLoad()
     }
+
+    internal fun cancelActiveForwardOperation(): Boolean = forwardOperationOwner.cancel()
+
+    internal fun retryActiveForwardOperation(): Boolean = forwardOperationOwner.retry()
+
+    internal fun dismissActiveForwardOperation(): Boolean = forwardOperationOwner.dismiss()
 
     /**
      * Stage an inbound Android share for the explicitly chosen local account.
@@ -3003,6 +3027,326 @@ class WhiteNoiseAppState private constructor(
         val titleCopy = notificationGroupTitleCopy()
         shareShortcutPublisher.publish(accountRef, chats) { item ->
             chatListItemDisplayTitle(item, this, titleCopy)
+        }
+    }
+
+    /**
+     * Start one ordered text/media forward operation. Source attachments are
+     * materialized through their original group, while every destination gets
+     * a separate upload before its batch acquires the destination commit lock.
+     */
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
+    internal fun startForwardMessages(
+        targetGroupIds: List<String>,
+        messages: List<ForwardMessagePayload>,
+    ): Boolean {
+        val sourceGroupIds =
+            messages
+                .map(ForwardMessagePayload::sourceGroupIdHex)
+                .filter(String::isNotBlank)
+        val targets =
+            MessageProjector
+                .normalizeForwardTargets(targetGroupIds)
+                .filterNot { target -> sourceGroupIds.any { it.equals(target, ignoreCase = true) } }
+        val account = activeAccountRef?.takeIf(String::isNotBlank)
+        if (account == null || messages.isEmpty() || targets.isEmpty()) return false
+        val sessionEpoch = mediaUploadSessionEpoch()
+
+        fun requireCurrentAccount() {
+            if (activeAccountRef != account || mediaUploadSessionEpoch() != sessionEpoch) {
+                throw ForwardSessionInvalidatedException()
+            }
+        }
+
+        val transport =
+            object : ForwardTransport {
+                override suspend fun materialize(
+                    sourceGroupIdHex: String,
+                    sourceMessageIdHex: String,
+                    source: dev.ipf.whitenoise.android.core.ForwardAttachmentSource,
+                ): PendingAttachment {
+                    requireCurrentAccount()
+                    val request =
+                        AttachmentTransferRequest(
+                            accountRef = account,
+                            groupIdHex = sourceGroupIdHex,
+                            messageIdHex = sourceMessageIdHex,
+                            attachmentIndex = source.attachmentIndex,
+                        )
+                    return materializeForwardAttachment(
+                        source = source,
+                        resolveAuthoritativeReference = {
+                            requireCurrentAccount()
+                            resolveAttachmentReference(request).also { requireCurrentAccount() }
+                        },
+                        downloadPlaintext = { reference ->
+                            requireCurrentAccount()
+                            downloadAttachmentPlaintext(request, reference).also { requireCurrentAccount() }
+                        },
+                    )
+                }
+
+                override suspend fun upload(
+                    targetGroupIdHex: String,
+                    message: PreparedForwardMessage.Media,
+                ): List<MediaAttachmentReferenceFfi> {
+                    requireCurrentAccount()
+                    val uploaded =
+                        marmotIo {
+                            uploadMedia(
+                                account,
+                                targetGroupIdHex,
+                                MediaUploadRequestFfi(
+                                    attachments =
+                                        message.attachments.map { attachment ->
+                                            MediaUploadAttachmentRequestFfi(
+                                                fileName = attachment.fileName,
+                                                mediaType = attachment.mediaType,
+                                                plaintext = attachment.plaintextBytes,
+                                                dim = attachment.dim,
+                                                thumbhash = attachment.thumbhash,
+                                            )
+                                        },
+                                    caption = message.caption,
+                                    send = false,
+                                    blossomServer = null,
+                                ),
+                            ).attachments.map { it.reference }
+                        }
+                    requireCurrentAccount()
+                    return uploaded
+                }
+
+                private suspend fun recentForwardTimeline(
+                    targetGroupIdHex: String,
+                    batchMessageCount: Int,
+                ): List<TimelineMessageRecordFfi> {
+                    requireCurrentAccount()
+                    val limit = maxOf(100u, batchMessageCount.toUInt() + 100u)
+                    return marmotIo {
+                        timelineMessages(
+                            account,
+                            TimelineMessageQueryFfi(
+                                groupIdHex = targetGroupIdHex,
+                                search = null,
+                                before = null,
+                                beforeMessageId = null,
+                                after = null,
+                                afterMessageId = null,
+                                limit = limit,
+                            ),
+                        ).messages
+                    }.also { requireCurrentAccount() }
+                }
+
+                private fun forwardProjectionRecords(
+                    timeline: List<TimelineMessageRecordFfi>,
+                    message: PreparedForwardMessage,
+                    references: List<MediaAttachmentReferenceFfi>,
+                ): Map<String, TimelineMessageRecordFfi> =
+                    timeline
+                        .asSequence()
+                        .filter { record ->
+                            record.direction == "sent" &&
+                                record.kind == 9uL &&
+                                when (message) {
+                                    is PreparedForwardMessage.Text ->
+                                        record.plaintext == message.text && record.media.isEmpty()
+                                    is PreparedForwardMessage.Media ->
+                                        record.plaintext == message.caption.orEmpty() &&
+                                            record.media.map { it.ciphertextSha256 } ==
+                                            references.map { it.ciphertextSha256 }
+                                }
+                        }.associateBy(TimelineMessageRecordFfi::messageIdHex)
+
+                @Suppress("LongMethod", "ThrowsCount", "TooGenericExceptionCaught")
+                override suspend fun publishBatch(
+                    targetGroupIdHex: String,
+                    messages: List<PreparedForwardMessage>,
+                    uploadedReferences: Map<Int, List<MediaAttachmentReferenceFfi>>,
+                    startIndex: Int,
+                    onBeforeMessagePublished: (messageIndex: Int) -> Unit,
+                    onMessagePublished: (messageIndex: Int) -> Unit,
+                ) {
+                    requireCurrentAccount()
+                    withGroupCommitLock(account, targetGroupIdHex) {
+                        val knownMessageIds =
+                            recentForwardTimeline(targetGroupIdHex, messages.size)
+                                .mapTo(mutableSetOf(), TimelineMessageRecordFfi::messageIdHex)
+                        for (messageIndex in startIndex until messages.size) {
+                            currentCoroutineContext().ensureActive()
+                            onBeforeMessagePublished(messageIndex)
+                            requireCurrentAccount()
+                            val message = messages[messageIndex]
+                            val references = uploadedReferences[messageIndex].orEmpty()
+                            val evidenceBefore = knownMessageIds.toSet()
+                            try {
+                                val publishedMessageIds =
+                                    when (message) {
+                                        is PreparedForwardMessage.Text ->
+                                            marmotIo { sendText(account, targetGroupIdHex, message.text) }.messageIds
+                                        is PreparedForwardMessage.Media -> {
+                                            check(references.isNotEmpty()) { "missing destination media references" }
+                                            marmotIo {
+                                                sendMediaAttachments(
+                                                    account,
+                                                    targetGroupIdHex,
+                                                    references,
+                                                    message.caption,
+                                                )
+                                            }.messageIds
+                                        }
+                                    }
+                                knownMessageIds += publishedMessageIds
+                            } catch (cancellation: CancellationException) {
+                                throw cancellation
+                            } catch (failure: Exception) {
+                                val recoveryEvidence =
+                                    ForwardPublishRecoveryEvidence(
+                                        messageIndex = messageIndex,
+                                        knownMessageIdsBefore = evidenceBefore,
+                                        pendingMessageIdHex = null,
+                                    )
+                                val timelineAfter =
+                                    try {
+                                        recentForwardTimeline(targetGroupIdHex, messages.size)
+                                    } catch (cancellation: CancellationException) {
+                                        throw cancellation
+                                    } catch (evidenceFailure: Exception) {
+                                        failure.addSuppressed(evidenceFailure)
+                                        throw ForwardPublishUncertainException(recoveryEvidence, failure)
+                                    }
+                                val projectionsAfter = forwardProjectionRecords(timelineAfter, message, references)
+                                val newProjectionIds = projectionsAfter.keys - evidenceBefore
+                                val newProjection = newProjectionIds.singleOrNull()?.let(projectionsAfter::get)
+                                when {
+                                    newProjection?.sourceMessageIdHex != null &&
+                                        newProjection.invalidationStatus == null ->
+                                        knownMessageIds += newProjection.messageIdHex
+                                    newProjection != null &&
+                                        !newProjection.deleted &&
+                                        newProjection.invalidationStatus == null ->
+                                        throw ForwardPublishUncertainException(
+                                            recoveryEvidence.copy(pendingMessageIdHex = newProjection.messageIdHex),
+                                            cause = failure,
+                                        )
+                                    newProjectionIds.isEmpty() ->
+                                        throw ForwardPublishNotCommittedException(failure)
+                                    else ->
+                                        throw ForwardPublishUncertainException(recoveryEvidence, failure)
+                                }
+                            }
+                            onMessagePublished(messageIndex)
+                        }
+                    }
+                }
+
+                @Suppress("ThrowsCount")
+                override suspend fun recoverPendingPublish(
+                    targetGroupIdHex: String,
+                    message: PreparedForwardMessage,
+                    uploadedReferences: List<MediaAttachmentReferenceFfi>,
+                    evidence: ForwardPublishRecoveryEvidence,
+                ): ForwardPublishRecoveryResult {
+                    requireCurrentAccount()
+                    val recovered =
+                        withGroupCommitLock(account, targetGroupIdHex) {
+                            val timeline =
+                                try {
+                                    recentForwardTimeline(targetGroupIdHex, messages.size)
+                                } catch (cancellation: CancellationException) {
+                                    throw cancellation
+                                } catch (invalidated: ForwardSessionInvalidatedException) {
+                                    throw invalidated
+                                } catch (_: Exception) {
+                                    return@withGroupCommitLock ForwardPublishRecoveryResult.Unavailable
+                                }
+                            val newProjections =
+                                forwardProjectionRecords(timeline, message, uploadedReferences)
+                                    .filterKeys { it !in evidence.knownMessageIdsBefore }
+                            val candidate =
+                                evidence.pendingMessageIdHex
+                                    ?.let { pendingId -> newProjections[pendingId] }
+                                    ?: newProjections.values.singleOrNull()
+                            if (candidate == null) {
+                                return@withGroupCommitLock if (
+                                    evidence.pendingMessageIdHex == null && newProjections.isEmpty()
+                                ) {
+                                    ForwardPublishRecoveryResult.NotCommitted
+                                } else {
+                                    ForwardPublishRecoveryResult.Unavailable
+                                }
+                            }
+                            if (candidate.invalidationStatus != null || candidate.deleted) {
+                                return@withGroupCommitLock ForwardPublishRecoveryResult.Unavailable
+                            }
+                            if (candidate.sourceMessageIdHex != null) {
+                                return@withGroupCommitLock ForwardPublishRecoveryResult.Published
+                            }
+                            marmotIo { retryGroupConvergence(account, targetGroupIdHex) }
+                            val delivered =
+                                try {
+                                    recentForwardTimeline(targetGroupIdHex, messages.size)
+                                        .firstOrNull { it.messageIdHex == candidate.messageIdHex }
+                                } catch (cancellation: CancellationException) {
+                                    throw cancellation
+                                } catch (invalidated: ForwardSessionInvalidatedException) {
+                                    throw invalidated
+                                } catch (_: Exception) {
+                                    null
+                                }
+                            if (delivered?.sourceMessageIdHex != null && delivered.invalidationStatus == null) {
+                                ForwardPublishRecoveryResult.Published
+                            } else {
+                                ForwardPublishRecoveryResult.Unavailable
+                            }
+                        }
+                    requireCurrentAccount()
+                    return recovered
+                }
+            }
+
+        val session =
+            ForwardSession(
+                scope = mutationsScope,
+                messages = messages,
+                targetGroupIds = targets,
+                transport = transport,
+                onFailure = { targetGroupIdHex, stage, throwable ->
+                    Log.w(
+                        "DMMessageForward",
+                        "forward failed stage=$stage target=${targetGroupIdHex?.take(8).orEmpty()}",
+                        throwable,
+                    )
+                },
+            )
+        // The app-scoped owner mirrors live per-target state into the global
+        // non-modal activity strip and retains terminal failures for explicit
+        // retry/dismiss. Its bounded retries preserve the same safe recovery
+        // boundary as the session: uncertain publishes converge, never resend.
+        val started = forwardOperationOwner.start(session)
+        if (!started) {
+            session.release()
+        }
+        return started
+    }
+
+    private fun scheduleForwardTerminalDismiss(snapshot: ForwardOperationSnapshot) {
+        if (
+            snapshot.phase != ForwardOperationPhase.Completed &&
+            snapshot.phase != ForwardOperationPhase.Cancelled
+        ) {
+            return
+        }
+        val dismissGeneration = ++forwardTerminalDismissGeneration
+        mutationsScope.launch {
+            delay(FORWARD_TERMINAL_STATUS_DURATION_MS)
+            if (
+                forwardTerminalDismissGeneration == dismissGeneration &&
+                activeForwardOperation.value == snapshot
+            ) {
+                dismissActiveForwardOperation()
+            }
         }
     }
 

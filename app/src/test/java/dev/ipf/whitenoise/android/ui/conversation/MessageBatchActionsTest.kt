@@ -1,18 +1,43 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaLocatorFfi
+import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
+import dev.ipf.whitenoise.android.core.ForwardBlockedReason
+import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import java.io.IOException
 
 class MessageBatchActionsTest {
+    @Test
+    fun forwardEligibilityRefreshesAtTheNextRetentionBoundary() {
+        assertEquals(
+            500L,
+            forwardEligibilityRefreshDelayMillis(
+                retentionExpiries = listOf(99uL, 101uL, 120uL),
+                nowMillis = 100_500L,
+            ),
+        )
+        assertNull(
+            forwardEligibilityRefreshDelayMillis(
+                retentionExpiries = listOf(99uL, 100uL),
+                nowMillis = 100_500L,
+            ),
+        )
+    }
+
     @Test
     fun submissionGuardRejectsRecompositionDoubleSubmitUntilCompletion() {
         val guard = BatchDeleteSubmissionGuard()
@@ -149,6 +174,69 @@ class MessageBatchActionsTest {
             )
 
         assertEquals(listOf(" one ", "one"), batchForwardBodies(selected))
+    }
+
+    @Test
+    fun forwardPayloadsAcceptAttachmentOnlyAndPreserveMixedTimelineOrder() {
+        val text = ForwardMessagePayload.Text("source", "text", "before")
+        val media =
+            ForwardMessagePayload.Media(
+                sourceGroupIdHex = "source",
+                sourceMessageIdHex = "media",
+                caption = "caption",
+                attachments = listOf(ForwardAttachmentSource(0, mediaReference("photo.jpg"))),
+            )
+        val captionless =
+            ForwardMessagePayload.Media(
+                sourceGroupIdHex = "source",
+                sourceMessageIdHex = "file",
+                caption = null,
+                attachments = listOf(ForwardAttachmentSource(0, mediaReference("notes.pdf"))),
+            )
+        val selected =
+            listOf(
+                actionItem("text", forwardPayload = text),
+                actionItem("media", forwardPayload = media),
+                actionItem("file", forwardPayload = captionless),
+            )
+
+        assertEquals(listOf(text, media, captionless), batchForwardPayloads(selected))
+        assertTrue(batchSelectionActionAvailability(selected, ComposerGate.COMPOSER).canForward)
+    }
+
+    @Test
+    fun oneBlockedAttachmentDisablesTheWholeForwardBatch() {
+        val media =
+            ForwardMessagePayload.Media(
+                sourceGroupIdHex = "source",
+                sourceMessageIdHex = "media",
+                caption = null,
+                attachments = listOf(ForwardAttachmentSource(0, mediaReference("photo.jpg"))),
+            )
+        val selected =
+            listOf(
+                actionItem("media", forwardPayload = media),
+                actionItem("pending", blockedReason = ForwardBlockedReason.PendingAttachment),
+            )
+
+        assertTrue(batchForwardPayloads(selected).isEmpty())
+        assertFalse(batchSelectionActionAvailability(selected, ComposerGate.COMPOSER).canForward)
+    }
+
+    @Test
+    fun explicitBlockedStateCannotFallBackToLegacyTextBody() {
+        val blocked =
+            BatchMessageActionItem(
+                messageId = "failed",
+                senderId = "alice",
+                senderDisplayName = "Alice",
+                copyableText = null,
+                forwardableText = "must not escape",
+                canDeleteForEveryone = false,
+                forwardBlockedReason = ForwardBlockedReason.Unsupported,
+            )
+
+        assertTrue(batchForwardPayloads(listOf(blocked)).isEmpty())
     }
 
     @Test
@@ -424,6 +512,35 @@ class MessageBatchActionsTest {
             assertFalse("user:pass" in report)
             assertFalse("IOException" in report)
         }
+
+    private fun actionItem(
+        id: String,
+        forwardPayload: ForwardMessagePayload? = null,
+        blockedReason: ForwardBlockedReason? = null,
+    ) = BatchMessageActionItem(
+        messageId = id,
+        senderId = "alice",
+        senderDisplayName = "Alice",
+        copyableText = null,
+        forwardableText = null,
+        canDeleteForEveryone = false,
+        forwardPayload = forwardPayload,
+        forwardBlockedReason = blockedReason,
+    )
+
+    private fun mediaReference(fileName: String) =
+        MediaAttachmentReferenceFfi(
+            locators = listOf(MediaLocatorFfi("blossom-v1", "https://media.example/$fileName")),
+            ciphertextSha256 = "a".repeat(64),
+            plaintextSha256 = "b".repeat(64),
+            nonceHex = "c".repeat(24),
+            fileName = fileName,
+            mediaType = "application/octet-stream",
+            version = EncryptedMediaVersionFfi.V1,
+            sourceEpoch = 7uL,
+            dim = null,
+            thumbhash = null,
+        )
 
     private fun selection(
         id: String,

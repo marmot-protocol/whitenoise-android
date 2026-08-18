@@ -3351,6 +3351,10 @@ class ChatsController private constructor(
     var materializedGroupsRevision by mutableStateOf(0L)
         private set
 
+    /** Complete observable revision for on-demand projections such as the forward picker. */
+    var forwardTargetsRevision by mutableStateOf(0L)
+        private set
+
     var memberSnapshotsRevision by mutableStateOf(0L)
         private set
 
@@ -4693,7 +4697,12 @@ class ChatsController private constructor(
      */
     fun forwardTargets(): List<ChatListItem> =
         sortChatListItems(
-            currentProjectedItems().filterNot { it.group.pendingConfirmation },
+            currentProjectedItems().filter { item ->
+                isEligibleForwardTarget(
+                    item = item,
+                    activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
+                )
+            },
         )
 
     private fun foldChatRow(
@@ -5628,6 +5637,10 @@ class ChatsController private constructor(
 
     private fun recompute() {
         if (isCleared) return
+        // currentProjectedItems() reads backing maps that remain warm while the
+        // visible chat-list projection is intentionally frozen. On-demand UI
+        // consumers key on this revision so those hidden updates stay live.
+        forwardTargetsRevision += 1L
         val unreadAccountRef = accountRef
         // Project once and reuse for both the per-account aggregate and the
         // visible list, so the aggregate sees the same removed-group
@@ -6005,6 +6018,11 @@ class ChatsController private constructor(
         }
     }
 }
+
+internal fun isEligibleForwardTarget(
+    item: ChatListItem,
+    activeAccountIdHex: String?,
+): Boolean = !item.group.pendingConfirmation && !item.removedFromGroup(activeAccountIdHex)
 
 /**
  * Parse [text] into the same Markdown AST the Rust core attaches to projected

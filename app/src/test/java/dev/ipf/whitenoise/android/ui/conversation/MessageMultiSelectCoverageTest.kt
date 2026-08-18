@@ -27,7 +27,7 @@ class MessageMultiSelectCoverageTest {
         assertTrue(topBarSource.contains("MessageSelectionBar("))
         assertTrue(bottomBarSource.contains("MessageSelectionBottomBar("))
         assertTrue(screenSource.contains("batchCopyText(actionItems)"))
-        assertTrue(screenSource.contains("batchForwardBodies(actionItems)"))
+        assertTrue(screenSource.contains("batchForwardPayloads(actionItems)"))
         assertTrue(screenSource.contains("batchSelectionActionAvailability("))
         assertTrue(screenSource.contains("if (initialTimelineAnchored && !selectionMode)"))
     }
@@ -65,7 +65,7 @@ class MessageMultiSelectCoverageTest {
         )
         assertTrue(
             source.contains(
-                "forwardBodies = batchForwardBodies(actionItems)",
+                "forwardPayloads = forwardPayloads",
             ),
         )
         assertTrue(
@@ -82,6 +82,18 @@ class MessageMultiSelectCoverageTest {
         assertTrue(source.contains("batchInfoSelection"))
         assertTrue(source.contains("batchInfoSelection = batchSelectionUi.selections.singleOrNull()"))
         assertFalse(source.contains("renderedTimeline.firstOrNull { it.record.messageIdHex == infoMessageId }"))
+    }
+
+    @Test
+    fun forwardingClearsSelectionThroughThePickerDismissalBoundary() {
+        val source = source("ConversationScreen.kt").replace(Regex("\\s+"), " ")
+        val forwardSheet = source.substringAfter("if (batchForwardSheetOpen").substringBefore("batchInfoSelection?.let")
+
+        assertTrue("onDismiss = { batchForwardSheetOpen = false selectedMessages.clear() }" in forwardSheet)
+        assertTrue("onForward = { targetGroupIds -> appState.startForwardMessages" in forwardSheet)
+        assertFalse(
+            Regex("onForward = \\{ targetGroupIds ->.*selectedMessages\\.clear\\(\\)").containsMatchIn(forwardSheet),
+        )
     }
 
     @Test

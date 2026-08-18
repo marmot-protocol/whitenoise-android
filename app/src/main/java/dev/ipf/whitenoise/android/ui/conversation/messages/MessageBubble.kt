@@ -73,6 +73,9 @@ import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
+import dev.ipf.whitenoise.android.core.ForwardBlockedReason
+import dev.ipf.whitenoise.android.core.ForwardEligibility
+import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -302,6 +305,13 @@ internal fun MessageBubble(
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
 ) {
     val record = item.record
+    val mediaReferences =
+        rememberMessageMediaReferences(
+            tags = record.tags,
+            messageIdHex = record.messageIdHex,
+            sourceEpoch = record.sourceEpoch,
+            projectedMedia = item.projected?.media,
+        )
     val mine = controller.isMessageMine(record)
     val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
     // The same capability model the controller re-validates on the mutation
@@ -675,24 +685,53 @@ internal fun MessageBubble(
             }
         }
     val effectiveTtsReadAloudProgress = ttsProjectionState.effectiveProgress
-    // Issue #390 v1 forwards text only. Forward must be hidden for any record
-    // whose displayed body is a synthetic surrogate (media filename/placeholder,
-    // "Reacted …", delete/system summaries, agent-stream copy) — forwarding
-    // `displayedBody` there would send misleading text into other groups. The
-    // raw text to forward is the edit-aware verbatim body, never the display
-    // fallback; `forwardBody` is null exactly when the message is not a
-    // forwardable text record, which also drives the menu gate below.
-    val forwardBody: String? =
-        remember(record, editState, deleted, invalidated) {
-            if (deleted || invalidated) {
-                null
+    val forwardNowSeconds = (System.currentTimeMillis() / 1000L).toULong()
+    val forwardEligibility =
+        remember(
+            record,
+            editState,
+            deleted,
+            invalidated,
+            persistedFailure,
+            mediaReferences,
+            item.status,
+            isActionMenuOpen,
+            forwardNowSeconds,
+        ) {
+            val failedCommittedMessage =
+                persistedFailure && !MessageProjector.isPendingMedia(record)
+            if (
+                deleted || invalidated || failedCommittedMessage
+            ) {
+                ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
+            } else if (persistedFailure) {
+                ForwardEligibility.Blocked(ForwardBlockedReason.FailedAttachment)
+            } else if (
+                item.status != dev.ipf.whitenoise.android.state.MessageStatus.Received &&
+                item.status != dev.ipf.whitenoise.android.state.MessageStatus.Sent
+            ) {
+                ForwardEligibility.Blocked(
+                    if (MessageProjector.isPendingMedia(record)) {
+                        ForwardBlockedReason.PendingAttachment
+                    } else {
+                        ForwardBlockedReason.Unsupported
+                    },
+                )
             } else {
-                MessageProjector.forwardableText(
-                    record,
+                MessageProjector.forwardEligibility(
+                    message = record,
+                    mediaReferences = mediaReferences,
                     editedText = editState?.latestText?.takeIf { record.kind == 9uL },
+                    cachedAttachmentIndices =
+                        mediaReferences.indices
+                            .filterTo(mutableSetOf()) { attachmentIndex ->
+                                controller.hasCachedAttachment(record.messageIdHex, attachmentIndex)
+                            },
+                    nowSeconds = forwardNowSeconds,
                 )
             }
         }
+    val forwardPayload = (forwardEligibility as? ForwardEligibility.Eligible)?.payload
     val reserveSenderAvatarSlot =
         GroupProjector.shouldShowTranscriptSenderAvatar(
             isDm = controller.isDm,
@@ -929,10 +968,7 @@ internal fun MessageBubble(
     }
 
     fun beginForward() {
-        // Defensive: the menu only renders Forward when forwardBody != null, but
-        // gate here too so a stale tap can never open the picker for a non-text
-        // record (issue #390 is text-only).
-        if (deleted || readOnly || forwardBody == null) return
+        if (deleted || readOnly || forwardPayload == null) return
         onActionMenuOpenChange(false)
         forwardSheetOpen = true
     }
@@ -1180,13 +1216,6 @@ internal fun MessageBubble(
                     } else {
                         controller.replyPreview(item, messageTextCopy)
                     }
-                val mediaReferences =
-                    rememberMessageMediaReferences(
-                        tags = record.tags,
-                        messageIdHex = record.messageIdHex,
-                        sourceEpoch = record.sourceEpoch,
-                        projectedMedia = item.projected?.media,
-                    )
                 val pendingAttachmentsForRecord = controller.pendingAttachmentsList(record.messageIdHex)
                 val bubbleMedia = rememberBubbleMedia(mediaReferences, pendingAttachmentsForRecord)
                 val imageAttachments = bubbleMedia.images
@@ -1738,7 +1767,13 @@ internal fun MessageBubble(
                     canReact = !deleted && !readOnly,
                     canDelete = deleteCapability.canDeleteAtAll,
                     canEdit = !readOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
-                    canForward = !deleted && !readOnly && forwardBody != null,
+                    canForward = !deleted && !readOnly && forwardPayload != null,
+                    forwardBlockedReason =
+                        if (!deleted && !readOnly) {
+                            (forwardEligibility as? ForwardEligibility.Blocked)?.reason
+                        } else {
+                            null
+                        },
                     canSelect = !deleted && !readOnly && batchSelectable,
                     // Whole-message Copy keeps using its actual clipboard payload,
                     // including card-style bubbles whose body is rendered by the
@@ -1953,14 +1988,19 @@ internal fun MessageBubble(
                         },
                     )
                 }
-                if (forwardSheetOpen && !deleted && forwardBody != null) {
+                if (forwardSheetOpen && !deleted && forwardPayload != null) {
                     ForwardMessageSheet(
                         appState = appState,
-                        body = forwardBody,
+                        attachmentCount =
+                            (forwardPayload as? ForwardMessagePayload.Media)?.attachments?.size ?: 0,
                         originGroupIdHex = record.groupIdHex,
                         onDismiss = { forwardSheetOpen = false },
                         onForward = { targetGroupIds ->
-                            if (!deleted) appState.forwardText(targetGroupIds, forwardBody)
+                            if (deleted) {
+                                false
+                            } else {
+                                appState.startForwardMessages(targetGroupIds, listOf(forwardPayload))
+                            }
                         },
                     )
                 }

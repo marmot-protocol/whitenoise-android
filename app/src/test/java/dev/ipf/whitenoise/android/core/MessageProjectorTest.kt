@@ -12,6 +12,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@Suppress("LargeClass") // Projection invariants share the same record/tag fixture vocabulary.
 class MessageProjectorTest {
     @Test
     fun reactedToMessageIdReadsEventTagOnKindSeven() {
@@ -378,6 +379,138 @@ class MessageProjectorTest {
     }
 
     @Test
+    fun forwardEligibilityPreservesMediaCaptionAndAttachmentOrder() {
+        val record =
+            message(
+                id = "album",
+                plaintext = "original caption",
+                tags =
+                    listOf(
+                        MessageTagFfi(listOf("imeta", "first")),
+                        MessageTagFfi(listOf("imeta", "second")),
+                    ),
+            )
+        val references =
+            listOf(
+                mediaReference("photo.jpg", "image/jpeg"),
+                mediaReference("notes.pdf", "application/pdf"),
+            )
+
+        val result =
+            MessageProjector.forwardEligibility(
+                message = record,
+                mediaReferences = references,
+                editedText = "edited caption",
+                nowSeconds = 100uL,
+            )
+
+        val payload = (result as ForwardEligibility.Eligible).payload as ForwardMessagePayload.Media
+        assertEquals("edited caption", payload.caption)
+        assertEquals(listOf(0, 1), payload.attachments.map(ForwardAttachmentSource::attachmentIndex))
+        assertEquals(listOf("photo.jpg", "notes.pdf"), payload.attachments.map { it.reference.fileName })
+    }
+
+    @Test
+    fun forwardEligibilityAcceptsCaptionlessCommittedMedia() {
+        val record =
+            message(
+                id = "attachment-only",
+                plaintext = "",
+                tags = listOf(MessageTagFfi(listOf("imeta", "attachment"))),
+            )
+
+        val result =
+            MessageProjector.forwardEligibility(
+                message = record,
+                mediaReferences = listOf(mediaReference("voice.ogg", "audio/ogg")),
+                nowSeconds = 100uL,
+            )
+
+        val payload = (result as ForwardEligibility.Eligible).payload as ForwardMessagePayload.Media
+        assertNull(payload.caption)
+        assertEquals(
+            "voice.ogg",
+            payload.attachments
+                .single()
+                .reference.fileName,
+        )
+    }
+
+    @Test
+    fun forwardEligibilityRejectsPendingMalformedExpiredAndRestrictedMedia() {
+        val validReference = mediaReference("photo.jpg", "image/jpeg")
+        val pending =
+            message(
+                id = "pending",
+                tags = listOf(MessageTagFfi(listOf("_media_pending", "photo.jpg", "image/jpeg"))),
+            )
+        val malformed =
+            message(
+                id = "malformed",
+                tags =
+                    listOf(
+                        MessageTagFfi(listOf("imeta", "valid")),
+                        MessageTagFfi(listOf("imeta", "malformed")),
+                    ),
+            )
+        val expired =
+            message(
+                id = "expired",
+                tags = listOf(MessageTagFfi(listOf("imeta", "valid"))),
+                retentionExpiresAt = 99uL,
+            )
+        val restricted =
+            message(
+                id = "restricted",
+                tags =
+                    listOf(
+                        MessageTagFfi(listOf("imeta", "valid")),
+                        MessageTagFfi(listOf("view_once", "true")),
+                    ),
+            )
+
+        assertEquals(
+            ForwardEligibility.Blocked(ForwardBlockedReason.PendingAttachment),
+            MessageProjector.forwardEligibility(pending, emptyList(), nowSeconds = 100uL),
+        )
+        assertEquals(
+            ForwardEligibility.Blocked(ForwardBlockedReason.MalformedAttachment),
+            MessageProjector.forwardEligibility(malformed, listOf(validReference), nowSeconds = 100uL),
+        )
+        assertEquals(
+            ForwardEligibility.Blocked(ForwardBlockedReason.ExpiredAttachment),
+            MessageProjector.forwardEligibility(expired, listOf(validReference), nowSeconds = 100uL),
+        )
+        assertEquals(
+            ForwardEligibility.Blocked(ForwardBlockedReason.RestrictedAttachment),
+            MessageProjector.forwardEligibility(restricted, listOf(validReference), nowSeconds = 100uL),
+        )
+    }
+
+    @Test
+    fun forwardEligibilityRequiresLocatorOrRetainedPlaintext() {
+        val record =
+            message(
+                id = "unavailable",
+                tags = listOf(MessageTagFfi(listOf("imeta", "valid"))),
+            )
+        val unavailable = mediaReference("archive.zip", "application/zip", hasLocator = false)
+
+        assertEquals(
+            ForwardEligibility.Blocked(ForwardBlockedReason.UnavailableAttachment),
+            MessageProjector.forwardEligibility(record, listOf(unavailable), nowSeconds = 100uL),
+        )
+        assertTrue(
+            MessageProjector.forwardEligibility(
+                record,
+                listOf(unavailable),
+                cachedAttachmentIndices = setOf(0),
+                nowSeconds = 100uL,
+            ) is ForwardEligibility.Eligible,
+        )
+    }
+
+    @Test
     fun forwardableTextIsNullForNonTextAndBlankRecords() {
         val media =
             message(
@@ -519,7 +652,7 @@ class MessageProjectorTest {
     fun normalizeForwardTargetsDeDupesDropsBlanksAndKeepsOrder() {
         val targets =
             MessageProjector.normalizeForwardTargets(
-                listOf("g1", "g2", "g1", "  ", "", "g3", "g2"),
+                listOf("g1", "g2", "G1", "  ", "", " g3 ", "g2"),
             )
 
         // First-seen order preserved, duplicates collapsed to one send each,
@@ -585,6 +718,7 @@ class MessageProjectorTest {
         kind: ULong = 9uL,
         tags: List<MessageTagFfi> = emptyList(),
         at: UInt = 1u,
+        retentionExpiresAt: ULong? = null,
     ) = AppMessageRecordFfi(
         messageIdHex = id,
         direction = direction,
@@ -596,7 +730,7 @@ class MessageProjectorTest {
         tags = tags,
         sourceEpoch = null,
         retentionSeconds = null,
-        retentionExpiresAt = null,
+        retentionExpiresAt = retentionExpiresAt,
         recordedAt = at.toULong(),
         receivedAt = at.toULong(),
     )
@@ -661,8 +795,14 @@ class MessageProjectorTest {
     private fun mediaReference(
         fileName: String,
         mediaType: String,
+        hasLocator: Boolean = true,
     ) = MediaAttachmentReferenceFfi(
-        locators = listOf(MediaLocatorFfi(kind = "blossom-v1", value = "https://media.example/blob")),
+        locators =
+            if (hasLocator) {
+                listOf(MediaLocatorFfi(kind = "blossom-v1", value = "https://media.example/blob"))
+            } else {
+                emptyList()
+            },
         ciphertextSha256 = "aa".repeat(32),
         plaintextSha256 = "bb".repeat(32),
         nonceHex = "cc".repeat(12),

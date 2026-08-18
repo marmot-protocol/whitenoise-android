@@ -325,6 +325,45 @@
     <string name="forward_search_chats">Pesquisar conversas</string>
     <string name="forward_no_chats">Nenhuma outra conversa para encaminhar.</string>
     <string name="forward_no_matches">Nenhuma conversa corresponde à pesquisa.</string>
+    <string name="forward_blocked_pending">Aguarde o anexo terminar de carregar</string>
+    <string name="forward_blocked_failed">Tente carregar o anexo novamente antes de encaminhar</string>
+    <string name="forward_blocked_malformed">Este anexo não pode ser encaminhado</string>
+    <string name="forward_blocked_expired">Este anexo expirou</string>
+    <string name="forward_blocked_unavailable">Baixe este anexo antes de encaminhar</string>
+    <string name="forward_blocked_restricted">Não é permitido encaminhar este anexo</string>
+    <string name="forward_blocked_unsupported">Esta mensagem não pode ser encaminhada</string>
+    <string name="forward_blocked_selection">Encaminhamento indisponível: %1$s</string>
+    <string name="forward_progress_title">Encaminhando</string>
+    <string name="forward_preparing_attachments">Preparando anexos: %1$d de %2$d</string>
+    <string name="forward_waiting">Aguardando</string>
+    <string name="forward_uploading_attachments">Carregando anexos: %1$d de %2$d</string>
+    <string name="forward_sending_messages">Enviando mensagens: %1$d de %2$d</string>
+    <string name="forward_sent">Enviado</string>
+    <string name="forward_cancelled">Cancelado</string>
+    <string name="forward_cancelling">Cancelando…</string>
+    <string name="forward_failed_preparing">Não foi possível preparar os anexos</string>
+    <string name="forward_failed_upload">Não foi possível carregar os anexos</string>
+    <string name="forward_failed_publish">Não foi possível enviar as mensagens</string>
+    <string name="forward_payload_too_large">Estes anexos são grandes demais para serem encaminhados juntos</string>
+    <string name="forward_failed_expired">O anexo expirou antes de poder ser encaminhado</string>
+    <string name="forward_failed_session_changed">A conta mudou. Feche e tente novamente.</string>
+    <string name="forward_failed_after_partial">%1$s · Enviadas %2$d de %3$d mensagens</string>
+    <plurals name="forward_completed_summary">
+        <item quantity="one">Encaminhado para %1$d conversa</item>
+        <item quantity="other">Encaminhado para %1$d conversas</item>
+    </plurals>
+    <string name="forward_partial_summary">Encaminhado para %1$d de %2$d conversas</string>
+    <string name="forward_failed_summary">Não foi possível encaminhar para as conversas selecionadas</string>
+    <string name="forward_start_failed">Não foi possível iniciar o encaminhamento. Feche e tente novamente.</string>
+    <string name="forward_retry_failed">Tentar novamente nas conversas com falha</string>
+    <plurals name="forward_attachment_count">
+        <item quantity="one">%1$d anexo</item>
+        <item quantity="other">%1$d anexos</item>
+    </plurals>
+    <plurals name="forward_message_count">
+        <item quantity="one">%1$d mensagem</item>
+        <item quantity="other">%1$d mensagens</item>
+    </plurals>
     <plurals name="forward_to_chats_count">
         <item quantity="one">Encaminhar para %1$d conversa</item>
         <item quantity="other">Encaminhar para %1$d conversas</item>

@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
+import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -39,6 +40,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposer
 internal fun ConversationBottomBar(
     selectionMode: Boolean,
     selectionActionAvailability: BatchSelectionActionAvailability,
+    selectionForwardBlockedReason: ForwardBlockedReason?,
     onCopySelection: () -> Unit,
     onForwardSelection: () -> Unit,
     onSaveSelection: () -> Unit,
@@ -114,6 +116,7 @@ internal fun ConversationBottomBar(
                     }
                     MessageSelectionBottomBar(
                         availability = selectionActionAvailability,
+                        forwardBlockedReason = selectionForwardBlockedReason,
                         onCopy = onCopySelection,
                         onForward = onForwardSelection,
                         onSave = onSaveSelection,

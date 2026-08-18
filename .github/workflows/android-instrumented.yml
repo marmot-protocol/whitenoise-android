@@ -17,6 +17,7 @@ on:
     paths:
       - 'app/build.gradle.kts'
       - 'app/src/main/marmotkit/**'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/core/ForwardMediaReferenceFfiIntegrationTest.kt'
       - 'scripts/prepare_marmotkit_artifact.py'
       - 'scripts/test_prepare_marmotkit_artifact.py'
       - 'scripts/run-android-instrumented-tests.sh'

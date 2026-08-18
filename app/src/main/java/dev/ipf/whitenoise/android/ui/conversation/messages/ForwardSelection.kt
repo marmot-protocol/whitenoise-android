@@ -31,6 +31,34 @@ internal fun forwardRecipientGroupIds(
         .distinct()
 }
 
+internal fun toggleForwardTargetSelection(
+    selected: List<String>,
+    groupIdHex: String,
+): List<String> {
+    val normalizedSelection = selected.mapNotNull(::normalizedForwardGroupId).distinct()
+    val normalizedGroupId = normalizedForwardGroupId(groupIdHex) ?: return normalizedSelection
+    return if (normalizedGroupId in normalizedSelection) {
+        normalizedSelection - normalizedGroupId
+    } else {
+        normalizedSelection + normalizedGroupId
+    }
+}
+
+/**
+ * Hands the immutable selection to the app-owned forwarding coordinator and
+ * closes the picker as soon as that coordinator accepts the work. Network and
+ * media work must never be owned by the picker composition.
+ */
+internal fun confirmForwardTargets(
+    targets: List<String>,
+    start: (List<String>) -> Boolean,
+    dismiss: () -> Unit,
+): Boolean {
+    if (!start(targets)) return false
+    dismiss()
+    return true
+}
+
 private fun normalizedForwardGroupId(groupIdHex: String): String? =
     groupIdHex
         .trim()

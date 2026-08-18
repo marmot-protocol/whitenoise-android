@@ -317,6 +317,45 @@
     <string name="forward_search_chats">搜尋聊天</string>
     <string name="forward_no_chats">沒有其他可轉發的聊天。</string>
     <string name="forward_no_matches">沒有符合搜尋的聊天。</string>
+    <string name="forward_blocked_pending">等待附件完成上傳</string>
+    <string name="forward_blocked_failed">請重試附件上傳後再轉發</string>
+    <string name="forward_blocked_malformed">此附件無法轉發</string>
+    <string name="forward_blocked_expired">此附件已過期</string>
+    <string name="forward_blocked_unavailable">請先下載此附件再轉發</string>
+    <string name="forward_blocked_restricted">不允許轉發此附件</string>
+    <string name="forward_blocked_unsupported">此訊息無法轉發</string>
+    <string name="forward_blocked_selection">無法轉發：%1$s</string>
+    <string name="forward_progress_title">正在轉發</string>
+    <string name="forward_preparing_attachments">正在準備附件 %1$d / %2$d</string>
+    <string name="forward_waiting">等待中</string>
+    <string name="forward_uploading_attachments">正在上傳附件 %1$d / %2$d</string>
+    <string name="forward_sending_messages">正在傳送訊息 %1$d / %2$d</string>
+    <string name="forward_sent">已傳送</string>
+    <string name="forward_cancelled">已取消</string>
+    <string name="forward_cancelling">正在取消…</string>
+    <string name="forward_failed_preparing">無法準備附件</string>
+    <string name="forward_failed_upload">無法上傳附件</string>
+    <string name="forward_failed_publish">無法傳送訊息</string>
+    <string name="forward_payload_too_large">這些附件合計過大，無法轉發</string>
+    <string name="forward_failed_expired">附件在轉發前已過期</string>
+    <string name="forward_failed_session_changed">帳號已變更。請關閉後重試。</string>
+    <string name="forward_failed_after_partial">%1$s · 已傳送 %2$d / %3$d 則訊息</string>
+    <plurals name="forward_completed_summary">
+        <item quantity="one">已轉發至 %1$d 個聊天</item>
+        <item quantity="other">已轉發至 %1$d 個聊天</item>
+    </plurals>
+    <string name="forward_partial_summary">已轉發至 %1$d / %2$d 個聊天</string>
+    <string name="forward_failed_summary">無法轉發至所選聊天</string>
+    <string name="forward_start_failed">無法開始轉發。請關閉後重試。</string>
+    <string name="forward_retry_failed">重試失敗的聊天</string>
+    <plurals name="forward_attachment_count">
+        <item quantity="one">%1$d 個附件</item>
+        <item quantity="other">%1$d 個附件</item>
+    </plurals>
+    <plurals name="forward_message_count">
+        <item quantity="one">%1$d 則訊息</item>
+        <item quantity="other">%1$d 則訊息</item>
+    </plurals>
     <plurals name="forward_to_chats_count">
         <item quantity="one">轉發至 %1$d 個聊天</item>
         <item quantity="other">轉發至 %1$d 個聊天</item>

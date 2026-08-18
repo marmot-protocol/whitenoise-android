@@ -325,6 +325,45 @@
     <string name="forward_search_chats">Sohbetlerde ara</string>
     <string name="forward_no_chats">İletilecek başka sohbet yok.</string>
     <string name="forward_no_matches">Aramanızla eşleşen sohbet yok.</string>
+    <string name="forward_blocked_pending">Ekin yüklenmesinin tamamlanmasını bekleyin</string>
+    <string name="forward_blocked_failed">İletmeden önce eki yeniden yüklemeyi deneyin</string>
+    <string name="forward_blocked_malformed">Bu ek iletilemiyor</string>
+    <string name="forward_blocked_expired">Bu ekin süresi doldu</string>
+    <string name="forward_blocked_unavailable">İletmeden önce bu eki indirin</string>
+    <string name="forward_blocked_restricted">Bu ekin iletilmesine izin verilmiyor</string>
+    <string name="forward_blocked_unsupported">Bu mesaj iletilemiyor</string>
+    <string name="forward_blocked_selection">İletme kullanılamıyor: %1$s</string>
+    <string name="forward_progress_title">İletiliyor</string>
+    <string name="forward_preparing_attachments">Ekler hazırlanıyor: %1$d / %2$d</string>
+    <string name="forward_waiting">Bekliyor</string>
+    <string name="forward_uploading_attachments">Ekler yükleniyor: %1$d / %2$d</string>
+    <string name="forward_sending_messages">Mesajlar gönderiliyor: %1$d / %2$d</string>
+    <string name="forward_sent">Gönderildi</string>
+    <string name="forward_cancelled">İptal edildi</string>
+    <string name="forward_cancelling">İptal ediliyor…</string>
+    <string name="forward_failed_preparing">Ekler hazırlanamadı</string>
+    <string name="forward_failed_upload">Ekler yüklenemedi</string>
+    <string name="forward_failed_publish">Mesajlar gönderilemedi</string>
+    <string name="forward_payload_too_large">Bu ekler birlikte iletilemeyecek kadar büyük</string>
+    <string name="forward_failed_expired">Ek iletilemeden önce süresi doldu</string>
+    <string name="forward_failed_session_changed">Hesap değişti. Kapatıp tekrar deneyin.</string>
+    <string name="forward_failed_after_partial">%1$s · %3$d mesajın %2$d tanesi gönderildi</string>
+    <plurals name="forward_completed_summary">
+        <item quantity="one">%1$d sohbete iletildi</item>
+        <item quantity="other">%1$d sohbete iletildi</item>
+    </plurals>
+    <string name="forward_partial_summary">%2$d sohbetin %1$d tanesine iletildi</string>
+    <string name="forward_failed_summary">Seçilen sohbetlere iletilemedi</string>
+    <string name="forward_start_failed">İletme başlatılamadı. Kapatıp tekrar deneyin.</string>
+    <string name="forward_retry_failed">Başarısız sohbetleri yeniden dene</string>
+    <plurals name="forward_attachment_count">
+        <item quantity="one">%1$d ek</item>
+        <item quantity="other">%1$d ek</item>
+    </plurals>
+    <plurals name="forward_message_count">
+        <item quantity="one">%1$d mesaj</item>
+        <item quantity="other">%1$d mesaj</item>
+    </plurals>
     <plurals name="forward_to_chats_count">
         <item quantity="one">%1$d sohbete ilet</item>
         <item quantity="other">%1$d sohbete ilet</item>

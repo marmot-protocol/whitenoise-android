@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.ui.conversation.messages.confirmForwardTargets
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -8,89 +9,93 @@ import java.io.File
 
 class ForwardMessageSheetCoverageTest {
     @Test
-    fun forwardActionStaysInVisibleSheetContentAboveImeInsets() {
-        val body = messageActionsSource().readText().functionBody("ForwardMessageSheet")
+    fun acceptedForwardStartsInAppScopeAndDismissesPickerImmediately() {
+        var dismissed = false
 
-        assertTrue(
-            "the forward sheet must not pin the action to the expanded sheet height, which hides it at the partial detent",
-            ".fillMaxHeight()" !in body &&
-                ".align(Alignment.BottomCenter)" !in body,
-        )
-        assertTrue(
-            "the Forward action bar must still ride above the IME when search opens the keyboard",
-            ".imePadding()" in body,
-        )
-        assertTrue(
-            "the scrollable target list must be height-constrained so the Forward action remains visible at the partial detent",
-            Regex(
-                """LazyColumn\s*\(.*\.heightIn\s*\(\s*max\s*=\s*targetListMaxHeight\s*\)""",
-                RegexOption.DOT_MATCHES_ALL,
-            ).containsMatchIn(body),
-        )
+        val accepted =
+            confirmForwardTargets(
+                targets = listOf("one", "two"),
+                start = { it == listOf("one", "two") },
+                dismiss = { dismissed = true },
+            )
+
+        assertTrue(accepted)
+        assertTrue(dismissed)
     }
 
     @Test
-    fun searchFocusExpandsForwardSheet() {
-        val body = messageActionsSource().readText().functionBody("ForwardMessageSheet")
+    fun rejectedForwardKeepsPickerOpen() {
+        var dismissed = false
 
-        assertTrue(
-            "the forward sheet should expand when search receives focus so the keyboard pushes the sheet up instead of covering actions",
-            "var searchFocused by remember" in body &&
-                ".onFocusChanged { searchFocused = it.isFocused }" in body &&
-                Regex(
-                    """LaunchedEffect\s*\(\s*searchFocused\s*\)\s*\{\s*if\s*\(\s*searchFocused\s*\)\s*sheetState\.expand\(\)\s*\}""",
-                    RegexOption.DOT_MATCHES_ALL,
-                ).containsMatchIn(body),
-        )
+        val accepted =
+            confirmForwardTargets(
+                targets = listOf("one"),
+                start = { false },
+                dismiss = { dismissed = true },
+            )
+
+        assertFalse(accepted)
+        assertFalse(dismissed)
     }
 
     @Test
-    fun forwardPreviewResolutionIsRememberedAcrossSearchEdits() {
-        val body = messageActionsSource().readText().functionBody("ForwardMessageSheet").replace(Regex("\\s+"), " ")
+    fun forwardingUsesAFullScreenPickerWithAStickyAction() {
+        val source = forwardPickerSource().readText()
+        val window = source.functionBody("ForwardMessagePickerFullScreen")
+        val content = source.functionBody("ForwardMessagePickerContent")
 
+        assertTrue("forwarding must own a full-screen modal window", "Dialog(" in window)
         assertTrue(
-            "mention resolution should rerun for body/profile changes, not every search-field recomposition",
-            "remember(body, appState.profileRevisionForCompose) { resolveMentionsInPlaintext(body)" in body,
+            "the picker must use full-height scaffold layout",
+            "Scaffold(" in content && ".fillMaxSize()" in content,
         )
-        assertTrue("Text( forwardPreviewText," in body)
+        assertTrue("the Forward action must remain visible", "StickyFormActionBar" in content)
+        assertFalse("the picker must not compete with a draggable sheet", "ModalBottomSheet(" in source)
+    }
+
+    @Test
+    fun pickerShowsCountsInsteadOfConcatenatedMessageBodies() {
+        val source = forwardPickerSource().readText()
+        val summary = source.functionBody("ForwardSelectionSummary")
+        val wrapper = messageActionsSource().readText().functionBody("ForwardMessageSheet")
+
+        assertTrue("R.plurals.forward_message_count" in summary)
+        assertTrue("R.plurals.forward_attachment_count" in summary)
+        assertFalse("the message body must not be forwarded into the recipient picker", "body =" in wrapper)
+        assertFalse("the old raw preview must stay removed", "forwardPreviewText" in source)
+    }
+
+    @Test
+    fun pickerObservesLoadingErrorsAndSelectionAccessibility() {
+        val source = forwardPickerSource().readText()
+        val content = source.functionBody("ForwardMessagePickerContent")
+        val targetList = source.functionBody("ForwardTargetList")
+        val targetRow = source.functionBody("ForwardTargetRow")
+
+        assertTrue("forwardTargetsLoading" in content)
+        assertTrue("forwardTargetsError" in content)
+        assertTrue("forwardTargetsRevision" in content)
+        assertTrue("remember(targetRevision, originGroupIdHex)" in content)
+        assertTrue("ErrorContent(" in targetList && "InlineErrorBanner(" in targetList)
+        assertTrue("appState::retryForwardTargets" in targetList)
+        assertTrue("Modifier.semantics { this.selected = selected }" in targetRow)
     }
 
     @Test
     fun groupMemberPreviewsUsePrivateContactNicknames() {
-        val body = messageActionsSource().readText().functionBody("ForwardMessageSheet")
+        val body = forwardPickerSource().readText().functionBody("ForwardTargetRow")
 
-        assertTrue(
-            "forward-sheet group member previews must use contactDisplayNameCached so private nicknames are shown",
-            Regex(
-                """forwardTargetMembersPreview\s*\([^)]*\)\s*\{\s*memberIdHex\s*->\s*appState\.contactDisplayNameCached\s*\(\s*memberIdHex\s*\)\s*\}""",
-                RegexOption.DOT_MATCHES_ALL,
-            ).containsMatchIn(body),
-        )
-        assertFalse(
-            "forward-sheet group member previews must not use chatMemberTitleCached, which skips private nicknames",
-            Regex(
-                """forwardTargetMembersPreview\s*\([^)]*\)\s*\{[^}]*appState\.chatMemberTitleCached\s*\(""",
-                RegexOption.DOT_MATCHES_ALL,
-            ).containsMatchIn(body),
-        )
+        assertTrue("appState.contactDisplayNameCached(memberIdHex)" in body)
+        assertFalse("appState.chatMemberTitleCached(" in body)
     }
 
-    @Test
-    fun forwardButtonRemainsOutsideScrollableTargetList() {
-        val body = messageActionsSource().readText().functionBody("ForwardMessageSheet")
-        val listIndex = body.indexOf("LazyColumn(")
-        val buttonIndex = body.indexOf("Button(", listIndex)
+    private fun forwardPickerSource(): File = sourceFile("ui/conversation/messages/ForwardMessagePicker.kt")
 
-        assertTrue(
-            "the Forward button should stay outside the scrollable list so list scrolling cannot hide it",
-            listIndex >= 0 && buttonIndex > listIndex,
-        )
-    }
+    private fun messageActionsSource(): File = sourceFile("ui/conversation/messages/MessageActions.kt")
 
-    private fun messageActionsSource(): File =
+    private fun sourceFile(relativePath: String): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt"),
-        ).firstOrNull { it.exists() }
-            ?: error("Missing MessageActions.kt source file")
+            File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
+        ).firstOrNull(File::exists) ?: error("Missing $relativePath")
 }

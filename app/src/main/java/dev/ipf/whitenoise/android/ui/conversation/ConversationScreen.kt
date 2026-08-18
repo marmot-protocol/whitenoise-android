@@ -47,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -87,6 +88,9 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
+import dev.ipf.whitenoise.android.core.ForwardBlockedReason
+import dev.ipf.whitenoise.android.core.ForwardEligibility
+import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -356,7 +360,8 @@ private data class ConversationBatchSelectionUiState(
     val selections: List<BatchMessageSelection>,
     val actionItems: List<BatchMessageActionItem>,
     val copyText: String,
-    val forwardBodies: List<String>,
+    val forwardPayloads: List<ForwardMessagePayload>,
+    val forwardBlockedReason: ForwardBlockedReason?,
     val deleteBreakdown: BatchDeleteBreakdown,
     val actionAvailability: BatchSelectionActionAvailability,
 )
@@ -379,11 +384,18 @@ private fun rememberConversationBatchSelectionUiState(
             selections.map { selection ->
                 selection.action.copy(senderDisplayName = appState.displayName(selection.action.senderId))
             }
+        val forwardPayloads = batchForwardPayloads(actionItems)
         ConversationBatchSelectionUiState(
             selections = selections,
             actionItems = actionItems,
             copyText = batchCopyText(actionItems),
-            forwardBodies = batchForwardBodies(actionItems),
+            forwardPayloads = forwardPayloads,
+            forwardBlockedReason =
+                if (forwardPayloads.isEmpty()) {
+                    actionItems.firstNotNullOfOrNull(BatchMessageActionItem::forwardBlockedReason)
+                } else {
+                    null
+                },
             deleteBreakdown = batchDeleteBreakdown(actionItems),
             actionAvailability = batchSelectionActionAvailability(actionItems, composerGate),
         )
@@ -715,6 +727,12 @@ internal fun ConversationScreen(
         remember(renderedTimeline) {
             renderedTimeline.map { it.id to it.record.messageIdHex }
         }
+    val mediaCacheRevision by appState.mediaCacheRevision.collectAsState()
+    val forwardEligibilityExpiries =
+        remember(renderedTimeline) {
+            renderedTimeline.mapNotNull { it.record.retentionExpiresAt?.takeIf { expiry -> expiry > 0uL } }
+        }
+    val eligibilityNowSeconds = rememberForwardEligibilityNowSeconds(forwardEligibilityExpiries)
     val selectableMessageProjections =
         remember(
             renderedTimeline,
@@ -725,6 +743,8 @@ internal fun ConversationScreen(
             // so a promotion/demotion or roster verification is reflected.
             controller.isSelfAdmin,
             controller.canSendMessages,
+            mediaCacheRevision,
+            eligibilityNowSeconds,
         ) {
             renderedTimeline
                 .mapNotNull { item ->
@@ -748,6 +768,23 @@ internal fun ConversationScreen(
                         controller.editsByTarget[messageId]
                             ?.latestText
                             ?.takeIf { record.kind == 9uL }
+                    val mediaReferences = controller.mediaReferencesFor(item)
+                    val forwardEligibility =
+                        if (invalidated || persistedFailure) {
+                            ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
+                        } else {
+                            MessageProjector.forwardEligibility(
+                                message = record,
+                                mediaReferences = mediaReferences,
+                                editedText = editedText,
+                                cachedAttachmentIndices =
+                                    mediaReferences.indices
+                                        .filterTo(mutableSetOf()) { attachmentIndex ->
+                                            controller.hasCachedAttachment(messageId, attachmentIndex)
+                                        },
+                                nowSeconds = eligibilityNowSeconds,
+                            )
+                        }
                     BatchMessageSelection(
                         action =
                             BatchMessageActionItem(
@@ -765,7 +802,10 @@ internal fun ConversationScreen(
                                 // surface and the mutation guard use, so bulk
                                 // routing never diverges from per-message policy.
                                 canDeleteForEveryone = controller.deleteCapabilityFor(record).canDeleteForEveryone,
-                                hasSaveableMedia = controller.mediaReferencesFor(item).isNotEmpty(),
+                                hasSaveableMedia = mediaReferences.isNotEmpty(),
+                                forwardPayload = (forwardEligibility as? ForwardEligibility.Eligible)?.payload,
+                                forwardBlockedReason =
+                                    (forwardEligibility as? ForwardEligibility.Blocked)?.reason,
                             ),
                         record = record,
                         status = item.status,
@@ -2598,11 +2638,11 @@ internal fun ConversationScreen(
     }
 
     val openDetailsDescription = stringResource(R.string.details)
-    LaunchedEffect(batchSelectionUi.forwardBodies.isEmpty()) {
+    LaunchedEffect(batchSelectionUi.forwardPayloads.isEmpty()) {
         batchForwardSheetOpen =
-            batchForwardSheetOpenForBodies(
+            batchForwardSheetOpenForPayloads(
                 currentlyOpen = batchForwardSheetOpen,
-                forwardBodies = batchSelectionUi.forwardBodies,
+                forwardPayloads = batchSelectionUi.forwardPayloads,
             )
     }
     Scaffold(
@@ -2715,6 +2755,7 @@ internal fun ConversationScreen(
                             )
                         }
                     },
+                selectionForwardBlockedReason = batchSelectionUi.forwardBlockedReason,
                 onCopySelection = {
                     if (batchSelectionUi.copyText.isNotBlank()) {
                         clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
@@ -2722,7 +2763,7 @@ internal fun ConversationScreen(
                     }
                 },
                 onForwardSelection = {
-                    if (batchSelectionUi.forwardBodies.isNotEmpty()) batchForwardSheetOpen = true
+                    if (batchSelectionUi.forwardPayloads.isNotEmpty()) batchForwardSheetOpen = true
                 },
                 onSaveSelection = {
                     if (batchSelectionUi.actionAvailability.canSave && !batchAttachmentSaveInFlight) {
@@ -3268,15 +3309,21 @@ internal fun ConversationScreen(
         }
     }
 
-    if (batchForwardSheetOpen && batchSelectionUi.forwardBodies.isNotEmpty()) {
+    if (batchForwardSheetOpen && batchSelectionUi.forwardPayloads.isNotEmpty()) {
         ForwardMessageSheet(
             appState = appState,
-            body = batchSelectionUi.forwardBodies.joinToString("\n"),
+            messageCount = batchSelectionUi.forwardPayloads.size,
+            attachmentCount =
+                batchSelectionUi.forwardPayloads.sumOf { payload ->
+                    (payload as? ForwardMessagePayload.Media)?.attachments?.size ?: 0
+                },
             originGroupIdHex = controller.group.groupIdHex,
-            onDismiss = { batchForwardSheetOpen = false },
-            onForward = { targetGroupIds ->
-                appState.forwardTexts(targetGroupIds, batchSelectionUi.forwardBodies)
+            onDismiss = {
+                batchForwardSheetOpen = false
                 selectedMessages.clear()
+            },
+            onForward = { targetGroupIds ->
+                appState.startForwardMessages(targetGroupIds, batchSelectionUi.forwardPayloads)
             },
         )
     }

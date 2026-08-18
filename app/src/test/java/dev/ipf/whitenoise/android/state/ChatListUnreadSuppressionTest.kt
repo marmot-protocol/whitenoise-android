@@ -153,6 +153,17 @@ class ChatListUnreadSuppressionTest {
         assertTrue(item.effectiveHasUnread("self"))
     }
 
+    @Test
+    fun forwardTargetsRequireConfirmedCurrentMembership() {
+        val active = item(unreadCount = 0uL, members = listOf("self", "peer"))
+        val removed = item(unreadCount = 0uL, members = listOf("peer"))
+        val pending = active.copy(group = active.group.copy(pendingConfirmation = true))
+
+        assertTrue(isEligibleForwardTarget(active, "self"))
+        assertFalse(isEligibleForwardTarget(removed, "self"))
+        assertFalse(isEligibleForwardTarget(pending, "self"))
+    }
+
     // ---- GroupMemberSnapshot.containsAccount --------------------------------
 
     @Test
