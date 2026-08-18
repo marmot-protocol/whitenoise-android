@@ -2,14 +2,20 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import android.app.Application
 import android.content.ClipData
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +44,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -272,6 +279,57 @@ class MessageTextSelectionTest {
                     ),
             ),
         )
+    }
+
+    @Test
+    fun selectionLayoutReportsDuringScrollDoNotRecompose() {
+        val registry = SelectableTextLayoutRegistry()
+        lateinit var scrollState: ScrollState
+        var compositions = 0
+
+        composeRule.setContent {
+            scrollState = rememberScrollState()
+            // Mirror MessageBubble's synchronous gesture-time snapshot read.
+            // The registry is deliberately not snapshot state, so later layout
+            // reports must not invalidate this composition.
+            registry.snapshot()
+            SideEffect { compositions++ }
+            WhiteNoiseTheme {
+                Column(
+                    Modifier
+                        .height(64.dp)
+                        .verticalScroll(scrollState),
+                ) {
+                    Spacer(Modifier.height(32.dp))
+                    CaptureSelectableText("message", "alpha beta") {
+                        registry.update(it.key, it.layoutResult, it.coordinates)
+                    }
+                    Spacer(Modifier.height(160.dp))
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val initialCompositions = compositions
+        val initialTop =
+            registry
+                .snapshot()
+                .single()
+                .coordinates
+                .boundsInWindow()
+                .top
+        composeRule.runOnIdle { scrollState.dispatchRawDelta(24f) }
+        composeRule.waitForIdle()
+        val scrolledTop =
+            registry
+                .snapshot()
+                .single()
+                .coordinates
+                .boundsInWindow()
+                .top
+
+        assertTrue("the layout reporter must observe the programmatic scroll", scrolledTop < initialTop)
+        assertEquals("ordinary scrolling must not recompose the message", initialCompositions, compositions)
     }
 
     @Composable
