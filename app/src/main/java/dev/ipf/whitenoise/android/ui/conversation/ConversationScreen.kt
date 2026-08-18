@@ -398,11 +398,13 @@ private fun rememberConversationBatchSelectionUiState(
 @Composable
 private fun rememberConversationReadAnchor(
     controller: ConversationController,
+    entrySessionIdentity: Any,
     renderedTimeline: List<TimelineMessage>,
     listState: LazyListState,
     hasOlderHeader: Boolean,
+    initialTimelineAnchored: Boolean,
 ): MutableState<String?> {
-    val readAnchor = remember(controller) { mutableStateOf(controller.lastReadMessageId) }
+    val readAnchor = remember(entrySessionIdentity) { mutableStateOf(controller.lastReadMessageId) }
     val renderedSize = renderedTimeline.size
     val currentHighestVisibleTimelineIndex by remember(listState, renderedSize, hasOlderHeader) {
         derivedStateOf {
@@ -422,11 +424,16 @@ private fun rememberConversationReadAnchor(
             ?.messageIdHex
     LaunchedEffect(
         controller,
+        initialTimelineAnchored,
         currentHighestVisibleTimelineIndex,
         currentHighestVisibleMessageId,
         controller.lastReadMessageId,
     ) {
-        val idx = currentHighestVisibleTimelineIndex
+        val idx =
+            conversationReadAnchorCandidateIndex(
+                initialTimelineAnchored = initialTimelineAnchored,
+                highestVisibleTimelineIndex = currentHighestVisibleTimelineIndex,
+            )
         if (idx < 0) return@LaunchedEffect
         readAnchor.value =
             advanceConversationReadAnchor(
@@ -496,13 +503,20 @@ internal fun ConversationScreen(
         onDispose { snackbarBottomInset.value = 0.dp }
     }
     // Capture the unread boundary at chat open. Stays fixed for this controller
-    // so the divider doesn't move as messages are marked read, but resets when
-    // an account/runtime switch creates a new controller for the same group.
-    val projectedEntryUnreadCount = chat.unreadCount.toInt().coerceAtLeast(0)
+    // so the divider doesn't move as messages are marked read. A new controller
+    // or a fresh notification-open request starts a distinct entry session.
+    val entryUnreadSessionIdentity =
+        remember(controller, notificationOpenRequestId) {
+            controller to notificationOpenRequestId
+        }
+    val projectedEntryUnreadCount = chat.unreadCount.coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
+    val entryProjectionAvailable = chat.projection != null
     val entryUnreadSnapshot =
         rememberConversationEntryUnreadSnapshot(
-            controllerIdentity = controller,
+            controllerIdentity = entryUnreadSessionIdentity,
             projectionUnread = projectedEntryUnreadCount,
+            projectionFirstUnreadMessageId = chat.projection?.firstUnreadMessageIdHex,
+            projectionAvailable = entryProjectionAvailable,
             timeline = controller.timeline,
             readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
         )
@@ -657,6 +671,7 @@ internal fun ConversationScreen(
         controller = controller,
         chatId = chat.id,
         entryUnreadCount = entryUnreadCount,
+        entryFirstUnreadMessageId = entryFirstUnreadMessageId,
         initialTimelineAnchored = initialTimelineAnchored,
     )
     val navigationState = rememberConversationNavigationState(controller)
@@ -983,9 +998,11 @@ internal fun ConversationScreen(
     var readAnchorMessageId by
         rememberConversationReadAnchor(
             controller = controller,
+            entrySessionIdentity = entryUnreadSessionIdentity,
             renderedTimeline = renderedTimeline,
             listState = listState,
             hasOlderHeader = hasOlderHeader,
+            initialTimelineAnchored = initialTimelineAnchored,
         )
     DisposableEffect(controller) {
         onDispose {
@@ -1963,9 +1980,34 @@ internal fun ConversationScreen(
                 }
             }
     }
-    var entryUnreadDividerRetired by remember(controller) { mutableStateOf(false) }
-    LaunchedEffect(controller, initialTimelineAnchored, entryUnreadCount, unreadIncomingCount) {
-        if (initialTimelineAnchored && entryUnreadCount > 0 && unreadIncomingCount == 0) {
+    // Loading the authoritative unread boundary can shift a capped subscription
+    // window away from the newest edge. Page forward again as the reader reaches
+    // that edge so chronological scrolling never ends at a stale window tail.
+    LaunchedEffect(listState, controller) {
+        snapshotFlow {
+            if (
+                !initialTimelineAnchored ||
+                !controller.hasMoreAfterTimeline ||
+                controller.isLoadingOlder
+            ) {
+                false
+            } else {
+                val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+                val liveOlderHeaderCount = if (controller.hasMoreBefore) 1 else 0
+                val liveBottomTimelineIndex = liveRenderedSize + 1 + liveOlderHeaderCount
+                val lastVisibleIndex =
+                    listState.layoutInfo.visibleItemsInfo
+                        .lastOrNull()
+                        ?.index ?: -1
+                lastVisibleIndex >= liveBottomTimelineIndex - NEWER_PAGE_PREFETCH_ROWS
+            }
+        }.distinctUntilChanged()
+            .filter { it }
+            .collect { controller.loadNewerTimelinePage() }
+    }
+    var entryUnreadDividerRetired by remember(entryUnreadSessionIdentity) { mutableStateOf(false) }
+    LaunchedEffect(controller, entryFirstUnreadMessageId, controller.timeline) {
+        if (hasSentMessageAfterUnreadBoundary(controller.timeline, entryFirstUnreadMessageId)) {
             entryUnreadDividerRetired = true
         }
     }
@@ -2129,102 +2171,113 @@ internal fun ConversationScreen(
         initialTimelineAnchored = true
         navigationState.lastFollowedLatestId = restoredRendered.lastOrNull()?.id
     }
-    LaunchedEffect(controller, latestTimelineItemId, notificationOpenRequestId) {
-        if (renderedTimeline.isNotEmpty()) {
-            if (!initialTimelineAnchored) {
-                if (scrollRestore != null) {
-                    return@LaunchedEffect
-                }
-                // First-time anchor on chat open. If there are unread
-                // messages, land at the first unread one so the user can
-                // read forward from there; otherwise drop them at the
-                // newest message. Re-resolve the index in renderedTimeline so
-                // scrollToItem refers to the lazy-list slot order, not the
-                // unfiltered controller timeline.
-                val unreadId =
-                    controller
-                        .firstUnreadTimelineIndex(entryUnreadCount)
-                        .takeIf { it >= 0 }
-                        ?.let {
-                            controller.timeline[it]
-                                .record.messageIdHex
-                                .takeIf { id -> id.isNotBlank() }
-                        }
-                val renderedUnreadIndex =
-                    unreadId?.let { id -> renderedTimeline.indexOfFirst { it.record.messageIdHex == id } } ?: -1
-                val targetIndex =
-                    if (renderedUnreadIndex >= 0) {
-                        1 + olderHeaderCount + renderedUnreadIndex
-                    } else {
-                        bottomTimelineIndex
-                    }
-                val resultingMode =
-                    if (renderedUnreadIndex >= 0) {
-                        ConversationScrollMode.ReadingHistory(unreadId, 0)
-                    } else {
-                        ConversationScrollMode.FollowingTail
-                    }
-                while (
-                    !scrollCoordinator.commitInitialAnchor(
-                        targetMessageId = unreadId,
-                        reason = ConversationScrollReason.InitialAnchor,
-                        resultingMode = resultingMode,
-                        targetIndex = targetIndex,
-                        captureLayout = {
-                            val layoutInfo = listState.layoutInfo
-                            ConversationInitialAnchorLayout(
-                                viewportHeight = layoutInfo.viewportSize.height,
-                                targetItemSize =
-                                    layoutInfo.visibleItemsInfo
-                                        .firstOrNull { it.index == targetIndex }
-                                        ?.size,
-                            )
-                        },
-                    )
-                ) {
-                    // Do not reveal until the target and viewport are stable.
-                    withFrameNanos { }
-                }
-                if (resultingMode is ConversationScrollMode.ReadingHistory) {
-                    val unreadItem = renderedTimeline.getOrNull(renderedUnreadIndex)
-                    scrollCoordinator.settleReadingAt(
-                        ConversationScrollAnchor(
-                            listIndex = targetIndex,
-                            pixelOffset = 0,
-                            itemId = unreadItem?.id,
-                            messageId = unreadId,
-                        ),
-                    )
-                }
-                postInitialReanchorGate.commit(
-                    structure =
-                        ConversationTimelineStructure(
-                            rowKeys = renderedTimelineAnchorKeys,
-                            olderHeaderCount = olderHeaderCount,
-                        ),
-                    viewportHeight = listState.layoutInfo.viewportSize.height,
-                )
-                initialTimelineAnchored = true
-                navigationState.lastFollowedLatestId = renderedTimeline.lastOrNull()?.id
+    LaunchedEffect(
+        controller,
+        renderedTimeline.isNotEmpty(),
+        notificationOpenRequestId,
+        entryProjectionAvailable,
+    ) {
+        if (
+            !shouldCommitConversationInitialAnchor(
+                hasRenderedTimeline = renderedTimeline.isNotEmpty(),
+                projectionAvailable = entryProjectionAvailable,
+                initialTimelineAnchored = initialTimelineAnchored,
+                hasScrollRestore = scrollRestore != null,
+            )
+        ) {
+            return@LaunchedEffect
+        }
+
+        // The chat-list projection carries the durable first-unread id. Page it
+        // into the bounded timeline before revealing or positioning the list;
+        // count-from-tail is only a compatibility fallback for older projections.
+        val unreadId =
+            resolveConversationEntryUnreadMessageId(
+                snapshot = entryUnreadSnapshot,
+                timeline = { controller.timeline },
+                loadUntilMessageAvailable = controller::loadConversationEntryUnreadMessageAvailable,
+            )
+        val anchoredTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        if (anchoredTimeline.isEmpty()) return@LaunchedEffect
+        val anchoredOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+        val anchoredBottomTimelineIndex = anchoredTimeline.size + 1 + anchoredOlderHeaderCount
+        val renderedUnreadIndex =
+            unreadId?.let { id -> anchoredTimeline.indexOfFirst { it.record.messageIdHex == id } } ?: -1
+        val targetIndex =
+            if (renderedUnreadIndex >= 0) {
+                1 + anchoredOlderHeaderCount + renderedUnreadIndex
             } else {
-                val latestId = renderedTimeline.lastOrNull()?.id
-                val previousId = navigationState.lastFollowedLatestId
-                // A genuine append: the last id changed and the row we last
-                // followed is still present (an older-page trim drops it, so
-                // that path is excluded). Id-based, so same-second tails count.
-                val isAppend =
-                    previousId != null &&
-                        latestId != null &&
-                        latestId != previousId &&
-                        renderedTimeline.any { it.id == previousId }
-                navigationState.lastFollowedLatestId = latestId ?: previousId
-                if (isAppend) {
-                    scrollCoordinator.followTailIfAllowed(
-                        resolveTailIndex = { currentTailIndex },
-                        reason = ConversationScrollReason.NewMessage,
-                    )
-                }
+                anchoredBottomTimelineIndex
             }
+        val resultingMode =
+            if (renderedUnreadIndex >= 0) {
+                ConversationScrollMode.ReadingHistory(unreadId, 0)
+            } else {
+                ConversationScrollMode.FollowingTail
+            }
+        if (hasSentMessageAfterUnreadBoundary(anchoredTimeline, unreadId)) {
+            entryUnreadDividerRetired = true
+        }
+        while (
+            !scrollCoordinator.commitInitialAnchor(
+                targetMessageId = unreadId,
+                reason = ConversationScrollReason.InitialAnchor,
+                resultingMode = resultingMode,
+                targetIndex = targetIndex,
+                captureLayout = {
+                    val layoutInfo = listState.layoutInfo
+                    ConversationInitialAnchorLayout(
+                        viewportHeight = layoutInfo.viewportSize.height,
+                        targetItemSize =
+                            layoutInfo.visibleItemsInfo
+                                .firstOrNull { it.index == targetIndex }
+                                ?.size,
+                    )
+                },
+            )
+        ) {
+            // Do not reveal until the target and viewport are stable.
+            withFrameNanos { }
+        }
+        if (resultingMode is ConversationScrollMode.ReadingHistory) {
+            val unreadItem = anchoredTimeline.getOrNull(renderedUnreadIndex)
+            scrollCoordinator.settleReadingAt(
+                ConversationScrollAnchor(
+                    listIndex = targetIndex,
+                    pixelOffset = 0,
+                    itemId = unreadItem?.id,
+                    messageId = unreadId,
+                ),
+            )
+        }
+        postInitialReanchorGate.commit(
+            structure =
+                ConversationTimelineStructure(
+                    rowKeys = anchoredTimeline.map { it.id to it.record.messageIdHex },
+                    olderHeaderCount = anchoredOlderHeaderCount,
+                ),
+            viewportHeight = listState.layoutInfo.viewportSize.height,
+        )
+        initialTimelineAnchored = true
+        navigationState.lastFollowedLatestId = anchoredTimeline.lastOrNull()?.id
+    }
+    LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
+        if (!initialTimelineAnchored || renderedTimeline.isEmpty()) return@LaunchedEffect
+        val latestId = renderedTimeline.lastOrNull()?.id
+        val previousId = navigationState.lastFollowedLatestId
+        // A genuine append: the last id changed and the row we last followed is
+        // still present. An older-page trim drops it and is therefore excluded.
+        val isAppend =
+            previousId != null &&
+                latestId != null &&
+                latestId != previousId &&
+                renderedTimeline.any { it.id == previousId }
+        navigationState.lastFollowedLatestId = latestId ?: previousId
+        if (isAppend) {
+            scrollCoordinator.followTailIfAllowed(
+                resolveTailIndex = { currentTailIndex },
+                reason = ConversationScrollReason.NewMessage,
+            )
         }
     }
 
@@ -2992,7 +3045,6 @@ internal fun ConversationScreen(
                                     newer = renderedTimeline.getOrNull(index + 1),
                                     transcriptLocale = transcriptLocale,
                                     entryUnreadCount = entryUnreadCount,
-                                    unreadIncomingCount = unreadIncomingCount,
                                     entryUnreadDividerRetired = entryUnreadDividerRetired,
                                     entryFirstUnreadMessageId = entryFirstUnreadMessageId,
                                     onMeasured = { id, height ->
@@ -3165,6 +3217,12 @@ internal fun ConversationScreen(
                                                                 pendingMessageId?.let(::currentTimelineListIndex)
                                                             targetIndex != null &&
                                                                 isConversationItemTopAligned(listState, targetIndex)
+                                                        },
+                                                        prepareTail = {
+                                                            loadConversationTimelineToNewest(
+                                                                hasMoreAfter = { controller.hasMoreAfterTimeline },
+                                                                loadNewer = controller::loadNewerTimelinePage,
+                                                            )
                                                         },
                                                         resolveTailIndex = { currentTailIndex },
                                                     )

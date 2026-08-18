@@ -102,6 +102,7 @@ internal fun ConversationTtsAutoReadEffects(
     controller: ConversationController,
     chatId: String,
     entryUnreadCount: Int,
+    entryFirstUnreadMessageId: String?,
     initialTimelineAnchored: Boolean,
 ) {
     suspend fun projectEntry(record: AppMessageRecordFfi) = projectConversationTtsEntry(appState, controller, record)
@@ -111,7 +112,15 @@ internal fun ConversationTtsAutoReadEffects(
             appState.ttsHasUsableEngine &&
                 appState.isConversationAutoRead(controller.group.groupIdHex) &&
                 entryUnreadCount > 0
-        val start = if (ready) controller.firstUnreadTimelineIndex(entryUnreadCount) else -1
+        val start =
+            if (ready) {
+                entryFirstUnreadMessageId
+                    ?.let { id -> controller.timeline.indexOfFirst { it.record.messageIdHex == id } }
+                    ?.takeIf { it >= 0 }
+                    ?: controller.firstUnreadTimelineIndex(entryUnreadCount)
+            } else {
+                -1
+            }
         return if (start < 0) {
             emptyList()
         } else {

@@ -98,6 +98,46 @@ class BubbleMediaTest {
     }
 
     @Test
+    fun uncaptionedVisualAlbumOwnsTheFooter() {
+        assertTrue(
+            visualMediaOwnsFooter(
+                deleted = false,
+                hasInvalidationWarning = false,
+                visualCount = 3,
+                hasCaption = false,
+            ),
+        )
+    }
+
+    @Test
+    fun visualAlbumDelegatesFooterToCaptionOrWarning() {
+        assertFalse(
+            visualMediaOwnsFooter(
+                deleted = false,
+                hasInvalidationWarning = false,
+                visualCount = 3,
+                hasCaption = true,
+            ),
+        )
+        assertFalse(
+            visualMediaOwnsFooter(
+                deleted = false,
+                hasInvalidationWarning = true,
+                visualCount = 3,
+                hasCaption = false,
+            ),
+        )
+        assertFalse(
+            visualMediaOwnsFooter(
+                deleted = true,
+                hasInvalidationWarning = false,
+                visualCount = 3,
+                hasCaption = false,
+            ),
+        )
+    }
+
+    @Test
     fun pendingFilePlaceholderOwnsTheOptimisticFileState() {
         assertTrue(
             shouldShowPendingFilePlaceholder(

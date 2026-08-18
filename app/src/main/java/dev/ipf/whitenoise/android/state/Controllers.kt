@@ -6500,7 +6500,7 @@ class ConversationController(
         private set
     var hasMoreBefore by mutableStateOf(false)
         private set
-    private var hasMoreAfter = false
+    private var hasMoreAfter by mutableStateOf(false)
 
     // Single guard for archive/leave/member-management mutations so the UI can
     // disable buttons while one is in flight and prevent double-submits.
@@ -9860,6 +9860,19 @@ class ConversationController(
         ) {
             if (!loadOlderPage()) break
             loadedPageCount += 1
+        }
+        return timelineRecords.containsKey(messageIdHex)
+    }
+
+    /**
+     * Page the exact chat-list first-unread boundary into the initial window.
+     * Unlike interactive reply navigation, entry positioning must not silently
+     * substitute a newer row after an arbitrary page cap. The subscription
+     * loader's no-progress and exhaustion guards still bound this traversal.
+     */
+    suspend fun loadConversationEntryUnreadMessageAvailable(messageIdHex: String): Boolean {
+        while (!timelineRecords.containsKey(messageIdHex) && hasMoreBefore) {
+            if (!loadOlderPage()) break
         }
         return timelineRecords.containsKey(messageIdHex)
     }

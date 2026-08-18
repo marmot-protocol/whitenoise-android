@@ -314,7 +314,7 @@ class AppStateSendLockCoverageTest {
                 "val state = remember(controller) { ConversationNavigationState() }" in source &&
                 "onDispose(state::cancelJobs)" in source &&
                 "var lastFollowedLatestId by mutableStateOf<String?>(null)" in source &&
-                "LaunchedEffect(controller, latestTimelineItemId, notificationOpenRequestId)" in source &&
+                "LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored)" in source &&
                 "LaunchedEffect(listState, controller)" in source,
         )
         assertTrue(

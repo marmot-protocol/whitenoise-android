@@ -817,12 +817,17 @@ class ConversationScrollCoordinatorTest {
                     writer = writer,
                     initialMode = ConversationScrollMode.ReadingHistory("reader", 14),
                 )
+            var prepareTailCalls = 0
 
             val firstOutcome =
                 coordinator.jumpToUnreadOrNewest(
                     pendingUnreadMessageId = "unread",
                     resolveUnreadIndex = { 40 },
                     isUnreadTopAligned = { writer.firstVisibleItemIndex == 40 },
+                    prepareTail = {
+                        prepareTailCalls += 1
+                        true
+                    },
                     resolveTailIndex = { 88 },
                 )
 
@@ -835,6 +840,7 @@ class ConversationScrollCoordinatorTest {
                 writer.writes,
             )
             assertEquals(ConversationScrollMode.ReadingHistory("unread", 0), coordinator.mode)
+            assertEquals(0, prepareTailCalls)
             val followedNewArrival =
                 coordinator.followTailIfAllowed(
                     resolveTailIndex = { 89 },
@@ -848,6 +854,10 @@ class ConversationScrollCoordinatorTest {
                     pendingUnreadMessageId = null,
                     resolveUnreadIndex = { null },
                     isUnreadTopAligned = { false },
+                    prepareTail = {
+                        prepareTailCalls += 1
+                        true
+                    },
                     resolveTailIndex = { 88 },
                 )
 
@@ -862,6 +872,69 @@ class ConversationScrollCoordinatorTest {
                 writer.writes,
             )
             assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+            assertEquals(1, prepareTailCalls)
+        }
+
+    @Test
+    fun jumpToUnreadOrNewest_doesNotClaimTailWhenNewestPageCannotLoad() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 14),
+                )
+
+            val outcome =
+                coordinator.jumpToUnreadOrNewest(
+                    pendingUnreadMessageId = null,
+                    resolveUnreadIndex = { null },
+                    isUnreadTopAligned = { false },
+                    prepareTail = { false },
+                    resolveTailIndex = { 88 },
+                )
+
+            assertEquals(ConversationJumpToNewestOutcome.Cancelled, outcome)
+            assertEquals(emptyList<ScrollWrite>(), writer.writes)
+            assertEquals(ConversationScrollMode.ReadingHistory("reader", 14), coordinator.mode)
+        }
+
+    @Test
+    fun userGestureCancelsNewestPreparationBeforeItCanJump() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 14),
+                )
+            val preparationStarted = CompletableDeferred<Unit>()
+            val releasePreparation = CompletableDeferred<Unit>()
+            var outcome: ConversationJumpToNewestOutcome? = null
+
+            val jump =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    outcome =
+                        coordinator.jumpToUnreadOrNewest(
+                            pendingUnreadMessageId = null,
+                            resolveUnreadIndex = { null },
+                            isUnreadTopAligned = { false },
+                            prepareTail = {
+                                preparationStarted.complete(Unit)
+                                releasePreparation.await()
+                                true
+                            },
+                            resolveTailIndex = { 88 },
+                        )
+                }
+            preparationStarted.await()
+
+            coordinator.onUserGestureStarted(anchor(messageId = "gesture", listIndex = 12, pixelOffset = 7))
+            jump.join()
+
+            assertEquals(ConversationJumpToNewestOutcome.Cancelled, outcome)
+            assertEquals(emptyList<ScrollWrite>(), writer.writes)
+            assertEquals(ConversationScrollMode.ReadingHistory("gesture", 7), coordinator.mode)
         }
 
     @Test

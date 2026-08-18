@@ -31,7 +31,6 @@ internal fun TimelineRow(
     newer: TimelineMessage?,
     transcriptLocale: Locale,
     entryUnreadCount: Int,
-    unreadIncomingCount: Int,
     entryUnreadDividerRetired: Boolean,
     entryFirstUnreadMessageId: String?,
     onMeasured: (itemId: String, heightPx: Int) -> Unit,
@@ -82,7 +81,6 @@ internal fun TimelineRow(
         if (
             shouldShowConversationEntryUnreadDivider(
                 entryUnreadCount = entryUnreadCount,
-                liveUnreadCount = unreadIncomingCount,
                 dividerRetired = entryUnreadDividerRetired,
                 messageId = item.record.messageIdHex,
                 firstUnreadMessageId = entryFirstUnreadMessageId,

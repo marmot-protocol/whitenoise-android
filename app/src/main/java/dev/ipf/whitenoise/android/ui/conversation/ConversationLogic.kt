@@ -7,9 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.PendingAttachment
-import dev.ipf.whitenoise.android.state.TimelineMessage
-import dev.ipf.whitenoise.android.state.firstUnreadReceivedIndex
-import dev.ipf.whitenoise.android.state.reconciledConversationEntryUnreadCount
 import kotlin.math.abs
 
 /**
@@ -56,59 +53,6 @@ internal fun conversationScrollKey(
     accountRef: String?,
     groupIdHex: String,
 ): String = "${accountRef.orEmpty()}\u0000$groupIdHex"
-
-internal data class ConversationEntryUnreadSnapshot(
-    val count: Int,
-    val firstUnreadMessageId: String?,
-)
-
-/** Keep the entry marker fixed while unread messages remain, then retire it. */
-internal fun shouldShowConversationEntryUnreadDivider(
-    entryUnreadCount: Int,
-    liveUnreadCount: Int,
-    dividerRetired: Boolean,
-    messageId: String,
-    firstUnreadMessageId: String?,
-): Boolean =
-    entryUnreadCount > 0 &&
-        liveUnreadCount > 0 &&
-        !dividerRetired &&
-        messageId == firstUnreadMessageId
-
-/**
- * Freezes the unread boundary on the first non-empty timeline for one
- * controller. Controller identity is part of the key because the same group id
- * can be open under multiple local accounts with different read watermarks.
- */
-@Composable
-internal fun rememberConversationEntryUnreadSnapshot(
-    controllerIdentity: Any,
-    projectionUnread: Int,
-    timeline: List<TimelineMessage>,
-    readAnchorMessageId: String?,
-): ConversationEntryUnreadSnapshot =
-    remember(controllerIdentity, timeline.isNotEmpty()) {
-        val count =
-            if (timeline.isEmpty()) {
-                projectionUnread.coerceAtLeast(0)
-            } else {
-                reconciledConversationEntryUnreadCount(
-                    projectionUnread = projectionUnread,
-                    timeline = timeline,
-                    readAnchorMessageId = readAnchorMessageId,
-                )
-            }
-        val firstUnreadIndex = firstUnreadReceivedIndex(timeline, count)
-        ConversationEntryUnreadSnapshot(
-            count = count,
-            firstUnreadMessageId =
-                timeline
-                    .getOrNull(firstUnreadIndex)
-                    ?.record
-                    ?.messageIdHex
-                    ?.takeIf { it.isNotBlank() },
-        )
-    }
 
 /**
  * Snapshot to persist when leaving a conversation. Returns null when the reader
@@ -161,6 +105,25 @@ internal data class ImageAttachmentReadOutcome(
 
 // How many rows from the top to begin prefetching the next older page.
 internal const val OLDER_PAGE_PREFETCH_ROWS = 4
+
+// Symmetric edge threshold after an unread-anchor load has shifted the bounded window.
+internal const val NEWER_PAGE_PREFETCH_ROWS = 4
+
+/**
+ * Walk a bounded timeline back to its physical newest edge before a jump-to-bottom.
+ * Each page loader reports whether its bounded window actually advanced, so a
+ * failed or corrupt pager stops on the first no-progress result without imposing
+ * an arbitrary history-size limit on legitimate conversations.
+ */
+internal suspend fun loadConversationTimelineToNewest(
+    hasMoreAfter: () -> Boolean,
+    loadNewer: suspend () -> Boolean,
+): Boolean {
+    while (hasMoreAfter()) {
+        if (!loadNewer()) break
+    }
+    return !hasMoreAfter()
+}
 
 /**
  * Shared definition of "user is at (or near) the newest message". Used both
