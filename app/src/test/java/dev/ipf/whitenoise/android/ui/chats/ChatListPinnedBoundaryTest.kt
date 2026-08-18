@@ -63,6 +63,30 @@ class ChatListPinnedBoundaryTest {
         captureBoundary(darkTheme = true, amoled = true, themeName = "amoled")
     }
 
+    @Test
+    fun unpinnedHeadSettledLight() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false, amoled = false) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().testTag(SCREENSHOT_TAG),
+                    color = MaterialTheme.colorScheme.surface,
+                ) {
+                    Column {
+                        PreviewRow("Pinned friends", pinned = true)
+                        ChatListPinnedBoundary()
+                        PreviewRow("Formerly pinned", pinned = false)
+                        PreviewRow("Recent conversation", pinned = false)
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(CHAT_LIST_PINNED_BOUNDARY_TAG).assertIsDisplayed()
+        composeRule
+            .onNodeWithTag(SCREENSHOT_TAG)
+            .captureRoboImage("src/test/snapshots/chat_list_unpinned_head_settled_light.png")
+    }
+
     private fun captureBoundary(
         darkTheme: Boolean,
         amoled: Boolean,
