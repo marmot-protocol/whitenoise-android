@@ -6999,13 +6999,13 @@ class ConversationController(
         )
 
     private fun foregroundSweepExpiryRows(): List<DisappearingMessageSweep.LocalExpiryRow> {
-        val records = foregroundSweepExpiryRecords()
+        val records = sweepExpiryRecords()
         val messageOrder = firstMessageOrder(records.map { it.messageIdHex })
         return records
             .map { localExpiryRow(it, messageOrder) }
     }
 
-    private fun foregroundSweepExpiryRecords(): List<AppMessageRecordFfi> =
+    private fun sweepExpiryRecords(): List<AppMessageRecordFfi> =
         buildList {
             optimisticMessages.values.forEach { add(it.record) }
             timelineOrder.mapNotNull { timelineItemsById[it]?.record }.forEach(::add)
@@ -10200,9 +10200,7 @@ class ConversationController(
 
     internal fun testActiveStreamIds(): Set<String> = activeStreamIds.toSet()
 
-    internal fun testForegroundSweepExpiryMessageIds(): List<String> {
-        return foregroundSweepExpiryRecords().map { it.messageIdHex }
-    }
+    internal fun testSweepExpiryIds(): List<String> = sweepExpiryRecords().map { it.messageIdHex }
 
     /**
      * Resolved reply target as (sender pubkey, display body). Returns the raw

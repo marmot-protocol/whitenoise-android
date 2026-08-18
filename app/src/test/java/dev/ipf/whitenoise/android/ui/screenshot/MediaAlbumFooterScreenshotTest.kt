@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.media.MasonryImageLayout
+import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import dev.ipf.whitenoise.android.ui.conversation.messages.VisualMediaFooterFrame
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -85,6 +86,20 @@ class MediaAlbumFooterScreenshotTest {
         showRetention: Boolean,
     ) {
         val tileColors = listOf(Color(0xFF526A91), Color(0xFF627C4B), Color(0xFF8E5B67))
+        val retention =
+            if (showRetention) {
+                RetentionIndicatorInput(
+                    controllerKey = this,
+                    accountRef = "account",
+                    groupIdHex = "group",
+                    messageIdHex = "message",
+                    sourceEpoch = 1uL,
+                    durationSeconds = 60uL,
+                    expiresAtEpochSeconds = null,
+                )
+            } else {
+                null
+            }
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
@@ -95,7 +110,8 @@ class MediaAlbumFooterScreenshotTest {
                                 timeText = "10:42",
                                 showStatus = true,
                                 status = status,
-                                showRetention = showRetention,
+                                retention = retention,
+                                reserveRetentionSpace = false,
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),

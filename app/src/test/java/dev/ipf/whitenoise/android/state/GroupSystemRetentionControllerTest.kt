@@ -36,14 +36,14 @@ class GroupSystemRetentionControllerTest {
             firstController.send("anchor retention state")
 
             assertTrue(firstController.timeline.any { it.record.messageIdHex == SYSTEM_MESSAGE_ID })
-            assertFalse(SYSTEM_MESSAGE_ID in firstController.testForegroundSweepExpiryMessageIds())
-            assertTrue(CONFIRMED_MESSAGE_ID in firstController.testForegroundSweepExpiryMessageIds())
+            assertFalse(SYSTEM_MESSAGE_ID in firstController.testSweepExpiryIds())
+            assertTrue(CONFIRMED_MESSAGE_ID in firstController.testSweepExpiryIds())
 
             val recreatedController = controller()
             recreatedController.load(groupSystemPage())
 
             assertTrue(recreatedController.timeline.any { it.record.messageIdHex == SYSTEM_MESSAGE_ID })
-            assertFalse(SYSTEM_MESSAGE_ID in recreatedController.testForegroundSweepExpiryMessageIds())
+            assertFalse(SYSTEM_MESSAGE_ID in recreatedController.testSweepExpiryIds())
         }
 
     private fun controller(): ConversationController =
