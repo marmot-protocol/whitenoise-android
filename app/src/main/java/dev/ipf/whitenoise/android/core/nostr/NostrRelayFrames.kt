@@ -1,12 +1,12 @@
-package dev.ipf.whitenoise.android.updates
+package dev.ipf.whitenoise.android.core.nostr
 
 import org.json.JSONArray
 
 /**
- * Pure interpretation of Nostr relay WebSocket frames used by [ZapstoreReleaseClient].
+ * Pure interpretation of Nostr relay WebSocket frames used by [NostrRelayQueryClient].
  * Ignores wrong subscription IDs and malformed/non-event frames.
  */
-internal object ZapstoreRelayFrames {
+internal object NostrRelayFrames {
     fun parseMessage(text: String): JSONArray? = runCatching { JSONArray(text) }.getOrNull()
 
     fun frameType(message: JSONArray): String = message.optString(0)

@@ -4,9 +4,9 @@ import com.code_intelligence.jazzer.api.FuzzedDataProvider
 import com.code_intelligence.jazzer.junit.DictionaryEntries
 import com.code_intelligence.jazzer.junit.DictionaryFile
 import com.code_intelligence.jazzer.junit.FuzzTest
-import dev.ipf.whitenoise.android.updates.NostrEvent
-import dev.ipf.whitenoise.android.updates.NostrEventVerifier
-import dev.ipf.whitenoise.android.updates.ZapstoreRelayFrames
+import dev.ipf.whitenoise.android.core.nostr.NostrEvent
+import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
+import dev.ipf.whitenoise.android.core.nostr.NostrRelayFrames
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.jupiter.api.Tag
@@ -87,14 +87,14 @@ class ZapstoreProtocolFuzzTest {
                     else -> noticeFrame(data)
                 }
 
-            val message = ZapstoreRelayFrames.parseMessage(frameText) ?: return@repeat
-            ZapstoreRelayFrames.parseEventForSubscription(message, expectedSubscription)?.let { collected += it }
-            if (ZapstoreRelayFrames.frameType(message) == "EVENT" &&
-                ZapstoreRelayFrames.subscriptionId(message) != expectedSubscription
+            val message = NostrRelayFrames.parseMessage(frameText) ?: return@repeat
+            NostrRelayFrames.parseEventForSubscription(message, expectedSubscription)?.let { collected += it }
+            if (NostrRelayFrames.frameType(message) == "EVENT" &&
+                NostrRelayFrames.subscriptionId(message) != expectedSubscription
             ) {
                 FuzzAssertions.assertNull(
                     "wrong-subscription EVENT must not parse for expected subscription",
-                    ZapstoreRelayFrames.parseEventForSubscription(message, expectedSubscription),
+                    NostrRelayFrames.parseEventForSubscription(message, expectedSubscription),
                 )
             }
         }
@@ -124,19 +124,19 @@ class ZapstoreProtocolFuzzTest {
         var terminal = false
 
         frames.forEach { frameText ->
-            val message = ZapstoreRelayFrames.parseMessage(frameText) ?: return@forEach
-            if (ZapstoreRelayFrames.parseEventForSubscription(message, subscriptionId) != null) {
+            val message = NostrRelayFrames.parseMessage(frameText) ?: return@forEach
+            if (NostrRelayFrames.parseEventForSubscription(message, subscriptionId) != null) {
                 events++
             }
-            if (ZapstoreRelayFrames.isTerminalForSubscription(message, subscriptionId)) {
+            if (NostrRelayFrames.isTerminalForSubscription(message, subscriptionId)) {
                 terminal = true
             }
-            if (ZapstoreRelayFrames.frameType(message) == "EVENT" &&
-                ZapstoreRelayFrames.subscriptionId(message) != subscriptionId
+            if (NostrRelayFrames.frameType(message) == "EVENT" &&
+                NostrRelayFrames.subscriptionId(message) != subscriptionId
             ) {
                 FuzzAssertions.assertNull(
                     "wrong-subscription EVENT must not parse for expected subscription",
-                    ZapstoreRelayFrames.parseEventForSubscription(message, subscriptionId),
+                    NostrRelayFrames.parseEventForSubscription(message, subscriptionId),
                 )
             }
         }
@@ -151,21 +151,21 @@ class ZapstoreProtocolFuzzTest {
         expectedSubscription: String,
     ) {
         if (!FuzzJsonStructure.withinBounds(frameText)) return
-        val message = ZapstoreRelayFrames.parseMessage(frameText) ?: return
-        ZapstoreRelayFrames.parseEventForSubscription(message, expectedSubscription)?.let { event ->
+        val message = NostrRelayFrames.parseMessage(frameText) ?: return
+        NostrRelayFrames.parseEventForSubscription(message, expectedSubscription)?.let { event ->
             assertFixedWidthHex(event.id, 64)
             assertFixedWidthHex(event.pubkey, 64)
             assertFixedWidthHex(event.sig, 128)
         }
-        if (ZapstoreRelayFrames.frameType(message) == "EVENT" &&
-            ZapstoreRelayFrames.subscriptionId(message) != expectedSubscription
+        if (NostrRelayFrames.frameType(message) == "EVENT" &&
+            NostrRelayFrames.subscriptionId(message) != expectedSubscription
         ) {
             FuzzAssertions.assertNull(
                 "wrong-subscription EVENT must not parse for expected subscription",
-                ZapstoreRelayFrames.parseEventForSubscription(message, expectedSubscription),
+                NostrRelayFrames.parseEventForSubscription(message, expectedSubscription),
             )
         }
-        ZapstoreRelayFrames.isTerminalForSubscription(message, expectedSubscription)
+        NostrRelayFrames.isTerminalForSubscription(message, expectedSubscription)
     }
 
     private fun eventFrame(

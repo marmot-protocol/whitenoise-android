@@ -26,9 +26,9 @@ val appProductionRoot = rootProject.file("app/src/main/java")
 
 val fuzzProductionIncludes =
     listOf(
-        "dev/ipf/whitenoise/android/updates/NostrEvent.kt",
-        "dev/ipf/whitenoise/android/updates/BIP340.kt",
-        "dev/ipf/whitenoise/android/updates/ZapstoreRelayFrames.kt",
+        "dev/ipf/whitenoise/android/core/nostr/NostrEvent.kt",
+        "dev/ipf/whitenoise/android/core/nostr/BIP340.kt",
+        "dev/ipf/whitenoise/android/core/nostr/NostrRelayFrames.kt",
         "dev/ipf/whitenoise/android/core/ProfileLink.kt",
         "dev/ipf/whitenoise/android/core/RecipientReference.kt",
         "dev/ipf/whitenoise/android/amber/Nip55SignerPure.kt",
@@ -62,7 +62,9 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags("fuzz-triage-selfcheck")
+    }
     testLogging {
         events("passed", "skipped", "failed")
     }
@@ -103,39 +105,89 @@ val fuzzCampaignTargets =
         ),
     )
 
-val syncFuzzRegressionCorpusOverlay =
-    tasks.register<Sync>("syncFuzzRegressionCorpusOverlay") {
+val fuzzReplayCorpusDir = layout.buildDirectory.dir("fuzz-replay-corpus")
+val fuzzReplayOverlayProbe =
+    "dev/ipf/whitenoise/android/fuzz/ZapstoreProtocolFuzzTestInputs/" +
+        "fuzzZapstoreProtocol/overlay_replay_probe.input"
+
+val syncFuzzReplayCorpus =
+    tasks.register<Sync>("syncFuzzReplayCorpus") {
+        from(layout.projectDirectory.file("src/test/resources/fuzz-grammar.dict"))
         fuzzCampaignTargets.forEach { target ->
             val classSimpleName = target.testClass.substringAfterLast('.')
+            val destination =
+                "dev/ipf/whitenoise/android/fuzz/" +
+                    "${classSimpleName}Inputs/${target.methodName}"
+            from(layout.projectDirectory.dir(target.seedCorpusPath)) {
+                into(destination)
+            }
             from(layout.projectDirectory.dir("regression-corpus/${target.taskName}")) {
-                into(
-                    "dev/ipf/whitenoise/android/fuzz/" +
-                        "${classSimpleName}Inputs/${target.methodName}",
-                )
+                into(destination)
             }
         }
-        into(layout.buildDirectory.dir("fuzz-regression-overlay"))
+        val replayInputsDir = project.findProperty("fuzzReplayInputsDir")?.toString()
+        if (replayInputsDir != null) {
+            from(rootProject.file(replayInputsDir))
+        }
+        into(fuzzReplayCorpusDir)
     }
+
+tasks.named<Test>("test") {
+    dependsOn(syncFuzzReplayCorpus)
+}
 
 tasks.register<Test>("replayFuzzRegression") {
     group = "verification"
     description = "Replay checked-in fuzz regression corpora without unbounded fuzzing"
-    dependsOn(tasks.testClasses, syncFuzzRegressionCorpusOverlay)
+    dependsOn(tasks.testClasses, syncFuzzReplayCorpus)
+    val replayCorpusOutput = syncFuzzReplayCorpus.get().destinationDir
+    val testResourcesOutput =
+        sourceSets.test
+            .get()
+            .output.resourcesDir
     testClassesDirs =
         sourceSets.test
             .get()
             .output.classesDirs
     classpath =
-        sourceSets.test.get().runtimeClasspath +
-        files(syncFuzzRegressionCorpusOverlay.get().destinationDir)
-    val replayRoot = project.findProperty("fuzzReplayInputsDir")?.toString()
-    if (replayRoot != null) {
-        classpath = classpath + files(replayRoot)
-    }
+        sourceSets.test
+            .get()
+            .runtimeClasspath
+            .filter { file -> file != testResourcesOutput }
+            .plus(files(replayCorpusOutput))
     useJUnitPlatform {
         includeTags("jazzer")
+        if (project.findProperty("fuzzReplayInputsDir") == null) {
+            excludeTags("fuzz-triage-selfcheck")
+        }
     }
     timeout.set(Duration.ofMinutes(5))
+    doLast {
+        val xmlDir =
+            reports.junitXml.outputLocation
+                .get()
+                .asFile
+        val zapstoreReports =
+            xmlDir
+                .walkTopDown()
+                .filter { file ->
+                    file.isFile &&
+                        file.name == "TEST-dev.ipf.whitenoise.android.fuzz.ZapstoreProtocolFuzzTest.xml"
+                }.toList()
+        if (zapstoreReports.isEmpty()) {
+            return@doLast
+        }
+        val overlayProbeListed =
+            zapstoreReports.any { xml ->
+                xml.readText().contains("overlay_replay_probe.input")
+            }
+        if (!overlayProbeListed) {
+            error(
+                "replayFuzzRegression did not execute regression overlay probe " +
+                    fuzzReplayOverlayProbe,
+            )
+        }
+    }
 }
 
 val fuzzJobsApplied = "-jobs=2"
@@ -193,10 +245,63 @@ fun org.gradle.api.tasks.JavaExec.configureFuzzCampaign(target: FuzzCampaignTarg
     args = jazzerArgs
 }
 
-fuzzCampaignTargets.forEach { target ->
+val fuzzTriageSelfCheckTarget =
+    FuzzCampaignTarget(
+        taskName = "fuzzTriageSelfCheck",
+        testClass = "dev.ipf.whitenoise.android.fuzz.FuzzTriageSelfCheck",
+        methodName = "fuzzTriageSelfCheck",
+        seedCorpusPath =
+            "src/test/resources/dev/ipf/whitenoise/android/fuzz/" +
+                "FuzzTriageSelfCheckInputs/fuzzTriageSelfCheck",
+    )
+
+(listOf(fuzzTriageSelfCheckTarget) + fuzzCampaignTargets).forEach { target ->
     tasks.register<JavaExec>(target.taskName) {
         configureFuzzCampaign(target)
     }
+}
+
+tasks.register<JavaExec>("fuzzMinimizeCrash") {
+    group = "fuzzing"
+    description = "Minimize a standalone Jazzer crash artifact for triage"
+    dependsOn(tasks.testClasses)
+    mainClass.set("com.code_intelligence.jazzer.Jazzer")
+    classpath = sourceSets.test.get().runtimeClasspath
+    val minimizeTask =
+        project.findProperty("fuzzMinimizeTask")?.toString()
+            ?: error("Set -PfuzzMinimizeTask to a :fuzz JavaExec task name (for example fuzzIdentityReference)")
+    val minimizeInput =
+        project.findProperty("fuzzMinimizeInput")?.toString()
+            ?: error("Set -PfuzzMinimizeInput to the crash artifact path")
+    val minimizeOutputDir =
+        project.findProperty("fuzzMinimizeOutputDir")?.toString()
+            ?: error("Set -PfuzzMinimizeOutputDir to the minimization output directory")
+    val target =
+        (listOf(fuzzTriageSelfCheckTarget) + fuzzCampaignTargets)
+            .firstOrNull { it.taskName == minimizeTask }
+            ?: error("Unknown fuzz minimize task: $minimizeTask")
+    val minimizeInputFile =
+        rootProject
+            .file(minimizeInput)
+            .absoluteFile
+    val outputDir =
+        rootProject
+            .file(minimizeOutputDir)
+            .absoluteFile
+            .apply { mkdirs() }
+    workingDir = outputDir
+    val maxHeap = project.findProperty("fuzzMaxHeap")?.toString() ?: "2g"
+    jvmArgs = listOf("-Xmx$maxHeap")
+    args =
+        listOf(
+            "--target_class=${target.testClass}",
+            "--target_method=${target.methodName}",
+            "-max_len=$fuzzMaxLen",
+            "-max_total_time=30",
+            "-minimize_crash=1",
+            "-exact_artifact_path=${outputDir.resolve("minimized-crash")}",
+            minimizeInputFile.absolutePath,
+        )
 }
 
 tasks.register<Exec>("fuzzScheduledDryRun") {

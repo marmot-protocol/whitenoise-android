@@ -22,7 +22,7 @@ Each fuzz class exposes one `@FuzzTest` entry point that dispatches on the first
 |-------------|-------------|------------|
 | `:fuzz:fuzzZapstoreProtocol` | `fuzzZapstoreProtocol` | `NostrEventJson`, `RelayEnvelopeFrames`, `RelayEnvelopeSequence` |
 | `:fuzz:fuzzIdentityReference` | `fuzzIdentityReference` | `ProfileLink`, `RecipientNormalize`, `RecipientTokenize`, `PlausibleClipboard` |
-| `:fuzz:fuzzNip55SignerProtocol` | `fuzzNip55SignerProtocol` | `ParseContentRow`, `ParseActivityResult`, `SignedEventPubkeyHelpers`, `IntentFallbackBudget` |
+| `:fuzz:fuzzNip55SignerProtocol` | `fuzzNip55SignerProtocol` | `ParseContentRow`, `ParseActivityResult`, `SignedEventPubkeyHelpers` |
 
 Synthetic seeds live under `*FuzzTestInputs/<entry-point>/` with a leading subtarget-id byte (0-based enum ordinal) followed by the fuzz payload.
 
@@ -89,22 +89,21 @@ Artifacts retain reviewed minimized reproducers under `fuzz/regression-corpus/` 
 Run `scripts/fuzz-triage.sh` after a local fuzz crash:
 
 ```bash
-scripts/fuzz-triage.sh :fuzz:fuzzIdentityReference path/to/reproducer RecipientNormalize
+scripts/fuzz-triage.sh :fuzz:fuzzIdentityReference path/to/reproducer [RecipientNormalize]
 ```
 
 The script:
 
-1. Validates the Gradle task and subtarget name
-2. Privacy-checks content (digest only in logs; no payload dump)
-3. Replays the prefixed reproducer in a fresh JVM via `:fuzz:replayFuzzRegression`
-4. Classifies as public regression vs. sensitive security finding
+1. Preserves the standalone Jazzer artifact byte-for-byte and derives its subtarget from byte 0; an optional subtarget name validates that mapping
+2. Minimizes the crash with standalone Jazzer's libFuzzer minimization mode
+3. Replays the minimized artifact in a fresh JVM via `:fuzz:replayFuzzRegression`
+4. Privacy-checks the minimized artifact (digest only in logs; no payload dump) and emits private-by-default classification guidance
 
 Manual follow-up before retention:
 
-1. Minimize with `JAZZER_FUZZ=1` and libFuzzer minimization on the crashing subtarget
-2. Add a deterministic `app` unit test covering the finding
-3. Copy the reviewed input (with subtarget prefix byte) into `fuzz/regression-corpus/<entry-point>/`
-4. Re-run `./gradlew :fuzz:replayFuzzRegression`
+1. Add a deterministic `app` unit test covering the finding
+2. Copy the privacy-reviewed minimized input into `fuzz/regression-corpus/<target>/`
+3. Re-run `./gradlew :fuzz:replayFuzzRegression`
 
 Logs contain only target name, seed digest, engine version, elapsed time, and sanitized exception class.
 
@@ -119,6 +118,6 @@ Potential signature-bypass, parser-confusion, memory/CPU denial-of-service, priv
 
 ## Phase-2 follow-up (not in this module)
 
-- **GroupSystemEvents.parse** — `GroupSystemEvents.kt` couples JSON fallback parsing to MarmotKit FFI types (`GroupSystemEventFfi`, `TimelineMessageRecordFfi`) and `ProfileSanitizer`. Fuzzing belongs here only after extracting a JVM-safe `parse(plaintext)` seam or adding a pure helper file; do not pull MarmotKit/Android into `:fuzz`. Open follow-up: [White Noise Android #1581](https://github.com/marmot-protocol/whitenoise-android/issues/1581) and [Marmot MDK #956](https://github.com/marmot-protocol/mdk/issues/956).
-- **MarmotKit `MediaReferenceSupport.parseAllImetaTags` integration harness** — completed media FFI follow-up tracked in [White Noise Android #1580](https://github.com/marmot-protocol/whitenoise-android/issues/1580) and [Marmot MDK #955](https://github.com/marmot-protocol/mdk/issues/955).
-- Upstream MarmotKit/MDK native FFI fuzzing (separate repository issue)
+- **Android-owned parser seams** — [White Noise Android #2117](https://github.com/marmot-protocol/whitenoise-android/issues/2117) tracks bounded fuzzing for `GroupSystemEvents.parse` after extracting a JVM-safe JSON helper and for the MarmotKit-backed `MediaReferenceSupport.parseAllImetaTags` integration seam. Do not pull MarmotKit/Android dependencies into the pure `:fuzz` targets or duplicate native validation in Kotlin.
+- **Upstream protocol/native boundaries** — [Marmot MDK #1476](https://github.com/marmot-protocol/mdk/issues/1476) tracks bounded native fuzzing for Nostr peeling, MLS ingestion, Marmot media/event parsing, and UniFFI conversions.
+- White Noise Android #1580/#1581 and MDK #955/#956 cover parser migration, FFI APIs, or authenticated provenance. They are related implementation work, not substitutes for the linked phase-2 fuzzing issues.

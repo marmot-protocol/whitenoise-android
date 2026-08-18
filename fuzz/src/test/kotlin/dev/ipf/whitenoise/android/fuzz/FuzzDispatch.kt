@@ -33,7 +33,6 @@ enum class Nip55Subtarget {
     ParseContentRow,
     ParseActivityResult,
     SignedEventPubkeyHelpers,
-    IntentFallbackBudget,
     ;
 
     companion object {

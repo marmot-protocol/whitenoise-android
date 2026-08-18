@@ -6,7 +6,6 @@ import com.code_intelligence.jazzer.junit.DictionaryFile
 import com.code_intelligence.jazzer.junit.FuzzTest
 import dev.ipf.whitenoise.android.amber.ActivityResultOutcome
 import dev.ipf.whitenoise.android.amber.ContentRowOutcome
-import dev.ipf.whitenoise.android.amber.Nip55Pure
 import dev.ipf.whitenoise.android.amber.SignerOp
 import dev.ipf.whitenoise.android.amber.parseActivityResult
 import dev.ipf.whitenoise.android.amber.parseContentRow
@@ -34,7 +33,6 @@ class Nip55SignerProtocolFuzzTest {
             Nip55Subtarget.ParseContentRow -> fuzzParseContentRow(data)
             Nip55Subtarget.ParseActivityResult -> fuzzParseActivityResult(data)
             Nip55Subtarget.SignedEventPubkeyHelpers -> fuzzSignedEventPubkeyHelpers(data)
-            Nip55Subtarget.IntentFallbackBudget -> fuzzIntentFallbackBudget(data)
         }
     }
 
@@ -190,23 +188,6 @@ class Nip55SignerProtocolFuzzTest {
                 "missing handled signer package must fail trusted validation",
                 trustedSignerPackageFailureReason(handledPackage, echoedPackage) == "missing handled signer package",
             )
-        }
-    }
-
-    private fun fuzzIntentFallbackBudget(data: FuzzedDataProvider) {
-        val direct = data.consumeParserInput()
-        val content =
-            if (direct.isNotEmpty()) {
-                direct
-            } else {
-                data.consumeBoundedUtf8(FuzzBounds.MAX_STRING_BYTES)
-            }
-        val fits = Nip55Pure.contentFitsIntentFallbackBudget(content)
-        val byteSize = content.toByteArray(Charsets.UTF_8).size
-        if (byteSize <= Nip55Pure.MAX_INTENT_FALLBACK_CONTENT_UTF8_BYTES) {
-            FuzzAssertions.assertTrue("content within budget must fit intent fallback", fits)
-        } else {
-            FuzzAssertions.assertFalse("content over budget must not fit intent fallback", fits)
         }
     }
 

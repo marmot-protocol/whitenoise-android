@@ -1,4 +1,4 @@
-package dev.ipf.whitenoise.android.updates
+package dev.ipf.whitenoise.android.core.nostr
 
 import org.json.JSONArray
 import org.json.JSONObject
@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ZapstoreRelayFramesTest {
+class NostrRelayFramesTest {
     @Test
     fun parseEventForSubscriptionIgnoresWrongSubscriptionAndMalformedFrames() {
         val expected = "dm-update-test"
@@ -33,9 +33,9 @@ class ZapstoreRelayFramesTest {
                 .put("other-sub")
                 .put(event)
 
-        assertEquals("a".repeat(64), ZapstoreRelayFrames.parseEventForSubscription(matching, expected)?.id)
-        assertNull(ZapstoreRelayFrames.parseEventForSubscription(wrongSub, expected))
-        assertNull(ZapstoreRelayFrames.parseMessage("not-json"))
+        assertEquals("a".repeat(64), NostrRelayFrames.parseEventForSubscription(matching, expected)?.id)
+        assertNull(NostrRelayFrames.parseEventForSubscription(wrongSub, expected))
+        assertNull(NostrRelayFrames.parseMessage("not-json"))
     }
 
     @Test
@@ -45,8 +45,8 @@ class ZapstoreRelayFramesTest {
         val closed = JSONArray().put("CLOSED").put(expected).put("finished")
         val wrong = JSONArray().put("EOSE").put("other")
 
-        assertTrue(ZapstoreRelayFrames.isTerminalForSubscription(eose, expected))
-        assertTrue(ZapstoreRelayFrames.isTerminalForSubscription(closed, expected))
-        assertFalse(ZapstoreRelayFrames.isTerminalForSubscription(wrong, expected))
+        assertTrue(NostrRelayFrames.isTerminalForSubscription(eose, expected))
+        assertTrue(NostrRelayFrames.isTerminalForSubscription(closed, expected))
+        assertFalse(NostrRelayFrames.isTerminalForSubscription(wrong, expected))
     }
 }

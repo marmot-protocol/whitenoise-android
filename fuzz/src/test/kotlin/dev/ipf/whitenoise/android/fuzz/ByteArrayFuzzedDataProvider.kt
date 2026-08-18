@@ -57,8 +57,9 @@ internal class ByteArrayFuzzedDataProvider(
         if (min >= max) {
             return min
         }
-        val span = max - min
-        return min + (consumeByte().toInt() and 0xFF) % (span + 1)
+        val span = max.toLong() - min.toLong()
+        val offset = (consumeByte().toInt() and 0xFF).toLong() % (span + 1)
+        return (min.toLong() + offset).toInt()
     }
 
     override fun consumeInts(size: Int): IntArray = IntArray(size) { consumeInt() }

@@ -61,7 +61,7 @@ write_metadata() {
     ./gradlew :fuzz:dependencies --configuration testRuntimeClasspath --quiet 2>/dev/null \
       | grep 'jazzer-junit:' \
       | head -1 \
-      | sed 's/.*jazzer-junit://' \
+      | sed -E 's/.*jazzer-junit:([^ ]*).*/\1/' \
       || echo 'unknown'
   )"
   mkdir -p "$(dirname "$METADATA_FILE")"
