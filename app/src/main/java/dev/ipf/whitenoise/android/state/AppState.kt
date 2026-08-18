@@ -8147,8 +8147,17 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): ChatListItem {
         check(activeAccountRef == accountRef) { "notification target account is not active" }
-        return loadAuthoritativeChatListItem(accountRef, groupIdHex)
+        return preloadNotificationChatListItem(accountRef, groupIdHex)
     }
+
+    /**
+     * Request-scoped local read that may run while [accountRef] is activating.
+     * The caller must not publish the returned item until that account is active.
+     */
+    suspend fun preloadNotificationChatListItem(
+        accountRef: String,
+        groupIdHex: String,
+    ): ChatListItem = loadAuthoritativeChatListItem(accountRef, groupIdHex)
 
     private suspend fun loadAuthoritativeChatListItem(
         accountRef: String,

@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -25,13 +26,22 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.notifications.NotificationInviteAuthoritativeOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationMessageDirectLoadOutcome
+import dev.ipf.whitenoise.android.notifications.NotificationMessagePreload
+import dev.ipf.whitenoise.android.notifications.NotificationMessagePreloadState
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
+import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
+import dev.ipf.whitenoise.android.notifications.NotificationRouteTraceSection
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
+import dev.ipf.whitenoise.android.notifications.awaitNotificationAccountActivationBoundary
 import dev.ipf.whitenoise.android.notifications.inviteAuthoritativeGroupAvailable
 import dev.ipf.whitenoise.android.notifications.loadNotificationMessageDirectly
+import dev.ipf.whitenoise.android.notifications.notificationMessagePreloadKey
+import dev.ipf.whitenoise.android.notifications.notificationMessageRouteChatListReady
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
 import dev.ipf.whitenoise.android.notifications.retryInviteAuthoritativeLoad
+import dev.ipf.whitenoise.android.notifications.runInactiveNotificationRouteStage
+import dev.ipf.whitenoise.android.notifications.stateFor
 import dev.ipf.whitenoise.android.share.EncryptedPendingShareRequestStore
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.resolveShareDirectGroupId
@@ -69,6 +79,7 @@ internal data class ConversationOpenContext(
     val focusMessageRequestId: Long = 0L,
     val ttsFocusSessionId: Long? = null,
     val notificationOpenRequestId: Long = 0L,
+    val notificationRouteTraceRequestId: Long? = null,
 )
 
 internal data class PendingStagedShareOpen(
@@ -186,8 +197,14 @@ internal fun ProfileGroupForegroundCoordinator(
     }
 }
 
-internal fun nextNotificationConversationOpenContext(current: ConversationOpenContext): ConversationOpenContext =
-    ConversationOpenContext(notificationOpenRequestId = current.notificationOpenRequestId + 1L)
+internal fun nextNotificationConversationOpenContext(
+    current: ConversationOpenContext,
+    notificationRouteTraceRequestId: Long? = null,
+): ConversationOpenContext =
+    ConversationOpenContext(
+        notificationOpenRequestId = current.notificationOpenRequestId + 1L,
+        notificationRouteTraceRequestId = notificationRouteTraceRequestId,
+    )
 
 internal enum class MainShellContentRoute {
     Conversation,
@@ -313,6 +330,9 @@ internal fun MainShell(
     val profileGroupForegroundState =
         remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
     var armedNotificationRequestId by remember { mutableLongStateOf(0L) }
+    var notificationAccountSwitchRequestId by remember(appState.runtimeGeneration) {
+        mutableStateOf<Long?>(null)
+    }
     var previousPendingProfileNpub by remember { mutableStateOf<String?>(null) }
     val supersedePendingGroupCreateOpen: () -> Unit = {
         shellNavState =
@@ -361,7 +381,21 @@ internal fun MainShell(
     ) {
         mutableIntStateOf(0)
     }
+    val notificationMessagePreloadKey =
+        notificationMessagePreloadKey(
+            target = inboundNotificationTarget,
+            requestId = inboundNotificationRequestId,
+        )
+    var notificationMessagePreload by remember(
+        notificationMessagePreloadKey,
+        appState.runtimeGeneration,
+    ) {
+        mutableStateOf<NotificationMessagePreload<ChatListItem>?>(null)
+    }
     val context = LocalContext.current
+    val currentInboundNotificationTarget by rememberUpdatedState(inboundNotificationTarget)
+    val currentInboundNotificationRequestId by rememberUpdatedState(inboundNotificationRequestId)
+    val currentRuntimeGeneration by rememberUpdatedState(appState.runtimeGeneration)
     val pendingShareRequestStore = remember(context) { EncryptedPendingShareRequestStore.create(context) }
     var sharePickerRequest by remember { mutableStateOf<ShareRequest?>(null) }
     var savedSharePickerRequestId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -468,6 +502,7 @@ internal fun MainShell(
         chatsController.items,
         chatsController.materializedGroupsRevision,
         notificationInviteAuthoritativelyUnavailable,
+        notificationMessagePreload,
     ) {
         val routingRequestId = inboundNotificationRequestId
         val target =
@@ -479,6 +514,12 @@ internal fun MainShell(
                 // render gate below would keep MainShell on a permanent
                 // LoadingScreen with no target to ever clear it (issue #585).
                 routingNotification = false
+                if (
+                    armedNotificationRequestId != 0L &&
+                    selectedChatOpenContext.notificationRouteTraceRequestId != armedNotificationRequestId
+                ) {
+                    NotificationRouteTrace.finishRequest(armedNotificationRequestId)
+                }
                 return@LaunchedEffect
             }
         if (routingRequestId != armedNotificationRequestId) {
@@ -493,12 +534,24 @@ internal fun MainShell(
             routingNotification = false
             return@LaunchedEffect
         }
-        val chatListReady =
+        val broadChatListReady =
             chatsController.boundAccountRef == target.accountRef &&
                 !chatsController.isLoading
         // Archived conversations still exist — include them so an archived
         // group isn't treated as a missing conversation.
         val allChats = chatsController.items + chatsController.archivedItems
+        val availableGroupIds = allChats.mapTo(mutableSetOf()) { it.group.groupIdHex }
+        val exactPreloadState = notificationMessagePreload.stateFor(notificationMessagePreloadKey)
+        val chatListReady =
+            if (target.kind == NotificationTargetKind.MESSAGE) {
+                notificationMessageRouteChatListReady(
+                    chatListReady = broadChatListReady,
+                    targetPresent = target.groupIdHex in availableGroupIds,
+                    preloadState = exactPreloadState,
+                )
+            } else {
+                broadChatListReady
+            }
 
         fun notificationChatItem(groupIdHex: String): ChatListItem? =
             allChats.firstOrNull { it.group.groupIdHex == groupIdHex }
@@ -524,7 +577,7 @@ internal fun MainShell(
                 knownAccountRefs = appState.accounts.mapTo(mutableSetOf()) { it.label },
                 activeAccountRef = appState.activeAccountRef,
                 chatListReady = chatListReady,
-                availableGroupIds = allChats.mapTo(mutableSetOf()) { it.group.groupIdHex },
+                availableGroupIds = availableGroupIds,
                 inviteRowMaterialized = inviteRowMaterialized,
                 inviteRowMembershipOpenable = inviteRowMembershipOpenable,
                 inviteAuthoritativelyUnavailable = notificationInviteAuthoritativelyUnavailable,
@@ -541,10 +594,21 @@ internal fun MainShell(
                     ),
                 ).state
             selectedChatOpenContext =
-                nextNotificationConversationOpenContext(selectedChatOpenContext)
+                nextNotificationConversationOpenContext(
+                    current = selectedChatOpenContext,
+                    notificationRouteTraceRequestId = routingRequestId,
+                )
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
             chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+            NotificationRouteTrace.beginPhase(
+                requestId = routingRequestId,
+                sectionName = NotificationRouteTraceSection.CONTROLLER_BIND,
+            )
+            NotificationRouteTrace.beginPhase(
+                requestId = routingRequestId,
+                sectionName = NotificationRouteTraceSection.FIRST_CONVERSATION_FRAME,
+            )
             selectedChat = chatItem
             routingNotification = false
             onNotificationTargetHandled(target, routingRequestId)
@@ -593,29 +657,143 @@ internal fun MainShell(
                 selectedChatOpenContext = ConversationOpenContext()
                 selectedChatJustCreated = false
                 selectedChatOpenedAsDmHint = false
+                if (notificationAccountSwitchRequestId == routingRequestId) {
+                    return@LaunchedEffect
+                }
+                notificationAccountSwitchRequestId = routingRequestId
+                val routeRuntimeGeneration = appState.runtimeGeneration
+                val preloadKey = notificationMessagePreloadKey
+                val canPreload =
+                    preloadKey != null &&
+                        appState.accounts.any {
+                            it.label == step.accountRef && it.isSignedInSigningAccount()
+                        }
+                if (canPreload) {
+                    notificationMessagePreload =
+                        NotificationMessagePreload(
+                            key = requireNotNull(preloadKey),
+                            state = NotificationMessagePreloadState.Loading,
+                        )
+                }
                 // This effect is keyed on activeAccountRef, so an inline suspend
                 // switch would cancel itself the moment the ref flips.
-                appState.launchMutation { appState.setActiveAccount(step.accountRef) }
+                appState.launchMutation {
+                    val activateAccount: suspend () -> Unit = {
+                        NotificationRouteTrace.beginPhase(
+                            requestId = routingRequestId,
+                            sectionName = NotificationRouteTraceSection.ACCOUNT_ACTIVATION,
+                        )
+                        // Signal the local-ready boundary from setActiveAccount's
+                        // callback. Its profile/privacy/push follow-up work keeps
+                        // running in the process scope without holding the route.
+                        awaitNotificationAccountActivationBoundary { onLocalReady ->
+                            appState.launchMutation {
+                                try {
+                                    appState.setActiveAccount(
+                                        label = step.accountRef,
+                                        shouldActivate = {
+                                            currentInboundNotificationRequestId == routingRequestId &&
+                                                currentInboundNotificationTarget == target &&
+                                                currentRuntimeGeneration == routeRuntimeGeneration
+                                        },
+                                        onActivated = {
+                                            NotificationRouteTrace.endPhase(
+                                                requestId = routingRequestId,
+                                                sectionName = NotificationRouteTraceSection.ACCOUNT_ACTIVATION,
+                                            )
+                                            onLocalReady()
+                                        },
+                                    )
+                                } finally {
+                                    NotificationRouteTrace.endPhase(
+                                        requestId = routingRequestId,
+                                        sectionName = NotificationRouteTraceSection.ACCOUNT_ACTIVATION,
+                                    )
+                                    onLocalReady()
+                                }
+                            }
+                        }
+                    }
+                    val stagedPreload =
+                        if (canPreload) {
+                            runInactiveNotificationRouteStage(
+                                key = requireNotNull(preloadKey),
+                                loadTarget = {
+                                    NotificationRouteTrace.tracePhase(
+                                        requestId = routingRequestId,
+                                        sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
+                                    ) {
+                                        appState.preloadNotificationChatListItem(
+                                            accountRef = preloadKey.accountRef,
+                                            groupIdHex = preloadKey.groupIdHex,
+                                        )
+                                    }
+                                },
+                                activateAccount = activateAccount,
+                                isCurrent = {
+                                    currentInboundNotificationRequestId == routingRequestId &&
+                                        currentInboundNotificationTarget == target &&
+                                        currentRuntimeGeneration == routeRuntimeGeneration
+                                },
+                            )
+                        } else {
+                            activateAccount()
+                            null
+                        }
+                    val requestStillCurrent =
+                        currentInboundNotificationRequestId == routingRequestId &&
+                            currentInboundNotificationTarget == target &&
+                            currentRuntimeGeneration == routeRuntimeGeneration
+                    if (requestStillCurrent && appState.activeAccountRef != step.accountRef) {
+                        notificationMessagePreload = null
+                        routingNotification = false
+                        fallBackToChatList()
+                        onNotificationTargetHandled(target, routingRequestId)
+                        NotificationRouteTrace.finishRequest(routingRequestId)
+                    } else if (stagedPreload != null) {
+                        notificationMessagePreload = stagedPreload
+                    }
+                }
             }
             NotificationNavStep.LoadMessageDirectly -> {
                 routingNotification = true
-                when (
-                    val outcome =
-                        loadNotificationMessageDirectly {
-                            appState.loadNotificationChatListItem(
-                                accountRef = target.accountRef,
-                                groupIdHex = target.groupIdHex,
-                            )
-                        }
-                ) {
-                    is NotificationMessageDirectLoadOutcome.OpenConversation -> {
+                when (val preloadState = notificationMessagePreload.stateFor(notificationMessagePreloadKey)) {
+                    NotificationMessagePreloadState.Loading -> Unit
+                    is NotificationMessagePreloadState.Ready -> {
                         markNotificationTargetRead()
-                        commitNotificationConversationOpen(outcome.item)
+                        commitNotificationConversationOpen(preloadState.item)
                     }
-                    NotificationMessageDirectLoadOutcome.AwaitChatList -> {
-                        // A transient local-read failure does not consume the tap;
-                        // the existing chat-list state will re-fire this route.
+                    NotificationMessagePreloadState.Failed -> {
+                        // Do not immediately repeat a failed local read. Keep the
+                        // target pending so the broad list can settle and prove
+                        // whether the conversation is missing.
                         routingNotification = false
+                    }
+                    null -> {
+                        when (
+                            val outcome =
+                                loadNotificationMessageDirectly {
+                                    NotificationRouteTrace.tracePhase(
+                                        requestId = routingRequestId,
+                                        sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
+                                    ) {
+                                        appState.loadNotificationChatListItem(
+                                            accountRef = target.accountRef,
+                                            groupIdHex = target.groupIdHex,
+                                        )
+                                    }
+                                }
+                        ) {
+                            is NotificationMessageDirectLoadOutcome.OpenConversation -> {
+                                markNotificationTargetRead()
+                                commitNotificationConversationOpen(outcome.item)
+                            }
+                            NotificationMessageDirectLoadOutcome.AwaitChatList -> {
+                                // A transient local-read failure does not consume the tap;
+                                // the existing chat-list state will re-fire this route.
+                                routingNotification = false
+                            }
+                        }
                     }
                 }
             }
@@ -675,12 +853,14 @@ internal fun MainShell(
                 fallBackToChatList()
                 appState.present(R.string.toast_notification_account_unavailable)
                 onNotificationTargetHandled(target, routingRequestId)
+                NotificationRouteTrace.finishRequest(routingRequestId)
             }
             NotificationNavStep.MissingConversation -> {
                 routingNotification = false
                 fallBackToChatList()
                 appState.present(R.string.toast_notification_conversation_unavailable)
                 onNotificationTargetHandled(target, routingRequestId)
+                NotificationRouteTrace.finishRequest(routingRequestId)
             }
         }
     }
@@ -1150,6 +1330,19 @@ internal fun MainShell(
     LaunchedEffect(conversationController, conversationController?.retryGeneration) {
         conversationController?.start()
     }
+    LaunchedEffect(
+        conversationController,
+        conversationController?.isLoading,
+        selectedChatOpenContext.notificationRouteTraceRequestId,
+    ) {
+        val requestId = selectedChatOpenContext.notificationRouteTraceRequestId ?: return@LaunchedEffect
+        if (conversationController != null && !conversationController.isLoading) {
+            NotificationRouteTrace.endPhase(
+                requestId = requestId,
+                sectionName = NotificationRouteTraceSection.CONTROLLER_BIND,
+            )
+        }
+    }
     if (
         shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible) &&
         savedSharePickerRequestId != null &&
@@ -1205,6 +1398,15 @@ internal fun MainShell(
                     focusMessageRequestId = selectedChatOpenContext.focusMessageRequestId,
                     ttsFocusSessionId = selectedChatOpenContext.ttsFocusSessionId,
                     notificationOpenRequestId = selectedChatOpenContext.notificationOpenRequestId,
+                    onFirstFrameCommitted = {
+                        selectedChatOpenContext.notificationRouteTraceRequestId?.let { requestId ->
+                            NotificationRouteTrace.endPhase(
+                                requestId = requestId,
+                                sectionName = NotificationRouteTraceSection.FIRST_CONVERSATION_FRAME,
+                            )
+                            NotificationRouteTrace.finishRequest(requestId)
+                        }
+                    },
                     justCreated = selectedChatJustCreated,
                     openedAsDmHint = selectedChatOpenedAsDmHint,
                     restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],

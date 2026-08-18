@@ -479,6 +479,7 @@ internal fun ConversationScreen(
     // fresh id so an already-mounted conversation re-runs its first-unread
     // anchor; it also implies current membership while verification catches up.
     notificationOpenRequestId: Long = 0L,
+    onFirstFrameCommitted: () -> Unit = {},
     // True only when this conversation was just created in the same navigation
     // step (issue #321) — drives a one-shot composer focus + keyboard raise so
     // the user can type the first message without an extra tap. False for row
@@ -500,6 +501,11 @@ internal fun ConversationScreen(
     onTtsTransportBodyClick: (() -> Unit)? = null,
 ) {
     WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
+    LaunchedEffect(chat.id, notificationOpenRequestId) {
+        if (notificationOpenRequestId == 0L) return@LaunchedEffect
+        withFrameNanos { }
+        onFirstFrameCommitted()
+    }
     // Push the global snackbar host above the conversation composer so
     // a toast (e.g. the post-invite-accept confirmation) doesn't
     // overlap and intercept touches on the message input. Resets to

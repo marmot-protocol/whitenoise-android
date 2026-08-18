@@ -28,4 +28,15 @@ class NotificationConversationOpenCoverageTest {
 
         assertNotEquals(first.notificationOpenRequestId, repeated.notificationOpenRequestId)
     }
+
+    @Test
+    fun notificationOpenCarriesProductionTraceOwnershipToFirstFrame() {
+        val opened =
+            nextNotificationConversationOpenContext(
+                current = ConversationOpenContext(),
+                notificationRouteTraceRequestId = 73L,
+            )
+
+        assertEquals(73L, opened.notificationRouteTraceRequestId)
+    }
 }

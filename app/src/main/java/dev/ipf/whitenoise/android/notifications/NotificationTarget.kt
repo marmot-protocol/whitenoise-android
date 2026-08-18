@@ -157,6 +157,57 @@ internal sealed interface NotificationMessageDirectLoadOutcome<out T> {
     data object AwaitChatList : NotificationMessageDirectLoadOutcome<Nothing>
 }
 
+/** Identity of one request-scoped message-notification preload. */
+internal data class NotificationMessagePreloadKey(
+    val requestId: Long,
+    val accountRef: String,
+    val groupIdHex: String,
+)
+
+/**
+ * Transient result of reading a notification target while its account is activating.
+ *
+ * This deliberately lives only in the shell navigation composition. It is not a
+ * protocol cache, and a result is usable only by the exact request that created it.
+ */
+internal sealed interface NotificationMessagePreloadState<out T> {
+    data object Loading : NotificationMessagePreloadState<Nothing>
+
+    data class Ready<T>(
+        val item: T,
+    ) : NotificationMessagePreloadState<T>
+
+    /** The broad chat-list route remains the authoritative fallback. */
+    data object Failed : NotificationMessagePreloadState<Nothing>
+}
+
+internal data class NotificationMessagePreload<out T>(
+    val key: NotificationMessagePreloadKey,
+    val state: NotificationMessagePreloadState<T>,
+)
+
+internal fun notificationMessagePreloadKey(
+    target: NotificationTarget?,
+    requestId: Long,
+): NotificationMessagePreloadKey? =
+    target
+        ?.takeIf { it.kind == NotificationTargetKind.MESSAGE }
+        ?.let {
+            NotificationMessagePreloadKey(
+                requestId = requestId,
+                accountRef = it.accountRef,
+                groupIdHex = it.groupIdHex,
+            )
+        }
+
+/** Rejects a completed read from an older tap, even when the target is identical. */
+internal fun <T> NotificationMessagePreload<T>?.stateFor(key: NotificationMessagePreloadKey?): NotificationMessagePreloadState<T>? =
+    if (this != null && key != null && this.key == key) {
+        state
+    } else {
+        null
+    }
+
 /** Performs the one-group local read without swallowing structured cancellation (#586). */
 @Suppress("MaxLineLength")
 internal suspend fun <T> loadNotificationMessageDirectly(load: suspend () -> T): NotificationMessageDirectLoadOutcome<T> =
