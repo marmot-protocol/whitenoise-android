@@ -2375,6 +2375,14 @@ class WhiteNoiseAppState private constructor(
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
     private val mutationsScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    private val forwardOperationOwner =
+        ForwardOperationOwner(
+            scope = mutationsScope,
+            automaticRetryAttempts = FORWARD_BACKGROUND_RETRY_ATTEMPTS,
+            retryDelayMillis = { attempt -> FORWARD_BACKGROUND_RETRY_DELAY_MS shl attempt },
+            onTerminal = ::presentForwardTerminal,
+        )
+    internal val activeForwardOperation: StateFlow<ForwardOperationSnapshot?> = forwardOperationOwner.state
     private val draftWriter =
         CoalescingMessageDraftWriter(
             scope = mutationsScope,
@@ -2957,6 +2965,12 @@ class WhiteNoiseAppState private constructor(
         chatsController?.retryLoad()
     }
 
+    internal fun cancelActiveForwardOperation(): Boolean = forwardOperationOwner.cancel()
+
+    internal fun retryActiveForwardOperation(): Boolean = forwardOperationOwner.retry()
+
+    internal fun dismissActiveForwardOperation(): Boolean = forwardOperationOwner.dismiss()
+
     /**
      * Stage an inbound Android share for the explicitly chosen local account.
      *
@@ -3261,51 +3275,43 @@ class WhiteNoiseAppState private constructor(
                     )
                 },
             )
-        // The app scope, not the picker composition, owns this session. This
-        // monitor retains it while the user navigates and performs bounded safe
-        // retries: uploads may repeat, while uncertain publishes recover through
-        // MDK convergence before the batch advances.
-        mutationsScope.launch {
-            var snapshot: ForwardOperationSnapshot
-            var retryCount = 0
-            session.start()
-            do {
-                snapshot = session.state.first { !it.isActive }
-                if (snapshot.canRetry && retryCount < FORWARD_BACKGROUND_RETRY_ATTEMPTS) {
-                    delay(FORWARD_BACKGROUND_RETRY_DELAY_MS shl retryCount)
-                    retryCount += 1
-                    session.retryFailed()
-                } else {
-                    break
-                }
-            } while (true)
-            when (snapshot.phase) {
-                ForwardOperationPhase.Completed ->
-                    presentTransient(
-                        AppText.Resource(
-                            R.string.toast_forwarded_to_chats,
-                            listOf(snapshot.completedTargets.toString()),
-                        ),
-                    )
-                ForwardOperationPhase.PartialFailure ->
-                    presentTransient(
-                        AppText.Resource(
-                            R.string.toast_forwarded_partial,
-                            listOf(snapshot.completedTargets.toString()),
-                        ),
-                    )
-                ForwardOperationPhase.Failed -> presentTransient(R.string.toast_forward_failed)
-                ForwardOperationPhase.Cancelled,
-                ForwardOperationPhase.Cancelling,
-                -> presentTransient(R.string.forward_cancelled)
-                ForwardOperationPhase.Preparing,
-                ForwardOperationPhase.Running,
-                -> Unit
-            }
+        // The app-scoped owner mirrors live per-target state into the global
+        // non-modal progress surface and retains terminal failures for explicit
+        // retry/dismiss. Its bounded retries preserve the same safe recovery
+        // boundary as the session: uncertain publishes converge, never resend.
+        val started = forwardOperationOwner.start(session)
+        if (started) {
+            presentTransient(R.string.forward_progress_title)
+        } else {
             session.release()
         }
-        presentTransient(R.string.forward_progress_title)
-        return true
+        return started
+    }
+
+    private fun presentForwardTerminal(snapshot: ForwardOperationSnapshot) {
+        when (snapshot.phase) {
+            ForwardOperationPhase.Completed ->
+                presentTransient(
+                    AppText.Resource(
+                        R.string.toast_forwarded_to_chats,
+                        listOf(snapshot.completedTargets.toString()),
+                    ),
+                )
+            ForwardOperationPhase.PartialFailure ->
+                presentTransient(
+                    AppText.Resource(
+                        R.string.toast_forwarded_partial,
+                        listOf(snapshot.completedTargets.toString()),
+                    ),
+                )
+            ForwardOperationPhase.Failed -> presentTransient(R.string.toast_forward_failed)
+            ForwardOperationPhase.Cancelled,
+            ForwardOperationPhase.Cancelling,
+            -> presentTransient(R.string.forward_cancelled)
+            ForwardOperationPhase.Preparing,
+            ForwardOperationPhase.Running,
+            -> Unit
+        }
     }
 
     /**

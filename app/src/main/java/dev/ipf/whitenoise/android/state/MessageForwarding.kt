@@ -12,10 +12,13 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
@@ -77,6 +80,12 @@ internal data class ForwardOperationSnapshot(
                         target.failureStage != ForwardFailureStage.PayloadTooLarge &&
                         target.failureStage != ForwardFailureStage.Expired &&
                         target.failureStage != ForwardFailureStage.SessionChanged
+                }
+    val canCancel: Boolean
+        get() =
+            (phase == ForwardOperationPhase.Preparing || phase == ForwardOperationPhase.Running) &&
+                targets.none { target ->
+                    target.phase == ForwardTargetPhase.Sending || target.sentMessages > 0
                 }
     val isActive: Boolean
         get() =
@@ -154,6 +163,7 @@ internal suspend fun materializeForwardAttachment(
 }
 
 private const val FORWARD_PAYLOAD_TOO_LARGE_MESSAGE = "forward payload exceeds the retained-byte limit"
+private const val DEFAULT_FORWARD_RETRY_DELAY_MS = 1_000L
 
 internal class ForwardPayloadTooLargeException : IllegalArgumentException(FORWARD_PAYLOAD_TOO_LARGE_MESSAGE)
 
@@ -570,6 +580,118 @@ internal class ForwardSession(
 
     private companion object {
         const val MILLIS_PER_SECOND = 1_000L
+    }
+}
+
+/**
+ * App-scoped owner for one visible forwarding operation. It mirrors the
+ * session's live state for UI collection, performs bounded safe retries, and
+ * retains terminal state until the user dismisses it or explicitly retries.
+ */
+internal class ForwardOperationOwner(
+    private val scope: CoroutineScope,
+    private val automaticRetryAttempts: Int = 3,
+    private val retryDelayMillis: (attempt: Int) -> Long = { attempt -> DEFAULT_FORWARD_RETRY_DELAY_MS shl attempt },
+    private val onTerminal: (ForwardOperationSnapshot) -> Unit = {},
+) {
+    private val _state = MutableStateFlow<ForwardOperationSnapshot?>(null)
+    val state: StateFlow<ForwardOperationSnapshot?> = _state.asStateFlow()
+
+    private var session: ForwardSession? = null
+    private var stateCollector: Job? = null
+    private var monitor: Job? = null
+
+    init {
+        require(automaticRetryAttempts >= 0) { "automatic retry attempts must not be negative" }
+    }
+
+    fun start(candidate: ForwardSession): Boolean {
+        if (session?.state?.value?.isActive == true) return false
+        clearActiveSession()
+        session = candidate
+        _state.value = candidate.state.value
+        stateCollector =
+            scope.launch {
+                candidate.state.collect { snapshot ->
+                    if (session === candidate) _state.value = snapshot
+                }
+            }
+        candidate.start()
+        monitor(candidate)
+        return true
+    }
+
+    fun cancel(): Boolean =
+        session?.takeIf { candidate -> candidate.state.value.canCancel }?.let { candidate ->
+            candidate.cancel()
+            true
+        } ?: false
+
+    fun retry(): Boolean {
+        val candidate = session
+        return if (candidate?.state?.value?.canRetry == true) {
+            monitor?.cancel()
+            candidate.retryFailed()
+            candidate.state.value.isActive.also { started ->
+                if (started) monitor(candidate)
+            }
+        } else {
+            false
+        }
+    }
+
+    fun dismiss(): Boolean {
+        if (_state.value?.isActive == true) return false
+        clearActiveSession()
+        return true
+    }
+
+    fun release() {
+        clearActiveSession()
+    }
+
+    private fun monitor(candidate: ForwardSession) {
+        monitor =
+            scope.launch {
+                var retryCount = 0
+                while (session === candidate) {
+                    val snapshot = candidate.state.first { !it.isActive }
+                    val retried = retryAutomatically(candidate, snapshot, retryCount)
+                    if (retried) {
+                        retryCount += 1
+                    } else {
+                        if (session === candidate) onTerminal(candidate.state.value)
+                        return@launch
+                    }
+                }
+            }
+    }
+
+    private suspend fun retryAutomatically(
+        candidate: ForwardSession,
+        snapshot: ForwardOperationSnapshot,
+        retryCount: Int,
+    ): Boolean =
+        if (snapshot.canRetry && retryCount < automaticRetryAttempts) {
+            delay(retryDelayMillis(retryCount))
+            if (session === candidate && candidate.state.value == snapshot) {
+                candidate.retryFailed()
+                candidate.state.value.isActive
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+
+    private fun clearActiveSession() {
+        monitor?.cancel()
+        stateCollector?.cancel()
+        session?.release()
+        monitor = null
+        stateCollector = null
+        session = null
+        _state.value = null
     }
 }
 

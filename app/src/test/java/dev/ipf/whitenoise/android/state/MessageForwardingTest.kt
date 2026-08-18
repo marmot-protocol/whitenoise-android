@@ -426,6 +426,97 @@ class MessageForwardingTest {
             assertTrue(retained.contentEquals(byteArrayOf(0, 0, 0)))
         }
 
+    @Test
+    fun operationOwnerPublishesLiveStateAndCancelsBeforeSending() =
+        runTest {
+            val uploadGate = CompletableDeferred<Unit>()
+            val transport = RecordingForwardTransport(uploadGate = uploadGate)
+            val owner = ForwardOperationOwner(scope = this, automaticRetryAttempts = 0)
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(mediaPayload("media", "caption", "photo.jpg")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            assertTrue(owner.start(session))
+            runCurrent()
+            assertEquals(
+                ForwardTargetPhase.Uploading,
+                owner.state.value
+                    ?.targets
+                    ?.single()
+                    ?.phase,
+            )
+            assertTrue(owner.cancel())
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Cancelled, owner.state.value?.phase)
+            assertTrue(transport.published.isEmpty())
+            assertTrue(owner.dismiss())
+            assertEquals(null, owner.state.value)
+        }
+
+    @Test
+    fun operationOwnerRetriesOnlyFailedTargetsAndRetainsTerminalState() =
+        runTest {
+            val terminalSnapshots = mutableListOf<ForwardOperationSnapshot>()
+            val transport = RecordingForwardTransport(failUploadOnceFor = mutableSetOf("target-b"))
+            val owner =
+                ForwardOperationOwner(
+                    scope = this,
+                    automaticRetryAttempts = 0,
+                    onTerminal = terminalSnapshots::add,
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(mediaPayload("media", null, "photo.jpg")),
+                    targetGroupIds = listOf("target-a", "target-b"),
+                    transport = transport,
+                )
+
+            assertTrue(owner.start(session))
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.PartialFailure, owner.state.value?.phase)
+            assertTrue(owner.retry())
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, owner.state.value?.phase)
+            assertEquals(1, transport.uploadTargets.count { it == "target-a" })
+            assertEquals(2, transport.uploadTargets.count { it == "target-b" })
+            assertEquals(listOf("target-a" to 0, "target-b" to 0), transport.published)
+            assertEquals(
+                listOf(ForwardOperationPhase.PartialFailure, ForwardOperationPhase.Completed),
+                terminalSnapshots.map(ForwardOperationSnapshot::phase),
+            )
+            owner.release()
+        }
+
+    @Test
+    fun operationCannotBeCancelledAfterPublishingBegins() =
+        runTest {
+            val snapshot =
+                ForwardOperationSnapshot(
+                    phase = ForwardOperationPhase.Running,
+                    preparedAttachments = 0,
+                    totalAttachments = 0,
+                    targets =
+                        listOf(
+                            ForwardTargetProgress(
+                                groupIdHex = "target",
+                                phase = ForwardTargetPhase.Sending,
+                                totalAttachments = 0,
+                                totalMessages = 2,
+                            ),
+                        ),
+                )
+
+            assertFalse(snapshot.canCancel)
+        }
+
     private class RecordingForwardTransport(
         private val failUploadOnceFor: MutableSet<String> = mutableSetOf(),
         private val failPublishUncertainOnceFor: MutableSet<String> = mutableSetOf(),

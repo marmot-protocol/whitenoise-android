@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
+import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingScreen
 import dev.ipf.whitenoise.android.ui.settings.WipeOutcomeSheet
@@ -86,12 +87,14 @@ internal fun GlobalTransientNotice(
 internal fun ShellTransientNoticeLayout(
     notice: TransientNotice?,
     modifier: Modifier = Modifier,
+    persistentBottomContent: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     Column(modifier.fillMaxSize()) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
             content()
         }
+        persistentBottomContent()
         GlobalTransientNotice(notice)
     }
 }
@@ -213,7 +216,10 @@ fun WhiteNoiseApp(
                         AppPhase.Bootstrapping -> StartupLoadingScreen()
                         AppPhase.Onboarding -> OnboardingScreen(appState)
                         AppPhase.Ready ->
-                            ShellTransientNoticeLayout(notice = transientNotice) {
+                            ShellTransientNoticeLayout(
+                                notice = transientNotice,
+                                persistentBottomContent = { ForwardOperationStatusHost(appState) },
+                            ) {
                                 MainShell(
                                     appState = appState,
                                     inboundNotificationTarget = inboundNotificationTarget,

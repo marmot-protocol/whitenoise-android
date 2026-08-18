@@ -36,6 +36,9 @@ class ForwardProductionBoundaryCoverageTest {
     @Test
     fun uncertainPublishUsesConvergenceAndTheAppScopeOwnsCompletion() {
         val body = appStateSource().readText().functionBody("startForwardMessages")
+        val ownerSource = messageForwardingSource().readText()
+        val owner = ownerSource.functionBody("monitor")
+        val retry = ownerSource.functionBody("retryAutomatically")
 
         assertTrue("forwardProjectionRecords(targetGroupIdHex, message, references)" in body)
         assertTrue("pendingMessageIdHex = newProjection.messageIdHex" in body)
@@ -43,9 +46,11 @@ class ForwardProductionBoundaryCoverageTest {
         assertTrue("retryGroupConvergence(account, targetGroupIdHex)" in body)
         assertTrue("it.messageIdHex == pendingMessageIdHex" in body)
         assertTrue("delivered.sourceMessageIdHex != null" in body)
-        assertTrue("mutationsScope.launch" in body)
-        assertTrue("session.state.first { !it.isActive }" in body)
+        assertTrue("forwardOperationOwner.start(session)" in body)
         assertTrue("session.release()" in body)
+        assertTrue("scope.launch" in owner)
+        assertTrue("candidate.state.first { !it.isActive }" in owner)
+        assertTrue("candidate.retryFailed()" in retry)
     }
 
     private fun appStateSource(): File =
@@ -53,4 +58,10 @@ class ForwardProductionBoundaryCoverageTest {
             File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull(File::exists) ?: error("Missing AppState.kt source file")
+
+    private fun messageForwardingSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/MessageForwarding.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/MessageForwarding.kt"),
+        ).firstOrNull(File::exists) ?: error("Missing MessageForwarding.kt source file")
 }

@@ -16,6 +16,7 @@ import dev.ipf.whitenoise.android.state.ForwardOperationPhase
 import dev.ipf.whitenoise.android.state.ForwardOperationSnapshot
 import dev.ipf.whitenoise.android.state.ForwardTargetPhase
 import dev.ipf.whitenoise.android.state.ForwardTargetProgress
+import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatus
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardProgressContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -43,6 +44,30 @@ class ForwardProgressScreenshotTest {
                     ForwardTargetProgress("work", ForwardTargetPhase.Sending, 4, 4, 1, 3),
                 ),
         )
+    }
+
+    @Test
+    fun persistentActiveForwardStatusLight() {
+        val snapshot =
+            snapshot(
+                phase = ForwardOperationPhase.Running,
+                ForwardTargetProgress("family", ForwardTargetPhase.Uploading, 2, 4, 0, 3),
+                ForwardTargetProgress("work", ForwardTargetPhase.Waiting, 0, 4, 0, 3),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(modifier = Modifier.testTag(TAG)) {
+                    ForwardOperationStatus(
+                        snapshot = snapshot,
+                        targetTitles = mapOf("family" to "Family", "work" to "Design team"),
+                        onCancel = {},
+                        onRetry = {},
+                        onDismiss = {},
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/forward_operation_status_active_light.png")
     }
 
     @Test
