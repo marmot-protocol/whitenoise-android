@@ -34,6 +34,7 @@ internal fun conversationRouteSettled(
  * assumes the tween's configured length.
  */
 @Composable
+@Suppress("FunctionNaming")
 internal fun ConversationRouteSettledPerformanceMarker(
     conversationId: String?,
     routeTransition: Transition<*>,
@@ -73,4 +74,7 @@ internal fun ConversationRouteSettledPerformanceMarker(
 }
 
 internal const val CONVERSATION_ROUTE_TRANSITION_MILLIS = 240
+
+/** Extra frames the outgoing route is retained past its tween before release. */
+internal const val CONVERSATION_ROUTE_EXIT_RETENTION_SLACK_MILLIS = 32L
 private const val MAIN_SHELL_ROUTE_KEY = "main-shell"

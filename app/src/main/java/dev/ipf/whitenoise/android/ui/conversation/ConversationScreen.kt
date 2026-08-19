@@ -625,7 +625,8 @@ internal fun ConversationScreen(
     val listState =
         key(controller) {
             rememberLazyListState(
-                initialFirstVisibleItemIndex = positionalScrollRestore?.firstVisibleItemIndex ?: firstFrameSeed.initialListIndex,
+                initialFirstVisibleItemIndex =
+                    positionalScrollRestore?.firstVisibleItemIndex ?: firstFrameSeed.initialListIndex,
                 initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
             )
         }

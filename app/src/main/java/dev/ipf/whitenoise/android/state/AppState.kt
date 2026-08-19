@@ -9350,10 +9350,11 @@ class WhiteNoiseAppState private constructor(
      */
     private fun ensureProfileMaterialized(accountIdHex: String) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
-        val reservation = reserveProfileMaterialization(id) ?: return
-        if (!reservation.ownsRead) return
-        profileScope.launch {
-            completeProfileMaterialization(id, reservation.completion)
+        val reservation = reserveProfileMaterialization(id)
+        if (reservation?.ownsRead == true) {
+            profileScope.launch {
+                completeProfileMaterialization(id, reservation.completion)
+            }
         }
     }
 

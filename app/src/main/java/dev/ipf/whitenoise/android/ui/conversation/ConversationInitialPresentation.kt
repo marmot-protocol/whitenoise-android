@@ -22,13 +22,6 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import kotlinx.coroutines.delay
 
-internal data class ConversationFirstFrameSeedPresentation(
-    val anchorTailImmediately: Boolean,
-    val initialListIndex: Int,
-    val latestTimelineId: String?,
-    val awaitingAuthoritativeTimeline: Boolean,
-)
-
 internal fun conversationFirstFrameSeedPresentation(
     controller: ConversationController,
     entryUnreadCount: Int,
@@ -57,6 +50,13 @@ internal fun conversationFirstFrameSeedPresentation(
     )
 }
 
+internal data class ConversationFirstFrameSeedPresentation(
+    val anchorTailImmediately: Boolean,
+    val initialListIndex: Int,
+    val latestTimelineId: String?,
+    val awaitingAuthoritativeTimeline: Boolean,
+)
+
 internal fun shouldAnchorConversationTailOnFirstFrame(
     entryUnreadCount: Int,
     projectionAvailable: Boolean,
@@ -77,6 +77,7 @@ internal fun shouldAnchorConversationTailOnFirstFrame(
 internal fun seededConversationTailListIndex(renderedTimelineSize: Int): Int = renderedTimelineSize.coerceAtLeast(0) + 1
 
 @Composable
+@Suppress("FunctionNaming")
 internal fun SeededConversationAnchorBaselineEffect(
     enabled: Boolean,
     listState: LazyListState,
@@ -94,6 +95,7 @@ internal fun SeededConversationAnchorBaselineEffect(
 }
 
 @Composable
+@Suppress("FunctionNaming")
 internal fun SeededConversationAuthoritativeReconciliationEffect(
     authoritativeTimelinePublished: Boolean,
     awaitingAuthoritativeTimeline: Boolean,
@@ -141,12 +143,13 @@ internal suspend fun reconcileSeededTailAnchor(
     awaitFrame: suspend () -> Unit,
     maxAttempts: Int = SEEDED_TAIL_ANCHOR_MAX_ATTEMPTS,
 ): Boolean {
-    repeat(maxAttempts.coerceAtLeast(1)) {
-        if (followTail()) return true
-        if (!isFollowingTail()) return false
+    var positioned = false
+    for (attempt in 0 until maxAttempts.coerceAtLeast(1)) {
+        positioned = followTail()
+        if (positioned || !isFollowingTail()) break
         awaitFrame()
     }
-    return false
+    return positioned
 }
 
 internal const val SEEDED_TAIL_ANCHOR_MAX_ATTEMPTS = 8
@@ -158,6 +161,7 @@ internal const val SEEDED_TAIL_ANCHOR_MAX_ATTEMPTS = 8
  */
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Suppress("FunctionNaming")
 internal fun ConversationInitialLoadingOverlay(
     visible: Boolean,
     modifier: Modifier = Modifier,

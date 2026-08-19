@@ -321,7 +321,10 @@ class ConversationImeCollapseFocusTest {
         }
     }
 
-    private fun progressNodes() = composeRule.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+    private fun progressNodes() =
+        composeRule.onAllNodes(
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo),
+        )
 
     private fun cachedPreview() =
         ChatListMessagePreviewFfi(

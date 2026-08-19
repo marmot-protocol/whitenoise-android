@@ -1467,7 +1467,10 @@ internal fun MainShell(
                         initialGroup = openChat.group,
                         initialMemberSnapshot =
                             openChat.memberSnapshot
-                                ?: appState.cachedGroupMemberSnapshot(conversationAccountRef, openChat.group.groupIdHex),
+                                ?: appState.cachedGroupMemberSnapshot(
+                                    conversationAccountRef,
+                                    openChat.group.groupIdHex,
+                                ),
                         initialTimelinePreview = openChat.projection?.lastMessage,
                         initialLastReadMessageId = openChat.projection?.lastReadMessageIdHex,
                         initialLastReadTimelineAt = openChat.projection?.lastReadTimelineAt,
@@ -1510,7 +1513,7 @@ internal fun MainShell(
     LaunchedEffect(exitingConversationChat?.id, selectedChat?.id) {
         val exiting = exitingConversationChat ?: return@LaunchedEffect
         if (selectedChat?.id == exiting.id) return@LaunchedEffect
-        delay(CONVERSATION_ROUTE_TRANSITION_MILLIS.toLong() + 32L)
+        delay(CONVERSATION_ROUTE_TRANSITION_MILLIS.toLong() + CONVERSATION_ROUTE_EXIT_RETENTION_SLACK_MILLIS)
         if (selectedChat?.id != exiting.id) exitingConversationChat = null
     }
     val pendingOpen = accountOwnedPendingConversationOpen
@@ -1554,10 +1557,12 @@ internal fun MainShell(
         appState.pendingProfileNpub,
         routingNotification,
     ) {
-        if (
-            pendingConversationOpen != null &&
-            (selectedChat != null || section != MainSection.Chats || appState.pendingProfileNpub != null || routingNotification)
-        ) {
+        val supersededByOtherNavigation =
+            selectedChat != null ||
+                section != MainSection.Chats ||
+                appState.pendingProfileNpub != null ||
+                routingNotification
+        if (pendingConversationOpen != null && supersededByOtherNavigation) {
             pendingConversationOpen = null
         }
     }

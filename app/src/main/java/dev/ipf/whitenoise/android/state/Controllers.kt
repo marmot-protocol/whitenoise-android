@@ -7375,12 +7375,9 @@ class ConversationController(
         val shouldStart =
             synchronized(liveSubscriptionLock) {
                 val generation = retryGeneration
-                if (
-                    accountTeardownRequested ||
-                    controllerCleared ||
-                    startJob?.isActive == true ||
-                    lastStartedGeneration == generation
-                ) {
+                val alreadyStartedForGeneration =
+                    startJob?.isActive == true || lastStartedGeneration == generation
+                if (accountTeardownRequested || controllerCleared || alreadyStartedForGeneration) {
                     false
                 } else {
                     lastStartedGeneration = generation
@@ -7585,6 +7582,38 @@ class ConversationController(
 
     private fun isAccountTeardownRequested(): Boolean = synchronized(liveSubscriptionLock) { accountTeardownRequested }
 
+    // The initial page is a local read, but it crosses the FFI boundary — a
+    // hung call would leave the chat-list tap permanently inert because
+    // navigation cannot promote until the first page publishes. Bound it, and
+    // convert exhaustion into the ordinary load failure whose surface already
+    // promotes navigation and offers retry. A reconnect keeps its records.
+    private suspend fun publishInitialTimelineSnapshot(
+        account: String,
+        timelineStream: TimelineMessagesSubscription,
+    ): List<String> {
+        if (timelineRecords.isNotEmpty()) return emptyList()
+        val snapshot =
+            awaitBoundedInitialRead(
+                read = controllerScope.async(Dispatchers.IO) { runCatching { timelineStream.snapshot() } },
+                budgetMillis = INITIAL_TIMELINE_SNAPSHOT_BUDGET_MILLIS,
+            ) {
+                throw ConversationInitialSnapshotTimeoutException()
+            }
+        return if (snapshot == null) {
+            publishAuthoritativeEmptyInitialTimeline()
+            emptyList()
+        } else {
+            val streamIds =
+                applyTimelinePage(
+                    snapshot,
+                    replaceWindow = true,
+                    updatePagination = true,
+                )
+            initializeReadState(account)
+            streamIds
+        }
+    }
+
     /**
      * Retry loop for the timeline + group-state live subscriptions. Extracted
      * from [start] so R8 can compile the smaller suspend entrypoint (the
@@ -7630,40 +7659,7 @@ class ConversationController(
                     }
                 }
             if (stopAfterTimelineOpen) return true to false
-            val timelineReconnect = timelineRecords.isNotEmpty()
-            val snapshotStreamIds =
-                if (timelineReconnect) {
-                    emptyList()
-                } else {
-                    // The initial page is a local read, but it crosses the FFI
-                    // boundary — a hung call here would leave the chat-list tap
-                    // permanently inert because navigation cannot promote until
-                    // the first page publishes. Bound it, and convert exhaustion
-                    // into the ordinary load failure whose surface already
-                    // promotes navigation and offers retry.
-                    val snapshot =
-                        awaitBoundedInitialRead(
-                            read = controllerScope.async(Dispatchers.IO) { runCatching { timelineStream.snapshot() } },
-                            budgetMillis = INITIAL_TIMELINE_SNAPSHOT_BUDGET_MILLIS,
-                        ) {
-                            throw ConversationInitialSnapshotTimeoutException()
-                        }
-                    if (snapshot == null) {
-                        publishAuthoritativeEmptyInitialTimeline()
-                        emptyList()
-                    } else {
-                        snapshot.let {
-                            val streamIds =
-                                applyTimelinePage(
-                                    it,
-                                    replaceWindow = true,
-                                    updatePagination = true,
-                                )
-                            initializeReadState(account)
-                            streamIds
-                        }
-                    }
-                }
+            val snapshotStreamIds = publishInitialTimelineSnapshot(account, timelineStream)
             // Don't blanket-mark the absolute newest as read here — the UI
             // layer now drives mark-read as the user scrolls so partial-read
             // sessions retain accurate unread counts on the chat list.
@@ -10924,6 +10920,27 @@ class ConversationController(
         )
     }
 
+    private fun trimStateForWindowReplacement() {
+        timelineRecords.clear()
+        timelineItemsById.clear()
+        timelineOrder.clear()
+        projectedMessageIds.clear()
+        // Drop stale projected records so messageById doesn't grow unbounded
+        // as older pages are loaded; keep in-flight optimistic records so a
+        // pending send still reconciles across a window replacement. See #68.
+        val optimisticIds = optimisticMessages.values.mapTo(mutableSetOf()) { it.record.messageIdHex }
+        messageById.keys.retainAll(optimisticIds)
+        // Same unbounded-growth trim for the optimistic position/timestamp
+        // overrides: the reconcile path below re-adds them for any optimistic
+        // message that reconciles into this page, so scrolled-out entries
+        // don't accumulate for the controller's lifetime.
+        localTimelineOrderOverrides.keys.retainAll(optimisticIds)
+        localTimelineTimestampOverrides.keys.retainAll(optimisticIds)
+        preservedTimelinePositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
+        optimisticSendPositionPreserves.retainAll(localTimelineTimestampOverrides.keys)
+        durableStreamPositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
+    }
+
     private suspend fun applyTimelinePage(
         page: TimelinePageFfi,
         replaceWindow: Boolean,
@@ -10931,26 +10948,7 @@ class ConversationController(
     ): List<String> {
         timelineWindowGeneration.invalidate()
         val pageMessages = page.messages
-        if (replaceWindow) {
-            timelineRecords.clear()
-            timelineItemsById.clear()
-            timelineOrder.clear()
-            projectedMessageIds.clear()
-            // Drop stale projected records so messageById doesn't grow unbounded
-            // as older pages are loaded; keep in-flight optimistic records so a
-            // pending send still reconciles across a window replacement. See #68.
-            val optimisticIds = optimisticMessages.values.mapTo(mutableSetOf()) { it.record.messageIdHex }
-            messageById.keys.retainAll(optimisticIds)
-            // Same unbounded-growth trim for the optimistic position/timestamp
-            // overrides: the reconcile path below re-adds them for any optimistic
-            // message that reconciles into this page, so scrolled-out entries
-            // don't accumulate for the controller's lifetime.
-            localTimelineOrderOverrides.keys.retainAll(optimisticIds)
-            localTimelineTimestampOverrides.keys.retainAll(optimisticIds)
-            preservedTimelinePositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
-            optimisticSendPositionPreserves.retainAll(localTimelineTimestampOverrides.keys)
-            durableStreamPositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
-        }
+        if (replaceWindow) trimStateForWindowReplacement()
         pageMessages.forEach { record ->
             val actionRecord =
                 upsertProjectedRecord(

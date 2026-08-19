@@ -31,28 +31,35 @@ internal fun initialConversationTimeline(
     return byMessageId.values.sortedWith(::compareTimelineMessages)
 }
 
-internal fun shouldDiscardInitialTimelineSeedForFailure(hasPublishedAuthoritativeTimeline: Boolean): Boolean = !hasPublishedAuthoritativeTimeline
+internal fun shouldDiscardInitialTimelineSeedForFailure(published: Boolean): Boolean = !published
+
+private fun ChatListMessagePreviewFfi.isRenderableInitialSeed(groupIdHex: String): Boolean =
+    ConversationController.HEX_MESSAGE_ID.matches(messageIdHex) &&
+        ConversationController.HEX_MESSAGE_ID.matches(groupIdHex) &&
+        ConversationController.HEX_MESSAGE_ID.matches(sender) &&
+        !deleted &&
+        kind == CHAT_MESSAGE_KIND &&
+        plaintext.isNotBlank() &&
+        attachmentKind == null &&
+        attachmentCount == 0u &&
+        !contentTokens.truncated
+
+private fun initialSeedStatus(deliveryState: ChatListMessageDeliveryStateFfi): MessageStatus? =
+    when (deliveryState) {
+        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE -> MessageStatus.Received
+        ChatListMessageDeliveryStateFfi.DELIVERED -> MessageStatus.Sent
+        // Pending has a truthful display-only state and needs no retry
+        // metadata. Keeping it eligible matters for offline conversations,
+        // where it is often the only safe first-frame preview.
+        ChatListMessageDeliveryStateFfi.PENDING -> MessageStatus.Pending
+        // Failed rows expose a retry action which requires the complete
+        // optimistic/projected record, not this display-shaped preview.
+        ChatListMessageDeliveryStateFfi.FAILED -> null
+    }
 
 private fun ChatListMessagePreviewFfi.toInitialTimelineMessage(groupIdHex: String): TimelineMessage? {
-    if (!ConversationController.HEX_MESSAGE_ID.matches(messageIdHex)) return null
-    if (!ConversationController.HEX_MESSAGE_ID.matches(groupIdHex)) return null
-    if (!ConversationController.HEX_MESSAGE_ID.matches(sender)) return null
-    if (deleted || kind != CHAT_MESSAGE_KIND || plaintext.isBlank()) return null
-    if (attachmentKind != null || attachmentCount != 0u) return null
-    if (contentTokens.truncated) return null
-
-    val status =
-        when (deliveryState) {
-            ChatListMessageDeliveryStateFfi.NOT_APPLICABLE -> MessageStatus.Received
-            ChatListMessageDeliveryStateFfi.DELIVERED -> MessageStatus.Sent
-            // Pending has a truthful display-only state and needs no retry
-            // metadata. Keeping it eligible matters for offline conversations,
-            // where it is often the only safe first-frame preview.
-            ChatListMessageDeliveryStateFfi.PENDING -> MessageStatus.Pending
-            // Failed rows expose a retry action which requires the complete
-            // optimistic/projected record, not this display-shaped preview.
-            ChatListMessageDeliveryStateFfi.FAILED -> return null
-        }
+    val status = initialSeedStatus(deliveryState)
+    if (status == null || !isRenderableInitialSeed(groupIdHex)) return null
     val record =
         AppMessageRecordFfi(
             messageIdHex = messageIdHex,

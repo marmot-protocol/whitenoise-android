@@ -99,8 +99,8 @@ class ConversationInitialTimelineTest {
 
     @Test
     fun initialFailureDiscardsSeedButRefreshFailureKeepsAuthoritativeContent() {
-        assertTrue(shouldDiscardInitialTimelineSeedForFailure(hasPublishedAuthoritativeTimeline = false))
-        assertFalse(shouldDiscardInitialTimelineSeedForFailure(hasPublishedAuthoritativeTimeline = true))
+        assertTrue(shouldDiscardInitialTimelineSeedForFailure(published = false))
+        assertFalse(shouldDiscardInitialTimelineSeedForFailure(published = true))
     }
 
     private fun preview(
