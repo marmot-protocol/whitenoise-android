@@ -715,7 +715,14 @@ internal fun ConversationScreen(
             mutableStateOf<BatchDeleteRetryState?>(null)
         }
     var initialTimelineAnchored by
-        remember(controller, notificationOpenRequestId) { mutableStateOf(firstFrameSeed.anchorTailImmediately) }
+        // Reveal from the first frame only when the authoritative page is already
+        // loaded (the preloaded chat-list-tap path anchors at the tail immediately).
+        // A direct open still awaiting its page must stay hidden until
+        // reconciliation scrolls to the tail, otherwise the grown page lays out at
+        // the clamped top spacer and flashes the oldest rows before jumping down.
+        remember(controller, notificationOpenRequestId) {
+            mutableStateOf(firstFrameSeed.anchorTailImmediately && !firstFrameSeed.awaitingAuthoritativeTimeline)
+        }
 
     // First-frame completion waits for the initial anchor, not just one frame:
     // until anchoring commits, the transcript is still transparent, so an
@@ -1781,6 +1788,9 @@ internal fun ConversationScreen(
         onReconciled = { latestId ->
             navigationState.seedTailAwaitingAuthoritative = false
             navigationState.lastFollowedLatestId = latestId
+            // The tail scroll has run; reveal the positioned transcript now so a
+            // direct open never shows the pre-scroll oldest-rows frame.
+            initialTimelineAnchored = true
         },
     )
 
