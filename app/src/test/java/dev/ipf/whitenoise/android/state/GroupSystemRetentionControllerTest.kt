@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -64,6 +65,7 @@ class GroupSystemRetentionControllerTest {
                 SendSummaryFfi(
                     published = 1u,
                     messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                    acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
                     maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
                 )
             },
