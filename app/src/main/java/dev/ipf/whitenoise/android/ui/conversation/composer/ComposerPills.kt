@@ -7,6 +7,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.content.MediaType
 import androidx.compose.foundation.content.ReceiveContentListener
 import androidx.compose.foundation.content.TransferableContent
@@ -33,9 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloseFullscreen
 import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -69,6 +68,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -306,7 +306,7 @@ internal fun ComposerPill(
                             .then(expandedHeightModifier)
                             .padding(
                                 start = if (expandedLayout) 12.dp else 44.dp,
-                                top = if (expandedLayout) 48.dp else 10.dp,
+                                top = if (expandedLayout) 36.dp else 10.dp,
                                 end = if (expandedLayout) 12.dp else compactTrailingReserve,
                                 bottom = if (expandedLayout) 48.dp else 10.dp,
                             ).focusProperties { canFocus = inputFocusEnabled }
@@ -400,7 +400,7 @@ internal fun ComposerPill(
                         modifier =
                             Modifier.padding(
                                 start = if (expandedLayout) 12.dp else 44.dp,
-                                top = if (expandedLayout) 48.dp else 10.dp,
+                                top = if (expandedLayout) 36.dp else 10.dp,
                             ),
                     )
                 }
@@ -457,13 +457,26 @@ internal fun ComposerPill(
             }
 
             if (expandedLayout && inputContentVisible) {
+                // One control owns both resize paths: continuous drag, and the
+                // documented accessible tap alternative that toggles full
+                // screen. The strip stays 96dp wide so the reduced height keeps
+                // a comfortably grabbable target without reserving a full
+                // touch-target row of dead space above the first text line.
+                val toggleDescription =
+                    stringResource(
+                        if (expansionMode == ComposerExpansionMode.FullScreen) {
+                            R.string.composer_collapse
+                        } else {
+                            R.string.composer_expand_full_screen
+                        },
+                    )
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier =
                         Modifier
                             .align(Alignment.TopCenter)
                             .width(96.dp)
-                            .height(48.dp)
+                            .height(36.dp)
                             .pointerInput(Unit) {
                                 detectVerticalDragGestures(
                                     onVerticalDrag = { change, dragAmount ->
@@ -473,7 +486,11 @@ internal fun ComposerPill(
                                     onDragEnd = { latestOnHeightDragStopped() },
                                     onDragCancel = { latestOnHeightDragStopped() },
                                 )
-                            }.semantics {
+                            }.clickable(
+                                onClickLabel = toggleDescription,
+                                role = Role.Button,
+                                onClick = onExpansionToggle,
+                            ).semantics {
                                 contentDescription = resizeComposerDescription
                             },
                 ) {
@@ -485,31 +502,6 @@ internal fun ComposerPill(
                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                                 RoundedCornerShape(2.dp),
                             ),
-                    )
-                }
-                IconButton(
-                    onClick = onExpansionToggle,
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .size(48.dp),
-                ) {
-                    Icon(
-                        if (expansionMode == ComposerExpansionMode.FullScreen) {
-                            Icons.Default.CloseFullscreen
-                        } else {
-                            Icons.Default.OpenInFull
-                        },
-                        contentDescription =
-                            stringResource(
-                                if (expansionMode == ComposerExpansionMode.FullScreen) {
-                                    R.string.composer_collapse
-                                } else {
-                                    R.string.composer_expand_full_screen
-                                },
-                            ),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
                     )
                 }
             }

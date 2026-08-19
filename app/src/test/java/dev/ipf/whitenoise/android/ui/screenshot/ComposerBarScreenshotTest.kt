@@ -84,7 +84,7 @@ class ComposerBarScreenshotTest {
     @Test
     fun composerBarFullScreenLargeRtl() {
         renderLongComposer(darkTheme = true, largeRtl = true)
-        composeRule.onNodeWithContentDescription("Expand message composer").performClick()
+        composeRule.onNodeWithContentDescription("Drag to resize message composer").performClick()
         composeRule.waitForIdle()
         composeRule
             .onNodeWithTag(LONG_TAG)

@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -57,7 +58,7 @@ class ComposerExpansionBehaviorTest {
                 .fetchSemanticsNode()
                 .boundsInRoot.height
 
-        composeRule.onNodeWithContentDescription(app.getString(R.string.composer_expand_full_screen)).performClick()
+        resizeHandle().performClick()
         composeRule.waitForIdle()
 
         val fullHeight =
@@ -68,7 +69,7 @@ class ComposerExpansionBehaviorTest {
         assertTrue("full screen should be materially taller than auto-grow", fullHeight > automaticHeight * 1.5f)
         composeRule.onNodeWithText(draft).assertExists()
 
-        composeRule.onNodeWithContentDescription(app.getString(R.string.composer_collapse)).performClick()
+        resizeHandle().performClick()
         composeRule.waitForIdle()
 
         val collapsedHeight =
@@ -91,14 +92,17 @@ class ComposerExpansionBehaviorTest {
         val attach = composerControlBounds(R.string.attach_options)
         val send = composerControlBounds(R.string.send)
         val resize = composerControlBounds(R.string.composer_resize)
-        val expand = composerControlBounds(R.string.composer_expand_full_screen)
 
         assertTrue(emoji.center.x < attach.center.x)
         assertTrue(attach.center.x < send.center.x)
         assertTrue(abs(emoji.bottom - send.bottom) <= 4f)
         assertTrue(abs(attach.bottom - send.bottom) <= 4f)
-        assertTrue("resize handle should expose a 48dp touch strip", resize.height >= 48f)
-        assertTrue("full-screen toggle should expose a 48dp touch target", expand.height >= 48f)
+        // 96dp wide x 36dp tall: the width keeps the merged control easily
+        // grabbable while the reduced height returns drafting space that a
+        // full touch-target row of top inset used to consume.
+        assertTrue("resize handle should keep a grabbable touch strip", resize.height >= 36f)
+        assertTrue("resize handle should stay wide", resize.width >= 96f)
+        assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
     }
 
     @Test
@@ -107,9 +111,6 @@ class ComposerExpansionBehaviorTest {
 
         composeRule
             .onNodeWithContentDescription(app.getString(R.string.composer_resize))
-            .assertDoesNotExist()
-        composeRule
-            .onNodeWithContentDescription(app.getString(R.string.composer_expand_full_screen))
             .assertDoesNotExist()
     }
 
@@ -169,16 +170,15 @@ class ComposerExpansionBehaviorTest {
 
         editor.performClick()
         editor.assertIsFocused()
-        composeRule.onNodeWithContentDescription(app.getString(R.string.composer_expand_full_screen)).performClick()
+        resizeHandle().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithContentDescription(app.getString(R.string.composer_collapse)).assertExists()
+        assertResizeHandleToggleLabel(R.string.composer_collapse)
         assertEquals(OnBackInvokedDispatcher.PRIORITY_OVERLAY, overlayPriority)
 
         composeRule.runOnIdle { checkNotNull(overlayCallback).onBackInvoked() }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithContentDescription(app.getString(R.string.composer_collapse)).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription(app.getString(R.string.composer_expand_full_screen)).assertExists()
+        assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
         assertNull("losing focus must release the overlay callback", overlayCallback)
         editor.assertIsNotFocused()
     }
@@ -209,6 +209,19 @@ class ComposerExpansionBehaviorTest {
             }
         }
         composeRule.waitForIdle()
+    }
+
+    private fun resizeHandle() = composeRule.onNodeWithContentDescription(app.getString(R.string.composer_resize))
+
+    // The handle is one control for both resize paths; its current tap
+    // outcome (expand vs collapse) is exposed as the click action's label.
+    private fun assertResizeHandleToggleLabel(labelRes: Int) {
+        val label =
+            resizeHandle()
+                .fetchSemanticsNode()
+                .config[SemanticsActions.OnClick]
+                .label
+        assertEquals(app.getString(labelRes), label)
     }
 
     private fun composerControlBounds(contentDescriptionRes: Int) =
