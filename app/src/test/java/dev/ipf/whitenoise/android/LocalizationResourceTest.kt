@@ -988,6 +988,8 @@ class LocalizationResourceTest {
                         "attachment_type_code",
                         "attachment_type_audio",
                         "attachment_type_video",
+                        // "Emoji" is the standard German loan word.
+                        "group_image_source_emoji",
                     ),
                 "values-es" to
                     setOf(
@@ -1020,6 +1022,8 @@ class LocalizationResourceTest {
                         "attachment_type_code",
                         "attachment_type_audio",
                         "attachment_type_image",
+                        // "Photos" is the standard French label.
+                        "group_image_source_photos",
                     ),
                 "values-it" to
                     setOf(
@@ -1036,11 +1040,15 @@ class LocalizationResourceTest {
                         "attachment_type_file",
                         // "Video" is also the established Italian event-card term.
                         "nostr_event_type_video",
+                        // "Emoji" is the standard Italian loan word.
+                        "group_image_source_emoji",
                     ),
                 "values-pt" to
                     setOf(
                         // The counted-preview format is punctuation-only here.
                         "media_counted_format",
+                        // "Emoji" is the standard Portuguese loan word.
+                        "group_image_source_emoji",
                     ),
                 "values-ru" to
                     setOf(
@@ -1054,6 +1062,8 @@ class LocalizationResourceTest {
                         // "Video" is the standard Turkish media-type term.
                         "attachment_type_video",
                         "nostr_event_type_video",
+                        // "Emoji" is the standard Turkish loan word.
+                        "group_image_source_emoji",
                     ),
             )
     }

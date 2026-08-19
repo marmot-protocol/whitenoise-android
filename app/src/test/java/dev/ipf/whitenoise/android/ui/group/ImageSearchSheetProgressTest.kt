@@ -45,4 +45,28 @@ class ImageSearchSheetProgressTest {
         }
         composeRule.onNodeWithText(applyLabel).assertIsDisplayed()
     }
+
+    @Test
+    fun emojiEntryUsesTheDedicatedChooserCallback() {
+        var emojiChooserCalls = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ImageSearchSheet(
+                    initialUrl = "",
+                    header = "Edit image",
+                    title = "Test image",
+                    seed = "test",
+                    urlLabel = "Image URL",
+                    applyInFlight = false,
+                    onDismiss = {},
+                    onApply = {},
+                    onPickEmoji = { emojiChooserCalls++ },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Emoji").assertIsDisplayed().performClick()
+
+        composeRule.runOnIdle { assertEquals(1, emojiChooserCalls) }
+    }
 }

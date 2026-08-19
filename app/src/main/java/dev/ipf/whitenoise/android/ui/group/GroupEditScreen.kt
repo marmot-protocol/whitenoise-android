@@ -105,6 +105,7 @@ internal fun GroupEditScreen(
     var description by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.description) }
     var showEmojiPicker by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
     var showImageSearch by remember { mutableStateOf(false) }
+    var showGroupEmojiImagePicker by remember { mutableStateOf(false) }
     var avatarViewerOpen by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var imageSaving by remember { mutableStateOf(false) }
@@ -152,7 +153,10 @@ internal fun GroupEditScreen(
         appState.launchMutation {
             try {
                 val draft = prepare()
-                if (controller.updateGroupImage(draft)) showImageSearch = false
+                if (controller.updateGroupImage(draft)) {
+                    showImageSearch = false
+                    showGroupEmojiImagePicker = false
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -412,7 +416,21 @@ internal fun GroupEditScreen(
                 if (picked == null) updateImage { null } else setPublicAvatarUrl(picked)
             },
             onPickPhoto = { uri -> uploadPublicAvatar(uri) },
+            onPickEmoji = {
+                showImageSearch = false
+                showGroupEmojiImagePicker = true
+            },
             onDismiss = { showImageSearch = false },
+        )
+    }
+
+    if (showGroupEmojiImagePicker) {
+        GroupEmojiImagePickerSheet(
+            applyInFlight = imageSaving || controller.mutationInFlight,
+            recentEmojis = recentEmojiRecentsOwner.recents,
+            onEmojiUsed = recentEmojiRecentsOwner::onEmojiUsed,
+            onApply = { draft -> updateImage { draft } },
+            onDismiss = { if (!imageSaving && !controller.mutationInFlight) showGroupEmojiImagePicker = false },
         )
     }
 

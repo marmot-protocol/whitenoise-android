@@ -899,6 +899,17 @@
     <string name="group_image_search_privacy">Web araması, sorgunuzu ve IP adresinizi DuckDuckGo\'ya ve görsel sunucularına gönderir.</string>
     <string name="group_image_search_apply">Bu görseli kullan</string>
     <string name="group_image_choose_photo">Fotoğraflardan seç</string>
+    <string name="group_image_choose_emoji">Emojiden oluştur</string>
+    <string name="group_image_source_emoji">Emoji</string>
+    <string name="group_image_source_photos">Fotoğraflar</string>
+    <string name="group_image_emoji_title">Emoji grup görseli</string>
+    <string name="group_image_emoji_hint">Bir veya iki emoji seçin. Tüm grup üyeleri aynı oluşturulan görseli görür.</string>
+    <string name="group_image_emoji_private">Grup içinde özel olarak paylaşılır. Davet önizlemeleri genel avatarı kullanmaya devam eder.</string>
+    <string name="group_image_emoji_none_selected">Emoji seçilmedi</string>
+    <string name="group_image_emoji_limit">En fazla iki emoji seçin.</string>
+    <string name="group_image_emoji_unsupported">Bu emoji bu cihazda oluşturulamıyor.</string>
+    <string name="group_image_emoji_preview_description">%1$s ile oluşturulan grup görseli önizlemesi</string>
+    <string name="group_image_emoji_use">Emoji görselini kullan</string>
     <string name="toast_couldnt_upload_group_image">Grup fotoğrafı yüklenemedi.</string>
     <string name="group_image_search_enter_query">Bir arama terimi girin.</string>
     <string name="group_image_search_unavailable">Görsel araması geçici olarak kullanılamıyor.</string>

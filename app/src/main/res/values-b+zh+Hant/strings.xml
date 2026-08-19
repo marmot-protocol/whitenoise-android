@@ -885,6 +885,17 @@
     <string name="group_image_search_privacy">網頁搜尋會將你的查詢和 IP 位址傳送給 DuckDuckGo 和圖片伺服器。</string>
     <string name="group_image_search_apply">使用此圖片</string>
     <string name="group_image_choose_photo">從照片中選擇</string>
+    <string name="group_image_choose_emoji">用表情建立</string>
+    <string name="group_image_source_emoji">表情</string>
+    <string name="group_image_source_photos">照片</string>
+    <string name="group_image_emoji_title">表情群組頭像</string>
+    <string name="group_image_emoji_hint">選擇一個或兩個表情。所有群組成員都會看到同一張產生的圖片。</string>
+    <string name="group_image_emoji_private">僅在群組內私密分享。邀請預覽仍使用公開頭像。</string>
+    <string name="group_image_emoji_none_selected">尚未選擇表情</string>
+    <string name="group_image_emoji_limit">最多選擇兩個表情。</string>
+    <string name="group_image_emoji_unsupported">此裝置無法呈現此表情。</string>
+    <string name="group_image_emoji_preview_description">使用 %1$s 產生的群組頭像預覽</string>
+    <string name="group_image_emoji_use">使用表情頭像</string>
     <string name="toast_couldnt_upload_group_image">無法上傳群組圖片。</string>
     <string name="group_image_search_enter_query">請輸入搜尋關鍵字。</string>
     <string name="group_image_search_unavailable">圖片搜尋暫時無法使用。</string>

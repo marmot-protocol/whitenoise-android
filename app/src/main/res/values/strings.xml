@@ -1165,6 +1165,17 @@
     <string name="group_image_search_privacy">Web search sends your query and IP address to DuckDuckGo and image hosts.</string>
     <string name="group_image_search_apply">Use this image</string>
     <string name="group_image_choose_photo">Choose from photos</string>
+    <string name="group_image_choose_emoji">Create from emoji</string>
+    <string name="group_image_source_emoji">Emoji</string>
+    <string name="group_image_source_photos">Photos</string>
+    <string name="group_image_emoji_title">Emoji group image</string>
+    <string name="group_image_emoji_hint">Choose one or two emoji. The same generated image will be shown to every group member.</string>
+    <string name="group_image_emoji_private">Shared privately inside the group. Invite previews continue using the public avatar.</string>
+    <string name="group_image_emoji_none_selected">No emoji selected</string>
+    <string name="group_image_emoji_limit">Choose at most two emoji.</string>
+    <string name="group_image_emoji_unsupported">This emoji cannot be rendered on this device.</string>
+    <string name="group_image_emoji_preview_description">Generated group image preview using %1$s</string>
+    <string name="group_image_emoji_use">Use emoji image</string>
     <string name="toast_couldnt_upload_group_image">Couldn\'t upload the group photo.</string>
     <string name="group_image_search_enter_query">Enter a search term.</string>
     <string name="group_image_search_unavailable">Image search is temporarily unavailable.</string>

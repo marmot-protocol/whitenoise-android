@@ -899,6 +899,17 @@
     <string name="group_image_search_privacy">La búsqueda web envía tu consulta y dirección IP a DuckDuckGo y a los servidores de imágenes.</string>
     <string name="group_image_search_apply">Usar esta imagen</string>
     <string name="group_image_choose_photo">Elegir de Fotos</string>
+    <string name="group_image_choose_emoji">Crear con emojis</string>
+    <string name="group_image_source_emoji">Emojis</string>
+    <string name="group_image_source_photos">Fotos</string>
+    <string name="group_image_emoji_title">Imagen de grupo con emojis</string>
+    <string name="group_image_emoji_hint">Elige uno o dos emojis. Todos los miembros verán la misma imagen generada.</string>
+    <string name="group_image_emoji_private">Se comparte de forma privada dentro del grupo. Las invitaciones siguen usando el avatar público.</string>
+    <string name="group_image_emoji_none_selected">Ningún emoji seleccionado</string>
+    <string name="group_image_emoji_limit">Elige como máximo dos emojis.</string>
+    <string name="group_image_emoji_unsupported">Este emoji no se puede representar en este dispositivo.</string>
+    <string name="group_image_emoji_preview_description">Vista previa de la imagen de grupo generada con %1$s</string>
+    <string name="group_image_emoji_use">Usar imagen con emojis</string>
     <string name="toast_couldnt_upload_group_image">No se pudo subir la foto del grupo.</string>
     <string name="group_image_search_enter_query">Introduce un término de búsqueda.</string>
     <string name="group_image_search_unavailable">La búsqueda de imágenes no está disponible temporalmente.</string>

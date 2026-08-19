@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.group
 
 import android.content.Context
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -15,12 +16,17 @@ import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -44,8 +50,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h1200dp-mdpi")
 class GroupEditNameEmojiPickerTest {
     @get:Rule
@@ -121,6 +129,32 @@ class GroupEditNameEmojiPickerTest {
         assertFalse(groupNameEmojiEditable(canEdit = true, saving = false, mutationInFlight = true))
     }
 
+    @Test
+    fun actualGroupInfoImageEntryOpensEmojiBuilderAndDismissPreservesName() {
+        render(admin = true)
+        val draftName = "Marmot launch"
+        composeRule
+            .onNode(hasSetTextAction() and hasText("Marmot team"))
+            .performTextReplacement(draftName)
+
+        composeRule
+            .onNode(
+                hasOnClickLabel(string(R.string.group_image_search_set)) and
+                    SemanticsMatcher.keyNotDefined(SemanticsProperties.Text),
+            ).performClick()
+        composeRule.onNodeWithText(string(R.string.group_image_source_emoji)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.group_image_choose_emoji)).assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_info_emoji_image_entry_light.png")
+        composeRule.onNodeWithText(string(R.string.group_image_source_emoji)).performClick()
+        composeRule.onNodeWithTag(GROUP_EMOJI_IMAGE_PICKER_TAG).assertIsDisplayed()
+
+        composeRule
+            .onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss))
+            .performSemanticsAction(SemanticsActions.Dismiss)
+        composeRule.onNodeWithTag(GROUP_EMOJI_IMAGE_PICKER_TAG).assertDoesNotExist()
+        composeRule.onNode(hasSetTextAction() and hasText(draftName)).assertExists()
+    }
+
     private fun render(admin: Boolean) {
         val appState = appState()
         composeRule.setContent {
@@ -141,6 +175,12 @@ class GroupEditNameEmojiPickerTest {
     }
 
     private fun string(res: Int): String = context.getString(res)
+
+    private fun hasOnClickLabel(label: String): SemanticsMatcher =
+        SemanticsMatcher("has click label '$label'") {
+            it.config.contains(SemanticsActions.OnClick) &&
+                it.config[SemanticsActions.OnClick].label == label
+        }
 
     private fun appState() =
         WhiteNoiseAppState(

@@ -19,6 +19,8 @@ import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -29,6 +31,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
@@ -39,6 +42,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupSetupScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.newGroupDetailsEditable
 import dev.ipf.whitenoise.android.ui.chats.newchat.submittedNewGroupName
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
+import dev.ipf.whitenoise.android.ui.group.GROUP_EMOJI_IMAGE_PICKER_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -48,8 +52,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 class NewGroupNameEmojiPickerTest {
     @get:Rule
@@ -234,6 +240,26 @@ class NewGroupNameEmojiPickerTest {
         assertFalse(newGroupDetailsEditable(retryGroupIdHex = null, busy = false, imagePreparing = true))
     }
 
+    @Test
+    fun actualNewGroupImageEntryOpensEmojiBuilderAndDismissPreservesName() {
+        renderScreen()
+        val draftName = "Team launch"
+        composeRule.onNode(hasSetTextAction()).performTextReplacement(draftName)
+
+        composeRule.onNode(hasOnClickLabel(string(R.string.group_image_search_set))).performClick()
+        composeRule.onNodeWithText(string(R.string.group_image_source_emoji)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.group_image_choose_emoji)).assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/new_group_emoji_image_entry_light.png")
+        composeRule.onNodeWithText(string(R.string.group_image_source_emoji)).performClick()
+        composeRule.onNodeWithTag(GROUP_EMOJI_IMAGE_PICKER_TAG).assertIsDisplayed()
+
+        composeRule
+            .onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss))
+            .performSemanticsAction(SemanticsActions.Dismiss)
+        composeRule.onNodeWithTag(GROUP_EMOJI_IMAGE_PICKER_TAG).assertDoesNotExist()
+        composeRule.onNode(hasSetTextAction() and hasText(draftName)).assertExists()
+    }
+
     private fun waitForEmoji(emoji: String) {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText(emoji).fetchSemanticsNodes().isNotEmpty()
@@ -270,6 +296,12 @@ class NewGroupNameEmojiPickerTest {
     }
 
     private fun string(res: Int): String = context.getString(res)
+
+    private fun hasOnClickLabel(label: String): SemanticsMatcher =
+        SemanticsMatcher("has click label '$label'") {
+            it.config.contains(SemanticsActions.OnClick) &&
+                it.config[SemanticsActions.OnClick].label == label
+        }
 
     private fun appState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
