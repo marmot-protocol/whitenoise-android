@@ -60,6 +60,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 
 /**
  * Screen-level coverage for the rule that an IME closure is not a composer
@@ -289,6 +290,10 @@ class ConversationImeCollapseFocusTest {
                 projection = cachedProjection(preview),
             )
 
+        // The bubble timestamp renders in the default zone — pin it so the
+        // snapshot matches regardless of the recording machine's locale.
+        val originalTimeZone = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         composeRule.mainClock.autoAdvance = false
         try {
             composeRule.setContent {
@@ -317,6 +322,7 @@ class ConversationImeCollapseFocusTest {
                 .captureRoboImage("src/test/snapshots/$snapshotName.png")
         } finally {
             composeRule.mainClock.autoAdvance = true
+            TimeZone.setDefault(originalTimeZone)
             controller.onCleared()
         }
     }
