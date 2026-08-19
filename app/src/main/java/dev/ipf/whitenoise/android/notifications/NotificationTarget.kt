@@ -201,7 +201,7 @@ internal fun notificationMessagePreloadKey(
         }
 
 /** Rejects a completed read from an older tap, even when the target is identical. */
-internal fun <T> NotificationMessagePreload<T>?.stateFor(key: NotificationMessagePreloadKey?): NotificationMessagePreloadState<T>? =
+internal fun <T> NotificationMessagePreload<T>?.stateFor(key: NotificationMessagePreloadKey?) =
     if (this != null && key != null && this.key == key) {
         state
     } else {
