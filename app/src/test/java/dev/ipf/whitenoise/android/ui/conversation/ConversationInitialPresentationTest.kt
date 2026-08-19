@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -44,6 +46,56 @@ class ConversationInitialPresentationTest {
         assertTrue(seededConversationTailListIndex(1) == 2)
         assertTrue(seededConversationTailListIndex(4) == 5)
     }
+
+    @Test
+    fun seededTailAnchorRetriesASupersededFollowAcrossFrames() =
+        runTest {
+            var attempts = 0
+            var frames = 0
+            val positioned =
+                reconcileSeededTailAnchor(
+                    followTail = { ++attempts >= 3 },
+                    isFollowingTail = { true },
+                    awaitFrame = { frames++ },
+                )
+            assertTrue(positioned)
+            assertEquals(3, attempts)
+            assertEquals(2, frames)
+        }
+
+    @Test
+    fun seededTailAnchorYieldsToChangedNavigationIntent() =
+        runTest {
+            var attempts = 0
+            val positioned =
+                reconcileSeededTailAnchor(
+                    followTail = {
+                        attempts++
+                        false
+                    },
+                    isFollowingTail = { false },
+                    awaitFrame = { },
+                )
+            assertFalse(positioned)
+            assertEquals(1, attempts)
+        }
+
+    @Test
+    fun seededTailAnchorNeverWedgesTheRevealOnPersistentRefusal() =
+        runTest {
+            var attempts = 0
+            val positioned =
+                reconcileSeededTailAnchor(
+                    followTail = {
+                        attempts++
+                        false
+                    },
+                    isFollowingTail = { true },
+                    awaitFrame = { },
+                )
+            assertFalse(positioned)
+            assertEquals(SEEDED_TAIL_ANCHOR_MAX_ATTEMPTS, attempts)
+        }
 
     private fun reveal(
         unread: Int = 0,

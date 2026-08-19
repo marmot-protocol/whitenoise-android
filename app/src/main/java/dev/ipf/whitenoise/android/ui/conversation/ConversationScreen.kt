@@ -1789,8 +1789,9 @@ internal fun ConversationScreen(
         onReconciled = { latestId ->
             navigationState.seedTailAwaitingAuthoritative = false
             navigationState.lastFollowedLatestId = latestId
-            // The tail scroll has run; reveal the positioned transcript now so a
-            // direct open never shows the pre-scroll oldest-rows frame.
+            // The list is positioned — at the tail, or wherever a superseding
+            // navigation moved it — so the reveal no longer risks the
+            // pre-scroll oldest-rows frame.
             initialTimelineAnchored = true
         },
     )

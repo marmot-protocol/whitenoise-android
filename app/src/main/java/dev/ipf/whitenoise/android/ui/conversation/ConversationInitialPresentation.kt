@@ -111,9 +111,15 @@ internal fun SeededConversationAuthoritativeReconciliationEffect(
         if (!awaitingAuthoritativeTimeline || !authoritativeTimelinePublished) return@LaunchedEffect
         val latestId = renderedTimeline.lastOrNull()?.id
         if (latestId != null) {
-            scrollCoordinator.followTailIfAllowed(
-                resolveTailIndex = { tailIndex },
-                reason = ConversationScrollReason.InitialAnchor,
+            reconcileSeededTailAnchor(
+                followTail = {
+                    scrollCoordinator.followTailIfAllowed(
+                        resolveTailIndex = { tailIndex },
+                        reason = ConversationScrollReason.InitialAnchor,
+                    )
+                },
+                isFollowingTail = { scrollCoordinator.isFollowingTail },
+                awaitFrame = { withFrameNanos { } },
             )
         }
         // Mutating this effect's key cancels the current coroutine. Commit only
@@ -121,6 +127,29 @@ internal fun SeededConversationAuthoritativeReconciliationEffect(
         onReconciled(latestId)
     }
 }
+
+/**
+ * Positions the tail before the seeded transcript is revealed. A refused
+ * follow while the coordinator still owns the tail is a superseded command —
+ * retry across frames. A refusal because tail-following ended means another
+ * navigation owns the position, so reveal there instead of forcing the tail.
+ * Attempts stay bounded so reconciliation can never wedge the reveal.
+ */
+internal suspend fun reconcileSeededTailAnchor(
+    followTail: suspend () -> Boolean,
+    isFollowingTail: () -> Boolean,
+    awaitFrame: suspend () -> Unit,
+    maxAttempts: Int = SEEDED_TAIL_ANCHOR_MAX_ATTEMPTS,
+): Boolean {
+    repeat(maxAttempts.coerceAtLeast(1)) {
+        if (followTail()) return true
+        if (!isFollowingTail()) return false
+        awaitFrame()
+    }
+    return false
+}
+
+internal const val SEEDED_TAIL_ANCHOR_MAX_ATTEMPTS = 8
 
 /**
  * Residual loading feedback for genuinely uncached or deliberately hidden
