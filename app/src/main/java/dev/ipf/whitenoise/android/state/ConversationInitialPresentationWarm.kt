@@ -14,7 +14,14 @@ internal fun initialPresentationProfileSenders(
 ): List<String> {
     if (maxProfiles <= 0) return emptyList()
     val senders = linkedSetOf<String>()
-    for (record in records.asReversed()) {
+    // Page order is a transport detail — rank by the timeline key instead, so
+    // a wrong-direction or unsorted page cannot silently warm the oldest rows.
+    val newestFirst =
+        records.sortedWith(
+            compareByDescending<TimelineMessageRecordFfi> { it.timelineAt }
+                .thenByDescending { it.messageIdHex },
+        )
+    for (record in newestFirst) {
         if (record.sender.isNotBlank()) senders += record.sender
         record.replyPreview
             ?.sender

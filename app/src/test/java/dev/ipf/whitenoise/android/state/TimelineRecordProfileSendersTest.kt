@@ -45,6 +45,7 @@ class TimelineRecordProfileSendersTest {
         sender: String,
         replyPreview: TimelineReplyPreviewFfi? = null,
         reactionSenders: List<String> = emptyList(),
+        timelineAt: ULong = 0uL,
     ) = TimelineMessageRecordFfi(
         messageIdHex = id,
         sourceMessageIdHex = id,
@@ -55,7 +56,7 @@ class TimelineRecordProfileSendersTest {
         contentTokens = emptyDoc(),
         kind = 9uL,
         tags = emptyList(),
-        timelineAt = 0uL,
+        timelineAt = timelineAt,
         receivedAt = 0uL,
         replyToMessageIdHex = replyPreview?.messageIdHex,
         replyPreview = replyPreview,
@@ -88,6 +89,21 @@ class TimelineRecordProfileSendersTest {
         assertEquals(
             listOf("carol", "dave", "bob"),
             initialPresentationProfileSenders(records, maxProfiles = 3),
+        )
+    }
+
+    @Test
+    fun initialPresentationWarmRanksByTimelineTimeNotPageOrder() {
+        val records =
+            listOf(
+                record("m9", sender = "newest", timelineAt = 9uL),
+                record("m1", sender = "oldest", timelineAt = 1uL),
+                record("m5", sender = "middle", timelineAt = 5uL),
+            )
+
+        assertEquals(
+            listOf("newest", "middle"),
+            initialPresentationProfileSenders(records, maxProfiles = 2),
         )
     }
 
