@@ -532,8 +532,8 @@ private fun recordPendingPushWakeCatchUp(context: Context) {
     }
 }
 
-private object BackgroundConnectionNotification {
-    private const val CHANNEL_ID = "whitenoise.background_connection.v1"
+internal object BackgroundConnectionNotification {
+    internal const val CHANNEL_ID = "whitenoise.background_connection.v1"
 
     @Volatile
     private var channelEnsured = false

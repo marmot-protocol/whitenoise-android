@@ -24,35 +24,71 @@ enum class NotificationChannelSpec(
     val id: String,
     val importance: ChannelImportance,
     internal val conversationPolicy: ConversationChannelPolicy,
+    val launcherBadgeByDefault: Boolean,
 ) {
     /** 1:1 conversation messages. */
-    DIRECT_MESSAGES("messages_dm", ChannelImportance.HIGH, ConversationChannelPolicy.REQUIRED_CHILD),
+    DIRECT_MESSAGES(
+        "messages_dm",
+        ChannelImportance.HIGH,
+        ConversationChannelPolicy.REQUIRED_CHILD,
+        launcherBadgeByDefault = true,
+    ),
 
     /** Group conversation messages. */
-    GROUP_MESSAGES("messages_group", ChannelImportance.HIGH, ConversationChannelPolicy.REQUIRED_CHILD),
+    GROUP_MESSAGES(
+        "messages_group",
+        ChannelImportance.HIGH,
+        ConversationChannelPolicy.REQUIRED_CHILD,
+        launcherBadgeByDefault = true,
+    ),
 
     /**
      * Messages that mention the local user. High importance and routed ahead of
      * the DM/group split so the highest-signal unread can be muted and surfaced
      * independently of ordinary conversation traffic.
      */
-    MENTIONS("mentions", ChannelImportance.HIGH, ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE),
+    MENTIONS(
+        "mentions",
+        ChannelImportance.HIGH,
+        ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE,
+        launcherBadgeByDefault = true,
+    ),
 
     /**
      * Reactions to the local user's messages, on their own channel so they can
      * be muted independently. High importance so a reaction heads-up like a
      * message.
      */
-    REACTIONS("reactions_v2", ChannelImportance.HIGH, ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE),
+    REACTIONS(
+        "reactions_v2",
+        ChannelImportance.HIGH,
+        ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE,
+        launcherBadgeByDefault = false,
+    ),
 
     /** Welcomes and group-join events. High importance so an invite heads-up. */
-    INVITES("invites_v2", ChannelImportance.HIGH, ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE),
+    INVITES(
+        "invites_v2",
+        ChannelImportance.HIGH,
+        ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE,
+        launcherBadgeByDefault = false,
+    ),
 
     /** Agent tool progress and status updates. Visible but silent by default. */
-    AGENT_ACTIVITY("agent_activity_v1", ChannelImportance.LOW, ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE),
+    AGENT_ACTIVITY(
+        "agent_activity_v1",
+        ChannelImportance.LOW,
+        ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE,
+        launcherBadgeByDefault = false,
+    ),
 
     /** Zapstore app-update availability notices. Low importance: visible, no buzz. */
-    APP_UPDATES("app_updates_v1", ChannelImportance.LOW, ConversationChannelPolicy.GLOBAL_ONLY),
+    APP_UPDATES(
+        "app_updates_v1",
+        ChannelImportance.LOW,
+        ConversationChannelPolicy.GLOBAL_ONLY,
+        launcherBadgeByDefault = false,
+    ),
     ;
 
     companion object {
