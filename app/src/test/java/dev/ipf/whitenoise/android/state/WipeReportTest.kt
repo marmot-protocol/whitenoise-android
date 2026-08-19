@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.GroupLeaveFailureFfi
 import dev.ipf.marmotkit.LocalCleanupReportFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.RelayFailureFfi
 import dev.ipf.marmotkit.SignOutOutcomeFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
@@ -163,11 +164,12 @@ class SignOutCompletionTest {
     private fun signOutOutcomeFfi(
         keyPackagesDeleted: UInt = 0u,
         keyPackageFailures: List<RelayFailureFfi> = emptyList(),
+        localCompleted: Boolean = true,
     ): SignOutOutcomeFfi =
         SignOutOutcomeFfi(
             keyPackagesDeleted = keyPackagesDeleted,
             keyPackageFailures = keyPackageFailures,
-            localCleanup = LocalCleanupReportFfi(completed = true, reason = null),
+            localCleanup = LocalCleanupReportFfi(completed = localCompleted, reason = null),
         )
 
     @Test
@@ -191,5 +193,28 @@ class SignOutCompletionTest {
                 keyPackageFailures = listOf(RelayFailureFfi(eventIdHex = "ee".repeat(32), reason = "timeout")),
             )
         assertEquals(SignOutCompletion.RelayCleanupIncomplete, signOutCompletion(outcome))
+    }
+
+    @Test
+    fun unfinishedEngineTeardownFlagsIncompleteCleanup() {
+        // The engine records a failed account-worker teardown in the outcome
+        // instead of throwing; zero relay failures must not read as Complete.
+        assertEquals(
+            SignOutCompletion.RelayCleanupIncomplete,
+            signOutCompletion(signOutOutcomeFfi(keyPackagesDeleted = 2u, localCompleted = false)),
+        )
+    }
+
+    @Test
+    fun missingKeyMaterialReadsAsAccountRemovalRejection() {
+        assertTrue(accountRemovalRejected(MarmotKitException.SecretNotFound("no local secret")))
+        assertTrue(accountRemovalRejected(MarmotKitException.ExternalSignerUnavailable("aa".repeat(32))))
+        assertTrue(accountRemovalRejected(MarmotKitException.ExternalSignerRejected()))
+    }
+
+    @Test
+    fun transientFailuresAreNotAccountRemovalRejections() {
+        assertFalse(accountRemovalRejected(RuntimeException("relay unreachable")))
+        assertFalse(accountRemovalRejected(MarmotKitException.RuntimeStopping()))
     }
 }

@@ -139,6 +139,49 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
+    fun rejectedSignOutReturnsBeforeAnyLocalTeardown() {
+        val body = appStateFunctionBody("signOutActiveAccount")
+        val engineCallIndex = body.indexOf("signOut(signedOutRef, deleteKeyPackages)")
+        val rejectionReturnIndex = body.indexOf("return SignOutCompletion.AccountRemovalRejected")
+        val teardownIndexes =
+            listOf(
+                body.indexOf("clearInMemoryMediaCaches()"),
+                body.indexOf("AvatarImageLoader.clear()"),
+                body.indexOf("clearCrossAccountCaches()"),
+                body.indexOf("clearConversationShortcutSurfaces()"),
+                body.indexOf("recordPendingDisable(signedOutRef)"),
+            )
+
+        assertTrue(
+            "the engine verdict must precede the rejection branch",
+            engineCallIndex >= 0 && rejectionReturnIndex > engineCallIndex,
+        )
+        assertTrue(
+            "an engine-rejected sign-out must return before any cache eviction or push disable",
+            teardownIndexes.all { it > rejectionReturnIndex },
+        )
+    }
+
+    @Test
+    fun rejectedSignOutCompletionPresentsTheDedicatedFailureString() {
+        val source =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt"),
+            ).firstOrNull { it.exists() }
+                ?.readText()
+                ?: error("Missing AccountKeysScreen.kt source file")
+
+        assertTrue(
+            "an engine-rejected sign-out must present the dedicated failure string, not the relay-cleanup toast",
+            Regex(
+                """SignOutCompletion\.AccountRemovalRejected\s*->\s*""" +
+                    """appState\.present\(R\.string\.toast_couldnt_sign_out\)""",
+            ).containsMatchIn(source),
+        )
+    }
+
+    @Test
     fun retentionSweepRoutesThroughEngineAccountWorker() {
         val body = appStateFunctionBody("runRetentionSweep")
 
@@ -265,7 +308,7 @@ class AppStateSendLockCoverageTest {
 
         assertTrue(
             "Marmot runtime is written on IO and read off-mutex, so visibility must be explicit",
-            Regex("""@Volatile\s+private\s+var\s+marmotRuntime:\s*AppMarmotRuntime\?""").containsMatchIn(source),
+            Regex("""@Volatile\s+internal\s+var\s+marmotRuntime:\s*AppMarmotRuntime\?""").containsMatchIn(source),
         )
     }
 

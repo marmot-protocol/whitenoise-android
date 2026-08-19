@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SignOutOutcomeFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
@@ -103,28 +104,52 @@ internal fun wipeReport(outcome: WipeOutcomeFfi): WipeReport =
 internal fun shortWipeSubject(hex: String): String = if (hex.length <= 12) hex else "${hex.take(12)}…"
 
 /**
- * How a non-destructive sign-out ended (#349). Local sign-out always
- * completes; this only distinguishes whether the engine's relay-side
- * KeyPackage cleanup finished.
+ * How a non-destructive sign-out ended (#349). Unless the engine rejected the
+ * account outright, local sign-out completes and this distinguishes whether
+ * the engine's relay-side KeyPackage cleanup finished.
  */
 enum class SignOutCompletion {
     /** Engine sign-out succeeded with no relay cleanup failures. */
     Complete,
 
     /**
-     * The engine call failed outright, or reported per-relay KeyPackage
-     * cleanup failures. The session is still signed out locally, but MDK does
-     * not retain a remote-deletion retry queue after this call.
+     * The engine call failed transiently, or its outcome reported per-relay
+     * KeyPackage cleanup failures or an unfinished engine-side account
+     * teardown. The session is still signed out locally, but MDK does not
+     * retain a retry queue for any of that cleanup after this call.
      */
     RelayCleanupIncomplete,
+
+    /**
+     * The engine refused to deactivate the account, so nothing was signed out
+     * — locally or remotely. The session stays fully active: no caches were
+     * evicted and the active account did not change.
+     */
+    AccountRemovalRejected,
 }
 
 /**
+ * True when the engine refused the sign-out outright and kept the account
+ * active — it holds no key material for the account, no registered external
+ * signer could stand in, or the user denied the signer prompt. Distinct from
+ * transient relay or runtime failures, after which local sign-out still
+ * proceeds.
+ */
+internal fun accountRemovalRejected(failure: Throwable): Boolean =
+    failure is MarmotKitException.SecretNotFound ||
+        failure is MarmotKitException.ExternalSignerUnavailable ||
+        failure is MarmotKitException.ExternalSignerRejected
+
+/**
  * Map the engine sign-out outcome (null when the FFI call itself failed) to
- * the completion the UI toasts about.
+ * the completion the UI toasts about. An outcome whose engine-side teardown
+ * did not finish is not a clean completion even with zero relay failures.
  */
 internal fun signOutCompletion(engineOutcome: SignOutOutcomeFfi?): SignOutCompletion =
-    if (engineOutcome == null || engineOutcome.keyPackageFailures.isNotEmpty()) {
+    if (engineOutcome == null ||
+        engineOutcome.keyPackageFailures.isNotEmpty() ||
+        !engineOutcome.localCleanup.completed
+    ) {
         SignOutCompletion.RelayCleanupIncomplete
     } else {
         SignOutCompletion.Complete

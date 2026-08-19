@@ -455,6 +455,10 @@ internal fun AccountKeysScreen(
                             // does not retain a retry queue for the deletions.
                             SignOutCompletion.RelayCleanupIncomplete ->
                                 appState.present(R.string.toast_signed_out_relay_cleanup_incomplete)
+                            // The engine kept the account active; nothing was
+                            // signed out, so the failure must read as one.
+                            SignOutCompletion.AccountRemovalRejected ->
+                                appState.present(R.string.toast_couldnt_sign_out)
                             null -> Unit
                         }
                     } finally {

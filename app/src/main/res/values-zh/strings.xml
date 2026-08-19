@@ -1086,6 +1086,7 @@
     <string name="sign_out_delete_key_packages_label">从中继删除密钥包</string>
     <string name="sign_out_delete_key_packages_help">防止陌生人在你退出登录期间邀请你加入新群组。</string>
     <string name="toast_signed_out_relay_cleanup_incomplete">已在本地退出登录，但中继上的密钥包清理未完全完成。</string>
+    <string name="toast_couldnt_sign_out">无法退出登录。账户在此设备上仍处于启用状态。</string>
     <string name="wipe_progress_title">正在退出登录并清除…</string>
     <string name="wipe_stage_leaving_groups">正在退出群组…</string>
     <string name="wipe_stage_deleting_key_packages">正在删除密钥包…</string>

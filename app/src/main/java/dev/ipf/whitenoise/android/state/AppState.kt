@@ -1720,7 +1720,7 @@ class WhiteNoiseAppState private constructor(
         )
 
     @Volatile
-    private var marmotRuntime: AppMarmotRuntime? = null
+    internal var marmotRuntime: AppMarmotRuntime? = null
 
     private val bootstrapAttempts = BootstrapAttemptCoordinator()
     private val bootstrapRuntime = BootstrapRuntimeCoordinator<AppMarmotRuntime>()
@@ -5192,14 +5192,58 @@ class WhiteNoiseAppState private constructor(
      * only the local UI bookkeeping: media-cache wipe, active-account
      * switch/navigation, and notification settings refresh.
      *
-     * An engine failure (relay unreachable, runtime error) must not strand
-     * the user in a session they asked to leave: local sign-out still
+     * A transient engine failure (relay unreachable, runtime error) must not
+     * strand the user in a session they asked to leave: local sign-out still
      * completes and the result is [SignOutCompletion.RelayCleanupIncomplete]
      * so the caller can report that the best-effort relay cleanup did not
-     * fully finish.
+     * fully finish. An outright engine rejection is different — the engine
+     * kept the account active, so nothing is torn down locally either and the
+     * result is [SignOutCompletion.AccountRemovalRejected].
      * Returns null only when no account is active.
      */
+    @Suppress("LongMethod", "ReturnCount")
+    // Three exits by design: no active account, an engine rejection that keeps
+    // the session untouched, and the local sign-out tail.
     suspend fun signOutActiveAccount(deleteKeyPackages: Boolean = true): SignOutCompletion? {
+        val signedOutRef = activeAccountRef ?: return null
+        // The engine call runs before any local teardown: a rejected sign-out
+        // keeps the session in use, so no cache may be evicted and no account
+        // switched until the engine's verdict is known.
+        val engineResult =
+            runCatchingCancellable {
+                marmotIo { signOut(signedOutRef, deleteKeyPackages) }
+            }
+        val engineFailure = engineResult.exceptionOrNull()
+        if (engineFailure != null) {
+            appStateDebug(engineFailure) {
+                "signOut failed account=${signedOutRef.take(8)}: ${engineFailure.readableMessage()}"
+            }
+            if (accountRemovalRejected(engineFailure)) {
+                // The engine kept the account active — nothing was signed out,
+                // locally or remotely. Leave the session untouched so the
+                // caller can report the failure plainly.
+                return SignOutCompletion.AccountRemovalRejected
+            }
+            // The engine never deactivated the account, so queue a push
+            // disable for the next foreground sync. MDK's relay-side
+            // KeyPackage cleanup is final for this call and is not queued.
+            pushTokenStore.recordPendingDisable(signedOutRef)
+        } else if (engineResult.getOrNull()?.localCleanup?.completed == true) {
+            // The engine deactivated the account (including its push
+            // registration), so any disable retry queued by an older
+            // per-step sign-out attempt is moot. Drop the local push
+            // fingerprint too: server-side registration state changed
+            // underneath the cache, and a stale hit would make a later
+            // re-sign-in skip the re-registration it needs.
+            pushTokenStore.clearPendingDisable(signedOutRef)
+            nativePushSyncMutex.withLock { perAccountSyncedFingerprints.remove(signedOutRef) }
+        } else {
+            // The call returned, but the engine's own teardown did not finish
+            // — the push registration may still be live, so keep a disable
+            // queued for the next foreground sync.
+            pushTokenStore.recordPendingDisable(signedOutRef)
+        }
+        val engineOutcome = engineResult.getOrNull()
         // Sign-out is a non-destructive session switch: the identity stays in
         // the device keychain and the user can switch back to it. Per-account
         // state that the user would expect to find on return (drafts, recent
@@ -5214,33 +5258,13 @@ class WhiteNoiseAppState private constructor(
         //
         // In-memory plaintext is dropped synchronously here; the on-disk wipe
         // is awaited in this suspend path so it isn't an orphaned background task.
-        val signedOutRef = activeAccountRef ?: return null
         stopTtsForRemovedAccount(signedOutRef)
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
         clearConversationShortcutSurfaces()
-        // The account is signed out engine-side once this returns; no code
-        // below may issue further account-scoped FFI calls for signedOutRef.
-        val engineOutcome =
-            runCatchingCancellable {
-                marmotIo { signOut(signedOutRef, deleteKeyPackages) }
-            }.onSuccess {
-                // The engine deactivated the account (including its push
-                // registration), so any disable retry queued by an older
-                // per-step sign-out attempt is moot. Drop the local push
-                // fingerprint too: server-side registration state changed
-                // underneath the cache, and a stale hit would make a later
-                // re-sign-in skip the re-registration it needs.
-                pushTokenStore.clearPendingDisable(signedOutRef)
-                nativePushSyncMutex.withLock { perAccountSyncedFingerprints.remove(signedOutRef) }
-            }.onFailure {
-                appStateDebug(it) { "signOut failed account=${signedOutRef.take(8)}: ${it.readableMessage()}" }
-                // The engine never deactivated the account, so queue a push
-                // disable for the next foreground sync. MDK's relay-side
-                // KeyPackage cleanup is final for this call and is not queued.
-                pushTokenStore.recordPendingDisable(signedOutRef)
-            }.getOrNull()
+        // The account is signed out engine-side; no code below may issue
+        // further account-scoped FFI calls for signedOutRef.
         clearContactPrivateDetailsForAccount(signedOutRef)
         refreshAccounts()
         val outcome = signOutOutcome(accounts.map { it.label }, signedOutRef)
