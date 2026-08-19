@@ -1439,7 +1439,16 @@ internal fun MainShell(
         pendingConversationOpen?.takeIf { request ->
             pendingConversationOpenBelongsToAccount(request.accountRef, appState.activeAccountRef)
         }
-    val controllerChat = selectedChat ?: accountOwnedPendingConversationOpen?.item ?: exitingConversationChat
+    // The pending leg is already account-gated; the selected/exiting legs are not,
+    // and the account-change nav reset clears them only a frame later — so during an
+    // account switch or the wipe transient-null they could otherwise build a
+    // controller seeded with the previous account's decrypted preview. Drop them
+    // until the shell's remembered account matches the live one.
+    val navAccountStable = previousActiveAccountRef == appState.activeAccountRef
+    val controllerChat =
+        selectedChat?.takeIf { navAccountStable }
+            ?: accountOwnedPendingConversationOpen?.item
+            ?: exitingConversationChat?.takeIf { navAccountStable }
     val conversationController =
         controllerChat?.let { openChat ->
             remember(openChat.id, conversationAccountRef, appState.runtimeGeneration) {
