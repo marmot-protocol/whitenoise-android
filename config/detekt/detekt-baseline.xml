@@ -55,9 +55,11 @@
     <ID>CyclomaticComplexMethod:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ConversationScreen</ID>
     <ID>CyclomaticComplexMethod:DiskByteCache.kt:DiskByteCache$fun put</ID>
     <ID>CyclomaticComplexMethod:DiskByteCache.kt:DiskByteCache$private fun buildHydratedIndex: HydratedIndex</ID>
+    <ID>CyclomaticComplexMethod:EmojiPicker.kt:@Composable internal fun EmojiPickerContent</ID>
     <ID>CyclomaticComplexMethod:EmojiPicker.kt:@Composable private fun EmojiPickerContent</ID>
     <ID>CyclomaticComplexMethod:GroupDetailsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupDetailsScreen</ID>
     <ID>CyclomaticComplexMethod:GroupEditScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupEditScreen</ID>
+    <ID>CyclomaticComplexMethod:GroupEmojiImagePicker.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupEmojiImagePickerSheet</ID>
     <ID>CyclomaticComplexMethod:GroupImageSearch.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ImageSearchSheet</ID>
     <ID>CyclomaticComplexMethod:GroupSystemEvents.kt:GroupSystemEvents$fun summary: String</ID>
     <ID>CyclomaticComplexMethod:HostSafety.kt:HostSafety$private fun isPrivateIpv4: Boolean</ID>
@@ -215,6 +217,7 @@
     <ID>FunctionNaming:EditHistory.kt:@Composable internal fun EditHistorySheet</ID>
     <ID>FunctionNaming:EditHistory.kt:@Composable private fun EditHistoryVersionRow</ID>
     <ID>FunctionNaming:EmojiPicker.kt:@Composable internal fun ComposerEmojiPickerPane</ID>
+    <ID>FunctionNaming:EmojiPicker.kt:@Composable internal fun EmojiPickerContent</ID>
     <ID>FunctionNaming:EmojiPicker.kt:@Composable private fun EmojiCategoryRail</ID>
     <ID>FunctionNaming:EmojiPicker.kt:@Composable private fun EmojiPickerContent</ID>
     <ID>FunctionNaming:EmojiPicker.kt:@Composable private fun EmojiRailIconButton</ID>
@@ -234,7 +237,9 @@
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun PushTokenDebugRows</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupDetailsScreen</ID>
     <ID>FunctionNaming:GroupEditScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupEditScreen</ID>
+    <ID>FunctionNaming:GroupEmojiImagePicker.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupEmojiImagePickerSheet</ID>
     <ID>FunctionNaming:GroupImageSearch.kt:@Composable private fun GroupImageSearchTile</ID>
+    <ID>FunctionNaming:GroupImageSearch.kt:@Composable private fun ImageSourceButton</ID>
     <ID>FunctionNaming:GroupImageSearch.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ImageSearchSheet</ID>
     <ID>FunctionNaming:GroupMembers.kt:@Composable internal fun GroupMemberIdentityRows</ID>
     <ID>FunctionNaming:GroupMembers.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun SoleAdminDeletePicker</ID>
@@ -456,12 +461,14 @@
     <ID>LongMethod:DonateScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DonateScreen</ID>
     <ID>LongMethod:EditHistory.kt:@Composable internal fun EditHistorySheet</ID>
     <ID>LongMethod:EditHistory.kt:@Composable private fun EditHistoryVersionRow</ID>
+    <ID>LongMethod:EmojiPicker.kt:@Composable internal fun EmojiPickerContent</ID>
     <ID>LongMethod:EmojiPicker.kt:@Composable private fun EmojiPickerContent</ID>
     <ID>LongMethod:EmojiPicker.kt:@Composable private fun EmojiSearchField</ID>
     <ID>LongMethod:GroupDetailsScreen.kt:@Composable internal fun GroupDetailsHeader</ID>
     <ID>LongMethod:GroupDetailsScreen.kt:@Composable private fun PushDeliveryDebugSection</ID>
     <ID>LongMethod:GroupDetailsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupDetailsScreen</ID>
     <ID>LongMethod:GroupEditScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupEditScreen</ID>
+    <ID>LongMethod:GroupEmojiImagePicker.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupEmojiImagePickerSheet</ID>
     <ID>LongMethod:GroupImageSearch.kt:@Composable private fun GroupImageSearchTile</ID>
     <ID>LongMethod:GroupImageSearch.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ImageSearchSheet</ID>
     <ID>LongMethod:GroupMembers.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun TransferAdminSheet</ID>

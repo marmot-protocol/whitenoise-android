@@ -119,6 +119,30 @@ class GroupEmojiImagePickerTest {
     }
 
     @Test
+    fun rejectedThirdSelectionIsNotRecordedAsRecentEmojiUsage() {
+        val used = mutableListOf<String>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                GroupEmojiImagePickerSheet(
+                    applyInFlight = false,
+                    recentEmojis = listOf("😀", "🚀", "🎉"),
+                    onEmojiUsed = used::add,
+                    onApply = {},
+                    onDismiss = {},
+                    renderer = { GroupEmojiImageRenderer.render(it, hasGlyph = { _, _ -> true }) },
+                )
+            }
+        }
+
+        select("😀")
+        select("🚀")
+        select("🎉")
+        composeRule.onNodeWithText("Choose at most two emoji.").assertIsDisplayed()
+
+        composeRule.runOnIdle { assertEquals(listOf("😀", "🚀"), used) }
+    }
+
+    @Test
     fun unsupportedGlyphExplainsFailureAndKeepsApplyDisabled() {
         composeRule.setContent {
             WhiteNoiseTheme {

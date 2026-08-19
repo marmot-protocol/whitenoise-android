@@ -79,6 +79,10 @@ private sealed interface GroupEmojiImageRenderState {
 
 internal const val GROUP_EMOJI_IMAGE_PICKER_TAG = "group_emoji_image_picker"
 
+// Fraction of the screen the sheet claims, tall enough for the emoji grid
+// while leaving the underlying screen context visible at the top.
+private const val PICKER_SHEET_HEIGHT_FRACTION = 0.92f
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GroupEmojiImagePickerSheet(
@@ -142,7 +146,7 @@ internal fun GroupEmojiImagePickerSheet(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.92f)
+                    .fillMaxHeight(PICKER_SHEET_HEIGHT_FRACTION)
                     .navigationBarsPadding()
                     .imePadding()
                     .testTag(GROUP_EMOJI_IMAGE_PICKER_TAG)
@@ -249,12 +253,15 @@ internal fun GroupEmojiImagePickerSheet(
             EmojiPickerContent(
                 onEmojiPicked = { emoji ->
                     val update = addGroupEmojiSelection(selectedEmojis, emoji)
+                    // Record recent-emoji usage only for accepted picks — a
+                    // rejected third tap or a blank emoji must not pollute the
+                    // shared recents list with something the user never applied.
+                    if (update.emojis.size > selectedEmojis.size) onEmojiUsed(emoji)
                     selectedEmojis = update.emojis
                     limitReached = update.limitReached
                 },
                 purpose = EmojiPickerPurpose.USE,
                 recentEmojis = recentEmojis,
-                onEmojiUsed = onEmojiUsed,
                 searchFieldAlwaysVisible = true,
                 selectionEnabled = !applyInFlight,
                 modifier = Modifier.fillMaxWidth().weight(1f),

@@ -26,13 +26,12 @@ internal data class GroupEmojiSelectionUpdate(
 internal fun addGroupEmojiSelection(
     current: List<String>,
     emoji: String,
-): GroupEmojiSelectionUpdate {
-    if (emoji.isBlank()) return GroupEmojiSelectionUpdate(current, limitReached = false)
-    if (current.size >= GROUP_EMOJI_IMAGE_MAX_SELECTION) {
-        return GroupEmojiSelectionUpdate(current, limitReached = true)
+): GroupEmojiSelectionUpdate =
+    when {
+        emoji.isBlank() -> GroupEmojiSelectionUpdate(current, limitReached = false)
+        current.size >= GROUP_EMOJI_IMAGE_MAX_SELECTION -> GroupEmojiSelectionUpdate(current, limitReached = true)
+        else -> GroupEmojiSelectionUpdate(current + emoji, limitReached = false)
     }
-    return GroupEmojiSelectionUpdate(current + emoji, limitReached = false)
-}
 
 /**
  * Renders catalog-selected emoji into the exact opaque JPEG bytes submitted to
@@ -51,15 +50,12 @@ internal object GroupEmojiImageRenderer {
         emojis: List<String>,
         hasGlyph: (Paint, String) -> Boolean = { paint, emoji -> paint.hasGlyph(emoji) },
     ): ImageUploadDraft {
-        if (emojis.size !in 1..GROUP_EMOJI_IMAGE_MAX_SELECTION || emojis.any(String::isBlank)) {
-            throw GroupEmojiImageException.InvalidSelection
-        }
         val paint =
             Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
                 typeface = Typeface.DEFAULT
                 textAlign = Paint.Align.CENTER
             }
-        if (emojis.any { !hasGlyph(paint, it) }) throw GroupEmojiImageException.UnsupportedGlyph
+        requireRenderable(emojis, paint, hasGlyph)
 
         val bitmap = Bitmap.createBitmap(GROUP_EMOJI_IMAGE_SIZE_PX, GROUP_EMOJI_IMAGE_SIZE_PX, Bitmap.Config.ARGB_8888)
         val encoded =
@@ -67,24 +63,46 @@ internal object GroupEmojiImageRenderer {
                 val canvas = Canvas(bitmap)
                 canvas.drawColor(BACKGROUND_COLOR)
                 when (emojis.size) {
-                    1 -> drawCentered(canvas, paint, emojis.single(), GROUP_EMOJI_IMAGE_SIZE_PX / 2f, ONE_EMOJI_TEXT_SIZE_PX)
+                    1 ->
+                        drawCentered(
+                            canvas,
+                            paint,
+                            emojis.single(),
+                            GROUP_EMOJI_IMAGE_SIZE_PX / 2f,
+                            ONE_EMOJI_TEXT_SIZE_PX,
+                        )
                     else -> {
                         drawCentered(canvas, paint, emojis[0], TWO_EMOJI_FIRST_CENTER_X, TWO_EMOJI_TEXT_SIZE_PX)
                         drawCentered(canvas, paint, emojis[1], TWO_EMOJI_SECOND_CENTER_X, TWO_EMOJI_TEXT_SIZE_PX)
                     }
                 }
-                ByteArrayOutputStream().use { output ->
-                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
-                        throw GroupEmojiImageException.EncodeFailed
-                    }
-                    output.toByteArray()
-                }
+                encodeJpeg(bitmap)
             } finally {
                 bitmap.recycle()
             }
-        if (encoded.isEmpty()) throw GroupEmojiImageException.EncodeFailed
         return GroupImageDraftProcessor.fromBytes(encoded, sourceUrl = null)
     }
+
+    private fun requireRenderable(
+        emojis: List<String>,
+        paint: Paint,
+        hasGlyph: (Paint, String) -> Boolean,
+    ) {
+        if (emojis.size !in 1..GROUP_EMOJI_IMAGE_MAX_SELECTION || emojis.any(String::isBlank)) {
+            throw GroupEmojiImageException.InvalidSelection
+        }
+        if (emojis.any { !hasGlyph(paint, it) }) throw GroupEmojiImageException.UnsupportedGlyph
+    }
+
+    private fun encodeJpeg(bitmap: Bitmap): ByteArray =
+        ByteArrayOutputStream().use { output ->
+            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
+                throw GroupEmojiImageException.EncodeFailed
+            }
+            val encoded = output.toByteArray()
+            if (encoded.isEmpty()) throw GroupEmojiImageException.EncodeFailed
+            encoded
+        }
 
     private fun drawCentered(
         canvas: Canvas,

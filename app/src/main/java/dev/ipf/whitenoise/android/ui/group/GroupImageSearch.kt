@@ -448,27 +448,19 @@ internal fun ImageSearchSheet(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else if (onPickPhoto != null) {
-                    Button(
+                    ImageSourceButton(
+                        label = photoSourceLabel,
+                        accessibilityLabel = resolvedChoosePhotoLabel,
+                        icon = Icons.Default.PhotoLibrary,
+                        enabled = !applyInFlight,
+                        loading = applyInFlight && pendingAction == GroupImageAction.PickPhoto,
                         onClick = {
                             photoPicker.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                             )
                         },
-                        enabled = !applyInFlight,
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (applyInFlight && pendingAction == GroupImageAction.PickPhoto) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                            )
-                        } else {
-                            Icon(Icons.Default.PhotoLibrary, contentDescription = null)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Text(resolvedChoosePhotoLabel)
-                    }
+                    )
                 }
                 OutlinedTextField(
                     value = urlDraft,
