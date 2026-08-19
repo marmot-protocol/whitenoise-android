@@ -1449,8 +1449,18 @@ internal fun MainShell(
     // and the account-change nav reset clears them only a frame later — so during an
     // account switch or the wipe transient-null they could otherwise build a
     // controller seeded with the previous account's decrypted preview. Drop them
-    // until the shell's remembered account matches the live one.
-    val navAccountStable = mainShellAccountContentOwned(previousActiveAccountRef, appState.activeAccountRef)
+    // until the shell's remembered account matches the live one. A notification-
+    // routed early open is the deliberate exception — its content is pinned to
+    // the very account that is arriving, so the flip that lands the pin must not
+    // blank or rebuild the conversation the route just opened.
+    val earlyOpenLandsPinnedAccount =
+        appState.activeAccountRef != null &&
+            notificationEarlyOpenRequestId != 0L &&
+            selectedChatOpenContext.pinnedAccountRef == appState.activeAccountRef &&
+            selectedChatOpenContext.notificationRouteTraceRequestId == notificationEarlyOpenRequestId
+    val navAccountStable =
+        mainShellAccountContentOwned(previousActiveAccountRef, appState.activeAccountRef) ||
+            earlyOpenLandsPinnedAccount
     val controllerChat =
         selectedChat?.takeIf { navAccountStable }
             ?: accountOwnedPendingConversationOpen?.item
