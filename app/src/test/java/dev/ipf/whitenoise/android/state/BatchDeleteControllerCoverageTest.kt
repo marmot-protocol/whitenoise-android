@@ -77,7 +77,10 @@ class BatchDeleteControllerCoverageTest {
     @Test
     fun batchDeleteRetryStateIsScopedToConversationOwnerAndGuardsRecomposition() {
         val conversation = source.conversationScreenSource().readText().replace(Regex("\\s+"), " ")
-        val ownerKeys = "controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration"
+        // The owner account follows the conversation, not the live active ref,
+        // so a notification-routed early open keeps one owner across the
+        // account-switch flip while real owner changes still reset the state.
+        val ownerKeys = "controller, chat.id, conversationAccountRef, appState.runtimeGeneration"
         val cancellationStart = conversation.indexOf("catch (cancellation: CancellationException)")
         val cancellationEnd = conversation.indexOf("finally", cancellationStart)
 

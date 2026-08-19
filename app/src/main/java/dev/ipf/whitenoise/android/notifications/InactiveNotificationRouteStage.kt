@@ -4,6 +4,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 /** Waits only for account-local readiness, not slower process-scope follow-up work. */
 internal suspend fun awaitNotificationAccountActivationBoundary(startActivation: (onLocalReady: () -> Unit) -> Unit) {
@@ -30,31 +31,37 @@ internal fun notificationMessageRouteChatListReady(
  *
  * [CoroutineStart.UNDISPATCHED] guarantees the read is entered before activation
  * begins; the SQLite-backed production read suspends while Marmot services it.
- * The result is published only when [isCurrent] still identifies this exact tap,
- * preventing a late completion from an older or process-recreated route.
+ *
+ * The read's result is handed to [onPreload] the moment it completes — before
+ * activation finishes — so a locally available conversation can open instantly
+ * while the switch settles behind it (#586). Publication happens only when
+ * [isCurrent] still identifies this exact tap, preventing a late completion
+ * from an older or process-recreated route. Activation is always awaited before
+ * returning so the caller's post-activation reconciliation still runs.
  */
 internal suspend fun <T> runInactiveNotificationRouteStage(
     key: NotificationMessagePreloadKey,
     loadTarget: suspend () -> T,
     activateAccount: suspend () -> Unit,
     isCurrent: () -> Boolean,
-): NotificationMessagePreload<T>? =
+    onPreload: (NotificationMessagePreload<T>) -> Unit,
+): Unit =
     coroutineScope {
         val preload =
             async(start = CoroutineStart.UNDISPATCHED) {
                 loadNotificationMessageDirectly(loadTarget)
             }
-        activateAccount()
+        val activation = launch { activateAccount() }
         val outcome = preload.await()
-        if (!isCurrent()) {
-            return@coroutineScope null
+        if (isCurrent()) {
+            val state =
+                when (outcome) {
+                    is NotificationMessageDirectLoadOutcome.OpenConversation ->
+                        NotificationMessagePreloadState.Ready(outcome.item)
+                    NotificationMessageDirectLoadOutcome.AwaitChatList ->
+                        NotificationMessagePreloadState.Failed
+                }
+            onPreload(NotificationMessagePreload(key = key, state = state))
         }
-        val state =
-            when (outcome) {
-                is NotificationMessageDirectLoadOutcome.OpenConversation ->
-                    NotificationMessagePreloadState.Ready(outcome.item)
-                NotificationMessageDirectLoadOutcome.AwaitChatList ->
-                    NotificationMessagePreloadState.Failed
-            }
-        NotificationMessagePreload(key = key, state = state)
+        activation.join()
     }

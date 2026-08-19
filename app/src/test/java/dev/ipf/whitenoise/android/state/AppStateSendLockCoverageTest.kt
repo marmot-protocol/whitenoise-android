@@ -308,7 +308,7 @@ class AppStateSendLockCoverageTest {
 
         assertTrue(
             "same-group account switches must reset anchoring state and cancel effects that capture the old controller",
-            "remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration)" in unreadJumpOwner &&
+            "remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration)" in unreadJumpOwner &&
                 "mutableStateOf(ConversationUnreadJumpState())" in unreadJumpOwner &&
                 "remember(controller, notificationOpenRequestId) { mutableStateOf(false) }" in source &&
                 "val state = remember(controller) { ConversationNavigationState() }" in source &&

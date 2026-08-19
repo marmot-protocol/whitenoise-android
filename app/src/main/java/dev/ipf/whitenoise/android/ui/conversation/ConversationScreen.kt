@@ -501,11 +501,14 @@ internal fun ConversationScreen(
     onTtsTransportBodyClick: (() -> Unit)? = null,
 ) {
     WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
-    LaunchedEffect(chat.id, notificationOpenRequestId) {
-        if (notificationOpenRequestId == 0L) return@LaunchedEffect
-        withFrameNanos { }
-        onFirstFrameCommitted()
-    }
+    // The conversation's own account. Identical to the active account except
+    // during a notification-routed early open (#586), while the switch is
+    // still landing; conversation-scoped state keys and self-identity follow
+    // the conversation, not the in-flight active ref, so the open neither
+    // misattributes "is me" nor resets scroll/selection state when the
+    // active ref catches up.
+    val conversationAccountRef = controller.boundAccountRef
+    val conversationSelfAccountIdHex = controller.boundAccountIdHex
     // Push the global snackbar host above the conversation composer so
     // a toast (e.g. the post-invite-accept confirmation) doesn't
     // overlap and intercept touches on the message input. Resets to
@@ -598,7 +601,7 @@ internal fun ConversationScreen(
             )
         }
     var unreadJumpState by
-        remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+        remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
             mutableStateOf(ConversationUnreadJumpState())
         }
     val scrollCoordinator =
@@ -606,7 +609,7 @@ internal fun ConversationScreen(
             controller,
             listState,
             chat.id,
-            appState.activeAccountRef,
+            conversationAccountRef,
             appState.runtimeGeneration,
         ) {
             ConversationScrollCoordinator(
@@ -660,31 +663,42 @@ internal fun ConversationScreen(
     // composition state deliberately: serializing decrypted message snapshots into
     // Android saved state would extend their lifetime and privacy footprint.
     val selectedMessages =
-        remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+        remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
             mutableStateMapOf<String, BatchMessageSelection>()
         }
     var batchForwardSheetOpen by
-        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+        remember(chat.id, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var batchAttachmentSaveInFlight by
-        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+        remember(chat.id, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var batchInfoSelection by
-        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+        remember(chat.id, conversationAccountRef, appState.runtimeGeneration) {
             mutableStateOf<BatchMessageSelection?>(null)
         }
     var showBatchDeleteConfirm by
-        remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+        remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var batchDeleteInFlight by
-        remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+        remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     val batchDeleteSubmissionGuard =
-        remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+        remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
             BatchDeleteSubmissionGuard()
         }
     var batchDeleteRetryState by
-        remember(controller, chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+        remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
             mutableStateOf<BatchDeleteRetryState?>(null)
         }
     var initialTimelineAnchored by
         remember(controller, notificationOpenRequestId) { mutableStateOf(false) }
+
+    // First-frame completion waits for the initial anchor, not just one frame:
+    // until anchoring commits, the transcript is still transparent, so an
+    // earlier callback would understate readable-conversation latency. Every
+    // open eventually anchors — non-empty timelines via the anchor commit,
+    // empty ones via backfill exhaustion.
+    LaunchedEffect(chat.id, notificationOpenRequestId, initialTimelineAnchored) {
+        if (notificationOpenRequestId == 0L || !initialTimelineAnchored) return@LaunchedEffect
+        withFrameNanos { }
+        onFirstFrameCommitted()
+    }
 
     ConversationTtsAutoReadEffects(
         appState = appState,
@@ -746,7 +760,7 @@ internal fun ConversationScreen(
             renderedTimeline,
             controller.deletedMessageIds,
             controller.editsByTarget,
-            appState.activeAccount?.accountIdHex,
+            conversationSelfAccountIdHex,
             // Moderation capability rides on these; re-snapshot when they move
             // so a promotion/demotion or roster verification is reflected.
             controller.isSelfAdmin,
@@ -841,13 +855,13 @@ internal fun ConversationScreen(
     val dragEdgeThresholdPx = with(dragSelectionDensity) { 56.dp.toPx() }
     val dragMaxScrollStepPx = with(dragSelectionDensity) { 18.dp.toPx() }
     var transcriptWindowTop by
-        remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(0f) }
+        remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(0f) }
     var transcriptHeightPx by
-        remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(0f) }
+        remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(0f) }
     var dragAnchorTimelineId by
-        remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
+        remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
     var dragPointerWindowY by
-        remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<Float?>(null) }
+        remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf<Float?>(null) }
 
     fun currentScrollAnchor(): ConversationScrollAnchor {
         val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
@@ -989,7 +1003,7 @@ internal fun ConversationScreen(
         rememberConversationBatchSelectionUiState(
             selectedMessages = selectedMessages,
             chatId = chat.id,
-            activeAccountRef = appState.activeAccountRef,
+            activeAccountRef = conversationAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
             composerGate = composerGate,
             appState = appState,
@@ -1102,7 +1116,7 @@ internal fun ConversationScreen(
     // oldest first — drives the in-conversation jump-to-mention chip. Mirrors
     // countUnreadIncoming's anchor logic; kind-9 only, matching the engine's
     // mention classification, reusing the #414 per-message detection.
-    val selfAccountIdHex = appState.activeAccount?.accountIdHex
+    val selfAccountIdHex = conversationSelfAccountIdHex
     val mentionDetectionCache = remember(controller, chat.id, selfAccountIdHex) { MentionDetectionCache() }
     val unreadMentionMessageIds by remember(controller, chat.id, selfAccountIdHex, mentionDetectionCache) {
         derivedStateOf {
@@ -1153,7 +1167,7 @@ internal fun ConversationScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val eventCardResolver =
-        remember(controller, appState, appState.activeAccountRef, appState.runtimeGeneration) {
+        remember(controller, appState, conversationAccountRef, appState.runtimeGeneration) {
             NostrEventCardResolver(
                 parentScope = scope,
                 relayProvider = appState::publicEventCardRelays,
@@ -2421,7 +2435,7 @@ internal fun ConversationScreen(
                 .currentTtsConversationDestination()
                 ?.takeIf {
                     it.sessionId == sessionId &&
-                        it.accountRef == appState.activeAccountRef &&
+                        it.accountRef == conversationAccountRef &&
                         it.groupIdHex.equals(controller.group.groupIdHex, ignoreCase = true)
                 }?.passage
                 ?.messageIdHex
@@ -2574,6 +2588,10 @@ internal fun ConversationScreen(
     // long-message reader's composer, so in-progress text never drifts between
     // them. Created at screen scope so both the bottom-bar composer and the
     // per-message reader can receive the same instance.
+    // Deliberately keyed on the live active ref: loadDraft resolves the active
+    // account internally, so a pre-flip run during a pinned open (#586) loads
+    // nothing useful and this re-fires with the right account once the switch
+    // lands.
     LaunchedEffect(appState.activeAccountRef, controller.group.groupIdHex) {
         appState.loadDraft(controller.group.groupIdHex)
     }
@@ -2964,7 +2982,7 @@ internal fun ConversationScreen(
     ) { padding ->
         ConversationTransientNoticeLayout(
             notice = appState.transientNotice,
-            accountRef = appState.activeAccountRef,
+            accountRef = conversationAccountRef,
             groupIdHex = controller.group.groupIdHex,
             modifier =
                 Modifier
@@ -3435,7 +3453,7 @@ internal fun ConversationScreen(
     }
 
     if (shareUserPickerOpen) {
-        val activeHex = appState.activeAccount?.accountIdHex
+        val activeHex = conversationSelfAccountIdHex
         ContactPickerScreen(
             appState = appState,
             title = stringResource(R.string.share_user_title),

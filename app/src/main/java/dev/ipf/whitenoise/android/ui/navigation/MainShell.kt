@@ -80,6 +80,12 @@ internal data class ConversationOpenContext(
     val ttsFocusSessionId: Long? = null,
     val notificationOpenRequestId: Long = 0L,
     val notificationRouteTraceRequestId: Long? = null,
+    // Non-null only when a notification-routed conversation opened before its
+    // account switch landed (#586). The conversation controller and scroll key
+    // bind to this account — never the still-switching active account — so the
+    // open renders the target account's local history immediately and survives
+    // the active-ref flip without recreation.
+    val pinnedAccountRef: String? = null,
 )
 
 internal data class PendingStagedShareOpen(
@@ -200,10 +206,12 @@ internal fun ProfileGroupForegroundCoordinator(
 internal fun nextNotificationConversationOpenContext(
     current: ConversationOpenContext,
     notificationRouteTraceRequestId: Long? = null,
+    pinnedAccountRef: String? = null,
 ): ConversationOpenContext =
     ConversationOpenContext(
         notificationOpenRequestId = current.notificationOpenRequestId + 1L,
         notificationRouteTraceRequestId = notificationRouteTraceRequestId,
+        pinnedAccountRef = pinnedAccountRef,
     )
 
 internal enum class MainShellContentRoute {
@@ -332,6 +340,12 @@ internal fun MainShell(
     var armedNotificationRequestId by remember { mutableLongStateOf(0L) }
     var notificationAccountSwitchRequestId by remember(appState.runtimeGeneration) {
         mutableStateOf<Long?>(null)
+    }
+    // Request id whose conversation opened before its account switch landed
+    // (#586). Consuming the tap clears the inbound target, so the switch's
+    // currency checks accept this id in place of a still-armed target.
+    var notificationEarlyOpenRequestId by remember(appState.runtimeGeneration) {
+        mutableLongStateOf(0L)
     }
     var previousPendingProfileNpub by remember { mutableStateOf<String?>(null) }
     val supersedePendingGroupCreateOpen: () -> Unit = {
@@ -581,6 +595,7 @@ internal fun MainShell(
                 inviteRowMaterialized = inviteRowMaterialized,
                 inviteRowMembershipOpenable = inviteRowMembershipOpenable,
                 inviteAuthoritativelyUnavailable = notificationInviteAuthoritativelyUnavailable,
+                exactPreloadReady = exactPreloadState is NotificationMessagePreloadState.Ready,
             )
 
         fun commitNotificationConversationOpen(chatItem: ChatListItem) {
@@ -593,10 +608,18 @@ internal fun MainShell(
                         chatItem.group.groupIdHex,
                     ),
                 ).state
+            // Opening before the account switch lands pins the conversation to
+            // the notification's own account (#586); the in-flight switch keeps
+            // running behind the already-rendered conversation.
+            val pinnedAccountRef = target.accountRef.takeIf { it != appState.activeAccountRef }
+            if (pinnedAccountRef != null) {
+                notificationEarlyOpenRequestId = routingRequestId
+            }
             selectedChatOpenContext =
                 nextNotificationConversationOpenContext(
                     current = selectedChatOpenContext,
                     notificationRouteTraceRequestId = routingRequestId,
+                    pinnedAccountRef = pinnedAccountRef,
                 )
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
@@ -662,6 +685,18 @@ internal fun MainShell(
                 }
                 notificationAccountSwitchRequestId = routingRequestId
                 val routeRuntimeGeneration = appState.runtimeGeneration
+
+                // An early-opened conversation consumes the tap (clearing the
+                // inbound target) while its switch is still landing, so the
+                // switch stays current either while the target is still armed
+                // or after this exact request committed an early open (#586).
+                fun switchStillCurrent(): Boolean =
+                    currentInboundNotificationRequestId == routingRequestId &&
+                        currentRuntimeGeneration == routeRuntimeGeneration &&
+                        (
+                            currentInboundNotificationTarget == target ||
+                                notificationEarlyOpenRequestId == routingRequestId
+                        )
                 val preloadKey = notificationMessagePreloadKey
                 val canPreload =
                     preloadKey != null &&
@@ -675,83 +710,102 @@ internal fun MainShell(
                             state = NotificationMessagePreloadState.Loading,
                         )
                 }
-                // This effect is keyed on activeAccountRef, so an inline suspend
-                // switch would cancel itself the moment the ref flips.
-                appState.launchMutation {
-                    val activateAccount: suspend () -> Unit = {
-                        NotificationRouteTrace.beginPhase(
-                            requestId = routingRequestId,
-                            sectionName = NotificationRouteTraceSection.ACCOUNT_ACTIVATION,
-                        )
-                        // Signal the local-ready boundary from setActiveAccount's
-                        // callback. Its profile/privacy/push follow-up work keeps
-                        // running in the process scope without holding the route.
-                        awaitNotificationAccountActivationBoundary { onLocalReady ->
-                            appState.launchMutation {
-                                try {
-                                    appState.setActiveAccount(
-                                        label = step.accountRef,
-                                        shouldActivate = {
-                                            currentInboundNotificationRequestId == routingRequestId &&
-                                                currentInboundNotificationTarget == target &&
-                                                currentRuntimeGeneration == routeRuntimeGeneration
-                                        },
-                                        onActivated = {
-                                            NotificationRouteTrace.endPhase(
-                                                requestId = routingRequestId,
-                                                sectionName = NotificationRouteTraceSection.ACCOUNT_ACTIVATION,
-                                            )
-                                            onLocalReady()
-                                        },
-                                    )
-                                } finally {
-                                    NotificationRouteTrace.endPhase(
-                                        requestId = routingRequestId,
-                                        sectionName = NotificationRouteTraceSection.ACCOUNT_ACTIVATION,
-                                    )
-                                    onLocalReady()
-                                }
+
+                val activateAccount: suspend () -> Unit = {
+                    NotificationRouteTrace.beginPhase(
+                        requestId = routingRequestId,
+                        sectionName = NotificationRouteTraceSection.ACCOUNT_ACTIVATION,
+                    )
+                    // Signal the local-ready boundary from setActiveAccount's
+                    // callback. Its profile/privacy/push follow-up work keeps
+                    // running in the process scope without holding the route.
+                    awaitNotificationAccountActivationBoundary { onLocalReady ->
+                        appState.launchMutation {
+                            try {
+                                appState.setActiveAccount(
+                                    label = step.accountRef,
+                                    shouldActivate = { switchStillCurrent() },
+                                    onActivated = {
+                                        NotificationRouteTrace.endPhase(
+                                            requestId = routingRequestId,
+                                            sectionName = NotificationRouteTraceSection.ACCOUNT_ACTIVATION,
+                                        )
+                                        onLocalReady()
+                                    },
+                                )
+                            } finally {
+                                NotificationRouteTrace.endPhase(
+                                    requestId = routingRequestId,
+                                    sectionName = NotificationRouteTraceSection.ACCOUNT_ACTIVATION,
+                                )
+                                onLocalReady()
                             }
                         }
                     }
-                    val stagedPreload =
-                        if (canPreload) {
-                            runInactiveNotificationRouteStage(
-                                key = requireNotNull(preloadKey),
-                                loadTarget = {
-                                    NotificationRouteTrace.tracePhase(
-                                        requestId = routingRequestId,
-                                        sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
-                                    ) {
-                                        appState.preloadNotificationChatListItem(
-                                            accountRef = preloadKey.accountRef,
-                                            groupIdHex = preloadKey.groupIdHex,
-                                        )
-                                    }
-                                },
-                                activateAccount = activateAccount,
-                                isCurrent = {
-                                    currentInboundNotificationRequestId == routingRequestId &&
-                                        currentInboundNotificationTarget == target &&
-                                        currentRuntimeGeneration == routeRuntimeGeneration
-                                },
-                            )
-                        } else {
-                            activateAccount()
-                            null
-                        }
-                    val requestStillCurrent =
-                        currentInboundNotificationRequestId == routingRequestId &&
-                            currentInboundNotificationTarget == target &&
-                            currentRuntimeGeneration == routeRuntimeGeneration
-                    if (requestStillCurrent && appState.activeAccountRef != step.accountRef) {
+                }
+
+                // This effect is keyed on activeAccountRef, so an inline suspend
+                // switch would cancel itself the moment the ref flips.
+                suspend fun runNotificationAccountSwitchRoute() {
+                    if (canPreload) {
+                        runInactiveNotificationRouteStage(
+                            key = requireNotNull(preloadKey),
+                            loadTarget = {
+                                NotificationRouteTrace.tracePhase(
+                                    requestId = routingRequestId,
+                                    sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
+                                ) {
+                                    appState.preloadNotificationChatListItem(
+                                        accountRef = preloadKey.accountRef,
+                                        groupIdHex = preloadKey.groupIdHex,
+                                    )
+                                }
+                            },
+                            activateAccount = activateAccount,
+                            isCurrent = {
+                                currentInboundNotificationRequestId == routingRequestId &&
+                                    currentInboundNotificationTarget == target &&
+                                    currentRuntimeGeneration == routeRuntimeGeneration
+                            },
+                            // Published before activation completes: a ready
+                            // local read re-fires the routing effect, which
+                            // commits the conversation open immediately while
+                            // the switch keeps settling behind it (#586).
+                            onPreload = { notificationMessagePreload = it },
+                        )
+                    } else {
+                        activateAccount()
+                    }
+                    if (switchStillCurrent() && appState.activeAccountRef != step.accountRef) {
+                        // The switch never landed. Also closes an early-opened
+                        // conversation pinned to the never-activated account —
+                        // fallBackToChatList clears the selected chat and its
+                        // pinned open context.
                         notificationMessagePreload = null
+                        notificationEarlyOpenRequestId = 0L
                         routingNotification = false
                         fallBackToChatList()
                         onNotificationTargetHandled(target, routingRequestId)
                         NotificationRouteTrace.finishRequest(routingRequestId)
-                    } else if (stagedPreload != null) {
-                        notificationMessagePreload = stagedPreload
+                    }
+                }
+                appState.launchMutation {
+                    try {
+                        runNotificationAccountSwitchRoute()
+                    } finally {
+                        // A route that died before publishing leaves this
+                        // request's Loading preload in place; the direct-load
+                        // branch maps Loading to "keep waiting", so it would
+                        // pin the loading overlay forever. Release both.
+                        if (
+                            notificationMessagePreload.stateFor(preloadKey)
+                                is NotificationMessagePreloadState.Loading
+                        ) {
+                            notificationMessagePreload = null
+                            if (currentInboundNotificationRequestId == routingRequestId) {
+                                routingNotification = false
+                            }
+                        }
                     }
                 }
             }
@@ -1299,17 +1353,23 @@ internal fun MainShell(
     }
 
     val conversationControllerCopy = rememberConversationControllerCopy()
+    // A notification-routed early open pins the conversation to the target
+    // account while its switch is still landing (#586). Keying and constructing
+    // on the pinned ref keeps the controller correct before the flip and stops
+    // it from being torn down and rebuilt when the active ref catches up.
+    val conversationAccountRef = selectedChatOpenContext.pinnedAccountRef ?: appState.activeAccountRef
     val conversationController =
         selectedChat?.let { openChat ->
-            remember(openChat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+            remember(openChat.id, conversationAccountRef, appState.runtimeGeneration) {
                 ConversationController(
                     appState = appState,
                     initialGroup = openChat.group,
                     initialMemberSnapshot =
                         openChat.memberSnapshot
-                            ?: appState.cachedGroupMemberSnapshot(appState.activeAccountRef, openChat.group.groupIdHex),
+                            ?: appState.cachedGroupMemberSnapshot(conversationAccountRef, openChat.group.groupIdHex),
                     initialLastReadMessageId = openChat.projection?.lastReadMessageIdHex,
                     initialLastReadTimelineAt = openChat.projection?.lastReadTimelineAt,
+                    accountRefOverride = selectedChatOpenContext.pinnedAccountRef,
                     copy = conversationControllerCopy,
                 )
             }
@@ -1389,7 +1449,7 @@ internal fun MainShell(
         ) {
             MainShellContentRoute.Conversation -> {
                 val chat = requireNotNull(openChat)
-                val scrollKey = conversationScrollKey(appState.activeAccountRef, chat.group.groupIdHex)
+                val scrollKey = conversationScrollKey(conversationAccountRef, chat.group.groupIdHex)
                 ConversationScreen(
                     appState = appState,
                     chat = chat,
@@ -1432,6 +1492,13 @@ internal fun MainShell(
                                 shellNavState,
                                 ShellNavigationEvent.ConversationBackedOut,
                             ).state
+                        // Backing out before the first frame committed abandons
+                        // the trace's owner; finish it here or TOTAL stays open
+                        // until the next notification. finishRequest is a no-op
+                        // for an already-finished request.
+                        selectedChatOpenContext.notificationRouteTraceRequestId?.let {
+                            NotificationRouteTrace.finishRequest(it)
+                        }
                         selectedChat = null
                         selectedChatOpenContext = ConversationOpenContext()
                         selectedChatJustCreated = false
