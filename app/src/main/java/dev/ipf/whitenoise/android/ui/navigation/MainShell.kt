@@ -778,14 +778,20 @@ internal fun MainShell(
                         activateAccount()
                     }
                     if (switchStillCurrent() && appState.activeAccountRef != step.accountRef) {
-                        // The switch never landed. Also closes an early-opened
-                        // conversation pinned to the never-activated account —
-                        // fallBackToChatList clears the selected chat and its
-                        // pinned open context.
+                        // The switch never landed. A route that never opened a
+                        // conversation falls back as before; one that opened
+                        // early closes it only while the user is still inside
+                        // it — navigation they performed since then must not
+                        // be undone by a now-stale failure.
+                        val earlyOpened = notificationEarlyOpenRequestId == routingRequestId
+                        val stillInsideEarlyOpen =
+                            selectedChatOpenContext.notificationRouteTraceRequestId == routingRequestId
                         notificationMessagePreload = null
                         notificationEarlyOpenRequestId = 0L
                         routingNotification = false
-                        fallBackToChatList()
+                        if (!earlyOpened || stillInsideEarlyOpen) {
+                            fallBackToChatList()
+                        }
                         onNotificationTargetHandled(target, routingRequestId)
                         NotificationRouteTrace.finishRequest(routingRequestId)
                     }
@@ -1167,7 +1173,18 @@ internal fun MainShell(
     var previousActiveAccountRef by remember { mutableStateOf(appState.activeAccountRef) }
     LaunchedEffect(appState.activeAccountRef) {
         val current = appState.activeAccountRef
-        if (shouldResetNavOnAccountChange(previousActiveAccountRef, current)) {
+        // A notification-routed early open renders its conversation before the
+        // switch lands (#586); when this transition is exactly that pinned
+        // account arriving while the user is still inside that conversation,
+        // resetting here would immediately close what the route just opened.
+        // Any other account change — including one while the user has since
+        // navigated elsewhere — keeps the full reset.
+        val earlyOpenLandsPinnedAccount =
+            current != null &&
+                notificationEarlyOpenRequestId != 0L &&
+                selectedChatOpenContext.pinnedAccountRef == current &&
+                selectedChatOpenContext.notificationRouteTraceRequestId == notificationEarlyOpenRequestId
+        if (shouldResetNavOnAccountChange(previousActiveAccountRef, current) && !earlyOpenLandsPinnedAccount) {
             val ttsOwnsAccountChange =
                 pendingTtsAccountSwitchOwnership.ownsAccountChange(
                     previousAccountRef = previousActiveAccountRef,

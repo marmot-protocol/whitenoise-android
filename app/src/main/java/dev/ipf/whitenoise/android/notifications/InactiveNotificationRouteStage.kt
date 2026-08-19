@@ -34,8 +34,10 @@ internal fun notificationMessageRouteChatListReady(
     chatListReady &&
         (
             targetPresent ||
-                preloadState !is NotificationMessagePreloadState.Loading &&
-                preloadState !is NotificationMessagePreloadState.Ready
+                (
+                    preloadState !is NotificationMessagePreloadState.Loading &&
+                        preloadState !is NotificationMessagePreloadState.Ready
+                )
         )
 
 /**

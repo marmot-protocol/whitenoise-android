@@ -24,7 +24,7 @@ internal object NotificationRouteTrace {
     )
 
     private val lock = Any()
-    private val nextCookie = AtomicInteger()
+    private val cookieCounter = AtomicInteger()
     private var activeRequest: Pair<Long, Int>? = null
     private val activePhases = mutableMapOf<PhaseKey, Int>()
 
@@ -100,7 +100,7 @@ internal object NotificationRouteTrace {
     }
 
     private fun nextCookie(): Int =
-        nextCookie.updateAndGet { current ->
+        cookieCounter.updateAndGet { current ->
             if (current == Int.MAX_VALUE) 1 else current + 1
         }
 }
