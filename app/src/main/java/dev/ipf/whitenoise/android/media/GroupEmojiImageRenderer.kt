@@ -54,7 +54,11 @@ internal object GroupEmojiImageRenderer {
     // shrinking the text size when the measured pair would not fit.
     private const val TWO_EMOJI_GAP_PX = 32f
     private const val TWO_EMOJI_EDGE_MARGIN_PX = 28f
-    private const val BACKGROUND_COLOR = 0xfff1f3f5.toInt()
+
+    // A single dark neutral rather than a theme-derived color — the avatar is
+    // a persisted image shared with every member, so it must not vary with the
+    // creator's theme, and a dark tone reads well on both light and dark UIs.
+    private const val BACKGROUND_COLOR = 0xff3c4043.toInt()
 
     fun render(
         emojis: List<String>,
@@ -152,7 +156,10 @@ internal object GroupEmojiImageRenderer {
         textSize: Float,
     ) {
         paint.textSize = textSize
-        paint.color = Color.BLACK
+        // Color emoji ignore the paint color; this only affects glyphs that
+        // fall back to text presentation, which need contrast on the dark
+        // background.
+        paint.color = Color.WHITE
         val metrics = paint.fontMetrics
         val baseline = GROUP_EMOJI_IMAGE_SIZE_PX / 2f - (metrics.ascent + metrics.descent) / 2f
         canvas.drawText(emoji, centerX, baseline, paint)

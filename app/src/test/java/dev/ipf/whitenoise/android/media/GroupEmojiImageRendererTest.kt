@@ -58,8 +58,11 @@ class GroupEmojiImageRendererTest {
 
         assertEquals(210f, layout.textSize, 0.01f)
         assertTrue("centers must be ordered", layout.firstCenterX < layout.secondCenterX)
-        val midpoint = (layout.firstCenterX + layout.secondCenterX) / 2f
-        assertEquals(GROUP_EMOJI_IMAGE_SIZE_PX / 2f, midpoint, paint.measureText("AB") / 2f)
+        // The content block is centered, so the left margin before the first
+        // glyph must mirror the right margin after the second one.
+        val leftMargin = layout.firstCenterX - paint.measureText("A") / 2f
+        val rightMargin = GROUP_EMOJI_IMAGE_SIZE_PX - (layout.secondCenterX + paint.measureText("B") / 2f)
+        assertEquals(leftMargin, rightMargin, 0.01f)
     }
 
     @Test
