@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import androidx.compose.animation.core.Transition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -8,31 +9,52 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 
-/** Benchmark-only marker emitted after the route tween has consumed its final frame. */
+/** True only when the route transition has landed and its destination is ready. */
+internal fun conversationRouteSettled(
+    currentStateMatchesTarget: Boolean,
+    transitionRunning: Boolean,
+    destinationContentReady: Boolean,
+): Boolean = currentStateMatchesTarget && !transitionRunning && destinationContentReady
+
+/**
+ * Benchmark-only marker emitted once the route observably settles: the
+ * transition reached its target state and stopped, the destination content is
+ * ready, and one further frame has rendered. A nominal duration wait would
+ * diverge from reality under dropped or delayed frames, so the marker never
+ * assumes the tween's configured length.
+ */
 @Composable
 internal fun ConversationRouteSettledPerformanceMarker(
     conversationId: String?,
-    transitionAnimated: Boolean,
+    routeTransition: Transition<*>,
+    destinationContentReady: Boolean,
 ) {
     if (!BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) return
 
     val targetKey = conversationId ?: MAIN_SHELL_ROUTE_KEY
     var settledKey by remember { mutableStateOf<String?>(targetKey) }
-    LaunchedEffect(targetKey, transitionAnimated) {
+    LaunchedEffect(targetKey, destinationContentReady) {
         if (settledKey == targetKey) return@LaunchedEffect
         settledKey = null
-        if (transitionAnimated) {
-            delay(CONVERSATION_ROUTE_TRANSITION_MILLIS.toLong())
-            withFrameNanos { }
-        }
+        if (!destinationContentReady) return@LaunchedEffect
+        snapshotFlow {
+            conversationRouteSettled(
+                currentStateMatchesTarget = routeTransition.currentState == routeTransition.targetState,
+                transitionRunning = routeTransition.isRunning,
+                destinationContentReady = true,
+            )
+        }.filter { it }.first()
+        withFrameNanos { }
         settledKey = targetKey
     }
     if (settledKey == targetKey) {

@@ -8,6 +8,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -1616,8 +1617,8 @@ internal fun MainShell(
                     )
                 }
             }
-        AnimatedContent(
-            targetState = transitionContent,
+        val routeTransition = updateTransition(targetState = transitionContent, label = "conversation route")
+        routeTransition.AnimatedContent(
             transitionSpec = {
                 when {
                     routingNotification || pendingTtsDestinationNavigation != null ->
@@ -1643,7 +1644,6 @@ internal fun MainShell(
                 }
             },
             contentKey = { content -> content?.chat?.id ?: "main-shell" },
-            label = "conversation route",
         ) { animatedConversation ->
             when (
                 resolveMainShellContentRoute(
@@ -1817,7 +1817,16 @@ internal fun MainShell(
         }
         ConversationRouteSettledPerformanceMarker(
             conversationId = transitionContent?.chat?.id,
-            transitionAnimated = !routingNotification && pendingTtsDestinationNavigation == null,
+            routeTransition = routeTransition,
+            destinationContentReady =
+                transitionContent?.controller?.let { controller ->
+                    preparedConversationCanOpen(
+                        hasPublishedAuthoritativeTimeline = controller.hasPublishedAuthoritativeTimeline,
+                        hasPreparedInitialPresentation = controller.hasPreparedInitialPresentation,
+                        hasLoadError = controller.error != null,
+                        terminalConversationUnavailable = controller.terminalConversationUnavailable,
+                    )
+                } ?: true,
         )
     }
 
