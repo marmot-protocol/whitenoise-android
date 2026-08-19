@@ -549,7 +549,7 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
-    fun mentionChannelRemainsIndependentOfThePrimaryVibrationChoice() {
+    fun inheritedMentionUsesTheGlobalChannelRegardlessOfPrimaryVibration() {
         presenter.ensureChannels()
         ConversationVibrationPreferences(context).setPattern(
             "account-a",
@@ -561,12 +561,8 @@ class LocalNotificationPresenterConversationTest {
             presenter.show(update(isMention = true), previewTextOverride = "hi", shortNpub = { "npub1test" })
         }
 
-        val shortcutId = conversationShortcutId("account-a", "group-a")!!
         assertEquals(
-            ConversationNotificationChannels.conversationChannelId(
-                NotificationChannelSpec.MENTIONS.id,
-                shortcutId,
-            ),
+            NotificationChannelSpec.MENTIONS.id,
             manager.activeNotifications
                 .single()
                 .notification.channelId,
@@ -679,22 +675,19 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
-    fun mentionPostsOnTheMentionConversationChannelForTheSameConversation() {
+    fun inheritedMentionPostsOnTheGlobalChannelAndKeepsItsConversationShortcut() {
         presenter.ensureChannels()
 
         runBlocking { presenter.show(update(isMention = true), previewTextOverride = "hi", shortNpub = { "npub1test" }) }
 
         val shortcutId = conversationShortcutId("account-a", "group-a")
         val notification = manager.activeNotifications.single().notification
-        assertEquals(
-            ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.MENTIONS.id, shortcutId!!),
-            notification.channelId,
-        )
+        assertEquals(NotificationChannelSpec.MENTIONS.id, notification.channelId)
         assertEquals(shortcutId, notification.shortcutId)
     }
 
     @Test
-    fun reactionPostsOnTheReactionChannelForItsConversation() {
+    fun inheritedReactionPostsOnTheGlobalReactionChannel() {
         presenter.ensureChannels()
 
         runBlocking {
@@ -704,9 +697,8 @@ class LocalNotificationPresenterConversationTest {
             )
         }
 
-        val shortcutId = conversationShortcutId("account-a", "group-a")
         assertEquals(
-            ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.REACTIONS.id, shortcutId!!),
+            NotificationChannelSpec.REACTIONS.id,
             manager.activeNotifications
                 .single()
                 .notification.channelId,
@@ -714,7 +706,42 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
-    fun agentActivityPostsOnTheSilentAgentChannelForItsConversation() {
+    fun explicitReactionOverridePostsOnTheCustomConversationChannel() {
+        presenter.ensureChannels()
+        val shortcutId = conversationShortcutId("account-a", "group-a")!!
+        ConversationNotificationRouting(context)
+            .setScope(
+                conversation =
+                    NotificationConversationDescriptor(
+                        shortcutId = shortcutId,
+                        isDm = false,
+                        title = "General",
+                        primaryVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
+                    ),
+                category = OverridableConversationNotificationCategory.REACTIONS,
+                scope = ConversationNotificationScope.CUSTOM_FOR_THIS_CHAT,
+            ).getOrThrow()
+
+        runBlocking {
+            presenter.show(
+                update(isMention = false, reactionEmoji = "👍"),
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        assertEquals(
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.REACTIONS.id,
+                shortcutId,
+            ),
+            manager.activeNotifications
+                .single()
+                .notification.channelId,
+        )
+    }
+
+    @Test
+    fun inheritedAgentActivityPostsOnTheGlobalSilentAgentChannel() {
         presenter.ensureChannels()
 
         runBlocking {
@@ -727,12 +754,8 @@ class LocalNotificationPresenterConversationTest {
             )
         }
 
-        val shortcutId = conversationShortcutId("account-a", "group-a")
         assertEquals(
-            ConversationNotificationChannels.conversationChannelId(
-                NotificationChannelSpec.AGENT_ACTIVITY.id,
-                shortcutId!!,
-            ),
+            NotificationChannelSpec.AGENT_ACTIVITY.id,
             manager.activeNotifications
                 .single()
                 .notification.channelId,

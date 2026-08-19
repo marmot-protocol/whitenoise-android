@@ -28,6 +28,58 @@ class ConversationNotificationChannelsTest {
         get() = context.getSystemService(NotificationManager::class.java)
 
     @Test
+    fun globalChannelNamesMakeTheirScopeExplicitWithoutChangingStableIds() {
+        NotificationChannels.ensureChannels(context)
+
+        assertEquals(
+            "Global defaults",
+            manager.notificationChannelGroups
+                .single { it.id == NotificationChannels.GLOBAL_DEFAULTS_GROUP_ID }
+                .name
+                .toString(),
+        )
+        assertEquals(
+            "Reactions · Default for all chats",
+            manager.getNotificationChannel(NotificationChannelSpec.REACTIONS.id).name.toString(),
+        )
+        assertEquals(
+            NotificationChannels.GLOBAL_DEFAULTS_GROUP_ID,
+            manager.getNotificationChannel(NotificationChannelSpec.REACTIONS.id).group,
+        )
+        assertEquals(
+            "App updates · App-wide",
+            manager.getNotificationChannel(NotificationChannelSpec.APP_UPDATES.id).name.toString(),
+        )
+        assertEquals("reactions_v2", NotificationChannelSpec.REACTIONS.id)
+    }
+
+    @Test
+    fun globalChannelCopyRefreshPreservesUserOwnedAlertSettings() {
+        val customSound = Uri.parse("content://test/global-custom-sound")
+        val legacy =
+            NotificationChannel(
+                NotificationChannelSpec.MENTIONS.id,
+                "Mentions",
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                setSound(customSound, audioAttributes)
+                enableVibration(false)
+                setShowBadge(false)
+            }
+        manager.createNotificationChannel(legacy)
+
+        NotificationChannels.ensureChannels(context)
+
+        val refreshed = manager.getNotificationChannel(NotificationChannelSpec.MENTIONS.id)
+        assertEquals("Mentions · Default for all chats", refreshed.name.toString())
+        assertEquals(NotificationManager.IMPORTANCE_LOW, refreshed.importance)
+        assertEquals(customSound, refreshed.sound)
+        assertFalse(refreshed.shouldVibrate())
+        assertFalse(refreshed.canShowBadge())
+        assertEquals(NotificationChannels.GLOBAL_DEFAULTS_GROUP_ID, refreshed.group)
+    }
+
+    @Test
     fun conversationChannelIdIsDeterministicAndScopedToParentAndShortcut() {
         val id = ConversationNotificationChannels.conversationChannelId("messages_group", "conversation-abc")
 
@@ -195,7 +247,7 @@ class ConversationNotificationChannelsTest {
                 ConversationVibrationPattern.LONG,
             ),
         )
-        assertNotNull(conversationChannel("mentions", shortcut))
+        assertNull(conversationChannel("mentions", shortcut))
     }
 
     @Test
@@ -294,40 +346,44 @@ class ConversationNotificationChannelsTest {
     }
 
     @Test
-    fun ensureCreatesConversationChannelsForGroupPrimaryAndMentions() {
+    fun ensureCreatesOnlyTheRequiredGroupMessageConversationChannel() {
         NotificationChannels.ensureChannels(context)
         val shortcut = "conversation-group"
 
         ConversationNotificationChannels.ensureConversationChannels(context, shortcut, isDm = false)
 
-        val groupChannel = manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("messages_group", shortcut))
-        val mentionChannel = manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("mentions", shortcut))
+        val groupChannel = conversationChannel(NotificationChannelSpec.GROUP_MESSAGES.id, shortcut)
+        val mentionChannel = conversationChannel(NotificationChannelSpec.MENTIONS.id, shortcut)
         assertNotNull(groupChannel)
-        assertEquals("messages_group", groupChannel!!.parentChannelId)
+        assertEquals(NotificationChannelSpec.GROUP_MESSAGES.id, groupChannel!!.parentChannelId)
         assertEquals(shortcut, groupChannel.conversationId)
-        assertNotNull(mentionChannel)
-        assertEquals("mentions", mentionChannel!!.parentChannelId)
-        assertEquals(shortcut, mentionChannel.conversationId)
-        assertNotNull(conversationChannel("reactions_v2", shortcut))
-        assertNotNull(conversationChannel("invites_v2", shortcut))
-        assertNotNull(conversationChannel("agent_activity_v1", shortcut))
+        assertNull(groupChannel.group)
+        assertNull(mentionChannel)
+        assertNull(conversationChannel(NotificationChannelSpec.REACTIONS.id, shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.INVITES.id, shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.AGENT_ACTIVITY.id, shortcut))
         // A group conversation never receives on the DM parent, so no DM child.
-        assertNull(manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("messages_dm", shortcut)))
+        assertNull(conversationChannel(ConversationNotificationChannels.primaryMessageParent(isDm = true).id, shortcut))
     }
 
     @Test
-    fun ensureCreatesConversationChannelsForDmPrimaryAndMentions() {
+    fun ensureCreatesOnlyTheRequiredDmMessageConversationChannel() {
         NotificationChannels.ensureChannels(context)
         val shortcut = "conversation-dm"
 
         ConversationNotificationChannels.ensureConversationChannels(context, shortcut, isDm = true)
 
-        assertNotNull(manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("messages_dm", shortcut)))
-        assertNotNull(manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("mentions", shortcut)))
-        assertNotNull(conversationChannel("reactions_v2", shortcut))
-        assertNotNull(conversationChannel("invites_v2", shortcut))
-        assertNotNull(conversationChannel("agent_activity_v1", shortcut))
-        assertNull(manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("messages_group", shortcut)))
+        assertNotNull(
+            conversationChannel(
+                ConversationNotificationChannels.primaryMessageParent(isDm = true).id,
+                shortcut,
+            ),
+        )
+        assertNull(conversationChannel(NotificationChannelSpec.MENTIONS.id, shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.REACTIONS.id, shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.INVITES.id, shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.AGENT_ACTIVITY.id, shortcut))
+        assertNull(conversationChannel(NotificationChannelSpec.GROUP_MESSAGES.id, shortcut))
     }
 
     @Test
@@ -405,6 +461,32 @@ class ConversationNotificationChannelsTest {
         )
 
         assertEquals("Green Orca · Direct messages", manager.getNotificationChannel(convId).name.toString())
+    }
+
+    @Test
+    fun ensureWithoutTitlePreservesExistingCustomChannelCopy() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-custom-copy-preserved"
+        val convId =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context = context,
+                parentChannelId = "reactions_v2",
+                conversationShortcutId = shortcut,
+                conversationTitle = "Green Orca",
+            )!!
+
+        ConversationNotificationChannels.ensureConversationChannel(
+            context = context,
+            parentChannelId = "reactions_v2",
+            conversationShortcutId = shortcut,
+        )
+
+        val preserved = manager.getNotificationChannel(convId)
+        assertEquals("Green Orca · Reactions (custom)", preserved.name.toString())
+        assertEquals(
+            "Custom Reactions alert behavior for Green Orca",
+            preserved.description,
+        )
     }
 
     @Test

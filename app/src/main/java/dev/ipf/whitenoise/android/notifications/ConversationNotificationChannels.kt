@@ -18,11 +18,11 @@ import android.os.VibrationEffect
  * treated as a conversation (People section, per-conversation settings). Without
  * it Android silently falls back to the app-wide parent channel.
  *
- * A single conversation can receive traffic on more than one parent — ordinary
- * messages on its DM/group channel, mentions, reactions, invites, and agent
- * activity — so a conversation channel is created per relevant parent. The channel id is derived
- * deterministically from (parent id, conversation shortcut id) so both the post
- * path and the settings deep link name the same channel.
+ * Ordinary messages always use a conversation child so Android's People and
+ * conversation controls keep working. Mentions, reactions, invites, and agent
+ * activity inherit their stable global channels until the user explicitly asks
+ * for a custom child. The channel id remains deterministic so legacy children,
+ * the post path, and settings deep links all resolve the same user-owned channel.
  *
  * Conversation channels require API 30; the app's minSdk is above that, so the
  * APIs are always available here.
@@ -104,7 +104,10 @@ object ConversationNotificationChannels {
             NotificationChannelSpec.AGENT_ACTIVITY,
         )
 
-    /** Creates the conversation channel for every parent this conversation can receive on. */
+    /**
+     * Creates only the required ordinary-message child. Optional event children
+     * are provisioned lazily by [ConversationNotificationRouting].
+     */
     fun ensureConversationChannels(
         context: Context,
         conversationShortcutId: String,
@@ -113,22 +116,15 @@ object ConversationNotificationChannels {
         primaryVibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
         sourceVibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
     ) {
-        val manager = context.getSystemService(NotificationManager::class.java) ?: return
         val primaryParent = primaryMessageParent(isDm)
-        relevantParents(isDm).forEach { parent ->
-            val vibrationPattern =
-                if (parent == primaryParent) primaryVibrationPattern else ConversationVibrationPattern.SYSTEM_DEFAULT
-            val sourcePattern =
-                if (parent == primaryParent) sourceVibrationPattern else ConversationVibrationPattern.SYSTEM_DEFAULT
-            ensureConversationChannel(
-                manager = manager,
-                parentChannelId = parent.id,
-                conversationShortcutId = conversationShortcutId,
-                conversationTitle = conversationTitle,
-                vibrationPattern = vibrationPattern,
-                sourceVibrationPattern = sourcePattern,
-            )
-        }
+        ensureConversationChannel(
+            context = context,
+            parentChannelId = primaryParent.id,
+            conversationShortcutId = conversationShortcutId,
+            conversationTitle = conversationTitle,
+            vibrationPattern = primaryVibrationPattern,
+            sourceVibrationPattern = sourceVibrationPattern,
+        )
     }
 
     /**
@@ -145,6 +141,29 @@ object ConversationNotificationChannels {
         sourceVibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
     ): String? {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return null
+        val parentSpec = NotificationChannelSpec.entries.firstOrNull { it.id == parentChannelId }
+        val baseName = parentSpec?.let { NotificationChannels.baseName(context, it) }
+        val usesCustomScope = parentSpec?.conversationPolicy == ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE
+        val customDisplayName =
+            if (usesCustomScope && !conversationTitle.isNullOrBlank() && baseName != null) {
+                context.getString(
+                    dev.ipf.whitenoise.android.R.string.notification_channel_custom_name,
+                    conversationTitle.trim(),
+                    baseName,
+                )
+            } else {
+                null
+            }
+        val customDescription =
+            if (usesCustomScope && !conversationTitle.isNullOrBlank() && baseName != null) {
+                context.getString(
+                    dev.ipf.whitenoise.android.R.string.notification_channel_custom_description,
+                    baseName,
+                    conversationTitle.trim(),
+                )
+            } else {
+                null
+            }
         return ensureConversationChannel(
             manager = manager,
             parentChannelId = parentChannelId,
@@ -152,6 +171,10 @@ object ConversationNotificationChannels {
             conversationTitle = conversationTitle,
             vibrationPattern = vibrationPattern,
             sourceVibrationPattern = sourceVibrationPattern,
+            baseName = baseName,
+            usesCustomScope = usesCustomScope,
+            customDisplayName = customDisplayName,
+            customDescription = customDescription,
         )
     }
 
@@ -162,10 +185,16 @@ object ConversationNotificationChannels {
         conversationTitle: String?,
         vibrationPattern: ConversationVibrationPattern,
         sourceVibrationPattern: ConversationVibrationPattern,
+        baseName: String?,
+        usesCustomScope: Boolean,
+        customDisplayName: String?,
+        customDescription: String?,
     ): String? {
         val conversationChannelId = conversationChannelId(parentChannelId, conversationShortcutId, vibrationPattern)
         val parent = manager.getNotificationChannel(parentChannelId) ?: return null
-        val displayName = conversationChannelDisplayName(parent.name, conversationTitle)
+        val displayName =
+            customDisplayName ?: conversationChannelDisplayName(baseName ?: parent.name, conversationTitle)
+        val displayDescription = customDescription ?: parent.description
         val existing = manager.getNotificationChannel(conversationChannelId)
         if (existing != null) {
             var republish = false
@@ -179,6 +208,17 @@ object ConversationNotificationChannels {
                 existing.name.toString() != displayName.toString()
             ) {
                 existing.name = displayName
+                republish = true
+            }
+            if (
+                shouldRefreshDescription(
+                    existing = existing.description,
+                    updated = displayDescription,
+                    usesCustomScope = usesCustomScope,
+                    conversationTitle = conversationTitle,
+                )
+            ) {
+                existing.description = displayDescription
                 republish = true
             }
             if (shouldDowngradeImportance(existing, parent)) {
@@ -208,6 +248,7 @@ object ConversationNotificationChannels {
                 conversationChannelId = conversationChannelId,
                 conversationShortcutId = conversationShortcutId,
                 displayName = displayName,
+                displayDescription = displayDescription,
                 vibrationPattern = vibrationPattern,
             ),
         )
@@ -236,6 +277,16 @@ object ConversationNotificationChannels {
             ?.let { "$it · $parentName" }
             ?: parentName
 
+    private fun shouldRefreshDescription(
+        existing: String?,
+        updated: String?,
+        usesCustomScope: Boolean,
+        conversationTitle: String?,
+    ): Boolean =
+        updated != null &&
+            existing != updated &&
+            (!usesCustomScope || !conversationTitle.isNullOrBlank() || existing == null)
+
     // Clone the parent's importance and alerting defaults onto the conversation
     // channel at creation time; the user can then diverge per conversation from
     // the OS settings without affecting the parent or its other conversations.
@@ -246,12 +297,12 @@ object ConversationNotificationChannels {
         conversationChannelId: String,
         conversationShortcutId: String,
         displayName: CharSequence,
+        displayDescription: String?,
         vibrationPattern: ConversationVibrationPattern,
     ): NotificationChannel =
         NotificationChannel(conversationChannelId, displayName, source.importance).apply {
             setConversationId(parentChannelId, conversationShortcutId)
-            group = source.group
-            description = source.description
+            description = displayDescription
             setShowBadge(source.canShowBadge())
             setSound(source.sound, source.audioAttributes)
             enableLights(source.shouldShowLights())

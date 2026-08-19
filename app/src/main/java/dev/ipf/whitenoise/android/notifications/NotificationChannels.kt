@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.app.Notification
 import android.app.NotificationChannel
+import android.app.NotificationChannelGroup
 import android.app.NotificationManager
 import android.content.Context
 import dev.ipf.whitenoise.android.R
@@ -18,8 +19,16 @@ import dev.ipf.whitenoise.android.R
  * stable once published.
  */
 object NotificationChannels {
+    internal const val GLOBAL_DEFAULTS_GROUP_ID = "global_notification_defaults"
+
     fun ensureChannels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        manager.createNotificationChannelGroup(
+            NotificationChannelGroup(
+                GLOBAL_DEFAULTS_GROUP_ID,
+                context.getString(R.string.notification_channel_group_global_defaults),
+            ),
+        )
         NotificationChannelSpec.entries.forEach { spec ->
             manager.createNotificationChannel(buildChannel(context, spec))
         }
@@ -31,10 +40,11 @@ object NotificationChannels {
     ): NotificationChannel =
         NotificationChannel(
             spec.id,
-            context.getString(spec.nameRes()),
+            context.getString(spec.globalNameRes()),
             spec.importance.toAndroidImportance(),
         ).apply {
-            description = context.getString(spec.descriptionRes())
+            group = GLOBAL_DEFAULTS_GROUP_ID
+            description = context.getString(spec.globalDescriptionRes())
             // Every channel stays private on the lockscreen so a redacted public
             // version is shown instead of the body. Only the message channels opt
             // into explicit vibration for a short single-pulse chat alert.
@@ -62,7 +72,12 @@ object NotificationChannels {
             }
         }
 
-    private fun NotificationChannelSpec.nameRes(): Int =
+    internal fun baseName(
+        context: Context,
+        spec: NotificationChannelSpec,
+    ): String = context.getString(spec.baseNameRes())
+
+    private fun NotificationChannelSpec.baseNameRes(): Int =
         when (this) {
             NotificationChannelSpec.DIRECT_MESSAGES -> R.string.notification_channel_direct_messages
             NotificationChannelSpec.GROUP_MESSAGES -> R.string.notification_channel_group_messages
@@ -73,15 +88,26 @@ object NotificationChannels {
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
         }
 
-    private fun NotificationChannelSpec.descriptionRes(): Int =
+    private fun NotificationChannelSpec.globalNameRes(): Int =
         when (this) {
-            NotificationChannelSpec.DIRECT_MESSAGES -> R.string.notification_channel_direct_messages_description
-            NotificationChannelSpec.GROUP_MESSAGES -> R.string.notification_channel_group_messages_description
-            NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions_description
-            NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions_description
-            NotificationChannelSpec.INVITES -> R.string.notification_channel_invites_description
-            NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity_description
-            NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates_description
+            NotificationChannelSpec.DIRECT_MESSAGES -> R.string.notification_channel_direct_messages_default
+            NotificationChannelSpec.GROUP_MESSAGES -> R.string.notification_channel_group_messages_default
+            NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions_default
+            NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions_default
+            NotificationChannelSpec.INVITES -> R.string.notification_channel_invites_default
+            NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity_default
+            NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates_global
+        }
+
+    private fun NotificationChannelSpec.globalDescriptionRes(): Int =
+        when (this) {
+            NotificationChannelSpec.DIRECT_MESSAGES -> R.string.notification_channel_direct_messages_default_description
+            NotificationChannelSpec.GROUP_MESSAGES -> R.string.notification_channel_group_messages_default_description
+            NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions_default_description
+            NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions_default_description
+            NotificationChannelSpec.INVITES -> R.string.notification_channel_invites_default_description
+            NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity_default_description
+            NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates_global_description
         }
 
     private fun ChannelImportance.toAndroidImportance(): Int =

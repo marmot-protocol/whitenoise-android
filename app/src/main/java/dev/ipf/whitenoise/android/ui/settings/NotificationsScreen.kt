@@ -1,10 +1,8 @@
+@file:Suppress("FunctionNaming") // Compose UI entry points intentionally use PascalCase.
+
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.provider.Settings
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -20,7 +18,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,10 +38,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 import kotlinx.coroutines.launch
@@ -158,13 +158,12 @@ internal fun NotificationsScreen(
                             },
                         )
                     }
-                    // Per-type controls (sound, vibration, importance, lockscreen, DND
-                    // bypass) live in the OS notification details — we deep-link there
-                    // rather than duplicate them in-app (#288).
-                    item {
-                        NotificationCategoriesRow(onClick = { openAppNotificationSettings(context) })
-                    }
                 }
+            }
+            item {
+                GlobalNotificationCategories(
+                    onOpenChannel = { channel -> openNotificationChannelSettings(context, channel) },
+                )
             }
         }
     }
@@ -196,20 +195,54 @@ private fun NotificationSwitchRow(
 }
 
 @Composable
-private fun NotificationCategoriesRow(onClick: () -> Unit) {
+internal fun GlobalNotificationCategories(onOpenChannel: (NotificationChannelSpec) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.notification_defaults_subtitle),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        SettingsGroup(
+            title = stringResource(R.string.notification_defaults),
+            icon = Icons.Filled.Tune,
+        ) {
+            NotificationChannelSpec.entries.forEach { channel ->
+                item {
+                    GlobalNotificationCategoryRow(
+                        channel = channel,
+                        onClick = { onOpenChannel(channel) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlobalNotificationCategoryRow(
+    channel: NotificationChannelSpec,
+    onClick: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
+            .testTag("global-notification-category-${channel.id}")
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(Icons.Filled.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.notification_categories), style = MaterialTheme.typography.bodyLarge)
+            Text(notificationChannelTitle(channel), style = MaterialTheme.typography.bodyLarge)
             Text(
-                stringResource(R.string.notification_categories_subtitle),
+                stringResource(
+                    if (channel == NotificationChannelSpec.APP_UPDATES) {
+                        R.string.notification_scope_app_wide
+                    } else {
+                        R.string.notification_scope_default_all_chats
+                    },
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -221,24 +254,16 @@ private fun NotificationCategoriesRow(onClick: () -> Unit) {
     }
 }
 
-// Open the OS app-notification details so the user gets native per-channel
-// controls (sound, vibration, importance, lockscreen, DND bypass). Falls back
-// to the generic app-details screen on the rare device that rejects the
-// channel-settings action, and finally toasts if even that fails. See #288.
-private fun openAppNotificationSettings(context: Context) {
-    val appNotificationIntent =
-        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    if (context.tryStartActivity(appNotificationIntent)) return
-
-    val appDetailsIntent =
-        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-            .setData(android.net.Uri.fromParts("package", context.packageName, null))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    if (context.tryStartActivity(appDetailsIntent)) return
-
-    Toast.makeText(context, R.string.toast_notification_settings_unavailable, Toast.LENGTH_SHORT).show()
-}
-
-private fun Context.tryStartActivity(intent: Intent): Boolean = runCatching { startActivity(intent) }.isSuccess
+@Composable
+private fun notificationChannelTitle(channel: NotificationChannelSpec): String =
+    stringResource(
+        when (channel) {
+            NotificationChannelSpec.DIRECT_MESSAGES -> R.string.notification_channel_direct_messages
+            NotificationChannelSpec.GROUP_MESSAGES -> R.string.notification_channel_group_messages
+            NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions
+            NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions
+            NotificationChannelSpec.INVITES -> R.string.notification_channel_invites
+            NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
+            NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
+        },
+    )
