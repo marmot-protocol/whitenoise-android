@@ -129,9 +129,25 @@ class MainThreadConfinementCoverageTest {
 
         val materialization = source.functionSection("materializeProfileLocally")
         assertFalse("profile FFI reads intentionally run off-main", "assertMainThread" in materialization)
-        assertTrue("profile reads must stay on marmotIo", "marmotIo" in materialization)
+        assertTrue(
+            "profile materialization must delegate to the shared persisted-profile reader",
+            "loadAccountSwitchProfileSeed" in materialization,
+        )
         assertTrue("profile publication must resume on Main", "withContext(Dispatchers.Main.immediate)" in materialization)
-        assertTrue("only the publication helper owns the main-thread assertion", "applyProfilePresentation" in materialization)
+        assertTrue(
+            "materialization must publish through the account-switch seed boundary",
+            "applyAccountSwitchProfileSeed" in materialization,
+        )
+
+        val seedPublication = source.functionSection("applyAccountSwitchProfileSeed")
+        assertTrue(
+            "the account-switch seed boundary must route to the guarded presentation helper",
+            "applyProfilePresentation" in seedPublication,
+        )
+
+        val persistedProfileRead = source.functionSection("loadAccountSwitchProfileSeed")
+        assertFalse("persisted profile reads intentionally run off-main", "assertMainThread" in persistedProfileRead)
+        assertTrue("persisted profile reads must stay on marmotIo", "marmotIo" in persistedProfileRead)
 
         val refresh = source.functionSection("refreshProfile")
         assertTrue("profile refresh reads must stay on marmotIo", "marmotIo" in refresh)
