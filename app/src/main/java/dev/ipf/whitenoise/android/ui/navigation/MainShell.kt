@@ -1457,20 +1457,25 @@ internal fun MainShell(
     val conversationController =
         controllerChat?.let { openChat ->
             remember(openChat.id, conversationAccountRef, appState.runtimeGeneration) {
-                ConversationController(
-                    appState = appState,
-                    initialGroup = openChat.group,
-                    initialMemberSnapshot =
-                        openChat.memberSnapshot
-                            ?: appState.cachedGroupMemberSnapshot(conversationAccountRef, openChat.group.groupIdHex),
-                    initialTimelinePreview = openChat.projection?.lastMessage,
-                    initialLastReadMessageId = openChat.projection?.lastReadMessageIdHex,
-                    initialLastReadTimelineAt = openChat.projection?.lastReadTimelineAt,
-                    accountRefOverride = selectedChatOpenContext.pinnedAccountRef,
-                    startOnConstruction = true,
-                    copy = conversationControllerCopy,
-                )
-            }
+                // startOnConstruction begins the subscription before this
+                // composition commits — the guard clears it if the commit
+                // never happens, since DisposableEffect can't run then.
+                RememberAbandonmentGuard(
+                    ConversationController(
+                        appState = appState,
+                        initialGroup = openChat.group,
+                        initialMemberSnapshot =
+                            openChat.memberSnapshot
+                                ?: appState.cachedGroupMemberSnapshot(conversationAccountRef, openChat.group.groupIdHex),
+                        initialTimelinePreview = openChat.projection?.lastMessage,
+                        initialLastReadMessageId = openChat.projection?.lastReadMessageIdHex,
+                        initialLastReadTimelineAt = openChat.projection?.lastReadTimelineAt,
+                        accountRefOverride = selectedChatOpenContext.pinnedAccountRef,
+                        startOnConstruction = true,
+                        copy = conversationControllerCopy,
+                    ),
+                ) { it.onCleared() }
+            }.value
         }
     // The controller is owned by the selected conversation route, not the
     // ConversationScreen composition. The profile-to-group picker temporarily
