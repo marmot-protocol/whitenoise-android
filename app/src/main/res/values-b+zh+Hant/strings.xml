@@ -1449,6 +1449,9 @@
     <string name="agent_connector_opencode_name">OpenCode</string>
     <string name="agent_connector_opencode_subtitle">開源程式設計代理</string>
     <string name="agent_connector_opencode_prompt">這是一則安裝提示，用於透過 Marmot 將此 OpenCode 設定連接到 White Noise。請閱讀最新的連接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。請向我解釋連接器的運作方式以及安裝會帶來哪些變更。接著針對我的公開 npub 提出安裝步驟：%1$s，並在進行任何變更之前請求我的核准。我核准後，請安裝並驗證連接器，然後回覆你的代理 npub。</string>
+    <string name="agent_connector_codex_name">Codex</string>
+    <string name="agent_connector_codex_subtitle">OpenAI Codex CLI 編碼代理</string>
+    <string name="agent_connector_codex_prompt">這是一則安裝提示，用於透過 Marmot 將此 Codex 設定連接到 White Noise。請閱讀權威 Codex harness 指南：https://github.com/marmot-protocol/mdk/blob/master/integrations/codex/marmot/README.md，以及長期有效的連接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。請向我解釋連接器的運作方式以及安裝會帶來哪些變更。確認前提條件：Codex CLI 已安裝、已驗證並可在 PATH 中使用，且此機器使用與手機相同的公開中繼集合。接著針對我的公開 npub 提出安裝步驟：%1$s，並在進行任何變更之前請求我的核准。我核准後，請使用經過校驗和驗證的 install-codex-marmot.sh 發佈流程，為該 npub 引導 wn-agent 並使用允許的 welcomer，驗證 wn-codex --version，然後回覆你的代理 npub。</string>
     <string name="account_and_keys">帳號與金鑰</string>
     <string name="account_keys_settings_subtitle">npub · 備份 · 登出</string>
     <string name="composer">輸入框</string>

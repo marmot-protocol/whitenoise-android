@@ -44,6 +44,37 @@ class AiAgentsScreenTest {
     private val app = ApplicationProvider.getApplicationContext<Context>()
 
     @Test
+    fun agentConnectorsIncludeCodexAsFourthConnector() {
+        assertEquals(4, agentConnectors.size)
+        assertEquals("codex", agentConnectors[3].id)
+    }
+
+    @Test
+    fun codexConnectorIsVisibleWithExpandAndCopyActions() {
+        renderContent()
+
+        val codexName = app.getString(R.string.agent_connector_codex_name)
+        composeRule
+            .onNodeWithTag(AI_AGENTS_CONTENT_TAG)
+            .performScrollToNode(hasText(codexName))
+        composeRule.onNodeWithText(codexName).assertIsDisplayed()
+        composeRule.onNodeWithTag(agentConnectorToggleTag("codex")).assertIsDisplayed()
+        composeRule.onNodeWithTag(agentConnectorCopyTag("codex")).assertIsDisplayed()
+    }
+
+    @Test
+    fun codexPromptInterpolatesNpubOnceAndReferencesHarnessGuide() {
+        val prompt = app.getString(R.string.agent_connector_codex_prompt, TEST_NPUB)
+
+        assertEquals(1, prompt.windowed(TEST_NPUB.length).count { it == TEST_NPUB })
+        assertFalse(prompt.contains("<USER_NPUB>"))
+        assertTrue(prompt.contains(CODEX_HARNESS_README_URL))
+        assertTrue(prompt.contains("install-codex-marmot.sh"))
+        assertTrue(prompt.contains("wn-codex --version"))
+        assertTrue(prompt.contains("wn-agent"))
+    }
+
+    @Test
     fun expandShowsFormattedPromptWithoutPlaceholder() {
         val npub = TEST_NPUB
         val expectedHermesPrompt = app.getString(R.string.agent_connector_hermes_prompt, npub)
@@ -281,6 +312,8 @@ class AiAgentsScreenTest {
 
     companion object {
         private const val ACCOUNT_REF = "test-account"
+        private const val CODEX_HARNESS_README_URL =
+            "https://github.com/marmot-protocol/mdk/blob/master/integrations/codex/marmot/README.md"
         private val ACCOUNT_HEX = "ab".repeat(32)
         private val TEST_NPUB = "npub1" + "a".repeat(58)
     }

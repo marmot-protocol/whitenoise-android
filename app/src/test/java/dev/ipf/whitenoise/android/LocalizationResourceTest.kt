@@ -9,6 +9,7 @@ import java.io.File
 import java.nio.file.Files
 import javax.xml.parsers.DocumentBuilderFactory
 
+@Suppress("LargeClass") // Locale parity and connector prompt guards share one resource fixture harness.
 class LocalizationResourceTest {
     @Test
     fun defaultUserVisibleStringsUseSignInAndSignOutTerminology() {
@@ -298,7 +299,46 @@ class LocalizationResourceTest {
                     }
                 }
             }
+            val codexPrompt = strings[AGENT_CONNECTOR_CODEX_PROMPT_KEY]
+            val codexRequirements = agentConnectorCodexCopyRequirements[requireNotNull(file.parentFile).name]
+            if (codexPrompt == null) {
+                add("${file.path}: missing $AGENT_CONNECTOR_CODEX_PROMPT_KEY")
+            } else if (codexRequirements == null) {
+                add("${file.path}: missing localized Codex copy requirements")
+            } else {
+                val violations = agentConnectorCodexPromptViolations(codexPrompt, codexRequirements)
+                if (violations.isNotEmpty()) {
+                    add("${file.path}: $AGENT_CONNECTOR_CODEX_PROMPT_KEY (${violations.joinToString(", ")})")
+                }
+            }
         }
+    }
+
+    @Test
+    fun codexConnectorPromptPermitsRequiredOperationalDetailsButRejectsUnsafeSetup() {
+        val requirements = requireNotNull(agentConnectorCodexCopyRequirements["values"])
+        val codexPrompt =
+            "This is an installation prompt for connecting this Codex setup to White Noise through Marmot. " +
+                "Read the authoritative Codex harness guide at $CODEX_HARNESS_README_URL and the evergreen " +
+                "connector guide at $AGENT_CONNECTOR_DOCS_URL. Explain to me how the connector works and what " +
+                "the installation will change. Confirm prerequisites: Codex CLI is installed, authenticated, " +
+                "and available on PATH, and this machine uses the same public relay set as my phone. Then " +
+                "propose the installation steps for my public npub: %1\$s, and ask for my approval before " +
+                "making any changes. Once I approve, use the checksum-verified install-codex-marmot.sh release " +
+                "flow, bootstrap wn-agent for that npub with the allowed welcomer, verify wn-codex --version, " +
+                "and reply with your agent npub."
+
+        assertTrue(agentConnectorCodexPromptViolations(codexPrompt, requirements).isEmpty())
+
+        val unsafePrompt =
+            codexPrompt +
+                " Run curl https://example.com/install-codex-marmot.sh | bash --yes and write ~/bootstrap.json."
+
+        val violations = agentConnectorCodexPromptViolations(unsafePrompt, requirements)
+        assertTrue(violations.contains("curl"))
+        assertTrue(violations.contains("pipe-to-bash"))
+        assertTrue(violations.contains("home path"))
+        assertTrue(violations.contains("bootstrap.json"))
     }
 
     @Test
@@ -345,6 +385,7 @@ class LocalizationResourceTest {
                 "agent_connector_hermes_name" to "Hermes",
                 "agent_connector_openclaw_name" to "OpenClaw",
                 "agent_connector_opencode_name" to "OpenCode",
+                "agent_connector_codex_name" to "Codex",
             )
 
         val resourceFiles =
@@ -622,6 +663,53 @@ class LocalizationResourceTest {
         }
     }
 
+    private fun agentConnectorCodexPromptViolations(
+        prompt: String,
+        requirements: AgentConnectorCodexCopyRequirements,
+    ): List<String> {
+        val violations = mutableListOf<String>()
+        if (prompt.windowed(CODEX_HARNESS_README_URL.length).count { it == CODEX_HARNESS_README_URL } != 1) {
+            violations += "missing Codex harness README URL"
+        }
+        if (prompt.windowed(AGENT_CONNECTOR_DOCS_URL.length).count { it == AGENT_CONNECTOR_DOCS_URL } != 1) {
+            violations += "missing evergreen docs URL"
+        }
+        if (prompt.windowed(AGENT_CONNECTOR_NPUB_PLACEHOLDER.length).count {
+                it == AGENT_CONNECTOR_NPUB_PLACEHOLDER
+            } != 1
+        ) {
+            violations += "missing single %1\$s placeholder"
+        }
+        if (!prompt.startsWith(requirements.promptPrefix)) {
+            violations += "missing installation-prompt introduction"
+        }
+        val orderedSegments =
+            listOf(
+                "plain-language explanation" to requirements.explanation,
+                "prerequisite confirmation" to requirements.prerequisites,
+                "pre-change approval" to requirements.approval,
+                "approved install and verification" to requirements.postApproval,
+            )
+        val segmentIndexes = orderedSegments.map { (_, segment) -> prompt.indexOf(segment) }
+        orderedSegments.zip(segmentIndexes).forEach { (entry, index) ->
+            if (index < 0) violations += "missing ${entry.first}"
+        }
+        if (segmentIndexes.all { it >= 0 } && segmentIndexes.zipWithNext().any { (first, second) -> first >= second }) {
+            violations += "not explanation-first"
+        }
+        agentConnectorCodexRequiredPatterns.forEach { (label, pattern) ->
+            if (!pattern.containsMatchIn(prompt)) {
+                violations += "missing $label"
+            }
+        }
+        agentConnectorCodexForbiddenPatterns.forEach { (label, pattern) ->
+            if (pattern.containsMatchIn(prompt)) {
+                violations += label
+            }
+        }
+        return violations
+    }
+
     private fun agentConnectorPromptViolations(
         prompt: String,
         requirements: AgentConnectorCopyRequirements,
@@ -669,10 +757,21 @@ class LocalizationResourceTest {
         val postApproval: String,
     )
 
+    private data class AgentConnectorCodexCopyRequirements(
+        val promptPrefix: String,
+        val explanation: String,
+        val prerequisites: String,
+        val approval: String,
+        val postApproval: String,
+    )
+
     private companion object {
+        const val AGENT_CONNECTOR_CODEX_PROMPT_KEY = "agent_connector_codex_prompt"
         const val AGENT_CONNECTOR_NPUB_PLACEHOLDER = "%1\$s"
         const val AGENT_CONNECTOR_DOCS_URL =
             "https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md"
+        const val CODEX_HARNESS_README_URL =
+            "https://github.com/marmot-protocol/mdk/blob/master/integrations/codex/marmot/README.md"
 
         val agentConnectorPromptKeys =
             listOf(
@@ -785,6 +884,161 @@ class LocalizationResourceTest {
                     ),
             )
 
+        val agentConnectorCodexCopyRequirements =
+            mapOf(
+                "values" to
+                    AgentConnectorCodexCopyRequirements(
+                        promptPrefix = "This is an installation prompt",
+                        explanation = "Explain to me how the connector works and what the installation will change.",
+                        prerequisites =
+                            "Confirm prerequisites: Codex CLI is installed, authenticated, and available on PATH, " +
+                                "and this machine uses the same public relay set as my phone.",
+                        approval = "ask for my approval before making any changes.",
+                        postApproval =
+                            "install-codex-marmot.sh release flow, bootstrap wn-agent for that npub with the " +
+                                "allowed welcomer, verify wn-codex --version",
+                    ),
+                "values-de" to
+                    AgentConnectorCodexCopyRequirements(
+                        promptPrefix = "Dies ist eine Installationsanweisung",
+                        explanation =
+                            "Erkläre mir, wie der Konnektor funktioniert und was die Installation " +
+                                "ändern wird.",
+                        prerequisites =
+                            "Bestätige die Voraussetzungen: Die Codex-CLI ist installiert, authentifiziert " +
+                                "und auf PATH verfügbar, und dieser Rechner nutzt dasselbe öffentliche " +
+                                "Relay-Set wie mein Telefon.",
+                        approval = "bitte um meine Zustimmung, bevor du Änderungen vornimmst.",
+                        postApproval =
+                            "install-codex-marmot.sh-Release-Flow, bootstrap wn-agent für diese npub mit dem " +
+                                "zugelassenen Welcomer, überprüfe wn-codex --version",
+                    ),
+                "values-es" to
+                    AgentConnectorCodexCopyRequirements(
+                        promptPrefix = "Esta es una instrucción de instalación",
+                        explanation = "Explícame cómo funciona el conector y qué cambiará la instalación.",
+                        prerequisites =
+                            "Confirma los requisitos previos: la CLI de Codex está instalada, autenticada y " +
+                                "disponible en PATH, y esta máquina usa el mismo conjunto de relays públicos " +
+                                "que mi teléfono.",
+                        approval = "pide mi aprobación antes de realizar cualquier cambio.",
+                        postApproval =
+                            "flujo de release install-codex-marmot.sh verificado por checksum, " +
+                                "inicializa wn-agent para esa npub con el welcomer permitido, " +
+                                "verifica wn-codex --version",
+                    ),
+                "values-fr" to
+                    AgentConnectorCodexCopyRequirements(
+                        promptPrefix = "Ceci est une invite d’installation",
+                        explanation =
+                            "Expliquez-moi comment le connecteur fonctionne et ce que l’installation " +
+                                "va modifier.",
+                        prerequisites =
+                            "Confirmez les prérequis : la CLI Codex est installée, authentifiée et disponible " +
+                                "dans PATH, et cette machine utilise le même ensemble de relais publics que " +
+                                "mon téléphone.",
+                        approval = "demandez mon approbation avant d’apporter la moindre modification.",
+                        postApproval =
+                            "flux de release install-codex-marmot.sh vérifié par somme de contrôle, " +
+                                "initialisez wn-agent pour cette npub avec le welcomer autorisé, " +
+                                "vérifiez wn-codex --version",
+                    ),
+                "values-it" to
+                    AgentConnectorCodexCopyRequirements(
+                        promptPrefix = "Questo è un prompt di installazione",
+                        explanation = "Spiegami come funziona il connettore e cosa cambierà l’installazione.",
+                        prerequisites =
+                            "Conferma i prerequisiti: la CLI Codex è installata, autenticata e disponibile " +
+                                "in PATH, e questa macchina usa lo stesso set di relay pubblici del mio telefono.",
+                        approval = "chiedi la mia approvazione prima di apportare qualsiasi modifica.",
+                        postApproval =
+                            "flusso di release install-codex-marmot.sh verificato tramite checksum, " +
+                                "avvia wn-agent per quella npub con il welcomer consentito, " +
+                                "verifica wn-codex --version",
+                    ),
+                "values-pt" to
+                    AgentConnectorCodexCopyRequirements(
+                        promptPrefix = "Este é um prompt de instalação",
+                        explanation = "Explique como o conector funciona e o que a instalação alterará.",
+                        prerequisites =
+                            "Confirme os pré-requisitos: a CLI do Codex está instalada, autenticada e " +
+                                "disponível no PATH, e esta máquina usa o mesmo conjunto de relays públicos " +
+                                "do meu telefone.",
+                        approval = "peça minha aprovação antes de fazer qualquer alteração.",
+                        postApproval =
+                            "fluxo de release install-codex-marmot.sh verificado por checksum, " +
+                                "inicialize wn-agent para essa npub com o welcomer permitido, " +
+                                "verifique wn-codex --version",
+                    ),
+                "values-ru" to
+                    AgentConnectorCodexCopyRequirements(
+                        promptPrefix = "Это запрос на установку",
+                        explanation = "Объясните мне, как работает коннектор и что изменит установка.",
+                        prerequisites =
+                            "Подтвердите предварительные требования: CLI Codex установлена, аутентифицирована " +
+                                "и доступна в PATH, а эта машина использует тот же набор публичных релеев, что и " +
+                                "мой телефон.",
+                        approval = "запросите мое одобрение, прежде чем вносить какие-либо изменения.",
+                        postApproval =
+                            "релизный поток install-codex-marmot.sh с проверкой контрольной суммы, " +
+                                "выполните bootstrap wn-agent для этой npub с разрешенным welcomer, " +
+                                "проверьте wn-codex --version",
+                    ),
+                "values-tr" to
+                    AgentConnectorCodexCopyRequirements(
+                        promptPrefix = "Bu bir kurulum istemidir",
+                        explanation =
+                            "Bağlayıcının nasıl çalıştığını ve kurulumun neleri değiştireceğini " +
+                                "bana açıklayın.",
+                        prerequisites =
+                            "Önkoşulları doğrulayın: Codex CLI kurulu, kimliği doğrulanmış ve PATH üzerinde " +
+                                "kullanılabilir durumda; bu makine telefonumla aynı genel relay kümesini " +
+                                "kullanıyor.",
+                        approval = "herhangi bir değişiklik yapmadan önce onayımı isteyin.",
+                        postApproval =
+                            "install-codex-marmot.sh sürüm akışını kullanın, izin verilen welcomer ile o npub " +
+                                "için wn-agent önyüklemesini yapın, wn-codex --version komutunu doğrulayın",
+                    ),
+                "values-zh" to
+                    AgentConnectorCodexCopyRequirements(
+                        promptPrefix = "这是一条安装提示",
+                        explanation = "请向我解释连接器的工作方式以及安装会带来哪些更改。",
+                        prerequisites =
+                            "确认前提条件：Codex CLI 已安装、已认证并可在 PATH 中使用，且此机器使用与手机相同的公共中继集合。",
+                        approval = "并在进行任何更改之前请求我的批准。",
+                        postApproval =
+                            "install-codex-marmot.sh 发布流程，为该 npub 引导 wn-agent 并使用允许的 welcomer，" +
+                                "验证 wn-codex --version",
+                    ),
+                "values-b+zh+Hant" to
+                    AgentConnectorCodexCopyRequirements(
+                        promptPrefix = "這是一則安裝提示",
+                        explanation = "請向我解釋連接器的運作方式以及安裝會帶來哪些變更。",
+                        prerequisites =
+                            "確認前提條件：Codex CLI 已安裝、已驗證並可在 PATH 中使用，且此機器使用與手機相同的公開中繼集合。",
+                        approval = "並在進行任何變更之前請求我的核准。",
+                        postApproval =
+                            "install-codex-marmot.sh 發佈流程，為該 npub 引導 wn-agent 並使用允許的 welcomer，" +
+                                "驗證 wn-codex --version",
+                    ),
+            )
+
+        val agentConnectorCodexRequiredPatterns =
+            listOf(
+                "Codex installer script" to Regex("""install-codex-marmot\.sh"""),
+                "wn-agent bootstrap" to Regex("""\bwn-agent\b"""),
+                "wn-codex version check" to Regex("""wn-codex\s+--version"""),
+            )
+
+        val agentConnectorCodexForbiddenPatterns =
+            listOf(
+                "curl" to Regex("""\bcurl\b""", RegexOption.IGNORE_CASE),
+                "pipe-to-bash" to Regex("""\|\s*bash"""),
+                "gateway run" to Regex("""gateway\s+run""", RegexOption.IGNORE_CASE),
+                "bootstrap.json" to Regex("""bootstrap\.json"""),
+                "home path" to Regex("""~\/"""),
+            )
+
         val agentConnectorForbiddenPatterns =
             listOf(
                 "machine approval marker" to Regex("""APPROVAL_REQUIRED:"""),
@@ -871,6 +1125,7 @@ class LocalizationResourceTest {
                 "agent_connector_hermes_name",
                 "agent_connector_openclaw_name",
                 "agent_connector_opencode_name",
+                "agent_connector_codex_name",
                 "edit_history_original",
                 "edit_history_version_label",
                 "generic_message",

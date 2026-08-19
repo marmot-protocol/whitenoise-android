@@ -30,4 +30,10 @@ internal val agentConnectors =
             subtitleRes = R.string.agent_connector_opencode_subtitle,
             promptRes = R.string.agent_connector_opencode_prompt,
         ),
+        AgentConnector(
+            id = "codex",
+            nameRes = R.string.agent_connector_codex_name,
+            subtitleRes = R.string.agent_connector_codex_subtitle,
+            promptRes = R.string.agent_connector_codex_prompt,
+        ),
     )
