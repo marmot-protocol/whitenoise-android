@@ -49,6 +49,11 @@ object NotificationChannels {
             // version is shown instead of the body. Only the message channels opt
             // into explicit vibration for a short single-pulse chat alert.
             lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            // A launcher dot is message-unread attention, not a generic signal
+            // that any White Noise notification exists. Android freezes this
+            // setting at first channel creation, so upgrades preserve every
+            // existing/user-owned channel while fresh installs get the policy.
+            setShowBadge(spec.launcherBadgeByDefault)
             when (spec) {
                 NotificationChannelSpec.DIRECT_MESSAGES,
                 NotificationChannelSpec.GROUP_MESSAGES,

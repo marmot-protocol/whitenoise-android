@@ -159,6 +159,23 @@ class NotificationChannelSpecTest {
         assertEquals("app_updates_v1", NotificationChannelSpec.APP_UPDATES.id)
     }
 
+    @Test
+    fun launcherBadgeDefaultsOnlyRepresentUnreadMessageAttention() {
+        val badgeEligible =
+            NotificationChannelSpec.entries
+                .filter(NotificationChannelSpec::launcherBadgeByDefault)
+                .toSet()
+
+        assertEquals(
+            setOf(
+                NotificationChannelSpec.DIRECT_MESSAGES,
+                NotificationChannelSpec.GROUP_MESSAGES,
+                NotificationChannelSpec.MENTIONS,
+            ),
+            badgeEligible,
+        )
+    }
+
     private fun update(
         trigger: NotificationTriggerFfi,
         isDm: Boolean = false,

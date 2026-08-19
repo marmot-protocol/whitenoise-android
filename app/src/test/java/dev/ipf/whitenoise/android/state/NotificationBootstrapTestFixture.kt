@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Looper
 import dev.ipf.marmotkit.AuditDataModeFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
+import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.NotificationSettingsFfi
@@ -40,6 +41,7 @@ internal class NotificationBootstrapTestFixture(
     initiallyBlockSubscriptionsSynchronously: Boolean = false,
     delayFirstNotificationDispatchAfterRuntimeStart: Boolean = false,
     receiverTimeoutMillis: Long = 100L,
+    private val markReadRow: ChatListRowFfi? = null,
 ) {
     private val appContext = context.applicationContext
     private val updates = Channel<NotificationUpdateFfi>(Channel.UNLIMITED)
@@ -62,6 +64,7 @@ internal class NotificationBootstrapTestFixture(
 
     val runtimeStartCalls = AtomicInteger(0)
     val subscriptionCalls = AtomicInteger(0)
+    val markReadCalls = AtomicInteger(0)
 
     @Volatile
     var receiverWasAttachedAtPostStartEmission = false
@@ -143,6 +146,10 @@ internal class NotificationBootstrapTestFixture(
                         localNotificationsEnabled = true,
                         nativePushEnabled = false,
                     )
+                "markTimelineMessageRead" -> {
+                    markReadCalls.incrementAndGet()
+                    markReadRow
+                }
                 "listAccounts", "chatList" -> emptyList<Any>()
                 "displayName" -> "Alice"
                 "toString" -> "NotificationBootstrapMarmotFake"
