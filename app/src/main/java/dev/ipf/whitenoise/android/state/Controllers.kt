@@ -4,6 +4,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.Choreographer
 import androidx.annotation.StringRes
+import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -7066,6 +7067,14 @@ class ConversationController(
 
     var hasPublishedAuthoritativeTimeline by mutableStateOf(false)
         private set
+
+    // Test-only seam: navigation promotes a chat-list tap only after the
+    // authoritative page publishes, and screen-level tests can't run the FFI
+    // subscription that flips this in production.
+    @VisibleForTesting
+    internal fun markAuthoritativeTimelinePublishedForTest() {
+        hasPublishedAuthoritativeTimeline = true
+    }
 
     /** Local sender metadata needed for a settled first presentation is ready. */
     var hasPreparedInitialPresentation by mutableStateOf(false)

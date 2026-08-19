@@ -34,9 +34,12 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
+import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -271,6 +274,11 @@ class ConversationImeCollapseFocusTest {
                 initialGroup = group,
                 initialTimelinePreview = preview,
             )
+        // Model the promoted chat-list-tap open: navigation only promotes after
+        // the authoritative page publishes, and the tapped row always carries
+        // the projection its preview came from. A projection-less open is the
+        // provisional direct route, which deliberately hides until anchored.
+        controller.markAuthoritativeTimelinePublishedForTest()
         val chat =
             ChatListItem(
                 group = group,
@@ -278,6 +286,7 @@ class ConversationImeCollapseFocusTest {
                 otherMemberAccount = null,
                 memberCount = 2,
                 memberSnapshot = null,
+                projection = cachedProjection(preview),
             )
 
         composeRule.mainClock.autoAdvance = false
@@ -332,6 +341,40 @@ class ConversationImeCollapseFocusTest {
             attachmentKind = null,
             attachmentCount = 0u,
             deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+        )
+
+    private fun cachedProjection(preview: ChatListMessagePreviewFfi) =
+        ChatListRowFfi(
+            selfMembership = SelfMembershipFfi.MEMBER,
+            unreadMentionCount = 0uL,
+            unreadMention = false,
+            groupIdHex = GROUP_ID,
+            archived = false,
+            pendingConfirmation = false,
+            title = "Handoff group",
+            groupName = "Handoff group",
+            avatarUrl = null,
+            avatar = null,
+            lastMessage = preview,
+            unreadCount = 0uL,
+            hasUnread = false,
+            firstUnreadMessageIdHex = null,
+            lastReadMessageIdHex = preview.messageIdHex,
+            lastReadTimelineAt = preview.timelineAt,
+            conversationCreatedAt = 0uL,
+            activitySortAt = preview.timelineAt,
+            updatedAt = preview.timelineAt,
+            leaveRequestPending = false,
+            leaveRequestedAtMs = null,
+            manuallyMarkedUnread = false,
+            conversationKind = ChatConversationKindFfi.UNKNOWN,
+            muted = false,
+            mutedUntilMs = null,
+            pinned = false,
+            pinnedPosition = null,
+            lifecycleState = GroupLifecycleStateFfi.STABLE,
+            disbanding = false,
+            disbandRequest = null,
         )
 
     private fun dispatchImeBottom(

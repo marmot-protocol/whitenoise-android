@@ -320,11 +320,18 @@ class AppStateSendLockCoverageTest {
                 source.indexOf("val scrollCoordinator ="),
             )
 
+        val initialAnchoredOwner =
+            source.substring(
+                source.indexOf("var initialTimelineAnchored by"),
+                source.indexOf("ConversationTtsAutoReadEffects("),
+            )
+
         assertTrue(
             "same-group account switches must reset anchoring state and cancel effects that capture the old controller",
             "remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration)" in unreadJumpOwner &&
                 "mutableStateOf(ConversationUnreadJumpState())" in unreadJumpOwner &&
-                "remember(controller, notificationOpenRequestId) { mutableStateOf(firstFrameSeed.anchorTailImmediately) }" in source &&
+                "remember(controller, notificationOpenRequestId)" in initialAnchoredOwner &&
+                "mutableStateOf(firstFrameSeed.anchorTailImmediately && !firstFrameSeed.awaitingAuthoritativeTimeline)" in initialAnchoredOwner &&
                 "remember(controller) {" in source &&
                 "ConversationNavigationState(" in source &&
                 "onDispose(state::cancelJobs)" in source &&
