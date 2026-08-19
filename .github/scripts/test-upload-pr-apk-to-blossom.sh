@@ -15,7 +15,8 @@ fake_nak="$tmp/nak"
 cat > "$fake_nak" <<'FAKE_NAK'
 #!/usr/bin/env bash
 set -euo pipefail
-cat >/dev/null
+apk_file=${@: -1}
+[[ -f "$apk_file" ]] || { printf 'missing upload file: %s\n' "$apk_file" >&2; exit 123; }
 attempt=$(<"$FAKE_NAK_STATE")
 attempt=$((attempt + 1))
 printf '%s\n' "$attempt" > "$FAKE_NAK_STATE"
@@ -70,12 +71,16 @@ case "$FAKE_SCENARIO:$attempt" in
     printf 'not-json\n'
     exit 0
     ;;
+  mime-mismatch:*)
+    printf '{"sha256":"%s","type":"application/zip"}\n' "$FAKE_APK_SHA256"
+    exit 0
+    ;;
   nxdomain:*)
     printf "failed to upload to 'https://example.test': dial tcp: lookup example.test: no such host\n" >&2
     exit 123
     ;;
 esac
-printf '{"sha256":"%s"}\n' "$FAKE_APK_SHA256"
+printf '{"sha256":"%s","type":"application/vnd.android.package-archive"}\n' "$FAKE_APK_SHA256"
 FAKE_NAK
 chmod +x "$fake_nak"
 
@@ -88,6 +93,7 @@ run_uploader() {
   APK_PATH="$apk" \
     BLOSSOM_SERVER='https://example.test' \
     BLOSSOM_UPLOAD_NSEC='test-secret-must-not-leak' \
+    BLOSSOM_SKIP_SERVE_CHECK=1 \
     NAK_BIN="$fake_nak" \
     FAKE_NAK_STATE="$state" \
     FAKE_APK_SHA256="$expected_sha" \
@@ -162,6 +168,13 @@ run_uploader hash-mismatch
 [[ "$(<"$stderr")" == *'Blossom upload sha mismatch'* ]]
 [[ "$(<"$stderr")" != *'test-secret-must-not-leak'* ]]
 printf 'ok - fails closed on a returned SHA-256 mismatch\n'
+
+run_uploader mime-mismatch
+[[ "$status" != '0' ]]
+[[ "$(<"$state")" == '1' ]]
+[[ "$(<"$stderr")" == *'Blossom stored APK as application/zip'* ]]
+[[ "$(<"$stderr")" != *'test-secret-must-not-leak'* ]]
+printf 'ok - fails closed on a returned APK MIME mismatch\n'
 
 for scenario in empty-output malformed-output; do
   run_uploader "$scenario"

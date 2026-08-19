@@ -39,7 +39,7 @@ jobs:
         run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
 
       - name: Test PR screenshot renderer
-        run: node --test .github/scripts/update-pr-screenshots.test.js
+        run: node --test .github/scripts/update-pr-screenshots.test.js .github/scripts/update-pr-preview-links.test.js
 
       - name: Test GitHub triage reconciliation
         run: python3 -m unittest scripts/test_check_github_triage.py

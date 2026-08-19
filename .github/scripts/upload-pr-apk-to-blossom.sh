@@ -24,8 +24,14 @@ if ! [[ "$backoff_seconds" =~ ^[0-9]+$ ]] || (( backoff_seconds > 60 )); then
 fi
 
 apk_sha256=$(sha256sum "$APK_PATH" | awk '{print $1}')
+expected_mime=${BLOSSOM_APK_MIME:-application/vnd.android.package-archive}
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+# Upload by file path (not stdin) so nak sends the APK MIME type. Stdin uploads
+# store blobs as application/zip on nostr.download, which makes browsers save
+# hash.apk.zip instead of a plain .apk.
+staging_apk="$tmp/preview-upload.apk"
+cp -- "$APK_PATH" "$staging_apk"
 
 for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
   stdout="$tmp/stdout"
@@ -35,10 +41,10 @@ for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
   set +e
   # The single-quoted command expands only inside the isolated child shell.
   # shellcheck disable=SC2016
-  NAK_BIN_VALUE="$nak_bin" LC_ALL=C \
+  NAK_BIN_VALUE="$nak_bin" APK_STAGING="$staging_apk" LC_ALL=C \
     timeout --verbose --signal=TERM --kill-after=10s "${attempt_timeout_seconds}s" \
-      bash -c 'exec "$NAK_BIN_VALUE" blossom upload --server "$BLOSSOM_SERVER" --sec "$BLOSSOM_UPLOAD_NSEC" 2>&3' \
-      < "$APK_PATH" > "$stdout" 2> "$timeout_stderr" 3> "$stderr"
+      bash -c 'exec "$NAK_BIN_VALUE" blossom upload --server "$BLOSSOM_SERVER" --sec "$BLOSSOM_UPLOAD_NSEC" "$APK_STAGING" 2>&3' \
+      > "$stdout" 2> "$timeout_stderr" 3> "$stderr"
   status=$?
   set -e
 
@@ -53,7 +59,27 @@ for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
         "$apk_sha256" "$returned" >&2
       exit 1
     fi
-    printf '%s/%s.apk\n' "${BLOSSOM_SERVER%/}" "$apk_sha256"
+    if ! returned_type=$(jq -er '.type | select(type == "string")' < "$stdout" 2>/dev/null) || \
+      [[ -z "$returned_type" ]]; then
+      printf 'Blossom upload returned an invalid MIME type\n' >&2
+      exit 1
+    fi
+    if [[ "$returned_type" != "$expected_mime" ]]; then
+      printf 'Blossom stored APK as %s instead of %s\n' "$returned_type" "$expected_mime" >&2
+      exit 1
+    fi
+    url=$(printf '%s/%s.apk' "${BLOSSOM_SERVER%/}" "$apk_sha256")
+    if [[ "${BLOSSOM_SKIP_SERVE_CHECK:-}" != 1 ]]; then
+      served_type=$(
+        curl --fail --silent --show-error --head --max-time 30 "$url" \
+          | awk -F': ' 'tolower($1) == "content-type" { sub(/\r$/, "", $2); print $2; exit }'
+      )
+      if [[ "$served_type" != "$expected_mime" ]]; then
+        printf 'Blossom serves %s as %s instead of %s\n' "$url" "$served_type" "$expected_mime" >&2
+        exit 1
+      fi
+    fi
+    printf '%s\n' "$url"
     exit 0
   fi
 
