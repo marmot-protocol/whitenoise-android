@@ -20,21 +20,35 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Banner states. Steady-state connected renders nothing — transient only. */
 internal enum class ConnectivityBannerState { Hidden, Offline, Connecting, JustConnected }
@@ -98,8 +112,50 @@ internal const val CONNECTIVITY_BANNER_DEBOUNCE_MILLIS = 500L
 internal const val CONNECTIVITY_BANNER_FLASH_MILLIS = 1_500L
 
 // Relay health is a polled snapshot (the bindings expose no push stream for
-// pool state), refreshed on this cadence while the banner can render.
+// pool state). The fast cadence runs only while the signal is banner-relevant,
+// steady connected operation backs off so the idle chat list is not woken
+// every two seconds for a signal that changes nothing.
 internal const val CONNECTIVITY_RELAY_POLL_MILLIS = 2_000L
+
+// Accepted tradeoff of the backoff: a relay-only drop (device network still
+// up) has no push source, so it is discovered by the next steady poll — up to
+// one backoff late. Network-driven transitions and foreground resumes wake the
+// sleep immediately through [relayPollWakeEvents].
+internal const val CONNECTIVITY_RELAY_STEADY_POLL_MILLIS = 15_000L
+
+/**
+ * Picks the relay-health poll delay: fast while the banner shows a problem or
+ * the relays are not connected, backed off once steady-state connected. Named
+ * so the regression test can pin that steady state never uses the fast cadence.
+ */
+internal fun relayPollDelayMillis(
+    displayed: ConnectivityBannerState,
+    relaysConnected: Boolean,
+): Long =
+    if (displayed == ConnectivityBannerState.Hidden && relaysConnected) {
+        CONNECTIVITY_RELAY_STEADY_POLL_MILLIS
+    } else {
+        CONNECTIVITY_RELAY_POLL_MILLIS
+    }
+
+/**
+ * Events that must cut a steady-state backoff sleep short: any state change
+ * that puts the poll back on the fast cadence (network loss is pushed, banner
+ * state is local), and every foreground resume — the poll is a no-op while
+ * backgrounded, so a resume must not wait out a sleep started against a stale
+ * pre-background snapshot.
+ */
+internal fun relayPollWakeEvents(
+    displayedStates: Flow<ConnectivityBannerState>,
+    relaysConnected: Flow<Boolean>,
+    foregroundResumes: Flow<Unit>,
+): Flow<Unit> =
+    merge(
+        combine(displayedStates, relaysConnected) { shown, connected ->
+            relayPollDelayMillis(shown, connected) == CONNECTIVITY_RELAY_POLL_MILLIS
+        }.filter { it }.map { },
+        foregroundResumes,
+    )
 
 internal const val CHAT_LIST_INLINE_CONNECTIVITY_TAG = "chat-list-inline-connectivity"
 
@@ -113,10 +169,34 @@ internal const val CHAT_LIST_OFFLINE_BANNER_TAG = "chat-list-offline-banner"
 @Composable
 internal fun rememberChatListConnectivityState(appState: WhiteNoiseAppState): ConnectivityBannerState {
     var displayed by remember { mutableStateOf(ConnectivityBannerState.Hidden) }
-    LaunchedEffect(appState) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var foregroundEpoch by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_START) foregroundEpoch++
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(appState, lifecycleOwner) {
+        val wakeEvents =
+            relayPollWakeEvents(
+                displayedStates = snapshotFlow { displayed },
+                relaysConnected = appState.connectivitySignals.map { it.relaysConnected },
+                foregroundResumes = snapshotFlow { foregroundEpoch }.drop(1).map { },
+            )
         while (true) {
             appState.refreshRelayConnectivity()
-            delay(CONNECTIVITY_RELAY_POLL_MILLIS)
+            val pollDelay = relayPollDelayMillis(displayed, appState.connectivitySignals.value.relaysConnected)
+            if (pollDelay == CONNECTIVITY_RELAY_POLL_MILLIS) {
+                delay(pollDelay)
+            } else {
+                // Sleep the backoff, but wake early on any event that needs
+                // the fast cadence back so recovery never waits out the
+                // remaining backoff window.
+                withTimeoutOrNull(pollDelay) { wakeEvents.first() }
+            }
         }
     }
     LaunchedEffect(appState) {

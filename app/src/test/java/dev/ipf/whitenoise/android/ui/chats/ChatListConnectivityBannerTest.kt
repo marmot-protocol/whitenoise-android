@@ -1,8 +1,19 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ChatListConnectivityBannerTest {
     @Test
     fun targetsMapTheTwoSignals() {
@@ -27,6 +38,119 @@ class ChatListConnectivityBannerTest {
             connectivityBannerTarget(hasNetwork = true, relaysConnected = true),
         )
     }
+
+    @Test
+    fun steadyStateConnectedNeverPollsOnTheFastCadence() {
+        // Steady state — banner hidden, relays connected — must back off, the
+        // idle chat list may not wake every two seconds.
+        assertEquals(
+            CONNECTIVITY_RELAY_STEADY_POLL_MILLIS,
+            relayPollDelayMillis(ConnectivityBannerState.Hidden, relaysConnected = true),
+        )
+    }
+
+    @Test
+    fun bannerRelevantStatesKeepTheFastPollCadence() {
+        assertEquals(
+            CONNECTIVITY_RELAY_POLL_MILLIS,
+            relayPollDelayMillis(ConnectivityBannerState.Offline, relaysConnected = false),
+        )
+        assertEquals(
+            CONNECTIVITY_RELAY_POLL_MILLIS,
+            relayPollDelayMillis(ConnectivityBannerState.Connecting, relaysConnected = false),
+        )
+        assertEquals(
+            CONNECTIVITY_RELAY_POLL_MILLIS,
+            relayPollDelayMillis(ConnectivityBannerState.JustConnected, relaysConnected = true),
+        )
+        // Hidden but relays down — the debounce window before the banner shows
+        // still needs the fast cadence to confirm or clear the problem.
+        assertEquals(
+            CONNECTIVITY_RELAY_POLL_MILLIS,
+            relayPollDelayMillis(ConnectivityBannerState.Hidden, relaysConnected = false),
+        )
+    }
+
+    @Test
+    fun steadyBackoffSleepRunsTheFullWindowWhenNothingChanges() =
+        runTest {
+            val woke =
+                withTimeoutOrNull(CONNECTIVITY_RELAY_STEADY_POLL_MILLIS) {
+                    relayPollWakeEvents(
+                        displayedStates = MutableStateFlow(ConnectivityBannerState.Hidden),
+                        relaysConnected = MutableStateFlow(true),
+                        foregroundResumes = MutableSharedFlow(),
+                    ).first()
+                }
+
+            assertNull(woke)
+        }
+
+    @Test
+    fun relayDegradationWakesTheBackoffSleepEarly() =
+        runTest {
+            val relays = MutableStateFlow(true)
+            val woke =
+                async {
+                    withTimeoutOrNull(CONNECTIVITY_RELAY_STEADY_POLL_MILLIS) {
+                        relayPollWakeEvents(
+                            displayedStates = MutableStateFlow(ConnectivityBannerState.Hidden),
+                            relaysConnected = relays,
+                            foregroundResumes = MutableSharedFlow(),
+                        ).first()
+                    }
+                }
+            runCurrent()
+
+            relays.value = false
+
+            assertNotNull(woke.await())
+        }
+
+    @Test
+    fun bannerStateChangeWakesTheBackoffSleepEarly() =
+        runTest {
+            val displayed = MutableStateFlow(ConnectivityBannerState.Hidden)
+            val woke =
+                async {
+                    withTimeoutOrNull(CONNECTIVITY_RELAY_STEADY_POLL_MILLIS) {
+                        relayPollWakeEvents(
+                            displayedStates = displayed,
+                            relaysConnected = MutableStateFlow(true),
+                            foregroundResumes = MutableSharedFlow(),
+                        ).first()
+                    }
+                }
+            runCurrent()
+
+            displayed.value = ConnectivityBannerState.Offline
+
+            assertNotNull(woke.await())
+        }
+
+    @Test
+    fun foregroundResumeWakesTheBackoffSleepEarly() =
+        runTest {
+            // A sleep started before backgrounding must not be waited out on
+            // resume — the poll was a no-op the whole time, so the snapshot it
+            // was priced against is stale.
+            val resumes = MutableSharedFlow<Unit>()
+            val woke =
+                async {
+                    withTimeoutOrNull(CONNECTIVITY_RELAY_STEADY_POLL_MILLIS) {
+                        relayPollWakeEvents(
+                            displayedStates = MutableStateFlow(ConnectivityBannerState.Hidden),
+                            relaysConnected = MutableStateFlow(true),
+                            foregroundResumes = resumes,
+                        ).first()
+                    }
+                }
+            runCurrent()
+
+            resumes.emit(Unit)
+
+            assertNotNull(woke.await())
+        }
 
     @Test
     fun relayHealthMapsToConnectivityByConnectedCount() {
