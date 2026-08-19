@@ -97,6 +97,7 @@ internal fun MediaFileBubble(
         }
     val noOpenAppMessage = stringResource(R.string.media_no_app_to_open)
     val couldntOpenMessage = stringResource(R.string.media_couldnt_open)
+    val couldntLoadMessage = stringResource(R.string.media_couldnt_load)
     // Reconcile the controller-owned transfer presentation against cache
     // hydration/eviction. This probe never owns or cancels a running transfer.
     val cacheRevision by appState.mediaCacheRevision.collectAsState()
@@ -141,14 +142,14 @@ internal fun MediaFileBubble(
                         scope.launch {
                             try {
                                 val file =
-                                    materializeMediaFile(
+                                    materializeMediaFileOrNotify(
                                         context = context,
                                         controller = controller,
                                         messageIdHex = messageIdHex,
                                         attachmentIndex = attachmentIndex,
                                         reference = reference,
                                         mine = mine,
-                                    ) ?: return@launch
+                                    ) { appState.present(couldntLoadMessage) } ?: return@launch
                                 // If the download finishes while the app is in the
                                 // background, keep this tap pending and open as soon
                                 // as the Activity resumes. Process death is covered by
@@ -206,14 +207,14 @@ internal fun MediaFileBubble(
             },
             onOpenExternal = openExternal@{
                 val file =
-                    materializeMediaFile(
+                    materializeMediaFileOrNotify(
                         context = context,
                         controller = controller,
                         messageIdHex = messageIdHex,
                         attachmentIndex = attachmentIndex,
                         reference = reference,
                         mine = mine,
-                    ) ?: return@openExternal
+                    ) { appState.present(couldntLoadMessage) } ?: return@openExternal
                 if (!lifecycleOwner.lifecycle.awaitResumedOrDestroyed()) return@openExternal
                 when (openAttachment(file, reference.mediaType)) {
                     OpenAttachmentResult.Opened -> Unit

@@ -1137,6 +1137,7 @@
     <string name="location_permission_denied">Location permission denied</string>
     <string name="media_no_app_to_open">No app installed to open this file</string>
     <string name="media_couldnt_open">Couldn\'t open file</string>
+    <string name="media_couldnt_load">Couldn\'t load file. Tap to retry.</string>
     <string name="media_open">Open</string>
     <string name="attachment_type_android_package">APK</string>
     <string name="attachment_type_android_package_description">Android app package</string>

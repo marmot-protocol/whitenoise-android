@@ -886,6 +886,7 @@
     <string name="location_permission_denied">Standortberechtigung verweigert</string>
     <string name="media_no_app_to_open">Keine App installiert, um diese Datei zu öffnen</string>
     <string name="media_couldnt_open">Datei konnte nicht geöffnet werden</string>
+    <string name="media_couldnt_load">Datei konnte nicht geladen werden. Tippe, um es erneut zu versuchen.</string>
     <string name="media_open">Öffnen</string>
     <string name="media_file_too_large">Datei zu groß zum Anhängen</string>
     <string name="media_album_too_large">Auswahl zu groß zum Senden</string>

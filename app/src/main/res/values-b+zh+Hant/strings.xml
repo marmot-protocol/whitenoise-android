@@ -872,6 +872,7 @@
     <string name="location_permission_denied">位置權限遭拒</string>
     <string name="media_no_app_to_open">未安裝可開啟此檔案的應用程式</string>
     <string name="media_couldnt_open">無法開啟檔案</string>
+    <string name="media_couldnt_load">無法載入檔案。點按重試。</string>
     <string name="media_open">開啟</string>
     <string name="media_file_too_large">檔案太大,無法附加</string>
     <string name="media_album_too_large">選取內容太大,無法傳送</string>

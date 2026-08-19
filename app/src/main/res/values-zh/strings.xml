@@ -872,6 +872,7 @@
     <string name="location_permission_denied">位置权限被拒绝</string>
     <string name="media_no_app_to_open">未安装可打开此文件的应用</string>
     <string name="media_couldnt_open">无法打开文件</string>
+    <string name="media_couldnt_load">无法加载文件。点按重试。</string>
     <string name="media_open">打开</string>
     <string name="media_file_too_large">文件过大,无法附加</string>
     <string name="media_album_too_large">所选内容过大,无法发送</string>
