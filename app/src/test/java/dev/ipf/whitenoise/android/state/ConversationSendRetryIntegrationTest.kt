@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
@@ -57,6 +58,7 @@ class ConversationSendRetryIntegrationTest {
                         SendSummaryFfi(
                             published = 1u,
                             messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
                             maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
                         )
                     },
@@ -108,6 +110,7 @@ class ConversationSendRetryIntegrationTest {
                         SendSummaryFfi(
                             published = 1u,
                             messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
                             maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
                         )
                     },
@@ -157,6 +160,7 @@ class ConversationSendRetryIntegrationTest {
                         SendSummaryFfi(
                             published = 1u,
                             messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
                             maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
                         )
                     },
