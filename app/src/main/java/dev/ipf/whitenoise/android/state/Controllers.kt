@@ -3295,6 +3295,7 @@ class ChatsController private constructor(
     private val memberSnapshotRetryDelay: (Int) -> Long,
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi,
     initialAccountRef: String?,
+    initialLocalSnapshot: AccountSwitchLocalSnapshot?,
 ) {
     constructor(appState: WhiteNoiseAppState) :
         this(
@@ -3307,6 +3308,7 @@ class ChatsController private constructor(
                 appState.marmotIo { setGroupArchived(accountRef, groupIdHex, archived) }
             },
             initialAccountRef = null,
+            initialLocalSnapshot = appState.consumeAccountSwitchLocalSnapshot(appState.activeAccountRef),
         )
 
     internal constructor(
@@ -3322,6 +3324,24 @@ class ChatsController private constructor(
             appState.marmotIo { setGroupArchived(accountRef, groupIdHex, archived) }
         },
         initialAccountRef,
+        null,
+    )
+
+    internal constructor(
+        appState: WhiteNoiseAppState,
+        initialAccountRef: String,
+        initialLocalSnapshot: AccountSwitchLocalSnapshot,
+        memberSnapshotRetryDelay: (Int) -> Long = ::memberSnapshotRetryDelayMillis,
+        memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
+    ) : this(
+        appState,
+        memberSnapshotLoader,
+        memberSnapshotRetryDelay,
+        { accountRef, groupIdHex, archived ->
+            appState.marmotIo { setGroupArchived(accountRef, groupIdHex, archived) }
+        },
+        initialAccountRef,
+        initialLocalSnapshot,
     )
 
     internal constructor(
@@ -3330,7 +3350,14 @@ class ChatsController private constructor(
         memberSnapshotRetryDelay: (Int) -> Long = ::memberSnapshotRetryDelayMillis,
         memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
         groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi,
-    ) : this(appState, memberSnapshotLoader, memberSnapshotRetryDelay, groupArchivedUpdater, initialAccountRef)
+    ) : this(
+        appState,
+        memberSnapshotLoader,
+        memberSnapshotRetryDelay,
+        groupArchivedUpdater,
+        initialAccountRef,
+        null,
+    )
 
     var items by mutableStateOf<List<ChatListItem>>(emptyList())
         private set
@@ -3340,7 +3367,7 @@ class ChatsController private constructor(
     // paint authoritative EmptyChats until bind() finishes the first local
     // snapshot (issue #1697).
 
-    var isLoading by mutableStateOf(true)
+    var isLoading by mutableStateOf(initialLocalSnapshot == null)
         private set
     var error by mutableStateOf<ErrorPresentation?>(null)
         private set
@@ -3361,7 +3388,7 @@ class ChatsController private constructor(
 
     /** The account this controller is currently bound to (observable so
      *  notification routing can tell when the right account's list is ready). */
-    var boundAccountRef by mutableStateOf<String?>(initialAccountRef)
+    var boundAccountRef by mutableStateOf<String?>(initialLocalSnapshot?.accountRef ?: initialAccountRef)
         private set
 
     /**
@@ -3380,7 +3407,8 @@ class ChatsController private constructor(
     var memberSnapshotsRevision by mutableStateOf(0L)
         private set
 
-    private var accountRef: String? = initialAccountRef
+    private var accountRef: String? = initialLocalSnapshot?.accountRef ?: initialAccountRef
+    private var pendingInitialLocalSnapshot = initialLocalSnapshot
 
     private fun chatRowKey(groupIdHex: String): String = groupIdHex.lowercase()
 
@@ -3741,11 +3769,14 @@ class ChatsController private constructor(
         chatsDebug { "bind account=${accountRef?.take(8)}" }
         this.accountRef = accountRef
         this.boundAccountRef = accountRef
-        val keepLoadedContent = preserveLoadedContent && chatRows.isNotEmpty()
+        val seededLocalSnapshot =
+            pendingInitialLocalSnapshot?.takeIf { snapshot -> snapshot.accountRef == accountRef }
+        pendingInitialLocalSnapshot = null
+        val keepLoadedContent = seededLocalSnapshot != null || (preserveLoadedContent && chatRows.isNotEmpty())
         isLoading = accountRef != null && !keepLoadedContent
         if (!keepLoadedContent) resetBackingState()
         bindEpoch += 1L
-        recompute()
+        recompute(scheduleBackgroundEnrichment = seededLocalSnapshot == null)
         error = null
         terminalLoadFailure = false
 
@@ -3760,7 +3791,21 @@ class ChatsController private constructor(
         appState.refreshDraftSummaries(accountRef)
         try {
             var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
-            var catchUpStarted = keepLoadedContent
+            var catchUpStarted = preserveLoadedContent && seededLocalSnapshot == null && keepLoadedContent
+            if (seededLocalSnapshot != null) {
+                // The one-shot MDK seed was installed synchronously during
+                // controller construction, before this LaunchedEffect began.
+                // Give that target-account composition a complete draw, then
+                // start every live/background enrichment path without ever
+                // replacing it with LoadingScreen or EmptyChats.
+                awaitRenderedChatListFrame()
+                if (shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
+                    appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
+                    catchUpStarted = true
+                    appState.launchCatchUpAccounts()
+                    recompute()
+                }
+            }
             while (coroutineContext.isActive && shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
                 var chatListSubscription: ChatListSubscription? = null
                 var chatsSubscription: ChatsSubscription? = null
@@ -4270,6 +4315,7 @@ class ChatsController private constructor(
     private fun applyInitialMemberIdProjections(
         projections: List<AppGroupMemberIdsFfi>,
         activeAccountIdHex: String?,
+        requestProfileRefresh: Boolean = true,
     ) {
         val updatedCache = memberCacheByGroup.toMutableMap()
         var updatedRemovedGroupIds = removedGroupIds
@@ -4286,7 +4332,9 @@ class ChatsController private constructor(
                 } else {
                     updatedRemovedGroupIds - groupIdHex
                 }
-            members.map { it.memberIdHex }.forEach(appState::requestProfile)
+            if (requestProfileRefresh) {
+                members.map { it.memberIdHex }.forEach(appState::requestProfile)
+            }
             presentationMembersByGroup = presentationMembersByGroup - groupIdHex
             cancelMemberSnapshotRetry(groupIdHex)
             memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
@@ -5652,6 +5700,7 @@ class ChatsController private constructor(
                 bindJob.also { bindJob = null }
             }
         jobToCancel?.cancel()
+        pendingInitialLocalSnapshot = null
         resetBackingState()
         items = emptyList()
         archivedItems = emptyList()
@@ -5687,7 +5736,7 @@ class ChatsController private constructor(
 
     private fun isActiveBindEpoch(epoch: Long): Boolean = !isCleared && bindEpoch == epoch && accountRef != null
 
-    private fun recompute() {
+    private fun recompute(scheduleBackgroundEnrichment: Boolean = true) {
         if (isCleared) return
         // currentProjectedItems() reads backing maps that remain warm while the
         // visible chat-list projection is intentionally frozen. On-demand UI
@@ -5743,17 +5792,21 @@ class ChatsController private constructor(
         // user is likely to receive from next. The app-state notification stream
         // independently warms each ingested sender/conversation on cold UI-less
         // process starts.
-        avatarWarmTargets.forEach(::preWarmNotificationAvatars)
+        if (scheduleBackgroundEnrichment) {
+            avatarWarmTargets.forEach(::preWarmNotificationAvatars)
+        }
         chatsDebug { "recompute visible=${items.size} archived=${archivedItems.size} total=${all.size}" }
         // For any group we don't yet have members cached for, fan out a
         // one-shot members fetch so unnamed titles and the profile sheet's
         // shared-groups list can resolve from local snapshots.
-        schedulePendingMemberFetches()
+        if (scheduleBackgroundEnrichment) schedulePendingMemberFetches()
         // Likewise, fan out off-main markdown parses for any preview text we
         // haven't tokenized yet; each completion folds back via
         // scheduleRecompute() so a burst coalesces into one rebuild.
-        schedulePendingPreviewParses()
-        schedulePendingMediaKindResolves()
+        if (scheduleBackgroundEnrichment) {
+            schedulePendingPreviewParses()
+            schedulePendingMediaKindResolves()
+        }
     }
 
     /**
@@ -6081,6 +6134,25 @@ class ChatsController private constructor(
                 }
             }
         }
+    }
+
+    private fun applyAccountSwitchLocalSnapshot(snapshot: AccountSwitchLocalSnapshot) {
+        accountRef = snapshot.accountRef
+        boundAccountRef = snapshot.accountRef
+        replaceChatRows(snapshot.rows)
+        groupRecordsById = snapshot.groups.associateBy { it.groupIdHex }
+        applyInitialMemberIdProjections(
+            projections = snapshot.memberIds,
+            activeAccountIdHex = snapshot.activeAccountIdHex,
+            requestProfileRefresh = false,
+        )
+        isLoading = false
+        error = null
+        recompute(scheduleBackgroundEnrichment = false)
+    }
+
+    init {
+        pendingInitialLocalSnapshot?.let(::applyAccountSwitchLocalSnapshot)
     }
 }
 

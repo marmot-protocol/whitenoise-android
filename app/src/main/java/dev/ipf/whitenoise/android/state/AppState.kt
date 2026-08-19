@@ -26,6 +26,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
@@ -34,6 +35,8 @@ import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
 import dev.ipf.marmotkit.AuditLogUploadSourceFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatListSubscription
+import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
@@ -1447,6 +1450,59 @@ private data class PendingAccountSwitchTrace(
     val startedAtMs: Long,
 )
 
+/**
+ * One-shot handoff of MDK's authoritative local projection across the
+ * active-account composition boundary. This is deliberately not a retained
+ * Android cache: [WhiteNoiseAppState] owns at most one pending value and the
+ * target [ChatsController] consumes it during construction.
+ */
+internal data class AccountSwitchLocalSnapshot(
+    val accountRef: String,
+    val activeAccountIdHex: String?,
+    val rows: List<ChatListRowFfi>,
+    val groups: List<AppGroupRecordFfi>,
+    val memberIds: List<AppGroupMemberIdsFfi>,
+    internal val profiles: List<AccountSwitchProfileSeed>,
+)
+
+internal data class AccountSwitchProfileSeed(
+    val accountIdHex: String,
+    val profile: UserProfileMetadataFfi?,
+    val displayName: String?,
+    val avatarUrl: String?,
+)
+
+/** Main-confined latest-wins owner for the one-shot account-switch handoff. */
+internal class AccountSwitchLocalSnapshotHandoff {
+    private var generation = 0L
+    private var pending: AccountSwitchLocalSnapshot? = null
+
+    fun beginRequest(): Long {
+        generation += 1L
+        pending = null
+        return generation
+    }
+
+    fun isCurrent(requestGeneration: Long): Boolean = generation == requestGeneration
+
+    fun publish(
+        requestGeneration: Long,
+        snapshot: AccountSwitchLocalSnapshot?,
+    ): Boolean {
+        if (!isCurrent(requestGeneration)) return false
+        pending = snapshot
+        return true
+    }
+
+    fun consume(accountRef: String?): AccountSwitchLocalSnapshot? {
+        val snapshot = pending
+        pending = null
+        return snapshot?.takeIf { accountRef != null && it.accountRef == accountRef }
+    }
+}
+
+private class AccountSwitchSnapshotSuperseded : RuntimeException()
+
 private data class StartupUnreadRefresh(
     val accounts: List<AccountSummaryFfi>,
     val accountListRevision: Long,
@@ -2409,6 +2465,7 @@ class WhiteNoiseAppState private constructor(
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private var accountCatchUpJob: Job? = null
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
+    private val accountSwitchHandoff = AccountSwitchLocalSnapshotHandoff()
 
     // Bumped whenever cross-account caches are cleared (switch / sign-out). An
     // in-flight profile refresh captures it at start and discards its result if
@@ -4642,12 +4699,139 @@ class WhiteNoiseAppState private constructor(
         accountUnreadCounts = accountUnreadCounts + (ref to result.unreadCount)
     }
 
+    private fun isAccountSwitchCurrent(generation: Long) = accountSwitchHandoff.isCurrent(generation)
+
+    private fun ensureAccountSwitchRequestIsCurrent(generation: Long) {
+        if (!isAccountSwitchCurrent(generation)) throw AccountSwitchSnapshotSuperseded()
+    }
+
+    private fun recordAccountSwitchPreloadStage(
+        accountRef: String,
+        stage: String,
+        rowCount: Int,
+    ) {
+        val trace = pendingAccountSwitchTrace ?: return
+        if (trace.accountRef != accountRef) return
+        val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
+        appStateDebug { "account-switch $stage +${elapsedMs}ms rows=$rowCount" }
+    }
+
+    /**
+     * Read the target account's local MDK projection before publishing the new
+     * active account. The old account remains composed behind the selector
+     * while these on-device reads run, so the first target composition can be
+     * the cached list rather than a loading placeholder.
+     */
+    private suspend fun loadAccountSwitchLocalSnapshot(
+        accountRef: String,
+        generation: Long,
+    ): AccountSwitchLocalSnapshot? {
+        var chatListSubscription: ChatListSubscription? = null
+        var chatsSubscription: ChatsSubscription? = null
+        return try {
+            chatListSubscription = marmotIo { subscribeChatList(accountRef, includeArchived = true) }
+            ensureAccountSwitchRequestIsCurrent(generation)
+            chatsSubscription = marmotIo { subscribeChats(accountRef, includeArchived = true) }
+            ensureAccountSwitchRequestIsCurrent(generation)
+            recordAccountSwitchPreloadStage(accountRef, "local-subscriptions-ready", 0)
+
+            val rows = withContext(Dispatchers.IO) { chatListSubscription.snapshot() }
+            ensureAccountSwitchRequestIsCurrent(generation)
+            recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
+
+            val groups = withContext(Dispatchers.IO) { chatsSubscription.snapshot() }
+            ensureAccountSwitchRequestIsCurrent(generation)
+            recordAccountSwitchPreloadStage(accountRef, "cached-groups-ready", rows.size)
+
+            val memberIds = loadAccountSwitchMemberIds(accountRef, rows)
+            ensureAccountSwitchRequestIsCurrent(generation)
+            val memberStage = accountSwitchMemberStage(rows, memberIds)
+            recordAccountSwitchPreloadStage(accountRef, memberStage, rows.size)
+
+            val activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
+            val profiles = loadAccountSwitchProfileSeeds(rows, memberIds, activeAccountIdHex)
+            ensureAccountSwitchRequestIsCurrent(generation)
+            recordAccountSwitchPreloadStage(accountRef, "persisted-profiles-ready", rows.size)
+            AccountSwitchLocalSnapshot(
+                accountRef = accountRef,
+                activeAccountIdHex = activeAccountIdHex,
+                rows = rows,
+                groups = groups,
+                memberIds = memberIds,
+                profiles = profiles,
+            )
+        } catch (_: AccountSwitchSnapshotSuperseded) {
+            null
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (throwable: Throwable) {
+            appStateDebug(throwable) {
+                "account-switch local snapshot failed: ${throwable.readableMessage()}"
+            }
+            null
+        } finally {
+            withContext(NonCancellable + Dispatchers.IO) {
+                runCatching { chatListSubscription?.close() }
+                runCatching { chatsSubscription?.close() }
+            }
+        }
+    }
+
+    private suspend fun loadAccountSwitchMemberIds(
+        accountRef: String,
+        rows: List<ChatListRowFfi>,
+    ): List<AppGroupMemberIdsFfi> =
+        runCatchingCancellable {
+            loadGroupMemberIdsPages(rows.map { it.groupIdHex }) { page ->
+                marmotIo { groupMemberIdsPage(accountRef, page) }
+            }
+        }.onFailure { error ->
+            appStateDebug(error) {
+                "account-switch local member projection failed: ${error.readableMessage()}"
+            }
+        }.getOrDefault(emptyList())
+
+    private fun accountSwitchMemberStage(
+        rows: List<ChatListRowFfi>,
+        memberIds: List<AppGroupMemberIdsFfi>,
+    ): String {
+        val projectedGroupIds = memberIds.mapTo(mutableSetOf()) { it.groupIdHex.lowercase(Locale.ROOT) }
+        return if (rows.all { it.groupIdHex.lowercase(Locale.ROOT) in projectedGroupIds }) {
+            "member-derived-local-ready"
+        } else {
+            "member-derived-local-deferred"
+        }
+    }
+
+    private suspend fun loadAccountSwitchProfileSeeds(
+        rows: List<ChatListRowFfi>,
+        memberIds: List<AppGroupMemberIdsFfi>,
+        activeAccountIdHex: String?,
+    ): List<AccountSwitchProfileSeed> {
+        val rowsByGroup = rows.associateBy { it.groupIdHex.lowercase(Locale.ROOT) }
+        val peerIds =
+            initialDirectPeerProfileIds(memberIds, activeAccountIdHex) { groupIdHex, memberCount ->
+                rowsByGroup[groupIdHex.lowercase(Locale.ROOT)]?.let { row ->
+                    GroupProjector.isDm(row.conversationKind, memberCount, row.groupName)
+                } == true
+            }
+        return coroutineScope {
+            val gate = Semaphore(PROFILE_PRESENTATION_WARM_FANOUT)
+            peerIds
+                .map { id -> async { gate.withPermit { loadAccountSwitchProfileSeed(id) } } }
+                .awaitAll()
+        }
+    }
+
+    internal fun consumeAccountSwitchLocalSnapshot(accountRef: String?) = accountSwitchHandoff.consume(accountRef)
+
     suspend fun setActiveAccount(
         label: String,
         deferUnreadRefresh: Boolean = false,
         shouldActivate: () -> Boolean = { true },
         onActivated: () -> Unit = {},
     ) {
+        val requestGeneration = accountSwitchHandoff.beginRequest()
         val switchingAccounts = label != activeAccountRef
         if (switchingAccounts && BuildConfig.DEBUG) {
             pendingAccountSwitchTrace =
@@ -4655,20 +4839,8 @@ class WhiteNoiseAppState private constructor(
                     accountRef = label,
                     startedAtMs = SystemClock.elapsedRealtime(),
                 )
-        }
-        // Account switch: drop in-process plaintext so account A's bytes
-        // aren't reachable from account B's UI loops, but keep L2 (disk)
-        // intact. The disk cache key is `mediaCacheKey(account, msg)`, so
-        // switching to B can never read A's files — and switching BACK to
-        // A re-hydrates L1 from L2 with a single file read instead of a
-        // re-download. Sign-out (signOutActiveAccount) is what actually
-        // wipes disk; switching is just a UI context flip.
-        // Skip the wipe when the label is unchanged (no-op tap on the
-        // already-active account).
-        if (switchingAccounts) {
-            clearInMemoryMediaCaches()
-            clearCrossAccountCaches()
-            clearConversationShortcutSurfaces()
+        } else if (pendingAccountSwitchTrace?.accountRef != label) {
+            pendingAccountSwitchTrace = null
         }
         val target = accounts.firstOrNull { it.label == label }
         if (target?.signedOut == true) {
@@ -4685,10 +4857,32 @@ class WhiteNoiseAppState private constructor(
                 refreshAccountUnreadCounts(refreshedAccounts)
             }
         }
+        val activationStillWanted =
+            shouldActivate() && isAccountSwitchCurrent(requestGeneration)
+        val localSnapshot =
+            if (switchingAccounts && activationStillWanted) {
+                loadAccountSwitchLocalSnapshot(label, requestGeneration)
+            } else {
+                null
+            }
         // A route may outlive the UI intent that requested it while a signed-out
         // account is being restored. Let request-scoped callers reject that late
         // activation without cancelling the process-lifetime sign-in work.
-        if (!shouldActivate()) return
+        if (!shouldActivate() || !isAccountSwitchCurrent(requestGeneration)) return
+        // Account switch: drop in-process plaintext so account A's bytes
+        // aren't reachable from account B's UI loops, but keep L2 (disk)
+        // intact. The disk cache key is `mediaCacheKey(account, msg)`, so
+        // switching to B can never read A's files — and switching BACK to
+        // A re-hydrates L1 from L2 with a single file read instead of a
+        // re-download. Sign-out (signOutActiveAccount) is what actually
+        // wipes disk; switching is just a UI context flip.
+        if (switchingAccounts) {
+            clearInMemoryMediaCaches()
+            clearCrossAccountCaches()
+            clearConversationShortcutSurfaces()
+            localSnapshot?.profiles?.forEach(::applyAccountSwitchProfileSeed)
+            accountSwitchHandoff.publish(requestGeneration, localSnapshot)
+        }
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
         reloadMediaAutoDownloadMatrix()
@@ -9126,6 +9320,16 @@ class WhiteNoiseAppState private constructor(
      */
     private suspend fun materializeProfileLocally(id: String) {
         val epoch = profileCacheEpoch.get()
+        val seed = loadAccountSwitchProfileSeed(id)
+        withContext(Dispatchers.Main.immediate) {
+            if (profileCacheEpoch.get() == epoch) {
+                applyAccountSwitchProfileSeed(seed)
+            }
+        }
+    }
+
+    /** Read one persisted profile without mutating the active account caches. */
+    private suspend fun loadAccountSwitchProfileSeed(id: String): AccountSwitchProfileSeed {
         val profile =
             if (profileReader != null) {
                 runCatchingCancellable { profileReader.invoke(id) }.getOrNull()
@@ -9144,11 +9348,24 @@ class WhiteNoiseAppState private constructor(
                 displayName = displayName,
                 avatarUrl = ProfileSanitizer.protocolImageUrl(profile?.picture),
             )
-        withContext(Dispatchers.Main.immediate) {
-            if (profileCacheEpoch.get() == epoch) {
-                applyProfilePresentation(id, profile, presentation)
-            }
-        }
+        return AccountSwitchProfileSeed(
+            accountIdHex = id,
+            profile = profile,
+            displayName = presentation.displayName,
+            avatarUrl = presentation.avatarUrl,
+        )
+    }
+
+    private fun applyAccountSwitchProfileSeed(seed: AccountSwitchProfileSeed) {
+        applyProfilePresentation(
+            accountIdHex = seed.accountIdHex,
+            profile = seed.profile,
+            presentation =
+                ProfilePresentation(
+                    displayName = seed.displayName,
+                    avatarUrl = seed.avatarUrl,
+                ),
+        )
     }
 
     /**
