@@ -6493,10 +6493,15 @@ class ConversationController(
     // the conversation's account instead of reading the live active account
     // (which can differ from the controller's account before teardown, and
     // during a notification-routed open while the switch is still landing).
+    // A pinned controller never falls back to the active account: an override
+    // whose label is missing resolves to null, which fails closed ("is me",
+    // admin, and composer gates all deny) instead of mixing two accounts.
     private val conversationAccountIdHex =
-        accountRefOverride
-            ?.let { ref -> appState.accounts.firstOrNull { it.label == ref }?.accountIdHex }
-            ?: appState.activeAccount?.accountIdHex
+        if (accountRefOverride != null) {
+            appState.accounts.firstOrNull { it.label == accountRefOverride }?.accountIdHex
+        } else {
+            appState.activeAccount?.accountIdHex
+        }
 
     private val membershipSeed = conversationMembershipSeed(initialGroup, initialMemberSnapshot, conversationAccountIdHex)
 

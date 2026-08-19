@@ -13,6 +13,18 @@ internal suspend fun awaitNotificationAccountActivationBoundary(startActivation:
     localReady.await()
 }
 
+/**
+ * True when a request's preload never left Loading — the staged route died
+ * before publishing a terminal state. The caller must then clear the preload
+ * and release the routing overlay, or the direct-load branch's Loading case
+ * pins the loading screen forever while the request-id dedupe guard blocks a
+ * retry of the same tap.
+ */
+internal fun notificationPreloadStuckLoading(
+    preload: NotificationMessagePreload<*>?,
+    key: NotificationMessagePreloadKey?,
+): Boolean = preload.stateFor(key) is NotificationMessagePreloadState.Loading
+
 /** A broad-list absence cannot outrun an exact in-flight or completed target read. */
 internal fun notificationMessageRouteChatListReady(
     chatListReady: Boolean,

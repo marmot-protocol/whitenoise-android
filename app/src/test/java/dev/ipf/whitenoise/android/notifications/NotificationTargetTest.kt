@@ -1103,6 +1103,67 @@ class NotificationTargetTest {
         }
 
     @Test
+    fun inactiveMessageRoute_cancelledStageNeverPublishesAndIsReleasedAsStuckLoading() =
+        runTest {
+            val key = requireNotNull(notificationMessagePreloadKey(target, requestId = 59L))
+            var published: NotificationMessagePreload<String>? = null
+            // The shell publishes Loading synchronously before the stage runs.
+            var shellState: NotificationMessagePreload<String>? =
+                NotificationMessagePreload(key = key, state = NotificationMessagePreloadState.Loading)
+
+            val stageFailure =
+                runCatching {
+                    runInactiveNotificationRouteStage<String>(
+                        key = key,
+                        loadTarget = {
+                            kotlinx.coroutines.suspendCancellableCoroutine { it.cancel() }
+                        },
+                        activateAccount = {},
+                        isCurrent = { true },
+                        onPreload = { published = it },
+                    )
+                }.exceptionOrNull()
+
+            assertTrue(
+                "a cancelled stage must fail rather than publish",
+                stageFailure is CancellationException,
+            )
+            assertNull(published)
+            // The caller's finally must detect the never-terminalized Loading
+            // state and release it, or the route pins the loading screen while
+            // the request-id dedupe guard blocks a retry of the same tap.
+            assertTrue(notificationPreloadStuckLoading(shellState, key))
+            shellState = null
+            assertFalse(notificationPreloadStuckLoading(shellState, key))
+        }
+
+    @Test
+    fun stuckLoadingDetectionIgnoresTerminalStatesAndForeignRequests() {
+        val key = requireNotNull(notificationMessagePreloadKey(target, requestId = 60L))
+        val foreignKey = requireNotNull(notificationMessagePreloadKey(target, requestId = 61L))
+
+        assertFalse(
+            notificationPreloadStuckLoading(
+                NotificationMessagePreload(key = key, state = NotificationMessagePreloadState.Ready("item")),
+                key,
+            ),
+        )
+        assertFalse(
+            notificationPreloadStuckLoading(
+                NotificationMessagePreload(key = key, state = NotificationMessagePreloadState.Failed),
+                key,
+            ),
+        )
+        assertFalse(
+            notificationPreloadStuckLoading(
+                NotificationMessagePreload(key = foreignKey, state = NotificationMessagePreloadState.Loading),
+                key,
+            ),
+        )
+        assertFalse(notificationPreloadStuckLoading(null, key))
+    }
+
+    @Test
     fun inactiveMessageRoute_missingTargetFallsBackToBroadChatList() =
         runTest {
             val key = requireNotNull(notificationMessagePreloadKey(target, requestId = 57L))

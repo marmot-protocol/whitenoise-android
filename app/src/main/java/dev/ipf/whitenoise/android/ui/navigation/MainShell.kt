@@ -38,6 +38,7 @@ import dev.ipf.whitenoise.android.notifications.inviteAuthoritativeGroupAvailabl
 import dev.ipf.whitenoise.android.notifications.loadNotificationMessageDirectly
 import dev.ipf.whitenoise.android.notifications.notificationMessagePreloadKey
 import dev.ipf.whitenoise.android.notifications.notificationMessageRouteChatListReady
+import dev.ipf.whitenoise.android.notifications.notificationPreloadStuckLoading
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
 import dev.ipf.whitenoise.android.notifications.retryInviteAuthoritativeLoad
 import dev.ipf.whitenoise.android.notifications.runInactiveNotificationRouteStage
@@ -797,10 +798,7 @@ internal fun MainShell(
                         // request's Loading preload in place; the direct-load
                         // branch maps Loading to "keep waiting", so it would
                         // pin the loading overlay forever. Release both.
-                        if (
-                            notificationMessagePreload.stateFor(preloadKey)
-                                is NotificationMessagePreloadState.Loading
-                        ) {
+                        if (notificationPreloadStuckLoading(notificationMessagePreload, preloadKey)) {
                             notificationMessagePreload = null
                             if (currentInboundNotificationRequestId == routingRequestId) {
                                 routingNotification = false

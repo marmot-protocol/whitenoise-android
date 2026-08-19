@@ -66,6 +66,19 @@ class ConversationControllerAccountPinningTest {
     }
 
     @Test
+    fun pinnedControllerWithMissingAccountLabelFailsClosedInsteadOfBorrowingTheActiveIdentity() {
+        val controller =
+            ConversationController(
+                appState = appState(activeAccountRef = PREVIOUS_REF),
+                initialGroup = group(),
+                accountRefOverride = "vanished-account",
+            )
+
+        assertEquals("vanished-account", controller.boundAccountRef)
+        assertEquals(null, controller.boundAccountIdHex)
+    }
+
+    @Test
     fun unpinnedControllerKeepsBindingToTheActiveAccount() {
         val controller =
             ConversationController(
