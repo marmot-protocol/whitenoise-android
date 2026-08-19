@@ -11,6 +11,8 @@ internal const val CREATE_GROUP_TRACE = "benchmark:create-group"
 internal const val ACCEPT_INVITE_TRACE = "benchmark:accept-invite"
 internal const val SCROLL_CONVERSATION_TRACE = "benchmark:scroll-conversation"
 internal const val SECONDARY_ACCOUNT_NOTIFICATION_TRACE = "benchmark:secondary-account-notification"
+internal const val OPEN_CONVERSATION_VISIBLE_TRACE = "benchmark:open-conversation-visible"
+internal const val OPEN_CONVERSATION_SETTLED_TRACE = "benchmark:open-conversation-settled"
 
 private val notificationRoutePhaseSections =
     listOf(
@@ -44,6 +46,24 @@ internal fun secondaryAccountNotificationMetrics(): List<Metric> =
                 targetPackageOnly = false,
             )
         }
+
+@OptIn(ExperimentalMetricApi::class)
+internal fun openConversationMetrics(): List<Metric> =
+    listOf(
+        FrameTimingMetric(),
+        TraceSectionMetric(
+            sectionName = OPEN_CONVERSATION_VISIBLE_TRACE,
+            mode = TraceSectionMetric.Mode.First,
+            label = "firstTranscriptVisibleMs",
+            targetPackageOnly = false,
+        ),
+        TraceSectionMetric(
+            sectionName = OPEN_CONVERSATION_SETTLED_TRACE,
+            mode = TraceSectionMetric.Mode.First,
+            label = "routeSettledMs",
+            targetPackageOnly = false,
+        ),
+    )
 
 internal inline fun tracedJourney(
     sectionName: String,

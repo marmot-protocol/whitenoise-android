@@ -8,13 +8,7 @@ import dev.ipf.marmotkit.TimelineUserReactionFfi
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * Regression coverage for the #609 fix: the set of profile presentations the
- * conversation pre-warms when a timeline page lands must include every author
- * the rows render — message authors, the authors of quoted reply previews, and
- * reaction authors — deduped and in first-seen order. Missing any of these
- * leaves that author's row flickering its name/avatar in on first paint.
- */
+/** Regression coverage for the bounded, newest-first first-presentation warm. */
 class TimelineRecordProfileSendersTest {
     private fun emptyDoc() =
         MarkdownDocumentFfi(
@@ -83,43 +77,36 @@ class TimelineRecordProfileSendersTest {
     )
 
     @Test
-    fun collectsMessageReplyAndReactionAuthorsDistinctInOrder() {
+    fun initialPresentationWarmPrioritizesNewestVisibleAuthorsWithinItsBudget() {
         val records =
             listOf(
-                record("m1", sender = "alice"),
-                record(
-                    "m2",
-                    sender = "bob",
-                    replyPreview = replyPreview("carol"),
-                    reactionSenders = listOf("dave", "alice"),
-                ),
+                record("m1", sender = "oldest"),
+                record("m2", sender = "bob", reactionSenders = listOf("offscreen-reaction")),
+                record("m3", sender = "carol", replyPreview = replyPreview("dave")),
             )
 
-        // alice (msg), bob (msg), carol (reply author), dave (reaction);
-        // alice's reaction is a dup and must not appear twice.
-        assertEquals(listOf("alice", "bob", "carol", "dave"), timelineRecordProfileSenders(records))
+        assertEquals(
+            listOf("carol", "dave", "bob"),
+            initialPresentationProfileSenders(records, maxProfiles = 3),
+        )
     }
 
     @Test
-    fun dropsBlankSenders() {
+    fun initialPresentationWarmExcludesBlankAndReactionOnlyAuthors() {
         val records =
             listOf(
-                record("m1", sender = ""),
+                record("m1", sender = "", reactionSenders = listOf("old-reaction")),
                 record(
                     "m2",
                     sender = "bob",
                     replyPreview = replyPreview("   "),
-                    reactionSenders = listOf("", "eve"),
+                    reactionSenders = listOf("new-reaction"),
                 ),
             )
 
-        // Blank message sender, blank reply author, and blank reaction author
-        // are all skipped so we never warm (or render initials for) an empty id.
-        assertEquals(listOf("bob", "eve"), timelineRecordProfileSenders(records))
-    }
-
-    @Test
-    fun emptyPageYieldsNoSenders() {
-        assertEquals(emptyList<String>(), timelineRecordProfileSenders(emptyList()))
+        assertEquals(
+            listOf("bob"),
+            initialPresentationProfileSenders(records, maxProfiles = 12),
+        )
     }
 }

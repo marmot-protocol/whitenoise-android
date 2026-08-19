@@ -28,7 +28,7 @@ class ChatListFolderFilterNavigationCoverageTest {
         val chatsScreenWiring =
             mainShell.requiredSection(
                 start = "ChatsScreen(",
-                end = "\n                        )",
+                end = "\n                            )",
             )
         assertTrue(
             "ChatsScreen must receive the shell-owned folder filter",
@@ -59,12 +59,12 @@ class ChatListFolderFilterNavigationCoverageTest {
         val conversationRoute =
             mainShellSource().readText().requiredSection(
                 start = "ConversationScreen(",
-                end = "\n                )",
+                end = "\n                    )",
             )
         val onBack =
             conversationRoute.requiredSection(
                 start = "onBack = {",
-                end = "\n                    },",
+                end = "\n                        },",
             )
 
         assertFalse(

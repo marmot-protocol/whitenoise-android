@@ -63,9 +63,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -78,6 +78,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -133,7 +134,6 @@ import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
-import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
@@ -182,6 +182,8 @@ import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -204,8 +206,12 @@ private data class ConversationSearchScrollAnchor(
  * large [ConversationScreen] method does not keep every independent snapshot
  * state and job in its verifier register set for the full composition.
  */
-private class ConversationNavigationState {
-    var lastFollowedLatestId by mutableStateOf<String?>(null)
+private class ConversationNavigationState(
+    initialFollowedLatestId: String?,
+    initialSeedTailAwaitingAuthoritative: Boolean,
+) {
+    var lastFollowedLatestId by mutableStateOf(initialFollowedLatestId)
+    var seedTailAwaitingAuthoritative by mutableStateOf(initialSeedTailAwaitingAuthoritative)
     var initialTimelineLoadStarted by mutableStateOf(false)
     var initialTimelineBackfillNoProgress by mutableStateOf(false)
     var initialTimelineBackfillRetryGeneration by mutableStateOf(0L)
@@ -245,8 +251,18 @@ private val InitialTimelineBackfillNoProgressError =
     )
 
 @Composable
-private fun rememberConversationNavigationState(controller: ConversationController): ConversationNavigationState {
-    val state = remember(controller) { ConversationNavigationState() }
+private fun rememberConversationNavigationState(
+    controller: ConversationController,
+    initialFollowedLatestId: String?,
+    initialSeedTailAwaitingAuthoritative: Boolean,
+): ConversationNavigationState {
+    val state =
+        remember(controller) {
+            ConversationNavigationState(
+                initialFollowedLatestId = initialFollowedLatestId,
+                initialSeedTailAwaitingAuthoritative = initialSeedTailAwaitingAuthoritative,
+            )
+        }
     DisposableEffect(state) {
         onDispose(state::cancelJobs)
     }
@@ -540,7 +556,9 @@ internal fun ConversationScreen(
             projectionUnread = projectedEntryUnreadCount,
             projectionFirstUnreadMessageId = chat.projection?.firstUnreadMessageIdHex,
             projectionAvailable = entryProjectionAvailable,
-            timeline = controller.timeline,
+            // A one-row chat-list seed cannot establish the authoritative unread
+            // boundary. Freeze only after MDK's first real page replaces it.
+            timeline = if (controller.initialTimelineSeedActive) emptyList() else controller.timeline,
             readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
         )
     val entryUnreadCount = entryUnreadSnapshot.count
@@ -593,10 +611,20 @@ internal fun ConversationScreen(
         scrollRestore?.takeIf {
             it.anchorItemId.isNullOrBlank() && it.anchorMessageIdHex.isNullOrBlank()
         }
+    val firstFrameSeed =
+        remember(controller, notificationOpenRequestId) {
+            conversationFirstFrameSeedPresentation(
+                controller = controller,
+                entryUnreadCount = entryUnreadCount,
+                hasScrollRestore = scrollRestore != null,
+                hasFocusedDestination = focusMessageId != null || ttsFocusSessionId != null,
+                notificationOpenRequestId = notificationOpenRequestId,
+            )
+        }
     val listState =
         key(controller) {
             rememberLazyListState(
-                initialFirstVisibleItemIndex = positionalScrollRestore?.firstVisibleItemIndex ?: 0,
+                initialFirstVisibleItemIndex = positionalScrollRestore?.firstVisibleItemIndex ?: firstFrameSeed.initialListIndex,
                 initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
             )
         }
@@ -687,7 +715,7 @@ internal fun ConversationScreen(
             mutableStateOf<BatchDeleteRetryState?>(null)
         }
     var initialTimelineAnchored by
-        remember(controller, notificationOpenRequestId) { mutableStateOf(false) }
+        remember(controller, notificationOpenRequestId) { mutableStateOf(firstFrameSeed.anchorTailImmediately) }
 
     // First-frame completion waits for the initial anchor, not just one frame:
     // until anchoring commits, the transcript is still transparent, so an
@@ -708,7 +736,12 @@ internal fun ConversationScreen(
         entryFirstUnreadMessageId = entryFirstUnreadMessageId,
         initialTimelineAnchored = initialTimelineAnchored,
     )
-    val navigationState = rememberConversationNavigationState(controller)
+    val navigationState =
+        rememberConversationNavigationState(
+            controller = controller,
+            initialFollowedLatestId = firstFrameSeed.latestTimelineId,
+            initialSeedTailAwaitingAuthoritative = firstFrameSeed.awaitingAuthoritativeTimeline,
+        )
     // Id of the newest row the bottom-follow has reacted to. A real append
     // gives a new last id while the previous one stays in the list; an
     // older-page load trims the newest rows, so the previous id is gone and
@@ -1733,6 +1766,23 @@ internal fun ConversationScreen(
     val olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
     val bottomTimelineIndex = renderedTimeline.size + 1 + olderHeaderCount
     val currentTailIndex by rememberUpdatedState(newValue = bottomTimelineIndex)
+    SeededConversationAnchorBaselineEffect(
+        enabled = firstFrameSeed.anchorTailImmediately,
+        listState = listState,
+        postInitialReanchorGate = postInitialReanchorGate,
+        timelineStructure = ConversationTimelineStructure(renderedTimelineAnchorKeys, olderHeaderCount),
+    )
+    SeededConversationAuthoritativeReconciliationEffect(
+        authoritativeTimelinePublished = controller.hasPublishedAuthoritativeTimeline,
+        awaitingAuthoritativeTimeline = navigationState.seedTailAwaitingAuthoritative,
+        renderedTimeline = renderedTimeline,
+        scrollCoordinator = scrollCoordinator,
+        tailIndex = bottomTimelineIndex,
+        onReconciled = { latestId ->
+            navigationState.seedTailAwaitingAuthoritative = false
+            navigationState.lastFollowedLatestId = latestId
+        },
+    )
 
     // Edit events are derived state, so a raw subscription page can be non-empty
     // while offering no row for the initial anchor. Page backward before the
@@ -2174,6 +2224,9 @@ internal fun ConversationScreen(
     // bottom before the reader's position is restored.
     LaunchedEffect(controller, scrollRestore) {
         val restore = scrollRestore ?: return@LaunchedEffect
+        snapshotFlow { controller.initialTimelineSeedActive }
+            .filter { active -> !active }
+            .first()
         restore.anchorMessageIdHex
             ?.takeIf { it.isNotBlank() }
             ?.let { controller.loadUntilMessageAvailable(it) }
@@ -2248,7 +2301,12 @@ internal fun ConversationScreen(
         renderedTimeline.isNotEmpty(),
         notificationOpenRequestId,
         entryProjectionAvailable,
+        controller.initialTimelineSeedActive,
+        navigationState.seedTailAwaitingAuthoritative,
     ) {
+        if (navigationState.seedTailAwaitingAuthoritative || controller.initialTimelineSeedActive) {
+            return@LaunchedEffect
+        }
         if (
             !shouldCommitConversationInitialAnchor(
                 hasRenderedTimeline = renderedTimeline.isNotEmpty(),
@@ -3011,14 +3069,12 @@ internal fun ConversationScreen(
                             }
                         },
                     )
-                controller.group.pendingConfirmation &&
-                    renderedTimeline.isEmpty() &&
-                    !controller.isLoading &&
-                    navigationState.initialTimelineLoadStarted ->
+                controller.group.pendingConfirmation && renderedTimeline.isEmpty() ->
                     InvitePreviewPlaceholder(
                         inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
                     )
-                controller.group.pendingConfirmation && renderedTimeline.isEmpty() -> LoadingScreen()
+                renderedTimeline.isEmpty() && controller.isLoading ->
+                    ConversationInitialLoadingOverlay(visible = true)
                 renderedTimeline.isEmpty() &&
                     !controller.hasMoreBefore &&
                     !controller.hasMoreAfterTimeline &&
@@ -3060,8 +3116,14 @@ internal fun ConversationScreen(
                                 Modifier
                                     .fillMaxSize()
                                     .padding(horizontal = 12.dp)
-                                    .alpha(if (initialTimelineAnchored) 1f else 0f)
-                                    .onGloballyPositioned { coordinates ->
+                                    .graphicsLayer {
+                                        alpha = if (initialTimelineAnchored) 1f else 0f
+                                    }.semantics {
+                                        if (!initialTimelineAnchored) hideFromAccessibility()
+                                    }.performanceTestTag(
+                                        PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE,
+                                        enabled = initialTimelineAnchored && renderedTimeline.isNotEmpty(),
+                                    ).onGloballyPositioned { coordinates ->
                                         val position = coordinates.positionInWindow()
                                         transcriptWindowTop = position.y
                                         transcriptHeightPx = coordinates.size.height.toFloat()
@@ -3221,6 +3283,10 @@ internal fun ConversationScreen(
                             // bottom-anchor index math stays stable.
                             item(key = "bottom-spacer") { Spacer(Modifier.height(4.dp)) }
                         }
+                        ConversationInitialLoadingOverlay(
+                            visible = !initialTimelineAnchored,
+                            graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
+                        )
                         // Day of the topmost visible message, shown only while
                         // scrolling — the inline separators carry it at rest.
                         // Confined to its own child so the scroll-backed reads
@@ -3231,9 +3297,6 @@ internal fun ConversationScreen(
                                 listState = listState,
                                 labelState = stickyDayLabelState,
                             )
-                        }
-                        if (!initialTimelineAnchored) {
-                            LoadingScreen()
                         }
                         if (initialTimelineAnchored && !selectionMode) {
                             Column(

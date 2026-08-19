@@ -995,6 +995,11 @@ private data class ProfilePresentation(
     }
 }
 
+private data class ProfileMaterializationReservation(
+    val completion: CompletableDeferred<Unit>,
+    val ownsRead: Boolean,
+)
+
 private data class InviteNotificationIdentityRefreshResult(
     val posted: Boolean,
     val displayedName: String?,
@@ -2323,12 +2328,13 @@ class WhiteNoiseAppState private constructor(
             lock = profilePresentationLock,
         )
 
-    // Ids with an in-flight local materialization, so a cache miss launches at
-    // most one local read per id. Distinct from the relay-refresh cooldown gate.
-    private val materializingProfiles =
-        ScopedSet<String>(
+    // Completion shared by lazy and awaited local materialization paths. Keeping
+    // the reservation account-scoped prevents duplicate FFI reads while also
+    // ensuring account switches cannot expose an old account's in-flight work.
+    private val profileMaterializations =
+        ScopedCache<String, CompletableDeferred<Unit>>(
             registry = accountScopedCaches,
-            name = "materializing-profiles",
+            name = "profile-materializations",
             maxEntries = MAX_MATERIALIZING_PROFILES,
             lock = profilePresentationLock,
         )
@@ -8108,12 +8114,12 @@ class WhiteNoiseAppState private constructor(
                 .map { id ->
                     async {
                         gate.withPermit {
-                            // Another warm/lazy read may have populated the cache
-                            // while this coroutine waited for a permit.
-                            if (synchronized(profilePresentationLock) { profilePresentations.containsKey(id) }) {
-                                return@withPermit
+                            val reservation = reserveProfileMaterialization(id) ?: return@withPermit
+                            if (reservation.ownsRead) {
+                                completeProfileMaterialization(id, reservation.completion)
+                            } else {
+                                reservation.completion.await()
                             }
-                            materializeProfileLocally(id)
                         }
                     }
                 }.awaitAll()
@@ -9344,33 +9350,47 @@ class WhiteNoiseAppState private constructor(
      */
     private fun ensureProfileMaterialized(accountIdHex: String) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
-        // Dedup concurrent lazy triggers: only launch if not already cached and
-        // not already in flight. The blocking warm path does not use this set —
-        // it reads and applies idempotently (see [warmProfilePresentationsBlocking]).
-        if (!claimProfileMaterialization(id)) return
+        val reservation = reserveProfileMaterialization(id) ?: return
+        if (!reservation.ownsRead) return
         profileScope.launch {
-            try {
-                materializeProfileLocally(id)
-            } finally {
-                synchronized(profilePresentationLock) { materializingProfiles.remove(id) }
-            }
+            completeProfileMaterialization(id, reservation.completion)
         }
     }
 
     /**
-     * Reserve [id] for an in-flight lazy materialization. Returns false (already
-     * cached or another lazy materialization in flight) so [ensureProfileMaterialized]
-     * skips a redundant launch. The reservation is released in that launch's
-     * `finally`, so a reserved id is always freed even on failure.
+     * Join or own [id]'s in-flight local materialization. Both the lazy path and
+     * the blocking first-frame warm use this reservation, so they perform at
+     * most one user-profile/display-name read for an uncached id.
      */
-    private fun claimProfileMaterialization(id: String): Boolean =
+    private fun reserveProfileMaterialization(id: String): ProfileMaterializationReservation? =
         synchronized(profilePresentationLock) {
             if (profilePresentations.containsKey(id)) {
-                false
+                null
             } else {
-                materializingProfiles.add(id)
+                profileMaterializations[id]?.let { running ->
+                    ProfileMaterializationReservation(running, ownsRead = false)
+                } ?: CompletableDeferred<Unit>().let { completion ->
+                    profileMaterializations.put(id, completion)
+                    ProfileMaterializationReservation(completion, ownsRead = true)
+                }
             }
         }
+
+    private suspend fun completeProfileMaterialization(
+        id: String,
+        completion: CompletableDeferred<Unit>,
+    ) {
+        try {
+            materializeProfileLocally(id)
+        } finally {
+            synchronized(profilePresentationLock) {
+                if (profileMaterializations[id] === completion) {
+                    profileMaterializations.remove(id)
+                }
+            }
+            completion.complete(Unit)
+        }
+    }
 
     /**
      * Read the *local* presentation (display name + avatar URL) for [id] off the
@@ -9380,8 +9400,8 @@ class WhiteNoiseAppState private constructor(
      * This is the single source of truth for the local materialization that both
      * the lazy async path ([ensureProfileMaterialized]) and the blocking warm
      * path ([warmProfilePresentationsBlocking]) run, so they can never diverge.
-     * It is pure read + idempotent apply (no `materializingProfiles` bookkeeping),
-     * so it is safe to call directly from the blocking warm without a prior claim.
+     * Reservation bookkeeping is owned by [completeProfileMaterialization], so
+     * every caller shares the same in-flight local read.
      */
     private suspend fun materializeProfileLocally(id: String) {
         val epoch = profileCacheEpoch.get()
@@ -9471,7 +9491,7 @@ class WhiteNoiseAppState private constructor(
             profilePresentations.clear()
             userProfiles.clear()
             pendingAvatarPreWarmAccountIds.clear()
-            materializingProfiles.clear()
+            profileMaterializations.clear()
         }
         profileRevision += 1
         bumpAllProfileAccountRevisions()

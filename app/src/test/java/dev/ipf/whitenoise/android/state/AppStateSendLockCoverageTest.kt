@@ -324,10 +324,11 @@ class AppStateSendLockCoverageTest {
             "same-group account switches must reset anchoring state and cancel effects that capture the old controller",
             "remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration)" in unreadJumpOwner &&
                 "mutableStateOf(ConversationUnreadJumpState())" in unreadJumpOwner &&
-                "remember(controller, notificationOpenRequestId) { mutableStateOf(false) }" in source &&
-                "val state = remember(controller) { ConversationNavigationState() }" in source &&
+                "remember(controller, notificationOpenRequestId) { mutableStateOf(firstFrameSeed.anchorTailImmediately) }" in source &&
+                "remember(controller) {" in source &&
+                "ConversationNavigationState(" in source &&
                 "onDispose(state::cancelJobs)" in source &&
-                "var lastFollowedLatestId by mutableStateOf<String?>(null)" in source &&
+                "var lastFollowedLatestId by mutableStateOf(initialFollowedLatestId)" in source &&
                 "LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored)" in source &&
                 "LaunchedEffect(listState, controller)" in source,
         )

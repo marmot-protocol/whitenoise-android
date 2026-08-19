@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.benchmark
 
+import android.graphics.Rect
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
@@ -58,7 +59,7 @@ internal class WhiteNoiseJourneys {
 
     fun openGroup(groupName: String) {
         waitForText(groupName).click()
-        waitForTag(PerformanceTags.OPEN_GROUP_DETAILS)
+        waitForVisibleTag(PerformanceTags.OPEN_GROUP_DETAILS)
     }
 
     fun openMembers(groupName: String) {
@@ -82,6 +83,15 @@ internal class WhiteNoiseJourneys {
             }
         }
         device.waitForIdle()
+    }
+
+    fun openConversationVisible(groupName: String) {
+        waitForText(groupName).click()
+        waitForVisibleTag(PerformanceTags.CONVERSATION_TRANSCRIPT_VISIBLE)
+    }
+
+    fun waitForConversationRouteSettled() {
+        waitForVisibleTag(PerformanceTags.CONVERSATION_ROUTE_SETTLED)
     }
 
     fun createGroup(
@@ -123,14 +133,22 @@ internal class WhiteNoiseJourneys {
 
     fun returnToChatList() {
         repeat(4) {
-            if (findTag(PerformanceTags.NEW_MESSAGE, NAVIGATION_SETTLE_TIMEOUT_MS) != null) return
+            if (
+                findTag(PerformanceTags.NEW_MESSAGE, NAVIGATION_SETTLE_TIMEOUT_MS) != null &&
+                findTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED, NAVIGATION_SETTLE_TIMEOUT_MS) != null
+            ) {
+                device.waitForIdle()
+                return
+            }
             // UiDevice returns false when no matching accessibility event is
             // observed, even when Android's predictive Back handled the key.
             // The bounded selector wait is the authoritative navigation check.
             device.pressBack()
             device.waitForIdle()
         }
-        waitForTag(PerformanceTags.NEW_MESSAGE)
+        waitForVisibleTag(PerformanceTags.NEW_MESSAGE)
+        waitForVisibleTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED)
+        device.waitForIdle()
     }
 
     private fun findTag(
@@ -153,6 +171,19 @@ internal class WhiteNoiseJourneys {
             "Timed out waiting for test tag '$tag'. " +
                 "Available performance tags: ${availablePerformanceTags()}. " +
                 "Confirm the dev app is authenticated and the fixture is in the expected state."
+        }
+
+    private fun waitForVisibleTag(
+        tag: String,
+        timeoutMs: Long = DEFAULT_TIMEOUT_MS,
+    ): UiObject2 =
+        checkNotNull(
+            device.onElementOrNull(timeoutMs = timeoutMs) {
+                matchesPerformanceTag(tag) && isVisibleOnDisplay()
+            },
+        ) {
+            "Timed out waiting for visible test tag '$tag'. " +
+                "Available performance tags: ${availablePerformanceTags()}."
         }
 
     private fun waitForEnabledTag(
@@ -250,6 +281,15 @@ internal class WhiteNoiseJourneys {
         viewIdResourceName == tag ||
             contentDescription?.toString() == tag ||
             extras.getCharSequence(COMPOSE_TEST_TAG_KEY)?.toString() == tag
+
+    private fun AccessibilityNodeInfo.isVisibleOnDisplay(): Boolean {
+        if (!isVisibleToUser) return false
+        val nodeBounds = Rect()
+        getBoundsInScreen(nodeBounds)
+        if (nodeBounds.isEmpty) return false
+        val displayBounds = Rect(0, 0, device.displayWidth, device.displayHeight)
+        return Rect.intersects(nodeBounds, displayBounds)
+    }
 
     private companion object {
         const val COMPOSE_TEST_TAG_KEY = "androidx.compose.ui.semantics.testTag"
