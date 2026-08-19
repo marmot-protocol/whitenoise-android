@@ -10,6 +10,20 @@ class ConversationInitialPresentationTest {
         assertTrue(
             shouldAnchorConversationTailOnFirstFrame(
                 entryUnreadCount = 0,
+                projectionAvailable = true,
+                hasScrollRestore = false,
+                hasFocusedDestination = false,
+                notificationOpenRequestId = 0L,
+            ),
+        )
+    }
+
+    @Test
+    fun provisionalDirectOpenWaitsForUnreadProjectionBeforeTailAnchoring() {
+        assertFalse(
+            shouldAnchorConversationTailOnFirstFrame(
+                entryUnreadCount = 0,
+                projectionAvailable = false,
                 hasScrollRestore = false,
                 hasFocusedDestination = false,
                 notificationOpenRequestId = 0L,
@@ -38,6 +52,7 @@ class ConversationInitialPresentationTest {
         notificationRequest: Long = 0L,
     ) = shouldAnchorConversationTailOnFirstFrame(
         entryUnreadCount = unread,
+        projectionAvailable = true,
         hasScrollRestore = hasRestore,
         hasFocusedDestination = hasFocus,
         notificationOpenRequestId = notificationRequest,

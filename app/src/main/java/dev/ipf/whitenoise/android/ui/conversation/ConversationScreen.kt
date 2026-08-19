@@ -616,6 +616,7 @@ internal fun ConversationScreen(
             conversationFirstFrameSeedPresentation(
                 controller = controller,
                 entryUnreadCount = entryUnreadCount,
+                projectionAvailable = entryProjectionAvailable,
                 hasScrollRestore = scrollRestore != null,
                 hasFocusedDestination = focusMessageId != null || ttsFocusSessionId != null,
                 notificationOpenRequestId = notificationOpenRequestId,

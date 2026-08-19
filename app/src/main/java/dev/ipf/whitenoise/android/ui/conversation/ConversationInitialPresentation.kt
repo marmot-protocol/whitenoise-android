@@ -32,6 +32,7 @@ internal data class ConversationFirstFrameSeedPresentation(
 internal fun conversationFirstFrameSeedPresentation(
     controller: ConversationController,
     entryUnreadCount: Int,
+    projectionAvailable: Boolean,
     hasScrollRestore: Boolean,
     hasFocusedDestination: Boolean,
     notificationOpenRequestId: Long,
@@ -40,6 +41,7 @@ internal fun conversationFirstFrameSeedPresentation(
     val anchorTailImmediately =
         shouldAnchorConversationTailOnFirstFrame(
             entryUnreadCount = entryUnreadCount,
+            projectionAvailable = projectionAvailable,
             hasScrollRestore = hasScrollRestore,
             hasFocusedDestination = hasFocusedDestination,
             notificationOpenRequestId = notificationOpenRequestId,
@@ -57,11 +59,16 @@ internal fun conversationFirstFrameSeedPresentation(
 
 internal fun shouldAnchorConversationTailOnFirstFrame(
     entryUnreadCount: Int,
+    projectionAvailable: Boolean,
     hasScrollRestore: Boolean,
     hasFocusedDestination: Boolean,
     notificationOpenRequestId: Long,
 ): Boolean =
-    entryUnreadCount <= 0 &&
+    // A provisional open without a projection cannot know its unread boundary
+    // yet — an entry count of zero there is absence of data, not "fully read".
+    // Defer to the authoritative initial-anchor path instead of tail-anchoring.
+    projectionAvailable &&
+        entryUnreadCount <= 0 &&
         !hasScrollRestore &&
         !hasFocusedDestination &&
         notificationOpenRequestId == 0L
