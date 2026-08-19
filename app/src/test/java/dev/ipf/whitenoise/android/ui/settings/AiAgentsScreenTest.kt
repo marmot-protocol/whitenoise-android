@@ -50,16 +50,45 @@ class AiAgentsScreenTest {
     }
 
     @Test
-    fun codexConnectorIsVisibleWithExpandAndCopyActions() {
-        renderContent()
+    fun codexExpandShowsFormattedPromptWithoutPlaceholder() {
+        val npub = TEST_NPUB
+        val expectedCodexPrompt = app.getString(R.string.agent_connector_codex_prompt, npub)
 
-        val codexName = app.getString(R.string.agent_connector_codex_name)
+        renderContent(npub)
+
         composeRule
             .onNodeWithTag(AI_AGENTS_CONTENT_TAG)
-            .performScrollToNode(hasText(codexName))
-        composeRule.onNodeWithText(codexName).assertIsDisplayed()
-        composeRule.onNodeWithTag(agentConnectorToggleTag("codex")).assertIsDisplayed()
-        composeRule.onNodeWithTag(agentConnectorCopyTag("codex")).assertIsDisplayed()
+            .performScrollToNode(hasTestTag(agentConnectorToggleTag("codex")))
+        composeRule
+            .onNodeWithTag(agentConnectorToggleTag("codex"))
+            .performClick()
+
+        composeRule
+            .onNodeWithTag(AI_AGENTS_CONTENT_TAG)
+            .performScrollToNode(hasTestTag(agentConnectorPreviewTag("codex")))
+        composeRule.onNodeWithTag(agentConnectorPreviewTag("codex")).assertIsDisplayed()
+        composeRule.onNodeWithText(expectedCodexPrompt).assertIsDisplayed()
+        assertFalse(expectedCodexPrompt.contains("<USER_NPUB>"))
+    }
+
+    @Test
+    fun codexCopyPassesFormattedPromptToCallback() {
+        val npub = TEST_NPUB
+        val expectedCodexPrompt = app.getString(R.string.agent_connector_codex_prompt, npub)
+        var copiedPrompt: String? = null
+
+        renderContent(npub, onCopyPrompt = { copiedPrompt = it })
+
+        composeRule
+            .onNodeWithTag(AI_AGENTS_CONTENT_TAG)
+            .performScrollToNode(hasTestTag(agentConnectorCopyTag("codex")))
+        composeRule
+            .onNodeWithTag(agentConnectorCopyTag("codex"))
+            .performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(expectedCodexPrompt, copiedPrompt)
+        }
     }
 
     @Test
@@ -247,14 +276,17 @@ class AiAgentsScreenTest {
         composeRule.runOnIdle { assertEquals(1, backCount) }
     }
 
-    private fun renderContent(npub: String? = TEST_NPUB) {
+    private fun renderContent(
+        npub: String? = TEST_NPUB,
+        onCopyPrompt: (String) -> Unit = {},
+    ) {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {
                     AiAgentsContent(
                         npub = npub,
                         snackbarHostState = SnackbarHostState(),
-                        onCopyPrompt = {},
+                        onCopyPrompt = onCopyPrompt,
                         onOpenConnectorDocs = {},
                         onBack = {},
                     )
