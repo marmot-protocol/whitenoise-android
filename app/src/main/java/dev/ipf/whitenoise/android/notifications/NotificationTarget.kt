@@ -96,6 +96,10 @@ sealed interface NotificationNavStep {
  * @param inviteRowMembershipOpenable when an invite row is reachable, false if
  *   terminal self-membership (LEFT/REMOVED) proves the invite is no longer
  *   openable even though the archived row still exists.
+ * @param exactPreloadReady true only when this exact request's targeted local
+ *   read has already produced the conversation. A ready message target opens
+ *   immediately while account activation finishes behind it, its content read
+ *   from local history for the notification's own account (#586).
  */
 fun resolveNotificationNav(
     target: NotificationTarget,
@@ -106,9 +110,15 @@ fun resolveNotificationNav(
     inviteRowMaterialized: Boolean = false,
     inviteRowMembershipOpenable: Boolean = true,
     inviteAuthoritativelyUnavailable: Boolean = false,
+    exactPreloadReady: Boolean = false,
 ): NotificationNavStep {
     if (target.accountRef !in knownAccountRefs) return NotificationNavStep.MissingAccount
-    if (target.accountRef != activeAccountRef) return NotificationNavStep.SwitchAccount(target.accountRef)
+    if (target.accountRef != activeAccountRef) {
+        if (target.kind == NotificationTargetKind.MESSAGE && exactPreloadReady) {
+            return NotificationNavStep.LoadMessageDirectly
+        }
+        return NotificationNavStep.SwitchAccount(target.accountRef)
+    }
     if (!chatListReady) {
         return if (target.kind == NotificationTargetKind.MESSAGE) {
             NotificationNavStep.LoadMessageDirectly
@@ -156,6 +166,57 @@ internal sealed interface NotificationMessageDirectLoadOutcome<out T> {
     /** Keep the tap pending and let the broad chat-list route settle. */
     data object AwaitChatList : NotificationMessageDirectLoadOutcome<Nothing>
 }
+
+/** Identity of one request-scoped message-notification preload. */
+internal data class NotificationMessagePreloadKey(
+    val requestId: Long,
+    val accountRef: String,
+    val groupIdHex: String,
+)
+
+/**
+ * Transient result of reading a notification target while its account is activating.
+ *
+ * This deliberately lives only in the shell navigation composition. It is not a
+ * protocol cache, and a result is usable only by the exact request that created it.
+ */
+internal sealed interface NotificationMessagePreloadState<out T> {
+    data object Loading : NotificationMessagePreloadState<Nothing>
+
+    data class Ready<T>(
+        val item: T,
+    ) : NotificationMessagePreloadState<T>
+
+    /** The broad chat-list route remains the authoritative fallback. */
+    data object Failed : NotificationMessagePreloadState<Nothing>
+}
+
+internal data class NotificationMessagePreload<out T>(
+    val key: NotificationMessagePreloadKey,
+    val state: NotificationMessagePreloadState<T>,
+)
+
+internal fun notificationMessagePreloadKey(
+    target: NotificationTarget?,
+    requestId: Long,
+): NotificationMessagePreloadKey? =
+    target
+        ?.takeIf { it.kind == NotificationTargetKind.MESSAGE }
+        ?.let {
+            NotificationMessagePreloadKey(
+                requestId = requestId,
+                accountRef = it.accountRef,
+                groupIdHex = it.groupIdHex,
+            )
+        }
+
+/** Rejects a completed read from an older tap, even when the target is identical. */
+internal fun <T> NotificationMessagePreload<T>?.stateFor(key: NotificationMessagePreloadKey?) =
+    if (this != null && key != null && this.key == key) {
+        state
+    } else {
+        null
+    }
 
 /** Performs the one-group local read without swallowing structured cancellation (#586). */
 @Suppress("MaxLineLength")

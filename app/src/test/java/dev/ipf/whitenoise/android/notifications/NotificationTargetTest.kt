@@ -9,6 +9,9 @@ import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -732,6 +735,62 @@ class NotificationTargetTest {
     }
 
     @Test
+    fun nav_backgroundAccountWithReadyPreload_opensDirectlyWhileSwitchSettles() {
+        val step =
+            resolveNotificationNav(
+                target,
+                knownAccountRefs = setOf("acct-a", "acct-b"),
+                activeAccountRef = "acct-b",
+                chatListReady = false,
+                availableGroupIds = emptySet(),
+                exactPreloadReady = true,
+            )
+        assertEquals(NotificationNavStep.LoadMessageDirectly, step)
+    }
+
+    @Test
+    fun nav_backgroundAccountWithoutReadyPreload_keepsSwitchingFirst() {
+        val step =
+            resolveNotificationNav(
+                target,
+                knownAccountRefs = setOf("acct-a", "acct-b"),
+                activeAccountRef = "acct-b",
+                chatListReady = false,
+                availableGroupIds = emptySet(),
+                exactPreloadReady = false,
+            )
+        assertEquals(NotificationNavStep.SwitchAccount("acct-a"), step)
+    }
+
+    @Test
+    fun nav_inviteOnBackgroundAccountIgnoresReadyPreload() {
+        val step =
+            resolveNotificationNav(
+                target.copy(kind = NotificationTargetKind.INVITE),
+                knownAccountRefs = setOf("acct-a", "acct-b"),
+                activeAccountRef = "acct-b",
+                chatListReady = false,
+                availableGroupIds = emptySet(),
+                exactPreloadReady = true,
+            )
+        assertEquals(NotificationNavStep.SwitchAccount("acct-a"), step)
+    }
+
+    @Test
+    fun nav_unknownAccountOutranksReadyPreload() {
+        val step =
+            resolveNotificationNav(
+                target,
+                knownAccountRefs = setOf("acct-b"),
+                activeAccountRef = "acct-b",
+                chatListReady = false,
+                availableGroupIds = emptySet(),
+                exactPreloadReady = true,
+            )
+        assertEquals(NotificationNavStep.MissingAccount, step)
+    }
+
+    @Test
     fun nav_activeAccount_doesNotSwitch_andOpensWhenReady() {
         val step =
             resolveNotificationNav(
@@ -806,6 +865,319 @@ class NotificationTargetTest {
     fun directMessageLoadPropagatesCancellation() =
         runTest {
             loadNotificationMessageDirectly<String> { throw CancellationException("recomposed") }
+        }
+
+    @Test
+    fun messagePreloadKeyIncludesRequestIdentity() {
+        val first = notificationMessagePreloadKey(target, requestId = 41L)
+        val repeated = notificationMessagePreloadKey(target, requestId = 42L)
+
+        assertNotEquals(first, repeated)
+        assertEquals("acct-a", first?.accountRef)
+        assertEquals("group-1", first?.groupIdHex)
+    }
+
+    @Test
+    fun inviteDoesNotStartMessagePreload() {
+        assertNull(
+            notificationMessagePreloadKey(
+                target.copy(kind = NotificationTargetKind.INVITE),
+                requestId = 41L,
+            ),
+        )
+    }
+
+    @Test
+    fun completedPreloadIsVisibleOnlyToExactRequest() {
+        val firstKey = requireNotNull(notificationMessagePreloadKey(target, requestId = 41L))
+        val repeatedKey = requireNotNull(notificationMessagePreloadKey(target, requestId = 42L))
+        val preload =
+            NotificationMessagePreload(
+                key = firstKey,
+                state = NotificationMessagePreloadState.Ready("first request item"),
+            )
+
+        assertEquals(
+            NotificationMessagePreloadState.Ready("first request item"),
+            preload.stateFor(firstKey),
+        )
+        assertNull(preload.stateFor(repeatedKey))
+    }
+
+    @Test
+    fun inactiveMessageRoute_warmReadStartsBeforeActivationAndRunsAlongsideIt() =
+        runTest {
+            val key = requireNotNull(notificationMessagePreloadKey(target, requestId = 51L))
+            val readStarted = CompletableDeferred<Unit>()
+            val releaseRead = CompletableDeferred<Unit>()
+            val published = mutableListOf<NotificationMessagePreload<String>>()
+
+            runInactiveNotificationRouteStage(
+                key = key,
+                loadTarget = {
+                    readStarted.complete(Unit)
+                    releaseRead.await()
+                    "warm conversation"
+                },
+                activateAccount = {
+                    assertTrue("target read must enter before activation", readStarted.isCompleted)
+                    releaseRead.complete(Unit)
+                },
+                isCurrent = { true },
+                onPreload = { published += it },
+            )
+
+            assertEquals(
+                listOf(
+                    NotificationMessagePreload(
+                        key = key,
+                        state = NotificationMessagePreloadState.Ready("warm conversation"),
+                    ),
+                ),
+                published,
+            )
+        }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun inactiveMessageRoute_readyReadPublishesBeforeActivationCompletes() =
+        runTest {
+            val key = requireNotNull(notificationMessagePreloadKey(target, requestId = 58L))
+            val releaseActivation = CompletableDeferred<Unit>()
+            var publishedWhileActivationHeld = false
+            var activationFinished = false
+
+            val stage =
+                launch {
+                    runInactiveNotificationRouteStage(
+                        key = key,
+                        loadTarget = { "instant conversation" },
+                        activateAccount = {
+                            releaseActivation.await()
+                            activationFinished = true
+                        },
+                        isCurrent = { true },
+                        onPreload = {
+                            publishedWhileActivationHeld = !activationFinished
+                        },
+                    )
+                }
+            runCurrent()
+
+            assertTrue(
+                "a ready local read must publish while activation is still in flight",
+                publishedWhileActivationHeld,
+            )
+            assertFalse("the stage must still await activation", stage.isCompleted)
+            releaseActivation.complete(Unit)
+            runCurrent()
+            assertTrue(activationFinished)
+            assertTrue(stage.isCompleted)
+        }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun accountActivationBoundaryDoesNotWaitForSlowerFollowUpWork() =
+        runTest {
+            val releaseFollowUp = CompletableDeferred<Unit>()
+            var followUpFinished = false
+
+            awaitNotificationAccountActivationBoundary { onLocalReady ->
+                backgroundScope.launch {
+                    onLocalReady()
+                    releaseFollowUp.await()
+                    followUpFinished = true
+                }
+            }
+
+            assertFalse(followUpFinished)
+            releaseFollowUp.complete(Unit)
+            runCurrent()
+            assertTrue(followUpFinished)
+        }
+
+    @Test
+    fun exactPreloadPreventsBroadListAbsenceFromWinningTheRoute() {
+        assertFalse(
+            notificationMessageRouteChatListReady(
+                chatListReady = true,
+                targetPresent = false,
+                preloadState = NotificationMessagePreloadState.Loading,
+            ),
+        )
+        assertFalse(
+            notificationMessageRouteChatListReady(
+                chatListReady = true,
+                targetPresent = false,
+                preloadState = NotificationMessagePreloadState.Ready("target"),
+            ),
+        )
+        assertTrue(
+            notificationMessageRouteChatListReady(
+                chatListReady = true,
+                targetPresent = false,
+                preloadState = NotificationMessagePreloadState.Failed,
+            ),
+        )
+        assertTrue(
+            notificationMessageRouteChatListReady(
+                chatListReady = true,
+                targetPresent = true,
+                preloadState = NotificationMessagePreloadState.Loading,
+            ),
+        )
+    }
+
+    @Test
+    fun inactiveMessageRoute_coldFixturePublishesOnlyFreshRequest() =
+        runTest {
+            val key = requireNotNull(notificationMessagePreloadKey(target, requestId = 52L))
+            var result: NotificationMessagePreload<String>? = null
+
+            runInactiveNotificationRouteStage(
+                key = key,
+                loadTarget = { "cold conversation" },
+                activateAccount = {},
+                isCurrent = { true },
+                onPreload = { result = it },
+            )
+
+            assertEquals(NotificationMessagePreloadState.Ready("cold conversation"), result.stateFor(key))
+        }
+
+    @Test
+    fun inactiveMessageRoute_processRecreationRejectsPriorRuntimeCompletion() =
+        runTest {
+            val priorRuntimeKey = requireNotNull(notificationMessagePreloadKey(target, requestId = 53L))
+            val recreatedRuntimeKey = requireNotNull(notificationMessagePreloadKey(target, requestId = 54L))
+            var priorRuntime: NotificationMessagePreload<String>? = null
+            var recreatedRuntime: NotificationMessagePreload<String>? = null
+
+            runInactiveNotificationRouteStage(
+                key = priorRuntimeKey,
+                loadTarget = { "prior runtime" },
+                activateAccount = {},
+                isCurrent = { false },
+                onPreload = { priorRuntime = it },
+            )
+            runInactiveNotificationRouteStage(
+                key = recreatedRuntimeKey,
+                loadTarget = { "recreated runtime" },
+                activateAccount = {},
+                isCurrent = { true },
+                onPreload = { recreatedRuntime = it },
+            )
+
+            assertNull(priorRuntime)
+            assertEquals(
+                NotificationMessagePreloadState.Ready("recreated runtime"),
+                recreatedRuntime.stateFor(recreatedRuntimeKey),
+            )
+        }
+
+    @Test
+    fun inactiveMessageRoute_repeatedTapRejectsOlderSameTargetRequest() =
+        runTest {
+            val oldKey = requireNotNull(notificationMessagePreloadKey(target, requestId = 55L))
+            val repeatedKey = requireNotNull(notificationMessagePreloadKey(target, requestId = 56L))
+            var old: NotificationMessagePreload<String>? = null
+            var repeated: NotificationMessagePreload<String>? = null
+
+            runInactiveNotificationRouteStage(
+                key = oldKey,
+                loadTarget = { "old item" },
+                activateAccount = {},
+                isCurrent = { false },
+                onPreload = { old = it },
+            )
+            runInactiveNotificationRouteStage(
+                key = repeatedKey,
+                loadTarget = { "repeated item" },
+                activateAccount = {},
+                isCurrent = { true },
+                onPreload = { repeated = it },
+            )
+
+            assertNull(old)
+            assertEquals(NotificationMessagePreloadState.Ready("repeated item"), repeated.stateFor(repeatedKey))
+        }
+
+    @Test
+    fun inactiveMessageRoute_cancelledStageNeverPublishesAndIsReleasedAsStuckLoading() =
+        runTest {
+            val key = requireNotNull(notificationMessagePreloadKey(target, requestId = 59L))
+            var published: NotificationMessagePreload<String>? = null
+            // The shell publishes Loading synchronously before the stage runs.
+            var shellState: NotificationMessagePreload<String>? =
+                NotificationMessagePreload(key = key, state = NotificationMessagePreloadState.Loading)
+
+            val stageFailure =
+                runCatching {
+                    runInactiveNotificationRouteStage<String>(
+                        key = key,
+                        loadTarget = {
+                            kotlinx.coroutines.suspendCancellableCoroutine { it.cancel() }
+                        },
+                        activateAccount = {},
+                        isCurrent = { true },
+                        onPreload = { published = it },
+                    )
+                }.exceptionOrNull()
+
+            assertTrue(
+                "a cancelled stage must fail rather than publish",
+                stageFailure is CancellationException,
+            )
+            assertNull(published)
+            // The caller's finally must detect the never-terminalized Loading
+            // state and release it, or the route pins the loading screen while
+            // the request-id dedupe guard blocks a retry of the same tap.
+            assertTrue(notificationPreloadStuckLoading(shellState, key))
+            shellState = null
+            assertFalse(notificationPreloadStuckLoading(shellState, key))
+        }
+
+    @Test
+    fun stuckLoadingDetectionIgnoresTerminalStatesAndForeignRequests() {
+        val key = requireNotNull(notificationMessagePreloadKey(target, requestId = 60L))
+        val foreignKey = requireNotNull(notificationMessagePreloadKey(target, requestId = 61L))
+
+        assertFalse(
+            notificationPreloadStuckLoading(
+                NotificationMessagePreload(key = key, state = NotificationMessagePreloadState.Ready("item")),
+                key,
+            ),
+        )
+        assertFalse(
+            notificationPreloadStuckLoading(
+                NotificationMessagePreload(key = key, state = NotificationMessagePreloadState.Failed),
+                key,
+            ),
+        )
+        assertFalse(
+            notificationPreloadStuckLoading(
+                NotificationMessagePreload(key = foreignKey, state = NotificationMessagePreloadState.Loading),
+                key,
+            ),
+        )
+        assertFalse(notificationPreloadStuckLoading(null, key))
+    }
+
+    @Test
+    fun inactiveMessageRoute_missingTargetFallsBackToBroadChatList() =
+        runTest {
+            val key = requireNotNull(notificationMessagePreloadKey(target, requestId = 57L))
+            var result: NotificationMessagePreload<String>? = null
+
+            runInactiveNotificationRouteStage<String>(
+                key = key,
+                loadTarget = { error("missing local group") },
+                activateAccount = {},
+                isCurrent = { true },
+                onPreload = { result = it },
+            )
+
+            assertEquals(NotificationMessagePreloadState.Failed, result.stateFor(key))
         }
 
     @Test

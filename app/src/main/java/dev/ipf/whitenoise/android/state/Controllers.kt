@@ -6518,6 +6518,12 @@ class ConversationController(
     initialMemberSnapshot: GroupMemberSnapshot? = null,
     initialLastReadMessageId: String? = null,
     initialLastReadTimelineAt: ULong? = null,
+    // Pins the conversation to a specific account instead of the account active
+    // at construction. Set only by notification routing when the target opens
+    // before its account switch lands (#586); every MDK read/write below is
+    // already account-explicit, so a pinned controller stays correct while the
+    // active account catches up.
+    accountRefOverride: String? = null,
     private val copy: ConversationControllerCopy = ConversationControllerCopy(),
     private val groupRosterReader: suspend (String, String) -> GroupRosterFfi = { account, groupIdHex ->
         appState.marmotIo(MarmotTraceSection.REFRESH_GROUP_ROSTER) {
@@ -6554,11 +6560,20 @@ class ConversationController(
      */
     private var pendingLegacyAvatarClearAfterImageMutationKey: String? = null
 
-    // Hex of the account active when this conversation opened. Captured like
+    // Hex of the conversation's own account. Captured like
     // conversationAccountRef so display/permission/"is me" helpers stay tied to
     // the conversation's account instead of reading the live active account
-    // (which can differ from the controller's account before teardown).
-    private val conversationAccountIdHex = appState.activeAccount?.accountIdHex
+    // (which can differ from the controller's account before teardown, and
+    // during a notification-routed open while the switch is still landing).
+    // A pinned controller never falls back to the active account: an override
+    // whose label is missing resolves to null, which fails closed ("is me",
+    // admin, and composer gates all deny) instead of mixing two accounts.
+    private val conversationAccountIdHex =
+        if (accountRefOverride != null) {
+            appState.accounts.firstOrNull { it.label == accountRefOverride }?.accountIdHex
+        } else {
+            appState.activeAccount?.accountIdHex
+        }
 
     private val membershipSeed = conversationMembershipSeed(initialGroup, initialMemberSnapshot, conversationAccountIdHex)
 
@@ -6773,9 +6788,15 @@ class ConversationController(
         }
     }
 
-    private val conversationAccountRef = appState.activeAccountRef
+    private val conversationAccountRef = accountRefOverride ?: appState.activeAccountRef
     internal val boundAccountRef: String?
         get() = conversationAccountRef
+
+    // Self-identity for conversation-scoped UI ("is me", mention detection).
+    // Follows the conversation's account, which the active account only lags
+    // during a notification-routed early open (#586).
+    internal val boundAccountIdHex: String?
+        get() = conversationAccountIdHex
 
     private fun presentConversationTransient(
         @StringRes titleRes: Int,

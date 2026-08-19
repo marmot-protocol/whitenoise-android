@@ -108,6 +108,19 @@ internal class WhiteNoiseJourneys {
         waitForTag(PerformanceTags.OPEN_GROUP_DETAILS, NETWORK_STATE_TIMEOUT_MS)
     }
 
+    /**
+     * Opens a real notification whose target belongs to a signed-in inactive account.
+     * The fixture owner must leave the source account active before starting the run.
+     */
+    fun openSecondaryAccountNotification(notificationText: String): Long {
+        device.openNotification()
+        val notification = waitForText(notificationText)
+        val intentDeliveryApproximationMs = SystemClock.elapsedRealtime()
+        notification.click()
+        waitForTag(PerformanceTags.OPEN_GROUP_DETAILS, NOTIFICATION_ROUTE_TIMEOUT_MS)
+        return SystemClock.elapsedRealtime() - intentDeliveryApproximationMs
+    }
+
     fun returnToChatList() {
         repeat(4) {
             if (findTag(PerformanceTags.NEW_MESSAGE, NAVIGATION_SETTLE_TIMEOUT_MS) != null) return
@@ -245,6 +258,7 @@ internal class WhiteNoiseJourneys {
         const val DEFAULT_TIMEOUT_MS = 15_000L
         const val STARTUP_TIMEOUT_MS = 30_000L
         const val NETWORK_STATE_TIMEOUT_MS = 45_000L
+        const val NOTIFICATION_ROUTE_TIMEOUT_MS = 10_000L
         const val NAVIGATION_SETTLE_TIMEOUT_MS = 2_000L
         const val INPUT_METHOD_POLL_INTERVAL_MS = 100L
         const val CONVERSATION_SCROLL_PASSES = 4

@@ -26,6 +26,7 @@ import androidx.fragment.app.FragmentActivity
 import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
+import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.inboundNotificationHandledMatchesCurrent
@@ -208,6 +209,9 @@ class MainActivity : FragmentActivity() {
                         notificationRequestId = inboundNotificationRequestId,
                     ),
             )
+        if (parsedTarget != null) {
+            NotificationRouteTrace.startRequest(routing.notificationRequestId)
+        }
         inboundNotificationTarget = routing.notificationTarget
         inboundNotificationRequestId = routing.notificationRequestId
         inboundProfilePayload = routing.profilePayload

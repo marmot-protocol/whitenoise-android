@@ -186,7 +186,7 @@ class ChatListProfileReturnSnapCoverageTest {
 
         val accountResetBlock =
             mainShell.requiredSection(
-                start = "if (shouldResetNavOnAccountChange(previousActiveAccountRef, current)) {",
+                start = "&& !earlyOpenLandsPinnedAccount) {",
                 end = "\n        }",
             )
         assertTrue(
@@ -199,7 +199,7 @@ class ChatListProfileReturnSnapCoverageTest {
     fun accountSwitchDismissesSharePickerBeforeTargetsCanCrossAccounts() {
         val accountResetBlock =
             mainShellSource().readText().requiredSection(
-                start = "if (shouldResetNavOnAccountChange(previousActiveAccountRef, current)) {",
+                start = "&& !earlyOpenLandsPinnedAccount) {",
                 end = "\n        }",
             )
 

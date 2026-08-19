@@ -18,6 +18,9 @@ internal object BenchmarkConfig {
     val createdGroupPrefix: String?
         get() = arguments.getString("createdGroupPrefix")?.trim()?.takeIf(String::isNotEmpty)
 
+    val notificationText: String?
+        get() = arguments.getString("notificationText")?.trim()?.takeIf(String::isNotEmpty)
+
     fun requireFixture(
         value: String?,
         argumentName: String,

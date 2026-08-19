@@ -113,7 +113,11 @@ class ChatListFolderFilterNavigationCoverageTest {
     fun accountSwitchClearsRememberedFolderFilter() {
         val accountResetBlock =
             mainShellSource().readText().requiredSection(
-                start = "if (shouldResetNavOnAccountChange(previousActiveAccountRef, current)) {",
+                // Anchored on the reset condition's tail: the reset is skipped
+                // only while a notification-routed early open is landing its
+                // own pinned account; every other account change still clears
+                // the folder filter below.
+                start = "&& !earlyOpenLandsPinnedAccount) {",
                 end = "\n        }",
             )
 
