@@ -24,6 +24,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.concurrent.ConcurrentHashMap
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -81,8 +82,14 @@ class GroupEmojiImagePickerTest {
     @Test
     fun thirdSelectionShowsLimitThenRemovalAllowsReplacement() {
         var applied: ImageUploadDraft? = null
-        var lastRenderedDraft: ImageUploadDraft? = null
-        val renderedSelections = mutableListOf<List<String>>()
+        // Keyed by selection, not last-write-wins: a producer cancelled by a
+        // newer selection still runs its non-suspending renderer to
+        // completion on Dispatchers.Default, so a stale intermediate render
+        // ([🚀]) can finish after the final one and must not confuse the
+        // assertions. The sheet itself is safe — withContext re-checks
+        // cancellation before publishing, and consumers gate on the current
+        // selection — this is purely test-observation ordering.
+        val renderedBySelection = ConcurrentHashMap<List<String>, ImageUploadDraft>()
         composeRule.setContent {
             WhiteNoiseTheme {
                 GroupEmojiImagePickerSheet(
@@ -91,11 +98,10 @@ class GroupEmojiImagePickerTest {
                     onEmojiUsed = {},
                     onApply = { applied = it },
                     onDismiss = {},
-                    renderer = {
-                        renderedSelections += it
+                    renderer = { emojis ->
                         GroupEmojiImageRenderer
-                            .render(it, hasGlyph = { _, _ -> true })
-                            .also { draft -> lastRenderedDraft = draft }
+                            .render(emojis, hasGlyph = { _, _ -> true })
+                            .also { draft -> renderedBySelection[emojis] = draft }
                     },
                 )
             }
@@ -112,9 +118,8 @@ class GroupEmojiImagePickerTest {
         composeRule.onNodeWithText("Use emoji image").assertIsEnabled().performClick()
 
         composeRule.runOnIdle {
-            assertEquals(listOf("🚀", "🎉"), renderedSelections.last())
             assertNotNull(applied)
-            assertSame(lastRenderedDraft, applied)
+            assertSame(renderedBySelection[listOf("🚀", "🎉")], applied)
         }
     }
 
