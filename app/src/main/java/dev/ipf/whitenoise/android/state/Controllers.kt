@@ -7626,7 +7626,19 @@ class ConversationController(
                 if (timelineReconnect) {
                     emptyList()
                 } else {
-                    val snapshot = withContext(Dispatchers.IO) { timelineStream.snapshot() }
+                    // The initial page is a local read, but it crosses the FFI
+                    // boundary — a hung call here would leave the chat-list tap
+                    // permanently inert because navigation cannot promote until
+                    // the first page publishes. Bound it, and convert exhaustion
+                    // into the ordinary load failure whose surface already
+                    // promotes navigation and offers retry.
+                    val snapshot =
+                        awaitBoundedInitialRead(
+                            read = controllerScope.async(Dispatchers.IO) { runCatching { timelineStream.snapshot() } },
+                            budgetMillis = INITIAL_TIMELINE_SNAPSHOT_BUDGET_MILLIS,
+                        ) {
+                            throw ConversationInitialSnapshotTimeoutException()
+                        }
                     if (snapshot == null) {
                         publishAuthoritativeEmptyInitialTimeline()
                         emptyList()
