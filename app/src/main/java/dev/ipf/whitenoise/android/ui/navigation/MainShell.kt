@@ -115,6 +115,11 @@ internal fun pendingConversationOpenBelongsToAccount(
     activeAccountRef: String?,
 ): Boolean = requestAccountRef != null && requestAccountRef == activeAccountRef
 
+internal fun mainShellAccountContentOwned(
+    previousAccountRef: String?,
+    activeAccountRef: String?,
+): Boolean = previousAccountRef == activeAccountRef
+
 internal data class ConversationTransitionContent(
     val chat: ChatListItem,
     val controller: ConversationController,
@@ -1444,7 +1449,7 @@ internal fun MainShell(
     // account switch or the wipe transient-null they could otherwise build a
     // controller seeded with the previous account's decrypted preview. Drop them
     // until the shell's remembered account matches the live one.
-    val navAccountStable = previousActiveAccountRef == appState.activeAccountRef
+    val navAccountStable = mainShellAccountContentOwned(previousActiveAccountRef, appState.activeAccountRef)
     val controllerChat =
         selectedChat?.takeIf { navAccountStable }
             ?: accountOwnedPendingConversationOpen?.item
@@ -1549,6 +1554,13 @@ internal fun MainShell(
         ) {
             pendingConversationOpen = null
         }
+    }
+    if (!navAccountStable) {
+        // Account invalidation is a privacy boundary, not an ordinary Back
+        // navigation. Remove the AnimatedContent subtree immediately so its
+        // outgoing slot cannot retain a decrypted route for the exit tween.
+        LoadingScreen()
+        return
     }
     if (
         shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible) &&

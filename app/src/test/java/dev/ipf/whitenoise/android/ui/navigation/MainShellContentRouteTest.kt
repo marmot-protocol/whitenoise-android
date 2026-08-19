@@ -127,4 +127,11 @@ class MainShellContentRouteTest {
         assertFalse(pendingConversationOpenBelongsToAccount("personal", "work"))
         assertFalse(pendingConversationOpenBelongsToAccount("personal", null))
     }
+
+    @Test
+    fun mainShellConversationContentRequiresStableAccountOwnership() {
+        assertTrue(mainShellAccountContentOwned("personal", "personal"))
+        assertFalse(mainShellAccountContentOwned("personal", "work"))
+        assertFalse(mainShellAccountContentOwned("personal", null))
+    }
 }
