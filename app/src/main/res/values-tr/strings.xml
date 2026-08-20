@@ -1412,7 +1412,7 @@
     <string name="tts_bar_return_to_source">Okunan mesaja dön</string>
     <string name="tts_source_unavailable">Okunan mesaj artık kullanılamıyor</string>
     <string name="tts_returning_to_passage">Seslendirilen bölüme dönülüyor…</string>
-    <string name="tts_resume_follow">Takibi sürdür</string>
+    <string name="tts_resume_follow">Sesli okumayı takip etmeye devam et</string>
     <string name="tts_bar_error">Sesli okunamadı</string>
     <string name="tts_bar_history_loading">Diğer mesajlar yükleniyor…</string>
     <string name="tts_bar_history_error">Diğer mesajlar yüklenemedi. Yeniden denemek için tekrar dokunun.</string>

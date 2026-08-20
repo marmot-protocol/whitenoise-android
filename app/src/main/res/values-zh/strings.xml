@@ -1387,7 +1387,7 @@
     <string name="tts_bar_return_to_source">返回正在朗读的消息</string>
     <string name="tts_source_unavailable">正在朗读的消息已不可用</string>
     <string name="tts_returning_to_passage">正在返回朗读段落…</string>
-    <string name="tts_resume_follow">恢复跟随</string>
+    <string name="tts_resume_follow">恢复跟随朗读</string>
     <string name="tts_bar_error">无法朗读</string>
     <string name="tts_bar_history_loading">正在加载更多消息…</string>
     <string name="tts_bar_history_error">无法加载更多消息。再次点按可重试。</string>
