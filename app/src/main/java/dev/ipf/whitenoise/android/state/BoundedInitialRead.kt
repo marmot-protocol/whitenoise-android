@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -130,13 +131,132 @@ internal class SingleFlightBoundedInitialSnapshotRead<T>(
     }
 }
 
+/**
+ * Owns one resource-producing native read across retry generations.
+ *
+ * Unlike a snapshot value, a subscription must be closed if the controller is
+ * cleared before a timed-out producer can hand it to a later retry. Ownership
+ * remains here until exactly one caller claims the completed resource.
+ */
+internal class SingleFlightBoundedInitialResourceRead<T>(
+    private val budgetMillis: Long = INITIAL_TIMELINE_READ_BUDGET_MILLIS,
+    producerDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val closeUnclaimed: suspend (T) -> Unit,
+) {
+    private val lock = Any()
+    private val producerScope = CoroutineScope(SupervisorJob() + producerDispatcher)
+    private var producer: Deferred<Result<T>>? = null
+    private var cancelled = false
+
+    suspend fun await(read: suspend () -> T): T {
+        val (current, reused) = producerFor(read)
+
+        if (reused && current.isActive) {
+            throw ConversationInitialLoadStillInFlightException()
+        }
+
+        val outcome = awaitOutcome(current)
+        val resource = resourceFromOutcome(current, outcome)
+        claim(current)
+        return resource
+    }
+
+    @Suppress("TooGenericExceptionCaught") // Every producer outcome must be retained for handoff or cleanup.
+    private fun producerFor(read: suspend () -> T): Pair<Deferred<Result<T>>, Boolean> =
+        synchronized(lock) {
+            if (cancelled) throw CancellationException("initial resource owner was cleared")
+            producer?.let { it to true }
+                ?: producerScope
+                    .async(start = CoroutineStart.DEFAULT) {
+                        try {
+                            Result.success(read())
+                        } catch (throwable: Throwable) {
+                            Result.failure(throwable)
+                        }
+                    }.also { producer = it }
+                    .let { it to false }
+        }
+
+    private suspend fun awaitOutcome(current: Deferred<Result<T>>): Result<T> =
+        withTimeoutOrNull(budgetMillis.coerceAtLeast(1L)) {
+            current.await()
+        } ?: throw ConversationInitialLoadTimeoutException()
+
+    @Suppress("TooGenericExceptionCaught") // Result may contain any throwable raised by the native producer.
+    private fun resourceFromOutcome(
+        current: Deferred<Result<T>>,
+        outcome: Result<T>,
+    ): T =
+        try {
+            outcome.getOrThrow()
+        } catch (throwable: Throwable) {
+            clearCompletedProducer(current)
+            throw throwable
+        }
+
+    private fun claim(current: Deferred<Result<T>>) {
+        val claimed =
+            synchronized(lock) {
+                if (!cancelled && producer === current) {
+                    producer = null
+                    true
+                } else {
+                    false
+                }
+            }
+        if (!claimed) {
+            // cancel() won ownership and is responsible for closing the result.
+            throw CancellationException("initial resource owner was cleared during handoff")
+        }
+    }
+
+    private fun clearCompletedProducer(current: Deferred<Result<T>>) {
+        if (!current.isCompleted) return
+        synchronized(lock) {
+            if (producer === current) producer = null
+        }
+    }
+
+    fun cancel() {
+        val current =
+            synchronized(lock) {
+                if (cancelled) return
+                cancelled = true
+                producer.also { producer = null }
+            }
+        if (current == null) {
+            producerScope.cancel()
+            return
+        }
+        producerScope.launch {
+            try {
+                runCatching { current.await() }
+                    .getOrNull()
+                    ?.getOrNull()
+                    ?.let { resource ->
+                        withContext(NonCancellable) {
+                            runCatching { closeUnclaimed(resource) }
+                        }
+                    }
+            } finally {
+                producerScope.cancel()
+            }
+        }
+    }
+}
+
 internal sealed class ConversationInitialLoadException(
     message: String,
 ) : Exception(message)
 
-internal class ConversationInitialLoadTimeoutException : ConversationInitialLoadException("initial conversation load exceeded its budget")
+internal class ConversationInitialLoadTimeoutException :
+    ConversationInitialLoadException(
+        "initial conversation load exceeded its budget",
+    )
 
 internal class ConversationInitialLoadStillInFlightException :
-    ConversationInitialLoadException("initial conversation load is still running; restart required")
+    ConversationInitialLoadException(
+        "initial conversation load is still running; restart required",
+    )
 
 internal const val INITIAL_TIMELINE_READ_BUDGET_MILLIS = 5_000L

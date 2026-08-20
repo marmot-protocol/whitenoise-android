@@ -87,5 +87,23 @@ class LoadFailurePlacementTest {
         assertTrue("if (!initialTimelineAnchored) hideFromAccessibility()" in screen)
     }
 
+    @Test
+    fun terminalConversationOpenStopsItsForegroundSweepSibling() {
+        val sourceCandidates =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android"),
+                File("app/src/main/java/dev/ipf/whitenoise/android"),
+            )
+        val sourceRoot = sourceCandidates.first(File::isDirectory)
+        val runStart =
+            File(sourceRoot, "state/Controllers.kt")
+                .readText()
+                .substringAfter("private suspend fun runStart(account: String)")
+                .substringBefore("private fun discardInitialTimelineSeedForFailure")
+
+        assertTrue("val foregroundSweepJob = launch" in runStart)
+        assertTrue("foregroundSweepJob.cancel()" in runStart)
+    }
+
     private fun String.countOccurrences(needle: String): Int = windowed(needle.length).count { it == needle }
 }

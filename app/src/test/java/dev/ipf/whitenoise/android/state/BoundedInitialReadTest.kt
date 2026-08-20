@@ -176,7 +176,83 @@ class BoundedInitialReadTest {
         }
 
     @Test
-    fun onlyNativeOpenTimeoutsRequireExplicitRetry() {
+    fun repeatedResourceRetriesReuseOneProducerAndTransferItsResult() =
+        runTest {
+            val releaseRead = CompletableDeferred<Unit>()
+            var startedReads = 0
+            var closeCount = 0
+            val resourceRead =
+                SingleFlightBoundedInitialResourceRead<String>(
+                    budgetMillis = 10L,
+                    producerDispatcher = StandardTestDispatcher(testScheduler),
+                    closeUnclaimed = { closeCount += 1 },
+                )
+
+            try {
+                try {
+                    resourceRead.await {
+                        startedReads += 1
+                        releaseRead.await()
+                        "subscription"
+                    }
+                    fail("expected the first resource read to time out")
+                } catch (_: ConversationInitialLoadTimeoutException) {
+                }
+
+                try {
+                    resourceRead.await { error("an active producer must remain single-flight") }
+                    fail("expected the active resource read to reject a duplicate retry")
+                } catch (_: ConversationInitialLoadStillInFlightException) {
+                }
+
+                assertEquals(1, startedReads)
+                releaseRead.complete(Unit)
+                testScheduler.runCurrent()
+                assertEquals(
+                    "subscription",
+                    resourceRead.await { error("a retry must consume the retained resource") },
+                )
+                assertEquals(1, startedReads)
+                assertEquals(0, closeCount)
+            } finally {
+                releaseRead.complete(Unit)
+                resourceRead.cancel()
+            }
+        }
+
+    @Test
+    fun clearingResourceOwnerClosesALateResultExactlyOnce() =
+        runTest {
+            val releaseRead = CompletableDeferred<Unit>()
+            val closed = CompletableDeferred<Unit>()
+            var closeCount = 0
+            val resourceRead =
+                SingleFlightBoundedInitialResourceRead<String>(
+                    budgetMillis = 10L,
+                    producerDispatcher = StandardTestDispatcher(testScheduler),
+                    closeUnclaimed = {
+                        closeCount += 1
+                        closed.complete(Unit)
+                    },
+                )
+
+            try {
+                resourceRead.await {
+                    releaseRead.await()
+                    "subscription"
+                }
+                fail("expected the resource read to time out")
+            } catch (_: ConversationInitialLoadTimeoutException) {
+            }
+
+            resourceRead.cancel()
+            releaseRead.complete(Unit)
+            closed.await()
+            assertEquals(1, closeCount)
+        }
+
+    @Test
+    fun nativeOpenTimeoutsRequireRestartInsteadOfRetry() {
         assertTrue(
             isTerminalOpenFailure(
                 ConversationInitialLoadTimeoutException(),
@@ -190,6 +266,18 @@ class BoundedInitialReadTest {
         assertEquals(
             false,
             isTerminalOpenFailure(IllegalStateException("stream ended")),
+        )
+        assertEquals(
+            false,
+            shouldOfferConversationLoadRetry(ConversationInitialLoadTimeoutException()),
+        )
+        assertEquals(
+            false,
+            shouldOfferConversationLoadRetry(ConversationInitialLoadStillInFlightException()),
+        )
+        assertEquals(
+            true,
+            shouldOfferConversationLoadRetry(IllegalStateException("stream ended")),
         )
     }
 }

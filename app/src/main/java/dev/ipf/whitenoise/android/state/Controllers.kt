@@ -6747,6 +6747,8 @@ internal fun conversationStartsLoading(
 
 internal fun isTerminalOpenFailure(throwable: Throwable): Boolean = throwable is ConversationInitialLoadException
 
+internal fun shouldOfferConversationLoadRetry(throwable: Throwable): Boolean = !isTerminalOpenFailure(throwable)
+
 class ConversationController(
     private val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
@@ -7138,6 +7140,10 @@ class ConversationController(
     // is not an Android-owned cache of White Noise data (AGENTS.md).
     private val sendTraceByTempId = linkedMapOf<String, SendTraceEntry>()
     private val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val initialTimelineSubscriptionRead =
+        SingleFlightBoundedInitialResourceRead<TimelineMessagesSubscription>(
+            closeUnclaimed = { lateStream -> runCatching { lateStream.close() } },
+        )
     private val initialTimelineSnapshotRead = SingleFlightBoundedInitialSnapshotRead<TimelinePageFfi?>()
     private val initialPresentationWarmCoordinator =
         ConversationInitialPresentationWarmCoordinator(
@@ -7427,8 +7433,15 @@ class ConversationController(
                     // The timer is lifecycle-bound to this conversation and is
                     // rescheduled by timeline/group-state publishes; when there is no
                     // loaded row near expiry it falls back to the old slow cadence.
-                    launch { runForegroundDisappearingMessageSweep(account) }
-                    runConversationSubscriptionLoop(account)
+                    val foregroundSweepJob = launch { runForegroundDisappearingMessageSweep(account) }
+                    try {
+                        runConversationSubscriptionLoop(account)
+                    } finally {
+                        // A terminal initial-open failure returns normally from
+                        // the subscription loop. Stop its infinite sibling so
+                        // runStart can finish and release its lifecycle state.
+                        foregroundSweepJob.cancel()
+                    }
                 } finally {
                     conversationScope = null
                 }
@@ -7664,16 +7677,11 @@ class ConversationController(
         var timelineStream: TimelineMessagesSubscription? = null
         try {
             timelineStream =
-                awaitBoundedInitialResourceRead(
-                    budgetMillis = INITIAL_TIMELINE_READ_BUDGET_MILLIS,
-                    read = {
-                        appState.marmotIo {
-                            subscribeTimelineMessages(account, group.groupIdHex, ConversationTimelinePageLimit)
-                        }
-                    },
-                    closeLate = { lateStream -> runCatching { lateStream.close() } },
-                    onTimeout = { throw ConversationInitialLoadTimeoutException() },
-                )
+                initialTimelineSubscriptionRead.await {
+                    appState.marmotIo {
+                        subscribeTimelineMessages(account, group.groupIdHex, ConversationTimelinePageLimit)
+                    }
+                }
             val stopAfterTimelineOpen =
                 synchronized(liveSubscriptionLock) {
                     if (accountTeardownRequested) {
@@ -7747,7 +7755,6 @@ class ConversationController(
                 return true to false
             }
             val initialOpenTimedOut = isTerminalOpenFailure(throwable)
-            val initialSnapshotStillInFlight = throwable is ConversationInitialLoadStillInFlightException
             discardInitialTimelineSeedForFailure(preserveOptimisticMessages = true)
             isLoading = false
             subscriptionError =
@@ -7755,20 +7762,21 @@ class ConversationController(
                     operationCode = if (timelineRecords.isEmpty()) "CONVERSATION_LOAD" else "CONVERSATION_REFRESH",
                     throwable = throwable,
                     message =
-                        if (initialSnapshotStillInFlight) {
+                        if (initialOpenTimedOut) {
                             AppText.Resource(R.string.error_restart_app_before_retry)
                         } else if (timelineRecords.isEmpty()) {
                             AppText.Resource(R.string.error_try_again)
                         } else {
                             AppText.Resource(R.string.error_loaded_content_may_be_out_of_date)
                         },
-                    retryable = !initialSnapshotStillInFlight,
+                    retryable = shouldOfferConversationLoadRetry(throwable),
                 )
             if (initialOpenTimedOut) {
                 // A timed-out FFI call may still occupy its native blocking
                 // worker. Automatic retries would accumulate more stuck calls;
-                // stop here. A visible Retry may advance the controller
-                // generation, but the snapshot read remains single-flight.
+                // stop here. The user must restart rather than launch another
+                // native open while the single-flight owner is unresolved.
+                initialTimelineSubscriptionRead.cancel()
                 terminalLoadFailure = true
                 return true to false
             }
@@ -7870,6 +7878,7 @@ class ConversationController(
      */
     fun onCleared() {
         controllerCleared = true
+        initialTimelineSubscriptionRead.cancel()
         initialTimelineSnapshotRead.cancel()
         controllerScope.cancel()
         inviteStreamScope.cancel()
