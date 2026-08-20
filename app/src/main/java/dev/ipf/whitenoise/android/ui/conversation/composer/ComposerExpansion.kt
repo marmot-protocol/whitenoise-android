@@ -13,6 +13,13 @@ internal data class ComposerExpansionState(
     val manualHeightPx: Float? = null,
 )
 
+private fun normalizedMaximumHeight(maximumHeightPx: Float): Float = maximumHeightPx.coerceAtLeast(0f)
+
+private fun normalizedMinimumHeight(
+    automaticHeightPx: Float,
+    maximumHeightPx: Float,
+): Float = automaticHeightPx.coerceIn(0f, normalizedMaximumHeight(maximumHeightPx))
+
 /**
  * Resolves the visible composer height. Automatic mode follows the text field;
  * manual and full-screen modes stay inside the live safe viewport.
@@ -22,8 +29,8 @@ internal fun composerHeightPx(
     automaticHeightPx: Float,
     maximumHeightPx: Float,
 ): Float {
-    val maximum = maximumHeightPx.coerceAtLeast(0f)
-    val minimum = automaticHeightPx.coerceIn(0f, maximum)
+    val maximum = normalizedMaximumHeight(maximumHeightPx)
+    val minimum = normalizedMinimumHeight(automaticHeightPx, maximum)
     return when (state.mode) {
         ComposerExpansionMode.Automatic -> minimum
         ComposerExpansionMode.Manual -> state.manualHeightPx?.coerceIn(minimum, maximum) ?: minimum
@@ -38,9 +45,11 @@ internal fun dragComposerHeight(
     automaticHeightPx: Float,
     maximumHeightPx: Float,
 ): ComposerExpansionState {
+    val maximum = normalizedMaximumHeight(maximumHeightPx)
+    val minimum = normalizedMinimumHeight(automaticHeightPx, maximum)
     val nextHeight =
-        (composerHeightPx(state, automaticHeightPx, maximumHeightPx) - dragDeltaYPx)
-            .coerceIn(automaticHeightPx, maximumHeightPx)
+        (composerHeightPx(state, minimum, maximum) - dragDeltaYPx)
+            .coerceIn(minimum, maximum)
     return ComposerExpansionState(
         mode = ComposerExpansionMode.Manual,
         manualHeightPx = nextHeight,
@@ -57,10 +66,12 @@ internal fun settleComposerHeight(
     maximumHeightPx: Float,
     deadbandPx: Float,
 ): ComposerExpansionState {
-    val height = composerHeightPx(state, automaticHeightPx, maximumHeightPx)
+    val maximum = normalizedMaximumHeight(maximumHeightPx)
+    val minimum = normalizedMinimumHeight(automaticHeightPx, maximum)
+    val height = composerHeightPx(state, minimum, maximum)
     return when {
-        abs(height - automaticHeightPx) <= deadbandPx -> ComposerExpansionState()
-        abs(maximumHeightPx - height) <= deadbandPx ->
+        abs(height - minimum) <= deadbandPx -> ComposerExpansionState()
+        abs(maximum - height) <= deadbandPx ->
             ComposerExpansionState(mode = ComposerExpansionMode.FullScreen)
         else -> ComposerExpansionState(ComposerExpansionMode.Manual, height)
     }

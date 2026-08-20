@@ -123,6 +123,8 @@ class ComposerExpansionBehaviorTest {
                 .onNodeWithTag(TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot.height
+        // This mdpi test renders inside a 720dp-tall Surface, so the automatic
+        // half-viewport ceiling is 360px; 300px proves the long draft grew.
         assertTrue("a long draft should grow well beyond the compact composer", height >= 300f)
         assertTrue("automatic growth should preserve roughly half the viewport", height <= 360f)
     }

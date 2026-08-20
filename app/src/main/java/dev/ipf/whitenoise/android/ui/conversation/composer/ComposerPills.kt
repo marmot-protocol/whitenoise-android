@@ -290,11 +290,28 @@ internal fun ComposerPill(
                     .then(expandedHeightModifier),
         ) {
             Box(
+                contentAlignment =
+                    if (expandedLayout) {
+                        Alignment.TopStart
+                    } else {
+                        Alignment.CenterStart
+                    },
                 modifier =
                     Modifier
-                        .fillMaxWidth()
+                        .align(
+                            if (expandedLayout) {
+                                Alignment.TopStart
+                            } else {
+                                Alignment.CenterStart
+                            },
+                        ).fillMaxWidth()
                         .then(expandedHeightModifier)
-                        .alpha(if (inputContentVisible) 1f else 0f)
+                        .padding(
+                            start = if (expandedLayout) 12.dp else 52.dp,
+                            top = if (expandedLayout) 36.dp else 10.dp,
+                            end = if (expandedLayout) 12.dp else compactTrailingReserve,
+                            bottom = if (expandedLayout) 48.dp else 10.dp,
+                        ).alpha(if (inputContentVisible) 1f else 0f)
                         .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
             ) {
                 BasicTextField(
@@ -304,12 +321,7 @@ internal fun ComposerPill(
                         Modifier
                             .fillMaxWidth()
                             .then(expandedHeightModifier)
-                            .padding(
-                                start = if (expandedLayout) 12.dp else 44.dp,
-                                top = if (expandedLayout) 36.dp else 10.dp,
-                                end = if (expandedLayout) 12.dp else compactTrailingReserve,
-                                bottom = if (expandedLayout) 48.dp else 10.dp,
-                            ).focusProperties { canFocus = inputFocusEnabled }
+                            .focusProperties { canFocus = inputFocusEnabled }
                             .contentReceiver(pasteImageReceiver)
                             .onPreInterceptKeyBeforeSoftKeyboard { event ->
                                 when (
@@ -397,11 +409,6 @@ internal fun ComposerPill(
                         stringResource(R.string.message),
                         style = LocalTextStyle.current.copy(fontSize = 16.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        modifier =
-                            Modifier.padding(
-                                start = if (expandedLayout) 12.dp else 44.dp,
-                                top = if (expandedLayout) 36.dp else 10.dp,
-                            ),
                     )
                 }
             }
@@ -410,13 +417,15 @@ internal fun ComposerPill(
                 modifier =
                     Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = 4.dp, bottom = 4.dp)
-                        .alpha(if (inputContentVisible) 1f else 0f)
+                        .padding(
+                            start = 4.dp,
+                            bottom = if (expandedLayout) 4.dp else 0.dp,
+                        ).alpha(if (inputContentVisible) 1f else 0f)
                         .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
             ) {
                 TextEntryEmojiAction(
                     pickerOpen = emojiPickerOpen,
-                    enabled = true,
+                    enabled = inputContentVisible,
                     onClick = onEmojiPickerToggle,
                     togglesKeyboard = true,
                 )
@@ -426,8 +435,7 @@ internal fun ComposerPill(
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)
-                        .height(44.dp)
-                        .padding(end = 0.dp),
+                        .height(44.dp),
             ) {
                 if (hasAttachmentAction) {
                     IconButton(

@@ -82,6 +82,12 @@ class ComposerBarScreenshotTest {
     }
 
     @Test
+    fun composerBarLongDraftAmoled() {
+        renderLongComposer(darkTheme = true, amoled = true)
+        composeRule.onNodeWithTag(LONG_TAG).captureRoboImage("src/test/snapshots/composer_bar_long_draft_amoled.png")
+    }
+
+    @Test
     fun composerBarFullScreenLargeRtl() {
         renderLongComposer(darkTheme = true, largeRtl = true)
         composeRule.onNodeWithContentDescription("Drag to resize message composer").performClick()
@@ -137,6 +143,7 @@ class ComposerBarScreenshotTest {
 
     private fun renderLongComposer(
         darkTheme: Boolean,
+        amoled: Boolean = false,
         largeRtl: Boolean = false,
     ) {
         val draft =
@@ -151,7 +158,7 @@ class ComposerBarScreenshotTest {
                 LocalDensity provides Density(baseDensity.density, if (largeRtl) 1.45f else 1f),
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = darkTheme) {
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                     Surface(modifier = Modifier.width(360.dp).height(720.dp)) {
                         Box {
                             ComposerBar(

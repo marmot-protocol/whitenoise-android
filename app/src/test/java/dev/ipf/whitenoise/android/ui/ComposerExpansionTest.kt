@@ -31,6 +31,14 @@ class ComposerExpansionTest {
     }
 
     @Test
+    fun dragNormalizesAnAutomaticHeightAboveTheAvailableViewport() {
+        val dragged = dragComposerHeight(ComposerExpansionState(), -40f, 700f, 600f)
+
+        assertEquals(ComposerExpansionMode.Manual, dragged.mode)
+        assertEquals(600f, dragged.manualHeightPx)
+    }
+
+    @Test
     fun releaseOnlySnapsInsideTheEndpointDeadband() {
         val middle = ComposerExpansionState(ComposerExpansionMode.Manual, 351f)
         assertEquals(middle, settleComposerHeight(middle, 200f, 600f, 20f))

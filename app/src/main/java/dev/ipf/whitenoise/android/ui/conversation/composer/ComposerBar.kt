@@ -806,7 +806,7 @@ internal fun ComposerBar(
             with(density) {
                 val navigationBottom = navigationInsets.getBottom(this)
                 if (appliesImePadding) {
-                    maxOf(imeInsets.getBottom(this), navigationBottom).toDp()
+                    maxOf(imeTargetInsets.getBottom(this), navigationBottom).toDp()
                 } else {
                     navigationBottom.toDp()
                 }
@@ -1127,8 +1127,13 @@ internal fun ComposerBar(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier =
                             Modifier
-                                .align(Alignment.BottomEnd)
-                                .height(44.dp),
+                                .align(
+                                    if (expandedControlLayout) {
+                                        Alignment.BottomEnd
+                                    } else {
+                                        Alignment.CenterEnd
+                                    },
+                                ).height(44.dp),
                     ) {
                         // This call site stays shared by idle and recording states;
                         // moving it would break the active hold gesture's identity.
@@ -1183,10 +1188,10 @@ internal fun ComposerBar(
                                     .matchParentSize()
                                     .padding(
                                         end =
-                                            if (voiceRecordingController.locked) {
-                                                84.dp
-                                            } else if (expandedControlLayout) {
-                                                44.dp
+                                            if (expandedControlLayout) {
+                                                if (voiceRecordingController.locked) 84.dp else 44.dp
+                                            } else if (voiceRecordingController.locked) {
+                                                92.dp
                                             } else {
                                                 52.dp
                                             },
