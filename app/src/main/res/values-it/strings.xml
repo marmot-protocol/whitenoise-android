@@ -1414,7 +1414,7 @@
     <string name="tts_bar_return_to_source">Torna al messaggio letto</string>
     <string name="tts_source_unavailable">Il messaggio letto non è più disponibile</string>
     <string name="tts_returning_to_passage">Ritorno al passaggio letto…</string>
-    <string name="tts_resume_follow">Riprendi scorrimento</string>
+    <string name="tts_resume_follow">Riprendi a seguire la lettura ad alta voce</string>
     <string name="tts_bar_error">Impossibile leggere ad alta voce</string>
     <string name="tts_bar_history_loading">Caricamento di altri messaggi…</string>
     <string name="tts_bar_history_error">Impossibile caricare altri messaggi. Tocca di nuovo per riprovare.</string>

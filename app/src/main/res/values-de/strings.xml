@@ -1412,7 +1412,7 @@
     <string name="tts_bar_return_to_source">Zur vorgelesenen Nachricht zurückkehren</string>
     <string name="tts_source_unavailable">Die vorgelesene Nachricht ist nicht mehr verfügbar</string>
     <string name="tts_returning_to_passage">Zur vorgelesenen Passage zurückkehren…</string>
-    <string name="tts_resume_follow">Folgen fortsetzen</string>
+    <string name="tts_resume_follow">Erneut dem Vorlesen folgen</string>
     <string name="tts_bar_error">Vorlesen fehlgeschlagen</string>
     <string name="tts_bar_history_loading">Weitere Nachrichten werden geladen…</string>
     <string name="tts_bar_history_error">Weitere Nachrichten konnten nicht geladen werden. Zum Wiederholen erneut tippen.</string>

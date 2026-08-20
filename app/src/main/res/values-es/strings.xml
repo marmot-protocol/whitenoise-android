@@ -1414,7 +1414,7 @@
     <string name="tts_bar_return_to_source">Volver al mensaje leído</string>
     <string name="tts_source_unavailable">El mensaje leído ya no está disponible</string>
     <string name="tts_returning_to_passage">Volviendo al pasaje leído…</string>
-    <string name="tts_resume_follow">Reanudar seguimiento</string>
+    <string name="tts_resume_follow">Reanudar el seguimiento de la lectura en voz alta</string>
     <string name="tts_bar_error">No se pudo leer en voz alta</string>
     <string name="tts_bar_history_loading">Cargando más mensajes…</string>
     <string name="tts_bar_history_error">No se pudieron cargar más mensajes. Toca de nuevo para reintentar.</string>

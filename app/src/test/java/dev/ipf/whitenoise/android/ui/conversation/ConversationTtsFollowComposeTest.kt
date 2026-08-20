@@ -25,12 +25,17 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -68,6 +73,61 @@ import org.robolectric.annotation.GraphicsMode
 class ConversationTtsFollowComposeTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun ttsResumeFollowButtonUsesIconOnlyAccessibilitySemantics() {
+        var clicked = false
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                TtsResumeFollowButton(onClick = { clicked = true })
+            }
+        }
+        val resumeLabel =
+            ApplicationProvider
+                .getApplicationContext<android.content.Context>()
+                .getString(R.string.tts_resume_follow)
+
+        composeRule.onNodeWithText(resumeLabel).assertDoesNotExist()
+        composeRule
+            .onNodeWithContentDescription(resumeLabel)
+            .assertIsDisplayed()
+            .assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp)
+            .assertWidthIsAtLeast(48.dp)
+            .performClick()
+        assertTrue(clicked)
+    }
+
+    @Test
+    @Config(qualifiers = "en")
+    fun ttsResumeFollowButtonTalkBackLabelNamesReadAloudFollow() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                TtsResumeFollowButton(onClick = {})
+            }
+        }
+
+        composeRule
+            .onNodeWithContentDescription("Resume following read-aloud")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun ttsResumeFollowButtonKeepsButtonRole() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                TtsResumeFollowButton(onClick = {})
+            }
+        }
+        val resumeLabel =
+            ApplicationProvider
+                .getApplicationContext<android.content.Context>()
+                .getString(R.string.tts_resume_follow)
+
+        composeRule
+            .onNodeWithContentDescription(resumeLabel)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+    }
 
     @Test
     @Config(qualifiers = "mdpi")
@@ -112,17 +172,17 @@ class ConversationTtsFollowComposeTest {
                 .getApplicationContext<android.content.Context>()
                 .getString(R.string.tts_resume_follow)
         composeRule.onNodeWithTag(TRANSCRIPT_TAG).performScrollToIndex(30)
-        composeRule.onNodeWithText(resumeLabel).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(resumeLabel).assertDoesNotExist()
 
         composeRule.onNodeWithTag(TRANSCRIPT_TAG).performTouchInput { swipeUp() }
         composeRule
-            .onNodeWithText(resumeLabel)
+            .onNodeWithContentDescription(resumeLabel)
             .assertIsDisplayed()
             .assertHasClickAction()
             .assertHeightIsAtLeast(48.dp)
             .assertWidthIsAtLeast(48.dp)
-        composeRule.onNodeWithText(resumeLabel).performClick()
-        composeRule.onNodeWithText(resumeLabel).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(resumeLabel).performClick()
+        composeRule.onNodeWithContentDescription(resumeLabel).assertDoesNotExist()
     }
 
     @Test
@@ -150,7 +210,7 @@ class ConversationTtsFollowComposeTest {
                 .getString(R.string.tts_resume_follow)
 
         composeRule.runOnIdle { suspendFollow() }
-        composeRule.onNodeWithText(resumeLabel).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(resumeLabel).assertIsDisplayed()
 
         restorationTester.emulateSavedInstanceStateRestore()
         composeRule.runOnIdle {
@@ -162,10 +222,10 @@ class ConversationTtsFollowComposeTest {
                 )
         }
 
-        composeRule.onNodeWithText(resumeLabel).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(resumeLabel).assertIsDisplayed()
 
         composeRule.runOnIdle { groupId = "group-2" }
-        composeRule.onNodeWithText(resumeLabel).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(resumeLabel).assertDoesNotExist()
     }
 
     @Test
@@ -194,7 +254,7 @@ class ConversationTtsFollowComposeTest {
             ApplicationProvider
                 .getApplicationContext<android.content.Context>()
                 .getString(R.string.tts_resume_follow)
-        composeRule.onNodeWithText(resumeLabel).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(resumeLabel).assertIsDisplayed()
         composeRule.runOnIdle { releasePaging.complete(Unit) }
         composeRule.waitForIdle()
 

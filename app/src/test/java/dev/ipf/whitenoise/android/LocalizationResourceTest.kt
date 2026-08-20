@@ -447,6 +447,31 @@ class LocalizationResourceTest {
         assertEquals("Where I receive", englishValues["inbox"])
     }
 
+    @Test
+    fun ttsResumeFollowAccessibilityLabelNamesReadAloudAcrossAllLocales() {
+        val resDir =
+            listOf(File("src/main/res"), File("app/src/main/res"))
+                .first { it.exists() }
+
+        val offenders =
+            ttsResumeFollowAccessibilityLabelsByLocale.mapNotNull { (localeDirName, expectedLabel) ->
+                val file = File(resDir, "$localeDirName/strings.xml")
+                val actual = stringValues(file)["tts_resume_follow"]
+                if (actual == expectedLabel) {
+                    null
+                } else {
+                    "${file.path}: tts_resume_follow=\"$actual\" expected \"$expectedLabel\""
+                }
+            }
+
+        assertTrue(
+            "tts_resume_follow is accessibility-only and must name read-aloud follow in every locale. " +
+                "Offenders:\n" +
+                offenders.joinToString("\n"),
+            offenders.isEmpty(),
+        )
+    }
+
     // Guards the umbrella sweep from #381: user-visible string values must not
     // expose raw NIP specification identifiers (e.g. "NIP-05", "NIP-65",
     // "NIP-44") or the deprecated "NIP-EE" naming. NIP numbers are protocol
@@ -767,6 +792,20 @@ class LocalizationResourceTest {
     )
 
     private companion object {
+        val ttsResumeFollowAccessibilityLabelsByLocale =
+            mapOf(
+                "values" to "Resume following read-aloud",
+                "values-de" to "Erneut dem Vorlesen folgen",
+                "values-es" to "Reanudar el seguimiento de la lectura en voz alta",
+                "values-fr" to "Reprendre le suivi de la lecture à voix haute",
+                "values-it" to "Riprendi a seguire la lettura ad alta voce",
+                "values-pt" to "Retomar o acompanhamento da leitura em voz alta",
+                "values-ru" to "Возобновить следование за озвучиванием",
+                "values-tr" to "Sesli okumayı takip etmeye devam et",
+                "values-zh" to "恢复跟随朗读",
+                "values-b+zh+Hant" to "恢復跟隨朗讀",
+            )
+
         const val AGENT_CONNECTOR_CODEX_PROMPT_KEY = "agent_connector_codex_prompt"
         const val AGENT_CONNECTOR_NPUB_PLACEHOLDER = "%1\$s"
         const val AGENT_CONNECTOR_DOCS_URL =
