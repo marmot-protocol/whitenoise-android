@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.amber
 
+import dev.ipf.whitenoise.android.fuzz.FuzzSyntheticCorpusReplay
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -15,6 +16,11 @@ import org.junit.Test
  * and they carry no Android dependencies so they run on the plain JVM.
  */
 class Nip55SignerParsingTest {
+    @Test
+    fun replaysSyntheticFuzzCorpus() {
+        FuzzSyntheticCorpusReplay.replaySuite(FuzzSyntheticCorpusReplay.Suite.Nip55SignerParsing)
+    }
+
     @Test
     fun getPublicKeyResultReadsPubkeyAndPackage() {
         val outcome =

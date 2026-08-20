@@ -1,11 +1,17 @@
 package dev.ipf.whitenoise.android.core
 
+import dev.ipf.whitenoise.android.fuzz.FuzzSyntheticCorpusReplay
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class ProfileLinkTest {
+    @Test
+    fun replaysSyntheticFuzzCorpus() {
+        FuzzSyntheticCorpusReplay.replaySuite(FuzzSyntheticCorpusReplay.Suite.ProfileLink)
+    }
+
     // A bech32 npub is `npub1` + 58 chars from the bech32 alphabet.
     private val sampleNpub = "npub1" + "a".repeat(58)
 

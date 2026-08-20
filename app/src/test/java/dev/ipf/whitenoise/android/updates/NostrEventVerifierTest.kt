@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.updates
 
 import dev.ipf.whitenoise.android.core.nostr.BIP340
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
+import dev.ipf.whitenoise.android.fuzz.FuzzSyntheticCorpusReplay
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -11,6 +12,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NostrEventVerifierTest {
+    @Test
+    fun replaysSyntheticFuzzCorpus() {
+        FuzzSyntheticCorpusReplay.replaySuite(FuzzSyntheticCorpusReplay.Suite.NostrEventVerifier)
+    }
+
     @Test
     fun verifiesBip340ReferenceVector() {
         assertTrue(

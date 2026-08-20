@@ -175,34 +175,35 @@ internal class NostrRelayQueryClient(
                         webSocket: WebSocket,
                         text: String,
                     ) {
-                        if (text.length <= MAX_RELAY_MESSAGE_CHARS) {
-                            runCatching { JSONArray(text) }.getOrNull()?.let { message ->
-                                when (message.optString(0)) {
-                                    "EVENT" -> {
-                                        val belongsToSubscription = message.optString(1) == subscriptionId
-                                        if (belongsToSubscription && events.size < maxEvents) {
-                                            message.readEvent()?.let { event ->
-                                                if (event.content.length <= MAX_EVENT_CONTENT_CHARS) {
-                                                    val added = events.putIfAbsent(event.id, event) == null
-                                                    if (added && events.size >= maxEvents) {
-                                                        finish(Result.success(events.values.toList()))
-                                                    }
-                                                }
+                        if (text.length > MAX_RELAY_MESSAGE_CHARS) return
+                        val message = NostrRelayFrames.parseMessage(text) ?: return
+                        when (NostrRelayFrames.frameType(message)) {
+                            "EVENT" -> {
+                                if (NostrRelayFrames.subscriptionId(message) == subscriptionId &&
+                                    events.size < maxEvents
+                                ) {
+                                    NostrRelayFrames.parseEventForSubscription(message, subscriptionId)?.let { event ->
+                                        if (event.content.length <= MAX_EVENT_CONTENT_CHARS) {
+                                            val added = events.putIfAbsent(event.id, event) == null
+                                            if (added && events.size >= maxEvents) {
+                                                finish(Result.success(events.values.toList()))
                                             }
                                         }
                                     }
-                                    "EOSE" ->
-                                        if (message.optString(1) == subscriptionId) {
-                                            endOfStoredEvents.set(true)
-                                            finish(Result.success(events.values.toList()))
-                                        }
-                                    "CLOSED" ->
-                                        if (message.optString(1) == subscriptionId) {
-                                            finishOnClose(message.optString(2))
-                                        }
-                                    "NOTICE" -> Unit
                                 }
                             }
+                            "EOSE" -> {
+                                if (NostrRelayFrames.subscriptionId(message) == subscriptionId) {
+                                    endOfStoredEvents.set(true)
+                                    finish(Result.success(events.values.toList()))
+                                }
+                            }
+                            "CLOSED" -> {
+                                if (NostrRelayFrames.subscriptionId(message) == subscriptionId) {
+                                    finishOnClose(message.optString(2))
+                                }
+                            }
+                            "NOTICE" -> Unit
                         }
                     }
 
@@ -278,8 +279,3 @@ internal class NostrRelayQueryClient(
         fun defaultHttpClient(): OkHttpClient = sharedDefaultHttpClient
     }
 }
-
-private fun JSONArray.readEvent(): NostrEvent? =
-    optJSONObject(2)?.let { json ->
-        runCatching { NostrEvent.fromJson(json) }.getOrNull()
-    }

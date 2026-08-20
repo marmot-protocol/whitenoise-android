@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 rootProject.name = "whitenoise-android"
 include(":app")
 include(":benchmark")
+include(":fuzz")
