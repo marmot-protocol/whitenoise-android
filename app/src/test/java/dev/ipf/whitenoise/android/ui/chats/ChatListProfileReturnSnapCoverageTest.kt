@@ -40,7 +40,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val onPresentProfileBlock =
             mainShell.requiredSection(
                 start = "onPresentProfile = {",
-                end = "\n                            },",
+                end = "\n                                },",
             )
         assertTrue(
             "chat-list profile presentation must arm the list-bound snapshot",
@@ -94,7 +94,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val onOpenSettingsBlock =
             mainShell.requiredSection(
                 start = "onOpenSettings = {",
-                end = "\n                            },",
+                end = "\n                                },",
             )
         assertTrue(
             "unrelated chat-list navigation must reset return-head provenance",
@@ -104,11 +104,12 @@ class ChatListProfileReturnSnapCoverageTest {
         val onOpenGroupBlock =
             mainShell.requiredSection(
                 start = "onOpenGroup = {",
-                end = "\n                            },",
+                end = "\n                                },",
             )
         assertTrue(
-            "direct list opens must arm conversation return head via reducer",
-            Regex("""openGroupFromChatList\(""").containsMatchIn(onOpenGroupBlock),
+            "direct list opens must carry visible-head provenance into the prepared-route request",
+            "PendingConversationOpen(" in onOpenGroupBlock &&
+                "visibleActiveListHeadId = visibleHeadId" in onOpenGroupBlock,
         )
     }
 
@@ -173,7 +174,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val chatsScreenWiring =
             mainShell.requiredSection(
                 start = "ChatsScreen(",
-                end = "\n                        )",
+                end = "\n                            )",
             )
         assertTrue(
             "ChatsScreen must receive the published head from the state machine",

@@ -101,6 +101,26 @@ skipped unless it is supplied, because each of its ten measured iterations
 creates and syncs a persistent MLS group. Omit it when measuring only startup
 and the repeatable group-open journey.
 
+To measure row tap to the first visible conversation transcript, run the warm
+re-open and cold-process variants against the same cached group fixture:
+
+```bash
+BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark#openGroupConversationVisible,dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark#openGroupConversationVisibleCold" \
+  scripts/run-performance-benchmarks.sh "$GROUP_NAME"
+```
+
+The warm method opens and closes the conversation once during each unmeasured
+setup block. The cold method restarts the app process, waits for the local chat
+list, and then measures the first conversation open. Both end the measured
+`firstTranscriptVisibleMs` section when the transcript's anchored, non-empty
+Compose node first intersects the physical display. `routeSettledMs` covers the
+same tap through the frame after the 240 ms route tween completes, and frame
+timing spans that entire measured block. Warm setup waits for both the chat
+list's settled-route marker and disposal of the outgoing conversation controller,
+so the measured reopen cannot reuse the short exit-retention window. Report median,
+P90, and frame-overrun/jank metrics from the retained benchmark JSON; do not
+substitute debug-build timings.
+
 Run the one-shot invite journey by filtering to its test method:
 
 ```bash

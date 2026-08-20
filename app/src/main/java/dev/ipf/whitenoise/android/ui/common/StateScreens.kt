@@ -137,10 +137,12 @@ internal fun ErrorContent(
             SelectionContainer {
                 Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Button(onClick = onRetry) {
-                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.retry))
+            if (error.retryable) {
+                Button(onClick = onRetry) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.retry))
+                }
             }
             TextButton(onClick = { clipboard.setText(AnnotatedString(error.report)) }) {
                 Icon(
@@ -183,7 +185,9 @@ internal fun InlineErrorBanner(
             IconButton(onClick = { clipboard.setText(AnnotatedString(error.report)) }) {
                 Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy))
             }
-            TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+            if (error.retryable) {
+                TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+            }
         }
     }
 }

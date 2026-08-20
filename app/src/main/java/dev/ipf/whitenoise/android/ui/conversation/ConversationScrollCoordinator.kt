@@ -800,6 +800,30 @@ internal suspend fun ConversationScrollCoordinator.commitInitialAnchor(
     return commandCompleted && layoutStabilized
 }
 
+/**
+ * Tail opens do not need the history path's two equal layout samples. Commit
+ * the bottom spacer, yield one layout frame, and reveal as soon as the viewport
+ * and target are both measured.
+ */
+internal suspend fun ConversationScrollCoordinator.commitInitialTailAnchor(
+    targetIndex: Int,
+    captureLayout: () -> ConversationInitialAnchorLayout,
+    awaitFrame: suspend () -> Unit = { withFrameNanos { } },
+): Boolean {
+    var layoutReady = false
+    val commandCompleted =
+        programmaticJump(
+            targetMessageId = null,
+            reason = ConversationScrollReason.InitialAnchor,
+            resultingMode = ConversationScrollMode.FollowingTail,
+        ) {
+            scrollToItem(targetIndex)
+            awaitFrame()
+            layoutReady = captureLayout().isReady
+        }
+    return commandCompleted && layoutReady
+}
+
 private suspend fun awaitStableInitialAnchorLayout(
     captureLayout: () -> ConversationInitialAnchorLayout,
     maxFrames: Int,

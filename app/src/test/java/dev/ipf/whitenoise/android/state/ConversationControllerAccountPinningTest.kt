@@ -14,6 +14,8 @@ import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -78,6 +80,24 @@ class ConversationControllerAccountPinningTest {
 
         assertEquals("vanished-account", controller.boundAccountRef)
         assertEquals(null, controller.boundAccountIdHex)
+    }
+
+    @Test
+    fun pinnedControllerLoadingStateUsesItsAccountOverride() {
+        assertTrue(
+            conversationStartsLoading(
+                startOnConstruction = true,
+                accountRefOverride = TARGET_REF,
+                activeAccountRef = null,
+            ),
+        )
+        assertFalse(
+            conversationStartsLoading(
+                startOnConstruction = true,
+                accountRefOverride = null,
+                activeAccountRef = null,
+            ),
+        )
     }
 
     @Test

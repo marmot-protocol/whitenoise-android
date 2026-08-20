@@ -320,14 +320,24 @@ class AppStateSendLockCoverageTest {
                 source.indexOf("val scrollCoordinator ="),
             )
 
+        val initialAnchoredOwner =
+            source.substring(
+                source.indexOf("var initialTimelineAnchored by"),
+                source.indexOf("ConversationTtsAutoReadEffects("),
+            )
+        val anchoredSeedInitializer =
+            "mutableStateOf(firstFrameSeed.anchorTailImmediately && !firstFrameSeed.awaitingAuthoritativeTimeline)"
+
         assertTrue(
             "same-group account switches must reset anchoring state and cancel effects that capture the old controller",
             "remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration)" in unreadJumpOwner &&
                 "mutableStateOf(ConversationUnreadJumpState())" in unreadJumpOwner &&
-                "remember(controller, notificationOpenRequestId) { mutableStateOf(false) }" in source &&
-                "val state = remember(controller) { ConversationNavigationState() }" in source &&
+                "remember(controller, notificationOpenRequestId)" in initialAnchoredOwner &&
+                anchoredSeedInitializer in initialAnchoredOwner &&
+                "remember(controller) {" in source &&
+                "ConversationNavigationState(" in source &&
                 "onDispose(state::cancelJobs)" in source &&
-                "var lastFollowedLatestId by mutableStateOf<String?>(null)" in source &&
+                "var lastFollowedLatestId by mutableStateOf(initialFollowedLatestId)" in source &&
                 "LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored)" in source &&
                 "LaunchedEffect(listState, controller)" in source,
         )
@@ -349,7 +359,8 @@ class AppStateSendLockCoverageTest {
             "val renderedTimelineAnchorKeys = remember(renderedTimeline)" in source &&
                 "renderedTimeline.map { it.id to it.record.messageIdHex }" in source &&
                 "scrollCoordinator.commitInitialAnchor(" in source &&
-                Regex("while \\(\\s*!scrollCoordinator\\.commitInitialAnchor\\(").findAll(source).count() == 2 &&
+                "scrollCoordinator.commitInitialTailAnchor(" in source &&
+                "while (!commitInitialPosition())" in source &&
                 "postInitialReanchorGate.commit(" in source &&
                 "postInitialReanchorGate.onStructure(" in source &&
                 "initialTimelineAnchored && structureChanged" in source &&

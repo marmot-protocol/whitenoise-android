@@ -4,6 +4,14 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.filled.Settings
@@ -12,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -20,7 +29,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.LayoutDirection.Ltr
+import androidx.compose.ui.unit.LayoutDirection.Rtl
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
@@ -73,7 +88,10 @@ import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
 import dev.ipf.whitenoise.android.ui.share.ShareChatPickerFullScreen
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal data class ConversationOpenContext(
     val focusMessageId: String? = null,
@@ -88,6 +106,71 @@ internal data class ConversationOpenContext(
     // the active-ref flip without recreation.
     val pinnedAccountRef: String? = null,
 )
+
+internal data class PendingConversationOpen(
+    val requestId: Long,
+    val accountRef: String?,
+    val item: ChatListItem,
+    val focusMessageId: String?,
+    val justCreated: Boolean,
+    val visibleActiveListHeadId: String?,
+)
+
+internal fun pendingConversationOpenBelongsToAccount(
+    requestAccountRef: String?,
+    activeAccountRef: String?,
+): Boolean = requestAccountRef != null && requestAccountRef == activeAccountRef
+
+internal fun mainShellAccountContentOwned(
+    previousAccountRef: String?,
+    activeAccountRef: String?,
+): Boolean = previousAccountRef == activeAccountRef
+
+internal data class ConversationTransitionContent(
+    val chat: ChatListItem,
+    val controller: ConversationController,
+    val accountRef: String,
+    val openContext: ConversationOpenContext,
+    val justCreated: Boolean,
+    val openedAsDmHint: Boolean,
+)
+
+internal fun conversationControllerAccountRef(
+    selectedPinnedAccountRef: String?,
+    pendingAccountRef: String?,
+    exitingAccountRef: String?,
+    activeAccountRef: String?,
+): String? = selectedPinnedAccountRef ?: pendingAccountRef ?: exitingAccountRef ?: activeAccountRef
+
+internal fun retainedConversationContentBelongsToRoute(
+    contentAccountRef: String,
+    activeAccountRef: String?,
+    pinnedAccountRef: String?,
+    notificationRouteTraceRequestId: Long?,
+    notificationEarlyOpenRequestId: Long,
+): Boolean =
+    contentAccountRef == activeAccountRef ||
+        (
+            pinnedAccountRef == contentAccountRef &&
+                notificationEarlyOpenRequestId != 0L &&
+                notificationRouteTraceRequestId == notificationEarlyOpenRequestId
+        )
+
+internal fun preparedConversationCanOpen(
+    hasPublishedAuthoritativeTimeline: Boolean,
+    hasPreparedInitialPresentation: Boolean,
+    hasLoadError: Boolean,
+    terminalConversationUnavailable: Boolean,
+): Boolean =
+    (hasPublishedAuthoritativeTimeline && hasPreparedInitialPresentation) ||
+        hasLoadError ||
+        terminalConversationUnavailable
+
+internal fun conversationRouteForwardDirection(layoutDirection: LayoutDirection): Int =
+    when (layoutDirection) {
+        Ltr -> 1
+        Rtl -> -1
+    }
 
 internal data class PendingStagedShareOpen(
     val accountRef: String,
@@ -249,6 +332,17 @@ internal fun MainShell(
     var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
     var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedChat by remember { mutableStateOf<ChatListItem?>(null) }
+    // Retain the complete outgoing route for the short back-slide. Account pin,
+    // controller and decrypted seed are one ownership unit; retaining only the
+    // chat would rebuild it against the active account during an early Back.
+    var exitingConversationContent by remember { mutableStateOf<ConversationTransitionContent?>(null) }
+    // A normal chat-list tap keeps the already-rendered list on screen while
+    // the destination controller reads its first local authoritative page.
+    // Once ready, the same controller is promoted into the conversation route,
+    // so that route's first composition already owns real data and final index
+    // math instead of painting an empty destination and filling it afterward.
+    var pendingConversationOpen by remember { mutableStateOf<PendingConversationOpen?>(null) }
+    var nextPendingConversationOpenRequestId by remember { mutableLongStateOf(0L) }
     // The open conversation must survive Activity recreation / process death
     // (issue #386): the in-app camera foregrounds an external activity that can
     // get the host process killed on low-memory devices, and on return a null
@@ -1199,6 +1293,8 @@ internal fun MainShell(
             clearSharePickerRequest()
             shellNavState =
                 reduceShellNavigation(shellNavState, ShellNavigationEvent.AccountSwitched).state
+            pendingConversationOpen = null
+            exitingConversationContent = null
             selectedChat = null
             selectedChatOpenContext = ConversationOpenContext()
             selectedChatJustCreated = false
@@ -1372,38 +1468,99 @@ internal fun MainShell(
     // account while its switch is still landing (#586). Keying and constructing
     // on the pinned ref keeps the controller correct before the flip and stops
     // it from being torn down and rebuilt when the active ref catches up.
-    val conversationAccountRef = selectedChatOpenContext.pinnedAccountRef ?: appState.activeAccountRef
-    val conversationController =
-        selectedChat?.let { openChat ->
+    val accountOwnedPendingConversationOpen =
+        pendingConversationOpen?.takeIf { request ->
+            pendingConversationOpenBelongsToAccount(request.accountRef, appState.activeAccountRef)
+        }
+    val accountOwnedExitingConversationContent =
+        exitingConversationContent?.takeIf { content ->
+            retainedConversationContentBelongsToRoute(
+                contentAccountRef = content.accountRef,
+                activeAccountRef = appState.activeAccountRef,
+                pinnedAccountRef = content.openContext.pinnedAccountRef,
+                notificationRouteTraceRequestId = content.openContext.notificationRouteTraceRequestId,
+                notificationEarlyOpenRequestId = notificationEarlyOpenRequestId,
+            )
+        }
+    val conversationAccountRef =
+        conversationControllerAccountRef(
+            selectedPinnedAccountRef = selectedChatOpenContext.pinnedAccountRef,
+            pendingAccountRef = accountOwnedPendingConversationOpen?.accountRef,
+            exitingAccountRef = accountOwnedExitingConversationContent?.accountRef,
+            activeAccountRef = appState.activeAccountRef,
+        )
+    // The pending and retained-exit legs are already account-gated; selected is not,
+    // and the account-change nav reset clears them only a frame later — so during an
+    // account switch or the wipe transient-null they could otherwise build a
+    // controller seeded with the previous account's decrypted preview. Drop it
+    // until the shell's remembered account matches the live one. A notification-
+    // routed early open is the deliberate exception — its content is pinned to
+    // the very account that is arriving, so the flip that lands the pin must not
+    // blank or rebuild the conversation the route just opened.
+    val earlyOpenLandsPinnedAccount =
+        appState.activeAccountRef != null &&
+            notificationEarlyOpenRequestId != 0L &&
+            selectedChatOpenContext.pinnedAccountRef == appState.activeAccountRef &&
+            selectedChatOpenContext.notificationRouteTraceRequestId == notificationEarlyOpenRequestId
+    val navAccountStable =
+        mainShellAccountContentOwned(previousActiveAccountRef, appState.activeAccountRef) ||
+            earlyOpenLandsPinnedAccount
+    val controllerChat =
+        selectedChat?.takeIf { navAccountStable && conversationAccountRef != null }
+            ?: accountOwnedPendingConversationOpen?.item
+    val selectedOrPendingConversationController =
+        controllerChat?.let { openChat ->
             remember(openChat.id, conversationAccountRef, appState.runtimeGeneration) {
-                ConversationController(
-                    appState = appState,
-                    initialGroup = openChat.group,
-                    initialMemberSnapshot =
-                        openChat.memberSnapshot
-                            ?: appState.cachedGroupMemberSnapshot(conversationAccountRef, openChat.group.groupIdHex),
-                    initialLastReadMessageId = openChat.projection?.lastReadMessageIdHex,
-                    initialLastReadTimelineAt = openChat.projection?.lastReadTimelineAt,
-                    accountRefOverride = selectedChatOpenContext.pinnedAccountRef,
-                    copy = conversationControllerCopy,
-                )
+                // startOnConstruction begins the subscription before this
+                // composition commits — the guard clears it if the commit
+                // never happens, since DisposableEffect can't run then.
+                RememberAbandonmentGuard(
+                    ConversationController(
+                        appState = appState,
+                        initialGroup = openChat.group,
+                        initialMemberSnapshot =
+                            openChat.memberSnapshot
+                                ?: appState.cachedGroupMemberSnapshot(
+                                    conversationAccountRef,
+                                    openChat.group.groupIdHex,
+                                ),
+                        initialTimelinePreview = openChat.projection?.lastMessage,
+                        initialLastReadMessageId = openChat.projection?.lastReadMessageIdHex,
+                        initialLastReadTimelineAt = openChat.projection?.lastReadTimelineAt,
+                        accountRefOverride = conversationAccountRef?.takeIf { it != appState.activeAccountRef },
+                        startOnConstruction = true,
+                        copy = conversationControllerCopy,
+                    ),
+                ) { it.onCleared() }
+            }.value
+        }
+    val conversationController =
+        selectedOrPendingConversationController
+            ?: accountOwnedExitingConversationContent?.controller
+    // Preloading, selected, and outgoing routes can briefly own different
+    // controllers during a rapid Back -> open gesture. Keep each instance alive
+    // for as long as any route slot references it; a single "current" effect
+    // would clear the outgoing controller while AnimatedContent still composes it.
+    val ownedConversationControllers =
+        remember(selectedOrPendingConversationController, accountOwnedExitingConversationContent?.controller) {
+            listOfNotNull(
+                selectedOrPendingConversationController,
+                accountOwnedExitingConversationContent?.controller,
+            ).distinct()
+        }
+    ownedConversationControllers.forEach { ownedController ->
+        key(ownedController) {
+            DisposableEffect(ownedController) {
+                appState.attachConversationController(ownedController)
+                onDispose {
+                    appState.detachConversationController(ownedController)
+                    ownedController.onCleared()
+                }
+            }
+            LaunchedEffect(ownedController, ownedController.retryGeneration) {
+                ownedController.start()
             }
         }
-    // The controller is owned by the selected conversation route, not the
-    // ConversationScreen composition. The profile-to-group picker temporarily
-    // replaces that screen, so disposing the controller with the screen would
-    // retain and then reuse an already-cleared controller when Back restores it.
-    DisposableEffect(conversationController) {
-        conversationController?.let(appState::attachConversationController)
-        onDispose {
-            conversationController?.let {
-                appState.detachConversationController(it)
-                it.onCleared()
-            }
-        }
-    }
-    LaunchedEffect(conversationController, conversationController?.retryGeneration) {
-        conversationController?.start()
     }
     LaunchedEffect(
         conversationController,
@@ -1418,6 +1575,64 @@ internal fun MainShell(
             )
         }
     }
+    val pendingOpen = accountOwnedPendingConversationOpen
+    LaunchedEffect(
+        pendingOpen?.requestId,
+        conversationController,
+    ) {
+        val request = pendingOpen ?: return@LaunchedEffect
+        val controller = conversationController ?: return@LaunchedEffect
+        if (!controller.group.groupIdHex.equals(request.item.group.groupIdHex, ignoreCase = true)) {
+            return@LaunchedEffect
+        }
+        withTimeoutOrNull(CONVERSATION_PENDING_OPEN_TIMEOUT_MILLIS) {
+            snapshotFlow {
+                preparedConversationCanOpen(
+                    hasPublishedAuthoritativeTimeline = controller.hasPublishedAuthoritativeTimeline,
+                    hasPreparedInitialPresentation = controller.hasPreparedInitialPresentation,
+                    hasLoadError = controller.error != null,
+                    terminalConversationUnavailable = controller.terminalConversationUnavailable,
+                )
+            }.filter { it }
+                .first()
+        }
+        // A normal cached open reaches the ready state before this deadline and
+        // keeps its spinner-free transition. A stuck local read must not make a
+        // tap look ignored indefinitely; after the bound, the destination owns
+        // the existing loading/error surfaces while the same controller continues.
+        selectedChatOpenContext = ConversationOpenContext(focusMessageId = request.focusMessageId)
+        selectedChatJustCreated = request.justCreated
+        selectedChatOpenedAsDmHint = request.justCreated
+        chatListReturnHeadSnap =
+            openGroupFromChatList(
+                chatListReturnHeadSnap,
+                visibleActiveListHeadId = request.visibleActiveListHeadId,
+            )
+        selectedChat = request.item
+        pendingConversationOpen = null
+    }
+    LaunchedEffect(
+        selectedChat?.id,
+        section,
+        appState.pendingProfileNpub,
+        routingNotification,
+    ) {
+        val supersededByOtherNavigation =
+            selectedChat != null ||
+                section != MainSection.Chats ||
+                appState.pendingProfileNpub != null ||
+                routingNotification
+        if (pendingConversationOpen != null && supersededByOtherNavigation) {
+            pendingConversationOpen = null
+        }
+    }
+    if (!navAccountStable) {
+        // Account invalidation is a privacy boundary, not an ordinary Back
+        // navigation. Remove the AnimatedContent subtree immediately so its
+        // outgoing slot cannot retain a decrypted route for the exit tween.
+        LoadingScreen()
+        return
+    }
     if (
         shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible) &&
         savedSharePickerRequestId != null &&
@@ -1428,7 +1643,7 @@ internal fun MainShell(
     }
     ProfileGroupForegroundCoordinator(
         appState = appState,
-        conversationController = conversationController,
+        conversationController = selectedOrPendingConversationController.takeIf { selectedChat != null },
         profileGroupForegroundState = profileGroupForegroundState,
         secureWindowEnabled =
             if (selectedChat != null || section == MainSection.Chats) {
@@ -1454,170 +1669,260 @@ internal fun MainShell(
         },
         onClosePicker = { chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap) },
     ) {
-        val openChat = selectedChat
-        when (
-            resolveMainShellContentRoute(
-                conversationOpen = openChat != null,
-                routingNotification = routingNotification,
-                routingTtsReturn = pendingTtsDestinationNavigation != null,
-            )
-        ) {
-            MainShellContentRoute.Conversation -> {
-                val chat = requireNotNull(openChat)
-                val scrollKey = conversationScrollKey(conversationAccountRef, chat.group.groupIdHex)
-                ConversationScreen(
-                    appState = appState,
-                    chat = chat,
-                    controller = requireNotNull(conversationController),
-                    focusMessageId = selectedChatOpenContext.focusMessageId,
-                    focusMessageRequestId = selectedChatOpenContext.focusMessageRequestId,
-                    ttsFocusSessionId = selectedChatOpenContext.ttsFocusSessionId,
-                    notificationOpenRequestId = selectedChatOpenContext.notificationOpenRequestId,
-                    onFirstFrameCommitted = {
-                        selectedChatOpenContext.notificationRouteTraceRequestId?.let { requestId ->
-                            NotificationRouteTrace.endPhase(
-                                requestId = requestId,
-                                sectionName = NotificationRouteTraceSection.FIRST_CONVERSATION_FRAME,
-                            )
-                            NotificationRouteTrace.finishRequest(requestId)
-                        }
-                    },
-                    justCreated = selectedChatJustCreated,
-                    openedAsDmHint = selectedChatOpenedAsDmHint,
-                    restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
-                    onOpenConversation = openGroupFromProfile,
-                    onGroupCreateSubmitted = onGroupCreateSubmitted,
-                    onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
-                    onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
-                    onTtsTransportBodyClick = requestTtsDestinationOpen,
-                    onSaveScrollSnapshot = { snapshot ->
-                        if (snapshot == null) {
-                            conversationScrollSnapshots.remove(scrollKey)
-                        } else {
-                            conversationScrollSnapshots[scrollKey] = snapshot
-                        }
-                    },
-                    onBack = {
-                        // Flush the hidden list before exposing it, so the first
-                        // drawn return frame already has the optimistic preview
-                        // in its final recency slot (#900).
-                        chatsController.setChatListVisible(true)
-                        shellNavState =
-                            reduceShellNavigation(
-                                shellNavState,
-                                ShellNavigationEvent.ConversationBackedOut,
-                            ).state
-                        // Backing out before the first frame committed abandons
-                        // the trace's owner; finish it here or TOTAL stays open
-                        // until the next notification. finishRequest is a no-op
-                        // for an already-finished request.
-                        selectedChatOpenContext.notificationRouteTraceRequestId?.let {
-                            NotificationRouteTrace.finishRequest(it)
-                        }
-                        selectedChat = null
-                        selectedChatOpenContext = ConversationOpenContext()
-                        selectedChatJustCreated = false
-                        selectedChatOpenedAsDmHint = false
-                    },
-                )
-            }
-            MainShellContentRoute.NotificationLoading -> {
-                // A notification tap on a non-active account resolves in steps
-                // (switch account → await its chat list → open conversation). Keep
-                // one loading surface over that whole route.
-                LoadingScreen()
-            }
-            MainShellContentRoute.TtsReturnTransition -> {
-                BackHandler { supersedePendingTtsDestinationNavigation() }
-                TtsReturnTransitionScreen(
-                    requestId = requireNotNull(pendingTtsDestinationNavigation).requestId,
-                )
-            }
-            MainShellContentRoute.Main ->
-                when (section) {
-                    MainSection.Chats -> {
-                        WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
-                        ChatsScreen(
-                            appState = appState,
-                            controller = chatsController,
-                            globalSearchState = scopedGlobalSearchState,
-                            onGlobalSearchStateChange = globalSearch.update,
-                            selectedFolderId = selectedChatListFolderId,
-                            onSelectFolder = { selectedChatListFolderId = it },
-                            onTtsTransportBodyClick = requestTtsDestinationOpen,
-                            onGroupCreateSubmitted = onGroupCreateSubmitted,
-                            onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
-                            onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
-                            conversationReturnHeadId = publishedConversationReturnHead(chatListReturnHeadSnap),
-                            onConversationReturnHeadHandled = {
-                                chatListReturnHeadSnap = onConversationReturnHeadHandled(chatListReturnHeadSnap)
-                            },
-                            onOpenSettings = {
-                                supersedePendingTtsDestinationNavigation()
-                                chatListReturnHeadSnap = resetChatListReturnHeadSnap()
-                                supersedePendingGroupCreateOpen()
-                                sectionName = MainSection.Settings.name
-                                settingsDetailName = null
-                            },
-                            onOpenGroup = { item, focusMessageId, justCreated, visibleHeadId ->
-                                commitExplicitConversationOpen(item.group.groupIdHex)
-                                selectedChatOpenContext = ConversationOpenContext(focusMessageId = focusMessageId)
-                                selectedChatJustCreated = justCreated
-                                // `justCreated` is true only for freshly-created DMs; group
-                                // creation and existing-DM opens pass false. Reuse that DM-only
-                                // invariant for the open-time subtitle hint (#998).
-                                selectedChatOpenedAsDmHint = justCreated
-                                chatListReturnHeadSnap = openGroupFromChatList(chatListReturnHeadSnap, visibleHeadId)
-                                selectedChat = item
-                            },
-                            onPresentProfile = { npub, visibleHeadId ->
-                                chatListReturnHeadSnap =
-                                    presentProfileFromChatList(chatListReturnHeadSnap, visibleHeadId)
-                                shellNavState =
-                                    armShellProfileForeground(shellNavState, profileGroupForegroundState)
-                                previousPendingProfileNpub = npub
-                                appState.presentProfile(npub)
-                            },
+        val routeForwardDirection = conversationRouteForwardDirection(LocalLayoutDirection.current)
+        val transitionContent =
+            selectedChat?.let { chat ->
+                selectedOrPendingConversationController?.let { controller ->
+                    conversationAccountRef?.let { accountRef ->
+                        ConversationTransitionContent(
+                            chat = chat,
+                            controller = controller,
+                            accountRef = accountRef,
+                            openContext = selectedChatOpenContext,
+                            justCreated = selectedChatJustCreated,
+                            openedAsDmHint = selectedChatOpenedAsDmHint,
                         )
                     }
-                    MainSection.Settings ->
-                        SettingsScreen(
-                            appState = appState,
-                            onBackToChats = {
-                                sectionName = MainSection.Chats.name
-                                settingsDetailName = null
-                            },
-                            onOpenDiagnostics = {
-                                // Preserve `settingsDetailName` so backing out of
-                                // Diagnostics returns to Developer (its only entry point)
-                                // rather than the Settings home, restoring the breadcrumb
-                                // the user walked in on (#412).
-                                sectionName = MainSection.Diagnostics.name
-                            },
-                            onOpenSupportChat = { item ->
-                                // Land in the conversation itself, not the chat list; no
-                                // list scroll state exists to snapshot from Settings.
-                                commitExplicitConversationOpen(item.group.groupIdHex)
-                                selectedChatOpenedAsDmHint = false
-                                selectedChat = item
-                                sectionName = MainSection.Chats.name
-                                settingsDetailName = null
-                            },
-                            detail = settingsDetail,
-                            onDetailChange = { settingsDetailName = it?.name },
-                        )
-                    MainSection.Diagnostics ->
-                        DiagnosticsScreen(
-                            appState = appState,
-                            onBack = {
-                                // Leave `settingsDetailName` alone — it still holds the
-                                // detail (Developer) the user opened Diagnostics from, so
-                                // Settings re-enters that screen directly (#412).
-                                sectionName = MainSection.Settings.name
-                            },
-                        )
                 }
+            }
+        val routeTransition = updateTransition(targetState = transitionContent, label = "conversation route")
+        LaunchedEffect(exitingConversationContent?.chat?.id, selectedChat?.id, routeTransition) {
+            val exiting = exitingConversationContent ?: return@LaunchedEffect
+            if (selectedChat?.id == exiting.chat.id) {
+                exitingConversationContent = null
+                return@LaunchedEffect
+            }
+            snapshotFlow {
+                conversationRouteTransitionComplete(
+                    currentStateMatchesTarget = routeTransition.currentState == routeTransition.targetState,
+                    transitionRunning = routeTransition.isRunning,
+                )
+            }.filter { it }
+                .first()
+            // AnimatedContent removes its outgoing slot at completion. Give that
+            // disposal one committed frame before releasing the controller that
+            // the outgoing ConversationScreen may still reference.
+            withFrameNanos { }
+            if (selectedChat?.id != exiting.chat.id) exitingConversationContent = null
         }
+        routeTransition.AnimatedContent(
+            transitionSpec = {
+                when {
+                    routingNotification || pendingTtsDestinationNavigation != null ->
+                        EnterTransition.None togetherWith ExitTransition.None
+                    targetState != null ->
+                        slideInHorizontally(
+                            animationSpec = tween(CONVERSATION_ROUTE_TRANSITION_MILLIS),
+                            initialOffsetX = { width -> width * routeForwardDirection },
+                        ) togetherWith
+                            slideOutHorizontally(
+                                animationSpec = tween(CONVERSATION_ROUTE_TRANSITION_MILLIS),
+                                targetOffsetX = { width -> -(width / 4) * routeForwardDirection },
+                            )
+                    else ->
+                        slideInHorizontally(
+                            animationSpec = tween(CONVERSATION_ROUTE_TRANSITION_MILLIS),
+                            initialOffsetX = { width -> -(width / 4) * routeForwardDirection },
+                        ) togetherWith
+                            slideOutHorizontally(
+                                animationSpec = tween(CONVERSATION_ROUTE_TRANSITION_MILLIS),
+                                targetOffsetX = { width -> width * routeForwardDirection },
+                            )
+                }
+            },
+            contentKey = { content -> content?.chat?.id ?: MAIN_SHELL_ROUTE_KEY },
+        ) { animatedConversation ->
+            when (
+                resolveMainShellContentRoute(
+                    conversationOpen = animatedConversation != null,
+                    routingNotification = routingNotification,
+                    routingTtsReturn = pendingTtsDestinationNavigation != null,
+                )
+            ) {
+                MainShellContentRoute.Conversation -> {
+                    val content = requireNotNull(animatedConversation)
+                    val chat = content.chat
+                    val scrollKey = conversationScrollKey(content.accountRef, chat.group.groupIdHex)
+                    ConversationScreen(
+                        appState = appState,
+                        chat = chat,
+                        controller = content.controller,
+                        focusMessageId = content.openContext.focusMessageId,
+                        focusMessageRequestId = content.openContext.focusMessageRequestId,
+                        ttsFocusSessionId = content.openContext.ttsFocusSessionId,
+                        notificationOpenRequestId = content.openContext.notificationOpenRequestId,
+                        onFirstFrameCommitted = {
+                            content.openContext.notificationRouteTraceRequestId?.let { requestId ->
+                                NotificationRouteTrace.endPhase(
+                                    requestId = requestId,
+                                    sectionName = NotificationRouteTraceSection.FIRST_CONVERSATION_FRAME,
+                                )
+                                NotificationRouteTrace.finishRequest(requestId)
+                            }
+                        },
+                        justCreated = content.justCreated,
+                        openedAsDmHint = content.openedAsDmHint,
+                        restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
+                        onOpenConversation = openGroupFromProfile,
+                        onGroupCreateSubmitted = onGroupCreateSubmitted,
+                        onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
+                        onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
+                        onTtsTransportBodyClick = requestTtsDestinationOpen,
+                        onSaveScrollSnapshot = { snapshot ->
+                            if (snapshot == null) {
+                                conversationScrollSnapshots.remove(scrollKey)
+                            } else {
+                                conversationScrollSnapshots[scrollKey] = snapshot
+                            }
+                        },
+                        onBack = {
+                            // Flush the hidden list before exposing it, so the first
+                            // drawn return frame already has the optimistic preview
+                            // in its final recency slot (#900).
+                            chatsController.setChatListVisible(true)
+                            shellNavState =
+                                reduceShellNavigation(
+                                    shellNavState,
+                                    ShellNavigationEvent.ConversationBackedOut,
+                                ).state
+                            // Backing out before the first frame committed abandons
+                            // the trace's owner; finish it here or TOTAL stays open
+                            // until the next notification. finishRequest is a no-op
+                            // for an already-finished request.
+                            content.openContext.notificationRouteTraceRequestId?.let {
+                                NotificationRouteTrace.finishRequest(it)
+                            }
+                            exitingConversationContent = content
+                            selectedChat = null
+                            selectedChatOpenContext = ConversationOpenContext()
+                            selectedChatJustCreated = false
+                            selectedChatOpenedAsDmHint = false
+                        },
+                    )
+                }
+                MainShellContentRoute.NotificationLoading -> {
+                    // A notification tap on a non-active account resolves in steps
+                    // (switch account → await its chat list → open conversation). Keep
+                    // one loading surface over that whole route.
+                    LoadingScreen()
+                }
+                MainShellContentRoute.TtsReturnTransition -> {
+                    BackHandler { supersedePendingTtsDestinationNavigation() }
+                    TtsReturnTransitionScreen(
+                        requestId = requireNotNull(pendingTtsDestinationNavigation).requestId,
+                    )
+                }
+                MainShellContentRoute.Main ->
+                    when (section) {
+                        MainSection.Chats -> {
+                            WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
+                            ChatsScreen(
+                                appState = appState,
+                                controller = chatsController,
+                                globalSearchState = scopedGlobalSearchState,
+                                onGlobalSearchStateChange = globalSearch.update,
+                                selectedFolderId = selectedChatListFolderId,
+                                onSelectFolder = { selectedChatListFolderId = it },
+                                onTtsTransportBodyClick = requestTtsDestinationOpen,
+                                onGroupCreateSubmitted = onGroupCreateSubmitted,
+                                onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
+                                onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
+                                conversationReturnHeadId = publishedConversationReturnHead(chatListReturnHeadSnap),
+                                onConversationReturnHeadHandled = {
+                                    chatListReturnHeadSnap = onConversationReturnHeadHandled(chatListReturnHeadSnap)
+                                },
+                                onOpenSettings = {
+                                    pendingConversationOpen = null
+                                    supersedePendingTtsDestinationNavigation()
+                                    chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+                                    supersedePendingGroupCreateOpen()
+                                    sectionName = MainSection.Settings.name
+                                    settingsDetailName = null
+                                },
+                                onOpenGroup = { item, focusMessageId, justCreated, visibleHeadId ->
+                                    commitExplicitConversationOpen(item.group.groupIdHex)
+                                    nextPendingConversationOpenRequestId += 1L
+                                    pendingConversationOpen =
+                                        PendingConversationOpen(
+                                            requestId = nextPendingConversationOpenRequestId,
+                                            accountRef = appState.activeAccountRef,
+                                            item = item,
+                                            focusMessageId = focusMessageId,
+                                            justCreated = justCreated,
+                                            visibleActiveListHeadId = visibleHeadId,
+                                        )
+                                },
+                                onPresentProfile = { npub, visibleHeadId ->
+                                    pendingConversationOpen = null
+                                    chatListReturnHeadSnap =
+                                        presentProfileFromChatList(chatListReturnHeadSnap, visibleHeadId)
+                                    shellNavState =
+                                        armShellProfileForeground(shellNavState, profileGroupForegroundState)
+                                    previousPendingProfileNpub = npub
+                                    appState.presentProfile(npub)
+                                },
+                            )
+                        }
+                        MainSection.Settings ->
+                            SettingsScreen(
+                                appState = appState,
+                                onBackToChats = {
+                                    sectionName = MainSection.Chats.name
+                                    settingsDetailName = null
+                                },
+                                onOpenDiagnostics = {
+                                    // Preserve `settingsDetailName` so backing out of
+                                    // Diagnostics returns to Developer (its only entry point)
+                                    // rather than the Settings home, restoring the breadcrumb
+                                    // the user walked in on (#412).
+                                    sectionName = MainSection.Diagnostics.name
+                                },
+                                onOpenSupportChat = { item ->
+                                    // Land in the conversation itself, not the chat list; no
+                                    // list scroll state exists to snapshot from Settings.
+                                    commitExplicitConversationOpen(item.group.groupIdHex)
+                                    selectedChatOpenedAsDmHint = false
+                                    selectedChat = item
+                                    sectionName = MainSection.Chats.name
+                                    settingsDetailName = null
+                                },
+                                detail = settingsDetail,
+                                onDetailChange = { settingsDetailName = it?.name },
+                            )
+                        MainSection.Diagnostics ->
+                            DiagnosticsScreen(
+                                appState = appState,
+                                onBack = {
+                                    // Leave `settingsDetailName` alone — it still holds the
+                                    // detail (Developer) the user opened Diagnostics from, so
+                                    // Settings re-enters that screen directly (#412).
+                                    sectionName = MainSection.Settings.name
+                                },
+                            )
+                    }
+            }
+        }
+        ConversationRouteSettledPerformanceMarker(
+            conversationId = transitionContent?.chat?.id,
+            routeTransition = routeTransition,
+            destinationContentReady =
+                transitionContent?.controller?.let { controller ->
+                    preparedConversationCanOpen(
+                        hasPublishedAuthoritativeTimeline = controller.hasPublishedAuthoritativeTimeline,
+                        hasPreparedInitialPresentation = controller.hasPreparedInitialPresentation,
+                        hasLoadError = controller.error != null,
+                        terminalConversationUnavailable = controller.terminalConversationUnavailable,
+                    )
+                } ?: true,
+        )
+        ConversationControllerReleasedPerformanceMarker(
+            controllerReleased =
+                conversationControllerReleased(
+                    conversationOpen = transitionContent != null,
+                    exitingContentRetained = exitingConversationContent != null,
+                    controllerPresent = conversationController != null,
+                ),
+        )
     }
 
     // Compose after every shell/profile/new-group surface. The full-screen

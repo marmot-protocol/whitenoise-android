@@ -4,6 +4,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.Choreographer
 import androidx.annotation.StringRes
+import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -820,28 +821,6 @@ internal fun chatRowNeedsMediaKindResolve(row: ChatListRowFfi): String? {
     // no local timeline read needed.
     if (preview.attachmentKind != null) return null
     return preview.messageIdHex.takeIf { it.isNotBlank() }
-}
-
-/**
- * Distinct, non-blank account ids whose profile presentation a timeline page
- * needs painted: every message author, every reply-preview author, and every
- * reaction author. First-seen order is preserved so the warm pass below favors
- * the rows nearest the top of the page. Used to pre-warm local profile
- * presentations before the first composition so sender names + avatars don't
- * pop in a few frames after the message bubble. See #609.
- */
-internal fun timelineRecordProfileSenders(records: Iterable<TimelineMessageRecordFfi>): List<String> {
-    val senders = linkedSetOf<String>()
-
-    fun add(id: String) {
-        if (id.isNotBlank()) senders.add(id)
-    }
-    records.forEach { record ->
-        add(record.sender)
-        record.replyPreview?.let { add(it.sender) }
-        record.reactions.userReactions.forEach { add(it.sender) }
-    }
-    return senders.toList()
 }
 
 /**
@@ -6760,10 +6739,21 @@ internal class OptimisticGroupRosterMutationTracker {
     }
 }
 
+internal fun conversationStartsLoading(
+    startOnConstruction: Boolean,
+    accountRefOverride: String?,
+    activeAccountRef: String?,
+): Boolean = startOnConstruction && (accountRefOverride ?: activeAccountRef) != null
+
+internal fun isTerminalOpenFailure(throwable: Throwable): Boolean = throwable is ConversationInitialLoadException
+
+internal fun shouldOfferConversationLoadRetry(throwable: Throwable): Boolean = !isTerminalOpenFailure(throwable)
+
 class ConversationController(
     private val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
     initialMemberSnapshot: GroupMemberSnapshot? = null,
+    initialTimelinePreview: ChatListMessagePreviewFfi? = null,
     initialLastReadMessageId: String? = null,
     initialLastReadTimelineAt: ULong? = null,
     // Pins the conversation to a specific account instead of the account active
@@ -6772,6 +6762,7 @@ class ConversationController(
     // already account-explicit, so a pinned controller stays correct while the
     // active account catches up.
     accountRefOverride: String? = null,
+    private val startOnConstruction: Boolean = false,
     private val copy: ConversationControllerCopy = ConversationControllerCopy(),
     private val groupRosterReader: suspend (String, String) -> GroupRosterFfi = { account, groupIdHex ->
         appState.marmotIo(MarmotTraceSection.REFRESH_GROUP_ROSTER) {
@@ -6923,8 +6914,6 @@ class ConversationController(
     // #787 repro). These seed paths are the same local evidence the composer
     // gate uses for its initial NOTICE.
     private val selfMembership = ConversationSelfLeftState(seededMembershipKnown, seededSelfMember)
-    var timeline by mutableStateOf<List<TimelineMessage>>(emptyList())
-        private set
 
     // A snapshot map (not mutableStateOf<Map>) so a bubble reading one key isn't
     // recomposed when a different message's reactions change.
@@ -6964,7 +6953,14 @@ class ConversationController(
      * instead of producing a new chat. Cleared on submit, cancel, or
      * navigation away. */
     var editingMessageId by mutableStateOf<String?>(null)
-    var isLoading by mutableStateOf(false)
+
+    // Production controllers start their local subscription during
+    // construction. Reflect that synchronously so the first composition cannot
+    // mistake the not-yet-started coroutine for an authoritative empty chat.
+    var isLoading by
+        mutableStateOf(
+            conversationStartsLoading(startOnConstruction, accountRefOverride, appState.activeAccountRef),
+        )
         private set
     var isLoadingOlder by mutableStateOf(false)
         private set
@@ -7064,6 +7060,42 @@ class ConversationController(
     private val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     private val timelineOrder = mutableListOf<String>()
     private val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
+    private val initialTimeline =
+        initialConversationTimeline(
+            preview = initialTimelinePreview,
+            groupIdHex = initialGroup.groupIdHex,
+            pendingConfirmation = initialGroup.pendingConfirmation,
+            optimisticMessages = optimisticMessages.values,
+        )
+
+    /** Whether construction had enough complete local UI state to paint a real bubble. */
+    val hadInitialTimelineSeed: Boolean = initialTimeline.isNotEmpty()
+
+    /** True only until MDK's first authoritative page replaces the construction seed. */
+    var initialTimelineSeedActive by mutableStateOf(hadInitialTimelineSeed)
+        private set
+
+    var timeline by mutableStateOf(initialTimeline)
+        private set
+
+    var hasPublishedAuthoritativeTimeline by mutableStateOf(false)
+        private set
+
+    // Test-only seam: navigation promotes a chat-list tap only after the
+    // authoritative page publishes, and screen-level tests can't run the FFI
+    // subscription that flips this in production.
+    @VisibleForTesting
+    internal fun markAuthoritativeTimelinePublishedForTest() {
+        hasPublishedAuthoritativeTimeline = true
+    }
+
+    /** Local sender metadata needed for a settled first presentation is ready. */
+    var hasPreparedInitialPresentation by mutableStateOf(false)
+        private set
+
+    /** The engine proved this conversation is no longer available to the account. */
+    var terminalConversationUnavailable by mutableStateOf(false)
+        private set
     private val projectedMessageIds = appState.projectedMessageIds(conversationAccountRef, initialGroup.groupIdHex)
     private val localTimelineOrderOverrides = appState.timelineOrderOverrides(conversationAccountRef, initialGroup.groupIdHex)
     private val localTimelineTimestampOverrides =
@@ -7107,6 +7139,19 @@ class ConversationController(
     // a local temp id, a one-run sequence string, and a monotonic long), so it
     // is not an Android-owned cache of White Noise data (AGENTS.md).
     private val sendTraceByTempId = linkedMapOf<String, SendTraceEntry>()
+    private val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val initialTimelineSubscriptionRead =
+        SingleFlightBoundedInitialResourceRead<TimelineMessagesSubscription>(
+            closeUnclaimed = { lateStream -> runCatching { lateStream.close() } },
+        )
+    private val initialTimelineSnapshotRead = SingleFlightBoundedInitialSnapshotRead<TimelinePageFfi?>()
+    private val initialPresentationWarmCoordinator =
+        ConversationInitialPresentationWarmCoordinator(
+            scope = controllerScope,
+            budgetMillis = INITIAL_PRESENTATION_PROFILE_WARM_BUDGET_MILLIS,
+            warm = appState::warmProfilePresentationsBlocking,
+            onReady = { hasPreparedInitialPresentation = true },
+        )
     private val inviteStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val attachmentTransferScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val attachmentTransfers = AttachmentTransferCoordinator(attachmentTransferScope)
@@ -7123,6 +7168,7 @@ class ConversationController(
     private val timelineSubscriptionActiveCallMutex = Mutex()
     private var groupStateSubscription: GroupStateSubscription? = null
     private var startJob: Job? = null
+    private var lastStartedGeneration: Long? = null
     private var conversationScope: CoroutineScope? = null
     private var accountTeardownRequested = false
     private var controllerCleared = false
@@ -7333,20 +7379,41 @@ class ConversationController(
 
     fun canTransferAdminTo(member: AppGroupMemberRecordFfi): Boolean = GroupProjector.canTransferAdminTo(group, member, conversationAccountIdHex)
 
-    suspend fun start() {
+    /**
+     * Starts the local snapshot and live subscriptions on this controller's
+     * lifecycle. Construction calls this before the first conversation frame;
+     * later calls (including retry wiring in MainShell) are single-flight.
+     */
+    fun start() {
         val account = conversationAccountRef ?: return
-        val currentStartJob = coroutineContext[Job]
+        val candidate =
+            controllerScope.launch(start = CoroutineStart.LAZY) {
+                runStart(account)
+            }
         val shouldStart =
             synchronized(liveSubscriptionLock) {
-                if (accountTeardownRequested) {
+                val generation = retryGeneration
+                val alreadyStartedForGeneration =
+                    startJob?.isActive == true || lastStartedGeneration == generation
+                if (accountTeardownRequested || controllerCleared || alreadyStartedForGeneration) {
                     false
                 } else {
-                    startJob = currentStartJob
+                    lastStartedGeneration = generation
+                    startJob = candidate
                     true
                 }
             }
-        if (!shouldStart) return
+        if (shouldStart) {
+            candidate.start()
+        } else {
+            candidate.cancel()
+        }
+    }
+
+    private suspend fun runStart(account: String) {
+        val currentStartJob = coroutineContext[Job]
         isLoading = true
+        terminalConversationUnavailable = false
         subscriptionError = null
         pageError = null
         terminalLoadFailure = false
@@ -7366,8 +7433,15 @@ class ConversationController(
                     // The timer is lifecycle-bound to this conversation and is
                     // rescheduled by timeline/group-state publishes; when there is no
                     // loaded row near expiry it falls back to the old slow cadence.
-                    launch { runForegroundDisappearingMessageSweep(account) }
-                    runConversationSubscriptionLoop(account)
+                    val foregroundSweepJob = launch { runForegroundDisappearingMessageSweep(account) }
+                    try {
+                        runConversationSubscriptionLoop(account)
+                    } finally {
+                        // A terminal initial-open failure returns normally from
+                        // the subscription loop. Stop its infinite sibling so
+                        // runStart can finish and release its lifecycle state.
+                        foregroundSweepJob.cancel()
+                    }
                 } finally {
                     conversationScope = null
                 }
@@ -7379,12 +7453,15 @@ class ConversationController(
             throw cancel
         } catch (throwable: Throwable) {
             if (throwable.isUseAfterEviction()) {
+                discardInitialTimelineSeedForFailure(preserveOptimisticMessages = false)
                 markActiveAccountRemovedFromMembers(account)
                 isLoading = false
+                terminalConversationUnavailable = true
                 subscriptionError = null
                 pageError = null
                 return
             }
+            discardInitialTimelineSeedForFailure(preserveOptimisticMessages = true)
             isLoading = false
             subscriptionError = privacySafeErrorPresentation("CONVERSATION_LOAD", throwable)
             terminalLoadFailure = true
@@ -7397,6 +7474,30 @@ class ConversationController(
                 }
             }
         }
+    }
+
+    private fun discardInitialTimelineSeedForFailure(preserveOptimisticMessages: Boolean) {
+        if (!shouldDiscardInitialTimelineSeedForFailure(hasPublishedAuthoritativeTimeline)) return
+        initialTimelineSeedActive = false
+        if (preserveOptimisticMessages) {
+            publishTimelineFromIndexes()
+        } else {
+            // Use-after-eviction means this account no longer owns the group.
+            // Do not keep any plaintext row visible under an unavailable owner.
+            timeline = emptyList()
+        }
+        // Failure is an authoritative resolution of the initial presentation:
+        // there is no page left to await. Let the route reconcile/reveal the
+        // retained optimistic rows or switch to its terminal-unavailable surface.
+        hasPublishedAuthoritativeTimeline = true
+        hasPreparedInitialPresentation = true
+    }
+
+    private fun publishAuthoritativeEmptyInitialTimeline() {
+        hasPublishedAuthoritativeTimeline = true
+        hasPreparedInitialPresentation = true
+        initialTimelineSeedActive = false
+        publishTimelineFromIndexes()
     }
 
     private suspend fun runForegroundDisappearingMessageSweep(account: String) {
@@ -7517,6 +7618,32 @@ class ConversationController(
 
     private fun isAccountTeardownRequested(): Boolean = synchronized(liveSubscriptionLock) { accountTeardownRequested }
 
+    // The initial page is a local read, but it crosses the FFI boundary — a
+    // hung call would leave the chat-list tap permanently inert because
+    // navigation cannot promote until the first page publishes. Bound it, and
+    // convert exhaustion into the ordinary load failure whose surface already
+    // promotes navigation and offers retry. A reconnect keeps its records.
+    private suspend fun publishInitialTimelineSnapshot(
+        account: String,
+        timelineStream: TimelineMessagesSubscription,
+    ): List<String> {
+        if (timelineRecords.isNotEmpty()) return emptyList()
+        val snapshot = initialTimelineSnapshotRead.await { timelineStream.snapshot() }
+        return if (snapshot == null) {
+            publishAuthoritativeEmptyInitialTimeline()
+            emptyList()
+        } else {
+            val streamIds =
+                applyTimelinePage(
+                    snapshot,
+                    replaceWindow = true,
+                    updatePagination = true,
+                )
+            initializeReadState(account)
+            streamIds
+        }
+    }
+
     /**
      * Retry loop for the timeline + group-state live subscriptions. Extracted
      * from [start] so R8 can compile the smaller suspend entrypoint (the
@@ -7541,16 +7668,19 @@ class ConversationController(
 
     /**
      * One connect/reconnect attempt. Returns whether the caller should exit
-     * entirely (account evicted) and whether the subscriptions connected
-     * successfully (so the retry backoff can reset).
+     * until explicit retry (account evicted or a native open timed out) and
+     * whether the subscriptions connected successfully (so the retry backoff
+     * can reset).
      */
     private suspend fun runConversationSubscriptionIteration(account: String): Pair<Boolean, Boolean> {
         var groupSubscription: GroupStateSubscription? = null
         var timelineStream: TimelineMessagesSubscription? = null
         try {
             timelineStream =
-                appState.marmotIo {
-                    subscribeTimelineMessages(account, group.groupIdHex, ConversationTimelinePageLimit)
+                initialTimelineSubscriptionRead.await {
+                    appState.marmotIo {
+                        subscribeTimelineMessages(account, group.groupIdHex, ConversationTimelinePageLimit)
+                    }
                 }
             val stopAfterTimelineOpen =
                 synchronized(liveSubscriptionLock) {
@@ -7562,24 +7692,7 @@ class ConversationController(
                     }
                 }
             if (stopAfterTimelineOpen) return true to false
-            val timelineReconnect = timelineRecords.isNotEmpty()
-            val snapshotStreamIds =
-                if (timelineReconnect) {
-                    emptyList()
-                } else {
-                    val snapshot = withContext(Dispatchers.IO) { timelineStream.snapshot() }
-                    snapshot
-                        ?.let {
-                            val streamIds =
-                                applyTimelinePage(
-                                    it,
-                                    replaceWindow = true,
-                                    updatePagination = true,
-                                )
-                            initializeReadState(account)
-                            streamIds
-                        }.orEmpty()
-                }
+            val snapshotStreamIds = publishInitialTimelineSnapshot(account, timelineStream)
             // Don't blanket-mark the absolute newest as read here — the UI
             // layer now drives mark-read as the user scrolls so partial-read
             // sessions retain accurate unread counts on the chat list.
@@ -7634,23 +7747,39 @@ class ConversationController(
             throw cancel
         } catch (throwable: Throwable) {
             if (throwable.isUseAfterEviction()) {
+                discardInitialTimelineSeedForFailure(preserveOptimisticMessages = false)
                 markActiveAccountRemovedFromMembers(account)
                 isLoading = false
+                terminalConversationUnavailable = true
                 subscriptionError = null
                 return true to false
             }
+            val initialOpenTimedOut = isTerminalOpenFailure(throwable)
+            discardInitialTimelineSeedForFailure(preserveOptimisticMessages = true)
             isLoading = false
             subscriptionError =
                 privacySafeErrorPresentation(
                     operationCode = if (timelineRecords.isEmpty()) "CONVERSATION_LOAD" else "CONVERSATION_REFRESH",
                     throwable = throwable,
                     message =
-                        if (timelineRecords.isEmpty()) {
+                        if (initialOpenTimedOut) {
+                            AppText.Resource(R.string.error_restart_app_before_retry)
+                        } else if (timelineRecords.isEmpty()) {
                             AppText.Resource(R.string.error_try_again)
                         } else {
                             AppText.Resource(R.string.error_loaded_content_may_be_out_of_date)
                         },
+                    retryable = shouldOfferConversationLoadRetry(throwable),
                 )
+            if (initialOpenTimedOut) {
+                // A timed-out FFI call may still occupy its native blocking
+                // worker. Automatic retries would accumulate more stuck calls;
+                // stop here. The user must restart rather than launch another
+                // native open while the single-flight owner is unresolved.
+                initialTimelineSubscriptionRead.cancel()
+                terminalLoadFailure = true
+                return true to false
+            }
         } finally {
             closeConversationSubscriptionHandles(groupSubscription, timelineStream)
         }
@@ -7749,6 +7878,9 @@ class ConversationController(
      */
     fun onCleared() {
         controllerCleared = true
+        initialTimelineSubscriptionRead.cancel()
+        initialTimelineSnapshotRead.cancel()
+        controllerScope.cancel()
         inviteStreamScope.cancel()
         attachmentTransferScope.cancel()
     }
@@ -10714,6 +10846,7 @@ class ConversationController(
     }
 
     suspend fun retryLoadFailure() {
+        if (subscriptionError?.retryable == false) return
         when (failedPageDirection?.takeIf { pageError != null }) {
             ConversationSearchPageDirection.OLDER -> loadOlderPage()
             ConversationSearchPageDirection.NEWER -> loadNewerPage()
@@ -10836,6 +10969,27 @@ class ConversationController(
         )
     }
 
+    private fun trimStateForWindowReplacement() {
+        timelineRecords.clear()
+        timelineItemsById.clear()
+        timelineOrder.clear()
+        projectedMessageIds.clear()
+        // Drop stale projected records so messageById doesn't grow unbounded
+        // as older pages are loaded; keep in-flight optimistic records so a
+        // pending send still reconciles across a window replacement. See #68.
+        val optimisticIds = optimisticMessages.values.mapTo(mutableSetOf()) { it.record.messageIdHex }
+        messageById.keys.retainAll(optimisticIds)
+        // Same unbounded-growth trim for the optimistic position/timestamp
+        // overrides: the reconcile path below re-adds them for any optimistic
+        // message that reconciles into this page, so scrolled-out entries
+        // don't accumulate for the controller's lifetime.
+        localTimelineOrderOverrides.keys.retainAll(optimisticIds)
+        localTimelineTimestampOverrides.keys.retainAll(optimisticIds)
+        preservedTimelinePositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
+        optimisticSendPositionPreserves.retainAll(localTimelineTimestampOverrides.keys)
+        durableStreamPositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
+    }
+
     private suspend fun applyTimelinePage(
         page: TimelinePageFfi,
         replaceWindow: Boolean,
@@ -10843,26 +10997,7 @@ class ConversationController(
     ): List<String> {
         timelineWindowGeneration.invalidate()
         val pageMessages = page.messages
-        if (replaceWindow) {
-            timelineRecords.clear()
-            timelineItemsById.clear()
-            timelineOrder.clear()
-            projectedMessageIds.clear()
-            // Drop stale projected records so messageById doesn't grow unbounded
-            // as older pages are loaded; keep in-flight optimistic records so a
-            // pending send still reconciles across a window replacement. See #68.
-            val optimisticIds = optimisticMessages.values.mapTo(mutableSetOf()) { it.record.messageIdHex }
-            messageById.keys.retainAll(optimisticIds)
-            // Same unbounded-growth trim for the optimistic position/timestamp
-            // overrides: the reconcile path below re-adds them for any optimistic
-            // message that reconciles into this page, so scrolled-out entries
-            // don't accumulate for the controller's lifetime.
-            localTimelineOrderOverrides.keys.retainAll(optimisticIds)
-            localTimelineTimestampOverrides.keys.retainAll(optimisticIds)
-            preservedTimelinePositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
-            optimisticSendPositionPreserves.retainAll(localTimelineTimestampOverrides.keys)
-            durableStreamPositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
-        }
+        if (replaceWindow) trimStateForWindowReplacement()
         pageMessages.forEach { record ->
             val actionRecord =
                 upsertProjectedRecord(
@@ -10887,19 +11022,6 @@ class ConversationController(
             }
         }
         applyDurableStreamPositions(durableStreamDisplayPositions(timelineRecords.values.toList()))
-        // Materialize local profile presentations for everyone this page
-        // references (message authors, reply-preview authors, reaction authors)
-        // and AWAIT it before the publish below kicks off the first composition.
-        // The requestProfile calls above are the gated *relay* refresh (network);
-        // this is the ungated *local* read each row would otherwise lazily fire
-        // on its own first paint. Awaiting it (rather than fire-and-forget) is
-        // what actually closes the per-row sender name/avatar hydration flicker
-        // for already-on-device history: a launch-and-return warm races this
-        // synchronous publish and can still lose, so the row's first frame would
-        // observe ProfilePresentation.Empty and pop the name/avatar in a frame
-        // later. Blocking here guarantees the cache is populated before publish,
-        // so the first composition paints the sender metadata. See #609.
-        appState.warmProfilePresentationsBlocking(timelineRecordProfileSenders(pageMessages))
         if (updatePagination) {
             hasMoreBefore = page.hasMoreBefore
             hasMoreAfter = page.hasMoreAfter
@@ -10919,7 +11041,14 @@ class ConversationController(
         // order indexes (and reconciled optimistics), exactly like the live
         // update paths do — so publish directly. A second full rebuild here
         // re-projected every held record on each page load. See #74.
+        val preparingInitialPresentation = !hasPreparedInitialPresentation
+        hasPublishedAuthoritativeTimeline = true
+        initialTimelineSeedActive = false
         publishTimelinePageBeforeMarkdownHydration(pageMessages)
+        scheduleProfilePresentationWarm(
+            records = pageMessages,
+            markInitialPresentationReady = preparingInitialPresentation,
+        )
         return pageMessages
             .map { TimelineProjector.toAppMessageRecord(it) }
             .filter { MessageProjector.isStreamStart(it) }
@@ -10927,6 +11056,20 @@ class ConversationController(
             // Don't relaunch a watcher for a stream whose final record was in
             // this same page — it was just marked removed. See #25.
             .filterNot { it in removedStreamIds }
+    }
+
+    /**
+     * Publish protocol rows immediately, then warm existing local profile
+     * presentation state. MainShell keeps a prepared chat-list tap on its source
+     * page until this initial warm completes, preventing sender metadata from
+     * remeasuring bubbles during the route transition.
+     */
+    private fun scheduleProfilePresentationWarm(
+        records: List<TimelineMessageRecordFfi>,
+        markInitialPresentationReady: Boolean,
+    ) {
+        if (!markInitialPresentationReady) return
+        initialPresentationWarmCoordinator.prepare(initialPresentationProfileSenders(records))
     }
 
     private fun publishTimelinePageBeforeMarkdownHydration(records: List<TimelineMessageRecordFfi>) {
@@ -12610,6 +12753,10 @@ class ConversationController(
         if (!BuildConfig.DEBUG) return
         val entry = sendTraceByTempId.remove(optimisticId) ?: return
         sendTrace(entry.sequence, "echo-reconcile", traceElapsedMs(entry.startMs))
+    }
+
+    init {
+        if (startOnConstruction) start()
     }
 
     companion object {

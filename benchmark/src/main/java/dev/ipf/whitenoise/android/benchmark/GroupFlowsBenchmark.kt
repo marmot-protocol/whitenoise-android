@@ -24,6 +24,14 @@ class GroupFlowsBenchmark {
             ),
         )
 
+    /** Re-open after one setup open so profiles, projection, and MDK pages are warm. */
+    @Test
+    fun openGroupConversationVisible() = measureOpenConversationVisible(warmConversation = true)
+
+    /** First conversation open after a cold process start and local chat-list load. */
+    @Test
+    fun openGroupConversationVisibleCold() = measureOpenConversationVisible(warmConversation = false)
+
     @Test
     fun createGroupConversationOpen() {
         // Require an explicit prefix because every iteration creates a real,
@@ -84,6 +92,39 @@ class GroupFlowsBenchmark {
             },
             measureBlock = {
                 tracedJourney(OPEN_MEMBERS_TRACE) { journeys.openMembers(groupName) }
+            },
+        )
+    }
+
+    private fun measureOpenConversationVisible(warmConversation: Boolean) {
+        val groupName = BenchmarkConfig.requireFixture(BenchmarkConfig.groupName, "groupName")
+        val journeys = WhiteNoiseJourneys()
+        benchmarkRule.measureRepeated(
+            packageName = BenchmarkConfig.TARGET_PACKAGE,
+            metrics = openConversationMetrics(),
+            compilationMode = CompilationMode.Partial(BaselineProfileMode.Require),
+            iterations = 20,
+            setupBlock = {
+                pressHome()
+                if (warmConversation) {
+                    journeys.run {
+                        resumeToChatList()
+                        openConversationVisible(groupName)
+                        returnToChatList()
+                        waitForConversationControllerReleased()
+                    }
+                } else {
+                    killProcess()
+                    journeys.run { launchToChatList() }
+                }
+            },
+            measureBlock = {
+                tracedJourney(OPEN_CONVERSATION_SETTLED_TRACE) {
+                    tracedJourney(OPEN_CONVERSATION_VISIBLE_TRACE) {
+                        journeys.openConversationVisible(groupName)
+                    }
+                    journeys.waitForConversationRouteSettled()
+                }
             },
         )
     }

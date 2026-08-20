@@ -15,6 +15,7 @@ enum class NoticeTier {
 data class ErrorPresentation(
     val message: AppText,
     val report: String,
+    val retryable: Boolean = true,
 )
 
 internal fun privacySafeErrorPresentation(
@@ -26,9 +27,11 @@ internal fun privacySafeErrorPresentation(
         runCatching { "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})" }
             .getOrDefault("unknown"),
     occurredAtUtc: String = Instant.now().toString(),
+    retryable: Boolean = true,
 ): ErrorPresentation =
     ErrorPresentation(
         message = message,
+        retryable = retryable,
         report =
             DiagnosticFormatter.errorReport(
                 operationCode = operationCode,

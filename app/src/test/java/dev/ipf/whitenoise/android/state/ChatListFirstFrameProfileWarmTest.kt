@@ -5,7 +5,9 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -44,6 +46,44 @@ class ChatListFirstFrameProfileWarmTest {
             assertEquals(PEER_NAME, appState.chatMemberTitleCached(PEER_ID))
             assertEquals(PEER_AVATAR, appState.avatarUrl(PEER_ID))
             assertEquals("local materialization must not start relay refresh", 0, relayRefreshRequests)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun blockingWarmSharesAnAlreadyRunningLazyMaterialization() =
+        runTest {
+            val readStarted = CompletableDeferred<Unit>()
+            val releaseRead = CompletableDeferred<Unit>()
+            var profileReads = 0
+            var displayNameReads = 0
+            val appState =
+                appState(
+                    profileReader = {
+                        profileReads += 1
+                        readStarted.complete(Unit)
+                        releaseRead.await()
+                        peerProfile()
+                    },
+                    profileDisplayNameReader = {
+                        displayNameReads += 1
+                        PEER_NAME
+                    },
+                    profileRefreshRequest = { error("relay unavailable") },
+                )
+
+            appState.requestProfile(PEER_ID)
+            readStarted.await()
+            val warm = async { appState.warmProfilePresentationsBlocking(listOf(PEER_ID)) }
+            runCurrent()
+
+            assertFalse("the warm must await the shared local read", warm.isCompleted)
+            assertEquals("the lazy and blocking paths must not duplicate userProfile", 1, profileReads)
+            releaseRead.complete(Unit)
+            warm.await()
+
+            assertEquals(1, profileReads)
+            assertEquals("the lazy and blocking paths must not duplicate displayName", 1, displayNameReads)
+            assertEquals(PEER_NAME, appState.chatMemberTitleCached(PEER_ID))
         }
 
     private fun appState(

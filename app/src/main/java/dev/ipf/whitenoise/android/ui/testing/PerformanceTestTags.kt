@@ -17,6 +17,10 @@ internal object PerformanceTestTags {
     const val OPEN_GROUP_DETAILS = "performance.open_group_details"
     const val MEMBER_LIST = "performance.member_list"
     const val JOIN_INVITE = "performance.join_invite"
+    const val CONVERSATION_TRANSCRIPT_VISIBLE = "performance.conversation_transcript_visible"
+    const val CONVERSATION_ROUTE_SETTLED = "performance.conversation_route_settled"
+    const val MAIN_SHELL_ROUTE_SETTLED = "performance.main_shell_route_settled"
+    const val CONVERSATION_CONTROLLER_RELEASED = "performance.conversation_controller_released"
 }
 
 /** Exposes a stable selector without changing accessibility descriptions. */

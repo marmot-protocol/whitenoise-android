@@ -693,6 +693,30 @@ class ConversationScrollCoordinatorTest {
         }
 
     @Test
+    fun initialTailAnchorCommitsAfterTheFirstMeasuredFrame() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            var frames = 0
+
+            val committed =
+                coordinator.commitInitialTailAnchor(
+                    targetIndex = 5,
+                    captureLayout = {
+                        ConversationInitialAnchorLayout(
+                            viewportHeight = 720,
+                            targetItemSize = 4,
+                        )
+                    },
+                    awaitFrame = { frames++ },
+                )
+
+            assertTrue(committed)
+            assertEquals(1, frames)
+            assertEquals(listOf(ScrollWrite.Snap(5, 0)), writer.writes)
+        }
+
+    @Test
     fun postInitialReanchorGateIgnoresCommittedStartupBaseline() {
         val gate = ConversationPostInitialReanchorGate()
         val initial =

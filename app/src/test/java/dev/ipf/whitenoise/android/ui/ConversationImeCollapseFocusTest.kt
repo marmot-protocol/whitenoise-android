@@ -3,16 +3,27 @@ package dev.ipf.whitenoise.android.ui
 import android.content.Context
 import android.view.View
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.SemanticsProperties.EditableText
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -23,7 +34,13 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
+import dev.ipf.marmotkit.ChatListMessagePreviewFfi
+import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -31,6 +48,8 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
+import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_INITIAL_LOADING_TEST_TAG
+import dev.ipf.whitenoise.android.ui.conversation.ConversationInitialLoadingOverlay
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -41,6 +60,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 
 /**
  * Screen-level coverage for the rule that an IME closure is not a composer
@@ -61,6 +81,66 @@ class ConversationImeCollapseFocusTest {
     val composeRule = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    @Test
+    fun residualConversationLoadingIndicatorHonorsItsGracePeriod() {
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    ConversationInitialLoadingOverlay(visible = true)
+                }
+            }
+
+            composeRule.onNodeWithTag(CONVERSATION_INITIAL_LOADING_TEST_TAG).assertDoesNotExist()
+            composeRule.mainClock.advanceTimeBy(149L)
+            composeRule.onNodeWithTag(CONVERSATION_INITIAL_LOADING_TEST_TAG).assertDoesNotExist()
+            composeRule.mainClock.advanceTimeBy(2L)
+            composeRule.onNodeWithTag(CONVERSATION_INITIAL_LOADING_TEST_TAG).assertExists()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test
+    fun anchoredTimelineDoesNotFlashLoadingDuringTheRouteTransition() {
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    ConversationInitialLoadingOverlay(
+                        visible = true,
+                        graceMillis = 300L,
+                    )
+                }
+            }
+
+            composeRule.mainClock.advanceTimeBy(299L)
+            composeRule.onNodeWithTag(CONVERSATION_INITIAL_LOADING_TEST_TAG).assertDoesNotExist()
+            composeRule.mainClock.advanceTimeBy(2L)
+            composeRule.onNodeWithTag(CONVERSATION_INITIAL_LOADING_TEST_TAG).assertExists()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test
+    fun cachedConversationPaintsMessageWithoutProgressOnFirstFrameLight() {
+        captureSeededConversationFirstFrame(
+            snapshotName = "conversation_cached_first_frame_light",
+            darkTheme = false,
+        )
+    }
+
+    @Test
+    fun cachedConversationPaintsMessageWithoutProgressOnFirstFrameDarkLargeFontRtl() {
+        captureSeededConversationFirstFrame(
+            snapshotName = "conversation_cached_first_frame_dark_large_font_rtl",
+            darkTheme = true,
+            fontScale = 1.5f,
+            layoutDirection = LayoutDirection.Rtl,
+        )
+    }
 
     /**
      * A keyboard-to-voice handoff collapses the IME insets to zero while the
@@ -180,6 +260,139 @@ class ConversationImeCollapseFocusTest {
         return view
     }
 
+    private fun captureSeededConversationFirstFrame(
+        snapshotName: String,
+        darkTheme: Boolean,
+        fontScale: Float = 1f,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+    ) {
+        val appState = appState()
+        val group = group()
+        val preview = cachedPreview()
+        val controller =
+            ConversationController(
+                appState = appState,
+                initialGroup = group,
+                initialTimelinePreview = preview,
+            )
+        // Model the promoted chat-list-tap open: navigation only promotes after
+        // the authoritative page publishes, and the tapped row always carries
+        // the projection its preview came from. A projection-less open is the
+        // provisional direct route, which deliberately hides until anchored.
+        controller.markAuthoritativeTimelinePublishedForTest()
+        val chat =
+            ChatListItem(
+                group = group,
+                latest = null,
+                otherMemberAccount = null,
+                memberCount = 2,
+                memberSnapshot = null,
+                projection = cachedProjection(preview),
+            )
+
+        // The bubble timestamp renders in the default zone — pin it so the
+        // snapshot matches regardless of the recording machine's locale.
+        val originalTimeZone = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.setContent {
+                val density = LocalDensity.current
+                WhiteNoiseTheme(darkTheme = darkTheme) {
+                    CompositionLocalProvider(
+                        LocalDensity provides Density(density.density, fontScale),
+                        LocalLayoutDirection provides layoutDirection,
+                    ) {
+                        ConversationScreen(
+                            appState = appState,
+                            chat = chat,
+                            controller = controller,
+                            onBack = {},
+                        )
+                    }
+                }
+            }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+
+            composeRule.onNodeWithText(CACHED_MESSAGE).assertIsDisplayed()
+            progressNodes().assertCountEquals(0)
+            composeRule
+                .onRoot()
+                .captureRoboImage("src/test/snapshots/$snapshotName.png")
+
+            // Keep the cached transcript spinner-free after the loading grace,
+            // not only during the first frame where the grace hides it anyway.
+            composeRule.mainClock.advanceTimeBy(500L)
+            composeRule.waitForIdle()
+            progressNodes().assertCountEquals(0)
+            composeRule.onNodeWithText(CACHED_MESSAGE).assertIsDisplayed()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+            TimeZone.setDefault(originalTimeZone)
+            controller.onCleared()
+        }
+    }
+
+    private fun progressNodes() =
+        composeRule.onAllNodes(
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo),
+        )
+
+    private fun cachedPreview() =
+        ChatListMessagePreviewFfi(
+            messageIdHex = "05" + "00".repeat(31),
+            sender = "02" + "00".repeat(31),
+            senderDisplayName = "Cached sender",
+            plaintext = CACHED_MESSAGE,
+            contentTokens =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = ByteArray(0),
+                ),
+            kind = 9uL,
+            timelineAt = 10uL,
+            deleted = false,
+            attachmentKind = null,
+            attachmentCount = 0u,
+            deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+        )
+
+    private fun cachedProjection(preview: ChatListMessagePreviewFfi) =
+        ChatListRowFfi(
+            selfMembership = SelfMembershipFfi.MEMBER,
+            unreadMentionCount = 0uL,
+            unreadMention = false,
+            groupIdHex = GROUP_ID,
+            archived = false,
+            pendingConfirmation = false,
+            title = "Handoff group",
+            groupName = "Handoff group",
+            avatarUrl = null,
+            avatar = null,
+            lastMessage = preview,
+            unreadCount = 0uL,
+            hasUnread = false,
+            firstUnreadMessageIdHex = null,
+            lastReadMessageIdHex = preview.messageIdHex,
+            lastReadTimelineAt = preview.timelineAt,
+            conversationCreatedAt = 0uL,
+            activitySortAt = preview.timelineAt,
+            updatedAt = preview.timelineAt,
+            leaveRequestPending = false,
+            leaveRequestedAtMs = null,
+            manuallyMarkedUnread = false,
+            conversationKind = ChatConversationKindFfi.UNKNOWN,
+            muted = false,
+            mutedUntilMs = null,
+            pinned = false,
+            pinnedPosition = null,
+            lifecycleState = GroupLifecycleStateFfi.STABLE,
+            disbanding = false,
+            disbandRequest = null,
+        )
+
     private fun dispatchImeBottom(
         view: View,
         bottomPx: Int,
@@ -272,6 +485,7 @@ class ConversationImeCollapseFocusTest {
     private companion object {
         const val ACCOUNT_REF = "personal"
         const val DRAFT = "draft text"
+        const val CACHED_MESSAGE = "Cached hello on the first frame"
         val ACCOUNT_ID = "01" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
     }
