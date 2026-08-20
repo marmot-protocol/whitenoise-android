@@ -40,6 +40,29 @@ internal suspend fun materializeMediaFile(
     }.getOrNull()
 }
 
+/**
+ * [materializeMediaFile] with the shared failure affordance every tap path
+ * needs: a failed materialization tells the user instead of dead-ending, and
+ * the next tap retries.
+ */
+internal suspend fun materializeMediaFileOrNotify(
+    context: Context,
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+    notifyFailure: () -> Unit,
+): File? =
+    materializeMediaFile(
+        context = context,
+        controller = controller,
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        reference = reference,
+        mine = mine,
+    ) ?: null.also { notifyFailure() }
+
 /** Loads bounded reader content while sharing the controller's durable attachment transfer. */
 internal suspend fun loadMediaFileBytes(
     controller: ConversationController,

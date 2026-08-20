@@ -147,6 +147,34 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
+    fun redactedPublicVersionCarriesGenericBodyText() {
+        presenter.ensureChannels()
+        runBlocking {
+            presenter.show(
+                update(isMention = false),
+                previewTextOverride = "hi",
+                directShareEligible = false,
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        // The public variant replaces the card when the OS hides sensitive
+        // content. Without a body line it renders as an icon+header shell
+        // that reads as a broken notification. The private card's
+        // collapsed text is already guaranteed by MessagingStyle extras.
+        val publicVersion =
+            checkNotNull(
+                manager.activeNotifications
+                    .single()
+                    .notification.publicVersion,
+            )
+        assertEquals(
+            context.getString(R.string.notification_hidden_content),
+            publicVersion.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
+        )
+    }
+
+    @Test
     fun clearingAccountShortcutsInvalidatesSnapshotForIdenticalRepublish() {
         presenter.ensureChannels()
         runBlocking {

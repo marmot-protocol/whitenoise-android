@@ -886,6 +886,7 @@
     <string name="location_permission_denied">Konum izni reddedildi</string>
     <string name="media_no_app_to_open">Bu dosyayı açacak uygulama yok</string>
     <string name="media_couldnt_open">Dosya açılamadı</string>
+    <string name="media_couldnt_load">Dosya yüklenemedi. Yeniden denemek için dokunun.</string>
     <string name="media_open">Aç</string>
     <string name="media_file_too_large">Dosya eklenemeyecek kadar büyük</string>
     <string name="media_album_too_large">Seçim gönderilemeyecek kadar büyük</string>

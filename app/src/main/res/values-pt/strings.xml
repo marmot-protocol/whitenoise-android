@@ -886,6 +886,7 @@
     <string name="location_permission_denied">Permissão de localização negada</string>
     <string name="media_no_app_to_open">Nenhum app instalado para abrir este arquivo</string>
     <string name="media_couldnt_open">Não foi possível abrir o arquivo</string>
+    <string name="media_couldnt_load">Não foi possível carregar o arquivo. Toque para tentar novamente.</string>
     <string name="media_open">Abrir</string>
     <string name="media_file_too_large">Arquivo muito grande para anexar</string>
     <string name="media_album_too_large">Seleção muito grande para enviar</string>

@@ -984,7 +984,8 @@ class LocalNotificationPresenter(
     // Shown in place of the real card whenever the lockscreen redacts private
     // notifications. The OS can auto-generate one, but that behaviour varies by
     // OEM; supplying our own guarantees no sender, body, or group name ever
-    // reaches the lockscreen — only the app name.
+    // reaches the lockscreen — it carries only the app name and the generic
+    // hidden-content message.
     private fun redactedPublicVersion(
         channelId: String,
         category: String,
@@ -994,6 +995,10 @@ class LocalNotificationPresenter(
             .Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_whitenoise)
             .setContentTitle(context.getString(R.string.app_name))
+            // A body line even in the redacted variant — without it the shade
+            // shows a bare icon+header shell when the OS hides sensitive
+            // content, which reads as a broken notification.
+            .setContentText(context.getString(R.string.notification_hidden_content))
             .setCategory(category)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setWhen(presentationTimestampMs)
