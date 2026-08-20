@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Screenshot
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -34,11 +35,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppLockDelay
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.auditLogShareChooserIntent
 import dev.ipf.whitenoise.android.ui.common.GroupSwitchRow
 import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 
@@ -48,8 +51,10 @@ internal fun DevicePrivacyScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
     var telemetryBusy by remember { mutableStateOf(false) }
     var auditLogsBusy by remember { mutableStateOf(false) }
+    var exportAuditLogsConfirmOpen by remember { mutableStateOf(false) }
     var deleteAuditLogsConfirmOpen by remember { mutableStateOf(false) }
 
     fun runAuditMutation(block: suspend () -> Unit) {
@@ -187,6 +192,12 @@ internal fun DevicePrivacyScreen(
                         }
                     }
                     item {
+                        AuditLogExportRow(
+                            enabled = !auditLogsBusy,
+                            onClick = { exportAuditLogsConfirmOpen = true },
+                        )
+                    }
+                    item {
                         Row(
                             Modifier
                                 .fillMaxWidth()
@@ -218,6 +229,28 @@ internal fun DevicePrivacyScreen(
         }
     }
 
+    if (exportAuditLogsConfirmOpen) {
+        val chooserTitle = stringResource(R.string.export_audit_logs)
+        AuditLogExportConsentDialog(
+            onDismiss = { exportAuditLogsConfirmOpen = false },
+            onConfirm = {
+                exportAuditLogsConfirmOpen = false
+                runAuditMutation {
+                    val files = appState.prepareAuditLogsForSharing()
+                    if (files.isNotEmpty()) {
+                        runCatching {
+                            context.startActivity(
+                                auditLogShareChooserIntent(context, files, chooserTitle),
+                            )
+                        }.onFailure {
+                            appState.present(R.string.toast_couldnt_export_audit_logs)
+                        }
+                    }
+                }
+            },
+        )
+    }
+
     if (deleteAuditLogsConfirmOpen) {
         AlertDialog(
             onDismissRequest = { deleteAuditLogsConfirmOpen = false },
@@ -242,5 +275,56 @@ internal fun DevicePrivacyScreen(
                 }
             },
         )
+    }
+}
+
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+@Composable
+internal fun AuditLogExportConsentDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.export_audit_logs_confirm_title)) },
+        text = { Text(stringResource(R.string.export_audit_logs_confirm_body)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.export_audit_logs_confirm_action))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+@Composable
+internal fun AuditLogExportRow(
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.Share, contentDescription = null)
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(R.string.export_audit_logs),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                stringResource(R.string.export_audit_logs_subtitle),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

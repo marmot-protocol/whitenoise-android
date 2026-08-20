@@ -555,7 +555,12 @@
     <string name="telemetry">Share anonymous app telemetry</string>
     <string name="telemetry_settings_subtitle">Share relay connection telemetry.</string>
     <string name="audit_logs">Audit logs</string>
-    <string name="audit_logs_settings_subtitle">Create and Send Group Audit Log Files</string>
+    <string name="audit_logs_settings_subtitle">Create and export local group forensic audit files</string>
+    <string name="export_audit_logs" translatable="false">Export audit logs</string>
+    <string name="export_audit_logs_subtitle" translatable="false">Share a copy of the local audit files you explicitly recorded</string>
+    <string name="export_audit_logs_confirm_title" translatable="false">Export sensitive audit data?</string>
+    <string name="export_audit_logs_confirm_body" translatable="false">Audit files may contain message content, identities, and device details. Share them only with someone you trust.</string>
+    <string name="export_audit_logs_confirm_action" translatable="false">Choose recipient</string>
     <string name="delete_audit_logs">Delete audit logs</string>
     <string name="delete_audit_logs_subtitle">Remove all local forensic audit files. Logging continues on a fresh file if it\'s still on.</string>
     <string name="redact_audit_data">Redact sensitive audit data</string>
@@ -991,6 +996,8 @@
     <string name="toast_audit_logs_deleted">Audit logs deleted</string>
     <string name="toast_couldnt_delete_audit_logs">Couldn\'t delete audit logs</string>
     <string name="toast_no_audit_logs_to_delete">No audit logs to delete</string>
+    <string name="toast_couldnt_export_audit_logs" translatable="false">Couldn\'t prepare audit logs for export</string>
+    <string name="toast_no_audit_logs_to_export" translatable="false">No audit logs to export</string>
     <string name="toast_chat_created">Chat created</string>
     <string name="group_create_stage_creating">Creating group…</string>
     <string name="group_create_stage_applying_retention">Applying disappearing messages…</string>

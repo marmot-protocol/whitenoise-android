@@ -5842,12 +5842,53 @@ class WhiteNoiseAppState private constructor(
         }
 
     /**
+     * Copies current audit files into the app cache for a user-confirmed share.
+     * The engine paths and file names are never logged or included in failures.
+     */
+    @Suppress("ReturnCount") // Each engine/cache failure is a distinct fail-closed export outcome.
+    suspend fun prepareAuditLogsForSharing(): List<java.io.File> {
+        val sourcePaths =
+            runCatching { marmotIo { auditLogFiles().map { it.path } } }
+                .getOrElse {
+                    if (it is CancellationException) throw it
+                    present(R.string.toast_couldnt_export_audit_logs)
+                    return emptyList()
+                }
+        if (sourcePaths.isEmpty()) {
+            presentTransient(R.string.toast_no_audit_logs_to_export)
+            return emptyList()
+        }
+
+        val staged =
+            runCatchingCancellable {
+                withContext(Dispatchers.IO) {
+                    prepareAuditLogShareFiles(
+                        cacheDir = appContext.cacheDir,
+                        allowedSourceRoot = java.io.File(appContext.filesDir, "Marmot"),
+                        sourcePaths = sourcePaths,
+                    )
+                }
+            }.getOrElse {
+                present(R.string.toast_couldnt_export_audit_logs)
+                return emptyList()
+            }
+        if (staged.isEmpty()) present(R.string.toast_couldnt_export_audit_logs)
+        return staged
+    }
+
+    /**
      * Delete every local audit log file. Each delete is best-effort; the
      * runtime hot-swaps any live recorder so logging keeps running on a
      * fresh file when audit logging is currently on. Returns true if at
      * least one file was successfully removed (or rotated).
      */
     suspend fun deleteAuditLogs(): Boolean {
+        var engineFailure: Throwable? = null
+        var cacheFailure: Throwable? = null
+        val preparedDeleted =
+            runCatchingCancellable {
+                withContext(Dispatchers.IO) { clearPreparedAuditLogShares(appContext.cacheDir) }
+            }.onFailure { cacheFailure = it }.getOrDefault(false)
         val files =
             runCatching { marmotIo { auditLogFiles() } }
                 .getOrElse {
@@ -5856,25 +5897,36 @@ class WhiteNoiseAppState private constructor(
                     return false
                 }
         if (files.isEmpty()) {
+            cacheFailure?.let {
+                presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
+                return false
+            }
+            if (preparedDeleted) {
+                presentTransient(R.string.toast_audit_logs_deleted)
+                return true
+            }
             presentTransient(R.string.toast_no_audit_logs_to_delete)
             return false
         }
         var anyDeleted = false
-        var firstFailure: Throwable? = null
         for (file in files) {
             val outcome =
                 runCatchingCancellable { marmotIo { deleteAuditLogFile(file.path) } }
                     .onFailure {
-                        if (firstFailure == null) firstFailure = it
+                        if (engineFailure == null) engineFailure = it
                         appStateDebug { "deleteAuditLogFile failed: ${it.readableMessage()}" }
                     }.getOrNull() ?: continue
             anyDeleted = true
             appStateDebug { "audit log deleted still_recording=${outcome.stillRecording}" }
         }
+        cacheFailure?.let {
+            presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
+            return false
+        }
         if (anyDeleted) {
             presentTransient(R.string.toast_audit_logs_deleted)
         } else {
-            firstFailure?.let {
+            engineFailure?.let {
                 presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
             } ?: present(R.string.toast_couldnt_delete_audit_logs)
         }
