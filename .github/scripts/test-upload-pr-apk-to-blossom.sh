@@ -11,6 +11,7 @@ printf 'test apk bytes' > "$apk"
 expected_sha=$(sha256sum "$apk" | awk '{print $1}')
 state="$tmp/attempts"
 fake_nak="$tmp/nak"
+fake_curl="$tmp/curl"
 
 cat > "$fake_nak" <<'FAKE_NAK'
 #!/usr/bin/env bash
@@ -71,8 +72,16 @@ case "$FAKE_SCENARIO:$attempt" in
     printf 'not-json\n'
     exit 0
     ;;
-  mime-mismatch:*)
+  mime-mismatch:1)
     printf '{"sha256":"%s","type":"application/zip"}\n' "$FAKE_APK_SHA256"
+    exit 0
+    ;;
+  always-mime-mismatch:*)
+    printf '{"sha256":"%s","type":"application/zip"}\n' "$FAKE_APK_SHA256"
+    exit 0
+    ;;
+  parameterized-upload-mime:*)
+    printf '{"sha256":"%s","type":" Application/Vnd.Android.Package-Archive ; charset=binary"}\n' "$FAKE_APK_SHA256"
     exit 0
     ;;
   nxdomain:*)
@@ -84,8 +93,20 @@ printf '{"sha256":"%s","type":"application/vnd.android.package-archive"}\n' "$FA
 FAKE_NAK
 chmod +x "$fake_nak"
 
+cat > "$fake_curl" <<'FAKE_CURL'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: 14\r\n\r\n' "$FAKE_SERVE_TYPE"
+FAKE_CURL
+chmod +x "$fake_curl"
+
 run_uploader() {
   local scenario=$1
+  local serve_type=${2:-}
+  local skip_serve_check=1
+  if [[ -n "$serve_type" ]]; then
+    skip_serve_check=''
+  fi
   printf '0\n' > "$state"
   stdout="$tmp/$scenario.stdout"
   stderr="$tmp/$scenario.stderr"
@@ -93,11 +114,13 @@ run_uploader() {
   APK_PATH="$apk" \
     BLOSSOM_SERVER='https://example.test' \
     BLOSSOM_UPLOAD_NSEC='test-secret-must-not-leak' \
-    BLOSSOM_SKIP_SERVE_CHECK=1 \
+    BLOSSOM_SKIP_SERVE_CHECK="$skip_serve_check" \
     NAK_BIN="$fake_nak" \
+    PATH="$tmp:$PATH" \
     FAKE_NAK_STATE="$state" \
     FAKE_APK_SHA256="$expected_sha" \
     FAKE_SCENARIO="$scenario" \
+    FAKE_SERVE_TYPE="$serve_type" \
     BLOSSOM_UPLOAD_BACKOFF_SECONDS=0 \
     BLOSSOM_UPLOAD_TIMEOUT_SECONDS=1 \
     "$uploader" >"$stdout" 2>"$stderr"
@@ -169,12 +192,35 @@ run_uploader hash-mismatch
 [[ "$(<"$stderr")" != *'test-secret-must-not-leak'* ]]
 printf 'ok - fails closed on a returned SHA-256 mismatch\n'
 
-run_uploader mime-mismatch
+assert_success_after_retry mime-mismatch
+printf 'ok - retries a transient returned APK MIME mismatch\n'
+
+run_uploader always-mime-mismatch
 [[ "$status" != '0' ]]
-[[ "$(<"$state")" == '1' ]]
+[[ "$(<"$state")" == '3' ]]
 [[ "$(<"$stderr")" == *'Blossom stored APK as application/zip'* ]]
 [[ "$(<"$stderr")" != *'test-secret-must-not-leak'* ]]
-printf 'ok - fails closed on a returned APK MIME mismatch\n'
+printf 'ok - fails closed after exhausting returned APK MIME retries\n'
+
+run_uploader parameterized-upload-mime
+[[ "$status" == '0' ]]
+[[ "$(<"$state")" == '1' ]]
+printf 'ok - accepts a case-insensitive parameterized upload MIME type\n'
+
+for serve_type in \
+  'application/vnd.android.package-archive' \
+  ' Application/Vnd.Android.Package-Archive ; charset=binary'; do
+  run_uploader success "$serve_type"
+  [[ "$status" == '0' ]]
+  [[ "$(<"$state")" == '1' ]]
+done
+printf 'ok - accepts bare and parameterized HEAD Content-Type values\n'
+
+run_uploader success 'application/zip'
+[[ "$status" != '0' ]]
+[[ "$(<"$state")" == '1' ]]
+[[ "$(<"$stderr")" == *'Blossom serves '*' as application/zip instead of'* ]]
+printf 'ok - fails closed on a wrong HEAD Content-Type\n'
 
 for scenario in empty-output malformed-output; do
   run_uploader "$scenario"

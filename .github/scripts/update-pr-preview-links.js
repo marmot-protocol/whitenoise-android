@@ -26,6 +26,10 @@ function replaceSection(body, section) {
   if (start !== -1 && end > start) {
     return `${current.slice(0, start)}${section}${current.slice(end + END.length)}`
   }
+  if (start !== -1) {
+    const prefix = current.slice(0, start).trimEnd()
+    return `${prefix}${prefix.length ? '\n\n' : ''}${section}`
+  }
   return `${current}${current.length ? '\n\n' : ''}${section}`
 }
 

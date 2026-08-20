@@ -40,3 +40,16 @@ test('replaces an existing preview section in place', () => {
   assert.doesNotMatch(updated, /old preview block/)
   assert.match(updated, /abc123\.apk/)
 })
+
+test('replaces an unterminated preview section without duplicating its start marker', () => {
+  const prior = [
+    'Fix overlap bug.',
+    '',
+    START,
+    'orphaned preview block',
+  ].join('\n')
+  const updated = replaceSection(prior, renderSection(links))
+  assert.equal(updated.match(new RegExp(START, 'g')).length, 1)
+  assert.doesNotMatch(updated, /orphaned preview block/)
+  assert.match(updated, /^Fix overlap bug\.\n\n<!-- pr-apk-preview:start -->/)
+})
