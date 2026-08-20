@@ -82,6 +82,43 @@ class BoundedInitialReadTest {
         }
 
     @Test
+    fun successfulSubscriptionCannotLeaveAHangingInitialSnapshotUnbounded() =
+        runTest {
+            val subscription =
+                awaitBoundedInitialResourceRead(
+                    budgetMillis = 1_000L,
+                    producerDispatcher = StandardTestDispatcher(testScheduler),
+                    read = { "subscription" },
+                    closeLate = {},
+                    onTimeout = { error("unexpected subscription timeout") },
+                )
+            val releaseSnapshot = CompletableDeferred<Unit>()
+            val snapshotFinished = CompletableDeferred<Unit>()
+            var timedOut = false
+
+            assertEquals("subscription", subscription)
+
+            try {
+                awaitBoundedInitialSnapshotRead(
+                    budgetMillis = 10L,
+                    producerDispatcher = StandardTestDispatcher(testScheduler),
+                    read = {
+                        releaseSnapshot.await()
+                        snapshotFinished.complete(Unit)
+                        "snapshot"
+                    },
+                )
+                fail("expected the snapshot timeout")
+            } catch (_: ConversationInitialLoadTimeoutException) {
+                timedOut = true
+            }
+
+            releaseSnapshot.complete(Unit)
+            snapshotFinished.await()
+            assertTrue(timedOut)
+        }
+
+    @Test
     fun onlyNativeOpenTimeoutsRequireExplicitRetry() {
         assertTrue(
             isTerminalOpenFailure(

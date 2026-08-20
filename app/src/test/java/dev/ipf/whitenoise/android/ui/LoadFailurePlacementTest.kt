@@ -61,5 +61,31 @@ class LoadFailurePlacementTest {
         assertTrue("preserveLoadedContent = chatsController.retryGeneration > 0L" in shell)
     }
 
+    @Test
+    fun optimisticRowStartupFailureCompletesTheAccessibilityRevealBarrier() {
+        val sourceCandidates =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android"),
+                File("app/src/main/java/dev/ipf/whitenoise/android"),
+            )
+        val sourceRoot = sourceCandidates.first(File::isDirectory)
+        val controllers = File(sourceRoot, "state/Controllers.kt").readText()
+        val screen = File(sourceRoot, "ui/conversation/ConversationScreen.kt").readText()
+        val failureResolution =
+            controllers
+                .substringAfter("private fun discardInitialTimelineSeedForFailure")
+                .substringBefore("private fun publishAuthoritativeEmptyInitialTimeline")
+        val seededReconciliation =
+            screen
+                .substringAfter("SeededConversationAuthoritativeReconciliationEffect(")
+                .substringBefore("// Edit events are derived state")
+
+        assertTrue("publishTimelineFromIndexes()" in failureResolution)
+        assertTrue("hasPublishedAuthoritativeTimeline = true" in failureResolution)
+        assertTrue("hasPreparedInitialPresentation = true" in failureResolution)
+        assertTrue("initialTimelineAnchored = true" in seededReconciliation)
+        assertTrue("if (!initialTimelineAnchored) hideFromAccessibility()" in screen)
+    }
+
     private fun String.countOccurrences(needle: String): Int = windowed(needle.length).count { it == needle }
 }

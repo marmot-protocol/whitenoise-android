@@ -71,6 +71,20 @@ internal suspend fun <T> awaitBoundedInitialResourceRead(
     }
 }
 
+/** Bounds a native value read whose late result needs no resource cleanup. */
+internal suspend fun <T> awaitBoundedInitialSnapshotRead(
+    budgetMillis: Long = INITIAL_TIMELINE_READ_BUDGET_MILLIS,
+    producerDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    read: suspend () -> T,
+): T =
+    awaitBoundedInitialResourceRead(
+        budgetMillis = budgetMillis,
+        producerDispatcher = producerDispatcher,
+        read = read,
+        closeLate = {},
+        onTimeout = { throw ConversationInitialLoadTimeoutException() },
+    )
+
 internal class ConversationInitialLoadTimeoutException : Exception("initial conversation load exceeded its budget")
 
-internal const val INITIAL_TIMELINE_SUBSCRIPTION_BUDGET_MILLIS = 5_000L
+internal const val INITIAL_TIMELINE_READ_BUDGET_MILLIS = 5_000L

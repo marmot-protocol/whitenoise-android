@@ -7614,7 +7614,10 @@ class ConversationController(
         timelineStream: TimelineMessagesSubscription,
     ): List<String> {
         if (timelineRecords.isNotEmpty()) return emptyList()
-        val snapshot = withContext(Dispatchers.IO) { timelineStream.snapshot() }
+        val snapshot =
+            awaitBoundedInitialSnapshotRead {
+                timelineStream.snapshot()
+            }
         return if (snapshot == null) {
             publishAuthoritativeEmptyInitialTimeline()
             emptyList()
@@ -7664,7 +7667,7 @@ class ConversationController(
         try {
             timelineStream =
                 awaitBoundedInitialResourceRead(
-                    budgetMillis = INITIAL_TIMELINE_SUBSCRIPTION_BUDGET_MILLIS,
+                    budgetMillis = INITIAL_TIMELINE_READ_BUDGET_MILLIS,
                     read = {
                         appState.marmotIo {
                             subscribeTimelineMessages(account, group.groupIdHex, ConversationTimelinePageLimit)
