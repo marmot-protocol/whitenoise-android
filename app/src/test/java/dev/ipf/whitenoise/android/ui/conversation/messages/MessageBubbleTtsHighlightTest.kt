@@ -26,6 +26,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
+import dev.ipf.whitenoise.android.ui.TtsLeafHighlight
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -63,7 +64,7 @@ class MessageBubbleTtsHighlightTest {
                 projection = projection,
                 locale = Locale.US,
             ) as TtsLeafHighlightResolver
-        var captured: IntRange? = null
+        var captured: TtsLeafHighlight? = null
         composeRule.setContent {
             WhiteNoiseTheme {
                 val highlight = resolver("plain", "Hello bright world.")
@@ -75,7 +76,13 @@ class MessageBubbleTtsHighlightTest {
             }
         }
         composeRule.waitForIdle()
-        assertEquals(6 until 12, captured)
+        assertEquals(
+            TtsLeafHighlight(
+                sentenceRanges = listOf(0 until "Hello bright world.".length),
+                wordRange = 6 until 12,
+            ),
+            captured,
+        )
     }
 
     @Test
@@ -118,6 +125,10 @@ class MessageBubbleTtsHighlightTest {
         composeRule.waitForIdle()
 
         val semantics = composeRule.onNodeWithTag("highlighted-text").fetchSemanticsNode().config
+        assertEquals(
+            listOf(0 until "Hello bright world.".length),
+            semantics.getOrNull(TtsReadAloudSentenceHighlightRangesKey),
+        )
         assertEquals(
             13 until 18,
             semantics.getOrNull(TtsReadAloudHighlightRangeKey),
@@ -273,11 +284,10 @@ class MessageBubbleTtsHighlightTest {
 @Composable
 private fun HighlightedPlainText(
     text: String,
-    highlightRange: IntRange?,
+    highlightRange: TtsLeafHighlight?,
     testTag: String? = null,
 ) {
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    val color = ttsReadAloudHighlightColor()
     Surface(color = MaterialTheme.colorScheme.primaryContainer) {
         Text(
             text = text,
@@ -286,7 +296,7 @@ private fun HighlightedPlainText(
                     .width(280.dp)
                     .padding(12.dp)
                     .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
-                    .ttsReadAloudHighlight(layout, highlightRange, color),
+                    .ttsReadAloudHighlight(layout, highlightRange),
             onTextLayout = { layout = it },
         )
     }

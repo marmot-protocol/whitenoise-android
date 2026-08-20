@@ -532,7 +532,6 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             } else {
                 Modifier
             }
-        val highlightColor = ttsReadAloudHighlightColor()
         var plainLayoutResult by remember(bodyText) { mutableStateOf<TextLayoutResult?>(null) }
         var plainLayoutCoordinates by remember(bodyText) { mutableStateOf<LayoutCoordinates?>(null) }
         DisposableEffect(presentedTtsSentenceLayoutReporter, bodyText) {
@@ -540,9 +539,9 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 presentedTtsSentenceLayoutReporter?.invoke("plain", bodyText, null, null)
             }
         }
-        val plainHighlightRange = presentedTtsLeafHighlightResolver?.invoke("plain", bodyText)
+        val plainHighlight = presentedTtsLeafHighlightResolver?.invoke("plain", bodyText)
         val plainHighlightModifier =
-            Modifier.ttsReadAloudHighlight(plainLayoutResult, plainHighlightRange, highlightColor)
+            Modifier.ttsReadAloudHighlight(plainLayoutResult, plainHighlight)
         val messageTextBody: @Composable () -> Unit = {
             if (renderMarkdownBody) {
                 readAloudMessageSemantics(

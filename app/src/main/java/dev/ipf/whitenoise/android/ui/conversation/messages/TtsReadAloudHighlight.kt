@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -30,6 +29,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.speakableProjectionFromDocument
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
+import dev.ipf.whitenoise.android.ui.TtsLeafHighlight
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import java.util.Locale
 import kotlin.math.max
@@ -37,7 +37,12 @@ import kotlin.math.min
 
 internal val TtsReadAloudHighlightRangeKey = SemanticsPropertyKey<IntRange>("TtsReadAloudHighlightRange")
 
+internal val TtsReadAloudSentenceHighlightRangesKey =
+    SemanticsPropertyKey<List<IntRange>>("TtsReadAloudSentenceHighlightRanges")
+
 private var SemanticsPropertyReceiver.ttsReadAloudHighlightRange by TtsReadAloudHighlightRangeKey
+
+private var SemanticsPropertyReceiver.ttsReadAloudSentenceHighlightRanges by TtsReadAloudSentenceHighlightRangesKey
 
 internal data class TtsReadAloudProgress(
     val sentenceIndex: Int,
@@ -161,9 +166,6 @@ internal fun activeTtsLeafHighlightResolver(
     }
 
 @Composable
-internal fun ttsReadAloudHighlightColor(): Color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.28f)
-
-@Composable
 internal fun readAloudMessageSemantics(
     progress: TtsReadAloudProgress?,
     modifier: Modifier = Modifier,
@@ -205,23 +207,43 @@ internal fun ttsHighlightTextRange(
 }
 
 @Suppress("ReturnCount")
+@Composable
 internal fun Modifier.ttsReadAloudHighlight(
     layoutResult: TextLayoutResult?,
-    highlightRange: IntRange?,
-    color: Color,
+    highlight: TtsLeafHighlight?,
 ): Modifier {
+    val sentenceColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.20f)
+    val wordColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.52f)
     val semanticsModifier =
-        if (highlightRange == null) {
+        if (highlight == null || highlight.sentenceRanges.isEmpty()) {
             Modifier
         } else {
-            Modifier.semantics { ttsReadAloudHighlightRange = highlightRange }
+            Modifier.semantics {
+                ttsReadAloudSentenceHighlightRanges = highlight.sentenceRanges
+                ttsReadAloudHighlightRange = highlight.wordRange ?: highlight.sentenceRanges.first()
+            }
         }
-    if (layoutResult == null || highlightRange == null) return this.then(semanticsModifier)
-    val range = ttsHighlightTextRange(highlightRange, layoutResult.layoutInput.text.length)
-    if (range.collapsed) return this.then(semanticsModifier)
+    if (layoutResult == null || highlight == null) return this.then(semanticsModifier)
+    val textLength = layoutResult.layoutInput.text.length
+    val sentenceRanges =
+        highlight.sentenceRanges
+            .map { ttsHighlightTextRange(it, textLength) }
+            .filterNot(TextRange::collapsed)
+    val wordRange =
+        highlight.wordRange
+            ?.let { ttsHighlightTextRange(it, textLength) }
+            ?.takeUnless(TextRange::collapsed)
+    if (sentenceRanges.isEmpty()) return this.then(semanticsModifier)
     return this.then(semanticsModifier).drawBehind {
-        highlightBoundingBoxes(layoutResult, range).forEach { box ->
-            drawRect(color = color, topLeft = Offset(box.left, box.top), size = box.size)
+        sentenceRanges.forEach { range ->
+            highlightBoundingBoxes(layoutResult, range).forEach { box ->
+                drawRect(color = sentenceColor, topLeft = Offset(box.left, box.top), size = box.size)
+            }
+        }
+        wordRange?.let { range ->
+            highlightBoundingBoxes(layoutResult, range).forEach { box ->
+                drawRect(color = wordColor, topLeft = Offset(box.left, box.top), size = box.size)
+            }
         }
     }
 }

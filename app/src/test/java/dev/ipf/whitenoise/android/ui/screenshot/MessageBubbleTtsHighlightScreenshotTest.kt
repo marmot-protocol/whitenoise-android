@@ -26,13 +26,15 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownListItemFfi
+import dev.ipf.marmotkit.MarkdownListKindFfi
+import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.conversation.messages.buildTtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlight
-import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlightColor
 import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -73,6 +75,12 @@ class MessageBubbleTtsHighlightScreenshotTest {
     fun markdownOutgoingWordHighlightLargeFont() {
         renderMarkdown(mine = true, darkTheme = false, amoled = false, sentenceFallback = false, largeFont = true)
         capture("message_bubble_tts_markdown_outgoing_word_large_font")
+    }
+
+    @Test
+    fun mixedMarkdownNestedListWordHighlightDark() {
+        renderMixedMarkdown(mine = false, darkTheme = true, amoled = false)
+        capture("message_bubble_tts_mixed_markdown_nested_list_word_dark")
     }
 
     @Test
@@ -143,17 +151,24 @@ class MessageBubbleTtsHighlightScreenshotTest {
                     visibleWord = listOf(TtsVisibleTextSpan("b0/n1/n0", 0, 5)),
                 )
             }
-        val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = if (largeFont) 1.3f else 1f) {
-                BubbleFixture(mine = mine, tag = TAG) {
-                    MarkdownMessageBody(
-                        document,
-                        ttsLeafHighlightResolver = resolver,
-                    )
-                }
-            }
-        }
+        renderMarkdownDocument(document, passage, mine, darkTheme, amoled, largeFont)
+    }
+
+    private fun renderMixedMarkdown(
+        mine: Boolean,
+        darkTheme: Boolean,
+        amoled: Boolean,
+    ) {
+        val document = mixedMarkdownDocument()
+        val projection = markdownDocumentToSpeakableProjection(document)
+        val passage =
+            TtsPassage(
+                messageIdHex = "m1",
+                sentenceIndex = 3,
+                projectionId = projection.projectionId,
+                visibleWord = listOf(TtsVisibleTextSpan("b2/i0/b1/i0/b0/n0", 0, 6)),
+            )
+        renderMarkdownDocument(document, passage, mine, darkTheme, amoled, largeFont = false)
     }
 
     private fun renderEditedMarkdown(
@@ -184,9 +199,21 @@ class MessageBubbleTtsHighlightScreenshotTest {
                 projectionId = projection.projectionId,
                 visibleWord = listOf(TtsVisibleTextSpan("b0/n1/n0", 0, 5)),
             )
+        renderMarkdownDocument(document, passage, mine, darkTheme, amoled, largeFont = false)
+    }
+
+    private fun renderMarkdownDocument(
+        document: MarkdownDocumentFfi,
+        passage: TtsPassage,
+        mine: Boolean,
+        darkTheme: Boolean,
+        amoled: Boolean,
+        largeFont: Boolean,
+    ) {
+        val projection = markdownDocumentToSpeakableProjection(document)
         val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = if (largeFont) 1.3f else 1f) {
                 BubbleFixture(mine = mine, tag = TAG) {
                     MarkdownMessageBody(
                         document,
@@ -201,6 +228,72 @@ class MessageBubbleTtsHighlightScreenshotTest {
         const val TAG = "message-bubble-tts-highlight"
     }
 }
+
+private fun mixedMarkdownDocument(): MarkdownDocumentFfi =
+    MarkdownDocumentFfi(
+        truncated = false,
+        blankLinesBefore = byteArrayOf(),
+        blocks =
+            listOf(
+                screenshotParagraph("Intro line."),
+                MarkdownBlockFfi.BlockQuote(
+                    blocks = listOf(screenshotParagraph("Quoted line.")),
+                    blankLinesBefore = byteArrayOf(),
+                ),
+                MarkdownBlockFfi.ListBlock(
+                    kind = MarkdownListKindFfi.Ordered(start = 1u, delimiter = "."),
+                    tight = true,
+                    items =
+                        listOf(
+                            MarkdownListItemFfi(
+                                blocks =
+                                    listOf(
+                                        screenshotParagraph("Parent row"),
+                                        MarkdownBlockFfi.ListBlock(
+                                            kind = MarkdownListKindFfi.Bullet(marker = "-"),
+                                            tight = true,
+                                            items =
+                                                listOf(
+                                                    MarkdownListItemFfi(
+                                                        blocks = listOf(screenshotParagraph("Nested row")),
+                                                        checked = null,
+                                                        blankLinesBefore = byteArrayOf(),
+                                                    ),
+                                                ),
+                                        ),
+                                    ),
+                                checked = null,
+                                blankLinesBefore = byteArrayOf(),
+                            ),
+                            MarkdownListItemFfi(
+                                blocks = listOf(screenshotParagraph("Sibling row")),
+                                checked = null,
+                                blankLinesBefore = byteArrayOf(),
+                            ),
+                        ),
+                ),
+                MarkdownBlockFfi.Table(
+                    alignments = emptyList(),
+                    header =
+                        listOf(
+                            MarkdownTableCellFfi(listOf(MarkdownInlineFfi.Text("Name"))),
+                            MarkdownTableCellFfi(listOf(MarkdownInlineFfi.Text("Value"))),
+                        ),
+                    rows =
+                        listOf(
+                            listOf(
+                                MarkdownTableCellFfi(listOf(MarkdownInlineFfi.Text("Latency"))),
+                                MarkdownTableCellFfi(listOf(MarkdownInlineFfi.Text("Low"))),
+                            ),
+                        ),
+                ),
+            ),
+    )
+
+private fun screenshotParagraph(text: String): MarkdownBlockFfi.Paragraph =
+    MarkdownBlockFfi.Paragraph(
+        listOf(MarkdownInlineFfi.Text(text)),
+    )
 
 @Composable
 private fun BubbleFixture(
@@ -253,7 +346,7 @@ private fun HighlightedPlainLeaf(
     Text(
         text = text,
         style = MaterialTheme.typography.bodyLarge,
-        modifier = Modifier.ttsReadAloudHighlight(layout, highlight, ttsReadAloudHighlightColor()),
+        modifier = Modifier.ttsReadAloudHighlight(layout, highlight),
         onTextLayout = { layout = it },
     )
 }

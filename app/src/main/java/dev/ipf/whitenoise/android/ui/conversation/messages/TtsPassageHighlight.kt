@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjectionSpan
+import dev.ipf.whitenoise.android.ui.TtsLeafHighlight
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -24,7 +25,7 @@ internal fun createTtsLeafHighlightResolver(
     messageIdHex: String,
     projection: SpeakableTextProjection,
     locale: Locale,
-): (String, String) -> IntRange? =
+): (String, String) -> TtsLeafHighlight? =
     TtsHighlightProjectionResolver(
         projection = projection,
         locale = locale,
@@ -49,7 +50,7 @@ internal class TtsHighlightProjectionResolver(
     internal fun resolverFor(
         passage: TtsPassage,
         messageIdHex: String,
-    ): (String, String) -> IntRange? =
+    ): (String, String) -> TtsLeafHighlight? =
         { renderedLeafId, renderedText ->
             resolveTtsRenderedHighlight(
                 passage = passage,
@@ -115,7 +116,7 @@ internal fun resolveTtsRenderedHighlight(
     renderedLeafId: String,
     renderedText: String,
     locale: Locale,
-): IntRange? {
+): TtsLeafHighlight? {
     val sentenceChunks =
         TtsChunker.chunk(
             projection.text,
@@ -142,7 +143,7 @@ private fun resolveTtsRenderedHighlight(
     renderedText: String,
     sentenceChunks: List<TtsChunk>,
     leafSpanCache: MutableMap<Pair<String, String>, List<RenderedProjectionSpan>?>?,
-): IntRange? {
+): TtsLeafHighlight? {
     if (passage == null || passage.messageIdHex != messageIdHex) return null
     if (passage.projectionId != projection.projectionId) return null
     if (renderedText.isEmpty()) return null
@@ -153,11 +154,17 @@ private fun resolveTtsRenderedHighlight(
             renderedText = renderedText,
             leafSpanCache = leafSpanCache,
         ) ?: return null
-    return if (passage.visibleWord.isNotEmpty()) {
-        visibleWordHighlight(passage.visibleWord, renderedLeafId, mappedSpans)
-    } else {
-        sentenceHighlight(passage.sentenceIndex, mappedSpans, sentenceChunks)
-    }
+    val sentence = sentenceSourceInterval(passage.sentenceIndex, sentenceChunks) ?: return null
+    val sentenceRanges = mappedSpans.sentenceRenderedRanges(sentence)
+    if (sentenceRanges.isEmpty()) return null
+    val wordRange =
+        passage.visibleWord
+            .takeIf(List<TtsVisibleTextSpan>::isNotEmpty)
+            ?.let { visibleWord -> visibleWordHighlight(visibleWord, renderedLeafId, mappedSpans) }
+    return TtsLeafHighlight(
+        sentenceRanges = sentenceRanges,
+        wordRange = wordRange,
+    )
 }
 
 private data class RenderedProjectionSpan(
@@ -307,27 +314,6 @@ private fun visibleWordHighlight(
             visibleCursor = overlapEnd
         }
         if (visibleCursor != visibleSpan.end) return null
-    }
-    return contiguousRange(intervals)
-}
-
-@Suppress("ReturnCount")
-private fun sentenceHighlight(
-    sentenceIndex: Int,
-    mappedSpans: List<RenderedProjectionSpan>,
-    sentenceChunks: List<TtsChunk>,
-): IntRange? {
-    val sentence = sentenceSourceInterval(sentenceIndex, sentenceChunks) ?: return null
-    val intervals = ArrayList<RenderedInterval>()
-    for (mapped in mappedSpans) {
-        val overlapStart = max(sentence.start, mapped.source.spokenStart)
-        val overlapEnd = min(sentence.end, mapped.source.spokenEnd)
-        if (overlapStart >= overlapEnd) continue
-        intervals +=
-            RenderedInterval(
-                start = mapped.renderedStart + overlapStart - mapped.source.spokenStart,
-                end = mapped.renderedStart + overlapEnd - mapped.source.spokenStart,
-            )
     }
     return contiguousRange(intervals)
 }

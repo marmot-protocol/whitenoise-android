@@ -83,7 +83,6 @@ import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlight
-import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlightColor
 import java.net.IDN
 import java.net.URI
 import java.util.Locale
@@ -359,7 +358,12 @@ private data class MarkdownBodyContext(
 internal typealias SelectableTextLayoutReporter =
     (key: Any, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates?) -> Unit
 
-internal typealias TtsLeafHighlightResolver = (leafId: String, renderedText: String) -> IntRange?
+internal data class TtsLeafHighlight(
+    val sentenceRanges: List<IntRange>,
+    val wordRange: IntRange? = null,
+)
+
+internal typealias TtsLeafHighlightResolver = (leafId: String, renderedText: String) -> TtsLeafHighlight?
 
 internal typealias TtsSentenceLayoutReporter =
     (leafId: String, renderedText: String, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates?) -> Unit
@@ -412,7 +416,6 @@ private fun MarkdownBodyText(
     val linkDestinations = remember(text) { markdownLinkDestinations(text) }
     val reportsLinks = linkDestinations.isNotEmpty()
     val tracker = remember(leafId, text) { MarkdownTextLayoutTracker() }
-    val highlightColor = ttsReadAloudHighlightColor()
     var layoutResult by remember(leafId, text) { mutableStateOf<TextLayoutResult?>(null) }
     val highlightRange =
         remember(highlightResolver, leafId, text.text) {
@@ -460,7 +463,7 @@ private fun MarkdownBodyText(
         modifier =
             modifier
                 .then(accessibilityModifier)
-                .ttsReadAloudHighlight(layoutResult, highlightRange, highlightColor)
+                .ttsReadAloudHighlight(layoutResult, highlightRange)
                 .onGloballyPositioned { coordinates ->
                     tracker.coordinates = coordinates
                     reportIfReady()

@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjectionSpan
+import dev.ipf.whitenoise.android.ui.TtsLeafHighlight
 import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableProjection
 import org.junit.Assert.assertEquals
@@ -58,9 +59,21 @@ class TtsPassageHighlightTest {
         val firstResolver = projectionResolver.resolverFor(firstPassage, "m1")
         val secondResolver = projectionResolver.resolverFor(secondPassage, "m1")
 
-        assertEquals(0 until 5, firstResolver("plain", projection.text))
+        assertEquals(
+            TtsLeafHighlight(
+                sentenceRanges = listOf(0 until projection.text.length),
+                wordRange = 0 until 5,
+            ),
+            firstResolver("plain", projection.text),
+        )
         assertEquals(1, projectionResolver.cachedLeafCount)
-        assertEquals(6 until 12, secondResolver("plain", projection.text))
+        assertEquals(
+            TtsLeafHighlight(
+                sentenceRanges = listOf(0 until projection.text.length),
+                wordRange = 6 until 12,
+            ),
+            secondResolver("plain", projection.text),
+        )
         assertEquals(1, projectionResolver.cachedLeafCount)
     }
 
@@ -93,7 +106,10 @@ class TtsPassageHighlightTest {
             )
 
         assertEquals(
-            5 until 9,
+            TtsLeafHighlight(
+                sentenceRanges = listOf(0 until "Read bold docs".length),
+                wordRange = 5 until 9,
+            ),
             resolveTtsRenderedHighlight(
                 passage = passage,
                 messageIdHex = "m1",
@@ -116,7 +132,7 @@ class TtsPassageHighlightTest {
             )
 
         assertEquals(
-            16 until 32,
+            TtsLeafHighlight(sentenceRanges = listOf(16 until 32)),
             resolveTtsRenderedHighlight(
                 passage = passage,
                 messageIdHex = "m1",
@@ -157,7 +173,7 @@ class TtsPassageHighlightTest {
             )
 
         assertEquals(
-            0 until renderedText.length,
+            TtsLeafHighlight(sentenceRanges = listOf(0 until renderedText.length)),
             resolveTtsRenderedHighlight(
                 passage = passage,
                 messageIdHex = "m1",
@@ -239,38 +255,46 @@ class TtsPassageHighlightTest {
     }
 
     @Test
-    fun childLeafHighlightDoesNotApplyToAnotherRenderedLeaf() {
+    fun wordHighlightAppliesOnlyToItsLeafWhileSentenceSpansEveryLeaf() {
         val projection =
-            markdownDocumentToSpeakableProjection(
-                MarkdownDocumentFfi(
-                    truncated = false,
-                    blankLinesBefore = byteArrayOf(),
-                    blocks =
-                        listOf(
-                            MarkdownBlockFfi.Paragraph(
-                                inlines = listOf(MarkdownInlineFfi.Text("Alpha")),
-                            ),
-                            MarkdownBlockFfi.Paragraph(
-                                inlines = listOf(MarkdownInlineFfi.Text("Beta")),
-                            ),
-                        ),
-                ),
+            SpeakableTextProjection(
+                text = "Hello world.",
+                spans =
+                    listOf(
+                        SpeakableTextProjectionSpan(0, 6, "b0", 0, 6),
+                        SpeakableTextProjectionSpan(6, 12, "b1", 0, 6),
+                    ),
             )
         val passage =
             TtsPassage(
                 messageIdHex = "m1",
                 sentenceIndex = 0,
                 projectionId = projection.projectionId,
-                visibleWord = listOf(TtsVisibleTextSpan("b1/n0", 0, 4)),
+                visibleWord = listOf(TtsVisibleTextSpan("b1", 0, 5)),
             )
 
-        assertNull(
+        assertEquals(
+            TtsLeafHighlight(sentenceRanges = listOf(0 until 6)),
             resolveTtsRenderedHighlight(
                 passage = passage,
                 messageIdHex = "m1",
                 projection = projection,
                 renderedLeafId = "b0",
-                renderedText = "Alpha",
+                renderedText = "Hello ",
+                locale = Locale.US,
+            ),
+        )
+        assertEquals(
+            TtsLeafHighlight(
+                sentenceRanges = listOf(0 until 6),
+                wordRange = 0 until 5,
+            ),
+            resolveTtsRenderedHighlight(
+                passage = passage,
+                messageIdHex = "m1",
+                projection = projection,
+                renderedLeafId = "b1",
+                renderedText = "world.",
                 locale = Locale.US,
             ),
         )
