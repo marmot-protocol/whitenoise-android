@@ -13,6 +13,7 @@ TARGETS=(
 
 METADATA_FILE="fuzz/build/fuzz-engine-metadata.properties"
 LOG_DIR="fuzz/build/fuzz-campaign-logs"
+TRIAGE_METADATA_DIR="fuzz/build/fuzz-triage-metadata"
 
 FUZZ_RUNS="${FUZZ_RUNS:-}"
 FUZZ_MAX_DURATION="${FUZZ_MAX_DURATION:-3m}"
@@ -21,10 +22,14 @@ FUZZ_JOBS_APPLIED="${FUZZ_JOBS_APPLIED:--jobs=2}"
 FUZZ_WORKERS_APPLIED="${FUZZ_WORKERS_APPLIED:--workers=2}"
 GRADLE_FLAGS=(--no-daemon)
 
+SELF_CHECK_FAILURE_TARGET="fuzzTriageSelfCheck"
+SELF_CHECK_FAILURE_MAGIC=$'\xfe\xed\xf0\x0d'
+
 usage() {
   cat <<'EOF'
 Usage:
   scripts/fuzz-run-campaign.sh [--self-check]
+  scripts/fuzz-run-campaign.sh [--self-check-failure]
   scripts/fuzz-run-campaign.sh [--target <gradleTaskName>]...
 
 Environment:
@@ -36,6 +41,7 @@ Environment:
 
 Each target runs one standalone Jazzer JavaExec with jobs/workers applied by libFuzzer.
 Phase-1 targets run sequentially. Full engine output is written to fuzz/build/fuzz-campaign-logs/.
+On target failure, deterministic crash artifacts are triaged before the campaign exits non-zero.
 EOF
 }
 
@@ -100,6 +106,40 @@ verify_engine_parallelism() {
   return 0
 }
 
+discover_crash_artifacts() {
+  local target="$1"
+  local corpus_root="fuzz/build/cifuzz-corpus/${target}"
+  if [[ ! -d "$corpus_root" ]]; then
+    return 0
+  fi
+  find "$corpus_root" -type f \( -name 'crash-*' -o -name 'timeout-*' -o -name 'oom-*' \) | sort
+}
+
+triage_target_artifacts() {
+  local target="$1"
+  local gradle_task=":fuzz:${target}"
+  local artifact
+  local triage_failed=0
+  local artifact_count=0
+
+  while IFS= read -r artifact; do
+    [[ -z "$artifact" ]] && continue
+    artifact_count=$((artifact_count + 1))
+    log "triage_start target=$target artifact=$artifact"
+    if ! scripts/fuzz-triage.sh "$gradle_task" "$artifact"; then
+      log "triage_failed target=$target artifact=$artifact"
+      triage_failed=1
+    else
+      log "triage_done target=$target artifact=$artifact"
+    fi
+  done < <(discover_crash_artifacts "$target")
+
+  if [[ "$artifact_count" -eq 0 ]]; then
+    log "triage_skipped target=$target reason=no_crash_artifacts"
+  fi
+  return "$triage_failed"
+}
+
 run_target() {
   local target="$1"
   local log_file="$LOG_DIR/${target}.log"
@@ -113,9 +153,11 @@ run_target() {
   date +%s >"$LOG_DIR/${target}.end"
   if [[ "$status" -ne 0 ]]; then
     log "target_failed name=$target status=$status log=$log_file"
+    triage_target_artifacts "$target" || true
     return "$status"
   fi
   if ! verify_engine_parallelism "$log_file"; then
+    triage_target_artifacts "$target" || true
     return 1
   fi
   log "target_passed name=$target log=$log_file"
@@ -154,10 +196,50 @@ self_check() {
   log "self_check=passed"
 }
 
+self_check_failure() {
+  local corpus_root="fuzz/build/cifuzz-corpus/${SELF_CHECK_FAILURE_TARGET}"
+  local crash_dir="${corpus_root}/generated"
+  local crash_file="${crash_dir}/crash-self-check"
+  rm -rf "$corpus_root" "$TRIAGE_METADATA_DIR"
+  mkdir -p "$crash_dir"
+  printf '%s' "$SELF_CHECK_FAILURE_MAGIC" >"$crash_file"
+
+  log "self_check_failure=compile"
+  ./gradlew "${GRADLE_FLAGS[@]}" :fuzz:compileKotlin :fuzz:compileTestKotlin
+
+  log "self_check_failure=triage target=$SELF_CHECK_FAILURE_TARGET"
+  if triage_target_artifacts "$SELF_CHECK_FAILURE_TARGET"; then
+    log "self_check_failure=failed step=triage expected_nonzero=true"
+    exit 1
+  fi
+
+  local metadata_count=0
+  if [[ -d "$TRIAGE_METADATA_DIR" ]]; then
+    metadata_count="$(find "$TRIAGE_METADATA_DIR" -type f -name '*.properties' | wc -l | tr -d ' ')"
+  fi
+  if [[ "$metadata_count" -eq 0 ]]; then
+    log "self_check_failure=failed step=metadata reason=missing_properties"
+    exit 1
+  fi
+
+  if ! grep -Rqs 'triage_stage=replay' "$TRIAGE_METADATA_DIR" ||
+    ! grep -Rqs 'privacy_check=passed' "$TRIAGE_METADATA_DIR" ||
+    ! grep -Rqs 'classification=MANUAL_REVIEW' "$TRIAGE_METADATA_DIR"; then
+    log "self_check_failure=failed step=metadata reason=missing_expected_fields"
+    exit 1
+  fi
+
+  log "self_check_failure=passed metadata_files=$metadata_count"
+}
+
 main() {
   local selected_targets=()
   if [[ "${1:-}" == "--self-check" ]]; then
     self_check
+    exit 0
+  fi
+  if [[ "${1:-}" == "--self-check-failure" ]]; then
+    self_check_failure
     exit 0
   fi
   while [[ $# -gt 0 ]]; do

@@ -59,3 +59,4 @@ jobs:
           path: |
             fuzz/regression-corpus/**
             fuzz/build/fuzz-engine-metadata.properties
+            fuzz/build/fuzz-triage-metadata/**

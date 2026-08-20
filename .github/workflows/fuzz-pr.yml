@@ -13,6 +13,14 @@ on:
       - 'app/src/main/java/dev/ipf/whitenoise/android/updates/ZapstoreReleaseClient.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/core/ProfileLink.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/core/RecipientReference.kt'
+      - 'app/build.gradle.kts'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/amber/Nip55SignerParsingTest.kt'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/core/ProfileLinkTest.kt'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/core/RecipientReferenceTest.kt'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/fuzz/**'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/updates/NostrEventVerifierTest.kt'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/updates/ZapstoreEventsTest.kt'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/updates/ZapstoreReleaseClientTest.kt'
       - '.github/workflows/fuzz-pr.yml'
       - '.github/workflows/fuzz-scheduled.yml'
       - 'scripts/fuzz-triage.sh'
@@ -56,4 +64,4 @@ jobs:
         run: ./gradlew :fuzz:compileKotlin :fuzz:compileTestKotlin --no-daemon
 
       - name: Replay fuzz regression corpus
-        run: ./gradlew :fuzz:replayFuzzRegression --no-daemon
+        run: ./gradlew :fuzz:replayAllFuzzRegression --no-daemon

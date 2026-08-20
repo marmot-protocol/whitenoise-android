@@ -13,6 +13,14 @@ SELF_CHECK_TARGET=":fuzz:fuzzTriageSelfCheck"
 SELF_CHECK_ENTRY_METHOD="fuzzTriageSelfCheck"
 SELF_CHECK_TEST_CLASS="dev.ipf.whitenoise.android.fuzz.FuzzTriageSelfCheck"
 SELF_CHECK_MAGIC=$'\xfe\xed\xf0\x0d'
+TRIAGE_METADATA_DIR="fuzz/build/fuzz-triage-metadata"
+
+TRIAGE_STAGE="started"
+TRIAGE_STATUS="unknown"
+PRIVACY_STATUS="unknown"
+REPRO_DIGEST=""
+MINIMIZED_DIGEST=""
+REPLAY_EXCEPTION_CLASS=""
 
 usage() {
   cat <<'EOF'
@@ -23,11 +31,12 @@ Supported tasks:
   :fuzz:fuzzZapstoreProtocol
   :fuzz:fuzzIdentityReference
   :fuzz:fuzzNip55SignerProtocol
+  :fuzz:fuzzTriageSelfCheck
 
 Example:
   scripts/fuzz-triage.sh :fuzz:fuzzZapstoreProtocol fuzz/build/repro-review/crash-001
 
-When a reproducer is supplied, the first byte is the subtarget selector. Pass an
+When a reproducer is supplied, the final byte is the subtarget selector. Pass an
 optional subtarget name to validate the mapping; omit it to derive the name from
 the artifact bytes.
 
@@ -39,8 +48,8 @@ Steps performed:
 
 Manual follow-up required before retention:
   - Add a deterministic app unit test covering the finding
-  - Copy a reviewed input into fuzz/regression-corpus/<target>/ with subtarget prefix byte
-  - Re-run ./gradlew :fuzz:replayFuzzRegression
+  - Copy a reviewed input into fuzz/regression-corpus/<target>/ with trailing subtarget byte
+  - Re-run ./gradlew :fuzz:replayAllFuzzRegression
 EOF
 }
 
@@ -57,7 +66,12 @@ digest() {
 }
 
 read_subtarget_id() {
-  od -An -tu1 -N1 "$1" | tr -d ' \n'
+  local size
+  size="$(wc -c <"$1" | tr -d ' ')"
+  if [[ "$size" -eq 0 ]]; then
+    return 1
+  fi
+  od -An -tu1 -j $((size - 1)) -N1 "$1" | tr -d ' \n'
 }
 
 privacy_check() {
@@ -66,12 +80,14 @@ privacy_check() {
   if grep -Eiq "$patterns" "$file"; then
     log "PRIVACY_BLOCK: reproducer matches sensitive pattern; store digest only"
     log "digest=$(digest "$file")"
+    PRIVACY_STATUS="blocked"
     return 1
   fi
   if LC_ALL=C grep -Pq '[^\x09\x0A\x0D\x20-\x7E]' "$file"; then
     log "NOTE: reproducer contains non-ASCII bytes; manual review required"
   fi
   log "privacy_check=passed digest=$(digest "$file")"
+  PRIVACY_STATUS="passed"
   return 0
 }
 
@@ -79,6 +95,35 @@ classify() {
   local exception_class="${1:-unknown}"
   log "classification=MANUAL_REVIEW default_private=true exception_class=$exception_class"
   log "classification_guidance=use private vulnerability reporting until a maintainer rules out security impact"
+}
+
+write_triage_metadata() {
+  mkdir -p "$TRIAGE_METADATA_DIR"
+  local metadata_key="${MINIMIZED_DIGEST:-$REPRO_DIGEST}"
+  local metadata_target="${GRADLE_TASK:-unknown}"
+  local elapsed_seconds=0
+  if [[ -z "$metadata_key" ]]; then
+    metadata_key="unknown"
+  fi
+  if [[ -n "${START_SECONDS:-}" ]]; then
+    elapsed_seconds=$((SECONDS - START_SECONDS))
+  fi
+  local metadata_file="$TRIAGE_METADATA_DIR/${metadata_target}-${metadata_key}.properties"
+  cat >"$metadata_file" <<EOF
+target=$TARGET
+gradle_task=${GRADLE_TASK:-unknown}
+subtarget=${SUBTARGET:-}
+input_digest=${REPRO_DIGEST:-unknown}
+minimized_digest=${MINIMIZED_DIGEST:-}
+exception_class=${REPLAY_EXCEPTION_CLASS:-unknown}
+triage_stage=${TRIAGE_STAGE:-unknown}
+triage_status=${TRIAGE_STATUS:-unknown}
+privacy_check=${PRIVACY_STATUS:-unknown}
+classification=MANUAL_REVIEW
+engine=jazzer-junit:${ENGINE_VERSION:-unknown}
+elapsed_seconds=$elapsed_seconds
+EOF
+  log "triage_metadata=$metadata_file"
 }
 
 subtarget_name_for_id() {
@@ -138,6 +183,14 @@ lookup_mapping() {
       ENTRY_METHOD="fuzzNip55SignerProtocol"
       GRADLE_TASK="fuzzNip55SignerProtocol"
       ;;
+    :fuzz:fuzzTriageSelfCheck)
+      TEST_CLASS="$SELF_CHECK_TEST_CLASS"
+      ENTRY_METHOD="$SELF_CHECK_ENTRY_METHOD"
+      GRADLE_TASK="fuzzTriageSelfCheck"
+      SUBTARGET=""
+      SUBTARGET_ID=""
+      return 0
+      ;;
     *)
       return 1
       ;;
@@ -163,6 +216,10 @@ resolve_subtarget() {
   local task="$1"
   local reproducer="$2"
   local requested_name="${3:-}"
+  if [[ "$task" == "$SELF_CHECK_TARGET" ]]; then
+    lookup_mapping "$task" ""
+    return 0
+  fi
   local derived_id
   derived_id="$(read_subtarget_id "$reproducer")"
   local derived_name
@@ -183,6 +240,7 @@ minimize_reproducer() {
   local gradle_task="$1"
   local crash_file="$2"
   local output_dir="$3"
+  TRIAGE_STAGE="minimize"
   rm -rf "$output_dir"
   mkdir -p "$output_dir"
   set +e
@@ -197,14 +255,18 @@ minimize_reproducer() {
   set -e
   if [[ $status -ne 0 ]]; then
     log "minimize=failed status=$status"
+    TRIAGE_STATUS="minimize_failed"
     return "$status"
   fi
   MINIMIZED_FILE="$output_dir/minimized-crash"
   if [[ ! -f "$MINIMIZED_FILE" ]]; then
     log "minimize=failed reason=missing_output"
+    TRIAGE_STATUS="minimize_failed"
     return 1
   fi
-  log "minimize=passed digest=$(digest "$MINIMIZED_FILE")"
+  MINIMIZED_DIGEST="$(digest "$MINIMIZED_FILE")"
+  log "minimize=passed digest=$MINIMIZED_DIGEST"
+  TRIAGE_STATUS="minimized"
   return 0
 }
 
@@ -228,6 +290,7 @@ replay_reproducer() {
   local test_class="$1"
   local entry_method="$2"
   local reproducer="$3"
+  TRIAGE_STAGE="replay"
   local replay_root="fuzz/build/repro-replay"
   local replay_inputs="$replay_root/dev/ipf/whitenoise/android/fuzz/${test_class##*.}Inputs/${entry_method}"
   local repro_digest
@@ -259,7 +322,7 @@ self_check() {
   local work_dir="fuzz/build/triage-self-check"
   local crash_file="$work_dir/crash.input"
   local minimize_dir="$work_dir/minimized"
-  rm -rf "$work_dir"
+  rm -rf "$work_dir" "$TRIAGE_METADATA_DIR"
   mkdir -p "$work_dir"
   printf '%s' "$SELF_CHECK_MAGIC" >"$crash_file"
 
@@ -277,7 +340,7 @@ self_check() {
     log "self_check=failed step=replay expected_exception=IllegalStateException actual_exception=$REPLAY_EXCEPTION_CLASS"
     exit 1
   fi
-  log "self_check=passed minimize_digest=$(digest "$MINIMIZED_FILE") exception_class=$REPLAY_EXCEPTION_CLASS"
+  log "self_check=passed minimize_digest=$MINIMIZED_DIGEST exception_class=$REPLAY_EXCEPTION_CLASS"
 }
 
 if [[ "${1:-}" == "--self-check" ]]; then
@@ -294,6 +357,7 @@ ENGINE_VERSION="$(./gradlew :fuzz:dependencies --configuration testRuntimeClassp
 log "engine=jazzer-junit:$ENGINE_VERSION target=$TARGET"
 
 START_SECONDS=$SECONDS
+EXIT_CODE=0
 
 if [[ -n "$REPRO" ]]; then
   if [[ ! -f "$REPRO" ]]; then
@@ -305,31 +369,45 @@ if [[ -n "$REPRO" ]]; then
     usage
     exit 1
   fi
-  log "subtarget=$SUBTARGET id=$SUBTARGET_ID digest=$(digest "$REPRO")"
+  REPRO_DIGEST="$(digest "$REPRO")"
+  if [[ -n "${SUBTARGET:-}" ]]; then
+    log "subtarget=$SUBTARGET id=$SUBTARGET_ID digest=$REPRO_DIGEST"
+  else
+    log "subtarget=none digest=$REPRO_DIGEST"
+  fi
 
   REPRO_REVIEW_DIR="fuzz/build/repro-review/${ENTRY_METHOD}"
   mkdir -p "$REPRO_REVIEW_DIR"
-  REPRO_DIGEST="$(digest "$REPRO")"
   REPRO_REVIEW_FILE="$REPRO_REVIEW_DIR/${REPRO_DIGEST}"
   cp "$REPRO" "$REPRO_REVIEW_FILE"
   log "repro_review_file=$REPRO_REVIEW_FILE"
 
   MINIMIZE_DIR="fuzz/build/repro-review/${ENTRY_METHOD}-minimized-${REPRO_DIGEST}"
   if ! minimize_reproducer "$GRADLE_TASK" "$REPRO_REVIEW_FILE" "$MINIMIZE_DIR"; then
+    write_triage_metadata
     exit 1
   fi
 
   replay_reproducer "$TEST_CLASS" "$ENTRY_METHOD" "$MINIMIZED_FILE"
-  privacy_check "$MINIMIZED_FILE" || exit 2
+  if ! privacy_check "$MINIMIZED_FILE"; then
+    TRIAGE_STATUS="privacy_blocked"
+    write_triage_metadata
+    exit 2
+  fi
 
   if [[ $REPLAY_STATUS -ne 0 ]]; then
     classify "$REPLAY_EXCEPTION_CLASS"
     log "replay=failed status=$REPLAY_STATUS exception_class=$REPLAY_EXCEPTION_CLASS"
     log "promotion=blocked copy reviewed input to fuzz/regression-corpus/${GRADLE_TASK}/ after app unit test"
+    TRIAGE_STATUS="replay_failed"
+    write_triage_metadata
     exit "$REPLAY_STATUS"
   fi
   log "replay=passed"
   log "promotion=manual copy reviewed input to fuzz/regression-corpus/${GRADLE_TASK}/ after app unit test"
+  TRIAGE_STATUS="passed"
+  TRIAGE_STAGE="complete"
+  write_triage_metadata
 else
   log "reproduce: JAZZER_FUZZ=1 ./gradlew $TARGET -PfuzzMaxDuration=3m -PfuzzMaxHeap=2g --no-daemon"
   log "triage: scripts/fuzz-triage.sh $TARGET <reproducer-file> [SubtargetName]"
@@ -337,3 +415,4 @@ fi
 
 ELAPSED=$((SECONDS - START_SECONDS))
 log "elapsed=${ELAPSED}s"
+exit "$EXIT_CODE"

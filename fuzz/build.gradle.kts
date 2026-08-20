@@ -106,6 +106,8 @@ val fuzzCampaignTargets =
     )
 
 val fuzzReplayCorpusDir = layout.buildDirectory.dir("fuzz-replay-corpus")
+val appFuzzSyntheticCorpusDir = layout.buildDirectory.dir("app-fuzz-synthetic-corpus")
+val appFuzzSyntheticCorpusRoot = appFuzzSyntheticCorpusDir.map { it.dir("fuzz-synthetic-corpus") }
 val fuzzReplayOverlayProbe =
     "dev/ipf/whitenoise/android/fuzz/ZapstoreProtocolFuzzTestInputs/" +
         "fuzzZapstoreProtocol/overlay_replay_probe.input"
@@ -132,6 +134,19 @@ val syncFuzzReplayCorpus =
             from(rootProject.file(replayInputsDir))
         }
         into(fuzzReplayCorpusDir)
+    }
+
+val syncAppFuzzSyntheticCorpus =
+    tasks.register<Sync>("syncAppFuzzSyntheticCorpus") {
+        fuzzCampaignTargets.forEach { target ->
+            from(layout.projectDirectory.dir(target.seedCorpusPath)) {
+                into(target.taskName)
+            }
+            from(layout.projectDirectory.dir("regression-corpus/${target.taskName}")) {
+                into(target.taskName)
+            }
+        }
+        into(appFuzzSyntheticCorpusRoot)
     }
 
 tasks.named<Test>("test") {
@@ -193,6 +208,15 @@ tasks.register<Test>("replayFuzzRegression") {
             )
         }
     }
+}
+
+tasks.register("replayAllFuzzRegression") {
+    group = "verification"
+    description = "Replay :fuzz Jazzer corpora and app-side synthetic corpus suites"
+    dependsOn(
+        tasks.named("replayFuzzRegression"),
+        ":app:replayAppFuzzSyntheticCorpus",
+    )
 }
 
 val fuzzJobsApplied = "-jobs=2"

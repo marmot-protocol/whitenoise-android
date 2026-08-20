@@ -1,5 +1,6 @@
 import com.android.build.api.attributes.ProductFlavorAttr
 import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.testing.Test
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.Properties
@@ -893,4 +894,38 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+}
+
+android.sourceSets.named("test") {
+    resources.directories.add(rootProject.file("fuzz/build/app-fuzz-synthetic-corpus/fuzz-synthetic-corpus").path)
+}
+
+tasks.register<Test>("replayAppFuzzSyntheticCorpus") {
+    group = "verification"
+    description = "Replay checked-in synthetic fuzz corpora through named app unit suites"
+    dependsOn(":fuzz:syncAppFuzzSyntheticCorpus")
+}
+
+tasks.matching { it.name == "processDevZapstoreDebugUnitTestJavaRes" }.configureEach {
+    dependsOn(":fuzz:syncAppFuzzSyntheticCorpus")
+}
+
+afterEvaluate {
+    val referenceTest = tasks.named<Test>("testDevZapstoreDebugUnitTest")
+    tasks.named<Test>("replayAppFuzzSyntheticCorpus").configure {
+        val reference = referenceTest.get()
+        testClassesDirs = reference.testClassesDirs
+        classpath = reference.classpath
+        reference.taskDependencies.getDependencies(reference).forEach { dependency ->
+            dependsOn(dependency)
+        }
+        filter {
+            includeTestsMatching("dev.ipf.whitenoise.android.updates.NostrEventVerifierTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.updates.ZapstoreEventsTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.updates.ZapstoreReleaseClientTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.core.ProfileLinkTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.core.RecipientReferenceTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.amber.Nip55SignerParsingTest")
+        }
+    }
 }

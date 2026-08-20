@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.updates
 
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
+import dev.ipf.whitenoise.android.fuzz.FuzzSyntheticCorpusReplay
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -11,6 +12,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ZapstoreEventsTest {
+    @Test
+    fun replaysSyntheticFuzzCorpus() {
+        FuzzSyntheticCorpusReplay.replaySuite(FuzzSyntheticCorpusReplay.Suite.ZapstoreEvents)
+    }
+
     // --- Latest-release discovery (signature-gated). Reads the version straight
     // from a kind-30063 release event, since Zapstore's app event carries no
     // pointer to the current release. ---

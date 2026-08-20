@@ -16,7 +16,7 @@ Production parsers are included from `app/` via an exact allow-list in `fuzz/bui
 
 ### Phase-1 targets
 
-Each fuzz class exposes one `@FuzzTest` entry point that dispatches on the first input byte to a bounded subtarget. This prevents Jazzer from silently skipping additional `@FuzzTest` methods in the same class.
+Each fuzz class exposes one `@FuzzTest` entry point that dispatches on the final input byte to a bounded subtarget. This matches Jazzer's end-consuming `FuzzedDataProvider` behavior and prevents Jazzer from silently skipping additional `@FuzzTest` methods in the same class.
 
 | Gradle task | Entry point | Subtargets |
 |-------------|-------------|------------|
@@ -24,7 +24,7 @@ Each fuzz class exposes one `@FuzzTest` entry point that dispatches on the first
 | `:fuzz:fuzzIdentityReference` | `fuzzIdentityReference` | `ProfileLink`, `RecipientNormalize`, `RecipientTokenize`, `PlausibleClipboard` |
 | `:fuzz:fuzzNip55SignerProtocol` | `fuzzNip55SignerProtocol` | `ParseContentRow`, `ParseActivityResult`, `SignedEventPubkeyHelpers` |
 
-Synthetic seeds live under `*FuzzTestInputs/<entry-point>/` with a leading subtarget-id byte (0-based enum ordinal) followed by the fuzz payload.
+Synthetic seeds live under `*FuzzTestInputs/<entry-point>/` with the fuzz payload followed by a trailing subtarget-id byte (0-based enum ordinal).
 
 Bounds enforced in harness helpers and Jazzer engine settings: 64 KiB strings (`jazzer.max_len=65536`), 64 collection elements, depth 16, 32 relay frames.
 
@@ -38,8 +38,8 @@ export JAVA_HOME=/path/to/temurin-17
 # Compile fuzz sources
 ./gradlew :fuzz:compileKotlin :fuzz:compileTestKotlin
 
-# Deterministic regression replay (PR gate)
-./gradlew :fuzz:replayFuzzRegression
+# Deterministic :fuzz and named app-suite corpus replay (PR gate)
+./gradlew :fuzz:replayAllFuzzRegression
 
 # Bounded campaign per target (standalone Jazzer with jobs=2, workers=2)
 ./gradlew :fuzz:fuzzZapstoreProtocol :fuzz:fuzzIdentityReference :fuzz:fuzzNip55SignerProtocol
@@ -49,6 +49,9 @@ export JAVA_HOME=/path/to/temurin-17
 
 # Runner self-check (verifies standalone Jazzer jobs/workers in engine logs)
 scripts/fuzz-run-campaign.sh --self-check
+
+# Injected-crash self-check (minimize -> fresh replay -> privacy/classification metadata)
+scripts/fuzz-run-campaign.sh --self-check-failure
 
 # Fixed-run local verification
 ./gradlew :fuzz:fuzzZapstoreProtocol -PfuzzRuns=10000 -PfuzzMaxHeap=2g
@@ -77,12 +80,12 @@ Campaign logs under `fuzz/build/fuzz-campaign-logs/` show the Jazzer wrapper lau
 
 | Workflow | Trigger | Limit |
 |----------|---------|-------|
-| `.github/workflows/fuzz-pr.yml` | PR touching harness or parser targets | 5 minutes, compile + regression replay only |
+| `.github/workflows/fuzz-pr.yml` | PR touching harness or parser targets | 5 minutes, compile + `:fuzz` and six named app-suite corpus replays |
 | `.github/workflows/fuzz-scheduled.yml` | Nightly `master` + `workflow_dispatch` | 15 minutes total (nightly) or 60 minutes (weekly manual) |
 
-Scheduled runs call `:fuzz:fuzzScheduledDryRun` (the shell runner), execute one target at a time, use `-Xmx2g` per worker JVM, `contents: read`, no secrets, and workflow-level concurrency with `cancel-in-progress: true`. Engine input size is capped at 64 KiB via `-max_len=65536`.
+Scheduled runs call `:fuzz:fuzzScheduledDryRun` (the shell runner), execute one target at a time, use `-Xmx2g` per worker JVM, `contents: read`, no secrets, and workflow-level concurrency with `cancel-in-progress: true`. Engine input size is capped at 64 KiB via `-max_len=65536`. A failed target is triaged before the campaign continues to the remaining targets and exits non-zero.
 
-Artifacts retain reviewed minimized reproducers under `fuzz/regression-corpus/` and `fuzz/build/fuzz-engine-metadata.properties` for 7 days. Evolving corpora (`fuzz/build/cifuzz-corpus/`), legacy JUnit corpus dirs (`fuzz/.cifuzz-corpus/`), Gradle campaign logs (`fuzz/build/fuzz-campaign-logs/`), and unreviewed crash payloads are never uploaded.
+Artifacts retain reviewed minimized reproducers under `fuzz/regression-corpus/`, `fuzz/build/fuzz-engine-metadata.properties`, and digest-only sanitized triage metadata under `fuzz/build/fuzz-triage-metadata/` for 7 days. Evolving corpora (`fuzz/build/cifuzz-corpus/`), legacy JUnit corpus dirs (`fuzz/.cifuzz-corpus/`), Gradle campaign logs (`fuzz/build/fuzz-campaign-logs/`), local minimized review files, and unreviewed crash payloads are never uploaded.
 
 ## Crash triage
 
@@ -94,18 +97,18 @@ scripts/fuzz-triage.sh :fuzz:fuzzIdentityReference path/to/reproducer [Recipient
 
 The script:
 
-1. Preserves the standalone Jazzer artifact byte-for-byte and derives its subtarget from byte 0; an optional subtarget name validates that mapping
+1. Preserves the standalone Jazzer artifact byte-for-byte and derives its subtarget from the final byte; an optional subtarget name validates that mapping
 2. Minimizes the crash with standalone Jazzer's libFuzzer minimization mode
 3. Replays the minimized artifact in a fresh JVM via `:fuzz:replayFuzzRegression`
-4. Privacy-checks the minimized artifact (digest only in logs; no payload dump) and emits private-by-default classification guidance
+4. Privacy-checks the minimized artifact (digest only in status output; no payload dump), emits private-by-default classification guidance, and writes sanitized metadata for scheduled retention
 
 Manual follow-up before retention:
 
 1. Add a deterministic `app` unit test covering the finding
 2. Copy the privacy-reviewed minimized input into `fuzz/regression-corpus/<target>/`
-3. Re-run `./gradlew :fuzz:replayFuzzRegression`
+3. Re-run `./gradlew :fuzz:replayAllFuzzRegression`
 
-Logs contain only target name, seed digest, engine version, elapsed time, and sanitized exception class.
+Uploaded triage metadata contains only target/subtarget names, digests, engine version, elapsed time, stage/status, and sanitized exception class. Full Jazzer engine logs stay local under the gitignored build directory.
 
 ### Sensitive findings
 
