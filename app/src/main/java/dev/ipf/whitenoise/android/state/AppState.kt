@@ -5224,11 +5224,8 @@ class WhiteNoiseAppState private constructor(
                 // caller can report the failure plainly.
                 return SignOutCompletion.AccountRemovalRejected
             }
-            // The engine never deactivated the account, so queue a push
-            // disable for the next foreground sync. MDK's relay-side
-            // KeyPackage cleanup is final for this call and is not queued.
-            pushTokenStore.recordPendingDisable(signedOutRef)
-        } else if (engineResult.getOrNull()?.localCleanup?.completed == true) {
+        }
+        if (engineResult.getOrNull()?.localCleanup?.completed == true) {
             // The engine deactivated the account (including its push
             // registration), so any disable retry queued by an older
             // per-step sign-out attempt is moot. Drop the local push
@@ -5238,9 +5235,10 @@ class WhiteNoiseAppState private constructor(
             pushTokenStore.clearPendingDisable(signedOutRef)
             nativePushSyncMutex.withLock { perAccountSyncedFingerprints.remove(signedOutRef) }
         } else {
-            // The call returned, but the engine's own teardown did not finish
-            // — the push registration may still be live, so keep a disable
-            // queued for the next foreground sync.
+            // The engine never deactivated the account — the call failed, or
+            // its own teardown did not finish — so queue a push disable for
+            // the next foreground sync. MDK's relay-side KeyPackage cleanup is
+            // final for this call and is not queued.
             pushTokenStore.recordPendingDisable(signedOutRef)
         }
         val engineOutcome = engineResult.getOrNull()
