@@ -158,6 +158,15 @@ class GroupEmojiImagePickerTest {
         }
 
         select("🫨")
+        // Renderer failures arrive from a Dispatchers.Default hop that
+        // Compose's idle synchronization does not await. Poll for the error
+        // like awaitPreview does for successful rendering.
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule
+                .onAllNodesWithText("This emoji cannot be rendered on this device.")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
         composeRule.onNodeWithText("This emoji cannot be rendered on this device.").assertIsDisplayed()
         composeRule.onNodeWithText("Use emoji image").assertIsNotEnabled()
     }
