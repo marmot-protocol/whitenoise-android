@@ -82,7 +82,9 @@ jobs:
     timeout-minutes: 20
     concurrency:
       group: android-pr-preview-publish-pr-${{ needs.prepare.outputs.pr_number }}
-      cancel-in-progress: true
+      # Let the active publisher finish its ownership reconciliation before a
+      # newer head proceeds, so the newest serialized run is the final writer.
+      cancel-in-progress: false
     env:
       BUILD_RUN_ID: ${{ github.event.workflow_run.id }}
       BUILD_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}

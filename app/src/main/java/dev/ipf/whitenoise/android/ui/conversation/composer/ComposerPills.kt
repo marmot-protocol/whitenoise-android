@@ -299,7 +299,7 @@ internal fun ComposerPill(
                         .then(expandedHeightModifier)
                         .padding(
                             start = if (expandedLayout) 12.dp else 52.dp,
-                            top = if (expandedLayout) 36.dp else 10.dp,
+                            top = if (expandedLayout) 48.dp else 10.dp,
                             end = if (expandedLayout) 12.dp else compactTrailingReserve,
                             bottom = if (expandedLayout) 48.dp else 10.dp,
                         ).alpha(if (inputContentVisible) 1f else 0f)
@@ -458,9 +458,9 @@ internal fun ComposerPill(
             if (expandedLayout && inputContentVisible) {
                 // One control owns both resize paths: continuous drag, and the
                 // documented accessible tap alternative that toggles full
-                // screen. The 48dp interaction layer overlaps the first 12dp
-                // of the editor rather than reserving more vertical space; the
-                // visible handle remains centered in the original 36dp inset.
+                // screen. The editor reserves this control's full 48dp touch
+                // target so caret and selection gestures never compete with
+                // resize gestures; the visible handle stays compact.
                 val toggleDescription =
                     stringResource(
                         if (expansionMode == ComposerExpansionMode.FullScreen) {

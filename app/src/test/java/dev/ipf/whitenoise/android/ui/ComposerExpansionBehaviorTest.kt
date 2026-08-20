@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -153,6 +154,35 @@ class ComposerExpansionBehaviorTest {
         assertTrue("upward drag should grow the composer", draggedHeight > initialHeight + 64f)
         assertTrue("a short drag must not jump directly to full screen", draggedHeight < initialHeight + 140f)
         composeRule.onNodeWithText(longDraft()).assertExists()
+    }
+
+    @Test
+    fun firstLineCenterTapTargetsTheEditorWithoutChangingExpansion() {
+        val draft = longDraft()
+        render(draft)
+        val editor = composeRule.onNodeWithText(draft)
+        val resizeBounds = composerControlBounds(R.string.composer_resize)
+        val editorBounds = editor.fetchSemanticsNode().boundsInRoot
+        val initialHeight =
+            composeRule
+                .onNodeWithTag(TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+
+        assertTrue("editor must start below the resize target", editorBounds.top >= resizeBounds.bottom)
+        editor.performClick()
+        editor.assertIsFocused()
+        editor.performTouchInput { click(Offset(width / 2f, 8f)) }
+        composeRule.waitForIdle()
+
+        editor.assertIsFocused()
+        assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
+        val finalHeight =
+            composeRule
+                .onNodeWithTag(TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        assertTrue("editor tap must not resize the composer", abs(finalHeight - initialHeight) <= 1f)
     }
 
     @Test
