@@ -108,6 +108,49 @@ class MessageReactionSummaryAnimationTest {
     }
 
     @Test
+    fun reactionChipContentCrossFadeShowsBothTalliesMidTransition() {
+        var tallies by mutableStateOf(listOf(ReactionTally(emoji = "👍", count = 1, mine = true)))
+
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            ReactionHostHarness(tallies = tallies)
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("3", useUnmergedTree = true).assertDoesNotExist()
+
+        composeRule.runOnUiThread {
+            tallies =
+                listOf(
+                    ReactionTally(emoji = "👍", count = 2, mine = true),
+                    ReactionTally(emoji = "❤️", count = 1, mine = false),
+                )
+        }
+        composeRule.runOnIdle { }
+
+        var sawCrossFadeContent = false
+        repeat(REACTION_CONTENT_CROSSFADE_SAMPLE_FRAMES) {
+            composeRule.mainClock.advanceTimeBy(REACTION_CONTENT_CROSSFADE_STEP_MILLIS)
+            composeRule.runOnIdle { }
+            val hasOutgoingEmoji =
+                runCatching {
+                    composeRule.onNodeWithText("👍", useUnmergedTree = true, substring = false).assertExists()
+                }.isSuccess
+            val hasIncomingEmoji =
+                runCatching {
+                    composeRule.onNodeWithText("👍❤️", useUnmergedTree = true, substring = false).assertExists()
+                }.isSuccess
+            if (hasOutgoingEmoji && hasIncomingEmoji) {
+                sawCrossFadeContent = true
+            }
+        }
+
+        assertTrue(
+            "reaction chip content should briefly show outgoing and incoming tallies during cross-fade",
+            sawCrossFadeContent,
+        )
+    }
+
+    @Test
     fun reactionChipContentUpdateDoesNotChangeHostHeight() {
         var tallies by mutableStateOf(listOf(ReactionTally(emoji = "👍", count = 1, mine = true)))
 
@@ -282,6 +325,8 @@ private fun ReactionListHarness(tallies: List<ReactionTally>) {
 private const val COLUMN_TAG = "message-reaction-host-column"
 private const val BUBBLE_TEXT_TAG = "message-reaction-bubble-text"
 private const val FOLLOWING_MESSAGE_TAG = "message-reaction-following-message"
+private const val REACTION_CONTENT_CROSSFADE_SAMPLE_FRAMES = 8
+private const val REACTION_CONTENT_CROSSFADE_STEP_MILLIS = 20L
 private const val HEIGHT_TOLERANCE = 0.5f
 private const val POSITION_TOLERANCE = 0.5f
 private const val ANIMATION_SAMPLE_FRAMES = 8

@@ -2028,9 +2028,10 @@ internal fun MessageBubble(
                     mine = mine,
                     bubbleBorderOverrideArgb = bubblePresentation.borderOverrideArgb,
                     visibilityState = reactionVisibilityState,
-                    onClick = { reactionSheetOpen = true },
+                    enabled = !deleted,
+                    onClick = { if (!deleted) reactionSheetOpen = true },
                 )
-                if (reactionSheetOpen) {
+                if (reactionSheetOpen && !deleted) {
                     val participants =
                         remember(record.messageIdHex, item.projected?.reactions, tallies) {
                             controller.reactionParticipantsFor(record.messageIdHex)
@@ -2044,7 +2045,7 @@ internal fun MessageBubble(
                             participants = participants,
                             appState = appState,
                             onRemoveOwnReaction =
-                                if (readOnly) {
+                                if (readOnly || deleted) {
                                     null
                                 } else {
                                     { emoji -> appState.launchMutation { controller.toggleReaction(emoji, record) } }

@@ -84,6 +84,7 @@ internal fun ColumnScope.MessageReactionSummary(
     mine: Boolean,
     bubbleBorderOverrideArgb: Long? = null,
     visibilityState: MutableTransitionState<Boolean>? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val reactionChipPadding = reactionChipPadding(mine)
@@ -138,6 +139,7 @@ internal fun ColumnScope.MessageReactionSummary(
                 tallies = displayTallies,
                 outgoing = mine,
                 customAmoledBorderColor = bubbleBorderOverrideArgb?.let(::colorFromArgb),
+                enabled = enabled,
                 onClick = onClick,
                 modifier = hostGraphicsModifier,
             )

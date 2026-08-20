@@ -141,6 +141,7 @@ internal fun ReactionSummaryChip(
     tallies: List<ReactionTally>,
     outgoing: Boolean,
     customAmoledBorderColor: Color? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -156,7 +157,7 @@ internal fun ReactionSummaryChip(
                 // the thicker selected outline provides the non-color visual cue.
                 .semantics { this.selected = selected }
                 .clip(RoundedCornerShape(percent = 50))
-                .clickable(role = Role.Button, onClick = onClick, onClickLabel = viewReactorsLabel),
+                .then(reactionSummaryChipInteractionModifier(enabled, onClick, viewReactorsLabel)),
         shape = RoundedCornerShape(percent = 50),
         color = reactionSummaryChipContainerColor(selected),
         contentColor = reactionSummaryChipContentColor(selected),
@@ -209,6 +210,21 @@ private data class ReactionSummaryContent(
     val emojis: String,
     val total: Long,
 )
+
+private fun reactionSummaryChipInteractionModifier(
+    enabled: Boolean,
+    onClick: () -> Unit,
+    onClickLabel: String,
+): Modifier =
+    if (enabled) {
+        Modifier.clickable(
+            role = Role.Button,
+            onClick = onClick,
+            onClickLabel = onClickLabel,
+        )
+    } else {
+        Modifier
+    }
 
 private const val REACTION_CONTENT_FADE_DURATION_MILLIS = 120
 

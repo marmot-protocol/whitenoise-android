@@ -73,6 +73,24 @@ class MessageReactionTransitionScreenshotTest {
             layoutDirection = LayoutDirection.Rtl,
         )
 
+    @Test
+    fun reactionContentChangeLight() =
+        captureReactionContentChange(
+            name = "message_reaction_content_change_light",
+            dark = false,
+            fontScale = 1f,
+            layoutDirection = LayoutDirection.Ltr,
+        )
+
+    @Test
+    fun reactionContentChangeDarkLargeRtl() =
+        captureReactionContentChange(
+            name = "message_reaction_content_change_dark_large_rtl",
+            dark = true,
+            fontScale = 1.6f,
+            layoutDirection = LayoutDirection.Rtl,
+        )
+
     private fun captureReactionEnter(
         name: String,
         dark: Boolean,
@@ -139,6 +157,45 @@ class MessageReactionTransitionScreenshotTest {
         composeRule.mainClock.advanceTimeBy(300)
         composeRule.runOnIdle { }
         assertAnchoring(avatarTop = avatarTop, bubbleTextTop = bubbleTextTop)
+    }
+
+    private fun captureReactionContentChange(
+        name: String,
+        dark: Boolean,
+        fontScale: Float,
+        layoutDirection: LayoutDirection,
+    ) {
+        var tallies by mutableStateOf(listOf(ReactionTally(emoji = "👍", count = 1, mine = true)))
+
+        composeRule.setContent {
+            val density = LocalDensity.current
+            WhiteNoiseTheme(darkTheme = dark) {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalDensity provides Density(density.density, fontScale),
+                    LocalLayoutDirection provides layoutDirection,
+                ) {
+                    ReactionTransitionGallery(tallies = tallies)
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnUiThread {
+            tallies =
+                listOf(
+                    ReactionTally(emoji = "👍", count = 2, mine = true),
+                    ReactionTally(emoji = "❤️", count = 1, mine = false),
+                )
+        }
+        composeRule.runOnIdle { }
+        composeRule.mainClock.advanceTimeBy(REACTION_CONTENT_MIDPOINT_MILLIS)
+        composeRule.runOnIdle { }
+
+        composeRule.onNodeWithText("👍", substring = false, useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("👍❤️", substring = false, useUnmergedTree = true).assertExists()
+        composeRule
+            .onNodeWithTag(GALLERY_TAG)
+            .captureRoboImage("src/test/snapshots/${name}_mid.png")
     }
 
     private fun galleryHeight(): Float =
@@ -232,8 +289,9 @@ class MessageReactionTransitionScreenshotTest {
 
     private companion object {
         const val GALLERY_TAG = "message-reaction-transition-gallery"
+        const val ENTERING_FRAME_COUNT = 8
+        const val REACTION_CONTENT_MIDPOINT_MILLIS = 60L
         const val HEIGHT_TOLERANCE = 0.5f
         const val POSITION_TOLERANCE = 0.5f
-        const val ENTERING_FRAME_COUNT = 8
     }
 }

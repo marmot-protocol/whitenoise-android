@@ -31,7 +31,9 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.marmotkit.TimelineReactionEmojiFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.marmotkit.TimelineUserReactionFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.state.AppText
@@ -150,6 +152,30 @@ class DeletedMessageLocalRemovalTest {
             }.isSuccess
         }
         placeholder().assertIsDisplayed()
+    }
+
+    @Test
+    fun remoteDeletionMakesRetainedReactionSummaryInertAndClosesDetailsSheet() {
+        val surface = renderLive(reactions = reactedSummary())
+        val viewReactorsAction =
+            SemanticsMatcher("has view reactors action") {
+                it.config.contains(SemanticsActions.OnClick) &&
+                    it.config[SemanticsActions.OnClick].label == string(R.string.view_reactors)
+            }
+        composeRule.onNode(viewReactorsAction, useUnmergedTree = true).performClick()
+        val reactionFilterAll = "${string(R.string.reaction_filter_all)} · 1"
+        composeRule.onNodeWithText(reactionFilterAll, substring = false).assertIsDisplayed()
+
+        composeRule.mainClock.autoAdvance = false
+        surface.markDeleted()
+        repeat(2) {
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.runOnIdle { }
+        }
+
+        placeholder().assertIsDisplayed()
+        composeRule.onNode(viewReactorsAction, useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText(reactionFilterAll, substring = false).assertDoesNotExist()
     }
 
     @Test
@@ -327,10 +353,11 @@ class DeletedMessageLocalRemovalTest {
     private fun renderLive(
         body: String = LIVE_BODY,
         collapseLongMessages: Boolean = false,
+        reactions: TimelineReactionSummaryFfi = emptyReactionSummary(),
     ): LiveTestSurface {
         val appState = appState(backingPreferences)
         val controller = ConversationController(appState = appState, initialGroup = group())
-        val projected = messageRecord(body = body, deleted = false)
+        val projected = messageRecord(body = body, deleted = false, reactions = reactions)
         val item =
             TimelineMessage(
                 id = "msg:$MESSAGE_ID",
@@ -396,10 +423,7 @@ class DeletedMessageLocalRemovalTest {
             }
         }
         composeRule.waitForIdle()
-        return LiveTestSurface {
-            composeRule.runOnIdle { markDeleted() }
-            composeRule.waitForIdle()
-        }
+        return LiveTestSurface { composeRule.runOnUiThread { markDeleted() } }
     }
 
     private fun appState(preferences: SharedPreferences) =
@@ -476,6 +500,7 @@ class DeletedMessageLocalRemovalTest {
     private fun messageRecord(
         body: String,
         deleted: Boolean,
+        reactions: TimelineReactionSummaryFfi = emptyReactionSummary(),
     ) = TimelineMessageRecordFfi(
         messageIdHex = MESSAGE_ID,
         sourceMessageIdHex = null,
@@ -499,7 +524,7 @@ class DeletedMessageLocalRemovalTest {
         media = emptyList(),
         agentTextStreamJson = null,
         groupSystem = null,
-        reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
+        reactions = reactions,
         deleted = deleted,
         deletedByMessageIdHex = if (deleted) "delete-event" else null,
         invalidationStatus = null,
@@ -507,6 +532,23 @@ class DeletedMessageLocalRemovalTest {
         retentionSeconds = null,
         retentionExpiresAt = null,
     )
+
+    private fun emptyReactionSummary() = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList())
+
+    private fun reactedSummary() =
+        TimelineReactionSummaryFfi(
+            byEmoji = listOf(TimelineReactionEmojiFfi("👍", 1u, listOf(SENDER_ID))),
+            userReactions =
+                listOf(
+                    TimelineUserReactionFfi(
+                        reactionMessageIdHex = "06" + "00".repeat(31),
+                        targetMessageIdHex = MESSAGE_ID,
+                        sender = SENDER_ID,
+                        emoji = "👍",
+                        reactedAt = 2uL,
+                    ),
+                ),
+        )
 
     private fun group() =
         AppGroupRecordFfi(
