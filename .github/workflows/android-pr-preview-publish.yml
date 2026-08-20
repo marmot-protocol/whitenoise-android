@@ -105,6 +105,7 @@ jobs:
         run: |
           .github/scripts/test-pr-preview-contract.sh
           .github/scripts/test-pr-preview-validation.sh
+          .github/scripts/test-upload-pr-apk-to-blossom.sh
           node --test .github/scripts/update-pr-preview-links.test.js
 
       - name: Download candidates from completed run

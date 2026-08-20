@@ -13,10 +13,16 @@ state="$tmp/attempts"
 curl_state="$tmp/curl-attempts"
 fake_nak="$tmp/nak"
 fake_curl="$tmp/curl"
+runner_stdin="$tmp/runner-stdin"
+printf 'non-interactive runner stdin\n' > "$runner_stdin"
 
 cat > "$fake_nak" <<'FAKE_NAK'
 #!/usr/bin/env bash
 set -euo pipefail
+[[ -c /dev/stdin ]] || {
+  printf 'do not pass arguments when piping from stdin\n' >&2
+  exit 125
+}
 apk_file=${@: -1}
 [[ -f "$apk_file" ]] || { printf 'missing upload file: %s\n' "$apk_file" >&2; exit 123; }
 attempt=$(<"$FAKE_NAK_STATE")
@@ -142,7 +148,7 @@ run_uploader() {
     FAKE_SERVE_SCENARIO="$serve_scenario" \
     BLOSSOM_UPLOAD_BACKOFF_SECONDS=0 \
     BLOSSOM_UPLOAD_TIMEOUT_SECONDS=1 \
-    "$uploader" >"$stdout" 2>"$stderr"
+    "$uploader" <"$runner_stdin" >"$stdout" 2>"$stderr"
   status=$?
   set -e
 }
@@ -158,6 +164,11 @@ assert_success_after_retry() {
     exit 1
   fi
 }
+
+run_uploader success
+[[ "$status" == '0' ]]
+[[ "$(<"$state")" == '1' ]]
+printf 'ok - detaches non-character runner stdin for file-path uploads\n'
 
 assert_success_after_retry http-502
 printf 'ok - retries an HTTP 502 and succeeds without leaking the upload secret\n'

@@ -84,11 +84,14 @@ for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
   timeout_stderr="$tmp/timeout-stderr"
 
   set +e
+  # GitHub's runner gives steps non-character-device stdin. nak treats that as
+  # a piped blob and rejects the explicit file argument, so detach stdin while
+  # retaining the file-path upload needed for the APK MIME type.
   # The single-quoted command expands only inside the isolated child shell.
   # shellcheck disable=SC2016
   NAK_BIN_VALUE="$nak_bin" APK_STAGING="$staging_apk" LC_ALL=C \
     timeout --verbose --signal=TERM --kill-after=10s "${attempt_timeout_seconds}s" \
-      bash -c 'exec "$NAK_BIN_VALUE" blossom upload --server "$BLOSSOM_SERVER" --sec "$BLOSSOM_UPLOAD_NSEC" "$APK_STAGING" 2>&3' \
+      bash -c 'exec "$NAK_BIN_VALUE" blossom upload --server "$BLOSSOM_SERVER" --sec "$BLOSSOM_UPLOAD_NSEC" "$APK_STAGING" </dev/null 2>&3' \
       > "$stdout" 2> "$timeout_stderr" 3> "$stderr"
   status=$?
   set -e
