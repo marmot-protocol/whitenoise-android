@@ -2361,6 +2361,12 @@ class WhiteNoiseAppState private constructor(
         mutableMapOf<String, OptimisticSendPositionPreserves>()
     private val retentionAtSendByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
 
+    // Canonical MDK app-event id -> local optimistic text id. MDK can accept a
+    // text intent before publishing it, so the eventual projection needs this
+    // exact bridge instead of matching identical pending texts heuristically.
+    private val acceptedPendingTextOptimisticIdsByConversation =
+        mutableMapOf<String, MutableMap<String, String>>()
+
     // Retained-upload bytes survive screen disposal so a user who navigates
     // out of a chat mid-send and returns sees the pending bubble still carry
     // its preview/filename instead of an empty placeholder. Cap (and sizeOf
@@ -2736,6 +2742,15 @@ class WhiteNoiseAppState private constructor(
             retentionAtSendByConversation.getOrPut(key) { mutableMapOf() }
         }
 
+    internal fun acceptedPendingTextOptimisticIds(
+        accountRef: String?,
+        groupIdHex: String,
+    ): MutableMap<String, String> =
+        synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            acceptedPendingTextOptimisticIdsByConversation.getOrPut(key) { mutableMapOf() }
+        }
+
     internal fun retainedMediaUploads(
         accountRef: String?,
         groupIdHex: String,
@@ -2821,6 +2836,7 @@ class WhiteNoiseAppState private constructor(
         timelineTimestampOverridesByConversation.remove(staleKey)
         optimisticSendPositionPreservesByConversation.remove(staleKey)
         retentionAtSendByConversation.remove(staleKey)
+        acceptedPendingTextOptimisticIdsByConversation.remove(staleKey)
         retainedMediaUploadsByConversation.remove(staleKey)
         activeUploadKeysByConversation.remove(staleKey)
         pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
@@ -5097,6 +5113,8 @@ class WhiteNoiseAppState private constructor(
             optimisticSendPositionPreservesByConversation.clear()
             retentionAtSendByConversation.values.forEach { it.clear() }
             retentionAtSendByConversation.clear()
+            acceptedPendingTextOptimisticIdsByConversation.values.forEach { it.clear() }
+            acceptedPendingTextOptimisticIdsByConversation.clear()
         }
         // Cancel any in-flight downloads (their Deferred holds the plaintext
         // result) and drop the index so the next session starts cold.
