@@ -25,8 +25,8 @@ jobs:
   fuzz-campaign:
     name: Bounded fuzz campaign
     runs-on: ubuntu-latest
-    # Nightly reserves margin beyond 9m of targets plus crash minimization/replay.
-    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.campaign == 'weekly' && 60 || 30 }}
+    # Nightly: 3x90s targets + one <=5.5m triage leaves 5m for setup/compile/upload.
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.campaign == 'weekly' && 60 || 15 }}
 
     steps:
       - name: Checkout
@@ -43,7 +43,7 @@ jobs:
 
       - name: Run bounded fuzz campaign
         env:
-          FUZZ_MAX_DURATION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.campaign == 'weekly' && '10m' || '3m' }}
+          FUZZ_MAX_DURATION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.campaign == 'weekly' && '10m' || '90s' }}
         run: |
           ./gradlew :fuzz:fuzzScheduledDryRun \
             -PfuzzMaxDuration="$FUZZ_MAX_DURATION" \

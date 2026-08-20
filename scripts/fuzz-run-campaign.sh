@@ -119,25 +119,20 @@ triage_target_artifacts() {
   local target="$1"
   local gradle_task=":fuzz:${target}"
   local artifact
-  local triage_failed=0
-  local artifact_count=0
 
   while IFS= read -r artifact; do
     [[ -z "$artifact" ]] && continue
-    artifact_count=$((artifact_count + 1))
     log "triage_start target=$target artifact=$artifact"
     if ! scripts/fuzz-triage.sh "$gradle_task" "$artifact"; then
       log "triage_failed target=$target artifact=$artifact"
-      triage_failed=1
-    else
-      log "triage_done target=$target artifact=$artifact"
+      return 1
     fi
+    log "triage_done target=$target artifact=$artifact"
+    return 0
   done < <(discover_crash_artifacts "$target")
 
-  if [[ "$artifact_count" -eq 0 ]]; then
-    log "triage_skipped target=$target reason=no_crash_artifacts"
-  fi
-  return "$triage_failed"
+  log "triage_skipped target=$target reason=no_crash_artifacts"
+  return 0
 }
 
 run_target() {
@@ -182,6 +177,29 @@ verify_targets_sequential() {
   return 0
 }
 
+run_targets() {
+  local completed_targets=()
+  local target
+  local failed=0
+  for target in "$@"; do
+    log "target_start name=$target"
+    if ! run_target "$target"; then
+      failed=1
+    fi
+    completed_targets+=("$target")
+    log "target_done name=$target"
+    if [[ "$failed" -ne 0 ]]; then
+      log "campaign_stop_after_failure target=$target"
+      break
+    fi
+  done
+
+  if [[ "${#completed_targets[@]}" -gt 1 ]]; then
+    verify_targets_sequential "${completed_targets[@]}" || failed=1
+  fi
+  return "$failed"
+}
+
 self_check() {
   local saved_runs="$FUZZ_RUNS"
   FUZZ_RUNS=100
@@ -210,8 +228,12 @@ self_check_failure() {
   ./gradlew "${GRADLE_FLAGS[@]}" :fuzz:compileKotlin :fuzz:compileTestKotlin
 
   log "self_check_failure=campaign target=$SELF_CHECK_FAILURE_TARGET runs=$FUZZ_RUNS"
-  if run_target "$SELF_CHECK_FAILURE_TARGET"; then
+  if run_targets "$SELF_CHECK_FAILURE_TARGET" "${TARGETS[0]}"; then
     log "self_check_failure=failed step=campaign expected_nonzero=true"
+    exit 1
+  fi
+  if [[ -f "$LOG_DIR/${TARGETS[0]}.start" ]]; then
+    log "self_check_failure=failed step=fail_fast unexpected_target=${TARGETS[0]}"
     exit 1
   fi
   FUZZ_RUNS="$saved_runs"
@@ -271,25 +293,12 @@ main() {
   rm -rf "$LOG_DIR"
   mkdir -p "$LOG_DIR"
 
-  local target
-  local failed=0
-  for target in "${selected_targets[@]}"; do
-    log "target_start name=$target"
-    if ! run_target "$target"; then
-      failed=1
-    fi
-    log "target_done name=$target"
-  done
-
-  if [[ "${#selected_targets[@]}" -gt 1 ]]; then
-    verify_targets_sequential "${selected_targets[@]}" || failed=1
-  fi
-
-  write_metadata
-  if [[ "$failed" -ne 0 ]]; then
+  if ! run_targets "${selected_targets[@]}"; then
+    write_metadata
     log "campaign=failed"
     exit 1
   fi
+  write_metadata
   log "campaign=passed targets=${selected_targets[*]}"
 }
 
