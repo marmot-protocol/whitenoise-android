@@ -33,6 +33,22 @@ function replaceSection(body, section) {
   return `${current}${current.length ? '\n\n' : ''}${section}`
 }
 
+function removeSectionIfMatches(body, section) {
+  const current = body || ''
+  const start = current.indexOf(START)
+  const end = current.indexOf(END, start + START.length)
+  if (start === -1 || end <= start) {
+    return current
+  }
+  const blockEnd = end + END.length
+  if (current.slice(start, blockEnd) !== section) {
+    return current
+  }
+  const before = current.slice(0, start).trimEnd()
+  const after = current.slice(blockEnd).trimStart()
+  return [before, after].filter(Boolean).join('\n\n')
+}
+
 async function removeLegacyPreviewComment(github, context, prNumber, core) {
   const comments = await github.paginate(github.rest.issues.listComments, {
     owner: context.repo.owner,
@@ -69,6 +85,10 @@ async function run({ github, context, core }) {
     repo: context.repo.repo,
     pull_number: prNumber,
   })
+  if (pr.state !== 'open' || pr.head?.sha !== headSha) {
+    core.info(`Skipping preview links for superseded PR head ${headSha}.`)
+    return
+  }
   const section = renderSection({ prNumber, headSha, stableUrl, isolatedUrl })
   await github.rest.pulls.update({
     owner: context.repo.owner,
@@ -77,7 +97,39 @@ async function run({ github, context, core }) {
     body: replaceSection(pr.body, section),
   })
   core.info('Updated the pull request description with preview APK links.')
+
+  // A newer push can land at the body-write boundary. The publisher workflow
+  // serializes runs per PR; if ownership changed during this write, remove
+  // only the exact section this run authored before the newer run proceeds.
+  const { data: latestPr } = await github.rest.pulls.get({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    pull_number: prNumber,
+  })
+  if (latestPr.state !== 'open' || latestPr.head?.sha !== headSha) {
+    const reconciledBody = removeSectionIfMatches(latestPr.body, section)
+    if (reconciledBody !== latestPr.body) {
+      await github.rest.pulls.update({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pull_number: prNumber,
+        body: reconciledBody,
+      })
+      core.info(`Removed superseded preview links after PR #${prNumber} moved during publication.`)
+    }
+    core.info(`Keeping the legacy preview comment because PR #${prNumber} moved after publication.`)
+    return
+  }
   await removeLegacyPreviewComment(github, context, prNumber, core)
 }
 
-module.exports = { START, END, APK_MIME, renderSection, replaceSection, removeLegacyPreviewComment, run }
+module.exports = {
+  START,
+  END,
+  APK_MIME,
+  renderSection,
+  replaceSection,
+  removeSectionIfMatches,
+  removeLegacyPreviewComment,
+  run,
+}

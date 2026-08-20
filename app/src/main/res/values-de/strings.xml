@@ -1557,4 +1557,7 @@
     <string name="nostr_event_type_release">Softwareversion</string>
     <string name="nostr_event_type_file">Datei</string>
     <string name="nostr_event_type_generic">Ereignis · Typ %1$d</string>
+    <string name="composer_resize">Ziehen, um die Größe des Nachrichtenfelds zu ändern</string>
+    <string name="composer_expand_full_screen">Nachrichtenfeld maximieren</string>
+    <string name="composer_collapse">Nachrichtenfeld minimieren</string>
 </resources>

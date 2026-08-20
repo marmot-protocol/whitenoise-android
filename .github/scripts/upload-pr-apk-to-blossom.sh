@@ -37,6 +37,40 @@ normalize_mime() {
   printf '%s' "$value"
 }
 
+verify_served_apk() {
+  local url=$1
+  local serve_attempt headers curl_status served_type delay
+
+  for (( serve_attempt = 1; serve_attempt <= max_attempts; serve_attempt++ )); do
+    set +e
+    headers=$(curl --fail --silent --show-error --head --max-time 30 "$url")
+    curl_status=$?
+    set -e
+    served_type=$(
+      printf '%s' "$headers" \
+        | awk -F': ' 'tolower($1) == "content-type" { sub(/\r$/, "", $2); print $2; exit }'
+    )
+    if (( curl_status == 0 )) && \
+      [[ "$(normalize_mime "$served_type")" == "$expected_base_mime" ]]; then
+      return 0
+    fi
+
+    if (( curl_status != 0 )); then
+      printf 'Blossom serve verification failed for %s (curl status %d)\n' \
+        "$url" "$curl_status" >&2
+    else
+      printf 'Blossom serves %s as %s instead of %s\n' "$url" "$served_type" "$expected_mime" >&2
+    fi
+    if (( serve_attempt == max_attempts )); then
+      return 1
+    fi
+    delay=$((backoff_seconds * (1 << (serve_attempt - 1))))
+    printf 'Transient Blossom serve verification failure (attempt %d/%d); retrying in %ds.\n' \
+      "$serve_attempt" "$max_attempts" "$delay" >&2
+    sleep "$delay"
+  done
+}
+
 expected_base_mime=$(normalize_mime "$expected_mime")
 # Upload by file path (not stdin) so nak sends the APK MIME type. Stdin uploads
 # store blobs as application/zip on nostr.download, which makes browsers save
@@ -88,14 +122,7 @@ for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
     fi
     url=$(printf '%s/%s.apk' "${BLOSSOM_SERVER%/}" "$apk_sha256")
     if [[ "${BLOSSOM_SKIP_SERVE_CHECK:-}" != 1 ]]; then
-      served_type=$(
-        curl --fail --silent --show-error --head --max-time 30 "$url" \
-          | awk -F': ' 'tolower($1) == "content-type" { sub(/\r$/, "", $2); print $2; exit }'
-      )
-      if [[ "$(normalize_mime "$served_type")" != "$expected_base_mime" ]]; then
-        printf 'Blossom serves %s as %s instead of %s\n' "$url" "$served_type" "$expected_mime" >&2
-        exit 1
-      fi
+      verify_served_apk "$url" || exit 1
     fi
     printf '%s\n' "$url"
     exit 0

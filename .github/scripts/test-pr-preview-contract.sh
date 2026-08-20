@@ -59,7 +59,7 @@ grep -Fq 'headSha.slice(0, 12)' .github/scripts/update-pr-preview-links.js
 grep -Fq 'ref: ${{ steps.resolve.outputs.head_sha }}' "$build"
 grep -Fq 'restore missing preview links' "$build"
 grep -Fq -- '--min-sdk-version 34' .github/scripts/sign-pr-preview-candidates.sh
-grep -Fq 'cancel-in-progress: true' "$workflow"
+grep -Fq 'cancel-in-progress: false' "$workflow"
 grep -Fq 'needs: prepare' "$workflow"
 grep -Fq 'group: android-pr-preview-publish-pr-${{ needs.prepare.outputs.pr_number }}' "$workflow"
 reject 'group: android-pr-preview-publish-${{ github.event.workflow_run.head_repository.full_name }}' "$workflow"

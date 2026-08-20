@@ -1621,4 +1621,7 @@
     <string name="nostr_event_type_release">Выпуск ПО</string>
     <string name="nostr_event_type_file">Файл</string>
     <string name="nostr_event_type_generic">Событие · Тип %1$d</string>
+    <string name="composer_resize">Перетащите, чтобы изменить размер поля сообщения</string>
+    <string name="composer_expand_full_screen">Развернуть поле сообщения</string>
+    <string name="composer_collapse">Свернуть поле сообщения</string>
 </resources>

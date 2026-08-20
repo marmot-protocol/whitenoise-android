@@ -1559,4 +1559,7 @@
     <string name="nostr_event_type_release">Versione software</string>
     <string name="nostr_event_type_file">File multimediale</string>
     <string name="nostr_event_type_generic">Evento · Tipo %1$d</string>
+    <string name="composer_resize">Trascina per ridimensionare il campo del messaggio</string>
+    <string name="composer_expand_full_screen">Espandi il campo del messaggio</string>
+    <string name="composer_collapse">Comprimi il campo del messaggio</string>
 </resources>

@@ -7,19 +7,25 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.content.MediaType
 import androidx.compose.foundation.content.ReceiveContentListener
 import androidx.compose.foundation.content.TransferableContent
 import androidx.compose.foundation.content.consume
 import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.content.hasMediaType
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -47,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
@@ -57,10 +64,14 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreInterceptKeyBeforeSoftKeyboard
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -71,6 +82,7 @@ import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
@@ -117,10 +129,21 @@ internal fun ComposerPill(
     preImeBackEnabled: Boolean = false,
     onPreImeBack: () -> Unit = {},
     overlayBackRegistrar: ComposerOverlayBackRegistrar? = null,
+    expansionMode: ComposerExpansionMode = ComposerExpansionMode.Automatic,
+    onExpansionToggle: () -> Unit = {},
+    onHeightDrag: (Float) -> Unit = {},
+    onHeightDragStopped: () -> Unit = {},
+    trailingAction: (@Composable RowScope.() -> Unit)? = null,
+    inputContentVisible: Boolean = true,
+    inputFocusEnabled: Boolean = true,
+    onMultilineControlsChanged: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val resizeComposerDescription = stringResource(R.string.composer_resize)
     val latestOnPasteImageUris by rememberUpdatedState(onPasteImageUris)
     val latestOnPreImeBack by rememberUpdatedState(onPreImeBack)
+    val latestOnHeightDrag by rememberUpdatedState(onHeightDrag)
+    val latestOnHeightDragStopped by rememberUpdatedState(onHeightDragStopped)
     var composerFocused by remember { mutableStateOf(false) }
     val backDispatcher = LocalView.current.findOnBackInvokedDispatcher()
     // Gesture/predictive Back reaches the IME before the activity's ordinary
@@ -234,30 +257,53 @@ internal fun ComposerPill(
                 }
             }
         }
+    val hasAttachmentAction =
+        onPickFromGallery != null ||
+            onPickDocument != null ||
+            hasCameraCapture ||
+            hasLocationShare ||
+            hasUserShare ||
+            hasContactShare
+    var multilineControls by remember { mutableStateOf(false) }
+    val expandedLayout = multilineControls || expansionMode != ComposerExpansionMode.Automatic
+    val compactTrailingReserve =
+        4.dp +
+            (if (hasAttachmentAction) 36.dp else 0.dp) +
+            (if (trailingAction != null) 44.dp else 0.dp)
+    val expandedHeightModifier =
+        if (expansionMode == ComposerExpansionMode.Automatic) {
+            Modifier
+        } else {
+            Modifier.fillMaxHeight()
+        }
+
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(22.dp),
         border = amoledSurfaceBorderStroke(),
         modifier = modifier,
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        val boxAlignment = if (expandedLayout) Alignment.TopStart else Alignment.CenterStart
+        Box(
             modifier =
                 Modifier
                     .heightIn(min = 44.dp)
-                    .padding(start = 4.dp, end = 4.dp),
+                    .then(expandedHeightModifier),
         ) {
-            TextEntryEmojiAction(
-                pickerOpen = emojiPickerOpen,
-                enabled = true,
-                onClick = onEmojiPickerToggle,
-                togglesKeyboard = true,
-            )
             Box(
+                contentAlignment = boxAlignment,
                 modifier =
                     Modifier
-                        .weight(1f)
-                        .padding(vertical = 10.dp),
+                        .align(boxAlignment)
+                        .fillMaxWidth()
+                        .then(expandedHeightModifier)
+                        .padding(
+                            start = if (expandedLayout) 12.dp else 52.dp,
+                            top = if (expandedLayout) 48.dp else 10.dp,
+                            end = if (expandedLayout) 12.dp else compactTrailingReserve,
+                            bottom = if (expandedLayout) 48.dp else 10.dp,
+                        ).alpha(if (inputContentVisible) 1f else 0f)
+                        .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
             ) {
                 BasicTextField(
                     value = textFieldValue,
@@ -265,6 +311,8 @@ internal fun ComposerPill(
                     modifier =
                         Modifier
                             .fillMaxWidth()
+                            .then(expandedHeightModifier)
+                            .focusProperties { canFocus = inputFocusEnabled }
                             .contentReceiver(pasteImageReceiver)
                             .onPreInterceptKeyBeforeSoftKeyboard { event ->
                                 when (
@@ -314,6 +362,7 @@ internal fun ComposerPill(
                         LocalTextStyle.current.copy(
                             color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 16.sp,
+                            textDirection = TextDirection.ContentOrLtr,
                         ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     visualTransformation = mentionVisualTransformation,
@@ -332,7 +381,19 @@ internal fun ComposerPill(
                                 },
                         ),
                     keyboardActions = KeyboardActions(onSend = { onImeSend() }),
-                    maxLines = 5,
+                    maxLines = Int.MAX_VALUE,
+                    onTextLayout = { layout ->
+                        val nextMultilineControls =
+                            when {
+                                multilineControls && layout.lineCount <= 1 -> false
+                                !multilineControls && layout.lineCount >= 3 -> true
+                                else -> multilineControls
+                            }
+                        if (nextMultilineControls != multilineControls) {
+                            multilineControls = nextMultilineControls
+                            onMultilineControlsChanged(nextMultilineControls)
+                        }
+                    },
                 )
                 if (textFieldValue.text.isEmpty()) {
                     Text(
@@ -342,28 +403,105 @@ internal fun ComposerPill(
                     )
                 }
             }
-            if (onPickFromGallery != null ||
-                onPickDocument != null ||
-                hasCameraCapture ||
-                hasLocationShare ||
-                hasUserShare ||
-                hasContactShare
+
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(
+                            start = 4.dp,
+                            bottom = if (expandedLayout) 4.dp else 0.dp,
+                        ).alpha(if (inputContentVisible) 1f else 0f)
+                        .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
             ) {
-                IconButton(
-                    onClick = onAttachmentsToggle,
-                    modifier = Modifier.size(36.dp),
+                TextEntryEmojiAction(
+                    pickerOpen = emojiPickerOpen,
+                    enabled = inputContentVisible,
+                    onClick = onEmojiPickerToggle,
+                    togglesKeyboard = true,
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .height(44.dp),
+            ) {
+                if (hasAttachmentAction) {
+                    IconButton(
+                        onClick = onAttachmentsToggle,
+                        enabled = inputContentVisible,
+                        modifier =
+                            Modifier
+                                .size(36.dp)
+                                .alpha(if (inputContentVisible) 1f else 0f)
+                                .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                    ) {
+                        // Swap the glyph on open (X) the way the emoji toggle swaps
+                        // to a keyboard, so sighted users get a visual cue, not just
+                        // a changed content description.
+                        Icon(
+                            if (attachmentSheetOpen) Icons.Default.Close else Icons.Default.AttachFile,
+                            contentDescription =
+                                stringResource(
+                                    if (attachmentSheetOpen) R.string.close else R.string.attach_options,
+                                ),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+                trailingAction?.invoke(this)
+            }
+
+            if (expandedLayout && inputContentVisible) {
+                // One control owns both resize paths: continuous drag, and the
+                // documented accessible tap alternative that toggles full
+                // screen. The editor reserves this control's full 48dp touch
+                // target so caret and selection gestures never compete with
+                // resize gestures; the visible handle stays compact.
+                val toggleDescription =
+                    stringResource(
+                        if (expansionMode == ComposerExpansionMode.FullScreen) {
+                            R.string.composer_collapse
+                        } else {
+                            R.string.composer_expand_full_screen
+                        },
+                    )
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .width(96.dp)
+                            .height(48.dp)
+                            .pointerInput(Unit) {
+                                detectVerticalDragGestures(
+                                    onVerticalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        latestOnHeightDrag(dragAmount)
+                                    },
+                                    onDragEnd = { latestOnHeightDragStopped() },
+                                    onDragCancel = { latestOnHeightDragStopped() },
+                                )
+                            }.clickable(
+                                onClickLabel = toggleDescription,
+                                role = Role.Button,
+                                onClick = onExpansionToggle,
+                            ).semantics {
+                                contentDescription = resizeComposerDescription
+                            },
                 ) {
-                    // Swap the glyph on open (X) the way the emoji toggle swaps
-                    // to a keyboard, so sighted users get a visual cue, not just
-                    // a changed content description.
-                    Icon(
-                        if (attachmentSheetOpen) Icons.Default.Close else Icons.Default.AttachFile,
-                        contentDescription =
-                            stringResource(
-                                if (attachmentSheetOpen) R.string.close else R.string.attach_options,
+                    Box(
+                        Modifier
+                            .offset(y = (-6).dp)
+                            .width(36.dp)
+                            .height(4.dp)
+                            .background(
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                RoundedCornerShape(2.dp),
                             ),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp),
                     )
                 }
             }
