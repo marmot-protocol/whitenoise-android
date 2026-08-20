@@ -127,6 +127,7 @@ class ComposerDictationControlTest {
         assertTrue(dictation.right - dictation.left >= 48.dp)
         assertTrue(dictation.bottom - dictation.top >= 48.dp)
         assertTrue("RTL emoji action must remain on the leading side", action.left >= field.left)
+        assertTrue("RTL dictation action must not overlap the text field", dictation.right <= field.left)
     }
 
     private fun render(

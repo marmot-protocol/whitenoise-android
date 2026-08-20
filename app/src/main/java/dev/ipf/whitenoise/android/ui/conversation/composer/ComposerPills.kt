@@ -270,6 +270,7 @@ internal fun ComposerPill(
     val expandedLayout = multilineControls || expansionMode != ComposerExpansionMode.Automatic
     val compactTrailingReserve =
         4.dp +
+            (if (onDictation != null) 48.dp else 0.dp) +
             (if (hasAttachmentAction) 36.dp else 0.dp) +
             (if (trailingAction != null) 44.dp else 0.dp)
     val expandedHeightModifier =
@@ -428,7 +429,7 @@ internal fun ComposerPill(
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)
-                        .height(44.dp),
+                        .height(if (onDictation != null) 48.dp else 44.dp),
             ) {
                 if (onDictation != null) {
                     IconButton(
