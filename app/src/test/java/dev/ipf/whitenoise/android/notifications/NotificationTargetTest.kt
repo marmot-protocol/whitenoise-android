@@ -646,6 +646,13 @@ class NotificationTargetTest {
             ),
         )
         assertEquals(
+            ListenableWorker.Result.success(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.AcceptedPending,
+                operationFailureAttempt = 0,
+            ),
+        )
+        assertEquals(
             ListenableWorker.Result.failure(),
             NotificationReplyWorker.resultAfterSendOutcome(
                 NotificationReplySendOutcome.NonRetryableFailure,

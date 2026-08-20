@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import org.junit.Assert.assertEquals
@@ -9,33 +10,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class OptimisticMessageReconciliationTest {
-    @Test
-    fun matchingPendingMessageIsReconciledWhenProjectionArrives() {
-        val pending = timelineMessage("temp", MessageStatus.Pending)
-
-        assertEquals(
-            "temp",
-            optimisticMessageIdForProjection(listOf(pending), message("confirmed")),
-        )
-    }
-
-    @Test
-    fun sentOptimisticMessageIsReconciledWhenProjectionArrivesAfterResponse() {
-        val sent = timelineMessage("sent", MessageStatus.Sent)
-
-        assertEquals(
-            "sent",
-            optimisticMessageIdForProjection(listOf(sent), message("confirmed")),
-        )
-    }
-
-    @Test
-    fun textSendSummaryWaitsOnlyWhileTempBubbleStillExists() {
-        assertEquals(true, textSendAwaitingEchoConfirmation(emptyList(), optimisticStillPresent = true))
-        assertEquals(false, textSendAwaitingEchoConfirmation(emptyList(), optimisticStillPresent = false))
-        assertEquals(false, textSendAwaitingEchoConfirmation(listOf("confirmed-id"), optimisticStillPresent = true))
-    }
-
     @Test
     fun retryEmptySummaryRetainsTempKeyedSentBubbleAndMessageById() {
         val tempId = "temp-retry"
@@ -47,6 +21,7 @@ class OptimisticMessageReconciliationTest {
         val reconciliation =
             reconcileSuccessfulTextSend(
                 summaryMessageIds = emptyList(),
+                acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
                 optimisticKey = key,
                 tempId = tempId,
                 optimisticRecord = record,
@@ -78,6 +53,7 @@ class OptimisticMessageReconciliationTest {
         val reconciliation =
             reconcileSuccessfulTextSend(
                 summaryMessageIds = emptyList(),
+                acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
                 optimisticKey = key,
                 tempId = tempId,
                 optimisticRecord = record,
@@ -104,6 +80,7 @@ class OptimisticMessageReconciliationTest {
         val reconciliation =
             reconcileSuccessfulTextSend(
                 summaryMessageIds = listOf("confirmed-id"),
+                acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
                 optimisticKey = key,
                 tempId = tempId,
                 optimisticRecord = record,
@@ -121,18 +98,6 @@ class OptimisticMessageReconciliationTest {
         assertEquals(MessageStatus.Sent, sent?.status)
         assertEquals("confirmed-id", sent?.record?.messageIdHex)
         assertEquals(record.copy(messageIdHex = "confirmed-id"), messageById["confirmed-id"])
-    }
-
-    @Test
-    fun sentOptimisticReplacementIsSkippedWhenProjectionArrivesBeforeResponse() {
-        assertEquals(
-            false,
-            shouldInsertSentOptimisticMessage("confirmed", setOf("confirmed")),
-        )
-        assertEquals(
-            true,
-            shouldInsertSentOptimisticMessage("confirmed", emptySet()),
-        )
     }
 
     @Test

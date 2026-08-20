@@ -151,9 +151,13 @@ private suspend fun runNewGroupCreateMutation(
                             )
                         }.also { appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_RETURN) }
                 }.getOrElse {
-                    appState.abandonGroupCreateTiming(ChatCreateOpenTiming.STAGE_CREATE_FAILED)
-                    onCreateError(it)
-                    return
+                    createdGroupIdAfterProjectionUnavailable(it)?.also {
+                        appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_RETURN)
+                    } ?: run {
+                        appState.abandonGroupCreateTiming(ChatCreateOpenTiming.STAGE_CREATE_FAILED)
+                        onCreateError(it)
+                        return
+                    }
                 }
         onRetryGroupId(groupIdHex)
         val retentionOutcome =

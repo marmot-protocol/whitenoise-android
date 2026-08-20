@@ -44,6 +44,7 @@ import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
@@ -1972,6 +1973,31 @@ internal fun optimisticMessageIdForProjection(
         ?.messageIdHex
 }
 
+/**
+ * MDK assigns an app-event id before reporting [SendAcceptDispositionFfi.ACCEPTED_PENDING].
+ * Use that id to settle retained media exactly; a content/timestamp heuristic cannot safely
+ * distinguish multiple queued albums.
+ */
+internal fun acceptedPendingMediaOptimisticIdForProjection(
+    projectedMessageIdHex: String,
+    acceptedPendingMessageIdsByOptimisticId: Map<String, String>,
+): String? =
+    acceptedPendingMessageIdsByOptimisticId
+        .entries
+        .singleOrNull { (_, acceptedMessageIdHex) -> acceptedMessageIdHex == projectedMessageIdHex }
+        ?.key
+
+/**
+ * Accepted-pending text keeps its local temporary id until its projection is
+ * visible, while MDK already knows the canonical app-event id. Pairing on that
+ * canonical id prevents identical queued text sends from stealing each other's
+ * projections.
+ */
+internal fun acceptedPendingTextOptimisticIdForProjection(
+    projectedMessageIdHex: String,
+    acceptedPendingOptimisticIdsByMessageId: Map<String, String>,
+): String? = acceptedPendingOptimisticIdsByMessageId[projectedMessageIdHex]
+
 private fun isSendableOptimisticStatus(
     status: MessageStatus,
     allowFailed: Boolean,
@@ -2088,8 +2114,14 @@ data class SuccessfulTextSendReconciliation(
     val confirmedId: String,
     val confirmed: AppMessageRecordFfi,
     val awaitingEcho: Boolean,
+    /** MDK durably accepted the intent but has not assigned a published event id. */
+    val acceptedPending: Boolean,
     val insertedSent: Boolean,
-)
+) {
+    /** Keep the optimistic bubble until MDK's durable projection settles it. */
+    val awaitingProjection: Boolean
+        get() = awaitingEcho || acceptedPending
+}
 
 /**
  * Shared optimistic-state transition after a successful text/reply publish.
@@ -2098,6 +2130,7 @@ data class SuccessfulTextSendReconciliation(
  */
 internal fun reconcileSuccessfulTextSend(
     summaryMessageIds: List<String>,
+    acceptDisposition: SendAcceptDispositionFfi,
     optimisticKey: String,
     tempId: String,
     optimisticRecord: AppMessageRecordFfi,
@@ -2105,26 +2138,38 @@ internal fun reconcileSuccessfulTextSend(
     messageById: MutableMap<String, AppMessageRecordFfi>,
     projectedMessageIds: Set<String>,
     timelineOrder: ULong,
+    acceptedPendingTextOptimisticIdsByMessageId: MutableMap<String, String>? = null,
 ): SuccessfulTextSendReconciliation {
     val retentionAtSendSeconds = optimisticMessages[optimisticKey]?.retentionAtSendSeconds
     val hasConfirmedId = summaryMessageIds.isNotEmpty()
+    val acceptedPending = acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING
     val awaitingEcho =
-        textSendAwaitingEchoConfirmation(
-            summaryMessageIds,
-            optimisticStillPresent = optimisticKey in optimisticMessages,
-        )
+        !acceptedPending &&
+            textSendAwaitingEchoConfirmation(
+                summaryMessageIds,
+                optimisticStillPresent = optimisticKey in optimisticMessages,
+            )
     val confirmedId = summaryMessageIds.firstOrNull() ?: tempId
     val confirmed = optimisticRecord.copy(messageIdHex = confirmedId)
     if ((hasConfirmedId || awaitingEcho) && confirmedId.isNotEmpty()) {
         messageById[confirmedId] = confirmed
     }
-    if (!awaitingEcho) {
+    rememberAcceptedPendingTextOptimisticId(
+        acceptedPending = acceptedPending,
+        confirmedId = confirmedId,
+        tempId = tempId,
+        acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIdsByMessageId,
+    )
+    if (!awaitingEcho && !acceptedPending) {
         optimisticMessages.remove(optimisticKey)
         if (confirmedId != tempId) messageById.remove(tempId)
     }
     val insertedSent =
-        awaitingEcho ||
-            (hasConfirmedId && shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds))
+        !acceptedPending &&
+            (
+                awaitingEcho ||
+                    (hasConfirmedId && shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds))
+            )
     if (insertedSent) {
         val sentKey = if (awaitingEcho) optimisticKey else "msg:$confirmedId"
         optimisticMessages[sentKey] =
@@ -2136,7 +2181,24 @@ internal fun reconcileSuccessfulTextSend(
                 retentionAtSendSeconds = retentionAtSendSeconds,
             )
     }
-    return SuccessfulTextSendReconciliation(confirmedId, confirmed, awaitingEcho, insertedSent)
+    return SuccessfulTextSendReconciliation(
+        confirmedId = confirmedId,
+        confirmed = confirmed,
+        awaitingEcho = awaitingEcho,
+        acceptedPending = acceptedPending,
+        insertedSent = insertedSent,
+    )
+}
+
+private fun rememberAcceptedPendingTextOptimisticId(
+    acceptedPending: Boolean,
+    confirmedId: String,
+    tempId: String,
+    acceptedPendingTextOptimisticIdsByMessageId: MutableMap<String, String>?,
+) {
+    if (acceptedPending && confirmedId.isNotEmpty()) {
+        acceptedPendingTextOptimisticIdsByMessageId?.set(confirmedId, tempId)
+    }
 }
 
 internal fun compareTimelineMessages(
@@ -3259,6 +3321,8 @@ internal class RetainedMediaUpload(
     val attachments: List<PendingAttachment>,
     val caption: String?,
     var uploadedReferences: List<MediaAttachmentReferenceFfi>? = null,
+    var acceptedPending: Boolean = false,
+    var acceptedPendingMessageIdHex: String? = null,
 )
 
 private data class OptimisticChatListPreviewEntry(
@@ -7014,6 +7078,12 @@ class ConversationController(
         appState.optimisticSendPositionPreserves(conversationAccountRef, initialGroup.groupIdHex)
     private val retentionAtSendByMessageId =
         appState.retentionAtSend(conversationAccountRef, initialGroup.groupIdHex)
+
+    // Unlike immediately published text, accepted-pending text keeps its
+    // temporary optimistic id. Retain MDK's canonical id across controller
+    // replacement so the eventual projection settles the exact bubble.
+    private val acceptedPendingTextOptimisticIds =
+        appState.acceptedPendingTextOptimisticIds(conversationAccountRef, initialGroup.groupIdHex)
     private val preservedTimelinePositionOverrideIds = mutableSetOf<String>()
     private val durableStreamPositionOverrideIds = mutableSetOf<String>()
 
@@ -7987,6 +8057,7 @@ class ConversationController(
             val reconciliation =
                 reconcileSuccessfulTextSend(
                     summaryMessageIds = summary.messageIds,
+                    acceptDisposition = summary.acceptDisposition,
                     optimisticKey = optimisticKey,
                     tempId = tempId,
                     optimisticRecord = optimistic,
@@ -7994,16 +8065,19 @@ class ConversationController(
                     messageById = messageById,
                     projectedMessageIds = projectedMessageIds,
                     timelineOrder = optimisticOrder,
+                    acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
                 )
-            transferRetentionAtSend(tempId, reconciliation.confirmedId)
-            appState.commitOptimisticSentPreview(
-                accountRef = conversationAccountRef,
-                groupIdHex = group.groupIdHex,
-                optimisticMessageIdHex = tempId,
-                confirmedMessageIdHex = reconciliation.confirmedId,
-            )
-            invalidatedProjectionIdsMatchingMessage(timelineRecords, reconciliation.confirmed)
-                .forEach(::removeProjectedRecord)
+            if (!reconciliation.acceptedPending) {
+                transferRetentionAtSend(tempId, reconciliation.confirmedId)
+                appState.commitOptimisticSentPreview(
+                    accountRef = conversationAccountRef,
+                    groupIdHex = group.groupIdHex,
+                    optimisticMessageIdHex = tempId,
+                    confirmedMessageIdHex = reconciliation.confirmedId,
+                )
+                invalidatedProjectionIdsMatchingMessage(timelineRecords, reconciliation.confirmed)
+                    .forEach(::removeProjectedRecord)
+            }
             val insertedSent = reconciliation.insertedSent
             publishTimelineFromIndexes()
             // The publish returned and the pending clock flips to sent here only
@@ -8023,7 +8097,7 @@ class ConversationController(
             )
             // When we keep the temp bubble for echo reconciliation, leave the
             // trace entry so `echo-reconcile` can still be logged.
-            if (!reconciliation.awaitingEcho) {
+            if (!reconciliation.awaitingProjection) {
                 forgetSendTrace(tempId)
             }
         } catch (throwable: Throwable) {
@@ -8420,6 +8494,45 @@ class ConversationController(
                             sendMediaAttachments(account, group.groupIdHex, references, retained.caption)
                         }
                     }
+                if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
+                    // MDK now owns a durable, unpublished media intent. It still
+                    // returns the canonical app-event id, which lets a later
+                    // projection settle this exact bubble even when other media
+                    // sends are queued at the same time.
+                    val acceptedPendingMessageIdHex =
+                        summary.messageIds.firstOrNull()?.takeIf(HEX_MESSAGE_ID::matches)
+                    // A retry can be discarded while the FFI call is suspended.
+                    // MDK cannot retract an accepted intent, but the user chose
+                    // to discard this local bubble, so don't retain its bytes or
+                    // use the canonical id to restore a deferred projection.
+                    if (discardedDuringRetry.remove(key)) {
+                        acceptedPendingMessageIdHex?.let(pendingProjectionsAwaitingBridge::remove)
+                        optimisticMessages.remove(key)
+                        messageById.remove(tempId)
+                        retentionAtSendByMessageId.remove(tempId)
+                        retainedMediaUploads.remove(key)
+                        activeUploadKeys.remove(key)
+                        rollbackOptimisticChatListPreview(tempId)
+                        publishTimelineFromIndexes()
+                        return
+                    }
+                    retained.acceptedPending = true
+                    retained.acceptedPendingMessageIdHex = acceptedPendingMessageIdHex
+                    // The local projection can beat the FFI return. It was held
+                    // only because several media optimistics were indistinguishable
+                    // at that instant; now the MDK id gives it an exact owner.
+                    acceptedPendingMessageIdHex
+                        ?.let(pendingProjectionsAwaitingBridge::get)
+                        ?.let { deferredProjection ->
+                            upsertProjectedRecord(
+                                deferredProjection,
+                                reconcileOptimistic = true,
+                                allowDelayedProjection = true,
+                            )
+                        }
+                    publishTimelineFromIndexes()
+                    return
+                }
                 val confirmedId = summary.messageIds.firstOrNull() ?: tempId
                 transferRetentionAtSend(tempId, confirmedId)
                 appState.commitOptimisticSentPreview(
@@ -9234,6 +9347,10 @@ class ConversationController(
                 }
             }
         }
+        if (retained.acceptedPending) {
+            retainedMediaUploads.remove(optimisticKey)
+            activeUploadKeys.remove(optimisticKey)
+        }
     }
 
     /**
@@ -9410,6 +9527,7 @@ class ConversationController(
             val reconciliation =
                 reconcileSuccessfulTextSend(
                     summaryMessageIds = summary.messageIds,
+                    acceptDisposition = summary.acceptDisposition,
                     optimisticKey = key,
                     tempId = tempId,
                     optimisticRecord = refreshedRecord,
@@ -9417,16 +9535,19 @@ class ConversationController(
                     messageById = messageById,
                     projectedMessageIds = projectedMessageIds,
                     timelineOrder = order,
+                    acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
                 )
-            transferRetentionAtSend(tempId, reconciliation.confirmedId)
-            appState.commitOptimisticSentPreview(
-                accountRef = conversationAccountRef,
-                groupIdHex = group.groupIdHex,
-                optimisticMessageIdHex = tempId,
-                confirmedMessageIdHex = reconciliation.confirmedId,
-            )
-            invalidatedProjectionIdsMatchingMessage(timelineRecords, reconciliation.confirmed)
-                .forEach(::removeProjectedRecord)
+            if (!reconciliation.acceptedPending) {
+                transferRetentionAtSend(tempId, reconciliation.confirmedId)
+                appState.commitOptimisticSentPreview(
+                    accountRef = conversationAccountRef,
+                    groupIdHex = group.groupIdHex,
+                    optimisticMessageIdHex = tempId,
+                    confirmedMessageIdHex = reconciliation.confirmedId,
+                )
+                invalidatedProjectionIdsMatchingMessage(timelineRecords, reconciliation.confirmed)
+                    .forEach(::removeProjectedRecord)
+            }
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
@@ -11107,6 +11228,40 @@ class ConversationController(
         ).forEach(optimisticMessages::remove)
     }
 
+    private fun acceptedPendingTextOptimisticIdForProjection(projectedMessageIdHex: String): String? {
+        val optimisticMessageId =
+            acceptedPendingTextOptimisticIdForProjection(
+                projectedMessageIdHex = projectedMessageIdHex,
+                acceptedPendingOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
+            ) ?: return null
+        return optimisticMessageId.takeIf { "msg:$it" in optimisticMessages }
+            ?: run {
+                // The projection is settling now, but its local bubble was
+                // discarded or otherwise removed in the meantime.
+                acceptedPendingTextOptimisticIds.remove(projectedMessageIdHex)
+                null
+            }
+    }
+
+    private fun acceptedPendingMediaOptimisticIdForProjection(projectedMessageIdHex: String): String? {
+        val acceptedPendingMessageIdsByOptimisticId =
+            retainedMediaUploads
+                .keysSnapshot()
+                .mapNotNull { optimisticKey ->
+                    val timelineMessage = optimisticMessages[optimisticKey] ?: return@mapNotNull null
+                    val isPendingMedia =
+                        timelineMessage.record.tags.any { it.values.firstOrNull() == "_media_pending" }
+                    val acceptedMessageIdHex = retainedMediaUploads.get(optimisticKey)?.acceptedPendingMessageIdHex
+                    acceptedMessageIdHex
+                        ?.takeIf { isPendingMedia }
+                        ?.let { optimisticKey.removePrefix("msg:") to it }
+                }.toMap()
+        return acceptedPendingMediaOptimisticIdForProjection(
+            projectedMessageIdHex = projectedMessageIdHex,
+            acceptedPendingMessageIdsByOptimisticId = acceptedPendingMessageIdsByOptimisticId,
+        )
+    }
+
     private fun pruneConfirmedOptimisticReactions() {
         confirmedOptimisticReactionKeys(
             activeAccountIdHex = conversationAccountIdHex,
@@ -11161,8 +11316,22 @@ class ConversationController(
         // — same content, same position.
         val draftAction = TimelineProjector.toAppMessageRecord(record)
         val projectedIsMediaUpsert = draftAction.tags.any { it.values.firstOrNull() == "imeta" }
+        val hasAcceptedPendingTextBridge =
+            reconcileOptimistic && record.messageIdHex in acceptedPendingTextOptimisticIds
+        val acceptedPendingTextOptimisticId =
+            if (hasAcceptedPendingTextBridge) {
+                acceptedPendingTextOptimisticIdForProjection(record.messageIdHex)
+            } else {
+                null
+            }
+        val acceptedPendingMediaOptimisticId =
+            acceptedPendingMediaOptimisticIdForProjection(record.messageIdHex).takeIf { reconcileOptimistic }
+        val acceptedPendingOptimisticId =
+            acceptedPendingTextOptimisticId ?: acceptedPendingMediaOptimisticId
         val hasExactBridge =
-            optimisticMessages.values.any { it.record.messageIdHex == record.messageIdHex }
+            optimisticMessages.values.any { it.record.messageIdHex == record.messageIdHex } ||
+                hasAcceptedPendingTextBridge ||
+                acceptedPendingOptimisticId != null
         if (projectedIsMediaUpsert && !hasExactBridge && reconcileOptimistic) {
             val pendingMediaCount =
                 optimisticMessages.values.count {
@@ -11213,11 +11382,16 @@ class ConversationController(
             displayedProjectedStreamItemIds,
         )
         val reconciledOptimisticId =
-            optimisticMessageIdForProjection(
-                optimisticMessages.values,
-                actionRecord,
-                allowDelayedProjection = allowDelayedProjection,
-            ).takeIf { reconcileOptimistic }
+            acceptedPendingOptimisticId
+                ?: if (hasAcceptedPendingTextBridge) {
+                    null
+                } else {
+                    optimisticMessageIdForProjection(
+                        optimisticMessages.values,
+                        actionRecord,
+                        allowDelayedProjection = allowDelayedProjection,
+                    ).takeIf { reconcileOptimistic }
+                }
         retentionAtSendSeconds =
             retentionAtSendForProjection(
                 messageId = record.messageIdHex,
@@ -11237,6 +11411,9 @@ class ConversationController(
             handoffOwnMediaCacheOnReconcile(optimisticKey, record.messageIdHex)
             optimisticMessages.remove(optimisticKey)
             messageById.remove(optimisticId)
+            if (optimisticId == acceptedPendingTextOptimisticId) {
+                acceptedPendingTextOptimisticIds.remove(record.messageIdHex)
+            }
             // The engine echo just flipped this pending bubble to a
             // projected record. If we're tracing this send, this is the
             // "self-echo drives the sent flip" path (issue #913).

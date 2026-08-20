@@ -162,6 +162,9 @@ case "$FAKE_SCENARIO:$attempt" in
     respond 201 'not-json'
     ;;
   always-mime-mismatch:*)
+    respond 200 "{\"sha256\":\"$FAKE_APK_SHA256\",\"type\":\"text/plain\"}"
+    ;;
+  zip-upload-mime:*)
     respond 200 "{\"sha256\":\"$FAKE_APK_SHA256\",\"type\":\"application/zip\"}"
     ;;
   parameterized-upload-mime:*)
@@ -286,9 +289,14 @@ printf 'ok - fails closed on a returned SHA-256 mismatch\n'
 run_uploader always-mime-mismatch
 [[ "$status" != '0' ]]
 [[ "$(<"$state")" == '1' ]]
-[[ "$(<"$stderr")" == *'Blossom stored APK as application/zip'* ]]
+[[ "$(<"$stderr")" == *'Blossom stored APK as unsupported MIME text/plain'* ]]
 [[ "$(<"$stderr")" != *'test-secret-must-not-leak'* ]]
 printf 'ok - fails closed immediately when an existing blob has the wrong MIME type\n'
+
+run_uploader zip-upload-mime
+[[ "$status" == '0' ]]
+[[ "$(<"$state")" == '1' ]]
+printf 'ok - accepts an APK content-sniffed as its ZIP container type\n'
 
 run_uploader auth-failure
 [[ "$status" != '0' ]]
@@ -304,7 +312,8 @@ printf 'ok - accepts a case-insensitive parameterized upload MIME type\n'
 
 for serve_type in \
   'application/vnd.android.package-archive' \
-  ' Application/Vnd.Android.Package-Archive ; charset=binary'; do
+  ' Application/Vnd.Android.Package-Archive ; charset=binary' \
+  'application/zip'; do
   run_uploader success "$serve_type"
   [[ "$status" == '0' ]]
   [[ "$(<"$state")" == '1' ]]
@@ -320,11 +329,11 @@ for serve_scenario in transport mime-delay; do
 done
 printf 'ok - retries transient HEAD transport and propagation failures\n'
 
-run_uploader success 'application/zip'
+run_uploader success 'text/plain'
 [[ "$status" != '0' ]]
 [[ "$(<"$state")" == '1' ]]
 [[ "$(<"$curl_state")" == '3' ]]
-[[ "$(<"$stderr")" == *'Blossom serves '*' as application/zip instead of'* ]]
+[[ "$(<"$stderr")" == *'Blossom serves '*' as unsupported APK MIME text/plain'* ]]
 printf 'ok - fails closed on a wrong HEAD Content-Type\n'
 
 for scenario in empty-output malformed-output; do

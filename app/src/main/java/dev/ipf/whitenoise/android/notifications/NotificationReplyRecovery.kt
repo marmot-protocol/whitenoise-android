@@ -46,6 +46,9 @@ internal enum class NotificationReplyCommitProbe {
 
 internal enum class NotificationReplySendOutcome {
     Sent,
+
+    /** MDK durably accepted the reply but has not published its event yet. */
+    AcceptedPending,
     AlreadyCommitted,
     RetryableFailure,
     NonRetryableFailure,

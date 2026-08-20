@@ -55,6 +55,7 @@ import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.RetentionSweepGroupOutcomeFfi
 import dev.ipf.marmotkit.RetentionSweepStatusFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -2360,6 +2361,12 @@ class WhiteNoiseAppState private constructor(
         mutableMapOf<String, OptimisticSendPositionPreserves>()
     private val retentionAtSendByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
 
+    // Canonical MDK app-event id -> local optimistic text id. MDK can accept a
+    // text intent before publishing it, so the eventual projection needs this
+    // exact bridge instead of matching identical pending texts heuristically.
+    private val acceptedPendingTextOptimisticIdsByConversation =
+        mutableMapOf<String, MutableMap<String, String>>()
+
     // Retained-upload bytes survive screen disposal so a user who navigates
     // out of a chat mid-send and returns sees the pending bubble still carry
     // its preview/filename instead of an empty placeholder. Cap (and sizeOf
@@ -2735,6 +2742,15 @@ class WhiteNoiseAppState private constructor(
             retentionAtSendByConversation.getOrPut(key) { mutableMapOf() }
         }
 
+    internal fun acceptedPendingTextOptimisticIds(
+        accountRef: String?,
+        groupIdHex: String,
+    ): MutableMap<String, String> =
+        synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            acceptedPendingTextOptimisticIdsByConversation.getOrPut(key) { mutableMapOf() }
+        }
+
     internal fun retainedMediaUploads(
         accountRef: String?,
         groupIdHex: String,
@@ -2820,6 +2836,7 @@ class WhiteNoiseAppState private constructor(
         timelineTimestampOverridesByConversation.remove(staleKey)
         optimisticSendPositionPreservesByConversation.remove(staleKey)
         retentionAtSendByConversation.remove(staleKey)
+        acceptedPendingTextOptimisticIdsByConversation.remove(staleKey)
         retainedMediaUploadsByConversation.remove(staleKey)
         activeUploadKeysByConversation.remove(staleKey)
         pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
@@ -5096,6 +5113,8 @@ class WhiteNoiseAppState private constructor(
             optimisticSendPositionPreservesByConversation.clear()
             retentionAtSendByConversation.values.forEach { it.clear() }
             retentionAtSendByConversation.clear()
+            acceptedPendingTextOptimisticIdsByConversation.values.forEach { it.clear() }
+            acceptedPendingTextOptimisticIdsByConversation.clear()
         }
         // Cancel any in-flight downloads (their Deferred holds the plaintext
         // result) and drop the index so the next session starts cold.
@@ -7215,6 +7234,10 @@ class WhiteNoiseAppState private constructor(
                 }
 
                 val summary = marmotIo { sendText(account, group, body) }
+                // MDK assigns the app-event id before deciding whether this call
+                // can publish it immediately. Persist it before returning either
+                // outcome: after a process death, it is our durable proof that an
+                // accepted-pending quick reply must never be sent a second time.
                 val committedMessageId =
                     summary.messageIds
                         .firstOrNull()
@@ -7225,7 +7248,11 @@ class WhiteNoiseAppState private constructor(
                         completionStore.markCommittedMessage(completionKey, committedMessageId)
                     }
                 if (!committed) return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
-                NotificationReplySendOutcome.Sent
+                if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
+                    NotificationReplySendOutcome.AcceptedPending
+                } else {
+                    NotificationReplySendOutcome.Sent
+                }
             }
         }.onFailure {
             appStateDebug(it) { "notification reply failed for group=${group.take(8)}: ${it.readableMessage()}" }
