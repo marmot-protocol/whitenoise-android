@@ -1912,7 +1912,10 @@ internal fun GroupDetailsHeader(
                 }
             } else if (onAddDescription != null) {
                 TextButton(onClick = onAddDescription) {
-                    Text(stringResource(R.string.add_group_description))
+                    Text(
+                        stringResource(R.string.add_group_description),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             FlowRow(
