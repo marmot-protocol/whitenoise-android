@@ -101,6 +101,9 @@ class AiAgentsScreenTest {
         assertTrue(prompt.contains("install-codex-marmot.sh"))
         assertTrue(prompt.contains("wn-codex --version"))
         assertTrue(prompt.contains("wn-agent"))
+        assertTrue(prompt.contains("send a test message"))
+        assertTrue(prompt.contains("Do not report setup complete until wn-codex returns a reply through White Noise"))
+        assertTrue(prompt.contains("device verification required"))
     }
 
     @Test
@@ -197,9 +200,30 @@ class AiAgentsScreenTest {
 
     @Test
     fun copyWritesPromptToClipboardAndShowsSnackbar() {
+        assertScreenCopyWritesPromptToClipboardAndShowsSnackbar(
+            connectorId = "hermes",
+            connectorName = "Hermes",
+            promptRes = R.string.agent_connector_hermes_prompt,
+        )
+    }
+
+    @Test
+    fun codexCopyWritesPromptToClipboardAndShowsSnackbar() {
+        assertScreenCopyWritesPromptToClipboardAndShowsSnackbar(
+            connectorId = "codex",
+            connectorName = "Codex",
+            promptRes = R.string.agent_connector_codex_prompt,
+        )
+    }
+
+    private fun assertScreenCopyWritesPromptToClipboardAndShowsSnackbar(
+        connectorId: String,
+        connectorName: String,
+        promptRes: Int,
+    ) {
         clearClipboard()
         val npub = TEST_NPUB
-        val expectedHermesPrompt = app.getString(R.string.agent_connector_hermes_prompt, npub)
+        val expectedPrompt = app.getString(promptRes, npub)
         val copiedMessage = app.getString(R.string.ai_agents_prompt_copied)
 
         composeRule.setContent {
@@ -211,12 +235,15 @@ class AiAgentsScreenTest {
         }
 
         composeRule
-            .onNodeWithContentDescription(app.getString(R.string.agent_connector_copy_prompt_cd, "Hermes"))
+            .onNodeWithTag(AI_AGENTS_CONTENT_TAG)
+            .performScrollToNode(hasTestTag(agentConnectorCopyTag(connectorId)))
+        composeRule
+            .onNodeWithContentDescription(app.getString(R.string.agent_connector_copy_prompt_cd, connectorName))
             .performClick()
 
         composeRule.waitForIdle()
         val clip = clipboardText()
-        assertEquals(expectedHermesPrompt, clip)
+        assertEquals(expectedPrompt, clip)
         composeRule.onNodeWithText(copiedMessage).assertIsDisplayed()
     }
 

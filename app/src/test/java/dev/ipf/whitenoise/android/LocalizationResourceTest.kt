@@ -332,7 +332,9 @@ class LocalizationResourceTest {
                 "propose the installation steps for my public npub: %1\$s, and ask for my approval before " +
                 "making any changes. Once I approve, use the checksum-verified install-codex-marmot.sh release " +
                 "flow, bootstrap wn-agent for that npub with the allowed welcomer, verify wn-codex --version, " +
-                "and reply with your agent npub."
+                "and reply with your agent npub. Ask me to invite it from White Noise and send a test message. " +
+                "Do not report setup complete until wn-codex returns a reply through White Noise; otherwise " +
+                "mark device verification required."
 
         assertTrue(
             agentConnectorPromptViolations(
@@ -695,6 +697,9 @@ class LocalizationResourceTest {
             if (!pattern.containsMatchIn(prompt)) {
                 violations += "missing $label"
             }
+        }
+        if (Regex("""\bwn-codex\b""").findAll(prompt).count() < 2) {
+            violations += "missing connector round-trip verification"
         }
         return violations
     }
