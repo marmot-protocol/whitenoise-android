@@ -25,7 +25,8 @@ jobs:
   fuzz-campaign:
     name: Bounded fuzz campaign
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.campaign == 'weekly' && 60 || 15 }}
+    # Nightly reserves margin beyond 9m of targets plus crash minimization/replay.
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.campaign == 'weekly' && 60 || 30 }}
 
     steps:
       - name: Checkout

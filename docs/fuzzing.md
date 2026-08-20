@@ -81,7 +81,7 @@ Campaign logs under `fuzz/build/fuzz-campaign-logs/` show the Jazzer wrapper lau
 | Workflow | Trigger | Limit |
 |----------|---------|-------|
 | `.github/workflows/fuzz-pr.yml` | PR touching harness or parser targets | 5 minutes, compile + `:fuzz` and six named app-suite corpus replays |
-| `.github/workflows/fuzz-scheduled.yml` | Nightly `master` + `workflow_dispatch` | 15 minutes total (nightly) or 60 minutes (weekly manual) |
+| `.github/workflows/fuzz-scheduled.yml` | Nightly `master` + `workflow_dispatch` | 30 minutes total (nightly) or 60 minutes (weekly manual) |
 
 Scheduled runs call `:fuzz:fuzzScheduledDryRun` (the shell runner), execute one target at a time, use `-Xmx2g` per worker JVM, `contents: read`, no secrets, and workflow-level concurrency with `cancel-in-progress: true`. Engine input size is capped at 64 KiB via `-max_len=65536`. A failed target is triaged before the campaign continues to the remaining targets and exits non-zero.
 
