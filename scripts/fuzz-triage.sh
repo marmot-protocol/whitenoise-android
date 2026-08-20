@@ -26,6 +26,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/fuzz-triage.sh <gradle-task> [reproducer-file] [subtarget-name]
        scripts/fuzz-triage.sh --self-check
+       scripts/fuzz-triage.sh --self-check-passing-replay
 
 Supported tasks:
   :fuzz:fuzzZapstoreProtocol
@@ -311,6 +312,29 @@ replay_reproducer() {
   REPLAY_EXCEPTION_CLASS="$(extract_exception_class "$REPLAY_OUTPUT")"
 }
 
+assert_passing_replay() {
+  local test_class="$1"
+  local entry_method="$2"
+  local passing_input="$3"
+  replay_reproducer "$test_class" "$entry_method" "$passing_input"
+  if [[ $REPLAY_STATUS -ne 0 ]]; then
+    log "self_check_passing_replay=failed class=$test_class status=$REPLAY_STATUS exception_class=$REPLAY_EXCEPTION_CLASS"
+    return 1
+  fi
+  log "self_check_passing_replay=passed class=$test_class"
+}
+
+self_check_passing_replay() {
+  assert_passing_replay \
+    "dev.ipf.whitenoise.android.fuzz.IdentityReferenceFuzzTest" \
+    "fuzzIdentityReference" \
+    "fuzz/src/test/resources/dev/ipf/whitenoise/android/fuzz/IdentityReferenceFuzzTestInputs/fuzzIdentityReference/profile_link_marmot.input"
+  assert_passing_replay \
+    "dev.ipf.whitenoise.android.fuzz.Nip55SignerProtocolFuzzTest" \
+    "fuzzNip55SignerProtocol" \
+    "fuzz/src/test/resources/dev/ipf/whitenoise/android/fuzz/Nip55SignerProtocolFuzzTestInputs/fuzzNip55SignerProtocol/parse_activity_result.input"
+}
+
 self_check() {
   local mapped_name
   if ! mapped_name="$(subtarget_name_for_id :fuzz:fuzzZapstoreProtocol 253)" ||
@@ -345,6 +369,11 @@ self_check() {
 
 if [[ "${1:-}" == "--self-check" ]]; then
   self_check
+  exit 0
+fi
+
+if [[ "${1:-}" == "--self-check-passing-replay" ]]; then
+  self_check_passing_replay
   exit 0
 fi
 

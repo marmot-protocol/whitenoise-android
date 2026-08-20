@@ -180,6 +180,7 @@ tasks.register<Test>("replayFuzzRegression") {
     }
     timeout.set(Duration.ofMinutes(5))
     doLast {
+        if (project.findProperty("fuzzReplayInputsDir") != null) return@doLast
         val xmlDir =
             reports.junitXml.outputLocation
                 .get()

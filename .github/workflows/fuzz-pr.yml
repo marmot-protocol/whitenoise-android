@@ -58,4 +58,6 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
       - name: Lint, compile, and replay fuzz regression corpus
-        run: ./gradlew :fuzz:ktlintCheck :fuzz:replayAllFuzzRegression --no-daemon
+        run: |
+          ./gradlew :fuzz:ktlintCheck :fuzz:replayAllFuzzRegression --no-daemon
+          scripts/fuzz-triage.sh --self-check-passing-replay
