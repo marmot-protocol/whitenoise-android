@@ -30,3 +30,9 @@ app/google-services.json
 
 # Local review-agent reports, never shipped
 /reviews/
+
+# Fuzz module generated state (never commit)
+/fuzz/build/
+/fuzz/.cifuzz-corpus/
+/fuzz/fuzz-*.log
+/fuzz/build/fuzz-campaign-logs/

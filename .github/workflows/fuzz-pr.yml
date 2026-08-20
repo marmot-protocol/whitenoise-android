@@ -1,0 +1,61 @@
+name: Fuzz PR gate
+
+on:
+  pull_request:
+    paths:
+      - 'fuzz/**'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/amber/Nip55SignerPure.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/amber/Nip55SignerProtocol.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrEvent.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/nostr/BIP340.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrRelayFrames.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrRelayQueryClient.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/updates/ZapstoreReleaseClient.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/ProfileLink.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/RecipientReference.kt'
+      - 'app/build.gradle.kts'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/amber/Nip55SignerParsingTest.kt'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/core/ProfileLinkTest.kt'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/core/RecipientReferenceTest.kt'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/fuzz/**'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/updates/NostrEventVerifierTest.kt'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/updates/ZapstoreEventsTest.kt'
+      - 'app/src/test/java/dev/ipf/whitenoise/android/updates/ZapstoreReleaseClientTest.kt'
+      - '.github/workflows/fuzz-pr.yml'
+      - '.github/workflows/fuzz-scheduled.yml'
+      - 'scripts/fuzz-triage.sh'
+      - 'scripts/fuzz-run-campaign.sh'
+      - 'docs/fuzzing.md'
+      - 'build.gradle.kts'
+      - 'fuzz/build.gradle.kts'
+      - 'gradle/libs.versions.toml'
+      - 'settings.gradle.kts'
+
+concurrency:
+  group: fuzz-pr-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz-regression:
+    name: Fuzz compile and regression replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Lint, compile, and replay fuzz regression corpus
+        run: ./gradlew :fuzz:ktlintCheck :fuzz:replayAllFuzzRegression --no-daemon

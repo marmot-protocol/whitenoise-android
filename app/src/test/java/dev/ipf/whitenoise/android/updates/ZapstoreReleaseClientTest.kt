@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.updates
 
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
+import dev.ipf.whitenoise.android.fuzz.FuzzSyntheticCorpusReplay
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -52,6 +53,11 @@ class ZapstoreReleaseClientTest {
         server.shutdown()
         httpClient.connectionPool.evictAll()
         httpClient.dispatcher.executorService.shutdownNow()
+    }
+
+    @Test
+    fun replaysSyntheticFuzzCorpus() {
+        FuzzSyntheticCorpusReplay.replaySuite(FuzzSyntheticCorpusReplay.Suite.ZapstoreReleaseClient)
     }
 
     @Test
