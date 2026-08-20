@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.media
 
 import android.graphics.BitmapFactory
+import android.graphics.Paint
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -27,6 +28,41 @@ class GroupEmojiImageRendererTest {
         assertEquals(GROUP_EMOJI_IMAGE_SIZE_PX, bitmap.height)
         assertEquals(255, bitmap.getPixel(0, 0).ushr(24))
         assertTrue(draft.plaintext.size in 1..REMOTE_PROFILE_IMAGE_MAX_BYTES)
+    }
+
+    @Test
+    fun wideGlyphPairsNeverOverlapAndStayInsideTheCanvas() {
+        val paint = Paint().apply { textAlign = Paint.Align.CENTER }
+        val wide = "WWW"
+
+        val layout = GroupEmojiImageRenderer.twoEmojiLayout(paint, wide, wide)
+
+        paint.textSize = layout.textSize
+        val halfWidth = paint.measureText(wide) / 2f
+        assertTrue(
+            "glyphs must not overlap",
+            layout.firstCenterX + halfWidth < layout.secondCenterX - halfWidth,
+        )
+        assertTrue("first glyph must stay on canvas", layout.firstCenterX - halfWidth >= 0f)
+        assertTrue(
+            "second glyph must stay on canvas",
+            layout.secondCenterX + halfWidth <= GROUP_EMOJI_IMAGE_SIZE_PX.toFloat(),
+        )
+    }
+
+    @Test
+    fun narrowGlyphPairsKeepTheBaseTextSizeAndStayCentered() {
+        val paint = Paint().apply { textAlign = Paint.Align.CENTER }
+
+        val layout = GroupEmojiImageRenderer.twoEmojiLayout(paint, "A", "B")
+
+        assertEquals(210f, layout.textSize, 0.01f)
+        assertTrue("centers must be ordered", layout.firstCenterX < layout.secondCenterX)
+        // The content block is centered, so the left margin before the first
+        // glyph must mirror the right margin after the second one.
+        val leftMargin = layout.firstCenterX - paint.measureText("A") / 2f
+        val rightMargin = GROUP_EMOJI_IMAGE_SIZE_PX - (layout.secondCenterX + paint.measureText("B") / 2f)
+        assertEquals(leftMargin, rightMargin, 0.01f)
     }
 
     @Test

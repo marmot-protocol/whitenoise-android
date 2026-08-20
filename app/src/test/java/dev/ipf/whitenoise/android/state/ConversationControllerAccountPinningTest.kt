@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import kotlinx.coroutines.test.runTest
@@ -41,6 +42,7 @@ class ConversationControllerAccountPinningTest {
                         SendSummaryFfi(
                             published = 1u,
                             messageIds = listOf(MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
                             maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
                         )
                     },

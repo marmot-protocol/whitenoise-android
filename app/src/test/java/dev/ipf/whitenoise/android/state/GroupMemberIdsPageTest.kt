@@ -17,7 +17,7 @@ class GroupMemberIdsPageTest {
             val loaded =
                 loadGroupMemberIdsPages(requested) { page ->
                     pages += page
-                    page.map { id -> AppGroupMemberIdsFfi(id, listOf(SELF, PEER)) }
+                    page.map { id -> AppGroupMemberIdsFfi(id, listOf(SELF, PEER), emptyList()) }
                 }
 
             assertEquals(listOf(requested), pages)
@@ -32,7 +32,7 @@ class GroupMemberIdsPageTest {
 
             loadGroupMemberIdsPages(requested) { page ->
                 pageSizes += page.size
-                page.map { id -> AppGroupMemberIdsFfi(id, listOf(SELF)) }
+                page.map { id -> AppGroupMemberIdsFfi(id, listOf(SELF), emptyList()) }
             }
 
             assertEquals(listOf(100, 100, 5), pageSizes)
@@ -56,10 +56,10 @@ class GroupMemberIdsPageTest {
         val selfOnlyGroup = groupId(4)
         val projections =
             listOf(
-                AppGroupMemberIdsFfi(directGroup, listOf(SELF.uppercase(), PEER)),
-                AppGroupMemberIdsFfi(duplicatePeerGroup, listOf(SELF, PEER.uppercase(), PEER)),
-                AppGroupMemberIdsFfi(namedGroup, listOf(SELF, OTHER)),
-                AppGroupMemberIdsFfi(selfOnlyGroup, listOf(SELF)),
+                AppGroupMemberIdsFfi(directGroup, listOf(SELF.uppercase(), PEER), emptyList()),
+                AppGroupMemberIdsFfi(duplicatePeerGroup, listOf(SELF, PEER.uppercase(), PEER), emptyList()),
+                AppGroupMemberIdsFfi(namedGroup, listOf(SELF, OTHER), emptyList()),
+                AppGroupMemberIdsFfi(selfOnlyGroup, listOf(SELF), emptyList()),
             )
 
         val peers =
@@ -72,7 +72,7 @@ class GroupMemberIdsPageTest {
 
     @Test
     fun firstFrameProfileWarmRequiresAnActiveAccount() {
-        val projections = listOf(AppGroupMemberIdsFfi(groupId(1), listOf(SELF, PEER)))
+        val projections = listOf(AppGroupMemberIdsFfi(groupId(1), listOf(SELF, PEER), emptyList()))
 
         assertTrue(initialDirectPeerProfileIds(projections, null) { _, _ -> true }.isEmpty())
     }
@@ -81,7 +81,7 @@ class GroupMemberIdsPageTest {
     fun mismatchedProjectionOrderFailsTheWholePage() =
         runTest {
             loadGroupMemberIdsPages(listOf(groupId(1), groupId(2))) { page ->
-                page.reversed().map { id -> AppGroupMemberIdsFfi(id, listOf(SELF)) }
+                page.reversed().map { id -> AppGroupMemberIdsFfi(id, listOf(SELF), emptyList()) }
             }
         }
 

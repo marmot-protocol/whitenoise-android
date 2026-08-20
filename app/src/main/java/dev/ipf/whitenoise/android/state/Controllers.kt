@@ -4193,7 +4193,7 @@ class ChatsController private constructor(
         val projections =
             liveResults.mapNotNull { result ->
                 result.result.getOrNull()?.let { members ->
-                    AppGroupMemberIdsFfi(result.groupIdHex, members.map { it.memberIdHex })
+                    AppGroupMemberIdsFfi(result.groupIdHex, members.map { it.memberIdHex }, adminIdsHex = emptyList())
                 }
             }
         val peerProfileIds = initialDirectPeerProfileIds(projections, activeAccountIdHex)
