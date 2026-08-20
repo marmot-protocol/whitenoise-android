@@ -19,9 +19,11 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
@@ -44,6 +46,8 @@ import org.robolectric.annotation.GraphicsMode
 class ComposerBarScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    private val app = ApplicationProvider.getApplicationContext<android.app.Application>()
 
     @Test
     fun composerBarIdleLight() {
@@ -90,7 +94,7 @@ class ComposerBarScreenshotTest {
     @Test
     fun composerBarFullScreenLargeRtl() {
         renderLongComposer(darkTheme = true, largeRtl = true)
-        composeRule.onNodeWithContentDescription("Drag to resize message composer").performClick()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.composer_resize)).performClick()
         composeRule.waitForIdle()
         composeRule
             .onNodeWithTag(LONG_TAG)

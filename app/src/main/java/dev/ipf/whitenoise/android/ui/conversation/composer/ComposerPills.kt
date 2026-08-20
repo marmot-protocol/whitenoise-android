@@ -283,6 +283,7 @@ internal fun ComposerPill(
         border = amoledSurfaceBorderStroke(),
         modifier = modifier,
     ) {
+        val boxAlignment = if (expandedLayout) Alignment.TopStart else Alignment.CenterStart
         Box(
             modifier =
                 Modifier
@@ -290,21 +291,11 @@ internal fun ComposerPill(
                     .then(expandedHeightModifier),
         ) {
             Box(
-                contentAlignment =
-                    if (expandedLayout) {
-                        Alignment.TopStart
-                    } else {
-                        Alignment.CenterStart
-                    },
+                contentAlignment = boxAlignment,
                 modifier =
                     Modifier
-                        .align(
-                            if (expandedLayout) {
-                                Alignment.TopStart
-                            } else {
-                                Alignment.CenterStart
-                            },
-                        ).fillMaxWidth()
+                        .align(boxAlignment)
+                        .fillMaxWidth()
                         .then(expandedHeightModifier)
                         .padding(
                             start = if (expandedLayout) 12.dp else 52.dp,
