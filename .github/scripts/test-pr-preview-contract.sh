@@ -4,6 +4,7 @@ set -euo pipefail
 workflow=.github/workflows/android-pr-preview-publish.yml
 build=.github/workflows/android-pr-apk.yml
 gradle=app/build.gradle.kts
+uploader=.github/scripts/upload-pr-apk-to-blossom.sh
 
 reject() {
   local pattern=$1 file=$2
@@ -73,3 +74,13 @@ reject 'pull_request_target:' "$build"
 # before checkout with "not a git repository" and no preview links are posted.
 [[ $(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-stable' "$workflow") -eq 2 ]]
 [[ $(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-isolated' "$workflow") -eq 2 ]]
+
+# APKs are ZIP containers, so nak's automatic MIME detection labels them as
+# application/zip. Preserve the BUD-11 signer while requiring an explicit
+# BUD-02 APK Content-Type on the upload request.
+grep -Fq 'NOSTR_SECRET_KEY="$BLOSSOM_UPLOAD_NSEC" "$nak_bin" event' "$uploader"
+grep -Fq -- '--tag "x=$apk_sha256"' "$uploader"
+grep -Fq -- '--tag "server=$server_host"' "$uploader"
+grep -Fq -- '--header "Content-Type: $expected_mime"' "$uploader"
+grep -Fq -- '--header "X-SHA-256: $apk_sha256"' "$uploader"
+reject 'blossom upload --server' "$uploader"
