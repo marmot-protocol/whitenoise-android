@@ -1,5 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation.reactions
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -137,14 +142,16 @@ internal fun ReactionSummaryChip(
     outgoing: Boolean,
     customAmoledBorderColor: Color? = null,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val selected = tallies.any { it.mine }
     val total = tallies.sumOf { it.count.toLong() }
     val emojis = tallies.take(MAX_VISIBLE_REACTIONS).joinToString(separator = "") { it.emoji }
+    val contentKey = ReactionSummaryContent(emojis = emojis, total = total)
     val viewReactorsLabel = stringResource(R.string.view_reactors)
     Surface(
         modifier =
-            Modifier
+            modifier
                 // Keep the current-user state available to accessibility services;
                 // the thicker selected outline provides the non-color visual cue.
                 .semantics { this.selected = selected }
@@ -161,33 +168,49 @@ internal fun ReactionSummaryChip(
             ),
         tonalElevation = if (isAmoledSurfaceTheme()) 0.dp else 1.dp,
     ) {
-        Row(
-            modifier =
-                Modifier
-                    .heightIn(min = 28.dp)
-                    .widthIn(min = 40.dp)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = emojis,
-                modifier = Modifier.weight(1f, fill = false),
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                softWrap = false,
-            )
-            if (total > 1) {
+        AnimatedContent(
+            targetState = contentKey,
+            transitionSpec = {
+                fadeIn(tween(durationMillis = REACTION_CONTENT_FADE_DURATION_MILLIS)) togetherWith
+                    fadeOut(tween(durationMillis = REACTION_CONTENT_FADE_DURATION_MILLIS))
+            },
+            label = "reactionSummaryChipContent",
+        ) { content ->
+            Row(
+                modifier =
+                    Modifier
+                        .heightIn(min = 28.dp)
+                        .widthIn(min = 40.dp)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Text(
-                    text = total.toString(),
-                    style = MaterialTheme.typography.labelMedium,
+                    text = content.emojis,
+                    modifier = Modifier.weight(1f, fill = false),
+                    style = MaterialTheme.typography.labelLarge,
                     maxLines = 1,
                     softWrap = false,
                 )
+                if (content.total > 1) {
+                    Text(
+                        text = content.total.toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
             }
         }
     }
 }
+
+private data class ReactionSummaryContent(
+    val emojis: String,
+    val total: Long,
+)
+
+private const val REACTION_CONTENT_FADE_DURATION_MILLIS = 120
 
 @Composable
 internal fun ReactionDetailsSheet(

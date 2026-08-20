@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -734,7 +735,14 @@ internal fun MessageBubble(
             mine = mine,
         )
     val tallies = controller.reactions[record.messageIdHex].orEmpty()
-    val showReactionSummary = tallies.isNotEmpty() && !deleted
+    val reactionTallies = if (deleted) emptyList() else tallies
+    val showReactionSummary = reactionTallies.isNotEmpty()
+    val reactionVisibilityState =
+        remember(record.messageIdHex) {
+            MutableTransitionState(showReactionSummary)
+        }
+    reactionVisibilityState.targetState = showReactionSummary
+    val reactionHostPresent = reactionVisibilityState.currentState || reactionVisibilityState.targetState
     // Match the timestamp to the bubble's visual cue. AMOLED uses the same
     // directional accent as the border; other themes keep their paired M3
     // on-color tokens.
@@ -1176,7 +1184,7 @@ internal fun MessageBubble(
                     seed = record.sender,
                     pictureUrl = appState.avatarUrl(record.sender),
                     enabled = !textSelectionMode,
-                    alignToBubbleBottom = showReactionSummary,
+                    alignToBubbleBottom = reactionHostPresent,
                     onClick = { appState.presentProfile(appState.npub(record.sender)) },
                 )
             }
@@ -1185,7 +1193,7 @@ internal fun MessageBubble(
                     Modifier
                         .widthIn(max = bubbleColumnMaxWidth)
                         .then(
-                            if (reserveSenderAvatarSlot && showReactionSummary) {
+                            if (reserveSenderAvatarSlot && reactionHostPresent) {
                                 Modifier.alignBy(MessageBubbleBottomAlignmentLine)
                             } else {
                                 Modifier
@@ -2014,15 +2022,14 @@ internal fun MessageBubble(
                         onDismissRequest = { deleteDialogOpen = false },
                     )
                 }
-                // Hide reaction tallies on a deleted message — nothing to show.
-                if (showReactionSummary) {
-                    MessageReactionSummary(
-                        tallies = tallies,
-                        mine = mine,
-                        bubbleBorderOverrideArgb = bubblePresentation.borderOverrideArgb,
-                        onClick = { reactionSheetOpen = true },
-                    )
-                }
+                // Keep the host composed through its exit; deleted messages target an empty summary.
+                MessageReactionSummary(
+                    tallies = reactionTallies,
+                    mine = mine,
+                    bubbleBorderOverrideArgb = bubblePresentation.borderOverrideArgb,
+                    visibilityState = reactionVisibilityState,
+                    onClick = { reactionSheetOpen = true },
+                )
                 if (reactionSheetOpen) {
                     val participants =
                         remember(record.messageIdHex, item.projected?.reactions, tallies) {
