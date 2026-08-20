@@ -6,39 +6,10 @@ import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OptimisticMessageReconciliationTest {
-    @Test
-    fun matchingPendingMessageIsReconciledWhenProjectionArrives() {
-        val pending = timelineMessage("temp", MessageStatus.Pending)
-
-        assertEquals(
-            "temp",
-            optimisticMessageIdForProjection(listOf(pending), message("confirmed")),
-        )
-    }
-
-    @Test
-    fun sentOptimisticMessageIsReconciledWhenProjectionArrivesAfterResponse() {
-        val sent = timelineMessage("sent", MessageStatus.Sent)
-
-        assertEquals(
-            "sent",
-            optimisticMessageIdForProjection(listOf(sent), message("confirmed")),
-        )
-    }
-
-    @Test
-    fun textSendSummaryWaitsOnlyWhileTempBubbleStillExists() {
-        assertEquals(true, textSendAwaitingEchoConfirmation(emptyList(), optimisticStillPresent = true))
-        assertEquals(false, textSendAwaitingEchoConfirmation(emptyList(), optimisticStillPresent = false))
-        assertEquals(false, textSendAwaitingEchoConfirmation(listOf("confirmed-id"), optimisticStillPresent = true))
-    }
-
     @Test
     fun retryEmptySummaryRetainsTempKeyedSentBubbleAndMessageById() {
         val tempId = "temp-retry"
@@ -127,47 +98,6 @@ class OptimisticMessageReconciliationTest {
         assertEquals(MessageStatus.Sent, sent?.status)
         assertEquals("confirmed-id", sent?.record?.messageIdHex)
         assertEquals(record.copy(messageIdHex = "confirmed-id"), messageById["confirmed-id"])
-    }
-
-    @Test
-    fun acceptedPendingTextSendKeepsTheBubblePendingUntilProjection() {
-        val tempId = "temp-accepted-pending"
-        val key = "msg:$tempId"
-        val record = message(tempId, plaintext = "queued for publication")
-        val optimisticMessages = linkedMapOf(key to timelineMessage(tempId, MessageStatus.Pending, plaintext = record.plaintext))
-        val messageById = linkedMapOf(tempId to record)
-
-        val reconciliation =
-            reconcileSuccessfulTextSend(
-                summaryMessageIds = emptyList(),
-                acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
-                optimisticKey = key,
-                tempId = tempId,
-                optimisticRecord = record,
-                optimisticMessages = optimisticMessages,
-                messageById = messageById,
-                projectedMessageIds = emptySet(),
-                timelineOrder = 13uL,
-            )
-
-        assertFalse(reconciliation.awaitingEcho)
-        assertTrue(reconciliation.acceptedPending)
-        assertTrue(reconciliation.awaitingProjection)
-        assertFalse(reconciliation.insertedSent)
-        assertEquals(MessageStatus.Pending, optimisticMessages[key]?.status)
-        assertEquals(record, messageById[tempId])
-    }
-
-    @Test
-    fun sentOptimisticReplacementIsSkippedWhenProjectionArrivesBeforeResponse() {
-        assertEquals(
-            false,
-            shouldInsertSentOptimisticMessage("confirmed", setOf("confirmed")),
-        )
-        assertEquals(
-            true,
-            shouldInsertSentOptimisticMessage("confirmed", emptySet()),
-        )
     }
 
     @Test

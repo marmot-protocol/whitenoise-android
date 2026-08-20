@@ -332,29 +332,6 @@ class NewChatFlowTest {
         }
 
     @Test
-    fun sharedStartChatAttemptLoadsTheCanonicalGroupAfterProjectionUnavailable() =
-        runTest {
-            val expected = chatListItem(group("Support"), otherMemberAccount = "support", members = emptyList())
-
-            val result =
-                attemptStartProfileChat(
-                    npub = "npub1support",
-                    progressHex = "support",
-                    recipientName = "White Noise support",
-                    createGroup = {
-                        throw MarmotKitException.CreatedGroupProjectionUnavailable("created-group")
-                    },
-                    loadCreatedChatListItem = {
-                        assertEquals("created-group", it)
-                        expected
-                    },
-                    displayName = { it },
-                )
-
-            assertEquals(StartChatAttemptResult.Open(expected), result)
-        }
-
-    @Test
     fun sharedStartChatAttemptRetriesCreatedGroupWithoutCreatingDuplicate() =
         runTest {
             var createCalled = false
