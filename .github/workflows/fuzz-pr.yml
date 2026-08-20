@@ -57,11 +57,5 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
-      - name: ktlint fuzz module
-        run: ./gradlew :fuzz:ktlintCheck --no-daemon
-
-      - name: Compile fuzz module
-        run: ./gradlew :fuzz:compileKotlin :fuzz:compileTestKotlin --no-daemon
-
-      - name: Replay fuzz regression corpus
-        run: ./gradlew :fuzz:replayAllFuzzRegression --no-daemon
+      - name: Lint, compile, and replay fuzz regression corpus
+        run: ./gradlew :fuzz:ktlintCheck :fuzz:replayAllFuzzRegression --no-daemon
