@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -16,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.KeyboardVoice
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -144,7 +142,6 @@ internal fun ComposerAttachmentSheetPane(
     onShareUser: (() -> Unit)?,
     onShareContact: (() -> Unit)?,
     onComingSoon: () -> Unit,
-    onDictation: (() -> Unit)? = null,
     bottomCornersOverride: ComposerAttachmentPaneBottomCorners? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -183,26 +180,6 @@ internal fun ComposerAttachmentSheetPane(
                     .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
         ) {
-            // This explicit secondary entry point delegates visible capture to
-            // the installed provider's standard recognition Activity. It still
-            // shares the immutable target and draft-conflict delivery pipeline
-            // with the compact in-composer action.
-            if (onDictation != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Spacer(Modifier.weight(1f))
-                    AttachmentActionTile(
-                        icon = Icons.Default.KeyboardVoice,
-                        label = stringResource(R.string.dictate_text),
-                        available = true,
-                        onClick = onDictation,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(Modifier.weight(1f))
-                }
-            }
             // Recent-media strip fills the space the pane reserves; it owns its
             // own opt-in permission and stays absent until the gallery action is
             // wired (same availability as the Gallery tile).

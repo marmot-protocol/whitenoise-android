@@ -34,8 +34,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.KeyboardVoice
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -441,10 +441,10 @@ internal fun ComposerPill(
                                 .alpha(if (inputContentVisible) 1f else 0f)
                                 .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
                     ) {
-                        // Keyboard + microphone is intentionally distinct from the
-                        // plain microphone used by hold-to-record voice notes.
+                        // A waveform keeps text dictation visually distinct from
+                        // the plain microphone used by hold-to-record voice notes.
                         Icon(
-                            Icons.Default.KeyboardVoice,
+                            Icons.Default.GraphicEq,
                             contentDescription = stringResource(R.string.dictate_text),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(21.dp),

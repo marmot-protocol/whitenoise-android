@@ -79,25 +79,25 @@ class ComposerDictationControlTest {
     }
 
     @Test
-    fun compactComposerActionUsesTheAppOwnedRecognizer() {
+    fun compactComposerActionUsesTheProviderOwnedRecognitionActivity() {
         val controller = render()
 
         composeRule.onNodeWithContentDescription("Dictate text").performClick()
 
-        assertTrue(controller.state is ConversationDictationState.Starting)
-        assertTrue(controller.ownsMicrophone)
+        assertTrue(controller.state is ConversationDictationState.ProviderActivityRequired)
+        assertFalse(controller.ownsMicrophone)
+        composeRule.onNodeWithTag(COMPOSER_DICTATION_STRIP_TAG).assertDoesNotExist()
+        composeRule.onNode(hasSetTextAction()).assertIsDisplayed()
     }
 
     @Test
-    fun attachmentSheetActionUsesTheProviderOwnedRecognitionActivity() {
+    fun attachmentSheetDoesNotDuplicateTheComposerDictationAction() {
         val controller = render(withAttachments = true)
         composeRule.onNodeWithContentDescription("Add attachment").performClick()
 
         val dictationActions = composeRule.onAllNodesWithContentDescription("Dictate text")
-        assertEquals(2, dictationActions.fetchSemanticsNodes().size)
-        dictationActions[1].performClick()
-
-        assertTrue(controller.state is ConversationDictationState.ProviderActivityRequired)
+        assertEquals(1, dictationActions.fetchSemanticsNodes().size)
+        assertTrue(controller.state is ConversationDictationState.Idle)
         assertFalse(controller.ownsMicrophone)
     }
 

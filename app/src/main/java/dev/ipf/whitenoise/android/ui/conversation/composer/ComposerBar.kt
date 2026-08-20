@@ -454,29 +454,6 @@ internal fun ComposerBar(
     val controllerForDictation = dictationController
     val accountForDictation = dictationAccountRef
     val groupForDictation = dictationGroupIdHex
-    val startInAppDictation: (() -> Unit)? =
-        if (controllerForDictation != null && accountForDictation != null && groupForDictation != null) {
-            if (editingMessageId != null) {
-                null
-            } else {
-                {
-                    composerEmojiPickerOpen = false
-                    composerEmojiPickerRequested = false
-                    attachmentSheetState.dismiss()
-                    composerExpansion = ComposerExpansionState()
-                    focusManager.clearFocus(force = true)
-                    keyboardController?.hide()
-                    controllerForDictation.requestStart(
-                        accountRef = accountForDictation,
-                        groupIdHex = groupForDictation,
-                        draft = textFieldValue,
-                    )
-                    onBottomInputChanged()
-                }
-            }
-        } else {
-            null
-        }
     val startProviderDictation: (() -> Unit)? =
         if (controllerForDictation != null && accountForDictation != null && groupForDictation != null) {
             if (editingMessageId != null) {
@@ -1048,7 +1025,20 @@ internal fun ComposerBar(
                 }
                 val activeRecordingController = voiceRecordingController?.takeIf { it.isRecording }
                 val isRecordingVoice = activeRecordingController != null
-                val dictationVisible = dictationOwnedByComposer && dictationState !is ConversationDictationState.Idle
+                // Provider handoff has no in-app recording phase. Keep the
+                // compact composer in place while the IME closes and Android's
+                // recognition Activity takes over; only actionable in-app
+                // results and failures replace it with the status strip.
+                val dictationVisible =
+                    dictationOwnedByComposer &&
+                        when (dictationState) {
+                            is ConversationDictationState.Idle,
+                            is ConversationDictationState.DisclosureRequired,
+                            is ConversationDictationState.ProviderActivityRequired,
+                            is ConversationDictationState.ProviderActivityActive,
+                            -> false
+                            else -> true
+                        }
                 val showMicButton =
                     (text.isBlank() || isRecordingVoice) &&
                         editingMessageId == null &&
@@ -1133,7 +1123,7 @@ internal fun ComposerBar(
                         onPickDocument = onPickDocument,
                         onPasteImageUris = onPasteImageUris?.takeIf { editingMessageId == null && !isRecordingVoice },
                         onDictation =
-                            startInAppDictation?.takeIf {
+                            startProviderDictation?.takeIf {
                                 dictationState is ConversationDictationState.Idle &&
                                     !dictationPendingElsewhere &&
                                     !isRecordingVoice
@@ -1374,10 +1364,6 @@ internal fun ComposerBar(
                                     }
                                 },
                             onComingSoon = { appState?.present(R.string.coming_soon) },
-                            onDictation =
-                                startProviderDictation?.takeIf {
-                                    !dictationPendingElsewhere && voiceRecordingController?.isRecording != true
-                                },
                         )
                     }
                 }

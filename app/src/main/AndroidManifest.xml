@@ -43,13 +43,8 @@
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
-        <!-- Package visibility for the installed speech-recognition service
-             used by the optional composer dictation control. -->
-        <intent>
-            <action android:name="android.speech.RecognitionService" />
-        </intent>
         <!-- Package visibility for the provider-owned recognition Activity
-             launched from the composer attachment sheet. -->
+             launched from the composer waveform action. -->
         <intent>
             <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
         </intent>
