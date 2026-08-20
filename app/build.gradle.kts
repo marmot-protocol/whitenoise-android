@@ -906,7 +906,7 @@ tasks.register<Test>("replayAppFuzzSyntheticCorpus") {
     dependsOn(":fuzz:syncAppFuzzSyntheticCorpus")
 }
 
-tasks.matching { it.name == "processDevZapstoreDebugUnitTestJavaRes" }.configureEach {
+tasks.matching { it.name.startsWith("process") && it.name.endsWith("UnitTestJavaRes") }.configureEach {
     dependsOn(":fuzz:syncAppFuzzSyntheticCorpus")
 }
 
