@@ -163,6 +163,15 @@ class GroupEmojiImagePickerTest {
         }
 
         select("🫨")
+        // The renderer failure surfaces from a Dispatchers.Default hop that
+        // waitForIdle does not await — poll for the error like awaitPreview
+        // does for success, instead of asserting the very next frame.
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule
+                .onAllNodesWithText("This emoji cannot be rendered on this device.")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
         composeRule.onNodeWithText("This emoji cannot be rendered on this device.").assertIsDisplayed()
         composeRule.onNodeWithText("Use emoji image").assertIsNotEnabled()
     }
