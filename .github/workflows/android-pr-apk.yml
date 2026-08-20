@@ -3,7 +3,7 @@ name: Android PR APK
 # This pull_request workflow is intentionally unprivileged. It compiles the PR
 # code and hands unsigned preview candidates to android-pr-preview-publish.yml;
 # it never receives signing or upload credentials. workflow_dispatch lets a
-# current internal PR head be rebuilt after merge to restore a missing comment.
+# current internal PR head be rebuilt after merge to restore missing preview links.
 on:
   pull_request:
     paths-ignore:
@@ -118,6 +118,7 @@ jobs:
         run: |
           .github/scripts/test-pr-preview-contract.sh
           .github/scripts/test-pr-preview-validation.sh
+          node --test .github/scripts/update-pr-preview-links.test.js
 
       # The Play distribution deliberately omits Zapstore's production-style
       # self-updater. Preview APKs are replaced only from the PR install link.

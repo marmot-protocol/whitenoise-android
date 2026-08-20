@@ -29,7 +29,7 @@ grep -Fq 'include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")' "$gradle"
 grep -Fq 'create("play")' "$gradle"
 grep -Fq 'buildConfigField("boolean", "SELF_UPDATE_ENABLED", "false")' "$gradle"
 grep -Fq 'Verify current PR head' "$workflow"
-grep -Fq 'Recheck PR head before comment' "$workflow"
+grep -Fq 'Recheck PR head before description update' "$workflow"
 grep -Fq 'Recheck PR head before upload' "$workflow"
 grep -Fq 'Test trusted publisher contract' "$workflow"
 grep -Fq '.github/scripts/test-pr-preview-validation.sh' "$workflow"
@@ -43,19 +43,21 @@ grep -Fq 'Resolve exact candidate provenance and current PR' "$workflow"
 grep -Fq 'stable_pr=$(provenance_value "$stable" pr_number)' "$workflow"
 grep -Fq '[[ "$stable_pr" == "$isolated_pr"' "$workflow"
 reject 'branches: [master]' "$build"
-grep -Fq 'stable app identity; keeps app data when switching PRs' "$workflow"
+grep -Fq 'Update PR description with preview links' "$workflow"
+grep -Fq '.github/scripts/update-pr-preview-links.js' "$workflow"
+grep -Fq 'stable app identity; keeps app data when switching PRs' .github/scripts/update-pr-preview-links.js
 grep -Fq 'github.event.repository.default_branch' "$workflow"
 reject 'github.event.workflow_run.repository.default_branch' "$workflow"
 # workflow_run.head_sha may gate pull_request runs, but must not override the
-# candidate-provenance HEAD_SHA in the comment step used by manual backfills.
+# candidate-provenance HEAD_SHA in the description step used by manual backfills.
 grep -Fq 'WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}' "$workflow"
 if grep -Eq '^[[:space:]]+HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}$' "$workflow"; then
-  printf 'Comment step must use the validated candidate HEAD_SHA.\n' >&2
+  printf 'Description step must use the validated candidate HEAD_SHA.\n' >&2
   exit 1
 fi
-grep -Fq 'process.env.HEAD_SHA.slice(0, 12)' "$workflow"
+grep -Fq 'headSha.slice(0, 12)' .github/scripts/update-pr-preview-links.js
 grep -Fq 'ref: ${{ steps.resolve.outputs.head_sha }}' "$build"
-grep -Fq 'restore a missing comment' "$build"
+grep -Fq 'restore missing preview links' "$build"
 grep -Fq -- '--min-sdk-version 34' .github/scripts/sign-pr-preview-candidates.sh
 grep -Fq 'cancel-in-progress: true' "$workflow"
 grep -Fq 'needs: prepare' "$workflow"
@@ -68,6 +70,6 @@ grep -Fq 'PR_PREVIEW_CERT_SHA256: ${{ secrets.PR_PREVIEW_CERT_SHA256 }}' "$workf
 reject 'pull_request_target:' "$build"
 # Both the pre-checkout prepare job and the post-checkout publish job must bind
 # artifact downloads explicitly to this repository. Without --repo, gh fails
-# before checkout with "not a git repository" and no sticky preview is posted.
+# before checkout with "not a git repository" and no preview links are posted.
 [[ $(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-stable' "$workflow") -eq 2 ]]
 [[ $(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-isolated' "$workflow") -eq 2 ]]
