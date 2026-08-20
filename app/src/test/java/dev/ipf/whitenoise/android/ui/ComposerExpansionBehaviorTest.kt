@@ -97,10 +97,9 @@ class ComposerExpansionBehaviorTest {
         assertTrue(attach.center.x < send.center.x)
         assertTrue(abs(emoji.bottom - send.bottom) <= 4f)
         assertTrue(abs(attach.bottom - send.bottom) <= 4f)
-        // 96dp wide x 36dp tall: the width keeps the merged control easily
-        // grabbable while the reduced height returns drafting space that a
-        // full touch-target row of top inset used to consume.
-        assertTrue("resize handle should keep a grabbable touch strip", resize.height >= 36f)
+        // The semantics and gesture layer meets the accessibility target while
+        // the visual handle remains in the compact 36dp top inset.
+        assertTrue("resize handle should meet the 48dp touch minimum", resize.height >= 48f)
         assertTrue("resize handle should stay wide", resize.width >= 96f)
         assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
     }

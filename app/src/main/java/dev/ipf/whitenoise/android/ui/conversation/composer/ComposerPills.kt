@@ -458,9 +458,9 @@ internal fun ComposerPill(
             if (expandedLayout && inputContentVisible) {
                 // One control owns both resize paths: continuous drag, and the
                 // documented accessible tap alternative that toggles full
-                // screen. The strip stays 96dp wide so the reduced height keeps
-                // a comfortably grabbable target without reserving a full
-                // touch-target row of dead space above the first text line.
+                // screen. The 48dp interaction layer overlaps the first 12dp
+                // of the editor rather than reserving more vertical space; the
+                // visible handle remains centered in the original 36dp inset.
                 val toggleDescription =
                     stringResource(
                         if (expansionMode == ComposerExpansionMode.FullScreen) {
@@ -475,7 +475,7 @@ internal fun ComposerPill(
                         Modifier
                             .align(Alignment.TopCenter)
                             .width(96.dp)
-                            .height(36.dp)
+                            .height(48.dp)
                             .pointerInput(Unit) {
                                 detectVerticalDragGestures(
                                     onVerticalDrag = { change, dragAmount ->
@@ -495,6 +495,7 @@ internal fun ComposerPill(
                 ) {
                     Box(
                         Modifier
+                            .offset(y = (-6).dp)
                             .width(36.dp)
                             .height(4.dp)
                             .background(

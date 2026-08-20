@@ -10,6 +10,7 @@ apk="$tmp/preview.apk"
 printf 'test apk bytes' > "$apk"
 expected_sha=$(sha256sum "$apk" | awk '{print $1}')
 state="$tmp/attempts"
+curl_state="$tmp/curl-attempts"
 fake_nak="$tmp/nak"
 fake_curl="$tmp/curl"
 
@@ -96,18 +97,34 @@ chmod +x "$fake_nak"
 cat > "$fake_curl" <<'FAKE_CURL'
 #!/usr/bin/env bash
 set -euo pipefail
-printf 'HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: 14\r\n\r\n' "$FAKE_SERVE_TYPE"
+attempt=$(<"$FAKE_CURL_STATE")
+attempt=$((attempt + 1))
+printf '%s\n' "$attempt" > "$FAKE_CURL_STATE"
+case "$FAKE_SERVE_SCENARIO:$attempt" in
+  transport:1)
+    exit 7
+    ;;
+  mime-delay:1)
+    served_type='application/octet-stream'
+    ;;
+  *)
+    served_type=$FAKE_SERVE_TYPE
+    ;;
+esac
+printf 'HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: 14\r\n\r\n' "$served_type"
 FAKE_CURL
 chmod +x "$fake_curl"
 
 run_uploader() {
   local scenario=$1
   local serve_type=${2:-}
+  local serve_scenario=${3:-success}
   local skip_serve_check=1
   if [[ -n "$serve_type" ]]; then
     skip_serve_check=''
   fi
   printf '0\n' > "$state"
+  printf '0\n' > "$curl_state"
   stdout="$tmp/$scenario.stdout"
   stderr="$tmp/$scenario.stderr"
   set +e
@@ -118,9 +135,11 @@ run_uploader() {
     NAK_BIN="$fake_nak" \
     PATH="$tmp:$PATH" \
     FAKE_NAK_STATE="$state" \
+    FAKE_CURL_STATE="$curl_state" \
     FAKE_APK_SHA256="$expected_sha" \
     FAKE_SCENARIO="$scenario" \
     FAKE_SERVE_TYPE="$serve_type" \
+    FAKE_SERVE_SCENARIO="$serve_scenario" \
     BLOSSOM_UPLOAD_BACKOFF_SECONDS=0 \
     BLOSSOM_UPLOAD_TIMEOUT_SECONDS=1 \
     "$uploader" >"$stdout" 2>"$stderr"
@@ -216,9 +235,19 @@ for serve_type in \
 done
 printf 'ok - accepts bare and parameterized HEAD Content-Type values\n'
 
+for serve_scenario in transport mime-delay; do
+  run_uploader success 'application/vnd.android.package-archive' "$serve_scenario"
+  [[ "$status" == '0' ]]
+  [[ "$(<"$state")" == '1' ]]
+  [[ "$(<"$curl_state")" == '2' ]]
+  [[ "$(<"$stderr")" == *'Transient Blossom serve verification failure'* ]]
+done
+printf 'ok - retries transient HEAD transport and propagation failures\n'
+
 run_uploader success 'application/zip'
 [[ "$status" != '0' ]]
 [[ "$(<"$state")" == '1' ]]
+[[ "$(<"$curl_state")" == '3' ]]
 [[ "$(<"$stderr")" == *'Blossom serves '*' as application/zip instead of'* ]]
 printf 'ok - fails closed on a wrong HEAD Content-Type\n'
 

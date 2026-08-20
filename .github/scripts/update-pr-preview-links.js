@@ -69,6 +69,10 @@ async function run({ github, context, core }) {
     repo: context.repo.repo,
     pull_number: prNumber,
   })
+  if (pr.state !== 'open' || pr.head?.sha !== headSha) {
+    core.info(`Skipping preview links for superseded PR head ${headSha}.`)
+    return
+  }
   const section = renderSection({ prNumber, headSha, stableUrl, isolatedUrl })
   await github.rest.pulls.update({
     owner: context.repo.owner,
@@ -77,6 +81,19 @@ async function run({ github, context, core }) {
     body: replaceSection(pr.body, section),
   })
   core.info('Updated the pull request description with preview APK links.')
+
+  // A newer push can land while this job is publishing. Keep the legacy
+  // fallback comment unless the PR is still open at this exact build head;
+  // the newer job can replace the links and remove it safely.
+  const { data: latestPr } = await github.rest.pulls.get({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    pull_number: prNumber,
+  })
+  if (latestPr.state !== 'open' || latestPr.head?.sha !== headSha) {
+    core.info(`Keeping the legacy preview comment because PR #${prNumber} moved after publication.`)
+    return
+  }
   await removeLegacyPreviewComment(github, context, prNumber, core)
 }
 
