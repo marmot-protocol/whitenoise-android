@@ -125,6 +125,7 @@ class NotificationReplyWorker(
                 }
             when (sendOutcome) {
                 NotificationReplySendOutcome.Sent,
+                NotificationReplySendOutcome.AcceptedPending,
                 NotificationReplySendOutcome.AlreadyCommitted,
                 -> {
                     withContext(Dispatchers.IO) {
@@ -428,6 +429,7 @@ class NotificationReplyWorker(
         ): Result =
             when {
                 outcome == NotificationReplySendOutcome.Sent ||
+                    outcome == NotificationReplySendOutcome.AcceptedPending ||
                     outcome == NotificationReplySendOutcome.AlreadyCommitted -> Result.success()
                 // A retryable failure whose attempt count couldn't be persisted (null)
                 // fails closed: retrying without a durable count lets the bound never

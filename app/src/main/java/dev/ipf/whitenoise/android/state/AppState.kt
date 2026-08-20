@@ -55,6 +55,7 @@ import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.RetentionSweepGroupOutcomeFfi
 import dev.ipf.marmotkit.RetentionSweepStatusFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -7215,6 +7216,12 @@ class WhiteNoiseAppState private constructor(
                 }
 
                 val summary = marmotIo { sendText(account, group, body) }
+                if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
+                    // The intent is already durable in MDK. There is no event id
+                    // to persist yet, but replaying this quick reply would create
+                    // a second intent, so complete the Android work item now.
+                    return@withGroupCommitLock NotificationReplySendOutcome.AcceptedPending
+                }
                 val committedMessageId =
                     summary.messageIds
                         .firstOrNull()

@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
@@ -88,6 +89,16 @@ internal data class StartChatErrorUiState(
     val copyable: Boolean
         get() = !diagnosticReport.isNullOrBlank()
 }
+
+/**
+ * MDK created the canonical group but could not load its local chat row yet.
+ * The id is safe to retain for a targeted read retry; creating again would
+ * create a duplicate conversation.
+ */
+internal fun createdGroupIdAfterProjectionUnavailable(error: Throwable): String? =
+    (error as? MarmotKitException.CreatedGroupProjectionUnavailable)
+        ?.groupIdHex
+        ?.takeIf { it.isNotBlank() }
 
 private fun startChatFailureReport(error: Throwable): String? =
     if (startProfileChatFailureCopyable(error)) {
@@ -166,16 +177,20 @@ internal suspend fun attemptStartProfileChat(
                 abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
                 throw error
             }
-            abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CREATE_FAILED)
-            return StartChatAttemptResult.Failed(
-                startChatErrorUiState(
-                    npub = npub,
-                    progressHex = progressHex,
-                    error = error,
-                    recipientName = recipientName,
-                    displayName = displayName,
-                ),
-            )
+            createdGroupIdAfterProjectionUnavailable(error)?.also {
+                markCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_RETURN)
+            } ?: run {
+                abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CREATE_FAILED)
+                return StartChatAttemptResult.Failed(
+                    startChatErrorUiState(
+                        npub = npub,
+                        progressHex = progressHex,
+                        error = error,
+                        recipientName = recipientName,
+                        displayName = displayName,
+                    ),
+                )
+            }
         }
     return try {
         runCatchingCancellable {

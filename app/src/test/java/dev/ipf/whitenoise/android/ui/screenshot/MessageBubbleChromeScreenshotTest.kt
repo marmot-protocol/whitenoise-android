@@ -75,6 +75,32 @@ class MessageBubbleChromeScreenshotTest {
     }
 
     @Test
+    fun acceptedPendingFooterLight() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface {
+                    Column(modifier = Modifier.width(360.dp).padding(16.dp).testTag(TAG)) {
+                        Text("Accepted, awaiting publication")
+                        MessageInlineFooter(
+                            timeText = "12:36",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            showStatus = true,
+                            status = MessageStatus.Pending,
+                            editedLabel = null,
+                            onEditedClick = null,
+                            retention = null,
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/message_bubble_accepted_pending_light.png")
+    }
+
+    @Test
     fun bubbleChromeAmoledDirectionAccents() {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -70,6 +71,7 @@ class RetentionOptimisticMessageHandoffTest {
 
         reconcileSuccessfulTextSend(
             summaryMessageIds = listOf("confirmed-retained"),
+            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
             optimisticKey = key,
             tempId = tempId,
             optimisticRecord = record,
