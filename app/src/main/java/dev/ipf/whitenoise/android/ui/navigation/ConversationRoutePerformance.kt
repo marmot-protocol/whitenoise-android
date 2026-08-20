@@ -24,7 +24,17 @@ internal fun conversationRouteSettled(
     currentStateMatchesTarget: Boolean,
     transitionRunning: Boolean,
     destinationContentReady: Boolean,
-): Boolean = currentStateMatchesTarget && !transitionRunning && destinationContentReady
+): Boolean =
+    conversationRouteTransitionComplete(
+        currentStateMatchesTarget = currentStateMatchesTarget,
+        transitionRunning = transitionRunning,
+    ) &&
+        destinationContentReady
+
+internal fun conversationRouteTransitionComplete(
+    currentStateMatchesTarget: Boolean,
+    transitionRunning: Boolean,
+): Boolean = currentStateMatchesTarget && !transitionRunning
 
 internal fun conversationControllerReleased(
     conversationOpen: Boolean,
@@ -92,7 +102,5 @@ internal fun ConversationControllerReleasedPerformanceMarker(controllerReleased:
 }
 
 internal const val CONVERSATION_ROUTE_TRANSITION_MILLIS = 240
-
-/** Extra frames the outgoing route is retained past its tween before release. */
-internal const val CONVERSATION_ROUTE_EXIT_RETENTION_SLACK_MILLIS = 32L
+internal const val CONVERSATION_PENDING_OPEN_TIMEOUT_MILLIS = 300L
 internal const val MAIN_SHELL_ROUTE_KEY = "main-shell"

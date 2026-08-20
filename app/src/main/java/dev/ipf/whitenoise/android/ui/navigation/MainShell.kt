@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -28,6 +29,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -85,8 +88,10 @@ import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
 import dev.ipf.whitenoise.android.ui.share.ShareChatPickerFullScreen
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal data class ConversationOpenContext(
     val focusMessageId: String? = null,
@@ -1501,7 +1506,7 @@ internal fun MainShell(
         mainShellAccountContentOwned(previousActiveAccountRef, appState.activeAccountRef) ||
             earlyOpenLandsPinnedAccount
     val controllerChat =
-        selectedChat?.takeIf { navAccountStable }
+        selectedChat?.takeIf { navAccountStable && conversationAccountRef != null }
             ?: accountOwnedPendingConversationOpen?.item
     val selectedOrPendingConversationController =
         controllerChat?.let { openChat ->
@@ -1532,21 +1537,30 @@ internal fun MainShell(
     val conversationController =
         selectedOrPendingConversationController
             ?: accountOwnedExitingConversationContent?.controller
-    // The controller is owned by the selected conversation route, not the
-    // ConversationScreen composition. The profile-to-group picker temporarily
-    // replaces that screen, so disposing the controller with the screen would
-    // retain and then reuse an already-cleared controller when Back restores it.
-    DisposableEffect(conversationController) {
-        conversationController?.let(appState::attachConversationController)
-        onDispose {
-            conversationController?.let {
-                appState.detachConversationController(it)
-                it.onCleared()
+    // Preloading, selected, and outgoing routes can briefly own different
+    // controllers during a rapid Back -> open gesture. Keep each instance alive
+    // for as long as any route slot references it; a single "current" effect
+    // would clear the outgoing controller while AnimatedContent still composes it.
+    val ownedConversationControllers =
+        remember(selectedOrPendingConversationController, accountOwnedExitingConversationContent?.controller) {
+            listOfNotNull(
+                selectedOrPendingConversationController,
+                accountOwnedExitingConversationContent?.controller,
+            ).distinct()
+        }
+    ownedConversationControllers.forEach { ownedController ->
+        key(ownedController) {
+            DisposableEffect(ownedController) {
+                appState.attachConversationController(ownedController)
+                onDispose {
+                    appState.detachConversationController(ownedController)
+                    ownedController.onCleared()
+                }
+            }
+            LaunchedEffect(ownedController, ownedController.retryGeneration) {
+                ownedController.start()
             }
         }
-    }
-    LaunchedEffect(conversationController, conversationController?.retryGeneration) {
-        conversationController?.start()
     }
     LaunchedEffect(
         conversationController,
@@ -1561,36 +1575,31 @@ internal fun MainShell(
             )
         }
     }
-    LaunchedEffect(exitingConversationContent?.chat?.id, selectedChat?.id) {
-        val exiting = exitingConversationContent ?: return@LaunchedEffect
-        if (selectedChat?.id == exiting.chat.id) return@LaunchedEffect
-        delay(CONVERSATION_ROUTE_TRANSITION_MILLIS.toLong() + CONVERSATION_ROUTE_EXIT_RETENTION_SLACK_MILLIS)
-        if (selectedChat?.id != exiting.chat.id) exitingConversationContent = null
-    }
     val pendingOpen = accountOwnedPendingConversationOpen
     LaunchedEffect(
         pendingOpen?.requestId,
         conversationController,
-        conversationController?.hasPublishedAuthoritativeTimeline,
-        conversationController?.hasPreparedInitialPresentation,
-        conversationController?.error,
-        conversationController?.terminalConversationUnavailable,
     ) {
         val request = pendingOpen ?: return@LaunchedEffect
         val controller = conversationController ?: return@LaunchedEffect
         if (!controller.group.groupIdHex.equals(request.item.group.groupIdHex, ignoreCase = true)) {
             return@LaunchedEffect
         }
-        if (
-            !preparedConversationCanOpen(
-                hasPublishedAuthoritativeTimeline = controller.hasPublishedAuthoritativeTimeline,
-                hasPreparedInitialPresentation = controller.hasPreparedInitialPresentation,
-                hasLoadError = controller.error != null,
-                terminalConversationUnavailable = controller.terminalConversationUnavailable,
-            )
-        ) {
-            return@LaunchedEffect
+        withTimeoutOrNull(CONVERSATION_PENDING_OPEN_TIMEOUT_MILLIS) {
+            snapshotFlow {
+                preparedConversationCanOpen(
+                    hasPublishedAuthoritativeTimeline = controller.hasPublishedAuthoritativeTimeline,
+                    hasPreparedInitialPresentation = controller.hasPreparedInitialPresentation,
+                    hasLoadError = controller.error != null,
+                    terminalConversationUnavailable = controller.terminalConversationUnavailable,
+                )
+            }.filter { it }
+                .first()
         }
+        // A normal cached open reaches the ready state before this deadline and
+        // keeps its spinner-free transition. A stuck local read must not make a
+        // tap look ignored indefinitely; after the bound, the destination owns
+        // the existing loading/error surfaces while the same controller continues.
         selectedChatOpenContext = ConversationOpenContext(focusMessageId = request.focusMessageId)
         selectedChatJustCreated = request.justCreated
         selectedChatOpenedAsDmHint = request.justCreated
@@ -1634,7 +1643,7 @@ internal fun MainShell(
     }
     ProfileGroupForegroundCoordinator(
         appState = appState,
-        conversationController = conversationController.takeIf { selectedChat != null },
+        conversationController = selectedOrPendingConversationController.takeIf { selectedChat != null },
         profileGroupForegroundState = profileGroupForegroundState,
         secureWindowEnabled =
             if (selectedChat != null || section == MainSection.Chats) {
@@ -1663,18 +1672,39 @@ internal fun MainShell(
         val routeForwardDirection = conversationRouteForwardDirection(LocalLayoutDirection.current)
         val transitionContent =
             selectedChat?.let { chat ->
-                conversationController?.let { controller ->
-                    ConversationTransitionContent(
-                        chat = chat,
-                        controller = controller,
-                        accountRef = requireNotNull(conversationAccountRef),
-                        openContext = selectedChatOpenContext,
-                        justCreated = selectedChatJustCreated,
-                        openedAsDmHint = selectedChatOpenedAsDmHint,
-                    )
+                selectedOrPendingConversationController?.let { controller ->
+                    conversationAccountRef?.let { accountRef ->
+                        ConversationTransitionContent(
+                            chat = chat,
+                            controller = controller,
+                            accountRef = accountRef,
+                            openContext = selectedChatOpenContext,
+                            justCreated = selectedChatJustCreated,
+                            openedAsDmHint = selectedChatOpenedAsDmHint,
+                        )
+                    }
                 }
             }
         val routeTransition = updateTransition(targetState = transitionContent, label = "conversation route")
+        LaunchedEffect(exitingConversationContent?.chat?.id, selectedChat?.id, routeTransition) {
+            val exiting = exitingConversationContent ?: return@LaunchedEffect
+            if (selectedChat?.id == exiting.chat.id) {
+                exitingConversationContent = null
+                return@LaunchedEffect
+            }
+            snapshotFlow {
+                conversationRouteTransitionComplete(
+                    currentStateMatchesTarget = routeTransition.currentState == routeTransition.targetState,
+                    transitionRunning = routeTransition.isRunning,
+                )
+            }.filter { it }
+                .first()
+            // AnimatedContent removes its outgoing slot at completion. Give that
+            // disposal one committed frame before releasing the controller that
+            // the outgoing ConversationScreen may still reference.
+            withFrameNanos { }
+            if (selectedChat?.id != exiting.chat.id) exitingConversationContent = null
+        }
         routeTransition.AnimatedContent(
             transitionSpec = {
                 when {

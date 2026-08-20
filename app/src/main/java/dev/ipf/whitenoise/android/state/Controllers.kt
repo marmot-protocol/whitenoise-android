@@ -7472,6 +7472,11 @@ class ConversationController(
             // Do not keep any plaintext row visible under an unavailable owner.
             timeline = emptyList()
         }
+        // Failure is an authoritative resolution of the initial presentation:
+        // there is no page left to await. Let the route reconcile/reveal the
+        // retained optimistic rows or switch to its terminal-unavailable surface.
+        hasPublishedAuthoritativeTimeline = true
+        hasPreparedInitialPresentation = true
     }
 
     private fun publishAuthoritativeEmptyInitialTimeline() {

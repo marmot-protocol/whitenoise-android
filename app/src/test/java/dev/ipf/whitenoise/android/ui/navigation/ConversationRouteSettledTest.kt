@@ -42,6 +42,28 @@ class ConversationRouteSettledTest {
     }
 
     @Test
+    fun transitionCompletesOnlyAfterCurrentStateLandsAndAnimationStops() {
+        assertTrue(
+            conversationRouteTransitionComplete(
+                currentStateMatchesTarget = true,
+                transitionRunning = false,
+            ),
+        )
+        assertFalse(
+            conversationRouteTransitionComplete(
+                currentStateMatchesTarget = false,
+                transitionRunning = false,
+            ),
+        )
+        assertFalse(
+            conversationRouteTransitionComplete(
+                currentStateMatchesTarget = true,
+                transitionRunning = true,
+            ),
+        )
+    }
+
+    @Test
     fun controllerReleaseMarkerWaitsPastTheOutgoingRetentionWindow() {
         assertFalse(
             conversationControllerReleased(

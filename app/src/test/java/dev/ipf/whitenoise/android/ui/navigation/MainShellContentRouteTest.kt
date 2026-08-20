@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.navigation
 import androidx.compose.ui.unit.LayoutDirection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -168,6 +169,18 @@ class MainShellContentRouteTest {
                 pinnedAccountRef = null,
                 notificationRouteTraceRequestId = null,
                 notificationEarlyOpenRequestId = 0L,
+            ),
+        )
+    }
+
+    @Test
+    fun conversationRouteHasNoAccountWhenEveryOwnershipSourceIsAbsent() {
+        assertNull(
+            conversationControllerAccountRef(
+                selectedPinnedAccountRef = null,
+                pendingAccountRef = null,
+                exitingAccountRef = null,
+                activeAccountRef = null,
             ),
         )
     }

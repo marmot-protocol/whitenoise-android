@@ -57,7 +57,7 @@ class LoadFailurePlacementTest {
         assertTrue(controllers.countOccurrences("terminalLoadFailure = true") >= 2)
         assertTrue(controllers.countOccurrences("retryGeneration += 1L") >= 2)
         assertTrue("chatsController.retryGeneration" in shell)
-        assertTrue("conversationController?.retryGeneration" in shell)
+        assertTrue("ownedController.retryGeneration" in shell)
         assertTrue("preserveLoadedContent = chatsController.retryGeneration > 0L" in shell)
     }
 
