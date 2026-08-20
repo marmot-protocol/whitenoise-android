@@ -1,6 +1,10 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.remember
@@ -9,9 +13,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerFrame
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerGallery
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
+import dev.ipf.whitenoise.android.ui.conversation.media.visualMediaViewerGallery
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,11 +30,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * Baseline for the full-screen media viewer's default loading frame: permanent
- * black chrome with close/save/share controls, page counter, caption scrim, and
- * a centered spinner — no live controller or attachment decode.
- */
+/** Deterministic baselines for the full-screen media viewer's gallery states. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
@@ -54,5 +61,132 @@ class MediaViewerScreenshotTest {
             }
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_default_frame.png")
+    }
+
+    @Test
+    fun mediaViewerFallbackGalleryUsesTheTappedPageMetadata() {
+        val tapped = page("tapped", sender = "Blair", recordedAt = 200uL)
+        val gallery =
+            visualMediaViewerGallery(
+                conversationImagePages = emptyList(),
+                messagePages = listOf(tapped),
+                tappedAttachmentIndex = tapped.attachmentIndex,
+            )
+
+        assertEquals(listOf(tapped), gallery.pages)
+        assertEquals(0, gallery.startIndex)
+        captureGallery(
+            gallery = gallery,
+            currentPageIndex = gallery.startIndex,
+            recordedAtLabel = "Jul 16, 2026, 3:45 PM",
+            mediaColor = TAPPED_MEDIA_COLOR,
+            snapshotName = "media_viewer_fallback_gallery.png",
+        )
+    }
+
+    @Test
+    fun mediaViewerLoadedGalleryPreservesTheTappedPageAndMetadata() {
+        val gallery = loadedConversationGallery()
+
+        assertEquals(1, gallery.startIndex)
+        assertEquals("tapped", gallery.pages[gallery.startIndex].messageIdHex)
+        captureGallery(
+            gallery = gallery,
+            currentPageIndex = gallery.startIndex,
+            recordedAtLabel = "Jul 16, 2026, 3:45 PM",
+            mediaColor = TAPPED_MEDIA_COLOR,
+            snapshotName = "media_viewer_loaded_gallery_current_page.png",
+        )
+    }
+
+    @Test
+    fun mediaViewerPagedGalleryShowsTheCurrentPagesMetadata() {
+        val gallery = loadedConversationGallery()
+        val oldestPageIndex = gallery.pages.lastIndex
+
+        assertEquals("oldest", gallery.pages[oldestPageIndex].messageIdHex)
+        captureGallery(
+            gallery = gallery,
+            currentPageIndex = oldestPageIndex,
+            recordedAtLabel = "Jul 14, 2026, 9:15 AM",
+            mediaColor = OLDEST_MEDIA_COLOR,
+            snapshotName = "media_viewer_paged_gallery_current_page.png",
+        )
+    }
+
+    private fun loadedConversationGallery(): MediaViewerGallery {
+        val newest = page("newest", sender = "Alex", recordedAt = 300uL)
+        val tapped = page("tapped", sender = "Blair", recordedAt = 200uL)
+        val oldest = page("oldest", sender = "Casey", recordedAt = 100uL)
+        return visualMediaViewerGallery(
+            conversationImagePages = listOf(newest, tapped, oldest),
+            messagePages = listOf(tapped),
+            tappedAttachmentIndex = tapped.attachmentIndex,
+        )
+    }
+
+    private fun captureGallery(
+        gallery: MediaViewerGallery,
+        currentPageIndex: Int,
+        recordedAtLabel: String,
+        mediaColor: Color,
+        snapshotName: String,
+    ) {
+        val currentPage = gallery.pages[currentPageIndex]
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                MediaViewerFrame(
+                    pageIndex = currentPageIndex,
+                    pageCount = gallery.pages.size,
+                    senderLabel = currentPage.sender,
+                    recordedAtLabel = recordedAtLabel,
+                    onDismiss = {},
+                    onSave = {},
+                    onShare = {},
+                    snackbarHostState = remember { SnackbarHostState() },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(Alignment.Center)
+                                .fillMaxWidth()
+                                .height(240.dp)
+                                .background(mediaColor),
+                    )
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshotName")
+    }
+
+    private fun page(
+        messageIdHex: String,
+        sender: String,
+        recordedAt: ULong,
+    ) = MediaViewerPage(
+        messageIdHex = messageIdHex,
+        attachmentIndex = 0,
+        reference =
+            MediaAttachmentReferenceFfi(
+                locators = emptyList(),
+                ciphertextSha256 = "aa".repeat(32),
+                plaintextSha256 = "bb".repeat(32),
+                nonceHex = "cc".repeat(12),
+                fileName = "$messageIdHex.jpg",
+                mediaType = "image/jpeg",
+                version = EncryptedMediaVersionFfi.V1,
+                sourceEpoch = 1uL,
+                dim = null,
+                thumbhash = null,
+            ),
+        mine = false,
+        sender = sender,
+        recordedAt = recordedAt,
+    )
+
+    private companion object {
+        val TAPPED_MEDIA_COLOR = Color(0xFF315C7D)
+        val OLDEST_MEDIA_COLOR = Color(0xFF7D4B31)
     }
 }
