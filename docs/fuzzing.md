@@ -50,7 +50,7 @@ export JAVA_HOME=/path/to/temurin-17
 # Runner self-check (verifies standalone Jazzer jobs/workers in engine logs)
 scripts/fuzz-run-campaign.sh --self-check
 
-# Injected-crash self-check (minimize -> fresh replay -> privacy/classification metadata)
+# Injected campaign-failure self-check (minimize -> fresh replay -> privacy/classification metadata)
 scripts/fuzz-run-campaign.sh --self-check-failure
 
 # Fixed-run local verification

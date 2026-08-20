@@ -200,18 +200,21 @@ self_check_failure() {
   local corpus_root="fuzz/build/cifuzz-corpus/${SELF_CHECK_FAILURE_TARGET}"
   local crash_dir="${corpus_root}/generated"
   local crash_file="${crash_dir}/crash-self-check"
-  rm -rf "$corpus_root" "$TRIAGE_METADATA_DIR"
+  local saved_runs="$FUZZ_RUNS"
+  FUZZ_RUNS=100
+  rm -rf "$corpus_root" "$TRIAGE_METADATA_DIR" "$LOG_DIR"
   mkdir -p "$crash_dir"
   printf '%s' "$SELF_CHECK_FAILURE_MAGIC" >"$crash_file"
 
   log "self_check_failure=compile"
   ./gradlew "${GRADLE_FLAGS[@]}" :fuzz:compileKotlin :fuzz:compileTestKotlin
 
-  log "self_check_failure=triage target=$SELF_CHECK_FAILURE_TARGET"
-  if triage_target_artifacts "$SELF_CHECK_FAILURE_TARGET"; then
-    log "self_check_failure=failed step=triage expected_nonzero=true"
+  log "self_check_failure=campaign target=$SELF_CHECK_FAILURE_TARGET runs=$FUZZ_RUNS"
+  if run_target "$SELF_CHECK_FAILURE_TARGET"; then
+    log "self_check_failure=failed step=campaign expected_nonzero=true"
     exit 1
   fi
+  FUZZ_RUNS="$saved_runs"
 
   local metadata_count=0
   if [[ -d "$TRIAGE_METADATA_DIR" ]]; then
