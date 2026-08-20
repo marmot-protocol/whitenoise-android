@@ -2,6 +2,10 @@ package dev.ipf.whitenoise.android.audio
 
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -135,6 +139,53 @@ class ConversationDictationControllerTest {
         assertEquals(0, fixture.writes)
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun authoritativeValidationDropsResultWhenInactiveOriginGroupWasRemoved() =
+        runTest {
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Keep", TextRange(4)),
+                    targetValidator = { _, _ -> false },
+                    targetValidationScope = this,
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onReady()
+
+            fixture.platform.listener.onResult("discard me")
+            advanceUntilIdle()
+
+            assertEquals("Keep", fixture.drafts.getValue(key()).text)
+            assertEquals(0, fixture.writes)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun reviewInsertionRevalidatesRemovedOriginGroup() =
+        runTest {
+            var targetExists = true
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Original anchor", TextRange(8)),
+                    targetValidator = { _, _ -> targetExists },
+                    targetValidationScope = this,
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.edit(key(), TextFieldValue("Completely rewritten", TextRange(20)))
+            fixture.platform.listener.onResult("dictated words")
+            advanceUntilIdle()
+            assertTrue(fixture.controller.state is ConversationDictationState.ReviewRequired)
+
+            targetExists = false
+            fixture.controller.insertReviewAtEnd()
+            advanceUntilIdle()
+
+            assertEquals("Completely rewritten", fixture.drafts.getValue(key()).text)
+            assertEquals(0, fixture.writes)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
 
     @Test
     fun playbackIsStoppedBeforeRecognizerStarts() {
@@ -604,6 +655,8 @@ class ConversationDictationControllerTest {
     private fun fixture(
         draft: TextFieldValue,
         targetAvailable: () -> Boolean = { true },
+        targetValidator: (suspend (String, String) -> Boolean)? = null,
+        targetValidationScope: CoroutineScope? = null,
         onBeforeRecognition: () -> Unit = {},
         platform: FakePlatform = FakePlatform(),
         tryAcquireMicrophone: () -> Boolean = { true },
@@ -634,6 +687,8 @@ class ConversationDictationControllerTest {
                     }
                 },
                 targetAvailable = { _, _ -> targetAvailable() },
+                targetValidator = targetValidator,
+                targetValidationScope = targetValidationScope,
                 onBeforeRecognition = onBeforeRecognition,
                 tryAcquireMicrophone = tryAcquireMicrophone,
                 releaseMicrophone = releaseMicrophone,

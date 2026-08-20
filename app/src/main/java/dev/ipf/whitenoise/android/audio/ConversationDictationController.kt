@@ -22,6 +22,10 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrAfter
 import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrBefore
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal data class ConversationDictationTarget(
     val accountRef: String,
@@ -191,6 +195,8 @@ internal class ConversationDictationController internal constructor(
         value: TextFieldValue,
     ) -> Boolean,
     private val targetAvailable: (accountRef: String, groupIdHex: String) -> Boolean = { _, _ -> true },
+    private val targetValidator: (suspend (accountRef: String, groupIdHex: String) -> Boolean)? = null,
+    private val targetValidationScope: CoroutineScope? = null,
     private val onBeforeRecognition: () -> Unit = {},
     private val tryAcquireMicrophone: () -> Boolean = { true },
     private val releaseMicrophone: () -> Unit = {},
@@ -210,6 +216,8 @@ internal class ConversationDictationController internal constructor(
             value: TextFieldValue,
         ) -> Boolean,
         targetAvailable: (accountRef: String, groupIdHex: String) -> Boolean,
+        targetValidator: suspend (accountRef: String, groupIdHex: String) -> Boolean,
+        targetValidationScope: CoroutineScope,
         onBeforeRecognition: () -> Unit,
         tryAcquireMicrophone: () -> Boolean,
         releaseMicrophone: () -> Unit,
@@ -218,6 +226,8 @@ internal class ConversationDictationController internal constructor(
         readDraft = readDraft,
         writeDraft = writeDraft,
         targetAvailable = targetAvailable,
+        targetValidator = targetValidator,
+        targetValidationScope = targetValidationScope,
         onBeforeRecognition = onBeforeRecognition,
         tryAcquireMicrophone = tryAcquireMicrophone,
         releaseMicrophone = releaseMicrophone,
@@ -245,6 +255,7 @@ internal class ConversationDictationController internal constructor(
     private var recognitionSession: ConversationDictationRecognitionSession? = null
     private var timeoutHandle: ConversationDictationTimeoutHandle? = null
     private var microphoneHeld = false
+    private var validatingSessionId: Long? = null
 
     private val _permissionRequestId = mutableLongStateOf(0L)
     val permissionRequestId: Long
@@ -412,7 +423,7 @@ internal class ConversationDictationController internal constructor(
             cancel()
             return
         }
-        deliverTranscript(active.sessionId, active.target, recognized)
+        validateAndDeliverTranscript(active.sessionId, active.target, recognized)
     }
 
     fun onProviderActivityCancelled() {
@@ -448,6 +459,32 @@ internal class ConversationDictationController internal constructor(
             cancel()
             return
         }
+        val validator = targetValidator
+        val validationScope = targetValidationScope
+        if (validator == null || validationScope == null) {
+            insertReviewAtEndValidated(review)
+            return
+        }
+        if (validatingSessionId == review.sessionId) return
+        validatingSessionId = review.sessionId
+        validationScope.launch {
+            val available =
+                try {
+                    validateTargetAuthoritatively(validator, review.target)
+                } finally {
+                    if (validatingSessionId == review.sessionId) validatingSessionId = null
+                }
+            val current = state as? ConversationDictationState.ReviewRequired
+            if (current?.sessionId != review.sessionId) return@launch
+            if (!available || !targetAvailable(review.target.accountRef, review.target.groupIdHex)) {
+                cancel()
+                return@launch
+            }
+            insertReviewAtEndValidated(review)
+        }
+    }
+
+    private fun insertReviewAtEndValidated(review: ConversationDictationState.ReviewRequired) {
         repeat(MAX_CONDITIONAL_WRITE_ATTEMPTS) {
             val current = readDraft(review.target.accountRef, review.target.groupIdHex)
             val merged = appendConversationDictationTranscript(current.value, review.transcript)
@@ -594,7 +631,7 @@ internal class ConversationDictationController internal constructor(
                         cancel()
                         return
                     }
-                    deliverTranscript(sessionId, target, recognized)
+                    validateAndDeliverTranscript(sessionId, target, recognized)
                 }
 
                 override fun onError(error: ConversationDictationFailure) {
@@ -629,6 +666,7 @@ internal class ConversationDictationController internal constructor(
     }
 
     private fun clearRecognitionSession(cancel: Boolean) {
+        validatingSessionId = null
         timeoutHandle?.cancel()
         timeoutHandle = null
         val session = recognitionSession
@@ -647,7 +685,7 @@ internal class ConversationDictationController internal constructor(
         transcript: String,
     ) {
         repeat(MAX_CONDITIONAL_WRITE_ATTEMPTS) {
-            if (!owns(sessionId) || !targetAvailable(target.accountRef, target.groupIdHex)) {
+            if (state.sessionId != sessionId || !targetAvailable(target.accountRef, target.groupIdHex)) {
                 cancel()
                 return
             }
@@ -685,6 +723,54 @@ internal class ConversationDictationController internal constructor(
         clearRecognitionSession(cancel = false)
         state = ConversationDictationState.ReviewRequired(sessionId, target, transcript)
     }
+
+    private fun validateAndDeliverTranscript(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        transcript: String,
+    ) {
+        val validator = targetValidator
+        val validationScope = targetValidationScope
+        if (validator == null || validationScope == null) {
+            deliverTranscript(sessionId, target, transcript)
+            return
+        }
+        if (validatingSessionId == sessionId) return
+        // Recognition has produced its terminal result. Release the provider
+        // and microphone immediately while the authoritative MDK membership
+        // probe runs; session-id ownership still rejects replacement/stale work.
+        clearRecognitionSession(cancel = false)
+        state = ConversationDictationState.Processing(sessionId, target)
+        validatingSessionId = sessionId
+        validationScope.launch {
+            val available =
+                try {
+                    validateTargetAuthoritatively(validator, target)
+                } finally {
+                    if (validatingSessionId == sessionId) validatingSessionId = null
+                }
+            if (state.sessionId != sessionId) return@launch
+            if (!available || !targetAvailable(target.accountRef, target.groupIdHex)) {
+                cancel()
+                return@launch
+            }
+            deliverTranscript(sessionId, target, transcript)
+        }
+    }
+
+    private suspend fun validateTargetAuthoritatively(
+        validator: suspend (String, String) -> Boolean,
+        target: ConversationDictationTarget,
+    ): Boolean =
+        try {
+            withTimeoutOrNull(PROCESSING_TIMEOUT_MILLIS) {
+                validator(target.accountRef, target.groupIdHex)
+            } ?: false
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            false
+        }
 
     private fun complete(target: ConversationDictationTarget) {
         clearRecognitionSession(cancel = false)

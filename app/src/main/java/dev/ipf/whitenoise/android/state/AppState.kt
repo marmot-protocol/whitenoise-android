@@ -55,6 +55,7 @@ import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.RetentionSweepGroupOutcomeFfi
 import dev.ipf.marmotkit.RetentionSweepStatusFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -1616,6 +1617,18 @@ class WhiteNoiseAppState private constructor(
                 accounts.any { it.label == accountRef && it.signedOut != true } &&
                     (activeAccountRef != accountRef || chatsController?.containsGroup(groupIdHex) != false)
             },
+            targetValidator = { accountRef, groupIdHex ->
+                if (accounts.none { it.label == accountRef && it.signedOut != true }) {
+                    false
+                } else {
+                    runCatchingCancellable {
+                        marmotIo {
+                            groupDetails(accountRef, groupIdHex).group.selfMembership == SelfMembershipFfi.MEMBER
+                        }
+                    }.getOrDefault(false)
+                }
+            },
+            targetValidationScope = mutationsScope,
             onBeforeRecognition = {
                 VoicePlaybackController.pause()
                 stopSpeaking()

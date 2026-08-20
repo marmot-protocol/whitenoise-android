@@ -11,7 +11,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -27,7 +29,7 @@ import java.util.concurrent.TimeUnit
 /** Hold-to-record controller. Slide left to cancel, slide up to lock,
  *  release to send. Auto-stops at [MAX_RECORDING_MS]. */
 @Stable
-class VoiceRecordingController(
+class VoiceRecordingController internal constructor(
     private val context: Context,
     private val outputDirectory: File,
     private val scope: CoroutineScope,
@@ -38,6 +40,11 @@ class VoiceRecordingController(
     // effect on the next recording without re-creating this controller.
     private val bitrateProvider: () -> Int = { VoiceRecorder.DEFAULT_BITRATE_BPS },
     private val microphoneCaptures: MicrophoneCaptureCoordinator? = null,
+    private val recorderFactory: (Context, File, Int) -> VoiceRecordingSession = { recorderContext, file, bitrate ->
+        VoiceRecorder(recorderContext, file, bitrate)
+    },
+    private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main,
+    private val recorderDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     companion object {
         // Safety cap to prevent runaway recordings if the hold gesture leaks
@@ -87,7 +94,7 @@ class VoiceRecordingController(
     var willLock: Boolean by mutableStateOf(false)
         private set
 
-    private var recorder: VoiceRecorder? = null
+    private var recorder: VoiceRecordingSession? = null
     private var tickJob: Job? = null
 
     // Releases the native recorder independently of [scope]: the conversation's
@@ -95,7 +102,7 @@ class VoiceRecordingController(
     // the moment a mid-recording teardown must still free the mic and the
     // output file descriptor. Releases are idempotent, so this never
     // double-frees a recorder that stop() already finalized.
-    private val recorderScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val recorderScope = CoroutineScope(SupervisorJob() + recorderDispatcher)
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     private var focusRequest: AudioFocusRequest? = null
     private val microphoneLeaseLock = Any()
@@ -149,7 +156,7 @@ class VoiceRecordingController(
             resetRecordingUiState()
             val generation = nextStartGeneration()
             restartJob =
-                scope.launch(Dispatchers.Main) {
+                scope.launch(mainDispatcher) {
                     try {
                         pending.join()
                         restarting = false
@@ -175,7 +182,7 @@ class VoiceRecordingController(
         isRecording = true
         resetRecordingUiState()
         val generation = nextStartGeneration()
-        val launched = scope.launch(Dispatchers.Main) { beginRecording(generation) }
+        val launched = scope.launch(mainDispatcher) { beginRecording(generation) }
         startJob = launched
         launched.invokeOnCompletion {
             if (startJob === launched) startJob = null
@@ -200,18 +207,18 @@ class VoiceRecordingController(
                 outputDirectory,
                 "voice-${System.currentTimeMillis()}.${VoiceRecorder.FILE_EXTENSION}",
             )
-        val r = VoiceRecorder(context, file, bitrateProvider())
+        val r = recorderFactory(context, file, bitrateProvider())
         return try {
-            withContext(Dispatchers.IO) { r.start() }
+            withContext(recorderDispatcher) { r.start() }
             if (!isRecording || generation != startGeneration) {
-                withContext(Dispatchers.IO) { r.cancel() }
+                withContext(recorderDispatcher) { r.cancel() }
                 return false
             }
             recorder = r
             isRecording = true
             resetRecordingUiState()
             tickJob =
-                scope.launch(Dispatchers.Main) {
+                scope.launch(mainDispatcher) {
                     val started = System.nanoTime()
                     while (isActive) {
                         val elapsed = (System.nanoTime() - started) / 1_000_000L
@@ -257,8 +264,8 @@ class VoiceRecordingController(
         startGeneration += 1
     }
 
-    private suspend fun releaseRecorderAfterStartFailure(recorder: VoiceRecorder) {
-        withContext(NonCancellable + Dispatchers.IO) {
+    private suspend fun releaseRecorderAfterStartFailure(recorder: VoiceRecordingSession) {
+        withContext(NonCancellable + recorderDispatcher) {
             runCatching { recorder.cancel() }
         }
     }
@@ -320,14 +327,14 @@ class VoiceRecordingController(
         val cut = CompletableDeferred<Unit>()
         tailCut = cut
         finalizeJob =
-            scope.launch(Dispatchers.Main) {
+            scope.launch(mainDispatcher, start = CoroutineStart.UNDISPATCHED) {
                 try {
                     // Keep the encoder running a short tail so the trailing word
                     // isn't clipped. Only the send path (stop) pays this; cancel
                     // never does. A new start() completes `cut` to end the tail
                     // early and free the mic. The recorder captures until r.stop().
                     withTimeoutOrNull(RECORDING_TAIL_MS) { cut.await() }
-                    val result = withContext(Dispatchers.IO) { r.stop() }
+                    val result = withContext(recorderDispatcher) { r.stop() }
                     if (result == null) {
                         onError(IllegalStateException("voice recording too short"))
                     } else {
@@ -342,26 +349,21 @@ class VoiceRecordingController(
                     // the scope's handler.
                     onError(t)
                 } finally {
-                    // A restart reuses this take's focus for the next recording;
-                    // only abandon it when no restart took over.
+                    // UNDISPATCHED starts this try/finally before stop() returns,
+                    // even when the composition scope is cancelled in the same
+                    // frame. Finish native teardown in NonCancellable so no
+                    // lifecycle cancellation can expose a free shared lease
+                    // while MediaRecorder is still capturing.
+                    withContext(NonCancellable + recorderDispatcher) {
+                        r.cancel()
+                    }
+                    // A restart reuses this take's focus for the next recording.
                     if (!restarting) {
                         abandonRecordingFocus()
                         releaseMicrophoneLease()
                     }
                 }
             }
-        // Guarantee the recorder is released even if the finalize coroutine is
-        // cancelled before its body ever runs (the conversation closes the same
-        // frame stop() is called) — a completion handler fires on cancellation
-        // too, unlike the body's finally. cancel()/release() can't recover this
-        // because `recorder` is already null. r.cancel() is idempotent, so this
-        // is a no-op once stop() has finalized the take.
-        finalizeJob?.invokeOnCompletion {
-            recorderScope.launch {
-                r.cancel()
-                if (restartJob?.isActive != true && !isRecording) releaseMicrophoneLease()
-            }
-        }
     }
 
     fun cancel() {
@@ -399,6 +401,12 @@ class VoiceRecordingController(
                 r.cancel()
                 releaseMicrophoneLease()
             }
+        } else if (finalizeJob?.isActive == true) {
+            // stop() already detached the recorder into its finalize job. End
+            // the tail and cancel delivery, but keep the lease until that job's
+            // NonCancellable finally has released the native recorder.
+            tailCut?.complete(Unit)
+            finalizeJob?.cancel()
         } else {
             releaseMicrophoneLease()
         }
