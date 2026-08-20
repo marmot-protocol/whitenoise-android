@@ -446,6 +446,36 @@ internal fun chatListItemSortKey(item: ChatListItem): String =
         ?: (item.presentationOtherMemberAccount ?: "~${item.presentationMemberCount}").lowercase()
 
 /**
+ * Group record as the chat list should display it. A row carrying any avatar
+ * signal is authoritative for the whole avatar identity — a URL↔encrypted
+ * switch must clear the stale half. A row with no avatar payload at all is a
+ * transient projection state: keep the record's last-known identity so a
+ * resolved avatar never degrades to generated initials; a genuine
+ * removal still propagates through the group record itself.
+ */
+private fun chatListDisplayGroup(
+    row: ChatListRowFfi,
+    baseGroup: AppGroupRecordFfi,
+): AppGroupRecordFfi {
+    val rowHasAvatarSignal = row.avatarUrl != null || row.avatar != null
+    val avatarUrl = if (rowHasAvatarSignal) row.avatarUrl else baseGroup.avatarUrl
+    return reconcileTerminalSelfMembership(
+        update =
+            baseGroup.copy(
+                name = row.groupName.ifBlank { baseGroup.name },
+                avatarUrl = avatarUrl,
+                avatarDim = baseGroup.avatarDim.takeIf { avatarUrl == baseGroup.avatarUrl },
+                avatarThumbhash = baseGroup.avatarThumbhash.takeIf { avatarUrl == baseGroup.avatarUrl },
+                imageHashHex = if (rowHasAvatarSignal) row.avatar?.imageHashHex else baseGroup.imageHashHex,
+                archived = row.archived,
+                pendingConfirmation = row.pendingConfirmation,
+                selfMembership = row.selfMembership,
+            ),
+        previousSelfMembership = baseGroup.selfMembership,
+    )
+}
+
+/**
  * Build a `ChatListItem` from the FFI projection. [members] is the current
  * authoritative roster used for membership-sensitive fields. The optional
  * [presentationMembers] supplies only last-known, display-shaped values while
@@ -464,21 +494,7 @@ internal fun chatListItemFromProjection(
     activitySequence: ULong = 0uL,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
-    val displayGroup =
-        reconcileTerminalSelfMembership(
-            update =
-                baseGroup.copy(
-                    name = row.groupName.ifBlank { baseGroup.name },
-                    avatarUrl = row.avatarUrl,
-                    avatarDim = baseGroup.avatarDim.takeIf { row.avatarUrl == baseGroup.avatarUrl },
-                    avatarThumbhash = baseGroup.avatarThumbhash.takeIf { row.avatarUrl == baseGroup.avatarUrl },
-                    imageHashHex = row.avatar?.imageHashHex,
-                    archived = row.archived,
-                    pendingConfirmation = row.pendingConfirmation,
-                    selfMembership = row.selfMembership,
-                ),
-            previousSelfMembership = baseGroup.selfMembership,
-        )
+    val displayGroup = chatListDisplayGroup(row, baseGroup)
     val presentation = members?.let { chatListMemberPresentation(it, activeAccountIdHex) } ?: presentationMembers
     return ChatListItem(
         group = displayGroup,
@@ -3524,7 +3540,7 @@ class ChatsController private constructor(
      * newer entry, or one newer activity has already moved past. A failed
      * entry never gains a confirmed id, so no other retire path can reach it,
      * and each holds a decrypted preview — without this a group would retain
-     * one per failed send for the controller's lifetime (#2148). Rollback and
+     * one per failed send for the controller's lifetime. Rollback and
      * retry of a pruned send stay correct: rollback no-ops and a retry applies
      * a fresh entry.
      */
@@ -3558,7 +3574,7 @@ class ChatsController private constructor(
                 ?.takeUnless { acceptBackwardActivity && activityCompare < 0 }
         // A failed send is terminal: its callback will never report a confirmed
         // id, so parking an authoritative row against it would strand the row
-        // on FAILED and discard every later update for that message (#2148).
+        // on FAILED and discard every later update for that message.
         val pendingEntryKey =
             match?.entryKey?.takeIf {
                 val entry = state.entries[it]
@@ -3656,7 +3672,7 @@ class ChatsController private constructor(
     /**
      * Handles a snapshot replay that lags a send the engine already confirmed.
      * Rewinding the row to the older last message would regress the list below
-     * the conversation's own state (#2148), but dropping the row wholesale
+     * the conversation's own state, but dropping the row wholesale
      * would strand its unread and read-state — subscription rows stay
      * authoritative for content. So the confirmed send keeps the row's last
      * message and sort position while every other field comes from the fresh
@@ -4401,6 +4417,16 @@ class ChatsController private constructor(
         projections.forEach { projection ->
             val groupIdHex = projection.groupIdHex
             val members = memberRecordsFromIds(projection.memberIdsHex, activeAccountIdHex)
+            // Same readiness gate as the streaming path: an empty or
+            // self-only-DM roster from the initial page can be a transient
+            // catch-up result. Caching it would pin the row on the Unknown
+            // fallback forever — memberSnapshotNeedsFetch never retries a
+            // cached key — and drop the last-known presentation for nothing.
+            // Skipped groups are refetched by the post-bind enrichment sweep,
+            // which owns the full gate and retry machinery.
+            if (!initialPageRosterReadyToCache(projection.groupIdHex, members, activeAccountIdHex)) {
+                return@forEach
+            }
             updatedCache[groupIdHex] = members
             updatedRemovedGroupIds =
                 if (
@@ -4423,6 +4449,58 @@ class ChatsController private constructor(
         memberCacheByGroup = updatedCache
         removedGroupIds = updatedRemovedGroupIds
         memberSnapshotsRevision += 1L
+    }
+
+    // The initial member-id page is gated with the same conversation context
+    // the streaming path derives: a self-only roster for a direct conversation
+    // is as transient as an empty one and must be retried, not cached.
+    private fun initialPageRosterReadyToCache(
+        groupIdHex: String,
+        members: List<AppGroupMemberRecordFfi>,
+        activeAccountIdHex: String?,
+    ): Boolean =
+        memberSnapshotReadyToCache(
+            members = members,
+            knownSelfRemoval = knownSelfRemovalFor(groupIdHex),
+            directConversation = directConversationCandidateFor(groupIdHex, members),
+            activeAccountIdHex = activeAccountIdHex,
+            selfOnlyDirectGraceElapsed = groupIdHex in selfOnlyDirectGraceRetryGroups,
+        )
+
+    /**
+     * Whether this account's removal from the group is already known locally,
+     * which makes an empty roster terminal rather than a hydration gap.
+     */
+    private fun knownSelfRemovalFor(groupIdHex: String): Boolean =
+        groupIdHex in removedGroupIds ||
+            chatRowsByGroup[chatRowKey(groupIdHex)]?.selfMembership?.isNonMember() == true ||
+            groupRecordsById[groupIdHex]?.selfMembership?.isNonMember() == true
+
+    /**
+     * Whether the group should be treated as a direct conversation for roster
+     * readiness, including the unresolved case where the projection has not
+     * classified an unnamed low-headcount conversation yet. Shared by the
+     * initial-page and streaming gates so the two cannot drift — an earlier
+     * copy of this heuristic living in only one of them is what let a
+     * self-only DM roster be cached and pin an Unknown title.
+     */
+    private fun directConversationCandidateFor(
+        groupIdHex: String,
+        members: List<AppGroupMemberRecordFfi>,
+    ): Boolean {
+        val row = chatRowsByGroup[chatRowKey(groupIdHex)]
+        val memberCount = GroupProjector.uniqueMemberCount(members)
+        val groupName = row?.groupName ?: groupRecordsById[groupIdHex]?.name.orEmpty()
+        val unresolvedDirectConversation =
+            row?.conversationKind == ChatConversationKindFfi.UNKNOWN &&
+                memberCount <= 1 &&
+                GroupProjector.isUnnamed(groupName)
+        return unresolvedDirectConversation ||
+            GroupProjector.isDm(
+                conversationKind = row?.conversationKind,
+                memberCount = memberCount,
+                name = groupName,
+            )
     }
 
     private fun recordMemberDerivedLocalReadyIfComplete() {
@@ -4517,7 +4595,7 @@ class ChatsController private constructor(
      * Flips a still-tracked optimistic preview to FAILED instead of erasing
      * it. A failed send must stay visible as failed on the row — silently
      * reverting the list to the prior message while the conversation shows a
-     * failed bubble breaks trust in the list (#2148). Genuine abandonment
+     * failed bubble breaks trust in the list. Genuine abandonment
      * (discard, own eviction) still uses [rollbackOptimisticSentPreview].
      */
     internal fun failOptimisticSentPreview(
@@ -4624,6 +4702,27 @@ class ChatsController private constructor(
     // conversation, #6), so on-demand callers — shared groups, DM lookup,
     // by-id resolution for navigation — see freshly created/updated groups
     // instead of the stale `items` snapshot.
+    // Last-known roster presentation for a row whose live caches are cold: a
+    // fresh bind (cold start, account switch, controller recreation) starts
+    // with empty per-bind maps while the account-scoped snapshot cache may
+    // still hold the roster from the previous session's group-details or
+    // conversation reads. Falling back keeps a previously resolved title and
+    // avatar on screen instead of the Unknown placeholder until hydration
+    // catches up. No new state: this reads an existing cache.
+    private fun lastKnownPresentation(
+        groupIdHex: String,
+        activeAccountIdHex: String?,
+    ): ChatListMemberPresentation? {
+        // An authoritative roster wins downstream — skip the fallback lookup
+        // entirely so hydrated rows pay no per-recompute cache reads.
+        if (memberCacheByGroup.containsKey(groupIdHex)) return null
+        return presentationMembersByGroup[groupIdHex]
+            ?: appState
+                .cachedGroupMemberSnapshot(accountRef, groupIdHex)
+                ?.members
+                ?.let { chatListMemberPresentation(it, activeAccountIdHex) }
+    }
+
     private fun currentProjectedItems(activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex): List<ChatListItem> =
         chatRows.map { authoritativeRow ->
             val row = optimisticArchiveRow(authoritativeRow)
@@ -4632,7 +4731,7 @@ class ChatsController private constructor(
                 group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
                 activeAccountIdHex = activeAccountIdHex,
                 members = memberCacheByGroup[row.groupIdHex],
-                presentationMembers = presentationMembersByGroup[row.groupIdHex],
+                presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
                 previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
                 resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
                 removed = row.groupIdHex in removedGroupIds,
@@ -4655,7 +4754,7 @@ class ChatsController private constructor(
             group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
             activeAccountIdHex = activeAccountIdHex,
             members = memberCacheByGroup[row.groupIdHex],
-            presentationMembers = presentationMembersByGroup[row.groupIdHex],
+            presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
             previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
             resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
             removed = row.groupIdHex in removedGroupIds,
@@ -6003,24 +6102,8 @@ class ChatsController private constructor(
     ) {
         if (!isActiveBindEpoch(epoch) || cacheEpoch != memberCacheEpoch) return
         val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
-        val knownSelfRemoval =
-            groupIdHex in removedGroupIds ||
-                chatRowsByGroup[chatRowKey(groupIdHex)]?.selfMembership?.isNonMember() == true ||
-                groupRecordsById[groupIdHex]?.selfMembership?.isNonMember() == true
-        val row = chatRowsByGroup[chatRowKey(groupIdHex)]
-        val memberCount = GroupProjector.uniqueMemberCount(members)
-        val groupName = row?.groupName ?: groupRecordsById[groupIdHex]?.name.orEmpty()
-        val unresolvedDirectConversation =
-            row?.conversationKind == ChatConversationKindFfi.UNKNOWN &&
-                memberCount <= 1 &&
-                GroupProjector.isUnnamed(groupName)
-        val directConversationCandidate =
-            unresolvedDirectConversation ||
-                GroupProjector.isDm(
-                    conversationKind = row?.conversationKind,
-                    memberCount = memberCount,
-                    name = groupName,
-                )
+        val knownSelfRemoval = knownSelfRemovalFor(groupIdHex)
+        val directConversationCandidate = directConversationCandidateFor(groupIdHex, members)
         val selfOnlyDirectRoster =
             isSelfOnlyDirectRoster(
                 members = members,
@@ -7861,7 +7944,7 @@ class ConversationController(
         if (!previewApplied) {
             // No bound row to bump (pre-first-frame open, brand-new group,
             // account-pinned window) — the engine echo will still update the
-            // list, but keep the drop visible in the send trace (#2148).
+            // list, but keep the drop visible in the send trace.
             sendTrace(trace, "chatlist-preview-dropped", traceElapsedMs(traceStartMs))
         }
         replyingTo = null
@@ -7962,7 +8045,7 @@ class ConversationController(
                 return
             }
             // The bubble stays visible as Failed — the row must agree instead
-            // of silently reverting to the prior message (#2148).
+            // of silently reverting to the prior message.
             failOptimisticChatListPreview(tempId)
             retainFailedOptimisticTextSend(
                 optimisticMessages = optimisticMessages,
@@ -8171,7 +8254,7 @@ class ConversationController(
             )
         messageById[tempId] = optimistic
         publishTimelineFromIndexes()
-        // Media sends bump the chat-list row like text sends do (#2148): the
+        // Media sends bump the chat-list row like text sends do: the
         // optimistic body is the caption or the attachment placeholder, so the
         // row and the bubble read the same. The engine echo folds by the
         // confirmed id recorded at commit time, so the placeholder never
@@ -8826,7 +8909,7 @@ class ConversationController(
 
     // The chat-list preview a manual retry re-applies: same optimistic id so
     // the row entry flips FAILED → PENDING in place, fresh timestamp so the
-    // row re-bumps to the top like any new send (#2148).
+    // row re-bumps to the top like any new send.
     private fun retryPreview(
         tempId: String,
         record: AppMessageRecordFfi,
@@ -9243,7 +9326,7 @@ class ConversationController(
             publishTimelineFromIndexes()
             // The retry is a fresh pending send from the list's point of view:
             // flip the row's failed preview back to pending and re-bump its
-            // position (#2148). performMediaUpload owns the terminal state.
+            // position. performMediaUpload owns the terminal state.
             appState.applyOptimisticSentPreview(
                 conversationAccountRef,
                 group.groupIdHex,
