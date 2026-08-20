@@ -3519,6 +3519,24 @@ class ChatsController private constructor(
                     row.lastMessage?.messageIdHex != baselineRow.lastMessage?.messageIdHex
             )
 
+    /**
+     * Drops failed previews the row can no longer show: one superseded by a
+     * newer entry, or one newer activity has already moved past. A failed
+     * entry never gains a confirmed id, so no other retire path can reach it,
+     * and each holds a decrypted preview — without this a group would retain
+     * one per failed send for the controller's lifetime (#2148). Rollback and
+     * retry of a pruned send stay correct: rollback no-ops and a retry applies
+     * a fresh entry.
+     */
+    private fun pruneUnreachableFailedEntries(state: OptimisticChatListPreviewState) {
+        val newestSequence = state.entries.values.maxOfOrNull { it.activitySequence } ?: return
+        state.entries.entries.removeAll { (_, entry) ->
+            entry.confirmedMessageIdHex == null &&
+                entry.preview.deliveryState == ChatListMessageDeliveryStateFfi.FAILED &&
+                (entry.activitySequence <= state.baselineActivitySequence || entry.activitySequence < newestSequence)
+        }
+    }
+
     private fun retireCommittedOptimisticEntriesThrough(
         state: OptimisticChatListPreviewState,
         activitySequence: ULong,
@@ -3538,7 +3556,16 @@ class ChatsController private constructor(
         val match =
             matchingOptimisticPreview(state, row)
                 ?.takeUnless { acceptBackwardActivity && activityCompare < 0 }
-        val pendingEntryKey = match?.entryKey?.takeIf { state.entries[it]?.confirmedMessageIdHex == null }
+        // A failed send is terminal: its callback will never report a confirmed
+        // id, so parking an authoritative row against it would strand the row
+        // on FAILED and discard every later update for that message (#2148).
+        val pendingEntryKey =
+            match?.entryKey?.takeIf {
+                val entry = state.entries[it]
+                entry != null &&
+                    entry.confirmedMessageIdHex == null &&
+                    entry.preview.deliveryState != ChatListMessageDeliveryStateFfi.FAILED
+            }
         if (pendingEntryKey != null) {
             // The stream can expose the locally committed row before send()
             // reports whether publishing succeeded. Keep it provisional so a
@@ -3570,45 +3597,97 @@ class ChatsController private constructor(
                 state.baselineActivitySequence = match.activitySequence
                 rememberBaselineActivitySequence(state, row, match.activitySequence)
             }
+        } else if (acceptBackwardActivity && foldSnapshotKeepingConfirmedSend(state, row)) {
+            acceptRow = false
         } else {
-            val knownActivitySequence =
-                state.baselineActivitySequenceByLastMessage[chatListLastMessageActivity(row)]
-            if (knownActivitySequence != null) {
+            acceptRow = foldUnmatchedChatListRow(state, row, activityCompare, acceptBackwardActivity)
+        }
+        if (acceptRow) state.baselineRow = row
+    }
+
+    /**
+     * Sequencing for a row that matches no optimistic preview: reuse the
+     * sequence already accepted for this activity when it is known, take a
+     * fresh one for genuinely newer activity, and otherwise keep the accepted
+     * ordering. Returns whether the row may replace the baseline.
+     */
+    private fun foldUnmatchedChatListRow(
+        state: OptimisticChatListPreviewState,
+        row: ChatListRowFfi,
+        activityCompare: Int,
+        acceptBackwardActivity: Boolean,
+    ): Boolean {
+        val knownActivitySequence =
+            state.baselineActivitySequenceByLastMessage[chatListLastMessageActivity(row)]
+        var acceptRow = true
+        when {
+            knownActivitySequence != null -> {
                 if (knownActivitySequence < state.baselineActivitySequence && !acceptBackwardActivity) {
                     acceptRow = false
                 } else {
                     state.baselineActivitySequence = knownActivitySequence
                     rememberBaselineActivitySequence(state, row, knownActivitySequence)
                 }
-            } else if (activityCompare > 0) {
+            }
+
+            activityCompare > 0 -> {
                 state.baselineActivitySequence = nextChatActivitySequence()
                 rememberBaselineActivitySequence(state, row, state.baselineActivitySequence)
                 state.entries.entries.removeAll { (_, entry) ->
                     entry.confirmedMessageIdHex != null &&
                         entry.activitySequence < state.baselineActivitySequence
                 }
-            } else if (activityCompare < 0) {
-                if (acceptBackwardActivity) {
-                    state.baselineActivitySequence = 0uL
-                    rememberBaselineActivitySequence(state, row, 0uL)
-                } else {
-                    // Subscription rows remain authoritative for content even
-                    // when their last-message tuple compares backward. Keep
-                    // the accepted ordering sequence without leaving other
-                    // fields stale after same-second id order or preview loss.
-                    rememberBaselineActivitySequence(state, row, state.baselineActivitySequence)
-                }
-            } else {
-                rememberBaselineActivitySequence(state, row, state.baselineActivitySequence)
             }
+
+            activityCompare < 0 && acceptBackwardActivity -> {
+                state.baselineActivitySequence = 0uL
+                rememberBaselineActivitySequence(state, row, 0uL)
+            }
+
+            // Subscription rows remain authoritative for content even when
+            // their last-message tuple compares backward. Keep the accepted
+            // ordering sequence without leaving other fields stale after
+            // same-second id order or preview loss.
+            else -> rememberBaselineActivitySequence(state, row, state.baselineActivitySequence)
         }
-        if (acceptRow) state.baselineRow = row
+        return acceptRow
+    }
+
+    /**
+     * Handles a snapshot replay that lags a send the engine already confirmed.
+     * Rewinding the row to the older last message would regress the list below
+     * the conversation's own state (#2148), but dropping the row wholesale
+     * would strand its unread and read-state — subscription rows stay
+     * authoritative for content. So the confirmed send keeps the row's last
+     * message and sort position while every other field comes from the fresh
+     * snapshot. Returns false when this does not apply, leaving the caller's
+     * normal handling in charge.
+     */
+    private fun foldSnapshotKeepingConfirmedSend(
+        state: OptimisticChatListPreviewState,
+        row: ChatListRowFfi,
+    ): Boolean {
+        val confirmedLastMessage =
+            state.baselineRow.lastMessage?.takeIf { baselineLastMessage ->
+                state.confirmedActivitySequenceById.containsKey(baselineLastMessage.messageIdHex) &&
+                    row.lastMessage?.messageIdHex != baselineLastMessage.messageIdHex &&
+                    compareChatListActivity(state.baselineRow, row) < 0
+            } ?: return false
+        val merged =
+            row.copy(
+                lastMessage = confirmedLastMessage,
+                activitySortAt = state.baselineRow.activitySortAt,
+            )
+        state.baselineRow = merged
+        rememberBaselineActivitySequence(state, merged, state.baselineActivitySequence)
+        return true
     }
 
     private fun materializeOptimisticChatListPreview(
         rowKey: String,
         state: OptimisticChatListPreviewState,
     ) {
+        pruneUnreachableFailedEntries(state)
         val latestEntry = state.entries.values.maxByOrNull { it.activitySequence }
         val visibleEntry = latestEntry?.takeIf { it.activitySequence > state.baselineActivitySequence }
         chatRowsByGroup[rowKey] =
@@ -4430,6 +4509,28 @@ class ChatsController private constructor(
                 state.entries.remove(optimisticMessageIdHex)
             }
         }
+        materializeOptimisticChatListPreview(rowKey, state)
+        scheduleRecompute()
+    }
+
+    /**
+     * Flips a still-tracked optimistic preview to FAILED instead of erasing
+     * it. A failed send must stay visible as failed on the row — silently
+     * reverting the list to the prior message while the conversation shows a
+     * failed bubble breaks trust in the list (#2148). Genuine abandonment
+     * (discard, own eviction) still uses [rollbackOptimisticSentPreview].
+     */
+    internal fun failOptimisticSentPreview(
+        groupIdHex: String,
+        optimisticMessageIdHex: String,
+    ) {
+        val rowKey = chatRowKey(groupIdHex)
+        val state = optimisticChatListPreviewByGroup[rowKey].takeIf { accountRef != null } ?: return
+        val entry = state.entries[optimisticMessageIdHex] ?: return
+        state.entries[optimisticMessageIdHex] =
+            entry.copy(
+                preview = entry.preview.copy(deliveryState = ChatListMessageDeliveryStateFfi.FAILED),
+            )
         materializeOptimisticChatListPreview(rowKey, state)
         scheduleRecompute()
     }
@@ -7739,8 +7840,9 @@ class ConversationController(
         // bubble, so a back-navigation to the list paints the new last-message
         // instead of a one-frame flash of the prior one (#900). Reuses the
         // already-parsed markdown from the optimistic record.
-        appState
-            .applyOptimisticSentPreview(
+        val previewApplied =
+            appState.applyOptimisticSentPreview(
+                conversationAccountRef,
                 group.groupIdHex,
                 ChatListMessagePreviewFfi(
                     messageIdHex = tempId,
@@ -7756,6 +7858,12 @@ class ConversationController(
                     deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
                 ),
             )
+        if (!previewApplied) {
+            // No bound row to bump (pre-first-frame open, brand-new group,
+            // account-pinned window) — the engine echo will still update the
+            // list, but keep the drop visible in the send trace (#2148).
+            sendTrace(trace, "chatlist-preview-dropped", traceElapsedMs(traceStartMs))
+        }
         replyingTo = null
         // The optimistic bubble is now in the projection and published — the
         // send has visibly started. Only now is it safe to clear the input and
@@ -7806,6 +7914,7 @@ class ConversationController(
                 )
             transferRetentionAtSend(tempId, reconciliation.confirmedId)
             appState.commitOptimisticSentPreview(
+                accountRef = conversationAccountRef,
                 groupIdHex = group.groupIdHex,
                 optimisticMessageIdHex = tempId,
                 confirmedMessageIdHex = reconciliation.confirmedId,
@@ -7852,7 +7961,9 @@ class ConversationController(
                 markActiveAccountRemovedFromMembers(account)
                 return
             }
-            rollbackOptimisticChatListPreview(tempId)
+            // The bubble stays visible as Failed — the row must agree instead
+            // of silently reverting to the prior message (#2148).
+            failOptimisticChatListPreview(tempId)
             retainFailedOptimisticTextSend(
                 optimisticMessages = optimisticMessages,
                 messageById = messageById,
@@ -8060,6 +8171,16 @@ class ConversationController(
             )
         messageById[tempId] = optimistic
         publishTimelineFromIndexes()
+        // Media sends bump the chat-list row like text sends do (#2148): the
+        // optimistic body is the caption or the attachment placeholder, so the
+        // row and the bubble read the same. The engine echo folds by the
+        // confirmed id recorded at commit time, so the placeholder never
+        // outlives reconciliation.
+        appState.applyOptimisticSentPreview(
+            conversationAccountRef,
+            group.groupIdHex,
+            sentPreview(tempId, body, optimistic.contentTokens, now),
+        )
         return QueuedAttachmentSend(account, key, tempId, optimisticOrder, optimistic)
     }
 
@@ -8129,6 +8250,7 @@ class ConversationController(
                 retentionAtSendByMessageId.remove(tempId)
                 retainedMediaUploads.remove(key)
                 activeUploadKeys.remove(key)
+                rollbackOptimisticChatListPreview(tempId)
                 publishTimelineFromIndexes()
                 return
             }
@@ -8146,6 +8268,7 @@ class ConversationController(
                             retentionAtSendSeconds = retentionAtSendSeconds,
                         )
                     activeUploadKeys.remove(key)
+                    failOptimisticChatListPreview(tempId)
                     publishTimelineFromIndexes()
                     appState.present(R.string.toast_reattach_to_retry_media)
                     return
@@ -8195,6 +8318,7 @@ class ConversationController(
                     retentionAtSendByMessageId.remove(tempId)
                     retainedMediaUploads.remove(key)
                     activeUploadKeys.remove(key)
+                    rollbackOptimisticChatListPreview(tempId)
                     publishTimelineFromIndexes()
                     return
                 }
@@ -8215,6 +8339,12 @@ class ConversationController(
                     }
                 val confirmedId = summary.messageIds.firstOrNull() ?: tempId
                 transferRetentionAtSend(tempId, confirmedId)
+                appState.commitOptimisticSentPreview(
+                    accountRef = conversationAccountRef,
+                    groupIdHex = group.groupIdHex,
+                    optimisticMessageIdHex = tempId,
+                    confirmedMessageIdHex = confirmedId,
+                )
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
                 // INVARIANT: the discard re-check must run BEFORE any cache mutation
@@ -8361,6 +8491,7 @@ class ConversationController(
                     retentionAtSendByMessageId.remove(tempId)
                     retainedMediaUploads.remove(key)
                     activeUploadKeys.remove(key)
+                    rollbackOptimisticChatListPreview(tempId)
                     publishTimelineFromIndexes()
                     return
                 }
@@ -8372,6 +8503,7 @@ class ConversationController(
                         timelineOrder = order,
                         retentionAtSendSeconds = retentionAtSendSeconds,
                     )
+                failOptimisticChatListPreview(tempId)
                 // Failed bubble shown but bytes are retained for a possible
                 // retry — KEEP the key in `activeUploadKeys` so a screen
                 // dispose can't wipe the bytes out from under a retry tap.
@@ -8664,8 +8796,41 @@ class ConversationController(
     private val discardedDuringRetry = mutableSetOf<String>()
 
     private fun rollbackOptimisticChatListPreview(optimisticMessageIdHex: String) {
-        appState.rollbackOptimisticSentPreview(group.groupIdHex, optimisticMessageIdHex)
+        appState.rollbackOptimisticSentPreview(conversationAccountRef, group.groupIdHex, optimisticMessageIdHex)
     }
+
+    private fun failOptimisticChatListPreview(optimisticMessageIdHex: String) {
+        appState.failOptimisticSentPreview(conversationAccountRef, group.groupIdHex, optimisticMessageIdHex)
+    }
+
+    // The pending chat-list preview an outgoing send bumps its row with.
+    private fun sentPreview(
+        tempId: String,
+        plaintext: String,
+        contentTokens: MarkdownDocumentFfi,
+        timelineAt: ULong,
+    ): ChatListMessagePreviewFfi =
+        ChatListMessagePreviewFfi(
+            messageIdHex = tempId,
+            sender = conversationAccountIdHex ?: "",
+            senderDisplayName = null,
+            plaintext = plaintext,
+            contentTokens = contentTokens,
+            kind = 9uL,
+            timelineAt = timelineAt,
+            deleted = false,
+            attachmentKind = null,
+            attachmentCount = 0u,
+            deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
+        )
+
+    // The chat-list preview a manual retry re-applies: same optimistic id so
+    // the row entry flips FAILED → PENDING in place, fresh timestamp so the
+    // row re-bumps to the top like any new send (#2148).
+    private fun retryPreview(
+        tempId: String,
+        record: AppMessageRecordFfi,
+    ): ChatListMessagePreviewFfi = sentPreview(tempId, record.plaintext, record.contentTokens, nowSeconds())
 
     /**
      * Compressed bytes for in-flight / failed outgoing attachments, keyed by
@@ -9076,6 +9241,14 @@ class ConversationController(
             activeUploadKeys.add(key)
             appState.trackInFlightMediaUpload(conversationAccountRef, group.groupIdHex, key)
             publishTimelineFromIndexes()
+            // The retry is a fresh pending send from the list's point of view:
+            // flip the row's failed preview back to pending and re-bump its
+            // position (#2148). performMediaUpload owns the terminal state.
+            appState.applyOptimisticSentPreview(
+                conversationAccountRef,
+                group.groupIdHex,
+                retryPreview(mediaTempId, current.record),
+            )
             performMediaUpload(account, key, mediaTempId, mediaOrder, current.record)
             return
         }
@@ -9093,6 +9266,11 @@ class ConversationController(
             )
         messageById[tempId] = refreshedRecord
         publishTimelineFromIndexes()
+        appState.applyOptimisticSentPreview(
+            conversationAccountRef,
+            group.groupIdHex,
+            retryPreview(tempId, refreshedRecord),
+        )
         try {
             val activeAccountIdHex = conversationAccountIdHex
             val committedProjection =
@@ -9107,6 +9285,12 @@ class ConversationController(
                     appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
                 }
                 transferRetentionAtSend(tempId, committedProjection.messageIdHex)
+                appState.commitOptimisticSentPreview(
+                    accountRef = conversationAccountRef,
+                    groupIdHex = group.groupIdHex,
+                    optimisticMessageIdHex = tempId,
+                    confirmedMessageIdHex = committedProjection.messageIdHex,
+                )
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
                 val projectedAction = TimelineProjector.toAppMessageRecord(committedProjection)
@@ -9136,6 +9320,7 @@ class ConversationController(
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
+                rollbackOptimisticChatListPreview(tempId)
                 publishTimelineFromIndexes()
                 return
             }
@@ -9151,6 +9336,12 @@ class ConversationController(
                     timelineOrder = order,
                 )
             transferRetentionAtSend(tempId, reconciliation.confirmedId)
+            appState.commitOptimisticSentPreview(
+                accountRef = conversationAccountRef,
+                groupIdHex = group.groupIdHex,
+                optimisticMessageIdHex = tempId,
+                confirmedMessageIdHex = reconciliation.confirmedId,
+            )
             invalidatedProjectionIdsMatchingMessage(timelineRecords, reconciliation.confirmed)
                 .forEach(::removeProjectedRecord)
             publishTimelineFromIndexes()
@@ -9166,6 +9357,7 @@ class ConversationController(
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
+                rollbackOptimisticChatListPreview(tempId)
                 publishTimelineFromIndexes()
                 return
             }
@@ -9175,6 +9367,7 @@ class ConversationController(
                     status = MessageStatus.Failed,
                     timelineOrder = order,
                 )
+            failOptimisticChatListPreview(tempId)
             suppressProjectedTimelineItems(
                 unpublishedProjectionIdsMatchingMessage(
                     timelineRecords = timelineRecords,
