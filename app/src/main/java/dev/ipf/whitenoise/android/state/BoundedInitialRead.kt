@@ -3,9 +3,12 @@ package dev.ipf.whitenoise.android.state
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -71,20 +74,69 @@ internal suspend fun <T> awaitBoundedInitialResourceRead(
     }
 }
 
-/** Bounds a native value read whose late result needs no resource cleanup. */
-internal suspend fun <T> awaitBoundedInitialSnapshotRead(
-    budgetMillis: Long = INITIAL_TIMELINE_READ_BUDGET_MILLIS,
+/**
+ * Owns one native snapshot producer across retry generations.
+ *
+ * A timed-out FFI await may still occupy a Rust blocking worker. Retrying must
+ * therefore never launch a replacement while that producer is active. Once it
+ * finishes, the next generation consumes the retained outcome instead of
+ * repeating the native read.
+ */
+internal class SingleFlightBoundedInitialSnapshotRead<T>(
+    private val budgetMillis: Long = INITIAL_TIMELINE_READ_BUDGET_MILLIS,
     producerDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    read: suspend () -> T,
-): T =
-    awaitBoundedInitialResourceRead(
-        budgetMillis = budgetMillis,
-        producerDispatcher = producerDispatcher,
-        read = read,
-        closeLate = {},
-        onTimeout = { throw ConversationInitialLoadTimeoutException() },
-    )
+) {
+    private val lock = Any()
+    private val producerScope = CoroutineScope(SupervisorJob() + producerDispatcher)
+    private var producer: Deferred<Result<T>>? = null
 
-internal class ConversationInitialLoadTimeoutException : Exception("initial conversation load exceeded its budget")
+    @Suppress("TooGenericExceptionCaught") // Every producer outcome must remain available to a later retry generation.
+    suspend fun await(read: suspend () -> T): T {
+        val (current, reused) =
+            synchronized(lock) {
+                producer?.let { it to true }
+                    ?: producerScope
+                        .async(start = CoroutineStart.DEFAULT) {
+                            try {
+                                Result.success(read())
+                            } catch (throwable: Throwable) {
+                                Result.failure(throwable)
+                            }
+                        }.also { producer = it }
+                        .let { it to false }
+            }
+
+        if (reused && current.isActive) {
+            throw ConversationInitialLoadStillInFlightException()
+        }
+
+        return try {
+            val outcome =
+                withTimeoutOrNull(budgetMillis.coerceAtLeast(1L)) {
+                    current.await()
+                } ?: throw ConversationInitialLoadTimeoutException()
+            outcome.getOrThrow()
+        } finally {
+            if (current.isCompleted) {
+                synchronized(lock) {
+                    if (producer === current) producer = null
+                }
+            }
+        }
+    }
+
+    fun cancel() {
+        producerScope.cancel()
+    }
+}
+
+internal sealed class ConversationInitialLoadException(
+    message: String,
+) : Exception(message)
+
+internal class ConversationInitialLoadTimeoutException : ConversationInitialLoadException("initial conversation load exceeded its budget")
+
+internal class ConversationInitialLoadStillInFlightException :
+    ConversationInitialLoadException("initial conversation load is still running; restart required")
 
 internal const val INITIAL_TIMELINE_READ_BUDGET_MILLIS = 5_000L

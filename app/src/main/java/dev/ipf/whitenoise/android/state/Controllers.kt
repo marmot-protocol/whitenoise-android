@@ -6745,7 +6745,7 @@ internal fun conversationStartsLoading(
     activeAccountRef: String?,
 ): Boolean = startOnConstruction && (accountRefOverride ?: activeAccountRef) != null
 
-internal fun isTerminalOpenFailure(throwable: Throwable): Boolean = throwable is ConversationInitialLoadTimeoutException
+internal fun isTerminalOpenFailure(throwable: Throwable): Boolean = throwable is ConversationInitialLoadException
 
 class ConversationController(
     private val appState: WhiteNoiseAppState,
@@ -7138,6 +7138,7 @@ class ConversationController(
     // is not an Android-owned cache of White Noise data (AGENTS.md).
     private val sendTraceByTempId = linkedMapOf<String, SendTraceEntry>()
     private val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val initialTimelineSnapshotRead = SingleFlightBoundedInitialSnapshotRead<TimelinePageFfi?>()
     private val initialPresentationWarmCoordinator =
         ConversationInitialPresentationWarmCoordinator(
             scope = controllerScope,
@@ -7614,10 +7615,7 @@ class ConversationController(
         timelineStream: TimelineMessagesSubscription,
     ): List<String> {
         if (timelineRecords.isNotEmpty()) return emptyList()
-        val snapshot =
-            awaitBoundedInitialSnapshotRead {
-                timelineStream.snapshot()
-            }
+        val snapshot = initialTimelineSnapshotRead.await { timelineStream.snapshot() }
         return if (snapshot == null) {
             publishAuthoritativeEmptyInitialTimeline()
             emptyList()
@@ -7749,6 +7747,7 @@ class ConversationController(
                 return true to false
             }
             val initialOpenTimedOut = isTerminalOpenFailure(throwable)
+            val initialSnapshotStillInFlight = throwable is ConversationInitialLoadStillInFlightException
             discardInitialTimelineSeedForFailure(preserveOptimisticMessages = true)
             isLoading = false
             subscriptionError =
@@ -7756,17 +7755,20 @@ class ConversationController(
                     operationCode = if (timelineRecords.isEmpty()) "CONVERSATION_LOAD" else "CONVERSATION_REFRESH",
                     throwable = throwable,
                     message =
-                        if (timelineRecords.isEmpty()) {
+                        if (initialSnapshotStillInFlight) {
+                            AppText.Resource(R.string.error_restart_app_before_retry)
+                        } else if (timelineRecords.isEmpty()) {
                             AppText.Resource(R.string.error_try_again)
                         } else {
                             AppText.Resource(R.string.error_loaded_content_may_be_out_of_date)
                         },
+                    retryable = !initialSnapshotStillInFlight,
                 )
             if (initialOpenTimedOut) {
                 // A timed-out FFI call may still occupy its native blocking
                 // worker. Automatic retries would accumulate more stuck calls;
-                // stop here and let the visible Retry action start one new
-                // controller generation on demand.
+                // stop here. A visible Retry may advance the controller
+                // generation, but the snapshot read remains single-flight.
                 terminalLoadFailure = true
                 return true to false
             }
@@ -7868,6 +7870,7 @@ class ConversationController(
      */
     fun onCleared() {
         controllerCleared = true
+        initialTimelineSnapshotRead.cancel()
         controllerScope.cancel()
         inviteStreamScope.cancel()
         attachmentTransferScope.cancel()
@@ -10834,6 +10837,7 @@ class ConversationController(
     }
 
     suspend fun retryLoadFailure() {
+        if (subscriptionError?.retryable == false) return
         when (failedPageDirection?.takeIf { pageError != null }) {
             ConversationSearchPageDirection.OLDER -> loadOlderPage()
             ConversationSearchPageDirection.NEWER -> loadNewerPage()

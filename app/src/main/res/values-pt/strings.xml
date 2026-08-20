@@ -6,6 +6,7 @@
     <string name="starting_securely">Inicialização segura…</string>
     <string name="startup_taking_too_long">A inicialização está demorando mais do que o esperado. Tente novamente.</string>
     <string name="error_try_again">Algo deu errado. Tente novamente; se o problema persistir, copie o relatório de erro.</string>
+    <string name="error_restart_app_before_retry">A leitura local da conversa ainda está em andamento. Reinicie o White Noise antes de tentar novamente.</string>
     <string name="error_loaded_content_may_be_out_of_date">O conteúdo carregado continua disponível, mas pode estar desatualizado. Tentando novamente…</string>
     <string name="error_loaded_content_kept">Não foi possível carregar mais conteúdo. Suas mensagens continuam disponíveis; tente novamente quando quiser.</string>
     <string name="refresh">Atualizar dump</string>

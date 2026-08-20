@@ -6,6 +6,7 @@
     <string name="starting_securely">Безопасный запуск…</string>
     <string name="startup_taking_too_long">Запуск занимает больше времени, чем ожидалось. Повторите попытку.</string>
     <string name="error_try_again">Что-то пошло не так. Повторите попытку. Если проблема не исчезнет, скопируйте отчёт об ошибке.</string>
+    <string name="error_restart_app_before_retry">Локальное чтение переписки всё ещё выполняется. Перезапустите White Noise перед повторной попыткой.</string>
     <string name="error_loaded_content_may_be_out_of_date">Загруженные данные по-прежнему доступны, но могли устареть. Повторная попытка…</string>
     <string name="error_loaded_content_kept">Не удалось загрузить дополнительные данные. Ваши сообщения по-прежнему доступны; повторите попытку, когда будете готовы.</string>
     <string name="refresh">Обновить дамп</string>

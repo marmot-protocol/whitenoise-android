@@ -6,6 +6,7 @@
     <string name="starting_securely">Güvenli şekilde başlatılıyor…</string>
     <string name="startup_taking_too_long">Başlatma beklenenden uzun sürüyor. Lütfen tekrar deneyin.</string>
     <string name="error_try_again">Bir sorun oluştu. Tekrar deneyin; sorun devam ederse hata raporunu kopyalayın.</string>
+    <string name="error_restart_app_before_retry">Yerel sohbet okuma işlemi hâlâ sürüyor. Tekrar denemeden önce White Noise’u yeniden başlatın.</string>
     <string name="error_loaded_content_may_be_out_of_date">Yüklenen içerikleriniz hâlâ kullanılabilir, ancak güncel olmayabilir. Yeniden deneniyor…</string>
     <string name="error_loaded_content_kept">Daha fazla içerik yüklenemedi. Mesajlarınız hâlâ kullanılabilir; hazır olduğunuzda tekrar deneyin.</string>
     <string name="refresh">Dökümü yenile</string>

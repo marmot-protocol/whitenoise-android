@@ -6,6 +6,7 @@
     <string name="starting_securely">正在安全启动…</string>
     <string name="startup_taking_too_long">启动时间超出预期。请重试。</string>
     <string name="error_try_again">出现问题。请重试；如果问题仍然存在，请复制错误报告。</string>
+    <string name="error_restart_app_before_retry">本地会话读取仍在进行中。请重启 White Noise 后再试。</string>
     <string name="error_loaded_content_may_be_out_of_date">已加载的内容仍然可用，但可能不是最新的。正在重试…</string>
     <string name="error_loaded_content_kept">无法加载更多内容。你的消息仍然可用；请在方便时重试。</string>
     <string name="refresh">刷新转储</string>

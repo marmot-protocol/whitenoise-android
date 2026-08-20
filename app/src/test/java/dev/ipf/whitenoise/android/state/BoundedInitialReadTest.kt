@@ -95,19 +95,20 @@ class BoundedInitialReadTest {
             val releaseSnapshot = CompletableDeferred<Unit>()
             val snapshotFinished = CompletableDeferred<Unit>()
             var timedOut = false
+            val snapshotRead =
+                SingleFlightBoundedInitialSnapshotRead<String>(
+                    budgetMillis = 10L,
+                    producerDispatcher = StandardTestDispatcher(testScheduler),
+                )
 
             assertEquals("subscription", subscription)
 
             try {
-                awaitBoundedInitialSnapshotRead(
-                    budgetMillis = 10L,
-                    producerDispatcher = StandardTestDispatcher(testScheduler),
-                    read = {
-                        releaseSnapshot.await()
-                        snapshotFinished.complete(Unit)
-                        "snapshot"
-                    },
-                )
+                snapshotRead.await {
+                    releaseSnapshot.await()
+                    snapshotFinished.complete(Unit)
+                    "snapshot"
+                }
                 fail("expected the snapshot timeout")
             } catch (_: ConversationInitialLoadTimeoutException) {
                 timedOut = true
@@ -115,7 +116,63 @@ class BoundedInitialReadTest {
 
             releaseSnapshot.complete(Unit)
             snapshotFinished.await()
+            snapshotRead.cancel()
             assertTrue(timedOut)
+        }
+
+    @Test
+    fun repeatedTimeoutsAndRetriesKeepSnapshotReadSingleFlight() =
+        runTest {
+            val releaseSnapshot = CompletableDeferred<Unit>()
+            var activeReads = 0
+            var maxActiveReads = 0
+            var startedReads = 0
+            val snapshotRead =
+                SingleFlightBoundedInitialSnapshotRead<String>(
+                    budgetMillis = 10L,
+                    producerDispatcher = StandardTestDispatcher(testScheduler),
+                )
+
+            try {
+                repeat(3) { attempt ->
+                    try {
+                        snapshotRead.await {
+                            startedReads += 1
+                            activeReads += 1
+                            maxActiveReads = maxOf(maxActiveReads, activeReads)
+                            try {
+                                releaseSnapshot.await()
+                                "snapshot"
+                            } finally {
+                                activeReads -= 1
+                            }
+                        }
+                        fail("expected the bounded snapshot read to remain unavailable")
+                    } catch (throwable: ConversationInitialLoadException) {
+                        if (attempt == 0) {
+                            assertTrue(throwable is ConversationInitialLoadTimeoutException)
+                        } else {
+                            assertTrue(throwable is ConversationInitialLoadStillInFlightException)
+                        }
+                    }
+                }
+
+                assertEquals(1, startedReads)
+                assertEquals(1, maxActiveReads)
+                assertEquals(1, activeReads)
+
+                releaseSnapshot.complete(Unit)
+                testScheduler.runCurrent()
+                assertEquals(
+                    "snapshot",
+                    snapshotRead.await { error("a retry must consume the retained producer result") },
+                )
+                assertEquals(0, activeReads)
+                assertEquals(1, startedReads)
+            } finally {
+                releaseSnapshot.complete(Unit)
+                snapshotRead.cancel()
+            }
         }
 
     @Test
@@ -123,6 +180,11 @@ class BoundedInitialReadTest {
         assertTrue(
             isTerminalOpenFailure(
                 ConversationInitialLoadTimeoutException(),
+            ),
+        )
+        assertTrue(
+            isTerminalOpenFailure(
+                ConversationInitialLoadStillInFlightException(),
             ),
         )
         assertEquals(
