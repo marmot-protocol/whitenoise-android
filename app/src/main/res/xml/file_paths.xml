@@ -4,6 +4,8 @@
     <cache-path name="camera" path="camera/" />
     <cache-path name="composer_paste" path="composer_paste/" />
     <cache-path name="shared_media" path="shared_media/" />
+    <!-- User-initiated, read-only forensic audit exports. -->
+    <cache-path name="audit_logs" path="audit_logs/" />
     <cache-path name="transcripts" path="transcripts/" />
     <cache-path name="video_attachments" path="video_attachments/" />
     <!-- Signed APKs downloaded for in-app self-update (Zapstore flavor only). -->
