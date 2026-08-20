@@ -219,6 +219,28 @@ class ChatListTitleTest {
         assertEquals(listOf("shared"), matches.map { it.group.groupIdHex })
     }
 
+    @Test
+    fun rowWithoutAvatarKeepsTheGroupRecordAvatarIdentity() {
+        // A chat-list row arriving with no avatar payload is a transient
+        // projection state, not an avatar removal — removal propagates through
+        // the group record. The item must keep the last-known identity so a
+        // resolved avatar never degrades to generated initials.
+        val item =
+            chatListItemFromProjection(
+                row = row(groupId = "test-group", rawTitle = "Named"),
+                group =
+                    group(name = "Named").copy(
+                        avatarUrl = "https://example.com/avatar.jpg",
+                        imageHashHex = "hash-1234",
+                    ),
+                activeAccountIdHex = "me-acc",
+                members = null,
+            )
+
+        assertEquals("https://example.com/avatar.jpg", item.group.avatarUrl)
+        assertEquals("hash-1234", item.group.imageHashHex)
+    }
+
     // --- fixtures ---
 
     private fun group(

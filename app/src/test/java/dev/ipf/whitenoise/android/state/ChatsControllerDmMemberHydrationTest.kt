@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
+import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
@@ -34,6 +35,7 @@ import kotlin.coroutines.coroutineContext
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
+@Suppress("LargeClass") // Roster-hydration scenarios share one expensive controller fixture.
 class ChatsControllerDmMemberHydrationTest {
     @get:Rule val composeRule = createComposeRule()
     private val boundControllers = mutableListOf<ChatsController>()
@@ -62,6 +64,106 @@ class ChatsControllerDmMemberHydrationTest {
         }
         composeRule.waitForIdle()
         return controller
+    }
+
+    @Test
+    fun cachedMemberSnapshotKeepsResolvedTitleWhileRosterHydrates() {
+        val copy =
+            GroupTitleCopy(
+                inviteFromFormat = "Invite from %1\$s",
+                groupOfPeopleFormat = "Group of %1\$d people",
+                unknownTitle = "Unknown",
+            )
+        val appState = testAppState()
+        // A previous session's group-details/conversation read left the roster
+        // in the account-scoped snapshot cache. A fresh bind must use it as
+        // the last-known presentation instead of flashing Unknown while the
+        // live roster loader is still in flight.
+        appState.cacheGroupMemberSnapshot(
+            ACCOUNT_REF,
+            DM_GROUP,
+            listOf(member(ME, local = true), member(PEER, local = false)),
+        )
+        var releaseRoster = false
+        val controller =
+            ChatsController(appState, ACCOUNT_REF, ::memberSnapshotRetryDelayMillis) { _, _ ->
+                while (coroutineContext.isActive && !releaseRoster) {
+                    delay(10)
+                }
+                listOf(member(ME, local = true), member(PEER, local = false))
+            }
+        boundControllers += controller
+        composeRule.setContent {}
+        composeRule.runOnIdle {
+            controller.setChatListVisible(false)
+            controller.applyChatListRow(dmRow(SelfMembershipFfi.MEMBER, ChatConversationKindFfi.UNKNOWN))
+            controller.applyLocalGroupUpdate(unnamedDmGroup(SelfMembershipFfi.MEMBER))
+            controller.setChatListVisible(true)
+        }
+        awaitCondition { controller.items.isNotEmpty() }
+
+        val item = controller.items.single()
+        assertEquals(
+            "Peer Name",
+            GroupProjector.displayTitle(
+                group = item.group,
+                otherMemberAccount = item.presentationOtherMemberAccount,
+                memberCount = item.presentationMemberCount,
+                memberTitle = { "Peer Name" },
+                copy = copy,
+            ),
+        )
+        releaseRoster = true
+    }
+
+    @Test
+    fun emptyInitialMemberIdPageDoesNotOverwriteAResolvedRoster() {
+        val controller =
+            bindDmController { _, _ ->
+                listOf(member(ME, local = true), member(PEER, local = false))
+            }
+        awaitCondition { controller.items.singleOrNull()?.otherMemberAccount == PEER }
+
+        // An initial member-id page carrying an empty roster is a transient
+        // catch-up result. Caching it would pin the Unknown fallback forever —
+        // a cached key is never retried.
+        ChatsController::class.java
+            .getDeclaredMethod(
+                "applyInitialMemberIdProjections",
+                List::class.java,
+                String::class.java,
+                Boolean::class.javaPrimitiveType,
+            ).apply { isAccessible = true }
+            .invoke(
+                controller,
+                listOf(AppGroupMemberIdsFfi(DM_GROUP, emptyList(), emptyList())),
+                ME,
+                false,
+            )
+
+        // A self-only roster for a direct conversation is equally transient —
+        // the streaming path grace-retries it, so the page path must too.
+        ChatsController::class.java
+            .getDeclaredMethod(
+                "applyInitialMemberIdProjections",
+                List::class.java,
+                String::class.java,
+                Boolean::class.javaPrimitiveType,
+            ).apply { isAccessible = true }
+            .invoke(
+                controller,
+                listOf(AppGroupMemberIdsFfi(DM_GROUP, listOf(ME), emptyList())),
+                ME,
+                false,
+            )
+
+        @Suppress("UNCHECKED_CAST")
+        val cache =
+            ChatsController::class.java
+                .getDeclaredField("memberCacheByGroup")
+                .apply { isAccessible = true }
+                .get(controller) as Map<String, List<AppGroupMemberRecordFfi>>
+        assertEquals(2, cache.getValue(DM_GROUP).size)
     }
 
     @Test

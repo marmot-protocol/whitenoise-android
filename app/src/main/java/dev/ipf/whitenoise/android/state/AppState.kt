@@ -2574,6 +2574,11 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    // Deliberately active-account keyed, matching setDraft/draftFor/loadDraft
+    // and the chat-list row's own read. Clearing under the conversation's
+    // pinned account instead would delete a draft nothing reads and leave the
+    // one the composer actually wrote in place — see the follow-up on making
+    // the whole draft pipeline conversation-keyed.
     fun clearDraftAfterSuccessfulSend(groupIdHex: String) {
         val accountRef = activeAccountRef ?: return
         val sentGeneration = draftWriter.generation(accountRef, groupIdHex)
@@ -2950,17 +2955,38 @@ class WhiteNoiseAppState private constructor(
             ?.applyLocalGroupDetails(record, members)
     }
 
+    // The optimistic-preview bridge is scoped to the sending account like
+    // applyChatListRowFromMarkRead below: chatRowKey is the bare group id, so
+    // during an account-pinned conversation window an unguarded write
+    // could land on another account's row for the same group.
     internal fun applyOptimisticSentPreview(
+        accountRef: String?,
         groupIdHex: String,
         preview: ChatListMessagePreviewFfi,
-    ): Boolean = chatsController?.applyOptimisticSentPreview(groupIdHex, preview) == true
+    ): Boolean =
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.applyOptimisticSentPreview(groupIdHex, preview) == true
 
     internal fun commitOptimisticSentPreview(
+        accountRef: String?,
         groupIdHex: String,
         optimisticMessageIdHex: String,
         confirmedMessageIdHex: String,
     ) {
-        chatsController?.commitOptimisticSentPreview(groupIdHex, optimisticMessageIdHex, confirmedMessageIdHex)
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.commitOptimisticSentPreview(groupIdHex, optimisticMessageIdHex, confirmedMessageIdHex)
+    }
+
+    internal fun failOptimisticSentPreview(
+        accountRef: String?,
+        groupIdHex: String,
+        optimisticMessageIdHex: String,
+    ) {
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.failOptimisticSentPreview(groupIdHex, optimisticMessageIdHex)
     }
 
     /**
@@ -2979,10 +3005,13 @@ class WhiteNoiseAppState private constructor(
     }
 
     internal fun rollbackOptimisticSentPreview(
+        accountRef: String?,
         groupIdHex: String,
         optimisticMessageIdHex: String,
     ) {
-        chatsController?.rollbackOptimisticSentPreview(groupIdHex, optimisticMessageIdHex)
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.rollbackOptimisticSentPreview(groupIdHex, optimisticMessageIdHex)
     }
 
     // A self-leave stops that group's subscription, so the engine pushes no

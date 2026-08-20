@@ -76,6 +76,7 @@ class OptimisticSentPreviewReturnFrameTest {
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
+@Suppress("LargeClass") // Optimistic-preview interleavings share one controller fixture.
 class OptimisticSentPreviewOrderingTest {
     @Test
     fun firstReturnFramePublishesOptimisticPreviewAtFinalSameSecondIndex() {
@@ -490,6 +491,131 @@ class OptimisticSentPreviewOrderingTest {
         val projection = controller.items.first().projection
         assertEquals("z-authoritative-b", projection?.lastMessage?.messageIdHex)
         assertEquals(20uL, projection?.activitySortAt)
+    }
+
+    @Test
+    fun failedSendStaysVisibleAsFailedOnTheRow() {
+        val controller = controllerWithRows(row("chat-a", "Alpha", 20uL), row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "pending B", 20uL))
+        controller.failOptimisticSentPreview("chat-b", "temp-b")
+        controller.setChatListVisible(true)
+
+        // The conversation shows a failed bubble — the row agrees instead of
+        // silently reverting to the prior last message. This holds
+        // until genuinely newer activity arrives in the group, which then
+        // owns the row's last message as usual.
+        val failedRow = controller.items.first()
+        assertEquals("chat-b", failedRow.id)
+        assertEquals("temp-b", failedRow.projection?.lastMessage?.messageIdHex)
+        assertEquals(
+            ChatListMessageDeliveryStateFfi.FAILED,
+            failedRow.projection?.lastMessage?.deliveryState,
+        )
+
+        // Discarding the failed send is genuine abandonment: only then does
+        // the row return to the pre-send baseline.
+        controller.setChatListVisible(false)
+        controller.rollbackOptimisticSentPreview("chat-b", "temp-b")
+        controller.setChatListVisible(true)
+        assertEquals(listOf("chat-a", "chat-b"), controller.items.map { it.id })
+    }
+
+    @Test
+    fun retryReappliesThePendingPreviewInPlace() {
+        val controller = controllerWithRows(row("chat-a", "Alpha", 30uL), row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "pending B", 20uL))
+        controller.failOptimisticSentPreview("chat-b", "temp-b")
+        // A manual retry re-applies the same optimistic id with a fresh
+        // timestamp: FAILED flips back to PENDING and the row re-bumps.
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "pending B", 40uL))
+        controller.setChatListVisible(true)
+
+        val retriedRow = controller.items.first()
+        assertEquals("chat-b", retriedRow.id)
+        assertEquals(
+            ChatListMessageDeliveryStateFfi.PENDING,
+            retriedRow.projection?.lastMessage?.deliveryState,
+        )
+    }
+
+    @Test
+    fun replacementSnapshotKeepsAConfirmedSendAndItsFreshRowFields() {
+        val controller = controllerWithRows(row("chat-a", "Alpha", 30uL), row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "pending B", 40uL))
+        controller.commitOptimisticSentPreview("chat-b", "temp-b", "confirmed-b")
+        // The engine echo lands and retires the committed entry, so from here
+        // the confirmed send lives only in the baseline row.
+        controller.applyChatListRow(
+            row("chat-b", "Zulu", 40uL).copy(
+                lastMessage =
+                    preview(
+                        "confirmed-b",
+                        "pending B",
+                        40uL,
+                        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    ),
+            ),
+        )
+        // A reconnect replays a coalesced snapshot that predates the send but
+        // carries fresh unread state. The row must keep the confirmed send as
+        // its last message and position while taking the newer unread count —
+        // rewinding loses the send, rejecting the row loses the badge.
+        replaceRows(
+            controller,
+            listOf(
+                row("chat-a", "Alpha", 30uL),
+                row("chat-b", "Zulu", 10uL).copy(unreadCount = 3uL, hasUnread = true),
+            ),
+        )
+        controller.setChatListVisible(true)
+
+        val confirmedRow = controller.items.first()
+        assertEquals("chat-b", confirmedRow.id)
+        assertEquals("confirmed-b", confirmedRow.projection?.lastMessage?.messageIdHex)
+        assertEquals(3uL, confirmedRow.projection?.unreadCount)
+        assertEquals(true, confirmedRow.projection?.hasUnread)
+    }
+
+    @Test
+    fun authoritativeEchoAfterAFailedSendStillFoldsInsteadOfParking() {
+        val controller = controllerWithRows(row("chat-a", "Alpha", 30uL), row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "pending B", 20uL))
+        controller.failOptimisticSentPreview("chat-b", "temp-b")
+        // A publish can fail locally after the relays accepted it, so the echo
+        // arrives for a message the row shows as failed. Its content matches
+        // the failed entry, but a failed send never reports a confirmed id, so
+        // nothing would ever drain a park — the row would stay stranded on the
+        // failed preview and every later update for it would be discarded
+        // wholesale. The echo must fold instead.
+        applySubscriptionChatListRow(
+            controller,
+            row("chat-b", "Zulu", 20uL).copy(
+                lastMessage =
+                    preview(
+                        "echoed-b",
+                        "pending B",
+                        20uL,
+                        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    ),
+            ),
+            ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+        )
+        controller.setChatListVisible(true)
+
+        val echoedRow = controller.items.single { it.id == "chat-b" }
+        assertEquals("echoed-b", echoedRow.projection?.lastMessage?.messageIdHex)
+        assertEquals(
+            ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+            echoedRow.projection?.lastMessage?.deliveryState,
+        )
     }
 
     @Test
