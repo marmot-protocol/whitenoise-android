@@ -27,6 +27,7 @@ apk_sha256=$(sha256sum "$APK_PATH" | awk '{print $1}')
 apk_size=$(wc -c < "$APK_PATH")
 apk_size=${apk_size//[[:space:]]/}
 expected_mime=${BLOSSOM_APK_MIME:-application/vnd.android.package-archive}
+apk_container_mime=application/zip
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
@@ -46,6 +47,15 @@ normalize_mime() {
   printf '%s' "$value"
 }
 
+is_accepted_apk_mime() {
+  local normalized
+  normalized=$(normalize_mime "$1")
+  # APKs are ZIP containers. nostr.download content-sniffs the signed bytes
+  # and reports application/zip even when BUD-02 receives the explicit Android
+  # package type. Both values describe the same digest-verified APK bytes.
+  [[ "$normalized" == "$expected_base_mime" || "$normalized" == "$apk_container_mime" ]]
+}
+
 verify_served_apk() {
   local url=$1
   local serve_attempt headers curl_status served_type delay
@@ -59,8 +69,7 @@ verify_served_apk() {
       printf '%s' "$headers" \
         | awk -F': ' 'tolower($1) == "content-type" { sub(/\r$/, "", $2); print $2; exit }'
     )
-    if (( curl_status == 0 )) && \
-      [[ "$(normalize_mime "$served_type")" == "$expected_base_mime" ]]; then
+    if (( curl_status == 0 )) && is_accepted_apk_mime "$served_type"; then
       return 0
     fi
 
@@ -68,7 +77,7 @@ verify_served_apk() {
       printf 'Blossom serve verification failed for %s (curl status %d)\n' \
         "$url" "$curl_status" >&2
     else
-      printf 'Blossom serves %s as %s instead of %s\n' "$url" "$served_type" "$expected_mime" >&2
+      printf 'Blossom serves %s as unsupported APK MIME %s\n' "$url" "$served_type" >&2
     fi
     if (( serve_attempt == max_attempts )); then
       return 1
@@ -157,8 +166,8 @@ for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
       printf 'Blossom upload returned an invalid MIME type\n' >&2
       exit 1
     fi
-    if [[ "$(normalize_mime "$returned_type")" != "$expected_base_mime" ]]; then
-      printf 'Blossom stored APK as %s instead of %s\n' "$returned_type" "$expected_mime" >&2
+    if ! is_accepted_apk_mime "$returned_type"; then
+      printf 'Blossom stored APK as unsupported MIME %s\n' "$returned_type" >&2
       exit 1
     fi
     url=$(printf '%s/%s.apk' "${BLOSSOM_SERVER%/}" "$apk_sha256")
