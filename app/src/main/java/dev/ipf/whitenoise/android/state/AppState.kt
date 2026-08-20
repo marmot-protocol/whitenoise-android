@@ -7216,12 +7216,10 @@ class WhiteNoiseAppState private constructor(
                 }
 
                 val summary = marmotIo { sendText(account, group, body) }
-                if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
-                    // The intent is already durable in MDK. There is no event id
-                    // to persist yet, but replaying this quick reply would create
-                    // a second intent, so complete the Android work item now.
-                    return@withGroupCommitLock NotificationReplySendOutcome.AcceptedPending
-                }
+                // MDK assigns the app-event id before deciding whether this call
+                // can publish it immediately. Persist it before returning either
+                // outcome: after a process death, it is our durable proof that an
+                // accepted-pending quick reply must never be sent a second time.
                 val committedMessageId =
                     summary.messageIds
                         .firstOrNull()
@@ -7232,7 +7230,11 @@ class WhiteNoiseAppState private constructor(
                         completionStore.markCommittedMessage(completionKey, committedMessageId)
                     }
                 if (!committed) return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
-                NotificationReplySendOutcome.Sent
+                if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
+                    NotificationReplySendOutcome.AcceptedPending
+                } else {
+                    NotificationReplySendOutcome.Sent
+                }
             }
         }.onFailure {
             appStateDebug(it) { "notification reply failed for group=${group.take(8)}: ${it.readableMessage()}" }

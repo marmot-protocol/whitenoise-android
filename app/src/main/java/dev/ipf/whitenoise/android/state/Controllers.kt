@@ -1973,6 +1973,20 @@ internal fun optimisticMessageIdForProjection(
         ?.messageIdHex
 }
 
+/**
+ * MDK assigns an app-event id before reporting [SendAcceptDispositionFfi.ACCEPTED_PENDING].
+ * Use that id to settle retained media exactly; a content/timestamp heuristic cannot safely
+ * distinguish multiple queued albums.
+ */
+internal fun acceptedPendingMediaOptimisticIdForProjection(
+    projectedMessageIdHex: String,
+    acceptedPendingMessageIdsByOptimisticId: Map<String, String>,
+): String? =
+    acceptedPendingMessageIdsByOptimisticId
+        .entries
+        .singleOrNull { (_, acceptedMessageIdHex) -> acceptedMessageIdHex == projectedMessageIdHex }
+        ?.key
+
 private fun isSendableOptimisticStatus(
     status: MessageStatus,
     allowFailed: Boolean,
@@ -3279,6 +3293,7 @@ internal class RetainedMediaUpload(
     val caption: String?,
     var uploadedReferences: List<MediaAttachmentReferenceFfi>? = null,
     var acceptedPending: Boolean = false,
+    var acceptedPendingMessageIdHex: String? = null,
 )
 
 private data class OptimisticChatListPreviewEntry(
@@ -8444,11 +8459,26 @@ class ConversationController(
                         }
                     }
                 if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
-                    // MDK now owns a durable, unpublished media intent. Keep the
-                    // existing pending bubble and its uploaded bytes until the
-                    // engine projects the final message id; presenting it as Sent
-                    // here would be false, and retrying would create a second send.
+                    // MDK now owns a durable, unpublished media intent. It still
+                    // returns the canonical app-event id, which lets a later
+                    // projection settle this exact bubble even when other media
+                    // sends are queued at the same time.
+                    val acceptedPendingMessageIdHex =
+                        summary.messageIds.firstOrNull()?.takeIf(HEX_MESSAGE_ID::matches)
                     retained.acceptedPending = true
+                    retained.acceptedPendingMessageIdHex = acceptedPendingMessageIdHex
+                    // The local projection can beat the FFI return. It was held
+                    // only because several media optimistics were indistinguishable
+                    // at that instant; now the MDK id gives it an exact owner.
+                    acceptedPendingMessageIdHex
+                        ?.let(pendingProjectionsAwaitingBridge::get)
+                        ?.let { deferredProjection ->
+                            upsertProjectedRecord(
+                                deferredProjection,
+                                reconcileOptimistic = true,
+                                allowDelayedProjection = true,
+                            )
+                        }
                     publishTimelineFromIndexes()
                     return
                 }
@@ -11146,6 +11176,25 @@ class ConversationController(
         ).forEach(optimisticMessages::remove)
     }
 
+    private fun acceptedPendingMediaOptimisticIdForProjection(projectedMessageIdHex: String): String? {
+        val acceptedPendingMessageIdsByOptimisticId =
+            retainedMediaUploads
+                .keysSnapshot()
+                .mapNotNull { optimisticKey ->
+                    val timelineMessage = optimisticMessages[optimisticKey] ?: return@mapNotNull null
+                    val isPendingMedia =
+                        timelineMessage.record.tags.any { it.values.firstOrNull() == "_media_pending" }
+                    val acceptedMessageIdHex = retainedMediaUploads.get(optimisticKey)?.acceptedPendingMessageIdHex
+                    acceptedMessageIdHex
+                        ?.takeIf { isPendingMedia }
+                        ?.let { optimisticKey.removePrefix("msg:") to it }
+                }.toMap()
+        return acceptedPendingMediaOptimisticIdForProjection(
+            projectedMessageIdHex = projectedMessageIdHex,
+            acceptedPendingMessageIdsByOptimisticId = acceptedPendingMessageIdsByOptimisticId,
+        )
+    }
+
     private fun pruneConfirmedOptimisticReactions() {
         confirmedOptimisticReactionKeys(
             activeAccountIdHex = conversationAccountIdHex,
@@ -11200,8 +11249,11 @@ class ConversationController(
         // — same content, same position.
         val draftAction = TimelineProjector.toAppMessageRecord(record)
         val projectedIsMediaUpsert = draftAction.tags.any { it.values.firstOrNull() == "imeta" }
+        val acceptedPendingMediaOptimisticId =
+            acceptedPendingMediaOptimisticIdForProjection(record.messageIdHex).takeIf { reconcileOptimistic }
         val hasExactBridge =
-            optimisticMessages.values.any { it.record.messageIdHex == record.messageIdHex }
+            optimisticMessages.values.any { it.record.messageIdHex == record.messageIdHex } ||
+                acceptedPendingMediaOptimisticId != null
         if (projectedIsMediaUpsert && !hasExactBridge && reconcileOptimistic) {
             val pendingMediaCount =
                 optimisticMessages.values.count {
@@ -11252,11 +11304,12 @@ class ConversationController(
             displayedProjectedStreamItemIds,
         )
         val reconciledOptimisticId =
-            optimisticMessageIdForProjection(
-                optimisticMessages.values,
-                actionRecord,
-                allowDelayedProjection = allowDelayedProjection,
-            ).takeIf { reconcileOptimistic }
+            acceptedPendingMediaOptimisticId
+                ?: optimisticMessageIdForProjection(
+                    optimisticMessages.values,
+                    actionRecord,
+                    allowDelayedProjection = allowDelayedProjection,
+                ).takeIf { reconcileOptimistic }
         retentionAtSendSeconds =
             retentionAtSendForProjection(
                 messageId = record.messageIdHex,

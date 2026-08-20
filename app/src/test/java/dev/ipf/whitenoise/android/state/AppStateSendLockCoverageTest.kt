@@ -68,6 +68,20 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
+    fun acceptedPendingNotificationReplyPersistsItsCanonicalIdBeforeReturning() {
+        val body = appStateFunctionBody("sendNotificationReply")
+        val sendIndex = body.indexOf("val summary = marmotIo { sendText(account, group, body) }")
+        val persistIndex = body.indexOf("completionStore.markCommittedMessage", startIndex = sendIndex)
+        val acceptedPendingIndex = body.indexOf("NotificationReplySendOutcome.AcceptedPending", startIndex = sendIndex)
+
+        assertTrue(
+            "an accepted-pending reply must persist MDK's canonical id before reporting " +
+                "success, so crash recovery cannot resend it",
+            sendIndex >= 0 && persistIndex > sendIndex && acceptedPendingIndex > persistIndex,
+        )
+    }
+
+    @Test
     fun notificationActionsAreBlockedWhileAppLockScreenIsVisible() {
         assertTrue(notificationActionsAllowed(appLockScreenVisible = false))
         assertFalse(notificationActionsAllowed(appLockScreenVisible = true))

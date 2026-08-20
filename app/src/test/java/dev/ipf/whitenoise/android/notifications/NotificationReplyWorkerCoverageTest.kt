@@ -34,7 +34,7 @@ class NotificationReplyWorkerCoverageTest {
         }
 
     @Test
-    fun committedMessageIdIsDurableProofWithoutTimelineLookup() =
+    fun acceptedPendingMessageIdIsDurableProofWithoutTimelineLookup() =
         runTest {
             var pageLoads = 0
 

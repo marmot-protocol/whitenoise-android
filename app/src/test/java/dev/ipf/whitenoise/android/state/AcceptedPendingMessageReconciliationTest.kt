@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -39,6 +40,38 @@ class AcceptedPendingMessageReconciliationTest {
         assertFalse(reconciliation.insertedSent)
         assertEquals(MessageStatus.Pending, optimisticMessages[key]?.status)
         assertEquals(record, messageById[tempId])
+    }
+
+    @Test
+    fun acceptedPendingMediaProjectionMatchesItsCanonicalIdWithOtherMediaQueued() {
+        val firstMessageId = "a".repeat(64)
+        val secondMessageId = "b".repeat(64)
+        val acceptedPendingMessageIdsByOptimisticId =
+            mapOf(
+                "first-temp" to firstMessageId,
+                "second-temp" to secondMessageId,
+            )
+
+        assertEquals(
+            "second-temp",
+            acceptedPendingMediaOptimisticIdForProjection(
+                projectedMessageIdHex = secondMessageId,
+                acceptedPendingMessageIdsByOptimisticId = acceptedPendingMessageIdsByOptimisticId,
+            ),
+        )
+        assertEquals(
+            "first-temp",
+            acceptedPendingMediaOptimisticIdForProjection(
+                projectedMessageIdHex = firstMessageId,
+                acceptedPendingMessageIdsByOptimisticId = acceptedPendingMessageIdsByOptimisticId,
+            ),
+        )
+        assertNull(
+            acceptedPendingMediaOptimisticIdForProjection(
+                projectedMessageIdHex = "c".repeat(64),
+                acceptedPendingMessageIdsByOptimisticId = acceptedPendingMessageIdsByOptimisticId,
+            ),
+        )
     }
 
     private fun message(id: String): AppMessageRecordFfi =
