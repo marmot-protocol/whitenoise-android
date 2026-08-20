@@ -38,6 +38,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
@@ -79,6 +80,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -297,21 +300,23 @@ internal fun AccountKeysScreen(
                     Button(
                         onClick = { showSignOutSheet = true },
                         enabled = active != null,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().semantics { traversalIndex = 0f },
                     ) {
                         Icon(Icons.Default.Close, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.sign_out))
                     }
-                    // Destructive "Sign Out & Wipe". Gated on engine FFI
-                    // availability (#348): the relay + MLS teardown is an engine
-                    // sub-issue that doesn't exist on the binding surface yet, so
-                    // we don't surface an affordance we can't honor.
+                    // Keep the irreversible action in its own terminal danger
+                    // section so routine and destructive actions are distinct.
                     if (WIPE_ENGINE_FFI_AVAILABLE) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.35f),
+                        )
                         OutlinedButton(
                             onClick = { showWipeSheet = true },
                             enabled = active != null,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().semantics { traversalIndex = 1f },
                             colors =
                                 ButtonDefaults.outlinedButtonColors(
                                     contentColor = MaterialTheme.colorScheme.error,
