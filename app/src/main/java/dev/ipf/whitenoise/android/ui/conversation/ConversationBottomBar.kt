@@ -175,7 +175,9 @@ internal fun ConversationBottomBar(
                             messageTextCopy = messageTextCopy,
                             onCancelReply = { controller.replyingTo = null },
                             onSend = { text, onAccepted ->
-                                appState.launchMutation { controller.send(text, onAccepted) }
+                                appState.launchMutation {
+                                    appState.sendConversationText(controller, text, onAccepted)
+                                }
                             },
                             initialDraft = initialDraft,
                             onDraftChange = onDraftChange,

@@ -424,6 +424,13 @@ internal data class ProfileGroupInviteToast(
     val copyable: Boolean = false,
 )
 
+/** Generation fence for deleting only the composer draft represented by one send gesture. */
+internal data class DraftSendClearToken(
+    val accountRef: String,
+    val groupIdHex: String,
+    val generation: MessageDraftGeneration,
+)
+
 internal class StartProfileChatNoActiveAccountException : IllegalStateException("No active account")
 
 internal fun profileGroupInviteToast(outcome: ProfileGroupInviteOutcome): ProfileGroupInviteToast? {
@@ -2673,9 +2680,24 @@ class WhiteNoiseAppState private constructor(
     // pinned account instead would delete a draft nothing reads and leave the
     // one the composer actually wrote in place — see the follow-up on making
     // the whole draft pipeline conversation-keyed.
+    internal fun captureDraftForSend(groupIdHex: String): DraftSendClearToken? =
+        activeAccountRef?.let { accountRef ->
+            DraftSendClearToken(
+                accountRef = accountRef,
+                groupIdHex = groupIdHex,
+                generation = draftWriter.generation(accountRef, groupIdHex),
+            )
+        }
+
     fun clearDraftAfterSuccessfulSend(groupIdHex: String) {
-        val accountRef = activeAccountRef ?: return
-        val sentGeneration = draftWriter.generation(accountRef, groupIdHex)
+        captureDraftForSend(groupIdHex)?.let(::clearDraftAfterSuccessfulSend)
+    }
+
+    internal fun clearDraftAfterSuccessfulSend(pendingClear: DraftSendClearToken) {
+        val accountRef = pendingClear.accountRef
+        val groupIdHex = pendingClear.groupIdHex
+        val sentGeneration = pendingClear.generation
+        if (!draftWriter.isCurrent(accountRef, groupIdHex, sentGeneration)) return
         draftStore.set(accountRef, groupIdHex, TextFieldValue(""))
         mutationsScope.launch {
             when (val deletion = draftWriter.deleteIfCurrent(accountRef, groupIdHex, sentGeneration)) {
@@ -2694,6 +2716,21 @@ class WhiteNoiseAppState private constructor(
                 MessageDraftConditionalDeleteResult.Superseded -> Unit
             }
         }
+    }
+
+    internal suspend fun sendConversationText(
+        controller: ConversationController,
+        text: String,
+        onAccepted: () -> Unit = {},
+    ) {
+        val pendingClear = captureDraftForSend(controller.group.groupIdHex)
+        controller.send(
+            text = text,
+            onAccepted = onAccepted,
+            onDurablyAccepted = {
+                pendingClear?.let(::clearDraftAfterSuccessfulSend)
+            },
+        )
     }
 
     internal suspend fun deleteDraftBeforeGroupRemoval(

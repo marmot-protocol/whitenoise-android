@@ -8022,18 +8022,20 @@ class ConversationController(
     }
 
     /**
-     * Send a text message. [onAccepted] runs only once the optimistic bubble
-     * has been committed to the projection and published — i.e. the send has
-     * actually started. The caller uses it to clear the input/draft and scroll
-     * to newest. It is deliberately NOT invoked when a guard rejects the send
-     * (no account yet, blank text, unknown/non-member state, or a terminal group)
-     * so the UI keeps the user's text instead of clearing it into the void.
+     * Send a text message. [onAccepted] runs once the optimistic bubble has
+     * been committed to the projection and published — i.e. the send has
+     * visibly started. [onDurablyAccepted] runs only after MDK returns a typed
+     * accepted disposition, so the caller can delete the persisted composer
+     * draft without losing a pre-acceptance send across process death. Neither
+     * callback runs when a guard rejects the send (no account yet, blank text,
+     * unknown/non-member state, or a terminal group).
      * The edit path also leaves [onAccepted] uncalled: the composer restores its
      * pre-edit draft via the `editingMessageId` LaunchedEffect, not by clearing.
      */
     suspend fun send(
         text: String,
         onAccepted: () -> Unit = {},
+        onDurablyAccepted: () -> Unit = {},
     ) {
         val trimmed = text.trim()
         val accountRef = conversationAccountRef
@@ -8187,6 +8189,7 @@ class ConversationController(
                     )
                     publishTextWithRetry(replyTarget, account, trimmed, trace, traceStartMs)
                 }
+            onDurablyAccepted()
             val reconciliation =
                 reconcileSuccessfulTextSend(
                     summaryMessageIds = summary.messageIds,

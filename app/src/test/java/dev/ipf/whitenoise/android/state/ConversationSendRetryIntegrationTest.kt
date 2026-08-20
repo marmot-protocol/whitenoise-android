@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -31,6 +32,134 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationSendRetryIntegrationTest {
+    @Test
+    fun durableAcceptanceClearsTheCapturedComposerDraft() {
+        val appState = appState()
+        appState.setDraft(GROUP_ID, TextFieldValue("hello"))
+        val pendingClear = requireNotNull(appState.captureDraftForSend(GROUP_ID))
+
+        appState.clearDraftAfterSuccessfulSend(pendingClear)
+
+        assertEquals(null, appState.draftFor(GROUP_ID))
+    }
+
+    @Test
+    fun durableAcceptanceDoesNotClearANewerComposerDraft() {
+        val appState = appState()
+        appState.setDraft(GROUP_ID, TextFieldValue("first message"))
+        val pendingClear = requireNotNull(appState.captureDraftForSend(GROUP_ID))
+        appState.setDraft(GROUP_ID, TextFieldValue("next message"))
+
+        appState.clearDraftAfterSuccessfulSend(pendingClear)
+
+        assertEquals("next message", appState.draftFor(GROUP_ID))
+    }
+
+    @Test
+    fun preAcceptanceFailureKeepsTheComposerDraftForRehydration() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("survives restart"))
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot =
+                        GroupMemberSnapshot(
+                            listOf(
+                                AppGroupMemberRecordFfi(
+                                    memberIdHex = ACCOUNT_ID,
+                                    account = ACCOUNT_REF,
+                                    local = true,
+                                ),
+                            ),
+                        ),
+                    textPublisher = { _, _, _, _ ->
+                        throw MarmotKitException.Publish("relay rejected event")
+                    },
+                )
+
+            appState.sendConversationText(controller, "survives restart")
+
+            assertEquals("survives restart", appState.draftFor(GROUP_ID))
+            assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+        }
+
+    @Test
+    fun acceptedPendingClearsTheCapturedComposerDraft() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("queued safely"))
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot =
+                        GroupMemberSnapshot(
+                            listOf(
+                                AppGroupMemberRecordFfi(
+                                    memberIdHex = ACCOUNT_ID,
+                                    account = ACCOUNT_REF,
+                                    local = true,
+                                ),
+                            ),
+                        ),
+                    textPublisher = { _, _, _, _ ->
+                        assertEquals("queued safely", appState.draftFor(GROUP_ID))
+                        SendSummaryFfi(
+                            published = 0u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            appState.sendConversationText(controller, "queued safely")
+
+            assertEquals(null, appState.draftFor(GROUP_ID))
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+        }
+
+    @Test
+    fun acceptedPendingSeparatesOptimisticAndDurableAcceptanceCallbacks() =
+        runTest {
+            val callbacks = mutableListOf<String>()
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot =
+                        GroupMemberSnapshot(
+                            listOf(
+                                AppGroupMemberRecordFfi(
+                                    memberIdHex = ACCOUNT_ID,
+                                    account = ACCOUNT_REF,
+                                    local = true,
+                                ),
+                            ),
+                        ),
+                    textPublisher = { _, _, _, _ ->
+                        assertEquals(listOf("optimistic"), callbacks)
+                        SendSummaryFfi(
+                            published = 0u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            controller.send(
+                text = "hello",
+                onAccepted = { callbacks += "optimistic" },
+                onDurablyAccepted = { callbacks += "durable" },
+            )
+
+            assertEquals(listOf("optimistic", "durable"), callbacks)
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+        }
+
     @Test
     fun optimisticRetentionHintSurvivesPendingToSentWithoutStartingTheCountdown() =
         runTest {

@@ -2972,7 +2972,6 @@ internal fun ConversationScreen(
                 composerTextState = composerTextState,
                 composerAttachmentSheet = composerAttachmentSheet,
                 onAfterSend = {
-                    appState.clearDraftAfterSuccessfulSend(controller.group.groupIdHex)
                     revealSentMessage()
                 },
                 onPickFromGallery = {

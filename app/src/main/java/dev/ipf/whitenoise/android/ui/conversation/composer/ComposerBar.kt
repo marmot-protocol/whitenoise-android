@@ -726,14 +726,12 @@ internal fun ComposerBar(
         hadReplyTarget = hasReplyTarget
     }
     // Single send path shared by the FAB and the Enter key (#404). Clears the
-    // input/draft and scroll-to-newest ONLY after the controller confirms the
-    // optimistic bubble is committed (it invokes onAccepted then). If a guard
-    // rejects the send the callback never runs, so the user's text stays in
-    // the field instead of vanishing silently (issue #264). For an in-place
-    // edit the controller short-circuits and never calls onAccepted; the
-    // LaunchedEffect that watches `editingMessageId` restores the pre-edit
-    // composer once edit state clears — so we pass a no-op and don't blank
-    // the field here.
+    // visible input and scrolls to newest only after the controller commits the
+    // optimistic bubble. The MDK-owned draft deliberately remains intact until
+    // the separate durable-acceptance callback clears it; otherwise process
+    // death during the FFI call can erase a send MDK never accepted (#1216).
+    // For an in-place edit the controller short-circuits and never calls
+    // onAccepted, so the pre-edit composer is restored instead.
     val submitMessage: () -> Unit = {
         if (text.isNotBlank()) {
             val sendingEdit = editingMessageId != null
@@ -746,7 +744,6 @@ internal fun ComposerBar(
                     // typed text is never wiped.
                     if (textFieldValue.text == sentText) {
                         textFieldValue = TextFieldValue("")
-                        onDraftChange(TextFieldValue(""))
                         composerExpansion = ComposerExpansionState()
                     }
                     onAfterSend()
