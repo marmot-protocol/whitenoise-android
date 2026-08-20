@@ -44,6 +44,69 @@ class AiAgentsScreenTest {
     private val app = ApplicationProvider.getApplicationContext<Context>()
 
     @Test
+    fun agentConnectorsIncludeCodexAsFourthConnector() {
+        assertEquals(4, agentConnectors.size)
+        assertEquals("codex", agentConnectors[3].id)
+    }
+
+    @Test
+    fun codexExpandShowsFormattedPromptWithoutPlaceholder() {
+        val npub = TEST_NPUB
+        val expectedCodexPrompt = app.getString(R.string.agent_connector_codex_prompt, npub)
+
+        renderContent(npub)
+
+        composeRule
+            .onNodeWithTag(AI_AGENTS_CONTENT_TAG)
+            .performScrollToNode(hasTestTag(agentConnectorToggleTag("codex")))
+        composeRule
+            .onNodeWithTag(agentConnectorToggleTag("codex"))
+            .performClick()
+
+        composeRule
+            .onNodeWithTag(AI_AGENTS_CONTENT_TAG)
+            .performScrollToNode(hasTestTag(agentConnectorPreviewTag("codex")))
+        composeRule.onNodeWithTag(agentConnectorPreviewTag("codex")).assertIsDisplayed()
+        composeRule.onNodeWithText(expectedCodexPrompt).assertIsDisplayed()
+        assertFalse(expectedCodexPrompt.contains("<USER_NPUB>"))
+    }
+
+    @Test
+    fun codexCopyPassesFormattedPromptToCallback() {
+        val npub = TEST_NPUB
+        val expectedCodexPrompt = app.getString(R.string.agent_connector_codex_prompt, npub)
+        var copiedPrompt: String? = null
+
+        renderContent(npub, onCopyPrompt = { copiedPrompt = it })
+
+        composeRule
+            .onNodeWithTag(AI_AGENTS_CONTENT_TAG)
+            .performScrollToNode(hasTestTag(agentConnectorCopyTag("codex")))
+        composeRule
+            .onNodeWithTag(agentConnectorCopyTag("codex"))
+            .performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(expectedCodexPrompt, copiedPrompt)
+        }
+    }
+
+    @Test
+    fun codexPromptInterpolatesNpubOnceAndReferencesHarnessGuide() {
+        val prompt = app.getString(R.string.agent_connector_codex_prompt, TEST_NPUB)
+
+        assertEquals(1, prompt.windowed(TEST_NPUB.length).count { it == TEST_NPUB })
+        assertFalse(prompt.contains("<USER_NPUB>"))
+        assertTrue(prompt.contains(CODEX_HARNESS_README_URL))
+        assertTrue(prompt.contains("install-codex-marmot.sh"))
+        assertTrue(prompt.contains("wn-codex --version"))
+        assertTrue(prompt.contains("wn-agent"))
+        assertTrue(prompt.contains("send a test message"))
+        assertTrue(prompt.contains("Do not report setup complete until wn-codex returns a reply through White Noise"))
+        assertTrue(prompt.contains("device verification required"))
+    }
+
+    @Test
     fun expandShowsFormattedPromptWithoutPlaceholder() {
         val npub = TEST_NPUB
         val expectedHermesPrompt = app.getString(R.string.agent_connector_hermes_prompt, npub)
@@ -137,9 +200,30 @@ class AiAgentsScreenTest {
 
     @Test
     fun copyWritesPromptToClipboardAndShowsSnackbar() {
+        assertScreenCopyWritesPromptToClipboardAndShowsSnackbar(
+            connectorId = "hermes",
+            connectorName = "Hermes",
+            promptRes = R.string.agent_connector_hermes_prompt,
+        )
+    }
+
+    @Test
+    fun codexCopyWritesPromptToClipboardAndShowsSnackbar() {
+        assertScreenCopyWritesPromptToClipboardAndShowsSnackbar(
+            connectorId = "codex",
+            connectorName = "Codex",
+            promptRes = R.string.agent_connector_codex_prompt,
+        )
+    }
+
+    private fun assertScreenCopyWritesPromptToClipboardAndShowsSnackbar(
+        connectorId: String,
+        connectorName: String,
+        promptRes: Int,
+    ) {
         clearClipboard()
         val npub = TEST_NPUB
-        val expectedHermesPrompt = app.getString(R.string.agent_connector_hermes_prompt, npub)
+        val expectedPrompt = app.getString(promptRes, npub)
         val copiedMessage = app.getString(R.string.ai_agents_prompt_copied)
 
         composeRule.setContent {
@@ -151,12 +235,15 @@ class AiAgentsScreenTest {
         }
 
         composeRule
-            .onNodeWithContentDescription(app.getString(R.string.agent_connector_copy_prompt_cd, "Hermes"))
+            .onNodeWithTag(AI_AGENTS_CONTENT_TAG)
+            .performScrollToNode(hasTestTag(agentConnectorCopyTag(connectorId)))
+        composeRule
+            .onNodeWithContentDescription(app.getString(R.string.agent_connector_copy_prompt_cd, connectorName))
             .performClick()
 
         composeRule.waitForIdle()
         val clip = clipboardText()
-        assertEquals(expectedHermesPrompt, clip)
+        assertEquals(expectedPrompt, clip)
         composeRule.onNodeWithText(copiedMessage).assertIsDisplayed()
     }
 
@@ -216,14 +303,17 @@ class AiAgentsScreenTest {
         composeRule.runOnIdle { assertEquals(1, backCount) }
     }
 
-    private fun renderContent(npub: String? = TEST_NPUB) {
+    private fun renderContent(
+        npub: String? = TEST_NPUB,
+        onCopyPrompt: (String) -> Unit = {},
+    ) {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {
                     AiAgentsContent(
                         npub = npub,
                         snackbarHostState = SnackbarHostState(),
-                        onCopyPrompt = {},
+                        onCopyPrompt = onCopyPrompt,
                         onOpenConnectorDocs = {},
                         onBack = {},
                     )
@@ -281,6 +371,8 @@ class AiAgentsScreenTest {
 
     companion object {
         private const val ACCOUNT_REF = "test-account"
+        private const val CODEX_HARNESS_README_URL =
+            "https://github.com/marmot-protocol/mdk/blob/master/integrations/codex/marmot/README.md"
         private val ACCOUNT_HEX = "ab".repeat(32)
         private val TEST_NPUB = "npub1" + "a".repeat(58)
     }
