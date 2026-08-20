@@ -40,4 +40,22 @@ class ConversationRouteSettledTest {
             ),
         )
     }
+
+    @Test
+    fun controllerReleaseMarkerWaitsPastTheOutgoingRetentionWindow() {
+        assertFalse(
+            conversationControllerReleased(
+                conversationOpen = false,
+                exitingContentRetained = true,
+                controllerPresent = true,
+            ),
+        )
+        assertTrue(
+            conversationControllerReleased(
+                conversationOpen = false,
+                exitingContentRetained = false,
+                controllerPresent = false,
+            ),
+        )
+    }
 }

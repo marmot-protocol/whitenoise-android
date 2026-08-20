@@ -124,10 +124,32 @@ internal fun mainShellAccountContentOwned(
 internal data class ConversationTransitionContent(
     val chat: ChatListItem,
     val controller: ConversationController,
+    val accountRef: String,
     val openContext: ConversationOpenContext,
     val justCreated: Boolean,
     val openedAsDmHint: Boolean,
 )
+
+internal fun conversationControllerAccountRef(
+    selectedPinnedAccountRef: String?,
+    pendingAccountRef: String?,
+    exitingAccountRef: String?,
+    activeAccountRef: String?,
+): String? = selectedPinnedAccountRef ?: pendingAccountRef ?: exitingAccountRef ?: activeAccountRef
+
+internal fun retainedConversationContentBelongsToRoute(
+    contentAccountRef: String,
+    activeAccountRef: String?,
+    pinnedAccountRef: String?,
+    notificationRouteTraceRequestId: Long?,
+    notificationEarlyOpenRequestId: Long,
+): Boolean =
+    contentAccountRef == activeAccountRef ||
+        (
+            pinnedAccountRef == contentAccountRef &&
+                notificationEarlyOpenRequestId != 0L &&
+                notificationRouteTraceRequestId == notificationEarlyOpenRequestId
+        )
 
 internal fun preparedConversationCanOpen(
     hasPublishedAuthoritativeTimeline: Boolean,
@@ -305,9 +327,10 @@ internal fun MainShell(
     var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
     var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedChat by remember { mutableStateOf<ChatListItem?>(null) }
-    // Retain the outgoing route for the short back-slide so its controller and
-    // fully rendered transcript are not torn down mid-animation.
-    var exitingConversationChat by remember { mutableStateOf<ChatListItem?>(null) }
+    // Retain the complete outgoing route for the short back-slide. Account pin,
+    // controller and decrypted seed are one ownership unit; retaining only the
+    // chat would rebuild it against the active account during an early Back.
+    var exitingConversationContent by remember { mutableStateOf<ConversationTransitionContent?>(null) }
     // A normal chat-list tap keeps the already-rendered list on screen while
     // the destination controller reads its first local authoritative page.
     // Once ready, the same controller is promoted into the conversation route,
@@ -1266,7 +1289,7 @@ internal fun MainShell(
             shellNavState =
                 reduceShellNavigation(shellNavState, ShellNavigationEvent.AccountSwitched).state
             pendingConversationOpen = null
-            exitingConversationChat = null
+            exitingConversationContent = null
             selectedChat = null
             selectedChatOpenContext = ConversationOpenContext()
             selectedChatJustCreated = false
@@ -1440,15 +1463,31 @@ internal fun MainShell(
     // account while its switch is still landing (#586). Keying and constructing
     // on the pinned ref keeps the controller correct before the flip and stops
     // it from being torn down and rebuilt when the active ref catches up.
-    val conversationAccountRef = selectedChatOpenContext.pinnedAccountRef ?: appState.activeAccountRef
     val accountOwnedPendingConversationOpen =
         pendingConversationOpen?.takeIf { request ->
             pendingConversationOpenBelongsToAccount(request.accountRef, appState.activeAccountRef)
         }
-    // The pending leg is already account-gated; the selected/exiting legs are not,
+    val accountOwnedExitingConversationContent =
+        exitingConversationContent?.takeIf { content ->
+            retainedConversationContentBelongsToRoute(
+                contentAccountRef = content.accountRef,
+                activeAccountRef = appState.activeAccountRef,
+                pinnedAccountRef = content.openContext.pinnedAccountRef,
+                notificationRouteTraceRequestId = content.openContext.notificationRouteTraceRequestId,
+                notificationEarlyOpenRequestId = notificationEarlyOpenRequestId,
+            )
+        }
+    val conversationAccountRef =
+        conversationControllerAccountRef(
+            selectedPinnedAccountRef = selectedChatOpenContext.pinnedAccountRef,
+            pendingAccountRef = accountOwnedPendingConversationOpen?.accountRef,
+            exitingAccountRef = accountOwnedExitingConversationContent?.accountRef,
+            activeAccountRef = appState.activeAccountRef,
+        )
+    // The pending and retained-exit legs are already account-gated; selected is not,
     // and the account-change nav reset clears them only a frame later — so during an
     // account switch or the wipe transient-null they could otherwise build a
-    // controller seeded with the previous account's decrypted preview. Drop them
+    // controller seeded with the previous account's decrypted preview. Drop it
     // until the shell's remembered account matches the live one. A notification-
     // routed early open is the deliberate exception — its content is pinned to
     // the very account that is arriving, so the flip that lands the pin must not
@@ -1464,8 +1503,7 @@ internal fun MainShell(
     val controllerChat =
         selectedChat?.takeIf { navAccountStable }
             ?: accountOwnedPendingConversationOpen?.item
-            ?: exitingConversationChat?.takeIf { navAccountStable }
-    val conversationController =
+    val selectedOrPendingConversationController =
         controllerChat?.let { openChat ->
             remember(openChat.id, conversationAccountRef, appState.runtimeGeneration) {
                 // startOnConstruction begins the subscription before this
@@ -1484,13 +1522,16 @@ internal fun MainShell(
                         initialTimelinePreview = openChat.projection?.lastMessage,
                         initialLastReadMessageId = openChat.projection?.lastReadMessageIdHex,
                         initialLastReadTimelineAt = openChat.projection?.lastReadTimelineAt,
-                        accountRefOverride = selectedChatOpenContext.pinnedAccountRef,
+                        accountRefOverride = conversationAccountRef?.takeIf { it != appState.activeAccountRef },
                         startOnConstruction = true,
                         copy = conversationControllerCopy,
                     ),
                 ) { it.onCleared() }
             }.value
         }
+    val conversationController =
+        selectedOrPendingConversationController
+            ?: accountOwnedExitingConversationContent?.controller
     // The controller is owned by the selected conversation route, not the
     // ConversationScreen composition. The profile-to-group picker temporarily
     // replaces that screen, so disposing the controller with the screen would
@@ -1520,11 +1561,11 @@ internal fun MainShell(
             )
         }
     }
-    LaunchedEffect(exitingConversationChat?.id, selectedChat?.id) {
-        val exiting = exitingConversationChat ?: return@LaunchedEffect
-        if (selectedChat?.id == exiting.id) return@LaunchedEffect
+    LaunchedEffect(exitingConversationContent?.chat?.id, selectedChat?.id) {
+        val exiting = exitingConversationContent ?: return@LaunchedEffect
+        if (selectedChat?.id == exiting.chat.id) return@LaunchedEffect
         delay(CONVERSATION_ROUTE_TRANSITION_MILLIS.toLong() + CONVERSATION_ROUTE_EXIT_RETENTION_SLACK_MILLIS)
-        if (selectedChat?.id != exiting.id) exitingConversationChat = null
+        if (selectedChat?.id != exiting.chat.id) exitingConversationContent = null
     }
     val pendingOpen = accountOwnedPendingConversationOpen
     LaunchedEffect(
@@ -1626,6 +1667,7 @@ internal fun MainShell(
                     ConversationTransitionContent(
                         chat = chat,
                         controller = controller,
+                        accountRef = requireNotNull(conversationAccountRef),
                         openContext = selectedChatOpenContext,
                         justCreated = selectedChatJustCreated,
                         openedAsDmHint = selectedChatOpenedAsDmHint,
@@ -1658,7 +1700,7 @@ internal fun MainShell(
                             )
                 }
             },
-            contentKey = { content -> content?.chat?.id ?: "main-shell" },
+            contentKey = { content -> content?.chat?.id ?: MAIN_SHELL_ROUTE_KEY },
         ) { animatedConversation ->
             when (
                 resolveMainShellContentRoute(
@@ -1670,7 +1712,7 @@ internal fun MainShell(
                 MainShellContentRoute.Conversation -> {
                     val content = requireNotNull(animatedConversation)
                     val chat = content.chat
-                    val scrollKey = conversationScrollKey(conversationAccountRef, chat.group.groupIdHex)
+                    val scrollKey = conversationScrollKey(content.accountRef, chat.group.groupIdHex)
                     ConversationScreen(
                         appState = appState,
                         chat = chat,
@@ -1720,7 +1762,7 @@ internal fun MainShell(
                             content.openContext.notificationRouteTraceRequestId?.let {
                                 NotificationRouteTrace.finishRequest(it)
                             }
-                            exitingConversationChat = chat
+                            exitingConversationContent = content
                             selectedChat = null
                             selectedChatOpenContext = ConversationOpenContext()
                             selectedChatJustCreated = false
@@ -1842,6 +1884,14 @@ internal fun MainShell(
                         terminalConversationUnavailable = controller.terminalConversationUnavailable,
                     )
                 } ?: true,
+        )
+        ConversationControllerReleasedPerformanceMarker(
+            controllerReleased =
+                conversationControllerReleased(
+                    conversationOpen = transitionContent != null,
+                    exitingContentRetained = exitingConversationContent != null,
+                    controllerPresent = conversationController != null,
+                ),
         )
     }
 

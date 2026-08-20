@@ -11,4 +11,5 @@ internal object PerformanceTags {
     const val CONVERSATION_TRANSCRIPT_VISIBLE = "performance.conversation_transcript_visible"
     const val CONVERSATION_ROUTE_SETTLED = "performance.conversation_route_settled"
     const val MAIN_SHELL_ROUTE_SETTLED = "performance.main_shell_route_settled"
+    const val CONVERSATION_CONTROLLER_RELEASED = "performance.conversation_controller_released"
 }

@@ -9,11 +9,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Regression coverage for the blocking local-profile primitive used by the
- * bounded first-presentation route barrier. Timeline data publishes immediately;
- * MainShell keeps the source route visible until the newest-author warm finishes
- * or its budget expires. These tests pin why the coordinator must await the warm
- * instead of launching it and declaring the destination ready synchronously.
+ * Coroutine-level coverage for the awaited local-profile primitive. Production
+ * route-barrier behavior is covered by ConversationInitialPresentationWarmCoordinatorTest.
  */
 class WarmProfilesBeforePublishTest {
     /** Minimal stand-in for the presentation cache the rows read on first paint. */
@@ -51,12 +48,12 @@ class WarmProfilesBeforePublishTest {
     }
 
     @Test
-    fun blockingWarmPopulatesCacheBeforeRouteBarrierRelease() =
+    fun awaitedWarmPopulatesCacheBeforeImmediateObservation() =
         runBlocking {
             val cache = FakePresentationCache()
             val senders = listOf("alice", "bob")
 
-            // The route barrier awaits the local warm before releasing.
+            // An awaited caller observes the cache only after materialization.
             for (id in senders) cache.materialize(id, name(id))
             val observedAtRelease = senders.associateWith(cache::read)
 
@@ -68,14 +65,12 @@ class WarmProfilesBeforePublishTest {
         }
 
     @Test
-    fun cachedDmRowPublicationAwaitsLocalPeerPresentation() =
+    fun awaitedDmPeerMaterializationPopulatesBeforeObservation() =
         runBlocking {
             val cache = FakePresentationCache()
             val peerId = "alice"
 
-            // The chat-list path now follows the same contract as timeline
-            // publication: roster projection identifies the peer, then its
-            // local profile materialization completes before the row publishes.
+            // The local presentation is available after the suspend call returns.
             cache.materialize(peerId, name(peerId))
             val observedFirstFrame = cache.read(peerId)
 
@@ -83,13 +78,13 @@ class WarmProfilesBeforePublishTest {
         }
 
     @Test
-    fun routeBarrierWouldObserveEmptyWhenWarmIsFireAndForget() =
+    fun fireAndForgetWarmLeavesCacheEmptyAtImmediateObservation() =
         runBlocking {
             val cache = FakePresentationCache()
             val senders = listOf("alice", "bob")
             val warmDone = CompletableDeferred<Unit>()
 
-            // A launch-and-return barrier releases before the warm can land.
+            // Launching and observing synchronously loses the materialization race.
             launch {
                 for (id in senders) cache.materialize(id, name(id))
                 warmDone.complete(Unit)

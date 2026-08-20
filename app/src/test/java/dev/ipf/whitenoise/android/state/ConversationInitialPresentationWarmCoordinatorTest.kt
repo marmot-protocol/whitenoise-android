@@ -64,4 +64,27 @@ class ConversationInitialPresentationWarmCoordinatorTest {
 
             assertEquals(1, readyCount)
         }
+
+    @Test
+    fun supersededWarmCannotRestartTheTotalNavigationBudget() =
+        runTest {
+            var readyCount = 0
+            val coordinator =
+                ConversationInitialPresentationWarmCoordinator(
+                    scope = this,
+                    budgetMillis = 100L,
+                    warm = { awaitCancellation() },
+                    onReady = { readyCount += 1 },
+                )
+
+            coordinator.prepare(listOf("first"))
+            runCurrent()
+            advanceTimeBy(90L)
+            coordinator.prepare(listOf("second"))
+            runCurrent()
+            advanceTimeBy(10L)
+            runCurrent()
+
+            assertEquals(1, readyCount)
+        }
 }

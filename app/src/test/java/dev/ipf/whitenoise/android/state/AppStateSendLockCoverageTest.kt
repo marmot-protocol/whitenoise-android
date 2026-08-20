@@ -359,7 +359,8 @@ class AppStateSendLockCoverageTest {
             "val renderedTimelineAnchorKeys = remember(renderedTimeline)" in source &&
                 "renderedTimeline.map { it.id to it.record.messageIdHex }" in source &&
                 "scrollCoordinator.commitInitialAnchor(" in source &&
-                Regex("while \\(\\s*!scrollCoordinator\\.commitInitialAnchor\\(").findAll(source).count() == 2 &&
+                "scrollCoordinator.commitInitialTailAnchor(" in source &&
+                "while (!commitInitialPosition())" in source &&
                 "postInitialReanchorGate.commit(" in source &&
                 "postInitialReanchorGate.onStructure(" in source &&
                 "initialTimelineAnchored && structureChanged" in source &&

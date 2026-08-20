@@ -44,9 +44,14 @@ class ConversationInitialTimelineTest {
 
         rejected.forEach { candidate ->
             assertTrue(
+                "preview must be rejected: $candidate",
                 initialConversationTimeline(candidate, GROUP_ID, false, emptyList()).isEmpty(),
             )
         }
+        assertTrue(
+            "non-hex group id must be rejected",
+            initialConversationTimeline(preview(), "not-hex", false, emptyList()).isEmpty(),
+        )
     }
 
     @Test

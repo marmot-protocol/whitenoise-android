@@ -4,8 +4,8 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** Newest visible sender metadata worth delaying the route for. */
 internal fun initialPresentationProfileSenders(
@@ -45,21 +45,39 @@ internal class ConversationInitialPresentationWarmCoordinator(
 ) {
     private var generation = 0L
     private var job: Job? = null
+    private var deadlineJob: Job? = null
+    private var ready = false
+
+    private fun markReady() {
+        if (ready) return
+        ready = true
+        job?.cancel()
+        deadlineJob?.cancel()
+        onReady()
+    }
 
     fun prepare(senders: List<String>) {
+        if (ready) return
         val token = ++generation
         job?.cancel()
         if (senders.isEmpty()) {
             job = null
-            onReady()
+            markReady()
             return
+        }
+        if (deadlineJob == null) {
+            deadlineJob =
+                scope.launch {
+                    delay(budgetMillis.coerceAtLeast(1L))
+                    // Successive authoritative pages may supersede the warm,
+                    // but they must not restart the route's total budget.
+                    markReady()
+                }
         }
         job =
             scope.launch {
                 try {
-                    withTimeoutOrNull(budgetMillis.coerceAtLeast(1L)) {
-                        warm(senders)
-                    }
+                    warm(senders)
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (_: Throwable) {
@@ -67,7 +85,7 @@ internal class ConversationInitialPresentationWarmCoordinator(
                     // existing lazy path remains authoritative on a local-read
                     // failure, so it must not strand navigation.
                 }
-                if (token == generation) onReady()
+                if (token == generation) markReady()
             }
     }
 }

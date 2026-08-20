@@ -26,6 +26,12 @@ internal fun conversationRouteSettled(
     destinationContentReady: Boolean,
 ): Boolean = currentStateMatchesTarget && !transitionRunning && destinationContentReady
 
+internal fun conversationControllerReleased(
+    conversationOpen: Boolean,
+    exitingContentRetained: Boolean,
+    controllerPresent: Boolean,
+): Boolean = !conversationOpen && !exitingContentRetained && !controllerPresent
+
 /**
  * Benchmark-only marker emitted once the route observably settles: the
  * transition reached its target state and stopped, the destination content is
@@ -73,8 +79,20 @@ internal fun ConversationRouteSettledPerformanceMarker(
     }
 }
 
+/** Benchmark-only proof that a warm reopen cannot reuse the outgoing controller. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun ConversationControllerReleasedPerformanceMarker(controllerReleased: Boolean) {
+    if (!BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS || !controllerReleased) return
+    Box(
+        Modifier
+            .size(1.dp)
+            .performanceTestTag(PerformanceTestTags.CONVERSATION_CONTROLLER_RELEASED),
+    )
+}
+
 internal const val CONVERSATION_ROUTE_TRANSITION_MILLIS = 240
 
 /** Extra frames the outgoing route is retained past its tween before release. */
 internal const val CONVERSATION_ROUTE_EXIT_RETENTION_SLACK_MILLIS = 32L
-private const val MAIN_SHELL_ROUTE_KEY = "main-shell"
+internal const val MAIN_SHELL_ROUTE_KEY = "main-shell"

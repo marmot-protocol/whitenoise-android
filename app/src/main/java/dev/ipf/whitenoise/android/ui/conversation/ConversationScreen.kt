@@ -2361,24 +2361,33 @@ internal fun ConversationScreen(
         if (hasSentMessageAfterUnreadBoundary(anchoredTimeline, unreadId)) {
             entryUnreadDividerRetired = true
         }
-        while (
-            !scrollCoordinator.commitInitialAnchor(
-                targetMessageId = unreadId,
-                reason = ConversationScrollReason.InitialAnchor,
-                resultingMode = resultingMode,
-                targetIndex = targetIndex,
-                captureLayout = {
-                    val layoutInfo = listState.layoutInfo
-                    ConversationInitialAnchorLayout(
-                        viewportHeight = layoutInfo.viewportSize.height,
-                        targetItemSize =
-                            layoutInfo.visibleItemsInfo
-                                .firstOrNull { it.index == targetIndex }
-                                ?.size,
-                    )
-                },
+        val captureInitialLayout = {
+            val layoutInfo = listState.layoutInfo
+            ConversationInitialAnchorLayout(
+                viewportHeight = layoutInfo.viewportSize.height,
+                targetItemSize =
+                    layoutInfo.visibleItemsInfo
+                        .firstOrNull { it.index == targetIndex }
+                        ?.size,
             )
-        ) {
+        }
+
+        suspend fun commitInitialPosition(): Boolean =
+            if (resultingMode is ConversationScrollMode.FollowingTail) {
+                scrollCoordinator.commitInitialTailAnchor(
+                    targetIndex = targetIndex,
+                    captureLayout = captureInitialLayout,
+                )
+            } else {
+                scrollCoordinator.commitInitialAnchor(
+                    targetMessageId = unreadId,
+                    reason = ConversationScrollReason.InitialAnchor,
+                    resultingMode = resultingMode,
+                    targetIndex = targetIndex,
+                    captureLayout = captureInitialLayout,
+                )
+            }
+        while (!commitInitialPosition()) {
             // Do not reveal until the target and viewport are stable.
             withFrameNanos { }
         }

@@ -126,6 +126,8 @@ class MainShellContentRouteTest {
         assertTrue(pendingConversationOpenBelongsToAccount("personal", "personal"))
         assertFalse(pendingConversationOpenBelongsToAccount("personal", "work"))
         assertFalse(pendingConversationOpenBelongsToAccount("personal", null))
+        assertFalse(pendingConversationOpenBelongsToAccount(null, "personal"))
+        assertFalse(pendingConversationOpenBelongsToAccount(null, null))
     }
 
     @Test
@@ -133,5 +135,40 @@ class MainShellContentRouteTest {
         assertTrue(mainShellAccountContentOwned("personal", "personal"))
         assertFalse(mainShellAccountContentOwned("personal", "work"))
         assertFalse(mainShellAccountContentOwned("personal", null))
+    }
+
+    @Test
+    fun retainedExitKeepsItsPinnedAccountAfterSelectedContextClears() {
+        assertEquals(
+            "target",
+            conversationControllerAccountRef(
+                selectedPinnedAccountRef = null,
+                pendingAccountRef = null,
+                exitingAccountRef = "target",
+                activeAccountRef = "source",
+            ),
+        )
+        assertTrue(
+            retainedConversationContentBelongsToRoute(
+                contentAccountRef = "target",
+                activeAccountRef = "source",
+                pinnedAccountRef = "target",
+                notificationRouteTraceRequestId = 42L,
+                notificationEarlyOpenRequestId = 42L,
+            ),
+        )
+    }
+
+    @Test
+    fun retainedExitRejectsContentFromAnUnrelatedAccount() {
+        assertFalse(
+            retainedConversationContentBelongsToRoute(
+                contentAccountRef = "personal",
+                activeAccountRef = "work",
+                pinnedAccountRef = null,
+                notificationRouteTraceRequestId = null,
+                notificationEarlyOpenRequestId = 0L,
+            ),
+        )
     }
 }

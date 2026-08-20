@@ -115,8 +115,9 @@ list, and then measures the first conversation open. Both end the measured
 `firstTranscriptVisibleMs` section when the transcript's anchored, non-empty
 Compose node first intersects the physical display. `routeSettledMs` covers the
 same tap through the frame after the 240 ms route tween completes, and frame
-timing spans that entire measured block. Warm setup likewise waits for the chat
-list's settled-route marker before starting the next iteration. Report median,
+timing spans that entire measured block. Warm setup waits for both the chat
+list's settled-route marker and disposal of the outgoing conversation controller,
+so the measured reopen cannot reuse the short exit-retention window. Report median,
 P90, and frame-overrun/jank metrics from the retained benchmark JSON; do not
 substitute debug-build timings.
 

@@ -320,6 +320,13 @@ class ConversationImeCollapseFocusTest {
             composeRule
                 .onRoot()
                 .captureRoboImage("src/test/snapshots/$snapshotName.png")
+
+            // Keep the cached transcript spinner-free after the loading grace,
+            // not only during the first frame where the grace hides it anyway.
+            composeRule.mainClock.advanceTimeBy(500L)
+            composeRule.waitForIdle()
+            progressNodes().assertCountEquals(0)
+            composeRule.onNodeWithText(CACHED_MESSAGE).assertIsDisplayed()
         } finally {
             composeRule.mainClock.autoAdvance = true
             TimeZone.setDefault(originalTimeZone)

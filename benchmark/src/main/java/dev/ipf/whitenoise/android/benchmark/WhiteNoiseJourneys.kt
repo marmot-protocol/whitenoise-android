@@ -94,6 +94,10 @@ internal class WhiteNoiseJourneys {
         waitForVisibleTag(PerformanceTags.CONVERSATION_ROUTE_SETTLED)
     }
 
+    fun waitForConversationControllerReleased() {
+        waitForVisibleTag(PerformanceTags.CONVERSATION_CONTROLLER_RELEASED)
+    }
+
     fun createGroup(
         prefix: String,
         suffix: Int,
@@ -134,8 +138,8 @@ internal class WhiteNoiseJourneys {
     fun returnToChatList() {
         repeat(4) {
             if (
-                findTag(PerformanceTags.NEW_MESSAGE, NAVIGATION_SETTLE_TIMEOUT_MS) != null &&
-                findTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED, NAVIGATION_SETTLE_TIMEOUT_MS) != null
+                findVisibleTag(PerformanceTags.NEW_MESSAGE, NAVIGATION_SETTLE_TIMEOUT_MS) != null &&
+                findVisibleTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED, NAVIGATION_SETTLE_TIMEOUT_MS) != null
             ) {
                 device.waitForIdle()
                 return
@@ -157,6 +161,14 @@ internal class WhiteNoiseJourneys {
     ): UiObject2? =
         device.onElementOrNull(timeoutMs = timeoutMs) {
             matchesPerformanceTag(tag)
+        }
+
+    private fun findVisibleTag(
+        tag: String,
+        timeoutMs: Long = 0,
+    ): UiObject2? =
+        device.onElementOrNull(timeoutMs = timeoutMs) {
+            matchesPerformanceTag(tag) && isVisibleOnDisplay()
         }
 
     private fun waitForTag(

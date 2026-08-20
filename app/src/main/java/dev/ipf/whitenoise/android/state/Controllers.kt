@@ -6739,6 +6739,14 @@ internal class OptimisticGroupRosterMutationTracker {
     }
 }
 
+internal fun conversationStartsLoading(
+    startOnConstruction: Boolean,
+    accountRefOverride: String?,
+    activeAccountRef: String?,
+): Boolean = startOnConstruction && (accountRefOverride ?: activeAccountRef) != null
+
+internal fun isTerminalOpenFailure(throwable: Throwable): Boolean = throwable is ConversationInitialLoadTimeoutException
+
 class ConversationController(
     private val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
@@ -6947,7 +6955,10 @@ class ConversationController(
     // Production controllers start their local subscription during
     // construction. Reflect that synchronously so the first composition cannot
     // mistake the not-yet-started coroutine for an authoritative empty chat.
-    var isLoading by mutableStateOf(startOnConstruction && appState.activeAccountRef != null)
+    var isLoading by
+        mutableStateOf(
+            conversationStartsLoading(startOnConstruction, accountRefOverride, appState.activeAccountRef),
+        )
         private set
     var isLoadingOlder by mutableStateOf(false)
         private set
@@ -7428,7 +7439,7 @@ class ConversationController(
             throw cancel
         } catch (throwable: Throwable) {
             if (throwable.isUseAfterEviction()) {
-                discardInitialTimelineSeedForFailure()
+                discardInitialTimelineSeedForFailure(preserveOptimisticMessages = false)
                 markActiveAccountRemovedFromMembers(account)
                 isLoading = false
                 terminalConversationUnavailable = true
@@ -7436,7 +7447,7 @@ class ConversationController(
                 pageError = null
                 return
             }
-            discardInitialTimelineSeedForFailure()
+            discardInitialTimelineSeedForFailure(preserveOptimisticMessages = true)
             isLoading = false
             subscriptionError = privacySafeErrorPresentation("CONVERSATION_LOAD", throwable)
             terminalLoadFailure = true
@@ -7451,10 +7462,16 @@ class ConversationController(
         }
     }
 
-    private fun discardInitialTimelineSeedForFailure() {
+    private fun discardInitialTimelineSeedForFailure(preserveOptimisticMessages: Boolean) {
         if (!shouldDiscardInitialTimelineSeedForFailure(hasPublishedAuthoritativeTimeline)) return
         initialTimelineSeedActive = false
-        timeline = emptyList()
+        if (preserveOptimisticMessages) {
+            publishTimelineFromIndexes()
+        } else {
+            // Use-after-eviction means this account no longer owns the group.
+            // Do not keep any plaintext row visible under an unavailable owner.
+            timeline = emptyList()
+        }
     }
 
     private fun publishAuthoritativeEmptyInitialTimeline() {
@@ -7592,13 +7609,7 @@ class ConversationController(
         timelineStream: TimelineMessagesSubscription,
     ): List<String> {
         if (timelineRecords.isNotEmpty()) return emptyList()
-        val snapshot =
-            awaitBoundedInitialRead(
-                read = controllerScope.async(Dispatchers.IO) { runCatching { timelineStream.snapshot() } },
-                budgetMillis = INITIAL_TIMELINE_SNAPSHOT_BUDGET_MILLIS,
-            ) {
-                throw ConversationInitialSnapshotTimeoutException()
-            }
+        val snapshot = withContext(Dispatchers.IO) { timelineStream.snapshot() }
         return if (snapshot == null) {
             publishAuthoritativeEmptyInitialTimeline()
             emptyList()
@@ -7638,17 +7649,25 @@ class ConversationController(
 
     /**
      * One connect/reconnect attempt. Returns whether the caller should exit
-     * entirely (account evicted) and whether the subscriptions connected
-     * successfully (so the retry backoff can reset).
+     * until explicit retry (account evicted or a native open timed out) and
+     * whether the subscriptions connected successfully (so the retry backoff
+     * can reset).
      */
     private suspend fun runConversationSubscriptionIteration(account: String): Pair<Boolean, Boolean> {
         var groupSubscription: GroupStateSubscription? = null
         var timelineStream: TimelineMessagesSubscription? = null
         try {
             timelineStream =
-                appState.marmotIo {
-                    subscribeTimelineMessages(account, group.groupIdHex, ConversationTimelinePageLimit)
-                }
+                awaitBoundedInitialResourceRead(
+                    budgetMillis = INITIAL_TIMELINE_SUBSCRIPTION_BUDGET_MILLIS,
+                    read = {
+                        appState.marmotIo {
+                            subscribeTimelineMessages(account, group.groupIdHex, ConversationTimelinePageLimit)
+                        }
+                    },
+                    closeLate = { lateStream -> runCatching { lateStream.close() } },
+                    onTimeout = { throw ConversationInitialLoadTimeoutException() },
+                )
             val stopAfterTimelineOpen =
                 synchronized(liveSubscriptionLock) {
                     if (accountTeardownRequested) {
@@ -7714,14 +7733,15 @@ class ConversationController(
             throw cancel
         } catch (throwable: Throwable) {
             if (throwable.isUseAfterEviction()) {
-                discardInitialTimelineSeedForFailure()
+                discardInitialTimelineSeedForFailure(preserveOptimisticMessages = false)
                 markActiveAccountRemovedFromMembers(account)
                 isLoading = false
                 terminalConversationUnavailable = true
                 subscriptionError = null
                 return true to false
             }
-            discardInitialTimelineSeedForFailure()
+            val initialOpenTimedOut = isTerminalOpenFailure(throwable)
+            discardInitialTimelineSeedForFailure(preserveOptimisticMessages = true)
             isLoading = false
             subscriptionError =
                 privacySafeErrorPresentation(
@@ -7734,6 +7754,14 @@ class ConversationController(
                             AppText.Resource(R.string.error_loaded_content_may_be_out_of_date)
                         },
                 )
+            if (initialOpenTimedOut) {
+                // A timed-out FFI call may still occupy its native blocking
+                // worker. Automatic retries would accumulate more stuck calls;
+                // stop here and let the visible Retry action start one new
+                // controller generation on demand.
+                terminalLoadFailure = true
+                return true to false
+            }
         } finally {
             closeConversationSubscriptionHandles(groupSubscription, timelineStream)
         }

@@ -111,6 +111,7 @@ class GroupFlowsBenchmark {
                         resumeToChatList()
                         openConversationVisible(groupName)
                         returnToChatList()
+                        waitForConversationControllerReleased()
                     }
                 } else {
                     killProcess()

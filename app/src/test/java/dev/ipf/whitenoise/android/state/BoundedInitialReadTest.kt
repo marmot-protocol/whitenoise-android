@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -10,42 +11,86 @@ import org.junit.Test
 
 class BoundedInitialReadTest {
     @Test
-    fun completedReadReturnsItsValueWithinTheBudget() =
+    fun completedResourceTransfersToTheCallerWithinTheBudget() =
         runTest {
-            val read = CompletableDeferred(Result.success("page"))
-            assertEquals(
-                "page",
-                awaitBoundedInitialRead(read, budgetMillis = 10L) { error("unexpected timeout") },
+            var closed = false
+            val resource = Any()
+
+            assertSame(
+                resource,
+                awaitBoundedInitialResourceRead(
+                    budgetMillis = 1_000L,
+                    producerDispatcher = StandardTestDispatcher(testScheduler),
+                    read = { resource },
+                    closeLate = { closed = true },
+                    onTimeout = { error("unexpected timeout") },
+                ),
             )
+            assertEquals(false, closed)
         }
 
     @Test
-    fun hungReadIsCancelledAndExitsThroughTheTimeoutBranch() =
+    fun lateResourceIsClosedAfterTheCallerTimesOut() =
         runTest {
-            val read = CompletableDeferred<Result<String>>()
+            val releaseRead = CompletableDeferred<Unit>()
+            val closed = CompletableDeferred<Unit>()
+            var closeCount = 0
             var timedOut = false
             try {
-                awaitBoundedInitialRead(read, budgetMillis = 10L) {
-                    timedOut = true
-                    throw ConversationInitialSnapshotTimeoutException()
-                }
+                awaitBoundedInitialResourceRead(
+                    budgetMillis = 10L,
+                    producerDispatcher = StandardTestDispatcher(testScheduler),
+                    read = {
+                        releaseRead.await()
+                        "subscription"
+                    },
+                    closeLate = {
+                        closeCount += 1
+                        closed.complete(Unit)
+                    },
+                    onTimeout = {
+                        timedOut = true
+                        throw ConversationInitialLoadTimeoutException()
+                    },
+                )
                 fail("expected the timeout branch to throw")
-            } catch (_: ConversationInitialSnapshotTimeoutException) {
+            } catch (_: ConversationInitialLoadTimeoutException) {
             }
+
+            releaseRead.complete(Unit)
+            closed.await()
             assertTrue(timedOut)
-            assertTrue(read.isCancelled)
+            assertEquals(1, closeCount)
         }
 
     @Test
     fun failedReadRethrowsTheOriginalError() =
         runTest {
             val boom = IllegalArgumentException("local read failed")
-            val read = CompletableDeferred(Result.failure<String>(boom))
             try {
-                awaitBoundedInitialRead(read, budgetMillis = 10L) { error("unexpected timeout") }
+                awaitBoundedInitialResourceRead(
+                    budgetMillis = 1_000L,
+                    producerDispatcher = StandardTestDispatcher(testScheduler),
+                    read = { throw boom },
+                    closeLate = {},
+                    onTimeout = { error("unexpected timeout") },
+                )
                 fail("expected the read failure to rethrow")
             } catch (thrown: IllegalArgumentException) {
                 assertSame(boom, thrown)
             }
         }
+
+    @Test
+    fun onlyNativeOpenTimeoutsRequireExplicitRetry() {
+        assertTrue(
+            isTerminalOpenFailure(
+                ConversationInitialLoadTimeoutException(),
+            ),
+        )
+        assertEquals(
+            false,
+            isTerminalOpenFailure(IllegalStateException("stream ended")),
+        )
+    }
 }
