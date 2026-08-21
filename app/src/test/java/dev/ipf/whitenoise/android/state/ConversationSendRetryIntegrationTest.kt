@@ -8,7 +8,12 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
+import dev.ipf.marmotkit.ChatListMessagePreviewFfi
+import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -222,6 +227,128 @@ class ConversationSendRetryIntegrationTest {
 
             assertEquals(null, appState.draftFor(GROUP_ID))
             assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+        }
+
+    @Test
+    fun acceptedPendingProjectionSettlesTheExactOptimisticChatListEntry() =
+        runTest {
+            val appState = appState()
+            val chatsController =
+                attachedChatsController(
+                    appState = appState,
+                    accountRef = ACCOUNT_REF,
+                    row = chatListRow(),
+                )
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        SendSummaryFfi(
+                            published = 0u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            controller.send("hello")
+            chatsController.setChatListVisible(true)
+            val optimisticMessageId =
+                controller.timeline
+                    .single()
+                    .record.messageIdHex
+            val optimisticPreview =
+                chatsController.items
+                    .single()
+                    .projection
+                    ?.lastMessage
+            assertEquals(optimisticMessageId, optimisticPreview?.messageIdHex)
+            assertEquals(
+                ChatListMessageDeliveryStateFfi.PENDING,
+                optimisticPreview?.deliveryState,
+            )
+
+            chatsController.setChatListVisible(false)
+            applyProjection(
+                controller,
+                projectedMessage(
+                    recordedAt = 20uL,
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
+                ),
+            )
+            chatsController.setChatListVisible(true)
+
+            val confirmedPreview =
+                chatsController.items
+                    .single()
+                    .projection
+                    ?.lastMessage
+            assertEquals(CONFIRMED_MESSAGE_ID, confirmedPreview?.messageIdHex)
+            assertEquals(
+                ChatListMessageDeliveryStateFfi.DELIVERED,
+                confirmedPreview?.deliveryState,
+            )
+        }
+
+    @Test
+    fun acceptedPendingSendReturnSettlesAProjectionThatArrivedFirst() =
+        runTest {
+            val appState = appState()
+            val chatsController =
+                ChatsController(
+                    appState = appState,
+                    initialAccountRef = ACCOUNT_REF,
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                )
+            appState.attachChatsController(chatsController)
+            chatsController.setChatListVisible(false)
+            chatsController.applyChatListRow(chatListRow())
+            lateinit var controller: ConversationController
+            controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                            listOf(
+                                TimelineMessageChangeFfi.Upsert(
+                                    trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                                    message =
+                                        projectedMessage(
+                                            recordedAt = 20uL,
+                                            retentionSeconds = null,
+                                            retentionExpiresAt = null,
+                                        ),
+                                ),
+                            ),
+                        )
+                        SendSummaryFfi(
+                            published = 0u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            controller.send("hello")
+            chatsController.setChatListVisible(true)
+
+            val confirmedPreview =
+                chatsController.items
+                    .single()
+                    .projection
+                    ?.lastMessage
+            assertEquals(CONFIRMED_MESSAGE_ID, confirmedPreview?.messageIdHex)
+            assertEquals(
+                ChatListMessageDeliveryStateFfi.DELIVERED,
+                confirmedPreview?.deliveryState,
+            )
         }
 
     @Test
@@ -456,6 +583,58 @@ class ConversationSendRetryIntegrationTest {
             viaWelcomeMessageIdHex = null,
         )
 
+    private fun chatListRow() =
+        ChatListRowFfi(
+            selfMembership = SelfMembershipFfi.MEMBER,
+            unreadMentionCount = 0uL,
+            unreadMention = false,
+            groupIdHex = GROUP_ID,
+            archived = false,
+            pendingConfirmation = false,
+            title = "Retry group",
+            groupName = "Retry group",
+            avatarUrl = null,
+            avatar = null,
+            lastMessage =
+                ChatListMessagePreviewFfi(
+                    messageIdHex = "d4".repeat(32),
+                    sender = ACCOUNT_ID,
+                    senderDisplayName = null,
+                    plaintext = "before send",
+                    contentTokens =
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks = emptyList(),
+                            blankLinesBefore = ByteArray(0),
+                        ),
+                    kind = 9uL,
+                    timelineAt = 10uL,
+                    deleted = false,
+                    attachmentKind = null,
+                    attachmentCount = 0u,
+                    deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                ),
+            unreadCount = 0uL,
+            hasUnread = false,
+            firstUnreadMessageIdHex = null,
+            lastReadMessageIdHex = null,
+            lastReadTimelineAt = null,
+            conversationCreatedAt = 0uL,
+            activitySortAt = 10uL,
+            updatedAt = 10uL,
+            leaveRequestPending = false,
+            leaveRequestedAtMs = null,
+            manuallyMarkedUnread = false,
+            conversationKind = ChatConversationKindFfi.UNKNOWN,
+            muted = false,
+            mutedUntilMs = null,
+            pinned = false,
+            pinnedPosition = null,
+            lifecycleState = GroupLifecycleStateFfi.STABLE,
+            disbanding = false,
+            disbandRequest = null,
+        )
+
     private fun projectedMessage(
         recordedAt: ULong,
         retentionSeconds: ULong?,
@@ -507,4 +686,33 @@ class ConversationSendRetryIntegrationTest {
         val GROUP_ID = "b2".repeat(32)
         val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
     }
+}
+
+private fun attachedChatsController(
+    appState: WhiteNoiseAppState,
+    accountRef: String,
+    row: ChatListRowFfi,
+): ChatsController =
+    ChatsController(
+        appState = appState,
+        initialAccountRef = accountRef,
+        memberSnapshotLoader = { _, _ -> emptyList() },
+    ).also { chatsController ->
+        appState.attachChatsController(chatsController)
+        chatsController.setChatListVisible(false)
+        chatsController.applyChatListRow(row)
+    }
+
+private fun applyProjection(
+    controller: ConversationController,
+    message: TimelineMessageRecordFfi,
+) {
+    controller.testApplyLiveTimelineChangesAndRegisterStreams(
+        listOf(
+            TimelineMessageChangeFfi.Upsert(
+                trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                message = message,
+            ),
+        ),
+    )
 }
