@@ -142,6 +142,11 @@ internal fun conversationControllerAccountRef(
     activeAccountRef: String?,
 ): String? = selectedPinnedAccountRef ?: pendingAccountRef ?: exitingAccountRef ?: activeAccountRef
 
+internal fun selectedConversationAccountRef(
+    pinnedAccountRef: String?,
+    activeAccountRef: String?,
+): String? = pinnedAccountRef ?: activeAccountRef
+
 internal fun retainedConversationContentBelongsToRoute(
     contentAccountRef: String,
     activeAccountRef: String?,
@@ -1230,8 +1235,17 @@ internal fun MainShell(
     // Follow the selection directly so a chat-to-chat switch never hops
     // through null — a notification update landing in that hop would beat
     // suppression and post for the conversation being opened.
-    LaunchedEffect(selectedChat?.id) {
-        appState.setActiveConversation(selectedChat?.group?.groupIdHex)
+    LaunchedEffect(selectedChat?.id, selectedChatOpenContext.pinnedAccountRef) {
+        appState.setActiveConversation(
+            accountRef =
+                selectedChat?.let {
+                    selectedConversationAccountRef(
+                        pinnedAccountRef = selectedChatOpenContext.pinnedAccountRef,
+                        activeAccountRef = appState.activeAccountRef,
+                    )
+                },
+            groupIdHex = selectedChat?.group?.groupIdHex,
+        )
     }
 
     // Upgrade a provisional open (targeted groupDetails read) to the

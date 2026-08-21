@@ -579,8 +579,11 @@ internal fun ConversationScreen(
     // user can't see incoming messages, so those must notify — lift the
     // active-conversation suppression for the group while details are showing
     // and restore it on return to the timeline.
-    LaunchedEffect(chat.group.groupIdHex, showDetails) {
-        appState.setActiveConversation(if (showDetails) null else chat.group.groupIdHex)
+    LaunchedEffect(controller.boundAccountRef, chat.group.groupIdHex, showDetails) {
+        appState.setActiveConversation(
+            accountRef = controller.boundAccountRef.takeUnless { showDetails },
+            groupIdHex = chat.group.groupIdHex.takeUnless { showDetails },
+        )
     }
     var pendingTopBarLeaveAction by remember { mutableStateOf<LeaveAction?>(null) }
     // Sole-admin Leave gate: a sole admin with other members can't leave until

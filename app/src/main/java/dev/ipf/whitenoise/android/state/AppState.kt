@@ -7096,11 +7096,16 @@ class WhiteNoiseAppState private constructor(
         mutationsScope.launch { draftWriter.flush() }
     }
 
-    private fun applyActiveConversationTransition(groupIdHex: String?) {
-        // The chat screen always runs under the active account, so capture it
-        // when opening; closing (null) clears both halves via the transition.
+    private fun applyActiveConversationTransition(
+        accountRef: String?,
+        groupIdHex: String?,
+    ) {
+        // Notification routing can render a conversation under its pinned
+        // account before that account becomes active. Keep suppression and
+        // dismissal tied to the account that owns the visible controller;
+        // closing (null) clears both halves via the transition.
         updateNotificationSuppression(
-            suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) activeAccountRef else null),
+            suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) accountRef else null),
         )
         if (groupIdHex != null) {
             synchronized(conversationStateLock) {
@@ -7109,8 +7114,11 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    suspend fun setActiveConversation(groupIdHex: String?) {
-        applyActiveConversationTransition(groupIdHex)
+    suspend fun setActiveConversation(
+        accountRef: String?,
+        groupIdHex: String?,
+    ) {
+        applyActiveConversationTransition(accountRef, groupIdHex)
         if (groupIdHex != null) {
             // Clear the conversation's tray cards on the first open, regardless
             // of whether mark-read later advances the read watermark. The
@@ -7127,7 +7135,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     fun clearActiveConversation() {
-        applyActiveConversationTransition(null)
+        applyActiveConversationTransition(accountRef = null, groupIdHex = null)
         appStateDebug {
             "active conversation=<none> account=${activeConversationAccountRef?.take(8) ?: "<none>"}"
         }
