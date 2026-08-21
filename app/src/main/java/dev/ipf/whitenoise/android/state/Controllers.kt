@@ -725,13 +725,15 @@ internal fun reduceSubscriptionChatListRow(
             )
     val advancesPastRead =
         newLastMessage != null &&
-            currentReadComplete &&
-            compareTimelineAtMessageIdHex(
-                newLastMessage.timelineAt,
-                newLastMessage.messageIdHex,
-                current.lastReadTimelineAt!!,
-                current.lastReadMessageIdHex!!,
-            ) > 0
+            (
+                !currentReadComplete ||
+                    compareTimelineAtMessageIdHex(
+                        newLastMessage.timelineAt,
+                        newLastMessage.messageIdHex,
+                        current.lastReadTimelineAt!!,
+                        current.lastReadMessageIdHex!!,
+                    ) > 0
+            )
     val addsUnread =
         trigger == ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE &&
             advancesLastMessage &&
@@ -2122,14 +2124,19 @@ internal fun reconcileSuccessfulTextSend(
 ): SuccessfulTextSendReconciliation {
     val retentionAtSendSeconds = optimisticMessages[optimisticKey]?.retentionAtSendSeconds
     val hasConfirmedId = summaryMessageIds.isNotEmpty()
-    val acceptedPending = acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING
+    val confirmedId = summaryMessageIds.firstOrNull() ?: tempId
+    // The authoritative projection can beat the accepted-pending FFI return.
+    // In that ordering there is nothing left to await or bridge: settle through
+    // the normal confirmed path using the exact canonical id already projected.
+    val acceptedPending =
+        acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING &&
+            confirmedId !in projectedMessageIds
     val awaitingEcho =
         !acceptedPending &&
             textSendAwaitingEchoConfirmation(
                 summaryMessageIds,
                 optimisticStillPresent = optimisticKey in optimisticMessages,
             )
-    val confirmedId = summaryMessageIds.firstOrNull() ?: tempId
     val confirmed = optimisticRecord.copy(messageIdHex = confirmedId)
     if ((hasConfirmedId || awaitingEcho) && confirmedId.isNotEmpty()) {
         messageById[confirmedId] = confirmed
@@ -8667,6 +8674,28 @@ class ConversationController(
                         publishTimelineFromIndexes()
                         return
                     }
+                    // A single-media projection can beat the FFI return and
+                    // reconcile heuristically before its exact MDK id is known.
+                    // Once the return supplies that id, finish the same exact
+                    // chat-list handoff and release the retained upload state.
+                    val acceptedPendingProjectionAlreadyLanded =
+                        acceptedPendingMessageIdHex != null &&
+                            acceptedPendingMessageIdHex in projectedMessageIds
+                    if (acceptedPendingProjectionAlreadyLanded) {
+                        val confirmedMessageIdHex = requireNotNull(acceptedPendingMessageIdHex)
+                        appState.commitOptimisticSentPreview(
+                            accountRef = conversationAccountRef,
+                            groupIdHex = group.groupIdHex,
+                            optimisticMessageIdHex = tempId,
+                            confirmedMessageIdHex = confirmedMessageIdHex,
+                        )
+                        optimisticMessages.remove(key)
+                        messageById.remove(tempId)
+                        retainedMediaUploads.remove(key)
+                        activeUploadKeys.remove(key)
+                        publishTimelineFromIndexes()
+                        return
+                    }
                     retained.acceptedPending = true
                     retained.acceptedPendingMessageIdHex = acceptedPendingMessageIdHex
                     // The local projection can beat the FFI return. It was held
@@ -11567,6 +11596,14 @@ class ConversationController(
                         allowDelayedProjection = allowDelayedProjection,
                     ).takeIf { reconcileOptimistic }
                 }
+        acceptedPendingOptimisticId?.let { optimisticId ->
+            appState.commitOptimisticSentPreview(
+                accountRef = conversationAccountRef,
+                groupIdHex = record.groupIdHex,
+                optimisticMessageIdHex = optimisticId,
+                confirmedMessageIdHex = record.messageIdHex,
+            )
+        }
         retentionAtSendSeconds =
             retentionAtSendForProjection(
                 messageId = record.messageIdHex,

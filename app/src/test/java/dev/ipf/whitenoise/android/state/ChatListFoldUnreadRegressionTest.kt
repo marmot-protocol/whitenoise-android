@@ -116,6 +116,37 @@ class ChatListFoldUnreadRegressionTest {
     }
 
     @Test
+    fun newLastMessage_addsUnreadWhenNeitherRowHasAReadWatermark() {
+        val current =
+            row(
+                messageId = idMid,
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = null,
+                lastReadMessageIdHex = null,
+            )
+        val incoming =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 1uL,
+                lastReadTimelineAt = null,
+                lastReadMessageIdHex = null,
+            )
+
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                incoming,
+                ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+            )
+
+        assertEquals(1uL, folded.unreadCount)
+        assertEquals(true, folded.hasUnread)
+        assertEquals(idTail, folded.firstUnreadMessageIdHex)
+    }
+
+    @Test
     fun lastMessageDeleted_adoptsBackwardPreviewAndPreservesReadWatermark() {
         val current =
             row(

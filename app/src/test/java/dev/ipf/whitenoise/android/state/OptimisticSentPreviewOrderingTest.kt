@@ -247,6 +247,54 @@ class OptimisticSentPreviewOrderingTest {
     }
 
     @Test
+    fun lateAcceptedPendingSettlementCannotRestoreOverNewerUnreadActivity() {
+        val controller = controllerWithRows(row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "pending B", 20uL))
+        applySubscriptionChatListRow(
+            controller,
+            row("chat-b", "Zulu", 20uL).copy(
+                lastMessage =
+                    preview(
+                        "confirmed-b",
+                        "pending B",
+                        20uL,
+                        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    ),
+            ),
+            ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+        )
+        applySubscriptionChatListRow(
+            controller,
+            row("chat-b", "Zulu", 30uL).copy(
+                lastMessage =
+                    preview(
+                        "incoming-b",
+                        "newer unread B",
+                        30uL,
+                        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    ),
+                unreadCount = 1uL,
+                hasUnread = true,
+                firstUnreadMessageIdHex = "incoming-b",
+            ),
+            ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+        )
+
+        controller.commitOptimisticSentPreview("chat-b", "temp-b", "confirmed-b")
+        controller.setChatListVisible(true)
+
+        val converged = controller.items.single().projection
+        assertEquals("incoming-b", converged?.lastMessage?.messageIdHex)
+        assertEquals("newer unread B", converged?.lastMessage?.plaintext)
+        assertEquals(1uL, converged?.unreadCount)
+        assertEquals(true, converged?.hasUnread)
+        assertEquals("incoming-b", converged?.firstUnreadMessageIdHex)
+        assertEquals(30uL, converged?.activitySortAt)
+    }
+
+    @Test
     fun laterIncomingSameSecondActivitySupersedesTheOptimisticTieBreak() {
         val controller = controllerWithRows(row("chat-a", "Alpha", 20uL), row("chat-b", "Zulu", 10uL))
 
