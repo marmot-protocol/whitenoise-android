@@ -1240,6 +1240,18 @@ internal fun ConversationScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
+    val currentOnBack by rememberUpdatedState(onBack)
+    val exitCoordinator = remember(chat.id) { ConversationExitCoordinator() }
+
+    fun exitConversation() {
+        exitCoordinator.requestExit(
+            imeIsOpen = imeIsOpen,
+            hideIme = { keyboardController?.hide() },
+            clearComposerFocus = { focusManager.clearFocus(force = true) },
+            navigate = { currentOnBack() },
+        )
+    }
+
     val eventCardResolver =
         remember(controller, appState, conversationAccountRef, appState.runtimeGeneration) {
             NostrEventCardResolver(
@@ -2127,7 +2139,7 @@ internal fun ConversationScreen(
                 composerDismissInProgress = true
                 keyboardController?.hide()
             }
-            ConversationBackAction.NAVIGATE_UP -> onBack()
+            ConversationBackAction.NAVIGATE_UP -> exitConversation()
         }
     }
 
@@ -2138,7 +2150,14 @@ internal fun ConversationScreen(
     // A voice/dictation handoff never sets composerDismissInProgress, so its
     // temporary inset collapse continues to preserve focus and selection.
     LaunchedEffect(imeIsOpen, composerDismissInProgress) {
-        if (!imeIsOpen && composerDismissInProgress) {
+        if (!imeIsOpen && exitCoordinator.awaitingImeDismiss) {
+            composerDismissInProgress = false
+            exitCoordinator.onImeVisibilityChanged(
+                imeIsOpen = false,
+                clearComposerFocus = { focusManager.clearFocus(force = true) },
+                navigate = { currentOnBack() },
+            )
+        } else if (!imeIsOpen && composerDismissInProgress) {
             focusManager.clearFocus(force = true)
             composerDismissInProgress = false
         }
@@ -2659,7 +2678,7 @@ internal fun ConversationScreen(
                 openTransferOnDetails = false
                 openAddMemberOnDetails = false
             },
-            onLeft = onBack,
+            onLeft = ::exitConversation,
             onJumpToMessage = { messageId ->
                 showDetails = false
                 openTransferOnDetails = false
@@ -2880,7 +2899,7 @@ internal fun ConversationScreen(
                 openedAsDmHint = openedAsDmHint,
                 openDetailsDescription = openDetailsDescription,
                 onOpenDetails = { showDetails = true },
-                onBack = onBack,
+                onBack = ::exitConversation,
                 menuOpen = menuOpen,
                 onMenuOpenChange = { menuOpen = it },
                 onOpenSearch = {
@@ -3029,7 +3048,7 @@ internal fun ConversationScreen(
                 controller = controller,
                 appState = appState,
                 messageTextCopy = messageTextCopy,
-                onBack = onBack,
+                onBack = ::exitConversation,
                 initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
                 onDraftChange = { appState.setDraft(draftAccountRef, controller.group.groupIdHex, it) },
                 composerTextState = composerTextState,
@@ -3106,7 +3125,7 @@ internal fun ConversationScreen(
                 },
                 onComposerPreImeBack = {
                     if (composerDismissInProgress) {
-                        onBack()
+                        exitConversation()
                     } else {
                         composerDismissInProgress = true
                         keyboardController?.hide()
@@ -3353,7 +3372,7 @@ internal fun ConversationScreen(
                                     onQuickReactionsReset = { resetQuickReactionEmojis() },
                                     onReplyPreviewClick = { navigateToReplyTarget(it) },
                                     composerGate = composerGate,
-                                    onBack = onBack,
+                                    onBack = ::exitConversation,
                                     mentionCandidates = mentionPicker.candidates,
                                     mentionPickerEnabled = mentionPicker.enabled,
                                     collapseLongMessages = collapseLongMessages,
@@ -3575,7 +3594,7 @@ internal fun ConversationScreen(
             onConfirm = {
                 pendingTopBarLeaveAction = null
                 appState.launchMutation {
-                    if (controller.leaveGroup()) onBack()
+                    if (controller.leaveGroup()) exitConversation()
                 }
             },
             onDismiss = { pendingTopBarLeaveAction = null },
