@@ -1102,6 +1102,7 @@ internal fun ChatsScreen(
             ChatListIdentifierResult(
                 resolution = identifierResolution,
                 appState = appState,
+                accountRef = controller.boundAccountRef,
                 existingDirectChat = { npub -> appState.existingDirectChat(npub) },
                 onOpenChat = { chat ->
                     openGroupFromVisibleList(chat, null, false)
@@ -1229,6 +1230,7 @@ internal fun ChatsScreen(
                                         ChatListRow(
                                             item = item,
                                             appState = appState,
+                                            accountRef = controller.boundAccountRef,
                                             isMuted =
                                                 item.engineMuted(),
                                             interactionsEnabled = !headReorderInProgress,
@@ -1454,6 +1456,7 @@ internal fun presentableIdentifierNpub(
 private fun ChatListIdentifierResult(
     resolution: IdentifierResolution,
     appState: WhiteNoiseAppState,
+    accountRef: String?,
     existingDirectChat: (String) -> ChatListItem?,
     onOpenChat: (ChatListItem) -> Unit,
     onOpenProfile: (String) -> Unit,
@@ -1484,6 +1487,7 @@ private fun ChatListIdentifierResult(
                 ChatRow(
                     item = existing,
                     appState = appState,
+                    accountRef = accountRef,
                     onClick = { onOpenChat(existing) },
                     onOpenProfile = onOpenProfile,
                 )

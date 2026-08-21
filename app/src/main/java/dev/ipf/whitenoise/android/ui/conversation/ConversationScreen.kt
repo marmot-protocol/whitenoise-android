@@ -2669,21 +2669,18 @@ internal fun ConversationScreen(
     // long-message reader's composer, so in-progress text never drifts between
     // them. Created at screen scope so both the bottom-bar composer and the
     // per-message reader can receive the same instance.
-    // Deliberately keyed on the live active ref: loadDraft resolves the active
-    // account internally, so a pre-flip run during a pinned open (#586) loads
-    // nothing useful and this re-fires with the right account once the switch
-    // lands.
-    LaunchedEffect(appState.activeAccountRef, controller.group.groupIdHex) {
-        appState.loadDraft(controller.group.groupIdHex)
+    val draftAccountRef = controller.boundAccountRef
+    LaunchedEffect(draftAccountRef, controller.group.groupIdHex) {
+        appState.loadDraft(draftAccountRef, controller.group.groupIdHex)
     }
-    val restoredDraftSnapshot = appState.draftSnapshotFor(controller.group.groupIdHex)
+    val restoredDraftSnapshot = appState.draftSnapshotFor(draftAccountRef, controller.group.groupIdHex)
     val composerShareRevision =
         rememberComposerShareRevision(
             externalRevision = appState.inboundShareRevision,
             editingMessageId = controller.editingMessageId,
         )
     val composerDictationRevision =
-        appState.activeAccountRef?.let { accountRef ->
+        draftAccountRef?.let { accountRef ->
             appState.conversationDictation.completionRevision(
                 accountRef = accountRef,
                 groupIdHex = controller.group.groupIdHex,
@@ -2968,7 +2965,7 @@ internal fun ConversationScreen(
                 messageTextCopy = messageTextCopy,
                 onBack = onBack,
                 initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-                onDraftChange = { appState.setDraft(controller.group.groupIdHex, it) },
+                onDraftChange = { appState.setDraft(draftAccountRef, controller.group.groupIdHex, it) },
                 composerTextState = composerTextState,
                 composerAttachmentSheet = composerAttachmentSheet,
                 onAfterSend = {

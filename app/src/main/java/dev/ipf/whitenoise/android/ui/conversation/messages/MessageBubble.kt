@@ -1936,10 +1936,12 @@ internal fun MessageBubble(
                                             },
                                             initialDraft =
                                                 appState
-                                                    .draftSnapshotFor(groupIdHex)
+                                                    .draftSnapshotFor(controller.boundAccountRef, groupIdHex)
                                                     ?.textFieldValue
                                                     ?: TextFieldValue(""),
-                                            onDraftChange = { appState.setDraft(groupIdHex, it) },
+                                            onDraftChange = {
+                                                appState.setDraft(controller.boundAccountRef, groupIdHex, it)
+                                            },
                                             draftKey = groupIdHex,
                                             textState = composerTextState,
                                             editingMessageId = controller.editingMessageId,

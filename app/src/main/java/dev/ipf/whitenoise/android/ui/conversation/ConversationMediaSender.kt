@@ -410,7 +410,8 @@ internal class ConversationMediaSender(
             onRejected()
             return
         }
-        val pendingDraftClear = appState.captureDraftForSend(controller.group.groupIdHex)
+        val pendingDraftClear =
+            appState.captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
         appState.launchMutation {
             val prepared = prepareStagedAttachments(imageSlots, documentUris, preparedImageAttachments)
