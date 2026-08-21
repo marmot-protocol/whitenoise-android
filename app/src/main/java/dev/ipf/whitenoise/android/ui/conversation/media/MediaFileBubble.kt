@@ -37,7 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
-private val FileBubbleWidth = 240.dp
+internal val FileBubbleWidth = 240.dp
 
 internal fun Modifier.fileBubbleWidth(): Modifier = width(FileBubbleWidth)
 

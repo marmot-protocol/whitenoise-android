@@ -112,6 +112,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
+import dev.ipf.whitenoise.android.ui.conversation.media.FileBubbleWidth
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
@@ -977,6 +978,38 @@ internal fun MessageBubble(
         forwardSheetOpen = true
     }
 
+    val pendingAttachmentsForRecord = controller.pendingAttachmentsList(record.messageIdHex)
+    val bubbleMedia = rememberBubbleMedia(mediaReferences, pendingAttachmentsForRecord)
+    val mediaPendingName =
+        remember(record.tags) {
+            record.tags
+                .firstOrNull { it.values.firstOrNull() == "_media_pending" }
+                ?.values
+                ?.getOrNull(1)
+        }
+    val showPendingPlaceholder =
+        shouldShowPendingFilePlaceholder(
+            deleted = deleted,
+            hasConfirmedMedia = bubbleMedia.hasConfirmedMedia,
+            pendingAudioCount = bubbleMedia.pendingAudio.size,
+            pendingVisualCount = bubbleMedia.pendingVisuals.size,
+            hasPendingMediaMarker = mediaPendingName != null,
+        )
+    val hasGeneralFileCard =
+        !deleted &&
+            !persistedFailure &&
+            (
+                bubbleMedia.files.isNotEmpty() ||
+                    (
+                        showPendingPlaceholder &&
+                            pendingAttachmentsForRecord.any { pending ->
+                                !pending.mediaType.startsWith("image/", ignoreCase = true) &&
+                                    !pending.mediaType.startsWith("video/", ignoreCase = true) &&
+                                    !pending.mediaType.startsWith("audio/", ignoreCase = true)
+                            }
+                    )
+            )
+
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val selectionGutterWidth = if (selectionMode) messageBubbleSelectionGutterWidth else 0.dp
         val senderAvatarSlotWidth = if (reserveSenderAvatarSlot) MessageBubbleSenderAvatarSlotWidth else 0.dp
@@ -985,6 +1018,11 @@ internal fun MessageBubble(
                 containerWidth = maxWidth,
                 selectionGutterWidth = selectionGutterWidth,
                 senderAvatarSlotWidth = senderAvatarSlotWidth,
+            )
+        val bubbleColumnMinWidth =
+            messageBubbleColumnMinWidth(
+                hasGeneralFileCard = hasGeneralFileCard,
+                maxWidth = bubbleColumnMaxWidth,
             )
         val longPressBlockedBySelection = selectionMode && !rangeDragActive
         val replySwipeUnavailable = deleted || readOnly || textSelectionMode
@@ -1191,7 +1229,7 @@ internal fun MessageBubble(
             Column(
                 modifier =
                     Modifier
-                        .widthIn(max = bubbleColumnMaxWidth)
+                        .widthIn(min = bubbleColumnMinWidth, max = bubbleColumnMaxWidth)
                         .then(
                             if (reserveSenderAvatarSlot && reactionHostPresent) {
                                 Modifier.alignBy(MessageBubbleBottomAlignmentLine)
@@ -1220,8 +1258,6 @@ internal fun MessageBubble(
                     } else {
                         controller.replyPreview(item, messageTextCopy)
                     }
-                val pendingAttachmentsForRecord = controller.pendingAttachmentsList(record.messageIdHex)
-                val bubbleMedia = rememberBubbleMedia(mediaReferences, pendingAttachmentsForRecord)
                 val imageAttachments = bubbleMedia.images
                 val videoAttachments = bubbleMedia.videos
                 val fileAttachments = bubbleMedia.files
@@ -1258,13 +1294,6 @@ internal fun MessageBubble(
                         }
                     }
                 }
-                val mediaPendingName =
-                    remember(record.tags) {
-                        record.tags
-                            .firstOrNull { it.values.firstOrNull() == "_media_pending" }
-                            ?.values
-                            ?.getOrNull(1)
-                    }
                 val mediaCaption =
                     MessageProjector.mediaCaption(
                         message = record,
@@ -1336,14 +1365,6 @@ internal fun MessageBubble(
                             visualCount = pendingVisualRefs.size,
                             hasCaption = mediaCaption != null,
                         )
-                val showPendingPlaceholder =
-                    shouldShowPendingFilePlaceholder(
-                        deleted = deleted,
-                        hasConfirmedMedia = anyConfirmedMedia,
-                        pendingAudioCount = pendingAudio.size,
-                        pendingVisualCount = pendingVisualRefs.size,
-                        hasPendingMediaMarker = mediaPendingName != null,
-                    )
                 val pendingFileFooterInCard =
                     fileCardOwnsFooter(
                         deleted = deleted,
@@ -2092,3 +2113,16 @@ internal fun messageBubbleColumnMaxWidth(
 ): Dp =
     (containerWidth - MessageBubbleOppositeGutter - selectionGutterWidth - senderAvatarSlotWidth)
         .coerceAtLeast(0.dp)
+
+internal fun messageBubbleColumnMinWidth(
+    hasGeneralFileCard: Boolean,
+    maxWidth: Dp,
+): Dp =
+    if (hasGeneralFileCard) {
+        // Establish the file-card invariant at the parent measurement boundary.
+        // The leaf still owns its preferred width, while small screens and row
+        // gutters remain authoritative through the already-computed maximum.
+        minOf(FileBubbleWidth, maxWidth.coerceAtLeast(0.dp))
+    } else {
+        Dp.Unspecified
+    }
