@@ -115,13 +115,50 @@ class NotificationAccountIsolationNavigationTest {
         assertFalse(observedOwnership.contains(TARGET_ACCOUNT to SHARED_GROUP))
     }
 
+    @Test
+    fun mainShell_ordinaryConversationAccountSwitchPreservesDestinationCards() {
+        val appState = appState(fakeMarmot(RouteOrderGate(preloadFinishesFirst = true)))
+        postConversationCards(SOURCE_ACCOUNT, "source-invite")
+        val targetKeys = postConversationCards(TARGET_ACCOUNT, "target-invite")
+        val routed = routedTarget(SOURCE_ACCOUNT)
+        val handled = AtomicBoolean(false)
+
+        appState.setAppInForeground(true)
+        composeRule.setContent {
+            var inboundTarget by remember { mutableStateOf(routed.notificationTarget) }
+            WhiteNoiseTheme {
+                MainShell(
+                    appState = appState,
+                    inboundNotificationTarget = inboundTarget,
+                    inboundNotificationRequestId = routed.notificationRequestId,
+                    onNotificationTargetHandled = { _, _ ->
+                        handled.set(true)
+                        inboundTarget = null
+                    },
+                )
+            }
+        }
+
+        awaitCondition { handled.get() }
+        awaitCondition {
+            manager.activeNotifications.map { it.tag to it.id }.toSet() == targetKeys.toSet()
+        }
+        assertEquals(SOURCE_ACCOUNT, appState.activeAccountRef)
+
+        composeRule.runOnIdle { setActiveAccountRefForTest(appState, TARGET_ACCOUNT) }
+        awaitCondition { appState.activeAccountRef == TARGET_ACCOUNT }
+        awaitCondition {
+            manager.activeNotifications.map { it.tag to it.id }.toSet() == targetKeys.toSet()
+        }
+    }
+
     private fun verifyInactiveAccountTapIsolation(preloadFinishesFirst: Boolean) {
         val gate = RouteOrderGate(preloadFinishesFirst)
         val appState = appState(fakeMarmot(gate))
         val sourceKeys = postConversationCards(SOURCE_ACCOUNT, "source-invite")
         val targetKeys = postConversationCards(TARGET_ACCOUNT, "target-invite")
         val lateSource = "source-during-route" to 52
-        val routed = routedTarget()
+        val routed = routedTarget(TARGET_ACCOUNT)
         val handled = AtomicBoolean(false)
 
         appState.setAppInForeground(true)
@@ -177,19 +214,20 @@ class NotificationAccountIsolationNavigationTest {
         assertEquals(TARGET_ACCOUNT, appState.activeAccountRef)
     }
 
-    private fun routedTarget(): InboundIntentRouting {
+    private fun routedTarget(accountRef: String): InboundIntentRouting {
         val target =
             NotificationTarget(
-                accountRef = TARGET_ACCOUNT,
+                accountRef = accountRef,
                 groupIdHex = SHARED_GROUP,
                 messageIdHex = MESSAGE_ID,
                 kind = NotificationTargetKind.MESSAGE,
             )
         val intent = Intent()
-        NotificationNavigation.applyToIntent(intent, target, "target-card", TAP_TOKEN)
+        val notificationKey = "$accountRef-card"
+        NotificationNavigation.applyToIntent(intent, target, notificationKey, TAP_TOKEN)
         val parsed =
-            NotificationNavigation.parse(intent) { notificationKey, tapToken ->
-                notificationKey == "target-card" && tapToken == TAP_TOKEN
+            NotificationNavigation.parse(intent) { parsedNotificationKey, tapToken ->
+                parsedNotificationKey == notificationKey && tapToken == TAP_TOKEN
             }
         return routeInboundIntent(
             parsedTarget = parsed,
@@ -197,6 +235,16 @@ class NotificationAccountIsolationNavigationTest {
             dataString = null,
             current = InboundIntentRouting(notificationTarget = null, profilePayload = null),
         )
+    }
+
+    private fun setActiveAccountRefForTest(
+        appState: WhiteNoiseAppState,
+        accountRef: String,
+    ) {
+        WhiteNoiseAppState::class.java
+            .getDeclaredMethod("setActiveAccountRef", String::class.java)
+            .apply { isAccessible = true }
+            .invoke(appState, accountRef)
     }
 
     private fun appState(marmot: MarmotInterface): WhiteNoiseAppState =
