@@ -1149,6 +1149,11 @@
     <string name="media_no_app_to_open">No app installed to open this file</string>
     <string name="media_couldnt_open">Couldn\'t open file</string>
     <string name="media_couldnt_load">Couldn\'t load file. Tap to retry.</string>
+    <string name="media_apk_no_installer">No package installer is available on this device</string>
+    <string name="media_apk_permission_denied">Allow installs from White Noise in system settings, then tap the APK again</string>
+    <string name="media_apk_permission_unavailable">Couldn\'t open the system setting for installing apps</string>
+    <string name="media_apk_install_unsupported">This build can\'t install APK attachments. Save the file and open it from a trusted installer.</string>
+    <string name="media_apk_invalid">This file is named as an APK but isn\'t a valid Android package</string>
     <string name="media_open">Open</string>
     <string name="attachment_type_android_package">APK</string>
     <string name="attachment_type_android_package_description">Android app package</string>

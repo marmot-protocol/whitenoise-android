@@ -26,6 +26,8 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 internal typealias DocumentSaveFallback = suspend (source: File, fileName: String, mediaType: String) -> Unit
+internal typealias AttachmentOpener = suspend (File, String, String) -> OpenAttachmentResult
+private typealias InstallPermissionRequester = suspend () -> Boolean
 
 /** User dismissed the destination picker; unlike parent cancellation, a batch may continue. */
 internal class DocumentDestinationCancelledException : CancellationException("document destination cancelled")
@@ -35,19 +37,20 @@ internal class DocumentDestinationCancelledException : CancellationException("do
  * per-source package-install permission screen returns.
  */
 @Composable
-internal fun rememberAttachmentOpener(): suspend (source: File, mediaType: String) -> OpenAttachmentResult {
+internal fun rememberAttachmentOpener(): AttachmentOpener {
     val context = LocalContext.current
     val requestInstallPermission =
         rememberStartActivityForResult { _ ->
             runCatching { context.packageManager.canRequestPackageInstalls() }.getOrDefault(false)
         }
     return remember(context, requestInstallPermission) {
-        { source, mediaType ->
+        { source, mediaType, fileName ->
             openAttachmentWithInstallerPermission(
                 source = source,
                 mediaType = mediaType,
-                open = { requestedSource, requestedMediaType ->
-                    openAttachmentExternally(context, requestedSource, requestedMediaType)
+                fileName = fileName,
+                open = { requestedSource, requestedMediaType, requestedFileName ->
+                    openAttachmentExternally(context, requestedSource, requestedMediaType, requestedFileName)
                 },
                 requestInstallPermission = {
                     requestInstallPermission(androidPackageInstallPermissionIntent(context))
@@ -60,22 +63,46 @@ internal fun rememberAttachmentOpener(): suspend (source: File, mediaType: Strin
 internal suspend fun openAttachmentWithInstallerPermission(
     source: File,
     mediaType: String,
-    open: suspend (File, String) -> OpenAttachmentResult,
+    fileName: String,
+    open: suspend (File, String, String) -> OpenAttachmentResult,
     requestInstallPermission: suspend () -> Boolean,
 ): OpenAttachmentResult {
-    val initial = open(source, mediaType)
-    if (initial != OpenAttachmentResult.InstallPermissionRequired) return initial
-
-    val granted =
-        try {
-            requestInstallPermission()
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (_: Throwable) {
-            false
-        }
-    return if (granted) open(source, mediaType) else OpenAttachmentResult.Error
+    val initial = open(source, mediaType, fileName)
+    return if (initial == OpenAttachmentResult.InstallPermissionRequired) {
+        openAfterInstallerPermission(source, mediaType, fileName, open, requestInstallPermission)
+    } else {
+        initial
+    }
 }
+
+private suspend fun openAfterInstallerPermission(
+    source: File,
+    mediaType: String,
+    fileName: String,
+    open: AttachmentOpener,
+    requestInstallPermission: InstallPermissionRequester,
+): OpenAttachmentResult {
+    AttachmentPlaintextCache.protectPublicationFile(source)
+    return try {
+        requestInstallerPermissionFailure(requestInstallPermission)
+            ?: open(source, mediaType, fileName)
+    } finally {
+        AttachmentPlaintextCache.unprotectPublicationFile(source)
+    }
+}
+
+private suspend fun requestInstallerPermissionFailure(request: InstallPermissionRequester): OpenAttachmentResult? =
+    try {
+        if (request()) null else OpenAttachmentResult.InstallPermissionDenied
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (_: ActivityNotFoundException) {
+        OpenAttachmentResult.InstallPermissionUnavailable
+    } catch (_: SecurityException) {
+        OpenAttachmentResult.SecurityFailure
+    } catch (_: RuntimeException) {
+        OpenAttachmentResult.InstallPermissionUnavailable
+    }
 
 internal fun androidPackageInstallPermissionIntent(context: Context): Intent =
     Intent(

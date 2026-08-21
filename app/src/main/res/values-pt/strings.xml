@@ -888,6 +888,11 @@
     <string name="media_no_app_to_open">Nenhum app instalado para abrir este arquivo</string>
     <string name="media_couldnt_open">Não foi possível abrir o arquivo</string>
     <string name="media_couldnt_load">Não foi possível carregar o arquivo. Toque para tentar novamente.</string>
+    <string name="media_apk_no_installer">Nenhum instalador de pacotes está disponível neste dispositivo</string>
+    <string name="media_apk_permission_denied">Permita instalações do White Noise nas definições do sistema e toque novamente no APK</string>
+    <string name="media_apk_permission_unavailable">Não foi possível abrir a definição do sistema para instalar aplicações</string>
+    <string name="media_apk_install_unsupported">Esta versão não pode instalar anexos APK. Guarde o ficheiro e abra-o com um instalador de confiança.</string>
+    <string name="media_apk_invalid">Este ficheiro tem o nome de um APK, mas não é um pacote Android válido</string>
     <string name="media_open">Abrir</string>
     <string name="media_file_too_large">Arquivo muito grande para anexar</string>
     <string name="media_album_too_large">Seleção muito grande para enviar</string>

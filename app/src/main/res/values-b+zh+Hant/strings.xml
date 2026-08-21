@@ -874,6 +874,11 @@
     <string name="media_no_app_to_open">未安裝可開啟此檔案的應用程式</string>
     <string name="media_couldnt_open">無法開啟檔案</string>
     <string name="media_couldnt_load">無法載入檔案。點按重試。</string>
+    <string name="media_apk_no_installer">裝置上沒有可用的套件安裝程式</string>
+    <string name="media_apk_permission_denied">請在系統設定中允許 White Noise 安裝應用程式，然後再次點按 APK</string>
+    <string name="media_apk_permission_unavailable">無法開啟允許安裝應用程式的系統設定</string>
+    <string name="media_apk_install_unsupported">此版本無法安裝 APK 附件。請儲存檔案，並使用受信任的安裝程式開啟。</string>
+    <string name="media_apk_invalid">此檔案的名稱顯示為 APK，但不是有效的 Android 套件</string>
     <string name="media_open">開啟</string>
     <string name="media_file_too_large">檔案太大,無法附加</string>
     <string name="media_album_too_large">選取內容太大,無法傳送</string>

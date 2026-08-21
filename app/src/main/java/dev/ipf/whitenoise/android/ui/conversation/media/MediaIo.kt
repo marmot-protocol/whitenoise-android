@@ -86,6 +86,7 @@ internal fun validatedAttachmentCacheFile(file: java.io.File?): java.io.File? =
 private val documentMaterializations = SingleFlight<String, java.io.File>()
 private const val MAX_DOCUMENT_EXTENSION_LENGTH = 12
 internal const val ANDROID_PACKAGE_MIME = "application/vnd.android.package-archive"
+internal const val GENERIC_BINARY_MIME = "application/octet-stream"
 private const val MEDIA_STORE_INSERT_ATTEMPTS = 2
 private const val MEDIA_STORE_INSERT_RETRY_DELAY_MILLIS = 150L
 
@@ -212,34 +213,66 @@ internal suspend fun openAttachmentExternally(
     context: android.content.Context,
     source: java.io.File,
     mediaType: String,
-): OpenAttachmentResult {
-    val uri =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val completeSource = validatedAttachmentCacheFile(source) ?: error("missing attachment artifact")
-                fileProviderUri(context, completeSource)
-            }.getOrNull()
+    fileName: String,
+    selfUpdateEnabled: Boolean = BuildConfig.SELF_UPDATE_ENABLED,
+    sdkInt: Int = Build.VERSION.SDK_INT,
+    canRequestPackageInstalls: () -> Boolean = {
+        runCatching { context.packageManager.canRequestPackageInstalls() }.getOrDefault(false)
+    },
+): OpenAttachmentResult =
+    withContext(Dispatchers.IO) { validatedAttachmentCacheFile(source) }
+        ?.let { completeSource ->
+            val classification =
+                withContext(Dispatchers.IO) {
+                    classifyAttachmentOpen(
+                        mediaType = mediaType,
+                        fileName = fileName,
+                        isValidAndroidPackage = { isValidAndroidPackageArchive(completeSource) },
+                    )
+                }
+            when (classification) {
+                is AttachmentOpenClassification.Ready ->
+                    openReadyAttachment(
+                        context = context,
+                        source = completeSource,
+                        mediaType = classification.mediaType,
+                        selfUpdateEnabled = selfUpdateEnabled,
+                        sdkInt = sdkInt,
+                        canRequestPackageInstalls = canRequestPackageInstalls,
+                    )
+                AttachmentOpenClassification.InvalidAndroidPackage -> OpenAttachmentResult.InvalidPackage
+            }
         }
-    return if (uri == null) {
-        OpenAttachmentResult.Error
-    } else {
-        val mime = attachmentOpenMime(mediaType)
-        if (
-            requiresAndroidPackageInstallPermission(
-                mediaType = mime,
-                selfUpdateEnabled = BuildConfig.SELF_UPDATE_ENABLED,
-                sdkInt = Build.VERSION.SDK_INT,
-                canRequestPackageInstalls = {
-                    runCatching { context.packageManager.canRequestPackageInstalls() }.getOrDefault(false)
-                },
-            )
-        ) {
-            OpenAttachmentResult.InstallPermissionRequired
-        } else {
-            launchAttachmentViewIntent(context, uri, mime)
-        }
+        ?: OpenAttachmentResult.MissingArtifact
+
+private suspend fun openReadyAttachment(
+    context: Context,
+    source: java.io.File,
+    mediaType: String,
+    selfUpdateEnabled: Boolean,
+    sdkInt: Int,
+    canRequestPackageInstalls: () -> Boolean,
+): OpenAttachmentResult =
+    when {
+        mediaType == ANDROID_PACKAGE_MIME && !selfUpdateEnabled -> OpenAttachmentResult.InstallUnsupported
+        requiresAndroidPackageInstallPermission(
+            mediaType = mediaType,
+            selfUpdateEnabled = selfUpdateEnabled,
+            sdkInt = sdkInt,
+            canRequestPackageInstalls = canRequestPackageInstalls,
+        ) -> OpenAttachmentResult.InstallPermissionRequired
+        else ->
+            try {
+                val uri = withContext(Dispatchers.IO) { fileProviderUri(context.applicationContext, source) }
+                launchAttachmentViewIntent(context, uri, mediaType)
+            } catch (_: SecurityException) {
+                OpenAttachmentResult.SecurityFailure
+            } catch (_: IllegalArgumentException) {
+                OpenAttachmentResult.Error
+            } catch (_: RuntimeException) {
+                OpenAttachmentResult.Error
+            }
     }
-}
 
 private fun launchAttachmentViewIntent(
     context: Context,
@@ -251,11 +284,19 @@ private fun launchAttachmentViewIntent(
         context.startActivity(intent)
         OpenAttachmentResult.Opened
     } catch (_: ActivityNotFoundException) {
-        OpenAttachmentResult.NoHandler
+        if (mediaType == ANDROID_PACKAGE_MIME) {
+            OpenAttachmentResult.NoInstaller
+        } else {
+            OpenAttachmentResult.NoHandler
+        }
     } catch (_: SecurityException) {
         // FileProvider grant rejected, or target activity has no permission
         // to access this URI for some reason. Surfacing this as a generic
         // error is more useful than crashing.
+        OpenAttachmentResult.SecurityFailure
+    } catch (_: IllegalArgumentException) {
+        OpenAttachmentResult.Error
+    } catch (_: RuntimeException) {
         OpenAttachmentResult.Error
     }
 }
@@ -271,8 +312,72 @@ internal fun attachmentViewIntent(
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 
-/** Presentation classification must never rewrite the MIME used to open a file. */
-internal fun attachmentOpenMime(mediaType: String): String = mediaType.ifBlank { "application/octet-stream" }
+internal sealed interface AttachmentOpenClassification {
+    data class Ready(
+        val mediaType: String,
+    ) : AttachmentOpenClassification
+
+    data object InvalidAndroidPackage : AttachmentOpenClassification
+}
+
+/**
+ * Resolve the MIME used for external dispatch only after the attachment has
+ * been materialized and verified by the transfer pipeline. A remote filename
+ * can refine blank/octet-stream metadata to APK only when its sanitized
+ * basename ends in `.apk` and the artifact is an APK-shaped ZIP containing an
+ * Android manifest. Conflicting non-generic metadata always wins.
+ */
+internal fun classifyAttachmentOpen(
+    mediaType: String,
+    fileName: String,
+    isValidAndroidPackage: () -> Boolean,
+): AttachmentOpenClassification {
+    val normalizedMime =
+        mediaType
+            .substringBefore(';')
+            .trim()
+            .lowercase(java.util.Locale.ROOT)
+    val openMime = mediaType.trim().ifBlank { GENERIC_BINARY_MIME }
+    return when {
+        normalizedMime == ANDROID_PACKAGE_MIME -> AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME)
+        normalizedMime.isNotEmpty() && normalizedMime != GENERIC_BINARY_MIME -> {
+            AttachmentOpenClassification.Ready(openMime)
+        }
+        !hasAndroidPackageExtension(fileName) -> AttachmentOpenClassification.Ready(openMime)
+        isValidAndroidPackage() -> AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME)
+        else -> AttachmentOpenClassification.InvalidAndroidPackage
+    }
+}
+
+private fun hasAndroidPackageExtension(fileName: String): Boolean =
+    MediaPipeline
+        .safeDisplayName(fileName)
+        .substringAfterLast('.', "")
+        .equals("apk", ignoreCase = true)
+
+internal fun isValidAndroidPackageArchive(source: java.io.File): Boolean =
+    runCatching {
+        java.util.zip.ZipFile(source).use { archive ->
+            val manifest = archive.getEntry("AndroidManifest.xml")?.takeUnless { it.isDirectory } ?: return@use false
+            val header = ByteArray(ANDROID_BINARY_XML_HEADER_BYTES)
+            java.io.DataInputStream(archive.getInputStream(manifest)).use { input ->
+                input.readFully(header)
+            }
+            val declaredSize =
+                (header[4].toLong() and 0xffL) or
+                    ((header[5].toLong() and 0xffL) shl 8) or
+                    ((header[6].toLong() and 0xffL) shl 16) or
+                    ((header[7].toLong() and 0xffL) shl 24)
+            header[0] == 0x03.toByte() &&
+                header[1] == 0x00.toByte() &&
+                header[2] == 0x08.toByte() &&
+                header[ANDROID_BINARY_XML_VERSION_HIGH_INDEX] == 0x00.toByte() &&
+                declaredSize == manifest.size
+        }
+    }.getOrDefault(false)
+
+private const val ANDROID_BINARY_XML_HEADER_BYTES = 8
+private const val ANDROID_BINARY_XML_VERSION_HIGH_INDEX = 3
 
 internal fun requiresAndroidPackageInstallPermission(
     mediaType: String,
