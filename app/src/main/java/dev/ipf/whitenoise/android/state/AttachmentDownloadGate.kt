@@ -34,7 +34,7 @@ internal class AttachmentDownloadGate(
         require(parallelism > 0) { "parallelism must be positive" }
     }
 
-    private data class Waiter(
+    private class Waiter(
         val key: String,
         val accountRef: String?,
         var priority: AttachmentDownloadPriority,
@@ -42,10 +42,32 @@ internal class AttachmentDownloadGate(
         var ownsPermit: Boolean = false,
     )
 
+    /** Tracks stale replacements while enforcing one permit owner per caller key. */
+    private class KeyedWaiters {
+        private val entries = mutableMapOf<String, MutableList<Waiter>>()
+
+        fun forKey(key: String): List<Waiter>? = entries[key]
+
+        fun register(waiter: Waiter) {
+            entries.getOrPut(waiter.key) { mutableListOf() }.add(waiter)
+        }
+
+        fun unregister(waiter: Waiter) {
+            val waiters = entries[waiter.key] ?: return
+            waiters.removeAll { it === waiter }
+            if (waiters.isEmpty()) entries.remove(waiter.key)
+        }
+
+        fun canOwnPermit(waiter: Waiter): Boolean =
+            entries[waiter.key]
+                .orEmpty()
+                .none { sibling -> sibling !== waiter && sibling.ownsPermit }
+    }
+
     private val lock = Any()
     private val automatic = ArrayDeque<Waiter>()
     private val interactive = ArrayDeque<Waiter>()
-    private val requestsByKey = mutableMapOf<String, Waiter>()
+    private val keyedWaiters = KeyedWaiters()
     private val anonymousKey = AtomicLong()
     private var activePermits = 0
     private var consecutiveInteractiveAdmissions = 0
@@ -81,13 +103,14 @@ internal class AttachmentDownloadGate(
     /** Moves a queued automatic identity to the interactive lane without creating another waiter. */
     fun promote(key: String): Boolean =
         synchronized(lock) {
-            val waiter = requestsByKey[key] ?: return@synchronized false
-            if (waiter.ownsPermit || waiter.priority == AttachmentDownloadPriority.Interactive) {
-                return@synchronized true
-            }
-            automatic.remove(waiter)
-            waiter.priority = AttachmentDownloadPriority.Interactive
-            interactive.addLast(waiter)
+            val waiters = keyedWaiters.forKey(key) ?: return@synchronized false
+            waiters
+                .filter { !it.ownsPermit && it.priority == AttachmentDownloadPriority.Automatic }
+                .forEach { waiter ->
+                    automatic.remove(waiter)
+                    waiter.priority = AttachmentDownloadPriority.Interactive
+                    interactive.addLast(waiter)
+                }
             true
         }
 
@@ -100,7 +123,7 @@ internal class AttachmentDownloadGate(
                     .also { waiters ->
                         waiters.forEach { waiter ->
                             automatic.remove(waiter)
-                            requestsByKey.remove(waiter.key, waiter)
+                            keyedWaiters.unregister(waiter)
                         }
                     }
             }
@@ -146,17 +169,10 @@ internal class AttachmentDownloadGate(
         val waiter = Waiter(key, accountRef, priority)
         val admittedImmediately =
             synchronized(lock) {
-                check(requestsByKey.putIfAbsent(key, waiter) == null) {
-                    "attachment key is already active or queued: $key"
-                }
-                if (activePermits < maxPermits && automatic.isEmpty() && interactive.isEmpty()) {
-                    activePermits += 1
-                    waiter.ownsPermit = true
-                    true
-                } else {
-                    lane(priority).addLast(waiter)
-                    false
-                }
+                keyedWaiters.register(waiter)
+                lane(priority).addLast(waiter)
+                admitAvailableLocked()
+                waiter.ownsPermit
             }
         if (admittedImmediately) return waiter
         try {
@@ -167,11 +183,11 @@ internal class AttachmentDownloadGate(
                 if (waiter.ownsPermit) {
                     waiter.ownsPermit = false
                     activePermits -= 1
-                    requestsByKey.remove(waiter.key, waiter)
+                    keyedWaiters.unregister(waiter)
                     admitAvailableLocked()
                 } else {
                     lane(waiter.priority).remove(waiter)
-                    requestsByKey.remove(waiter.key, waiter)
+                    keyedWaiters.unregister(waiter)
                 }
             }
             throw cancellation
@@ -183,7 +199,7 @@ internal class AttachmentDownloadGate(
             if (!waiter.ownsPermit) return
             waiter.ownsPermit = false
             activePermits -= 1
-            requestsByKey.remove(waiter.key, waiter)
+            keyedWaiters.unregister(waiter)
             admitAvailableLocked()
         }
     }
@@ -198,15 +214,24 @@ internal class AttachmentDownloadGate(
     }
 
     private fun nextWaiterLocked(): Waiter? {
+        val nextAutomatic = automatic.firstOrNull(keyedWaiters::canOwnPermit)
+        val nextInteractive = interactive.firstOrNull(keyedWaiters::canOwnPermit)
         val admitAutomatic =
-            automatic.isNotEmpty() &&
-                (interactive.isEmpty() || consecutiveInteractiveAdmissions >= MAX_INTERACTIVE_BURST)
+            nextAutomatic != null &&
+                (nextInteractive == null || consecutiveInteractiveAdmissions >= MAX_INTERACTIVE_BURST)
         return if (admitAutomatic) {
             consecutiveInteractiveAdmissions = 0
-            automatic.removeFirst()
+            automatic.remove(nextAutomatic)
+            nextAutomatic
         } else {
-            interactive.removeFirstOrNull()?.also { consecutiveInteractiveAdmissions += 1 }
-                ?: automatic.removeFirstOrNull()?.also { consecutiveInteractiveAdmissions = 0 }
+            nextInteractive
+                ?.also {
+                    interactive.remove(it)
+                    consecutiveInteractiveAdmissions += 1
+                } ?: nextAutomatic?.also {
+                automatic.remove(it)
+                consecutiveInteractiveAdmissions = 0
+            }
         }
     }
 

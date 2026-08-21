@@ -4072,9 +4072,14 @@ class WhiteNoiseAppState private constructor(
         return intents.hasOpenIntent(request)
     }
 
-    internal fun consumeAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean {
+    internal suspend fun consumeAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean {
         val intents = attachmentDownloadIntents
-        return intents.consumeOpenIntent(request)
+        return withContext(Dispatchers.IO) { intents.consumeOpenIntent(request) }
+    }
+
+    /** Restores a failed dispatch without immediately looping the active effect. */
+    internal fun restoreAttachmentOpenIntent(request: AttachmentTransferRequest) {
+        attachmentDownloadIntents.markOpenIntent(request)
     }
 
     fun automaticAttachmentDownloadsPaused(): Boolean {

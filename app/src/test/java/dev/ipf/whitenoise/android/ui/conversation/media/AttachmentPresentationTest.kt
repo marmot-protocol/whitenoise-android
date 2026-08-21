@@ -344,6 +344,40 @@ class AttachmentPresentationTest {
         }
 
     @Test
+    fun explicitAutomaticPauseBlocksOnlyNetworkFallbacks() {
+        assertFalse(
+            shouldMaterializeAttachmentAutomatically(
+                mine = true,
+                mediaAutoDownloadAllowed = false,
+                automaticDownloadsPaused = true,
+            ),
+        )
+        assertTrue(
+            shouldMaterializeAttachmentAutomatically(
+                mine = true,
+                mediaAutoDownloadAllowed = false,
+                automaticDownloadsPaused = true,
+                hasRetainedPlaintext = true,
+            ),
+        )
+        assertTrue(
+            shouldMaterializeAttachmentAutomatically(
+                mine = false,
+                mediaAutoDownloadAllowed = false,
+                automaticDownloadsPaused = true,
+                hasCachedAttachment = true,
+            ),
+        )
+        assertTrue(
+            shouldMaterializeAttachmentAutomatically(
+                mine = true,
+                mediaAutoDownloadAllowed = false,
+                automaticDownloadsPaused = false,
+            ),
+        )
+    }
+
+    @Test
     fun unresolvedCacheStateNeverStartsAnAutomaticDownload() {
         assertFalse(shouldStartAttachmentDownload(AttachmentTransferState.Resolving, true, 12uL, mine = false))
         assertFalse(shouldStartAttachmentDownload(AttachmentTransferState.Available, true, 12uL, mine = false))

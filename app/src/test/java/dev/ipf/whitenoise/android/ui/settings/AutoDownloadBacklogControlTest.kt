@@ -70,6 +70,7 @@ class AutoDownloadBacklogControlTest {
             .onNodeWithText(context.getString(R.string.media_auto_download_restart))
             .performScrollTo()
             .assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/auto_download_paused_restart_light.png")
     }
 
     private fun render() {

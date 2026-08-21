@@ -9480,12 +9480,22 @@ class ConversationController(
         )
     }
 
-    internal fun consumeAttachmentOpenIntent(
+    internal suspend fun consumeAttachmentOpenIntent(
         messageIdHex: String,
         attachmentIndex: Int,
     ): Boolean {
         val account = conversationAccountRef ?: return false
         return appState.consumeAttachmentOpenIntent(
+            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+        )
+    }
+
+    internal fun restoreAttachmentOpenIntent(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ) {
+        val account = conversationAccountRef ?: return
+        appState.restoreAttachmentOpenIntent(
             AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
         )
     }

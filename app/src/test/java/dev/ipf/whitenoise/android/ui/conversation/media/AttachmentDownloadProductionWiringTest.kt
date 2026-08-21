@@ -35,6 +35,16 @@ class AttachmentDownloadProductionWiringTest {
     }
 
     @Test
+    fun clickableImageLoadingProgressHasAnAccessibleName() {
+        val image = source("MediaImageBubbles.kt").normalized()
+
+        assertTrue(
+            ".semantics { contentDescription = downloadLabel } .clickable( " +
+                "onClickLabel = downloadLabel," in image,
+        )
+    }
+
+    @Test
     fun everyInteractiveControllerDownloadHasDurableTerminalCleanup() {
         val controller = projectSource("state/Controllers.kt").normalized()
         val worker = projectSource("state/AttachmentDownloadWorker.kt").normalized()

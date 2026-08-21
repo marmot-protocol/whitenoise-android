@@ -969,10 +969,10 @@
     <string name="media_auto_download_subtitle">Документы и большие видео могут расходовать много трафика. Выберите, что загружать автоматически для каждого типа подключения.</string>
     <string name="media_auto_download_backlog_title">Очередь загрузок</string>
     <string name="media_auto_download_stop">Остановить автозагрузки</string>
-    <string name="media_auto_download_stop_subtitle">Очистить очередь автозагрузок; активные и выбранные загрузки продолжатся</string>
-    <string name="media_auto_download_stop_confirmation">Будут удалены только ожидающие автозагрузки этой учетной записи. Активные загрузки и выбранные вами файлы продолжатся.</string>
-    <string name="media_auto_download_stop_action">Остановить только авто</string>
-    <string name="media_auto_download_restart">Возобновить автозагрузки</string>
+    <string name="media_auto_download_stop_subtitle">Очистить очередь автозагрузок; активные и начатые вручную загрузки продолжатся</string>
+    <string name="media_auto_download_stop_confirmation">Будут удалены только ожидающие автозагрузки этой учетной записи. Активные загрузки и загрузки, начатые вами вручную, продолжатся.</string>
+    <string name="media_auto_download_stop_action">Остановить только автозагрузки</string>
+    <string name="media_auto_download_restart">Разрешить автозагрузки</string>
     <string name="media_auto_download_restart_subtitle">Снова разрешить новые автоматические загрузки</string>
     <string name="network_wifi">Wi-Fi</string>
     <string name="network_mobile">Мобильные данные</string>

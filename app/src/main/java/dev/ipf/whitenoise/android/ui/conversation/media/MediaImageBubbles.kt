@@ -49,6 +49,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -210,9 +211,15 @@ internal fun MediaImageBubble(
     var failed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
     var viewerOpen by remember(key, attachmentIndex) { mutableStateOf(false) }
     var reloadToken by remember(key, attachmentIndex, epoch) { mutableStateOf(0) }
-    // Auto-download gating (#10): own messages always render (bytes are cached
-    // from the send), incoming honor the policy. Keyed on the policy so
-    // flipping the setting re-gates undownloaded bubbles.
+    val cachedPlaintextOnEntry =
+        remember(controller, key, attachmentIndex, epoch) {
+            controller.hasCachedAttachment(key, attachmentIndex)
+        }
+    val retainedPlaintextOnEntry =
+        mine && controller.pendingAttachmentsList(key).getOrNull(attachmentIndex) != null
+    // Auto-download gating (#10): retained/cached own bytes always render;
+    // a cache-missing own image bypasses the matrix only while the explicit
+    // account backlog pause is off. Incoming images honor the matrix.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
     var startDownload by remember(
         key,
@@ -220,7 +227,15 @@ internal fun MediaImageBubble(
         appState.mediaAutoDownloadMatrix,
         automaticDownloadsPaused,
     ) {
-        mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image))
+        mutableStateOf(
+            shouldMaterializeAttachmentAutomatically(
+                mine = mine,
+                mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
+                automaticDownloadsPaused = automaticDownloadsPaused,
+                hasCachedAttachment = cachedPlaintextOnEntry,
+                hasRetainedPlaintext = retainedPlaintextOnEntry,
+            ),
+        )
     }
     var interactiveDownloadRequested by remember(key, attachmentIndex) { mutableStateOf(false) }
 
@@ -314,6 +329,7 @@ internal fun MediaImageBubble(
         modifier = imageBubbleSizing(bubbleAspectRatio),
     ) {
         Box(contentAlignment = Alignment.Center) {
+            val downloadLabel = stringResource(R.string.media_tap_to_download)
             val current = presentation
             val placeholder = rememberThumbhashImage(reference.thumbhash)
             // Paint the blurred placeholder behind whatever loading-state is
@@ -367,7 +383,7 @@ internal fun MediaImageBubble(
                         !startDownload ->
                             MediaCircleAction(
                                 icon = Icons.Default.ArrowDownward,
-                                contentDescription = stringResource(R.string.media_tap_to_download),
+                                contentDescription = downloadLabel,
                                 onClick = {
                                     controller.requestAttachmentOpen(key, attachmentIndex)
                                 },
@@ -378,8 +394,9 @@ internal fun MediaImageBubble(
                                 modifier =
                                     Modifier
                                         .size(48.dp)
+                                        .semantics { contentDescription = downloadLabel }
                                         .clickable(
-                                            onClickLabel = stringResource(R.string.media_tap_to_download),
+                                            onClickLabel = downloadLabel,
                                             onClick = {
                                                 controller.requestAttachmentOpen(key, attachmentIndex)
                                             },
@@ -619,17 +636,31 @@ internal fun MediaImageGridTile(
     }
     var failed by remember(decodeKey) { mutableStateOf(false) }
     var reloadToken by remember(decodeKey) { mutableStateOf(0) }
+    val cachedPlaintextOnEntry =
+        remember(controller, decodeKey) {
+            controller.hasCachedAttachment(messageIdHex, attachmentIndex)
+        }
+    val retainedPlaintextOnEntry =
+        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
     // Mirror the single-image bubble's auto-download gate (#10) so the
-    // policy applies to album tiles too. Outgoing tiles (`mine`) always
-    // download because the bytes are seeded from the send. Re-keyed on
-    // the policy so flipping the setting re-gates undownloaded tiles.
+    // policy applies to album tiles too. Retained/cached outgoing bytes still
+    // materialize during a pause, but a cache-missing network fallback waits
+    // for restart or a tap. Re-keyed so policy changes re-gate unloaded tiles.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
     var startDownload by remember(
         tileSlot,
         appState.mediaAutoDownloadMatrix,
         automaticDownloadsPaused,
     ) {
-        mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image))
+        mutableStateOf(
+            shouldMaterializeAttachmentAutomatically(
+                mine = mine,
+                mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
+                automaticDownloadsPaused = automaticDownloadsPaused,
+                hasCachedAttachment = cachedPlaintextOnEntry,
+                hasRetainedPlaintext = retainedPlaintextOnEntry,
+            ),
+        )
     }
     var interactiveDownloadRequested by remember(tileSlot) { mutableStateOf(false) }
 

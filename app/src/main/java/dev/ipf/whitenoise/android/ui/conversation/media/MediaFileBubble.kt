@@ -107,12 +107,19 @@ internal fun MediaFileBubble(
     LaunchedEffect(pillKey, mine, cacheRevision) {
         controller.refreshAttachmentTransferState(messageIdHex, attachmentIndex)
     }
-    // Auto-download gate (#407): own sends are already cached; incoming
-    // documents honor the Documents matrix row for the active connection.
+    // Auto-download gate (#407): local own sends stay available, while a
+    // cache-missing own file bypasses the matrix only when the account backlog
+    // has not been explicitly paused. Incoming documents honor the Documents row.
     // Recomposition re-reads the matrix, so flipping a toggle re-gates an
     // un-fetched file. A tap bypasses this gate entirely, so manual fetch/open
     // stays available regardless of the policy.
-    val autoDownloadAllowed = mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Document)
+    val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    val autoDownloadAllowed =
+        shouldMaterializeAttachmentAutomatically(
+            mine = mine,
+            mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Document),
+            automaticDownloadsPaused = automaticDownloadsPaused,
+        )
 
     // When the Documents policy allows auto-download, prefetch into encrypted
     // L2. Notification receipt now schedules the same durable work; this
@@ -147,8 +154,17 @@ internal fun MediaFileBubble(
                     mine = mine,
                 ) { appState.present(couldntLoadMessage) } ?: return@LaunchedEffect
             if (!lifecycleOwner.lifecycle.awaitResumedOrDestroyed()) return@LaunchedEffect
-            if (!controller.consumeAttachmentOpenIntent(messageIdHex, attachmentIndex)) return@LaunchedEffect
-            when (openAttachment(file, reference.mediaType, reference.fileName)) {
+            var openResult: OpenAttachmentResult? = null
+            val dispatched =
+                consumeAndDispatchAttachmentOpen(
+                    consume = { controller.consumeAttachmentOpenIntent(messageIdHex, attachmentIndex) },
+                    restore = { controller.restoreAttachmentOpenIntent(messageIdHex, attachmentIndex) },
+                    dispatch = {
+                        openResult = openAttachment(file, reference.mediaType, reference.fileName)
+                    },
+                )
+            if (!dispatched) return@LaunchedEffect
+            when (checkNotNull(openResult)) {
                 OpenAttachmentResult.Opened -> Unit
                 OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
                 OpenAttachmentResult.NoInstaller -> appState.present(noInstallerMessage)

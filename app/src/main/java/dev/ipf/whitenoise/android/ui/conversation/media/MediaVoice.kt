@@ -110,12 +110,15 @@ internal fun MediaVoiceBubble(
         remember(pillKey, epoch, reference.mediaType) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
+    val retainedPlaintextOnEntry =
+        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
     var totalDurationMs by remember(pillKey, epoch) { mutableStateOf(0) }
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
-    // Auto-download gate (#407): own clips always materialize (bytes are
-    // cached from the send), incoming honor the Audio matrix row unless the
-    // attachment is already local. A cached voice file or controller plaintext
+    // Auto-download gate (#407): retained/cached own clips always materialize;
+    // a cache-missing own clip waits during an explicit backlog pause. Incoming
+    // clips honor the Audio matrix row unless the attachment is already local.
+    // A cached voice file or controller plaintext
     // cache means re-entering the chat should start at Play instead of showing
     // a fake Download affordance. Re-keyed on the matrix so flipping a toggle
     // re-gates an un-fetched clip. A tap on the bubble flips this to true so
@@ -131,8 +134,10 @@ internal fun MediaVoiceBubble(
             shouldStartVoiceAttachmentDownload(
                 mine = mine,
                 audioAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio),
+                automaticDownloadsPaused = automaticDownloadsPaused,
                 hasCachedAttachment = cachedPlaintextOnEntry,
                 hasCachedFile = localFile != null,
+                hasRetainedPlaintext = retainedPlaintextOnEntry,
             ),
         )
     }
@@ -194,7 +199,15 @@ internal fun MediaVoiceBubble(
         realWaveform = null
         totalDurationMs = 0
         failed = true
-        startDownload = mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio)
+        startDownload =
+            shouldStartVoiceAttachmentDownload(
+                mine = mine,
+                audioAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio),
+                automaticDownloadsPaused = automaticDownloadsPaused,
+                hasCachedAttachment = false,
+                hasCachedFile = false,
+                hasRetainedPlaintext = retainedPlaintextOnEntry,
+            )
     }
 
     suspend fun playReadyVoice(file: java.io.File) {
@@ -239,7 +252,7 @@ internal fun MediaVoiceBubble(
         // Skip + retry once the projection rebinds the bubble with a real
         // epoch. Own sends keep epoch 0 valid (retained bytes short-circuit).
         if (!mine && reference.sourceEpoch == 0uL) return@LaunchedEffect
-        val instant = mine || controller.hasCachedAttachment(messageIdHex, attachmentIndex)
+        val instant = retainedPlaintextOnEntry || controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         if (!instant) loading = true
         runCatching {
             materializeVoiceAttachment(
@@ -282,7 +295,14 @@ internal fun MediaVoiceBubble(
             interactiveDownloadRequested = true
             startDownload = true
         },
-        dispatchOpen = { localFile?.let { playReadyVoice(it) } },
+        dispatchOpen = {
+            val file = localFile
+            if (file == null) {
+                controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+            } else {
+                playReadyVoice(file)
+            }
+        },
     )
 
     // Surface a cached duration as soon as the file is materialized so the
@@ -588,9 +608,19 @@ private fun rememberCachedVoiceAttachmentFileState(
 internal fun shouldStartVoiceAttachmentDownload(
     mine: Boolean,
     audioAutoDownload: Boolean,
+    automaticDownloadsPaused: Boolean = false,
     hasCachedAttachment: Boolean,
     hasCachedFile: Boolean,
-): Boolean = mine || audioAutoDownload || hasCachedAttachment || hasCachedFile
+    hasRetainedPlaintext: Boolean = false,
+): Boolean =
+    shouldMaterializeAttachmentAutomatically(
+        mine = mine,
+        mediaAutoDownloadAllowed = audioAutoDownload,
+        automaticDownloadsPaused = automaticDownloadsPaused,
+        hasCachedAttachment = hasCachedAttachment,
+        hasMaterializedFile = hasCachedFile,
+        hasRetainedPlaintext = hasRetainedPlaintext,
+    )
 
 internal fun shouldInvalidateVoiceAttachmentCache(playbackResult: VoicePlaybackController.PlaybackStartResult): Boolean =
     playbackResult == VoicePlaybackController.PlaybackStartResult.PrepareFailed ||

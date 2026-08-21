@@ -117,6 +117,8 @@ internal fun MediaVideoGridTile(
         remember(messageIdHex, attachmentIndex) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
+    val retainedPlaintextOnEntry =
+        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
     // MediaImageGridTile). A sourceEpoch upgrade re-keys this state, so without
     // the cache seed the poster would reset to null and flash back to the
@@ -138,8 +140,10 @@ internal fun MediaVideoGridTile(
             shouldStartVideoAttachmentDownload(
                 mine = mine,
                 videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
+                automaticDownloadsPaused = automaticDownloadsPaused,
                 hasCachedAttachment = cachedPlaintextOnEntry,
                 hasCachedFile = localFile != null,
+                hasRetainedPlaintext = retainedPlaintextOnEntry,
             ),
         )
     }
@@ -407,6 +411,8 @@ internal fun MediaVideoBubble(
         remember(pillKey) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
+    val retainedPlaintextOnEntry =
+        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
@@ -436,8 +442,10 @@ internal fun MediaVideoBubble(
             shouldStartVideoAttachmentDownload(
                 mine = mine,
                 videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
+                automaticDownloadsPaused = automaticDownloadsPaused,
                 hasCachedAttachment = cachedPlaintextOnEntry,
                 hasCachedFile = localFile != null,
+                hasRetainedPlaintext = retainedPlaintextOnEntry,
             ),
         )
     }
@@ -946,9 +954,19 @@ private fun rememberCachedVideoAttachmentFileState(
 internal fun shouldStartVideoAttachmentDownload(
     mine: Boolean,
     videoAutoDownload: Boolean,
+    automaticDownloadsPaused: Boolean = false,
     hasCachedAttachment: Boolean,
     hasCachedFile: Boolean,
-): Boolean = mine || videoAutoDownload || hasCachedAttachment || hasCachedFile
+    hasRetainedPlaintext: Boolean = false,
+): Boolean =
+    shouldMaterializeAttachmentAutomatically(
+        mine = mine,
+        mediaAutoDownloadAllowed = videoAutoDownload,
+        automaticDownloadsPaused = automaticDownloadsPaused,
+        hasCachedAttachment = hasCachedAttachment,
+        hasMaterializedFile = hasCachedFile,
+        hasRetainedPlaintext = hasRetainedPlaintext,
+    )
 
 private fun videoAttachmentCacheFile(
     context: android.content.Context,

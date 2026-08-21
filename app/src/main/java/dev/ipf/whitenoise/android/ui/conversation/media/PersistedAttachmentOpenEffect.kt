@@ -8,7 +8,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 
 /**
  * Replays one persisted attachment-open intent after its media is ready and
@@ -52,6 +54,9 @@ internal fun persistedAttachmentOpenEffect(
             consume = {
                 controller.consumeAttachmentOpenIntent(messageIdHex, attachmentIndex)
             },
+            restore = {
+                controller.restoreAttachmentOpenIntent(messageIdHex, attachmentIndex)
+            },
             dispatch = { currentDispatchOpen.value() },
         )
     }
@@ -62,12 +67,28 @@ internal suspend fun dispatchAttachmentOpenWhenReady(
     lifecycle: Lifecycle,
     awaitReady: suspend () -> Unit,
     isReady: () -> Boolean,
-    consume: () -> Boolean,
+    consume: suspend () -> Boolean,
+    restore: suspend () -> Unit = {},
     dispatch: suspend () -> Unit,
 ): Boolean {
     awaitReady()
     val readyAndResumed = isReady() && lifecycle.awaitResumedOrDestroyed()
-    val consumed = readyAndResumed && isReady() && consume()
-    if (consumed) dispatch()
-    return consumed
+    if (!readyAndResumed || !isReady()) return false
+    return consumeAndDispatchAttachmentOpen(consume, restore, dispatch)
 }
+
+/** Cancellation or dispatch failure cannot strand an intent after its atomic consume fence. */
+internal suspend fun consumeAndDispatchAttachmentOpen(
+    consume: suspend () -> Boolean,
+    restore: suspend () -> Unit,
+    dispatch: suspend () -> Unit,
+): Boolean =
+    withContext(NonCancellable) {
+        val consumed = consume()
+        if (!consumed) return@withContext false
+        val failure = runCatching { dispatch() }.exceptionOrNull() ?: return@withContext true
+        runCatching { restore() }
+            .exceptionOrNull()
+            ?.let(failure::addSuppressed)
+        throw failure
+    }

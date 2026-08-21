@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.SharedPreferences
+import android.util.Log
 
 /**
  * Persists Android-owned scheduling intent only. MDK remains the authority for
@@ -40,7 +41,11 @@ internal class AttachmentDownloadIntentStore(
             val current = readSet(OPEN_IDENTITIES)
             val token = requestToken(request)
             if (token !in current) return@synchronized false
-            preferences.edit().putStringSet(OPEN_IDENTITIES, current - token).commit()
+            val committed = preferences.edit().putStringSet(OPEN_IDENTITIES, current - token).commit()
+            if (!committed) {
+                Log.w(TAG, "Open-intent disk commit failed after the in-memory consume fence")
+            }
+            true
         }
 
     private fun readSet(key: String): Set<String> = preferences.getStringSet(key, emptySet()).orEmpty().toSet()
@@ -50,11 +55,12 @@ internal class AttachmentDownloadIntentStore(
         transform: (Set<String>) -> Set<String>,
     ) {
         synchronized(LOCK) {
-            preferences.edit().putStringSet(key, transform(readSet(key))).commit()
+            preferences.edit().putStringSet(key, transform(readSet(key))).apply()
         }
     }
 
     private companion object {
+        const val TAG = "AttachmentIntentStore"
         val LOCK = Any()
         const val PAUSED_ACCOUNTS = "attachment_download_paused_accounts"
         const val INTERACTIVE_IDENTITIES = "attachment_download_interactive_identities"

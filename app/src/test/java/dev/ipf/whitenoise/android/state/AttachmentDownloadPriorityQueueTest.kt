@@ -121,6 +121,48 @@ class AttachmentDownloadPriorityQueueTest {
             }
         }
 
+    @Test
+    fun replacementForAStaleDuplicateKeyWaitsWithoutBlockingOtherKeys() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 2)
+                val releaseFirst = CompletableDeferred<Unit>()
+                val releaseOther = CompletableDeferred<Unit>()
+                val started = mutableListOf<String>()
+                val first =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("same-key", ACCOUNT, AttachmentDownloadPriority.Automatic) {
+                            started += "first"
+                            releaseFirst.await()
+                        }
+                    }
+                val replacement =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("same-key", ACCOUNT, AttachmentDownloadPriority.Interactive) {
+                            started += "replacement"
+                        }
+                    }
+                val other =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("other-key", ACCOUNT, AttachmentDownloadPriority.Automatic) {
+                            started += "other"
+                            releaseOther.await()
+                        }
+                    }
+
+                assertEquals(listOf("first", "other"), started)
+                assertFalse(replacement.isCompleted)
+
+                first.cancel()
+                first.join()
+                replacement.await()
+                assertEquals(listOf("first", "other", "replacement"), started)
+
+                releaseOther.complete(Unit)
+                other.await()
+            }
+        }
+
     private companion object {
         const val ACCOUNT = "account-a"
         const val TEST_TIMEOUT = 5_000L

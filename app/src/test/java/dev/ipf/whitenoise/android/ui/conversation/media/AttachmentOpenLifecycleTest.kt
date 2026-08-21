@@ -113,6 +113,64 @@ class AttachmentOpenLifecycleTest {
             assertEquals(1, consumeCount)
             assertEquals(1, dispatchCount)
         }
+
+    @Test
+    fun cancellationAfterConsumptionCannotStrandTheOpenBeforeDispatchCompletes() =
+        runBlocking {
+            val dispatchStarted = CompletableDeferred<Unit>()
+            val releaseDispatch = CompletableDeferred<Unit>()
+            var consumeCount = 0
+            var dispatchCount = 0
+            val opening =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    consumeAndDispatchAttachmentOpen(
+                        consume = {
+                            consumeCount++
+                            true
+                        },
+                        restore = {},
+                        dispatch = {
+                            dispatchStarted.complete(Unit)
+                            releaseDispatch.await()
+                            dispatchCount++
+                        },
+                    )
+                }
+
+            dispatchStarted.await()
+            opening.cancel()
+            assertEquals(1, consumeCount)
+            assertEquals(0, dispatchCount)
+
+            releaseDispatch.complete(Unit)
+            opening.join()
+            assertEquals(1, dispatchCount)
+        }
+
+    @Test
+    fun failedDispatchRestoresTheConsumedIntentForALaterOwner() =
+        runBlocking {
+            var intentAvailable = true
+            var restoreCount = 0
+
+            val failure =
+                runCatching {
+                    consumeAndDispatchAttachmentOpen(
+                        consume = {
+                            intentAvailable.also { intentAvailable = false }
+                        },
+                        restore = {
+                            restoreCount++
+                            intentAvailable = true
+                        },
+                        dispatch = { error("viewer launch failed") },
+                    )
+                }.exceptionOrNull()
+
+            assertTrue(failure is IllegalStateException)
+            assertTrue(intentAvailable)
+            assertEquals(1, restoreCount)
+        }
 }
 
 private class AttachmentLifecycleOwner : LifecycleOwner {

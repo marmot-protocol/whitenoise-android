@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -62,6 +63,15 @@ class AttachmentDownloadIntentStoreTest {
         assertFalse(AttachmentDownloadIntentStore(preferences).hasOpenIntent(REQUEST_A))
     }
 
+    @Test
+    fun failedDiskCommitDoesNotDiscardTheAlreadyConsumedInMemoryIntent() {
+        AttachmentDownloadIntentStore(preferences).markOpenIntent(REQUEST_A)
+        val store = AttachmentDownloadIntentStore(CommitFailingSharedPreferences(preferences))
+
+        assertTrue(store.consumeOpenIntent(REQUEST_A))
+        assertFalse(store.hasOpenIntent(REQUEST_A))
+    }
+
     private companion object {
         const val ACCOUNT_A = "account-a"
         const val ACCOUNT_B = "account-b"
@@ -73,5 +83,28 @@ class AttachmentDownloadIntentStoreTest {
                 attachmentIndex = 0,
             )
         val REQUEST_B = REQUEST_A.copy(accountRef = ACCOUNT_B)
+    }
+}
+
+private class CommitFailingSharedPreferences(
+    private val delegate: SharedPreferences,
+) : SharedPreferences by delegate {
+    override fun edit(): SharedPreferences.Editor = CommitFailingEditor(delegate.edit())
+
+    private class CommitFailingEditor(
+        private val delegate: SharedPreferences.Editor,
+    ) : SharedPreferences.Editor by delegate {
+        override fun putStringSet(
+            key: String?,
+            values: Set<String>?,
+        ): SharedPreferences.Editor {
+            delegate.putStringSet(key, values)
+            return this
+        }
+
+        override fun commit(): Boolean {
+            delegate.commit()
+            return false
+        }
     }
 }
