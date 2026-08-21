@@ -29,4 +29,29 @@ class MessageBubbleLayoutTest {
             ),
         )
     }
+
+    @Test
+    fun fileCardColumnKeepsItsReadableWidthButClampsToAvailableSpace() {
+        assertEquals(
+            240.dp,
+            messageBubbleColumnMinWidth(
+                hasGeneralFileCard = true,
+                maxWidth = 312.dp,
+            ),
+        )
+        assertEquals(
+            132.dp,
+            messageBubbleColumnMinWidth(
+                hasGeneralFileCard = true,
+                maxWidth = 132.dp,
+            ),
+        )
+        assertEquals(
+            androidx.compose.ui.unit.Dp.Unspecified,
+            messageBubbleColumnMinWidth(
+                hasGeneralFileCard = false,
+                maxWidth = 312.dp,
+            ),
+        )
+    }
 }
