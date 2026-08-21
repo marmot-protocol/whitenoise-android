@@ -43,6 +43,7 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
+import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
@@ -2092,6 +2093,14 @@ internal fun textSendAwaitingEchoConfirmation(
     optimisticStillPresent: Boolean,
 ): Boolean = summaryMessageIds.isEmpty() && optimisticStillPresent
 
+internal fun acceptedPendingTextAwaitingProjection(
+    acceptDisposition: SendAcceptDispositionFfi,
+    confirmedId: String,
+    projectedMessageIds: Set<String>,
+): Boolean =
+    acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING &&
+        confirmedId !in projectedMessageIds
+
 data class SuccessfulTextSendReconciliation(
     val confirmedId: String,
     val confirmed: AppMessageRecordFfi,
@@ -2129,8 +2138,11 @@ internal fun reconcileSuccessfulTextSend(
     // In that ordering there is nothing left to await or bridge: settle through
     // the normal confirmed path using the exact canonical id already projected.
     val acceptedPending =
-        acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING &&
-            confirmedId !in projectedMessageIds
+        acceptedPendingTextAwaitingProjection(
+            acceptDisposition = acceptDisposition,
+            confirmedId = confirmedId,
+            projectedMessageIds = projectedMessageIds,
+        )
     val awaitingEcho =
         !acceptedPending &&
             textSendAwaitingEchoConfirmation(
@@ -6757,6 +6769,15 @@ internal fun isTerminalOpenFailure(throwable: Throwable): Boolean = throwable is
 
 internal fun shouldOfferConversationLoadRetry(throwable: Throwable): Boolean = !isTerminalOpenFailure(throwable)
 
+internal typealias MediaUploader =
+    suspend (String, String, MediaUploadRequestFfi) -> MediaUploadResultFfi
+
+internal typealias MediaImetaTagsBuilder =
+    suspend (String, String, List<MediaAttachmentReferenceFfi>) -> List<MessageTagFfi>
+
+internal typealias MediaPublisher =
+    suspend (String, String, List<MediaAttachmentReferenceFfi>, String?) -> SendSummaryFfi
+
 class ConversationController(
     private val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
@@ -6785,6 +6806,17 @@ class ConversationController(
                 appState.marmotIo { sendText(account, groupIdHex, text) }
             }
         },
+    private val mediaUploader: MediaUploader = { account, groupIdHex, request ->
+        appState.marmotIo { uploadMedia(account, groupIdHex, request) }
+    },
+    private val mediaImetaTagsBuilder: MediaImetaTagsBuilder = { account, groupIdHex, references ->
+        appState.marmotIo {
+            references.map { reference -> buildMediaImetaTag(account, groupIdHex, reference) }
+        }
+    },
+    private val mediaPublisher: MediaPublisher = { account, groupIdHex, references, caption ->
+        appState.marmotIo { sendMediaAttachments(account, groupIdHex, references, caption) }
+    },
 ) {
     var group by mutableStateOf(initialGroup)
         private set
@@ -8592,33 +8624,32 @@ class ConversationController(
                 // blobs (publish-only failure) — re-uploading would orphan
                 // duplicates on the Blossom server.
                 val references =
-                    retained.uploadedReferences ?: appState
-                        .marmotIo {
-                            uploadMedia(
-                                account,
-                                group.groupIdHex,
-                                MediaUploadRequestFfi(
-                                    attachments =
-                                        retained.attachments.map { attachment ->
-                                            MediaUploadAttachmentRequestFfi(
-                                                fileName = attachment.fileName,
-                                                mediaType = attachment.mediaType,
-                                                plaintext = attachment.plaintextBytes,
-                                                dim = attachment.dim,
-                                                thumbhash = attachment.thumbhash,
-                                            )
-                                        },
-                                    caption = retained.caption,
-                                    send = false,
-                                    blossomServer = null,
-                                ),
-                            ).attachments.map { it.reference }.also { uploaded ->
-                                if (uploaded.size != retained.attachments.size) {
-                                    error(
-                                        "media upload returned ${uploaded.size} references " +
-                                            "for ${retained.attachments.size} attachments",
+                    retained.uploadedReferences ?: mediaUploader(
+                        account,
+                        group.groupIdHex,
+                        MediaUploadRequestFfi(
+                            attachments =
+                                retained.attachments.map { attachment ->
+                                    MediaUploadAttachmentRequestFfi(
+                                        fileName = attachment.fileName,
+                                        mediaType = attachment.mediaType,
+                                        plaintext = attachment.plaintextBytes,
+                                        dim = attachment.dim,
+                                        thumbhash = attachment.thumbhash,
                                     )
-                                }
+                                },
+                            caption = retained.caption,
+                            send = false,
+                            blossomServer = null,
+                        ),
+                    ).attachments
+                        .map { it.reference }
+                        .also { uploaded ->
+                            if (uploaded.size != retained.attachments.size) {
+                                error(
+                                    "media upload returned ${uploaded.size} references " +
+                                        "for ${retained.attachments.size} attachments",
+                                )
                             }
                         }.also { retained.uploadedReferences = it }
                 // Discard window #1: blobs uploaded but not yet published. If the
@@ -8639,17 +8670,10 @@ class ConversationController(
                 // MarmotKit owns the encrypted-media wire format. Build the
                 // optimistic bridge tags through the same native API that
                 // validates and publishes the projected attachments.
-                val imetaTags =
-                    appState.marmotIo {
-                        references.map { reference ->
-                            buildMediaImetaTag(account, group.groupIdHex, reference)
-                        }
-                    }
+                val imetaTags = mediaImetaTagsBuilder(account, group.groupIdHex, references)
                 val summary =
                     appState.withGroupCommitLock(account, group.groupIdHex) {
-                        appState.marmotIo {
-                            sendMediaAttachments(account, group.groupIdHex, references, retained.caption)
-                        }
+                        mediaPublisher(account, group.groupIdHex, references, retained.caption)
                     }
                 completeDurableAcceptance(key)
                 if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {

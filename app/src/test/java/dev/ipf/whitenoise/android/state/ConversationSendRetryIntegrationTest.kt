@@ -234,14 +234,11 @@ class ConversationSendRetryIntegrationTest {
         runTest {
             val appState = appState()
             val chatsController =
-                ChatsController(
+                attachedChatsController(
                     appState = appState,
-                    initialAccountRef = ACCOUNT_REF,
-                    memberSnapshotLoader = { _, _ -> emptyList() },
+                    accountRef = ACCOUNT_REF,
+                    row = chatListRow(),
                 )
-            appState.attachChatsController(chatsController)
-            chatsController.setChatListVisible(false)
-            chatsController.applyChatListRow(chatListRow())
             val controller =
                 ConversationController(
                     appState = appState,
@@ -275,12 +272,12 @@ class ConversationSendRetryIntegrationTest {
             )
 
             chatsController.setChatListVisible(false)
-            controller.testApplyLiveTimelineChangesAndRegisterStreams(
-                listOf(
-                    TimelineMessageChangeFfi.Upsert(
-                        trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
-                        message = projectedMessage(recordedAt = 20uL, retentionSeconds = null, retentionExpiresAt = null),
-                    ),
+            applyProjection(
+                controller,
+                projectedMessage(
+                    recordedAt = 20uL,
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
                 ),
             )
             chatsController.setChatListVisible(true)
@@ -604,7 +601,12 @@ class ConversationSendRetryIntegrationTest {
                     sender = ACCOUNT_ID,
                     senderDisplayName = null,
                     plaintext = "before send",
-                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
+                    contentTokens =
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks = emptyList(),
+                            blankLinesBefore = ByteArray(0),
+                        ),
                     kind = 9uL,
                     timelineAt = 10uL,
                     deleted = false,
@@ -684,4 +686,33 @@ class ConversationSendRetryIntegrationTest {
         val GROUP_ID = "b2".repeat(32)
         val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
     }
+}
+
+private fun attachedChatsController(
+    appState: WhiteNoiseAppState,
+    accountRef: String,
+    row: ChatListRowFfi,
+): ChatsController =
+    ChatsController(
+        appState = appState,
+        initialAccountRef = accountRef,
+        memberSnapshotLoader = { _, _ -> emptyList() },
+    ).also { chatsController ->
+        appState.attachChatsController(chatsController)
+        chatsController.setChatListVisible(false)
+        chatsController.applyChatListRow(row)
+    }
+
+private fun applyProjection(
+    controller: ConversationController,
+    message: TimelineMessageRecordFfi,
+) {
+    controller.testApplyLiveTimelineChangesAndRegisterStreams(
+        listOf(
+            TimelineMessageChangeFfi.Upsert(
+                trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                message = message,
+            ),
+        ),
+    )
 }
