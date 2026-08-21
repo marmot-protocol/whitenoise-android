@@ -142,11 +142,6 @@ internal fun conversationControllerAccountRef(
     activeAccountRef: String?,
 ): String? = selectedPinnedAccountRef ?: pendingAccountRef ?: exitingAccountRef ?: activeAccountRef
 
-internal fun selectedConversationAccountRef(
-    pinnedAccountRef: String?,
-    activeAccountRef: String?,
-): String? = pinnedAccountRef ?: activeAccountRef
-
 internal fun retainedConversationContentBelongsToRoute(
     contentAccountRef: String,
     activeAccountRef: String?,
@@ -1239,8 +1234,10 @@ internal fun MainShell(
         appState.setActiveConversation(
             accountRef =
                 selectedChat?.let {
-                    selectedConversationAccountRef(
-                        pinnedAccountRef = selectedChatOpenContext.pinnedAccountRef,
+                    conversationControllerAccountRef(
+                        selectedPinnedAccountRef = selectedChatOpenContext.pinnedAccountRef,
+                        pendingAccountRef = null,
+                        exitingAccountRef = null,
                         activeAccountRef = appState.activeAccountRef,
                     )
                 },

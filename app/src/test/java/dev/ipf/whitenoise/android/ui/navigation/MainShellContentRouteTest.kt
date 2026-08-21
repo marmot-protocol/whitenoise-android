@@ -189,8 +189,10 @@ class MainShellContentRouteTest {
     fun selectedNotificationConversationKeepsItsPinnedAccountUntilTheSwitchLands() {
         assertEquals(
             "account-b",
-            selectedConversationAccountRef(
-                pinnedAccountRef = "account-b",
+            conversationControllerAccountRef(
+                selectedPinnedAccountRef = "account-b",
+                pendingAccountRef = null,
+                exitingAccountRef = null,
                 activeAccountRef = "account-a",
             ),
         )
@@ -200,8 +202,10 @@ class MainShellContentRouteTest {
     fun ordinarySelectedConversationUsesTheActiveAccount() {
         assertEquals(
             "account-a",
-            selectedConversationAccountRef(
-                pinnedAccountRef = null,
+            conversationControllerAccountRef(
+                selectedPinnedAccountRef = null,
+                pendingAccountRef = null,
+                exitingAccountRef = null,
                 activeAccountRef = "account-a",
             ),
         )

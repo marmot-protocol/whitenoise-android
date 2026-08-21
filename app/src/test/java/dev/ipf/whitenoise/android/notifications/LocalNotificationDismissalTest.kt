@@ -9,7 +9,7 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import dev.ipf.whitenoise.android.state.dismissConversationNotificationsOnOpen
-import dev.ipf.whitenoise.android.ui.navigation.selectedConversationAccountRef
+import dev.ipf.whitenoise.android.ui.navigation.conversationControllerAccountRef
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -175,8 +175,10 @@ class LocalNotificationDismissalTest {
                 notificationManager.activeNotifications
             }
         val visibleAccount =
-            selectedConversationAccountRef(
-                pinnedAccountRef = targetAccount,
+            conversationControllerAccountRef(
+                selectedPinnedAccountRef = targetAccount,
+                pendingAccountRef = null,
+                exitingAccountRef = null,
                 activeAccountRef = sourceAccount,
             )
 
