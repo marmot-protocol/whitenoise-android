@@ -7166,6 +7166,7 @@ class ConversationController(
     @VisibleForTesting
     internal fun markAuthoritativeTimelinePublishedForTest() {
         hasPublishedAuthoritativeTimeline = true
+        initialTimelineSeedActive = false
     }
 
     /** Local sender metadata needed for a settled first presentation is ready. */
@@ -10767,7 +10768,7 @@ class ConversationController(
         var loadedPageCount = 0
         while (
             ReplyNavigation.shouldLoadOlder(
-                targetLoaded = timelineRecords.containsKey(messageIdHex),
+                targetLoaded = renderedTimelineContains(messageIdHex),
                 hasMoreBefore = hasMoreBefore,
                 loadedPageCount = loadedPageCount,
                 maxOlderPages = maxOlderPages,
@@ -10776,8 +10777,11 @@ class ConversationController(
             if (!loadOlderPage()) break
             loadedPageCount += 1
         }
-        return timelineRecords.containsKey(messageIdHex)
+        return renderedTimelineContains(messageIdHex)
     }
+
+    private fun renderedTimelineContains(messageIdHex: String): Boolean =
+        timeline.any { message -> message.record.messageIdHex.equals(messageIdHex, ignoreCase = true) }
 
     /**
      * Page the exact chat-list first-unread boundary into the initial window.
@@ -10874,6 +10878,10 @@ class ConversationController(
     /** Read a raw message record from the in-memory window or recent store tail. */
     private suspend fun lookupMessageRecord(messageIdHex: String): AppMessageRecordFfi? {
         messageById[messageIdHex]?.let { return it }
+        timeline
+            .firstOrNull { message -> message.record.messageIdHex.equals(messageIdHex, ignoreCase = true) }
+            ?.record
+            ?.let { return it }
         val account = conversationAccountRef ?: return null
         return runCatchingCancellable {
             withContext(Dispatchers.IO) {

@@ -289,14 +289,31 @@ internal fun ProfileGroupForegroundCoordinator(
 
 internal fun nextNotificationConversationOpenContext(
     current: ConversationOpenContext,
+    focusMessageId: String? = null,
     notificationRouteTraceRequestId: Long? = null,
     pinnedAccountRef: String? = null,
 ): ConversationOpenContext =
     ConversationOpenContext(
+        focusMessageId = focusMessageId,
+        focusMessageRequestId = current.focusMessageRequestId + 1L,
         notificationOpenRequestId = current.notificationOpenRequestId + 1L,
         notificationRouteTraceRequestId = notificationRouteTraceRequestId,
         pinnedAccountRef = pinnedAccountRef,
     )
+
+internal fun cancelNotificationLoadingRoute(
+    target: NotificationTarget?,
+    requestId: Long,
+    onHandled: (NotificationTarget, Long) -> Unit,
+    finishTrace: (Long) -> Unit,
+    onSettled: (Long) -> Unit,
+): Boolean {
+    val currentTarget = target ?: return false
+    onHandled(currentTarget, requestId)
+    finishTrace(requestId)
+    onSettled(requestId)
+    return true
+}
 
 internal enum class MainShellContentRoute {
     Conversation,
@@ -324,6 +341,7 @@ internal fun MainShell(
     inboundNotificationTarget: NotificationTarget? = null,
     inboundNotificationRequestId: Long = 0L,
     onNotificationTargetHandled: (NotificationTarget, Long) -> Unit = { _, _ -> },
+    onNotificationRouteSettled: (Long) -> Unit = {},
     inboundShareRequest: ShareRequest? = null,
     onShareRequestHandled: (ShareRequest) -> Unit = {},
     inboundAppUpdateTap: Int = 0,
@@ -395,7 +413,11 @@ internal fun MainShell(
     // (switching account / awaiting its chat list). Holds a single stable loading
     // state over the multi-step route so the chat list never paints as an
     // intermediate stop between the account switch and the opened conversation.
-    var routingNotification by remember { mutableStateOf(false) }
+    // A recreated Activity restores the lightweight pending route before this
+    // composition starts. Begin behind the loading gate in that case so the
+    // saved group-id restore cannot expose an ordinary unread/newest frame
+    // before the exact notification request is re-applied.
+    var routingNotification by remember { mutableStateOf(inboundNotificationTarget != null) }
     // Tracks whether an in-flight group-create completion may still open its
     // conversation. Explicit shell navigation advances [navigationGeneration]
     // and invalidates a captured pending generation (issue #1953).
@@ -693,7 +715,10 @@ internal fun MainShell(
                 exactPreloadReady = exactPreloadState is NotificationMessagePreloadState.Ready,
             )
 
-        fun commitNotificationConversationOpen(chatItem: ChatListItem) {
+        fun commitNotificationConversationOpen(
+            chatItem: ChatListItem,
+            focusMessageIdHex: String?,
+        ) {
             sectionName = MainSection.Chats.name
             settingsDetailName = null
             shellNavState =
@@ -713,6 +738,7 @@ internal fun MainShell(
             selectedChatOpenContext =
                 nextNotificationConversationOpenContext(
                     current = selectedChatOpenContext,
+                    focusMessageId = focusMessageIdHex,
                     notificationRouteTraceRequestId = routingRequestId,
                     pinnedAccountRef = pinnedAccountRef,
                 )
@@ -727,6 +753,12 @@ internal fun MainShell(
                 requestId = routingRequestId,
                 sectionName = NotificationRouteTraceSection.FIRST_CONVERSATION_FRAME,
             )
+            if (focusMessageIdHex != null) {
+                NotificationRouteTrace.beginPhase(
+                    requestId = routingRequestId,
+                    sectionName = NotificationRouteTraceSection.INITIAL_ANCHOR,
+                )
+            }
             selectedChat = chatItem
             routingNotification = false
             onNotificationTargetHandled(target, routingRequestId)
@@ -848,12 +880,17 @@ internal fun MainShell(
                             loadTarget = {
                                 NotificationRouteTrace.tracePhase(
                                     requestId = routingRequestId,
-                                    sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
+                                    sectionName = NotificationRouteTraceSection.TARGETED_PRELOAD,
                                 ) {
-                                    appState.preloadNotificationChatListItem(
-                                        accountRef = preloadKey.accountRef,
-                                        groupIdHex = preloadKey.groupIdHex,
-                                    )
+                                    NotificationRouteTrace.tracePhase(
+                                        requestId = routingRequestId,
+                                        sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
+                                    ) {
+                                        appState.preloadNotificationChatListItem(
+                                            accountRef = preloadKey.accountRef,
+                                            groupIdHex = preloadKey.groupIdHex,
+                                        )
+                                    }
                                 }
                             },
                             activateAccount = activateAccount,
@@ -888,6 +925,7 @@ internal fun MainShell(
                         }
                         onNotificationTargetHandled(target, routingRequestId)
                         NotificationRouteTrace.finishRequest(routingRequestId)
+                        onNotificationRouteSettled(routingRequestId)
                     }
                 }
                 appState.launchMutation {
@@ -913,7 +951,7 @@ internal fun MainShell(
                     NotificationMessagePreloadState.Loading -> Unit
                     is NotificationMessagePreloadState.Ready -> {
                         markNotificationTargetRead()
-                        commitNotificationConversationOpen(preloadState.item)
+                        commitNotificationConversationOpen(preloadState.item, target.messageIdHex)
                     }
                     NotificationMessagePreloadState.Failed -> {
                         // Do not immediately repeat a failed local read. Keep the
@@ -938,7 +976,7 @@ internal fun MainShell(
                         ) {
                             is NotificationMessageDirectLoadOutcome.OpenConversation -> {
                                 markNotificationTargetRead()
-                                commitNotificationConversationOpen(outcome.item)
+                                commitNotificationConversationOpen(outcome.item, target.messageIdHex)
                             }
                             NotificationMessageDirectLoadOutcome.AwaitChatList -> {
                                 // A transient local-read failure does not consume the tap;
@@ -973,7 +1011,7 @@ internal fun MainShell(
                     )
                 ) {
                     NotificationInviteAuthoritativeOutcome.OpenConversation ->
-                        commitNotificationConversationOpen(requireNotNull(authoritativeItem))
+                        commitNotificationConversationOpen(requireNotNull(authoritativeItem), null)
                     NotificationInviteAuthoritativeOutcome.Unavailable ->
                         notificationInviteAuthoritativelyUnavailable = true
                     NotificationInviteAuthoritativeOutcome.Inconclusive -> {
@@ -993,11 +1031,13 @@ internal fun MainShell(
                         // cannot cancel the scroll-driven mark-read before it
                         // reaches the store (#1016).
                         if (step.readThroughMessageIdHex != null) markNotificationTargetRead()
-                        commitNotificationConversationOpen(item)
+                        commitNotificationConversationOpen(item, step.focusMessageIdHex)
                     }
                     ?: run {
                         routingNotification = false
                         onNotificationTargetHandled(target, routingRequestId)
+                        NotificationRouteTrace.finishRequest(routingRequestId)
+                        onNotificationRouteSettled(routingRequestId)
                     }
             }
             NotificationNavStep.MissingAccount -> {
@@ -1006,6 +1046,7 @@ internal fun MainShell(
                 appState.present(R.string.toast_notification_account_unavailable)
                 onNotificationTargetHandled(target, routingRequestId)
                 NotificationRouteTrace.finishRequest(routingRequestId)
+                onNotificationRouteSettled(routingRequestId)
             }
             NotificationNavStep.MissingConversation -> {
                 routingNotification = false
@@ -1013,6 +1054,7 @@ internal fun MainShell(
                 appState.present(R.string.toast_notification_conversation_unavailable)
                 onNotificationTargetHandled(target, routingRequestId)
                 NotificationRouteTrace.finishRequest(routingRequestId)
+                onNotificationRouteSettled(routingRequestId)
             }
         }
     }
@@ -1757,7 +1799,12 @@ internal fun MainShell(
                                     requestId = requestId,
                                     sectionName = NotificationRouteTraceSection.FIRST_CONVERSATION_FRAME,
                                 )
+                                NotificationRouteTrace.endPhase(
+                                    requestId = requestId,
+                                    sectionName = NotificationRouteTraceSection.INITIAL_ANCHOR,
+                                )
                                 NotificationRouteTrace.finishRequest(requestId)
+                                onNotificationRouteSettled(requestId)
                             }
                         },
                         justCreated = content.justCreated,
@@ -1791,6 +1838,7 @@ internal fun MainShell(
                             // for an already-finished request.
                             content.openContext.notificationRouteTraceRequestId?.let {
                                 NotificationRouteTrace.finishRequest(it)
+                                onNotificationRouteSettled(it)
                             }
                             exitingConversationContent = content
                             selectedChat = null
@@ -1804,6 +1852,19 @@ internal fun MainShell(
                     // A notification tap on a non-active account resolves in steps
                     // (switch account → await its chat list → open conversation). Keep
                     // one loading surface over that whole route.
+                    BackHandler(enabled = inboundNotificationTarget != null) {
+                        val requestId = inboundNotificationRequestId
+                        notificationMessagePreload = null
+                        notificationEarlyOpenRequestId = 0L
+                        routingNotification = false
+                        cancelNotificationLoadingRoute(
+                            target = inboundNotificationTarget,
+                            requestId = requestId,
+                            onHandled = onNotificationTargetHandled,
+                            finishTrace = NotificationRouteTrace::finishRequest,
+                            onSettled = onNotificationRouteSettled,
+                        )
+                    }
                     LoadingScreen()
                 }
                 MainShellContentRoute.TtsReturnTransition -> {

@@ -107,7 +107,11 @@ private val TOP_BAR_OTHER_ACCOUNT_UNREAD_DOT_SIZE = 10.dp
 
 internal const val OTHER_ACCOUNT_AVATAR_TAG_PREFIX = "other-account-avatar-"
 
+internal const val ACTIVE_ACCOUNT_AVATAR_TAG_PREFIX = "active-account-avatar-"
+
 internal const val OTHER_ACCOUNT_UNREAD_DOT_TAG_PREFIX = "other-account-unread-dot-"
+
+internal fun activeAccountAvatarTag(accountLabel: String): String = "$ACTIVE_ACCOUNT_AVATAR_TAG_PREFIX$accountLabel"
 
 internal fun otherAccountAvatarTag(accountLabel: String): String = "$OTHER_ACCOUNT_AVATAR_TAG_PREFIX$accountLabel"
 

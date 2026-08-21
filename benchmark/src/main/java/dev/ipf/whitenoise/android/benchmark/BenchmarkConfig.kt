@@ -21,6 +21,23 @@ internal object BenchmarkConfig {
     val notificationText: String?
         get() = arguments.getString("notificationText")?.trim()?.takeIf(String::isNotEmpty)
 
+    val notificationSourceAccountRef: String?
+        get() = arguments.getString("notificationSourceAccountRef")?.trim()?.takeIf(String::isNotEmpty)
+
+    val notificationTexts: List<String>
+        get() = fixtureList("notificationTexts").ifEmpty { listOfNotNull(notificationText) }
+
+    val notificationMessageTexts: List<String>
+        get() = fixtureList("notificationMessageTexts")
+
+    private fun fixtureList(argumentName: String): List<String> =
+        arguments
+            .getString(argumentName)
+            .orEmpty()
+            .split(NOTIFICATION_SAMPLE_DELIMITER)
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+
     fun requireFixture(
         value: String?,
         argumentName: String,
@@ -42,4 +59,6 @@ internal object BenchmarkConfig {
                 "-Pandroid.testInstrumentationRunnerArguments.$argumentName=<value> " +
                 "after preparing the authenticated dev fixture."
         }
+
+    private const val NOTIFICATION_SAMPLE_DELIMITER = ";;"
 }

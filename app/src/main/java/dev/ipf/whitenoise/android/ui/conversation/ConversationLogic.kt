@@ -49,6 +49,22 @@ internal fun shouldRestoreConversationScrollSnapshot(
         notificationOpenRequestId == 0L &&
         entryUnreadCount <= 0
 
+/** Whether an exact notification target must position the hidden initial transcript. */
+internal fun notificationFocusOwnsInitialConversationAnchor(
+    notificationOpenRequestId: Long,
+    focusMessageId: String?,
+    focusMessageRequestId: Long,
+    fallbackRequestId: Long,
+    ttsFocusSessionId: Long?,
+): Boolean =
+    notificationOpenRequestId != 0L &&
+        !focusMessageId.isNullOrBlank() &&
+        focusMessageRequestId != fallbackRequestId &&
+        ttsFocusSessionId == null
+
+/** Exact focus may resolve only after MDK publishes the authoritative window. */
+internal fun notificationFocusTimelineReady(authoritativeTimelinePublished: Boolean): Boolean = authoritativeTimelinePublished
+
 internal fun conversationScrollKey(
     accountRef: String?,
     groupIdHex: String,

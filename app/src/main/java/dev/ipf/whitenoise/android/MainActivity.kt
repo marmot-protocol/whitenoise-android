@@ -29,7 +29,10 @@ import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
+import dev.ipf.whitenoise.android.notifications.PendingNotificationRoute
 import dev.ipf.whitenoise.android.notifications.inboundNotificationHandledMatchesCurrent
+import dev.ipf.whitenoise.android.notifications.putNotificationRouteState
+import dev.ipf.whitenoise.android.notifications.restoreNotificationRouteState
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.parseShareRequest
@@ -50,6 +53,7 @@ class MainActivity : AppCompatActivity() {
     private var inboundProfilePayload by mutableStateOf<String?>(null)
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
     private var inboundNotificationRequestId by mutableStateOf(0L)
+    private var pendingNotificationRoute: PendingNotificationRoute? = null
     private var inboundShareRequest by mutableStateOf<ShareRequest?>(null)
     private var inboundAppUpdateTap by mutableStateOf(0)
     private var appUnlockPromptActive = false
@@ -79,6 +83,7 @@ class MainActivity : AppCompatActivity() {
         )
         notificationTapTokens = NotificationTapTokens.create(this)
         registerAmberSignerLauncher()
+        restoreNotificationRoute(savedInstanceState)
         consumeIntent(intent)
         enableEdgeToEdge()
         applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
@@ -116,6 +121,7 @@ class MainActivity : AppCompatActivity() {
                     inboundNotificationTarget = inboundNotificationTarget,
                     inboundNotificationRequestId = inboundNotificationRequestId,
                     onNotificationTargetHandled = ::handleNotificationTarget,
+                    onNotificationRouteSettled = ::handleNotificationRouteSettled,
                     inboundShareRequest = inboundShareRequest,
                     onShareRequestHandled = { handled ->
                         if (inboundShareRequest == handled) inboundShareRequest = null
@@ -130,7 +136,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun handleNotificationTarget(
+    internal fun handleNotificationTarget(
         handledTarget: NotificationTarget,
         handledRequestId: Long,
     ) {
@@ -143,6 +149,28 @@ class MainActivity : AppCompatActivity() {
             )
         ) {
             inboundNotificationTarget = null
+        }
+    }
+
+    internal fun handleNotificationRouteSettled(requestId: Long) {
+        if (pendingNotificationRoute?.requestId == requestId) {
+            pendingNotificationRoute = null
+        }
+    }
+
+    private fun supersedePendingNotificationRoute() {
+        pendingNotificationRoute?.requestId?.let(NotificationRouteTrace::finishRequest)
+        pendingNotificationRoute = null
+    }
+
+    private fun restoreNotificationRoute(savedInstanceState: Bundle?) {
+        val restored = savedInstanceState?.restoreNotificationRouteState() ?: return
+        inboundNotificationRequestId = restored.latestRequestId
+        pendingNotificationRoute = restored.pendingRoute
+        restored.pendingRoute?.let { route ->
+            inboundNotificationTarget = route.target
+            inboundNotificationRequestId = route.requestId
+            NotificationRouteTrace.startRequest(route.requestId)
         }
     }
 
@@ -185,6 +213,8 @@ class MainActivity : AppCompatActivity() {
      */
     private fun consumeIntent(intent: Intent?) {
         if (AppUpdateNavigation.isUpdateTap(intent)) {
+            inboundNotificationTarget = null
+            supersedePendingNotificationRoute()
             inboundAppUpdateTap += 1
             // One-shot, like the notification tap below: clear the stored intent so
             // activity recreation cannot replay the same update tap.
@@ -211,6 +241,13 @@ class MainActivity : AppCompatActivity() {
             )
         if (parsedTarget != null) {
             NotificationRouteTrace.startRequest(routing.notificationRequestId)
+            pendingNotificationRoute =
+                PendingNotificationRoute(
+                    target = parsedTarget,
+                    requestId = routing.notificationRequestId,
+                )
+        } else if (parsedShare != null || intent?.dataString != null) {
+            supersedePendingNotificationRoute()
         }
         inboundNotificationTarget = routing.notificationTarget
         inboundNotificationRequestId = routing.notificationRequestId
@@ -268,6 +305,14 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         consumeIntent(intent)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putNotificationRouteState(
+            latestRequestId = inboundNotificationRequestId,
+            pendingRoute = pendingNotificationRoute,
+        )
+        super.onSaveInstanceState(outState)
     }
 
     private fun requestAppUnlock() {

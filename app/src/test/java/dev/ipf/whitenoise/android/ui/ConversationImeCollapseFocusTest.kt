@@ -33,6 +33,7 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
@@ -46,6 +47,8 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_INITIAL_LOADING_TEST_TAG
@@ -140,6 +143,61 @@ class ConversationImeCollapseFocusTest {
             fontScale = 1.5f,
             layoutDirection = LayoutDirection.Rtl,
         )
+    }
+
+    @Test
+    fun exactNotificationTargetOwnsTheRealConversationScreensFirstReadableViewport() {
+        val appState = appState()
+        val group = group()
+        val messages = (1..12).map(::notificationTimelineMessage)
+        messages.forEach { message ->
+            appState.optimisticMessages(ACCOUNT_REF, GROUP_ID)[message.id] = message
+        }
+        val latestPreview = notificationPreview(messages.last())
+        val controller =
+            ConversationController(
+                appState = appState,
+                initialGroup = group,
+                initialTimelinePreview = latestPreview,
+            )
+        controller.markAuthoritativeTimelinePublishedForTest()
+        val chat =
+            ChatListItem(
+                group = group,
+                latest = null,
+                otherMemberAccount = null,
+                memberCount = 2,
+                memberSnapshot = null,
+                projection = cachedProjection(latestPreview),
+            )
+        var firstFrameCommitted = false
+        val originalTimeZone = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = false) {
+                    ConversationScreen(
+                        appState = appState,
+                        chat = chat,
+                        controller = controller,
+                        focusMessageId = NOTIFICATION_TARGET_ID,
+                        focusMessageRequestId = 1L,
+                        notificationOpenRequestId = 1L,
+                        onFirstFrameCommitted = { firstFrameCommitted = true },
+                        onBack = {},
+                    )
+                }
+            }
+
+            composeRule.waitUntil(timeoutMillis = 5_000) { firstFrameCommitted }
+            composeRule.onNodeWithText(NOTIFICATION_TARGET_TEXT).assertIsDisplayed()
+            composeRule
+                .onRoot()
+                .captureRoboImage("src/test/snapshots/conversation_notification_target_screen_first_frame_light.png")
+        } finally {
+            TimeZone.setDefault(originalTimeZone)
+            controller.onCleared()
+        }
     }
 
     /**
@@ -359,6 +417,54 @@ class ConversationImeCollapseFocusTest {
             deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
         )
 
+    private fun notificationTimelineMessage(index: Int): TimelineMessage {
+        val messageId = notificationMessageId(index)
+        val text = if (index == NOTIFICATION_TARGET_INDEX) NOTIFICATION_TARGET_TEXT else "Route context message $index"
+        return TimelineMessage(
+            id = "msg:$messageId",
+            record =
+                AppMessageRecordFfi(
+                    messageIdHex = messageId,
+                    direction = "received",
+                    groupIdHex = GROUP_ID,
+                    sender = NOTIFICATION_SENDER_ID,
+                    plaintext = text,
+                    contentTokens =
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks = emptyList(),
+                            blankLinesBefore = ByteArray(0),
+                        ),
+                    kind = 9uL,
+                    tags = emptyList(),
+                    sourceEpoch = null,
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
+                    recordedAt = index.toULong(),
+                    receivedAt = index.toULong(),
+                ),
+            status = MessageStatus.Received,
+            timelineOrder = index.toULong(),
+        )
+    }
+
+    private fun notificationPreview(message: TimelineMessage) =
+        ChatListMessagePreviewFfi(
+            messageIdHex = message.record.messageIdHex,
+            sender = message.record.sender,
+            senderDisplayName = "Route sender",
+            plaintext = message.record.plaintext,
+            contentTokens = message.record.contentTokens,
+            kind = message.record.kind,
+            timelineAt = message.timelineOrder,
+            deleted = false,
+            attachmentKind = null,
+            attachmentCount = 0u,
+            deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+        )
+
+    private fun notificationMessageId(index: Int): String = "%02x".format(index) + "00".repeat(31)
+
     private fun cachedProjection(preview: ChatListMessagePreviewFfi) =
         ChatListRowFfi(
             selfMembership = SelfMembershipFfi.MEMBER,
@@ -486,7 +592,11 @@ class ConversationImeCollapseFocusTest {
         const val ACCOUNT_REF = "personal"
         const val DRAFT = "draft text"
         const val CACHED_MESSAGE = "Cached hello on the first frame"
+        const val NOTIFICATION_TARGET_INDEX = 7
+        const val NOTIFICATION_TARGET_TEXT = "Exact notification target"
         val ACCOUNT_ID = "01" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
+        val NOTIFICATION_SENDER_ID = "02" + "00".repeat(31)
+        val NOTIFICATION_TARGET_ID = "07" + "00".repeat(31)
     }
 }

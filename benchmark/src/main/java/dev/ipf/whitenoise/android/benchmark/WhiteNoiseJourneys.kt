@@ -11,6 +11,15 @@ import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.onElementOrNull
 import androidx.test.uiautomator.textAsString
 
+internal data class NotificationRouteSample(
+    val durationMs: Long,
+    val conversationVisible: Boolean,
+    val exactTargetVisible: Boolean,
+) {
+    val succeeded: Boolean
+        get() = conversationVisible && exactTargetVisible
+}
+
 internal class WhiteNoiseJourneys {
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
@@ -122,17 +131,59 @@ internal class WhiteNoiseJourneys {
         waitForTag(PerformanceTags.OPEN_GROUP_DETAILS, NETWORK_STATE_TIMEOUT_MS)
     }
 
+    /** Restores the same non-target account before every notification sample. */
+    fun activateNotificationSourceAccount(accountRef: String) {
+        val activeAccountAvatarTag = "active-account-avatar-$accountRef"
+        if (findVisibleTag(activeAccountAvatarTag, NAVIGATION_SETTLE_TIMEOUT_MS) != null) return
+        val otherAccountAvatarTag = "other-account-avatar-$accountRef"
+        val avatar =
+            checkNotNull(findVisibleTag(otherAccountAvatarTag, NOTIFICATION_ROUTE_TIMEOUT_MS)) {
+                "Source account '$accountRef' is neither active nor available in the account switcher."
+            }
+        avatar.click()
+        waitForVisibleTag(activeAccountAvatarTag, NOTIFICATION_ROUTE_TIMEOUT_MS)
+        waitForVisibleTag(PerformanceTags.NEW_MESSAGE, NOTIFICATION_ROUTE_TIMEOUT_MS)
+        waitForVisibleTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED, NOTIFICATION_ROUTE_TIMEOUT_MS)
+        device.waitForIdle()
+    }
+
     /**
-     * Opens a real notification whose target belongs to a signed-in inactive account.
-     * The fixture owner must leave the source account active before starting the run.
+     * Opens a unique inactive-account notification and records whether its
+     * exact message became visible. The diagnostic ceiling is deliberately
+     * longer than the performance budget: a slow sample must reach aggregate
+     * reporting instead of aborting measureRepeated before median/p95/max are
+     * calculated.
      */
-    fun openSecondaryAccountNotification(notificationText: String): Long {
+    fun openSecondaryAccountNotification(
+        notificationText: String,
+        targetMessageText: String,
+    ): NotificationRouteSample {
         device.openNotification()
         val notification = waitForText(notificationText)
         val intentDeliveryApproximationMs = SystemClock.elapsedRealtime()
         notification.click()
-        waitForTag(PerformanceTags.OPEN_GROUP_DETAILS, NOTIFICATION_ROUTE_TIMEOUT_MS)
-        return SystemClock.elapsedRealtime() - intentDeliveryApproximationMs
+        val diagnosticDeadlineMs = intentDeliveryApproximationMs + NOTIFICATION_ROUTE_DIAGNOSTIC_TIMEOUT_MS
+        val conversation =
+            findVisibleTag(
+                PerformanceTags.OPEN_GROUP_DETAILS,
+                (diagnosticDeadlineMs - SystemClock.elapsedRealtime()).coerceAtLeast(0L),
+            )
+        val exactTarget =
+            if (conversation == null) {
+                null
+            } else {
+                device.onElementOrNull(
+                    timeoutMs = (diagnosticDeadlineMs - SystemClock.elapsedRealtime()).coerceAtLeast(0L),
+                ) {
+                    textAsString() == targetMessageText && isVisibleOnDisplay()
+                }
+            }
+        val durationMs = SystemClock.elapsedRealtime() - intentDeliveryApproximationMs
+        return NotificationRouteSample(
+            durationMs = durationMs,
+            conversationVisible = conversation != null,
+            exactTargetVisible = exactTarget != null,
+        )
     }
 
     fun returnToChatList() {
@@ -311,6 +362,7 @@ internal class WhiteNoiseJourneys {
         const val STARTUP_TIMEOUT_MS = 30_000L
         const val NETWORK_STATE_TIMEOUT_MS = 45_000L
         const val NOTIFICATION_ROUTE_TIMEOUT_MS = 10_000L
+        const val NOTIFICATION_ROUTE_DIAGNOSTIC_TIMEOUT_MS = 30_000L
         const val NAVIGATION_SETTLE_TIMEOUT_MS = 2_000L
         const val INPUT_METHOD_POLL_INTERVAL_MS = 100L
         const val CONVERSATION_SCROLL_PASSES = 4

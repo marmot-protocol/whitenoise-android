@@ -58,10 +58,11 @@ sealed interface NotificationNavStep {
      */
     data object AwaitInviteRow : NotificationNavStep
 
-    /** Ready: open this conversation and optionally persist its read-through cursor. */
+    /** Ready: open this conversation with independent read-through and visible-focus targets. */
     data class OpenConversation(
         val groupIdHex: String,
         val readThroughMessageIdHex: String?,
+        val focusMessageIdHex: String? = readThroughMessageIdHex,
     ) : NotificationNavStep
 
     /** Target account no longer exists locally — fall back to the chat list. */
@@ -128,7 +129,11 @@ fun resolveNotificationNav(
     }
     if (target.kind == NotificationTargetKind.MESSAGE) {
         if (target.groupIdHex in availableGroupIds) {
-            return NotificationNavStep.OpenConversation(target.groupIdHex, target.messageIdHex)
+            return NotificationNavStep.OpenConversation(
+                groupIdHex = target.groupIdHex,
+                readThroughMessageIdHex = target.messageIdHex,
+                focusMessageIdHex = target.messageIdHex,
+            )
         }
         return NotificationNavStep.MissingConversation
     }
@@ -142,7 +147,11 @@ fun resolveNotificationNav(
         if (!inviteRowMembershipOpenable) {
             return NotificationNavStep.MissingConversation
         }
-        return NotificationNavStep.OpenConversation(target.groupIdHex, target.messageIdHex)
+        return NotificationNavStep.OpenConversation(
+            groupIdHex = target.groupIdHex,
+            readThroughMessageIdHex = target.messageIdHex,
+            focusMessageIdHex = null,
+        )
     }
     return NotificationNavStep.AwaitInviteRow
 }

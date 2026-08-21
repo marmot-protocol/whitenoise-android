@@ -7,7 +7,9 @@ internal object NotificationRouteTraceSection {
     const val TOTAL = "WhiteNoise.notificationRoute.total"
     const val ACCOUNT_ACTIVATION = "WhiteNoise.notificationRoute.accountActivation"
     const val GROUP_DETAILS = "WhiteNoise.notificationRoute.groupDetails"
+    const val TARGETED_PRELOAD = "WhiteNoise.notificationRoute.targetedPreload"
     const val CONTROLLER_BIND = "WhiteNoise.notificationRoute.controllerBind"
+    const val INITIAL_ANCHOR = "WhiteNoise.notificationRoute.initialAnchor"
     const val FIRST_CONVERSATION_FRAME = "WhiteNoise.notificationRoute.firstConversationFrame"
 }
 

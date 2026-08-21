@@ -483,17 +483,17 @@ internal fun ConversationScreen(
     chat: ChatListItem,
     controller: ConversationController,
     onBack: () -> Unit,
-    // When opened from a chat-list message-body search hit (issue #290), the
-    // matched message id to scroll to and briefly highlight once the timeline
-    // has paged it in. Null for every normal open path.
+    // Explicit destination for chat-list search, notification, and TTS opens.
+    // Notification routing keeps this separate from its persisted read-through
+    // cursor so opening a tap cannot silently anchor somewhere else (#586).
     focusMessageId: String? = null,
     // Advances for repeated shell-level focus requests to the same message.
     focusMessageRequestId: Long = 0L,
     // Non-null only for a transport-body return to a live TTS session.
     ttsFocusSessionId: Long? = null,
     // Non-zero when opened by tapping a message notification. Each tap gets a
-    // fresh id so an already-mounted conversation re-runs its first-unread
-    // anchor; it also implies current membership while verification catches up.
+    // fresh id so an already-mounted conversation re-runs its initial anchor;
+    // it also implies current membership while verification catches up.
     notificationOpenRequestId: Long = 0L,
     onFirstFrameCommitted: () -> Unit = {},
     // True only when this conversation was just created in the same navigation
@@ -611,6 +611,7 @@ internal fun ConversationScreen(
         scrollRestore?.takeIf {
             it.anchorItemId.isNullOrBlank() && it.anchorMessageIdHex.isNullOrBlank()
         }
+    var notificationFocusFallbackRequestId by remember(controller) { mutableStateOf(Long.MIN_VALUE) }
     val firstFrameSeed =
         remember(controller, notificationOpenRequestId) {
             conversationFirstFrameSeedPresentation(
@@ -622,6 +623,14 @@ internal fun ConversationScreen(
                 notificationOpenRequestId = notificationOpenRequestId,
             )
         }
+    val notificationFocusOwnsInitialAnchor =
+        notificationFocusOwnsInitialConversationAnchor(
+            notificationOpenRequestId = notificationOpenRequestId,
+            focusMessageId = focusMessageId,
+            focusMessageRequestId = focusMessageRequestId,
+            fallbackRequestId = notificationFocusFallbackRequestId,
+            ttsFocusSessionId = ttsFocusSessionId,
+        )
     val listState =
         key(controller) {
             rememberLazyListState(
@@ -725,7 +734,6 @@ internal fun ConversationScreen(
         remember(controller, notificationOpenRequestId) {
             mutableStateOf(firstFrameSeed.anchorTailImmediately && !firstFrameSeed.awaitingAuthoritativeTimeline)
         }
-
     // First-frame completion waits for the initial anchor, not just one frame:
     // until anchoring commits, the transcript is still transparent, so an
     // earlier callback would understate readable-conversation latency. Every
@@ -2314,10 +2322,19 @@ internal fun ConversationScreen(
         controller,
         renderedTimeline.isNotEmpty(),
         notificationOpenRequestId,
+        focusMessageId,
+        focusMessageRequestId,
+        notificationFocusFallbackRequestId,
         entryProjectionAvailable,
         controller.initialTimelineSeedActive,
         navigationState.seedTailAwaitingAuthoritative,
     ) {
+        if (
+            notificationFocusOwnsInitialAnchor &&
+            notificationFocusFallbackRequestId != focusMessageRequestId
+        ) {
+            return@LaunchedEffect
+        }
         if (navigationState.seedTailAwaitingAuthoritative || controller.initialTimelineSeedActive) {
             return@LaunchedEffect
         }
@@ -2501,15 +2518,19 @@ internal fun ConversationScreen(
         }
     }
 
-    // Scroll-to-message for a chat-list message-body search hit (issue #290).
-    // Waits for the first-open anchor to settle, then pages the local timeline
-    // back until the matched message is materialized and scrolls to it with a
-    // brief highlight — the same affordance the reply-jump uses. Fires once
-    // per (chat.id, focusMessageId); a missing message (e.g. it was deleted
-    // between the search and the tap) just toasts and leaves the user at the
-    // normal anchor. Local-only: loadUntilMessageAvailable paginates the
-    // already-persisted store, never a relay fetch.
-    LaunchedEffect(controller, focusMessageId, focusMessageRequestId, ttsFocusSessionId) {
+    // Explicit destination for search, notification, and TTS opens. A message
+    // notification owns the *initial* hidden anchor: it pages and positions the
+    // exact logical target before the transcript becomes visible, avoiding an
+    // unread/newest flash. Search and TTS retain their post-open centered jump.
+    // Local-only: loadScrollNavigationTarget uses bounded, cancellable paging
+    // over the persisted store and resolves reaction events to their parent.
+    LaunchedEffect(
+        controller,
+        focusMessageId,
+        focusMessageRequestId,
+        ttsFocusSessionId,
+        notificationOpenRequestId,
+    ) {
         fun latestFocusMessageId(): String? {
             val sessionId = ttsFocusSessionId ?: return focusMessageId
             return appState
@@ -2523,9 +2544,19 @@ internal fun ConversationScreen(
         }
 
         var focus = latestFocusMessageId() ?: return@LaunchedEffect
-        // Let the initial unread/newest anchor run first so our scroll isn't
-        // immediately overwritten by it.
-        snapshotFlow { initialTimelineAnchored }.filter { it }.first()
+        if (notificationFocusOwnsInitialAnchor) {
+            // A preview that cannot seed the transcript (for example an
+            // attachment) starts with initialTimelineSeedActive=false even
+            // while the authoritative page is still loading. Exact
+            // notification focus must not search that empty controller.
+            snapshotFlow { notificationFocusTimelineReady(controller.hasPublishedAuthoritativeTimeline) }
+                .filter { it }
+                .first()
+        } else {
+            // Search/TTS opens let the ordinary unread/newest anchor settle
+            // before their visible centered jump.
+            snapshotFlow { initialTimelineAnchored }.filter { it }.first()
+        }
         var target = controller.loadScrollNavigationTarget(focus)
         val latestFocus = latestFocusMessageId()
         if (ttsFocusSessionId != null && latestFocus == null) return@LaunchedEffect
@@ -2536,6 +2567,9 @@ internal fun ConversationScreen(
         if (ttsFocusSessionId != null && latestFocusMessageId() != focus) return@LaunchedEffect
         if (target == null) {
             appState.present(R.string.toast_original_message_unavailable)
+            if (notificationFocusOwnsInitialAnchor) {
+                notificationFocusFallbackRequestId = focusMessageRequestId
+            }
             return@LaunchedEffect
         }
         val timelineIndex =
@@ -2544,6 +2578,9 @@ internal fun ConversationScreen(
                 .indexOfFirst { it.record.messageIdHex == target }
         if (timelineIndex < 0) {
             appState.present(R.string.toast_original_message_unavailable)
+            if (notificationFocusOwnsInitialAnchor) {
+                notificationFocusFallbackRequestId = focusMessageRequestId
+            }
             return@LaunchedEffect
         }
         val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
@@ -2554,7 +2591,25 @@ internal fun ConversationScreen(
                 1 + olderMessagesHeaderCount + timelineIndex,
                 ConversationScrollReason.FocusMessage,
             )
-        if (!centered) return@LaunchedEffect
+        if (!centered) {
+            if (notificationFocusOwnsInitialAnchor) {
+                notificationFocusFallbackRequestId = focusMessageRequestId
+            }
+            return@LaunchedEffect
+        }
+        if (notificationFocusOwnsInitialAnchor) {
+            val focusedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+            postInitialReanchorGate.commit(
+                structure =
+                    ConversationTimelineStructure(
+                        rowKeys = focusedTimeline.map { it.id to it.record.messageIdHex },
+                        olderHeaderCount = olderMessagesHeaderCount,
+                    ),
+                viewportHeight = listState.layoutInfo.viewportSize.height,
+            )
+            initialTimelineAnchored = true
+            navigationState.lastFollowedLatestId = focusedTimeline.lastOrNull()?.id
+        }
         showTransientMessageHighlight(target)
     }
 

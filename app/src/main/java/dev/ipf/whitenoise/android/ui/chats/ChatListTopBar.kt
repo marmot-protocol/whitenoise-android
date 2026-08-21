@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
+import dev.ipf.whitenoise.android.ui.account.activeAccountAvatarTag
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
@@ -161,6 +162,7 @@ internal fun ChatListTopBar(
                         pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
                         size = 44.dp,
                         onClick = onOpenSettings,
+                        modifier = Modifier.testTag(activeAccountAvatarTag(active?.label.orEmpty())),
                         // Per-account dot: light only when the active account
                         // itself has unread, same shared decision the other
                         // avatars use — not "some other account has unread" (#805).

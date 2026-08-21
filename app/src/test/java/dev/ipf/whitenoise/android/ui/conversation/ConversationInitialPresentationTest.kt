@@ -42,6 +42,62 @@ class ConversationInitialPresentationTest {
     }
 
     @Test
+    fun exactNotificationTargetOwnsTheHiddenInitialAnchor() {
+        assertTrue(
+            notificationFocusOwnsInitialConversationAnchor(
+                notificationOpenRequestId = 9L,
+                focusMessageId = "tapped-message",
+                focusMessageRequestId = 3L,
+                fallbackRequestId = Long.MIN_VALUE,
+                ttsFocusSessionId = null,
+            ),
+        )
+    }
+
+    @Test
+    fun exactNotificationFocusWaitsForAuthorityEvenWhenNoPreviewSeedIsActive() {
+        // Attachment/truncated/deleted previews produce no visual seed. That
+        // absence is not evidence that the authoritative timeline is ready.
+        assertFalse(notificationFocusTimelineReady(authoritativeTimelinePublished = false))
+        assertTrue(notificationFocusTimelineReady(authoritativeTimelinePublished = true))
+    }
+
+    @Test
+    fun missingTargetFallsBackToTheOrdinaryUnreadAnchorForThatRequestOnly() {
+        assertFalse(
+            notificationFocusOwnsInitialConversationAnchor(
+                notificationOpenRequestId = 9L,
+                focusMessageId = "missing-message",
+                focusMessageRequestId = 3L,
+                fallbackRequestId = 3L,
+                ttsFocusSessionId = null,
+            ),
+        )
+        assertTrue(
+            notificationFocusOwnsInitialConversationAnchor(
+                notificationOpenRequestId = 10L,
+                focusMessageId = "newer-message",
+                focusMessageRequestId = 4L,
+                fallbackRequestId = 3L,
+                ttsFocusSessionId = null,
+            ),
+        )
+    }
+
+    @Test
+    fun absentNotificationTargetPreservesTheOldestUnreadAnchor() {
+        assertFalse(
+            notificationFocusOwnsInitialConversationAnchor(
+                notificationOpenRequestId = 9L,
+                focusMessageId = null,
+                focusMessageRequestId = 3L,
+                fallbackRequestId = Long.MIN_VALUE,
+                ttsFocusSessionId = null,
+            ),
+        )
+    }
+
+    @Test
     fun seededTailIndexTargetsTheBottomSpacer() {
         assertTrue(seededConversationTailListIndex(1) == 2)
         assertTrue(seededConversationTailListIndex(4) == 5)
