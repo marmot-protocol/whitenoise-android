@@ -47,6 +47,7 @@ import java.lang.reflect.Proxy
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /** Full Compose-route regression coverage for the inactive-account race in #2191. */
 @RunWith(RobolectricTestRunner::class)
@@ -80,6 +81,28 @@ class NotificationAccountIsolationNavigationTest {
     @Test
     fun inactiveAccountTap_activationFinishesBeforePreload_preservesSourceAccountCards() {
         verifyInactiveAccountTapIsolation(preloadFinishesFirst = false)
+    }
+
+    @Test
+    fun ordinaryConversation_activeAccountChangeResynchronizesNotificationOwnership() {
+        val activeAccount = mutableStateOf(SOURCE_ACCOUNT)
+        val observedOwnership = AtomicReference<Pair<String?, String?>>()
+
+        composeRule.setContent {
+            ConversationNotificationOwnershipEffect(
+                selectedChatId = SHARED_GROUP,
+                selectedGroupIdHex = SHARED_GROUP,
+                selectedPinnedAccountRef = null,
+                activeAccountRef = activeAccount.value,
+                onOwnershipChanged = { accountRef, groupIdHex ->
+                    observedOwnership.set(accountRef to groupIdHex)
+                },
+            )
+        }
+
+        awaitCondition { observedOwnership.get() == (SOURCE_ACCOUNT to SHARED_GROUP) }
+        composeRule.runOnIdle { activeAccount.value = TARGET_ACCOUNT }
+        awaitCondition { observedOwnership.get() == (TARGET_ACCOUNT to SHARED_GROUP) }
     }
 
     private fun verifyInactiveAccountTapIsolation(preloadFinishesFirst: Boolean) {

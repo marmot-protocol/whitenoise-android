@@ -1230,19 +1230,13 @@ internal fun MainShell(
     // Follow the selection directly so a chat-to-chat switch never hops
     // through null — a notification update landing in that hop would beat
     // suppression and post for the conversation being opened.
-    LaunchedEffect(selectedChat?.id, selectedChatOpenContext.pinnedAccountRef) {
-        appState.setActiveConversation(
-            accountRef =
-                selectedChat?.let {
-                    conversationControllerAccountRef(
-                        selectedPinnedAccountRef = selectedChatOpenContext.pinnedAccountRef,
-                        pendingAccountRef = null,
-                        exitingAccountRef = null,
-                        activeAccountRef = appState.activeAccountRef,
-                    )
-                },
-            groupIdHex = selectedChat?.group?.groupIdHex,
-        )
+    ConversationNotificationOwnershipEffect(
+        selectedChatId = selectedChat?.id,
+        selectedGroupIdHex = selectedChat?.group?.groupIdHex,
+        selectedPinnedAccountRef = selectedChatOpenContext.pinnedAccountRef,
+        activeAccountRef = appState.activeAccountRef,
+    ) { accountRef, groupIdHex ->
+        appState.setActiveConversation(accountRef, groupIdHex)
     }
 
     // Upgrade a provisional open (targeted groupDetails read) to the
