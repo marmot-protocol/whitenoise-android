@@ -2404,6 +2404,11 @@ class WhiteNoiseAppState private constructor(
             observable = true,
         )
     private val optimisticMessagesByConversation = mutableMapOf<String, SnapshotStateMap<String, TimelineMessage>>()
+
+    // A failed optimistic send can be retried by a replacement controller after
+    // navigation. Keep its one-shot acceptance cleanup beside the retained row,
+    // under the same bounded conversation-state lifecycle.
+    private val durableAcceptanceCallbacksByConversation = mutableMapOf<String, MutableMap<String, () -> Unit>>()
     private val projectedMessageIdsByConversation = mutableMapOf<String, MutableSet<String>>()
     private val timelineOrderOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
     private val timelineTimestampOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
@@ -2815,6 +2820,15 @@ class WhiteNoiseAppState private constructor(
             optimisticMessagesByConversation.getOrPut(key) { mutableStateMapOf() }
         }
 
+    internal fun durableAcceptanceCallbacks(
+        accountRef: String?,
+        groupIdHex: String,
+    ): MutableMap<String, () -> Unit> =
+        synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            durableAcceptanceCallbacksByConversation.getOrPut(key) { mutableMapOf() }
+        }
+
     internal fun projectedMessageIds(
         accountRef: String?,
         groupIdHex: String,
@@ -2951,6 +2965,7 @@ class WhiteNoiseAppState private constructor(
 
     private fun removeConversationState(staleKey: String) {
         optimisticMessagesByConversation.remove(staleKey)
+        durableAcceptanceCallbacksByConversation.remove(staleKey)?.clear()
         projectedMessageIdsByConversation.remove(staleKey)
         timelineOrderOverridesByConversation.remove(staleKey)
         timelineTimestampOverridesByConversation.remove(staleKey)
@@ -5223,6 +5238,8 @@ class WhiteNoiseAppState private constructor(
             // LRU, so a signed-out account's sent plaintext lingered in memory.
             optimisticMessagesByConversation.values.forEach { it.clear() }
             optimisticMessagesByConversation.clear()
+            durableAcceptanceCallbacksByConversation.values.forEach { it.clear() }
+            durableAcceptanceCallbacksByConversation.clear()
             projectedMessageIdsByConversation.values.forEach { it.clear() }
             projectedMessageIdsByConversation.clear()
             timelineOrderOverridesByConversation.values.forEach { it.clear() }

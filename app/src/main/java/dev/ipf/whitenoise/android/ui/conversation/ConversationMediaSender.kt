@@ -432,9 +432,17 @@ internal class ConversationMediaSender(
                 return@launchMutation
             }
             onAccepted()
-            pendingDraftClear?.let(appState::clearDraftAfterSuccessfulSend)
             onAfterSend()
-            seeded.forEach { controller.uploadQueued(it) }
+            val clearDraftAfterDurableAcceptance: (() -> Unit)? =
+                pendingDraftClear?.let { pendingClear ->
+                    { appState.clearDraftAfterSuccessfulSend(pendingClear) }
+                }
+            seeded.forEachIndexed { index, queued ->
+                controller.uploadQueued(
+                    seeded = queued,
+                    onDurablyAccepted = if (index == 0) clearDraftAfterDurableAcceptance else null,
+                )
+            }
         }
     }
 

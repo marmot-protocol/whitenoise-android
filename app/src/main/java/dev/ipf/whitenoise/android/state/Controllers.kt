@@ -7061,7 +7061,8 @@ class ConversationController(
     private val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     private val timelineOrder = mutableListOf<String>()
     private val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
-    private val durableAcceptanceCallbacks = mutableMapOf<String, () -> Unit>()
+    private val durableAcceptanceCallbacks =
+        appState.durableAcceptanceCallbacks(conversationAccountRef, initialGroup.groupIdHex)
     private val initialTimeline =
         initialConversationTimeline(
             preview = initialTimelinePreview,
@@ -8505,13 +8506,21 @@ class ConversationController(
             receivedAt = now,
         )
 
-    /** Drive the upload + publish for a previously [queueAttachments]-seeded slot. */
-    suspend fun uploadQueued(seeded: QueuedAttachmentSend) {
+    /**
+     * Drive the upload + publish for a previously [queueAttachments]-seeded slot.
+     * [onDurablyAccepted] survives controller replacement and runs once MDK
+     * accepts the logical send, including accepted-pending ownership.
+     */
+    suspend fun uploadQueued(
+        seeded: QueuedAttachmentSend,
+        onDurablyAccepted: (() -> Unit)? = null,
+    ) {
         // `activeUploadKeys` was added at `queueAttachments` time so that
         // EVERY seeded slot — even the ones still waiting for an earlier
         // upload to finish — survives a dispose-time
         // `clearRetainedUploads`. Removal happens at performMediaUpload's
         // terminal paths.
+        onDurablyAccepted?.let { durableAcceptanceCallbacks.putIfAbsent(seeded.key, it) }
         performMediaUpload(seeded.account, seeded.key, seeded.tempId, seeded.optimisticOrder, seeded.optimistic)
     }
 
@@ -8542,6 +8551,7 @@ class ConversationController(
                 )
             ) {
                 optimisticMessages.remove(key)
+                durableAcceptanceCallbacks.remove(key)
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
                 retainedMediaUploads.remove(key)
@@ -8633,6 +8643,7 @@ class ConversationController(
                             sendMediaAttachments(account, group.groupIdHex, references, retained.caption)
                         }
                     }
+                completeDurableAcceptance(key)
                 if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
                     // MDK now owns a durable, unpublished media intent. It still
                     // returns the canonical app-event id, which lets a later

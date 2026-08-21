@@ -129,6 +129,46 @@ class ConversationSendRetryIntegrationTest {
         }
 
     @Test
+    fun successfulRetryFromReplacementControllerClearsTheInitiallyCapturedDraft() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("retry after navigation"))
+            val failedController =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        throw MarmotKitException.Publish("relay rejected event")
+                    },
+                )
+
+            appState.sendConversationText(failedController, "retry after navigation")
+            assertEquals("retry after navigation", appState.draftFor(GROUP_ID))
+            assertEquals(MessageStatus.Failed, failedController.timeline.single().status)
+
+            val replacementController =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        SendSummaryFfi(
+                            published = 1u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            replacementController.retryFailedSend(replacementController.timeline.single())
+
+            assertEquals(null, appState.draftFor(GROUP_ID))
+            assertEquals(MessageStatus.Sent, replacementController.timeline.single().status)
+        }
+
+    @Test
     fun acceptedPendingClearsTheCapturedComposerDraft() =
         runTest {
             val appState = appState()
@@ -374,6 +414,17 @@ class ConversationSendRetryIntegrationTest {
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,
+        )
+
+    private fun memberSnapshot() =
+        GroupMemberSnapshot(
+            listOf(
+                AppGroupMemberRecordFfi(
+                    memberIdHex = ACCOUNT_ID,
+                    account = ACCOUNT_REF,
+                    local = true,
+                ),
+            ),
         )
 
     private fun group(disappearingMessageSecs: ULong = 0uL) =
