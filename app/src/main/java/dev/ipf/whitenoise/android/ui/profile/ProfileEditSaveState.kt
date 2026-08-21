@@ -24,6 +24,45 @@ internal fun profileEditMetadata(
         lud16 = lud16.trim().ifBlank { null },
     )
 
+internal data class ProfileEditDraft(
+    val displayName: String = "",
+    val about: String = "",
+    val picture: String = "",
+    val banner: String = "",
+    val nip05: String = "",
+    val lud16: String = "",
+) {
+    fun metadata(): UserProfileMetadataFfi = profileEditMetadata(displayName, about, picture, banner, nip05, lud16)
+
+    fun mergeUntouchedFields(
+        loadStartedWith: ProfileEditDraft,
+        refreshed: ProfileEditDraft,
+    ): ProfileEditDraft =
+        ProfileEditDraft(
+            displayName = displayName.refreshIfUntouched(loadStartedWith.displayName, refreshed.displayName),
+            about = about.refreshIfUntouched(loadStartedWith.about, refreshed.about),
+            picture = picture.refreshIfUntouched(loadStartedWith.picture, refreshed.picture),
+            banner = banner.refreshIfUntouched(loadStartedWith.banner, refreshed.banner),
+            nip05 = nip05.refreshIfUntouched(loadStartedWith.nip05, refreshed.nip05),
+            lud16 = lud16.refreshIfUntouched(loadStartedWith.lud16, refreshed.lud16),
+        )
+}
+
+internal fun profileEditDraft(profile: UserProfileMetadataFfi?): ProfileEditDraft =
+    ProfileEditDraft(
+        displayName = profile?.displayName ?: profile?.name.orEmpty(),
+        about = profile?.about.orEmpty(),
+        picture = profile?.picture.orEmpty(),
+        banner = profile?.banner.orEmpty(),
+        nip05 = profile?.nip05.orEmpty(),
+        lud16 = profile?.lud16.orEmpty(),
+    )
+
+private fun String.refreshIfUntouched(
+    loadStartedWith: String,
+    refreshed: String,
+): String = if (this == loadStartedWith) refreshed else this
+
 @Stable
 internal class ProfileEditSaveState {
     private var baselineAccountId by mutableStateOf<String?>(null)

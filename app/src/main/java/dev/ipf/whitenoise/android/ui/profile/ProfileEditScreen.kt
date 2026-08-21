@@ -466,19 +466,36 @@ internal fun ProfileSaveButton(
 internal fun ProfileEditScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
+    cachedProfile: (String) -> UserProfileMetadataFfi? = appState::userProfileCached,
     loadProfile: suspend (String) -> UserProfileMetadataFfi? = appState::loadUserProfile,
     publishProfile: suspend (UserProfileMetadataFfi) -> Boolean = appState::publishProfile,
 ) {
     val active = appState.activeAccount
     val activeAccountId = active?.accountIdHex
-    val saveState = remember { ProfileEditSaveState() }
-    var displayName by remember(activeAccountId) { mutableStateOf("") }
-    var about by remember(activeAccountId) { mutableStateOf("") }
-    var imageDrafts by remember(activeAccountId) { mutableStateOf(ProfileImageDrafts()) }
+    val cachedDraft =
+        remember(appState, activeAccountId) {
+            activeAccountId?.let(cachedProfile)?.let(::profileEditDraft)
+        }
+    val initialDraft = cachedDraft ?: ProfileEditDraft()
+    val saveState =
+        remember(appState, activeAccountId) {
+            ProfileEditSaveState().apply {
+                beginLoad(activeAccountId)
+                if (activeAccountId != null && cachedDraft != null) {
+                    completeLoad(activeAccountId, cachedDraft.metadata())
+                }
+            }
+        }
+    var displayName by remember(appState, activeAccountId) { mutableStateOf(initialDraft.displayName) }
+    var about by remember(appState, activeAccountId) { mutableStateOf(initialDraft.about) }
+    var imageDrafts by
+        remember(appState, activeAccountId) {
+            mutableStateOf(ProfileImageDrafts(picture = initialDraft.picture, banner = initialDraft.banner))
+        }
     val picture = imageDrafts.picture
     val banner = imageDrafts.banner
-    var nip05 by remember(activeAccountId) { mutableStateOf("") }
-    var lud16 by remember(activeAccountId) { mutableStateOf("") }
+    var nip05 by remember(appState, activeAccountId) { mutableStateOf(initialDraft.nip05) }
+    var lud16 by remember(appState, activeAccountId) { mutableStateOf(initialDraft.lud16) }
     // In-flight / failed LNURL-pay resolution of the lud16 field (#795). The
     // error is a string resource id so the inline message can distinguish
     // "doesn't resolve" from "no network"; it clears on every edit.
@@ -490,6 +507,7 @@ internal fun ProfileEditScreen(
     var pictureUploadJob by remember(activeAccountId) { mutableStateOf<Job?>(null) }
     var bannerUploading by remember(activeAccountId) { mutableStateOf(false) }
     var bannerUploadJob by remember(activeAccountId) { mutableStateOf<Job?>(null) }
+    var profileContentReady by remember(appState, activeAccountId) { mutableStateOf(cachedDraft != null) }
     // Drives the avatar bottom sheet (pick-from-photos / paste-link / remove).
     // The picture URL no longer lives as a standalone editor row; it's edited
     // exclusively through this control so the editor reads like an app screen,
@@ -508,7 +526,6 @@ internal fun ProfileEditScreen(
     val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)
     val lud16Valid = ProfileFieldValidation.isAcceptableLud16(lud16)
     val currentMetadata = profileEditMetadata(displayName, about, picture, banner, nip05, lud16)
-    val profileLoaded = saveState.isLoadedFor(activeAccountId)
     val saveEnabled =
         !busy &&
             !pictureUploading &&
@@ -659,36 +676,28 @@ internal fun ProfileEditScreen(
 
     @Suppress("TooGenericExceptionCaught") // The injected or FFI profile reader can throw any non-cancellation failure.
     LaunchedEffect(activeAccountId) {
-        saveState.beginLoad(activeAccountId)
         val accountId = activeAccountId ?: return@LaunchedEffect
+        val loadStartedWith = ProfileEditDraft(displayName, about, picture, banner, nip05, lud16)
         try {
             val profile = loadProfile(accountId)
-            val loadedDisplayName = profile?.displayName ?: profile?.name ?: ""
-            val loadedAbout = profile?.about ?: ""
-            val loadedPicture = profile?.picture ?: ""
-            val loadedBanner = profile?.banner ?: ""
-            val loadedNip05 = profile?.nip05 ?: ""
-            val loadedLud16 = profile?.lud16 ?: ""
-            val loadedMetadata =
-                profileEditMetadata(
-                    loadedDisplayName,
-                    loadedAbout,
-                    loadedPicture,
-                    loadedBanner,
-                    loadedNip05,
-                    loadedLud16,
-                )
-            if (!saveState.completeLoad(accountId, loadedMetadata)) return@LaunchedEffect
-            displayName = loadedDisplayName
-            about = loadedAbout
-            imageDrafts = ProfileImageDrafts(picture = loadedPicture, banner = loadedBanner)
-            nip05 = loadedNip05
-            lud16 = loadedLud16
+            if (appState.activeAccount?.accountIdHex != accountId) return@LaunchedEffect
+            if (profile == null && cachedDraft != null) return@LaunchedEffect
+
+            val refreshed = profileEditDraft(profile)
+            val current = ProfileEditDraft(displayName, about, picture, banner, nip05, lud16)
+            val merged = current.mergeUntouchedFields(loadStartedWith, refreshed)
+            if (!saveState.completeLoad(accountId, refreshed.metadata())) return@LaunchedEffect
+            displayName = merged.displayName
+            about = merged.about
+            imageDrafts = ProfileImageDrafts(picture = merged.picture, banner = merged.banner)
+            nip05 = merged.nip05
+            lud16 = merged.lud16
+            profileContentReady = true
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            val emptyMetadata = profileEditMetadata("", "", "", "", "", "")
-            if (saveState.completeLoad(accountId, emptyMetadata)) {
+            if (appState.activeAccount?.accountIdHex == accountId) {
+                profileContentReady = true
                 appState.presentFailure(
                     R.string.toast_couldnt_load_profile,
                     "PROFILE_EDIT_LOAD",
@@ -748,7 +757,7 @@ internal fun ProfileEditScreen(
                         bannerUrl = safeBannerUrl,
                         bannerValid = bannerValid,
                         bannerUploading = bannerUploading,
-                        contentReady = profileLoaded,
+                        contentReady = profileContentReady,
                         avatarImageAvailable = avatarImageAvailable,
                         pictureInvalid =
                             picture.isNotBlank() &&
