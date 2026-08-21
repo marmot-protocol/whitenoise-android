@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -212,12 +213,18 @@ internal fun MediaImageBubble(
     // Auto-download gating (#10): own messages always render (bytes are cached
     // from the send), incoming honor the policy. Keyed on the policy so
     // flipping the setting re-gates undownloaded bubbles.
-    var startDownload by remember(key, attachmentIndex, appState.mediaAutoDownloadMatrix) {
+    val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    var startDownload by remember(
+        key,
+        attachmentIndex,
+        appState.mediaAutoDownloadMatrix,
+        automaticDownloadsPaused,
+    ) {
         mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image))
     }
     var interactiveDownloadRequested by remember(key, attachmentIndex) { mutableStateOf(false) }
 
-    LaunchedEffect(key, attachmentIndex, epoch, startDownload, reloadToken) {
+    LaunchedEffect(key, attachmentIndex, epoch, startDownload, reloadToken, interactiveDownloadRequested) {
         if (presentation != null) return@LaunchedEffect // already have decoded pixels
         if (!startDownload) return@LaunchedEffect
         // Own optimistic sends still have their bytes only in the pending list
@@ -351,11 +358,22 @@ internal fun MediaImageBubble(
                                 },
                             )
                         else ->
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(28.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier =
+                                    Modifier
+                                        .size(48.dp)
+                                        .clickable(
+                                            onClickLabel = stringResource(R.string.media_tap_to_download),
+                                            onClick = { interactiveDownloadRequested = true },
+                                        ),
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(28.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                     }
             }
             if (uploading) {
@@ -588,12 +606,17 @@ internal fun MediaImageGridTile(
     // policy applies to album tiles too. Outgoing tiles (`mine`) always
     // download because the bytes are seeded from the send. Re-keyed on
     // the policy so flipping the setting re-gates undownloaded tiles.
-    var startDownload by remember(tileSlot, appState.mediaAutoDownloadMatrix) {
+    val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    var startDownload by remember(
+        tileSlot,
+        appState.mediaAutoDownloadMatrix,
+        automaticDownloadsPaused,
+    ) {
         mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image))
     }
     var interactiveDownloadRequested by remember(tileSlot) { mutableStateOf(false) }
 
-    LaunchedEffect(decodeKey, startDownload, reloadToken) {
+    LaunchedEffect(decodeKey, startDownload, reloadToken, interactiveDownloadRequested) {
         if (presentation != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
         val pendingBytes =
@@ -665,6 +688,8 @@ internal fun MediaImageGridTile(
                         interactiveDownloadRequested = true
                         failed = false
                         reloadToken++
+                    } else {
+                        interactiveDownloadRequested = true
                     }
                 },
             ),
@@ -702,6 +727,7 @@ internal fun MediaImageGridTile(
                             icon = Icons.Default.Refresh,
                             contentDescription = stringResource(R.string.media_tap_to_retry),
                             onClick = {
+                                interactiveDownloadRequested = true
                                 failed = false
                                 reloadToken++
                             },
@@ -710,7 +736,10 @@ internal fun MediaImageGridTile(
                         MediaCircleAction(
                             icon = Icons.Default.ArrowDownward,
                             contentDescription = stringResource(R.string.media_tap_to_download),
-                            onClick = { startDownload = true },
+                            onClick = {
+                                interactiveDownloadRequested = true
+                                startDownload = true
+                            },
                         )
                     else ->
                         CircularProgressIndicator(

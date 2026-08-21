@@ -15,11 +15,18 @@ internal class AttachmentDownloadIntentStore(
 
     fun isAutomaticPaused(accountRef: String): Boolean = accountToken(accountRef) in readSet(PAUSED_ACCOUNTS)
 
-    fun markInteractive(request: AttachmentTransferRequest) = updateSet(INTERACTIVE_IDENTITIES) { it + requestToken(request) }
+    fun setInteractive(
+        request: AttachmentTransferRequest,
+        interactive: Boolean,
+    ) = updateSet(INTERACTIVE_IDENTITIES) { identities ->
+        val token = requestToken(request)
+        if (interactive) identities + token else identities - token
+    }
 
-    fun clearInteractive(request: AttachmentTransferRequest) = updateSet(INTERACTIVE_IDENTITIES) { it - requestToken(request) }
-
-    fun isInteractive(request: AttachmentTransferRequest): Boolean = requestToken(request) in readSet(INTERACTIVE_IDENTITIES)
+    fun isInteractive(request: AttachmentTransferRequest): Boolean {
+        val interactiveIdentities = readSet(INTERACTIVE_IDENTITIES)
+        return requestToken(request) in interactiveIdentities
+    }
 
     fun containsInteractiveTag(tags: Set<String>): Boolean = tags.any(readSet(INTERACTIVE_IDENTITIES)::contains)
 

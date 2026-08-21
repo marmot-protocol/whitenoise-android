@@ -127,7 +127,13 @@ internal fun MediaVideoGridTile(
     }
     var failed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
-    var startDownload by remember(messageIdHex, attachmentIndex, appState.mediaAutoDownloadMatrix) {
+    val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    var startDownload by remember(
+        messageIdHex,
+        attachmentIndex,
+        appState.mediaAutoDownloadMatrix,
+        automaticDownloadsPaused,
+    ) {
         mutableStateOf(
             shouldStartVideoAttachmentDownload(
                 mine = mine,
@@ -140,7 +146,15 @@ internal fun MediaVideoGridTile(
     var interactiveDownloadRequested by remember(messageIdHex, attachmentIndex) { mutableStateOf(false) }
     var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(0) }
 
-    LaunchedEffect(messageIdHex, attachmentIndex, epoch, startDownload, reloadToken, cachedPlaintextOnEntry) {
+    LaunchedEffect(
+        messageIdHex,
+        attachmentIndex,
+        epoch,
+        startDownload,
+        reloadToken,
+        cachedPlaintextOnEntry,
+        interactiveDownloadRequested,
+    ) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
         // Re-probe the decrypted-byte cache right before using the epoch-0 bypass;
@@ -403,7 +417,12 @@ internal fun MediaVideoBubble(
     // uncached video (e.g. Wi-Fi-only on cellular), a tap flips
     // startDownload=true so the user always has a path to fetch — never
     // "looks present but can't be opened". See PR #191 reviewer feedback.
-    var startDownload by remember(pillKey, appState.mediaAutoDownloadMatrix) {
+    val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    var startDownload by remember(
+        pillKey,
+        appState.mediaAutoDownloadMatrix,
+        automaticDownloadsPaused,
+    ) {
         mutableStateOf(
             shouldStartVideoAttachmentDownload(
                 mine = mine,
@@ -415,7 +434,13 @@ internal fun MediaVideoBubble(
     }
     var interactiveDownloadRequested by remember(pillKey) { mutableStateOf(false) }
 
-    LaunchedEffect(pillKey, epoch, startDownload, cachedPlaintextOnEntry) {
+    LaunchedEffect(
+        pillKey,
+        epoch,
+        startDownload,
+        cachedPlaintextOnEntry,
+        interactiveDownloadRequested,
+    ) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
         // Re-probe the decrypted-byte cache right before using the epoch-0 bypass;
@@ -543,7 +568,7 @@ internal fun MediaVideoBubble(
                             onClick = {
                                 when {
                                     uploadFailed -> onRetryUpload?.invoke()
-                                    loading -> Unit
+                                    loading -> interactiveDownloadRequested = true
                                     else ->
                                         scope.launch {
                                             interactiveDownloadRequested = true

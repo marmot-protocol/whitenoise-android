@@ -120,7 +120,13 @@ internal fun MediaVoiceBubble(
     // a fake Download affordance. Re-keyed on the matrix so flipping a toggle
     // re-gates an un-fetched clip. A tap on the bubble flips this to true so
     // manual fetch/playback is always available even when auto-download is off.
-    var startDownload by remember(pillKey, epoch, appState.mediaAutoDownloadMatrix) {
+    val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    var startDownload by remember(
+        pillKey,
+        epoch,
+        appState.mediaAutoDownloadMatrix,
+        automaticDownloadsPaused,
+    ) {
         mutableStateOf(
             shouldStartVoiceAttachmentDownload(
                 mine = mine,
@@ -198,7 +204,7 @@ internal fun MediaVoiceBubble(
         }
     }
 
-    LaunchedEffect(pillKey, epoch, startDownload) {
+    LaunchedEffect(pillKey, epoch, startDownload, interactiveDownloadRequested) {
         if (localFile != null) return@LaunchedEffect
         // Honor the auto-download gate: when Audio is off for the active
         // connection the clip waits behind a Download affordance until the
@@ -276,9 +282,12 @@ internal fun MediaVoiceBubble(
                     Modifier
                         .size(48.dp)
                         .combinedClickable(
-                            enabled = !loading,
                             onLongClick = onLongPress,
                             onClick = {
+                                if (loading) {
+                                    interactiveDownloadRequested = true
+                                    return@combinedClickable
+                                }
                                 failed = false
                                 // First tap on an un-fetched, auto-download-off clip
                                 // is a Download affordance: opt in and let the

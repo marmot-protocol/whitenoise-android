@@ -20,6 +20,8 @@ import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
+private const val ATTACHMENT_PREFERENCES_NAME = "whitenoise"
+
 /**
  * Minimal identity needed to find an attachment again from MDK after process
  * death. The media reference itself deliberately stays in MDK's SQLite source
@@ -33,7 +35,13 @@ internal data class AttachmentTransferRequest(
     val attachmentIndex: Int,
 )
 
-internal fun AttachmentTransferRequest.cacheKey(): String = mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex)
+internal fun AttachmentTransferRequest.cacheKey(): String =
+    mediaCacheKey(
+        accountRef,
+        groupIdHex,
+        messageIdHex,
+        attachmentIndex,
+    )
 
 internal object AttachmentDownloadWorkData {
     private const val KEY_ACCOUNT_REF = "account_ref"
@@ -86,7 +94,10 @@ internal fun attachmentIdentityDigest(value: String): String =
         .digest(value.toByteArray())
         .joinToString("") { byte -> "%02x".format(byte.toInt() and BYTE_MASK) }
 
-internal fun attachmentAutomaticAccountTag(accountRef: String): String = "attachment_download_auto_account_${attachmentIdentityDigest(accountRef)}"
+internal fun attachmentAutomaticAccountTag(accountRef: String): String {
+    val identity = attachmentIdentityDigest(accountRef)
+    return "attachment_download_auto_account_$identity"
+}
 
 internal fun attachmentIdentityTag(request: AttachmentTransferRequest): String =
     "attachment_download_identity_${attachmentIdentityDigest(attachmentDownloadWorkName(request))}"
@@ -120,28 +131,36 @@ class AttachmentDownloadWorker(
     override suspend fun doWork(): Result {
         val request = AttachmentDownloadWorkData.decode(inputData)
         val application = applicationContext as? WhiteNoiseApplication
-        if (request == null || application == null) return Result.failure()
-        val intentStore =
-            AttachmentDownloadIntentStore(
-                applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
-            )
-        val priority =
-            if (intentStore.isInteractive(request)) {
-                AttachmentDownloadPriority.Interactive
+        return if (request == null || application == null) {
+            Result.failure()
+        } else {
+            val intentStore = attachmentIntentStore(applicationContext)
+            val priority = intentStore.priorityFor(request)
+            if (
+                priority == AttachmentDownloadPriority.Automatic &&
+                intentStore.isAutomaticPaused(request.accountRef)
+            ) {
+                Result.success()
             } else {
-                AttachmentDownloadPriority.Automatic
+                performDownload(application, request, priority, intentStore)
             }
-        if (priority == AttachmentDownloadPriority.Automatic && intentStore.isAutomaticPaused(request.accountRef)) {
-            return Result.success()
         }
-        return try {
+    }
+
+    private suspend fun performDownload(
+        application: WhiteNoiseApplication,
+        request: AttachmentTransferRequest,
+        priority: AttachmentDownloadPriority,
+        intentStore: AttachmentDownloadIntentStore,
+    ): Result =
+        try {
             withContext(Dispatchers.Main.immediate) {
                 application.appState.ensureNotificationRuntimeStarted()
             }
             if (!application.appState.downloadAttachmentForDurableWork(request, priority)) {
                 throw java.io.IOException("attachment did not reach encrypted cache")
             }
-            intentStore.clearInteractive(request)
+            intentStore.setInteractive(request, interactive = false)
             Result.success()
         } catch (cancel: CancellationException) {
             throw cancel
@@ -159,30 +178,32 @@ class AttachmentDownloadWorker(
                 // immune to a later automatic-backlog stop. The durable open
                 // intent remains; returning to the bubble can explicitly
                 // promote and retry it again.
-                intentStore.clearInteractive(request)
+                intentStore.setInteractive(request, interactive = false)
                 Result.failure()
             }
         }
-    }
 
     companion object {
         internal const val MAX_RETRY_ATTEMPTS = 1
         private const val TAG = "DMAttachmentWorker"
         private const val BACKOFF_SECONDS = 30L
         private const val LOG_ID_PREFIX_LENGTH = 8
-        private const val PREFERENCES_NAME = "whitenoise"
 
         internal fun enqueue(
             context: Context,
             request: AttachmentTransferRequest,
             priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
         ) {
-            val intentStore =
-                AttachmentDownloadIntentStore(
-                    context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
-                )
-            if (priority == AttachmentDownloadPriority.Automatic && intentStore.isAutomaticPaused(request.accountRef)) return
-            if (priority == AttachmentDownloadPriority.Interactive) intentStore.markInteractive(request)
+            val intentStore = attachmentIntentStore(context.applicationContext)
+            if (
+                priority == AttachmentDownloadPriority.Automatic &&
+                intentStore.isAutomaticPaused(request.accountRef)
+            ) {
+                return
+            }
+            if (priority == AttachmentDownloadPriority.Interactive) {
+                intentStore.setInteractive(request, interactive = true)
+            }
             val work =
                 OneTimeWorkRequestBuilder<AttachmentDownloadWorker>()
                     .setInputData(AttachmentDownloadWorkData.encode(request))
@@ -214,10 +235,7 @@ class AttachmentDownloadWorker(
         ): Int {
             val appContext = context.applicationContext
             val manager = WorkManager.getInstance(appContext)
-            val intentStore =
-                AttachmentDownloadIntentStore(
-                    appContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
-                )
+            val intentStore = attachmentIntentStore(appContext)
             val queued =
                 withContext(Dispatchers.IO) {
                     manager.getWorkInfosByTag(attachmentAutomaticAccountTag(accountRef)).get()
@@ -232,5 +250,17 @@ class AttachmentDownloadWorker(
         }
     }
 }
+
+private fun attachmentIntentStore(context: Context): AttachmentDownloadIntentStore =
+    AttachmentDownloadIntentStore(
+        context.getSharedPreferences(ATTACHMENT_PREFERENCES_NAME, Context.MODE_PRIVATE),
+    )
+
+private fun AttachmentDownloadIntentStore.priorityFor(request: AttachmentTransferRequest): AttachmentDownloadPriority =
+    if (isInteractive(request)) {
+        AttachmentDownloadPriority.Interactive
+    } else {
+        AttachmentDownloadPriority.Automatic
+    }
 
 private const val BYTE_MASK = 0xFF

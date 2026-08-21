@@ -4055,7 +4055,7 @@ class WhiteNoiseAppState private constructor(
         priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
     ) {
         if (priority == AttachmentDownloadPriority.Interactive) {
-            attachmentDownloadIntents.markInteractive(request)
+            attachmentDownloadIntents.setInteractive(request, interactive = true)
             attachmentDownloadGate.promote(request.cacheKey())
         }
         AttachmentDownloadWorker.enqueue(appContext, request, priority)
@@ -4067,9 +4067,15 @@ class WhiteNoiseAppState private constructor(
         attachmentOpenIntentRevision += 1
     }
 
-    internal fun hasAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean = attachmentDownloadIntents.hasOpenIntent(request)
+    internal fun hasAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean {
+        val intents = attachmentDownloadIntents
+        return intents.hasOpenIntent(request)
+    }
 
-    internal fun consumeAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean = attachmentDownloadIntents.consumeOpenIntent(request)
+    internal fun consumeAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean {
+        val intents = attachmentDownloadIntents
+        return intents.consumeOpenIntent(request)
+    }
 
     fun automaticAttachmentDownloadsPaused(): Boolean {
         attachmentDownloadPolicyRevision
@@ -4141,60 +4147,73 @@ class WhiteNoiseAppState private constructor(
                     }
         if (cached != null) {
             if (priority == AttachmentDownloadPriority.Interactive) {
-                attachmentDownloadIntents.clearInteractive(request)
+                attachmentDownloadIntents.setInteractive(request, interactive = false)
             }
             return cached
         }
 
         if (priority == AttachmentDownloadPriority.Interactive) {
-            attachmentDownloadIntents.markInteractive(request)
+            attachmentDownloadIntents.setInteractive(request, interactive = true)
             attachmentDownloadGate.promote(cacheKey)
         }
 
         val deferred =
             memoizedDownload(cacheKey, request, priority) {
-                val publicationToken = diskMediaCache.capturePublicationToken()
-                val result =
-                    runCatchingCancellable {
-                        marmotIo { downloadMedia(request.accountRef, request.groupIdHex, reference) }
-                    }.onFailure {
-                        val host =
-                            reference.locators
-                                .firstOrNull()
-                                ?.value
-                                ?.let { url ->
-                                    url
-                                        .substringAfter("://", "")
-                                        .substringBefore('/')
-                                        .substringBefore('?')
-                                        .substringBefore('#')
-                                }.orEmpty()
-                        Log.w(
-                            "DMAttachmentDownload",
-                            "download failed group=${request.groupIdHex.take(8)} " +
-                                "message=${request.messageIdHex.take(8)} host=$host",
-                            it,
-                        )
-                    }.getOrThrow()
-                if (result.plaintext.isNotEmpty()) {
-                    cacheMediaPlaintext(cacheKey, result.plaintext)
-                    val plaintext = result.plaintext
-                    withContext(Dispatchers.IO) {
-                        diskMediaCache.put(
-                            cacheKey,
-                            plaintext,
-                            publicationToken,
-                            reference.ciphertextSha256,
-                        )
-                    }
-                }
-                result.plaintext
+                downloadAndCacheAttachment(request, reference, cacheKey)
             }
         return deferred.await().also {
             if (priority == AttachmentDownloadPriority.Interactive) {
-                attachmentDownloadIntents.clearInteractive(request)
+                attachmentDownloadIntents.setInteractive(request, interactive = false)
             }
         }
+    }
+
+    private suspend fun downloadAndCacheAttachment(
+        request: AttachmentTransferRequest,
+        reference: MediaAttachmentReferenceFfi,
+        cacheKey: String,
+    ): ByteArray {
+        val publicationToken = diskMediaCache.capturePublicationToken()
+        val result =
+            runCatchingCancellable {
+                marmotIo { downloadMedia(request.accountRef, request.groupIdHex, reference) }
+            }.onFailure { failure ->
+                logAttachmentDownloadFailure(request, reference, failure)
+            }.getOrThrow()
+        if (result.plaintext.isNotEmpty()) {
+            cacheMediaPlaintext(cacheKey, result.plaintext)
+            withContext(Dispatchers.IO) {
+                diskMediaCache.put(
+                    cacheKey,
+                    result.plaintext,
+                    publicationToken,
+                    reference.ciphertextSha256,
+                )
+            }
+        }
+        return result.plaintext
+    }
+
+    private fun logAttachmentDownloadFailure(
+        request: AttachmentTransferRequest,
+        reference: MediaAttachmentReferenceFfi,
+        failure: Throwable,
+    ) {
+        val host =
+            reference.locators
+                .firstOrNull()
+                ?.value
+                ?.substringAfter("://", "")
+                ?.substringBefore('/')
+                ?.substringBefore('?')
+                ?.substringBefore('#')
+                .orEmpty()
+        Log.w(
+            "DMAttachmentDownload",
+            "download failed group=${request.groupIdHex.take(8)} " +
+                "message=${request.messageIdHex.take(8)} host=$host",
+            failure,
+        )
     }
 
     internal suspend fun downloadAttachmentForDurableWork(

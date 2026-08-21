@@ -38,7 +38,7 @@ class AttachmentDownloadIntentStoreTest {
     @Test
     fun promotedIdentityRemainsDistinctFromAutomaticAccountStop() {
         val store = AttachmentDownloadIntentStore(preferences)
-        store.markInteractive(REQUEST_A)
+        store.setInteractive(REQUEST_A, interactive = true)
         store.pauseAutomatic(ACCOUNT_A)
 
         val recreated = AttachmentDownloadIntentStore(preferences)
