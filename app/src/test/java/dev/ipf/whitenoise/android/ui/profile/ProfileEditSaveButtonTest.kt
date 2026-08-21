@@ -1,12 +1,15 @@
 package dev.ipf.whitenoise.android.ui.profile
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -154,6 +157,136 @@ class ProfileEditSaveButtonTest {
     }
 
     @Test
+    fun cachedProfilePaintsBeforeBlockedLoadAndSurvivesFailure() {
+        val cached = fullMetadata("Cached")
+        val loadCompletion = CompletableDeferred<UserProfileMetadataFfi?>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileEditScreen(
+                    appState = appState(),
+                    onBack = {},
+                    cachedProfile = { cached },
+                    loadProfile = { loadCompletion.await() },
+                )
+            }
+        }
+        val saveButton = composeRule.onNodeWithText(context.getString(R.string.save))
+        val displayNameMatcher = hasSetTextAction() and hasText(context.getString(R.string.display_name))
+
+        composeRule.onNodeWithTag(PROFILE_HEADER_NAME_TAG).assertTextContains("Cached name")
+        composeRule.onNodeWithTag(PROFILE_HERO_LOADING_TAG).assertDoesNotExist()
+        saveButton.assertIsNotEnabled()
+        composeRule.onNode(hasScrollAction()).performScrollToNode(displayNameMatcher)
+        composeRule.onNode(displayNameMatcher).assertTextContains("Cached name")
+
+        loadCompletion.completeExceptionally(IllegalStateException("offline"))
+        composeRule.waitForIdle()
+
+        composeRule.onNode(displayNameMatcher).assertTextContains("Cached name")
+        saveButton.assertIsNotEnabled()
+        composeRule.onNode(displayNameMatcher).performTextReplacement("Edited")
+        saveButton.assertIsEnabled()
+    }
+
+    @Test
+    fun asyncRefreshMergesUntouchedFieldsWithoutClobberingEdit() {
+        val loadCompletion = CompletableDeferred<UserProfileMetadataFfi?>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileEditScreen(
+                    appState = appState(),
+                    onBack = {},
+                    cachedProfile = { fullMetadata("Cached") },
+                    loadProfile = { loadCompletion.await() },
+                )
+            }
+        }
+        val displayNameMatcher = hasSetTextAction() and hasText(context.getString(R.string.display_name))
+        val aboutMatcher = hasSetTextAction() and hasText(context.getString(R.string.about))
+        composeRule.onNode(hasScrollAction()).performScrollToNode(displayNameMatcher)
+        composeRule.onNode(displayNameMatcher).performTextReplacement("User edit")
+
+        loadCompletion.complete(fullMetadata("Fresh"))
+        composeRule.waitForIdle()
+
+        composeRule.onNode(displayNameMatcher).assertTextContains("User edit")
+        composeRule.onNode(hasScrollAction()).performScrollToNode(aboutMatcher)
+        composeRule.onNode(aboutMatcher).assertTextContains("Fresh about")
+        composeRule.onNodeWithText(context.getString(R.string.save)).assertIsEnabled()
+    }
+
+    @Test
+    fun cacheMissTransitionsToBoundedFailureButKeepsSaveDisabled() {
+        val loadCompletion = CompletableDeferred<UserProfileMetadataFfi?>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileEditScreen(
+                    appState = appState(),
+                    onBack = {},
+                    cachedProfile = { null },
+                    loadProfile = { loadCompletion.await() },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(PROFILE_HERO_LOADING_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.save)).assertIsNotEnabled()
+        loadCompletion.completeExceptionally(IllegalStateException("offline"))
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(PROFILE_HERO_LOADING_TAG).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.save)).assertIsNotEnabled()
+        val displayNameMatcher = hasSetTextAction() and hasText(context.getString(R.string.display_name))
+        composeRule.onNode(hasScrollAction()).performScrollToNode(displayNameMatcher)
+        composeRule.onNode(displayNameMatcher).performTextReplacement("Untrusted edit")
+        composeRule.onNodeWithText(context.getString(R.string.save)).assertIsNotEnabled()
+    }
+
+    @Test
+    fun accountSwitchPaintsNewCacheImmediatelyAndIgnoresLateOldLoad() {
+        val currentAppState = mutableStateOf(appState(ACCOUNT_A_REF, ACCOUNT_A_ID))
+        val loadCalls = LinkedBlockingQueue<LoadCall>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileEditScreen(
+                    appState = currentAppState.value,
+                    onBack = {},
+                    cachedProfile = { accountId ->
+                        when (accountId) {
+                            ACCOUNT_A_ID -> fullMetadata("Cached A")
+                            ACCOUNT_B_ID -> fullMetadata("Cached B")
+                            else -> null
+                        }
+                    },
+                    loadProfile = { accountId ->
+                        val call = LoadCall(accountId)
+                        loadCalls.put(call)
+                        call.completion.await()
+                    },
+                )
+            }
+        }
+
+        val accountALoad = requireNotNull(loadCalls.poll(5, TimeUnit.SECONDS))
+        composeRule.onNodeWithTag(PROFILE_HEADER_NAME_TAG).assertTextContains("Cached A name")
+        composeRule.runOnIdle {
+            currentAppState.value = appState(ACCOUNT_B_REF, ACCOUNT_B_ID)
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(PROFILE_HEADER_NAME_TAG).assertTextContains("Cached B name")
+        composeRule.onNodeWithTag(PROFILE_HERO_LOADING_TAG).assertDoesNotExist()
+        val accountBLoad = requireNotNull(loadCalls.poll(5, TimeUnit.SECONDS))
+        assertEquals(ACCOUNT_B_ID, accountBLoad.accountId)
+
+        accountALoad.completion.complete(fullMetadata("Late A"))
+        accountBLoad.completion.complete(null)
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(PROFILE_HEADER_NAME_TAG).assertTextContains("Cached B name")
+        composeRule.onNodeWithText(context.getString(R.string.save)).assertIsNotEnabled()
+    }
+
+    @Test
     fun screenIgnoresStalePublishCompletionAfterAccountSwitch() {
         val currentAppState = mutableStateOf(appState(ACCOUNT_A_REF, ACCOUNT_A_ID))
         val loadCalls = LinkedBlockingQueue<LoadCall>()
@@ -218,6 +351,16 @@ class ProfileEditSaveButtonTest {
             banner = "",
             nip05 = "",
             lud16 = "",
+        )
+
+    private fun fullMetadata(value: String): UserProfileMetadataFfi =
+        profileEditMetadata(
+            displayName = "$value name",
+            about = "$value about",
+            picture = "https://example.com/$value-picture.jpg",
+            banner = "https://example.com/$value-banner.jpg",
+            nip05 = "$value@example.com",
+            lud16 = "$value@getalby.com",
         )
 
     private fun appState(

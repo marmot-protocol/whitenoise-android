@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.profile
 
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -49,6 +50,49 @@ class ProfileEditSaveStateTest {
         assertEquals("https://example.com/banner.jpg", metadata.banner)
         assertEquals("alice@example.com", metadata.nip05)
         assertEquals("alice@getalby.com", metadata.lud16)
+    }
+
+    @Test
+    fun cachedProfileSeedsEveryEditableFieldIncludingImages() {
+        val draft =
+            profileEditDraft(
+                UserProfileMetadataFfi(
+                    name = "fallback-name",
+                    displayName = "Cached Alice",
+                    about = "Cached about",
+                    picture = "https://example.com/cached-picture.jpg",
+                    banner = "https://example.com/cached-banner.jpg",
+                    nip05 = "alice@example.com",
+                    lud16 = "alice@getalby.com",
+                ),
+            )
+
+        assertEquals("Cached Alice", draft.displayName)
+        assertEquals("Cached about", draft.about)
+        assertEquals("https://example.com/cached-picture.jpg", draft.picture)
+        assertEquals("https://example.com/cached-banner.jpg", draft.banner)
+        assertEquals("alice@example.com", draft.nip05)
+        assertEquals("alice@getalby.com", draft.lud16)
+    }
+
+    @Test
+    fun asyncRefreshUpdatesUntouchedFieldsButPreservesEveryUserEdit() {
+        val cached = fullDraft("cached")
+        val refreshed = fullDraft("refreshed")
+
+        assertEquals(refreshed, cached.mergeUntouchedFields(cached, refreshed))
+
+        val edited =
+            ProfileEditDraft(
+                displayName = "edited name",
+                about = "edited about",
+                picture = "https://example.com/edited-picture.jpg",
+                banner = "https://example.com/edited-banner.jpg",
+                nip05 = "edited@example.com",
+                lud16 = "edited@getalby.com",
+            )
+
+        assertEquals(edited, edited.mergeUntouchedFields(cached, refreshed))
     }
 
     @Test
@@ -104,6 +148,16 @@ class ProfileEditSaveStateTest {
             banner = "",
             nip05 = "",
             lud16 = "",
+        )
+
+    private fun fullDraft(value: String) =
+        ProfileEditDraft(
+            displayName = "$value name",
+            about = "$value about",
+            picture = "https://example.com/$value-picture.jpg",
+            banner = "https://example.com/$value-banner.jpg",
+            nip05 = "$value@example.com",
+            lud16 = "$value@getalby.com",
         )
 
     private companion object {
