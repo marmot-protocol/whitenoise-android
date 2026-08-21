@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.focus.FocusDirection
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollToNode
@@ -88,18 +90,25 @@ class AccountKeysPresentationTest {
     @Test
     fun destructiveActionIsTheFinalKeyboardFocusTarget() {
         val focusManager = renderAccountKeys()
+        val back = composeRule.onNodeWithContentDescription(app.getString(R.string.back))
         val signOut = composeRule.onNodeWithText(app.getString(R.string.sign_out))
         val wipe = composeRule.onNodeWithText(app.getString(R.string.sign_out_and_wipe))
 
         signOut.performSemanticsAction(SemanticsActions.RequestFocus).assertIsFocused()
         composeRule.runOnIdle { assertTrue(focusManager.moveFocus(FocusDirection.Next)) }
         wipe.assertIsFocused()
+        composeRule.runOnIdle { assertTrue(focusManager.moveFocus(FocusDirection.Next)) }
+        back.assertIsFocused()
     }
 
     @Test
     @Config(sdk = [36], qualifiers = "en-w360dp-h640dp-mdpi")
     fun largeFontRtlKeepsTerminalActionInsideTheSafeViewport() {
-        renderAccountKeys(fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
+        renderAccountKeys(
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+            contentWindowInsets = WindowInsets(bottom = NAVIGATION_BAR_BOTTOM),
+        )
         val wipeLabel = app.getString(R.string.sign_out_and_wipe)
         composeRule.onNode(hasScrollAction()).performScrollToNode(hasText(wipeLabel))
         val wipe =
@@ -114,9 +123,9 @@ class AccountKeysPresentationTest {
                 .boundsInRoot.bottom
 
         val safeBottomGap = rootBottom - wipe.boundsInRoot.bottom
-        val minimumSafeBottomGap = with(composeRule.density) { 16.dp.toPx() }
+        val minimumSafeBottomGap = with(composeRule.density) { (NAVIGATION_BAR_BOTTOM + 16.dp).toPx() }
         assertTrue(
-            "The terminal action must retain bottom safe-area spacing",
+            "The terminal action must clear the navigation bar plus content spacing",
             safeBottomGap >= minimumSafeBottomGap,
         )
     }
@@ -124,6 +133,7 @@ class AccountKeysPresentationTest {
     private fun renderAccountKeys(
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+        contentWindowInsets: WindowInsets = WindowInsets(0.dp),
     ): FocusManager {
         lateinit var focusManager: FocusManager
         val appState = appStateWithNpub(CANONICAL_NPUB)
@@ -136,7 +146,11 @@ class AccountKeysPresentationTest {
             ) {
                 WhiteNoiseTheme {
                     Surface {
-                        AccountKeysScreen(appState = appState, onBack = {})
+                        AccountKeysScreen(
+                            appState = appState,
+                            onBack = {},
+                            contentWindowInsets = contentWindowInsets,
+                        )
                     }
                 }
             }
@@ -182,5 +196,6 @@ class AccountKeysPresentationTest {
         const val ACCOUNT_REF = "personal"
         const val ACCOUNT_HEX = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         const val CANONICAL_NPUB = "npub1qy352hw5xrsq5k6x5t5vnpqx4lhfv3q8jqk9x0h5q6x5t5vnpq"
+        val NAVIGATION_BAR_BOTTOM = 48.dp
     }
 }

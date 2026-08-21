@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,6 +49,7 @@ import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -173,6 +175,7 @@ internal suspend fun exportIdentitySecretForSession(
 internal fun AccountKeysScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
+    contentWindowInsets: WindowInsets = ScaffoldDefaults.contentWindowInsets,
 ) {
     // The screen surfaces the raw nsec; keep it out of Recents thumbnails and
     // screenshots, matching the encrypted-backup sheet's posture.
@@ -228,6 +231,7 @@ internal fun AccountKeysScreen(
     }
 
     Scaffold(
+        contentWindowInsets = contentWindowInsets,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.account_and_keys)) },
