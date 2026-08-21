@@ -9,16 +9,24 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
@@ -199,6 +207,71 @@ class MessageBubbleFrameTest {
     }
 
     @Test
+    fun mentionRailUsesLogicalStartAndStaysInsideTheFrame() {
+        val frameSize = Size(width = 120f, height = 60f)
+        val ltr =
+            messageMentionRailBounds(
+                frameSize = frameSize,
+                layoutDirection = LayoutDirection.Ltr,
+                railWidth = 3f,
+                edgeInset = 1f,
+                verticalInset = 14f,
+            )
+        val rtl =
+            messageMentionRailBounds(
+                frameSize = frameSize,
+                layoutDirection = LayoutDirection.Rtl,
+                railWidth = 3f,
+                edgeInset = 1f,
+                verticalInset = 14f,
+            )
+
+        assertEquals(1f, ltr.left, 0f)
+        assertEquals(frameSize.width - 1f, rtl.right, 0f)
+        assertEquals(ltr.top, rtl.top, 0f)
+        assertEquals(ltr.bottom, rtl.bottom, 0f)
+        assertTrue(ltr.left >= 0f && ltr.right <= frameSize.width)
+        assertTrue(rtl.left >= 0f && rtl.right <= frameSize.width)
+        assertTrue(ltr.top >= 0f && ltr.bottom <= frameSize.height)
+    }
+
+    @Test
+    fun mentionRecompositionKeepsBubbleBoundsAndClearsStaleSemantics() {
+        var mentionedSelf by mutableStateOf(false)
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                    MessageBubbleFrame(
+                        presentation = customAmoledPresentation(),
+                        highlighted = false,
+                        mine = false,
+                        mentionedSelf = mentionedSelf,
+                        mentionedYouLabel = "Mentioned you",
+                        modifier = Modifier.width(220.dp).testTag(RECOMPOSING_MENTION_TAG),
+                    ) {
+                        Text("Alice")
+                        Text("A wrapping message that mentions @You without changing the bubble geometry")
+                    }
+                }
+            }
+        }
+
+        val before = composeRule.onNodeWithTag(RECOMPOSING_MENTION_TAG).fetchSemanticsNode().boundsInRoot
+        composeRule.onNodeWithContentDescription("Mentioned you").assertDoesNotExist()
+
+        composeRule.runOnIdle { mentionedSelf = true }
+        composeRule.onNodeWithContentDescription("Mentioned you").assertIsDisplayed()
+        val mentioned = composeRule.onNodeWithTag(RECOMPOSING_MENTION_TAG).fetchSemanticsNode().boundsInRoot
+        assertEquals(before, mentioned)
+
+        composeRule.runOnIdle { mentionedSelf = false }
+        composeRule.onNodeWithContentDescription("Mentioned you").assertDoesNotExist()
+        val cleared = composeRule.onNodeWithTag(RECOMPOSING_MENTION_TAG).fetchSemanticsNode().boundsInRoot
+        assertEquals(before, cleared)
+    }
+
+    @Test
     fun replyFooterPinsToQuoteWidenedBubbleEnd() {
         composeRule.setContent {
             Column(Modifier.width(IntrinsicSize.Max).testTag(REPLY_BUBBLE_TAG)) {
@@ -371,5 +444,6 @@ class MessageBubbleFrameTest {
         const val MEDIA_REPLY_FOOTER_TAG = "media-reply-footer"
         const val NON_REPLY_COLUMN_TAG = "non-reply-column"
         const val NON_REPLY_BODY_TAG = "non-reply-body"
+        const val RECOMPOSING_MENTION_TAG = "recomposing-mention-bubble"
     }
 }

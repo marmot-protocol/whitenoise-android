@@ -12,10 +12,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -23,9 +24,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 /** Shared frame for caption and plain-text bubbles. */
 @Composable
@@ -53,14 +56,15 @@ internal fun MessageBubbleFrame(
             color = highlightColor,
         )
     val mentionModifier =
-        messageMentionRailModifier(
+        messageMentionFrameModifier(
             mentionedSelf = mentionedSelf,
             mentionedYouLabel = mentionedYouLabel,
             accentArgb = presentation.mentionAccentArgb,
+            integratedWithBorder = isAmoledSurfaceTheme(),
         )
 
     Surface(
-        modifier = modifier.then(highlightModifier),
+        modifier = modifier.then(highlightModifier).then(mentionModifier),
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
         shape = shape,
@@ -74,7 +78,7 @@ internal fun MessageBubbleFrame(
         tonalElevation = if (mine) 1.dp else 0.dp,
     ) {
         Column(
-            modifier = bubbleContentModifier(mentionModifier, contentModifier),
+            modifier = bubbleContentModifier(contentModifier),
             verticalArrangement = bubbleContentArrangement,
             content = content,
         )
@@ -115,14 +119,15 @@ internal fun MediaCaptionFrame(
             color = highlightColor,
         )
     val mentionModifier =
-        messageMentionRailModifier(
+        messageMentionFrameModifier(
             mentionedSelf = mentionedSelf,
             mentionedYouLabel = mentionedYouLabel,
             accentArgb = presentation.mentionAccentArgb,
+            integratedWithBorder = isAmoledSurfaceTheme(),
         )
 
     Surface(
-        modifier = modifier.then(highlightModifier),
+        modifier = modifier.then(highlightModifier).then(mentionModifier),
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
         shape = shape,
@@ -141,7 +146,7 @@ internal fun MediaCaptionFrame(
         ) {
             Column(modifier = contentModifier.fillMaxWidth()) {
                 Column(
-                    modifier = bubbleContentModifier(mentionModifier, Modifier),
+                    modifier = bubbleContentModifier(Modifier),
                     verticalArrangement = bubbleContentArrangement,
                     content = caption,
                 )
@@ -206,12 +211,8 @@ private enum class MediaEnvelopeSlot {
 
 private val bubbleContentArrangement = Arrangement.spacedBy(6.dp)
 
-private fun bubbleContentModifier(
-    mentionModifier: Modifier,
-    contentModifier: Modifier,
-): Modifier =
-    mentionModifier
-        .then(contentModifier)
+private fun bubbleContentModifier(contentModifier: Modifier): Modifier =
+    contentModifier
         .padding(horizontal = 14.dp, vertical = 10.dp)
 
 @Composable
@@ -260,24 +261,61 @@ private fun messageTargetHighlightModifier(
         Modifier
     }
 
-private fun messageMentionRailModifier(
+private fun messageMentionFrameModifier(
     mentionedSelf: Boolean,
     mentionedYouLabel: String,
     accentArgb: Long,
+    integratedWithBorder: Boolean,
 ): Modifier =
     if (mentionedSelf) {
         Modifier
             .semantics { contentDescription = mentionedYouLabel }
-            .drawBehind {
+            .drawWithCache {
                 val railWidth = 3.dp.toPx()
-                val inset = 4.dp.toPx()
-                drawRoundRect(
-                    color = colorFromArgb(accentArgb),
-                    topLeft = Offset(inset, inset),
-                    size = Size(railWidth, (size.height - inset * 2).coerceAtLeast(railWidth)),
-                    cornerRadius = CornerRadius(railWidth / 2f, railWidth / 2f),
-                )
+                val bounds =
+                    messageMentionRailBounds(
+                        frameSize = size,
+                        layoutDirection = layoutDirection,
+                        railWidth = railWidth,
+                        edgeInset = if (integratedWithBorder) 1.dp.toPx() else 4.dp.toPx(),
+                        verticalInset = if (integratedWithBorder) 14.dp.toPx() else 4.dp.toPx(),
+                    )
+                val railColor = colorFromArgb(accentArgb)
+                onDrawWithContent {
+                    drawContent()
+                    drawRoundRect(
+                        color = railColor,
+                        topLeft = bounds.topLeft,
+                        size = bounds.size,
+                        cornerRadius = CornerRadius(bounds.width / 2f, bounds.width / 2f),
+                    )
+                }
             }
     } else {
         Modifier
     }
+
+internal fun messageMentionRailBounds(
+    frameSize: Size,
+    layoutDirection: LayoutDirection,
+    railWidth: Float,
+    edgeInset: Float,
+    verticalInset: Float,
+): Rect {
+    val safeRailWidth = railWidth.coerceIn(0f, frameSize.width.coerceAtLeast(0f))
+    val horizontalRange = (frameSize.width - safeRailWidth).coerceAtLeast(0f)
+    val safeEdgeInset = edgeInset.coerceIn(0f, horizontalRange)
+    val maxVerticalInset = ((frameSize.height - safeRailWidth) / 2f).coerceAtLeast(0f)
+    val safeVerticalInset = verticalInset.coerceIn(0f, maxVerticalInset)
+    val left =
+        when (layoutDirection) {
+            LayoutDirection.Ltr -> safeEdgeInset
+            LayoutDirection.Rtl -> horizontalRange - safeEdgeInset
+        }
+    return Rect(
+        left = left,
+        top = safeVerticalInset,
+        right = left + safeRailWidth,
+        bottom = (frameSize.height - safeVerticalInset).coerceAtLeast(safeVerticalInset),
+    )
+}
