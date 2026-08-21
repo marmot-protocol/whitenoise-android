@@ -3316,6 +3316,7 @@ private data class OptimisticChatListPreviewState(
     var baselineRow: ChatListRowFfi,
     var baselineActivitySequence: ULong,
     val entries: LinkedHashMap<String, OptimisticChatListPreviewEntry> = linkedMapOf(),
+    var failedFallbackEntry: OptimisticChatListPreviewEntry? = null,
     val confirmedActivitySequenceById: LinkedHashMap<String, ULong> = linkedMapOf(),
     val baselineActivitySequenceByLastMessage: LinkedHashMap<ChatListLastMessageActivity, ULong> = linkedMapOf(),
 )
@@ -3560,9 +3561,14 @@ class ChatsController private constructor(
             }
         return matchingEntry?.let { (entryKey, entry) ->
             OptimisticChatListPreviewMatch(entryKey, entry.activitySequence)
-        } ?: state.confirmedActivitySequenceById[authoritative.messageIdHex]?.let { activitySequence ->
-            OptimisticChatListPreviewMatch(entryKey = null, activitySequence = activitySequence)
-        }
+        } ?: state.failedFallbackEntry
+            ?.takeIf { entry -> representsSameChatListActivity(entry.preview, authoritative) }
+            ?.let { entry ->
+                OptimisticChatListPreviewMatch(entryKey = null, activitySequence = entry.activitySequence)
+            }
+            ?: state.confirmedActivitySequenceById[authoritative.messageIdHex]?.let { activitySequence ->
+                OptimisticChatListPreviewMatch(entryKey = null, activitySequence = activitySequence)
+            }
     }
 
     private fun optimisticMatchIsStale(
@@ -3580,16 +3586,29 @@ class ChatsController private constructor(
             )
 
     /**
-     * Drops failed previews the row can no longer show: one superseded by a
-     * newer entry, or one newer activity has already moved past. A failed
-     * entry never gains a confirmed id, so no other retire path can reach it,
-     * and each holds a decrypted preview — without this a group would retain
-     * one per failed send for the controller's lifetime. Rollback and
-     * retry of a pruned send stay correct: rollback no-ops and a retry applies
-     * a fresh entry.
+     * Keep only the newest failed preview that a later provisional entry is
+     * currently hiding. If that newer entry is abandoned, the row can reveal
+     * this fallback instead of jumping to the pre-send baseline. The scalar
+     * slot preserves the decrypted-preview memory bound: repeated failures
+     * replace one fallback rather than accumulating one entry per send.
      */
     private fun pruneUnreachableFailedEntries(state: OptimisticChatListPreviewState) {
+        state.failedFallbackEntry =
+            state.failedFallbackEntry?.takeIf {
+                it.activitySequence > state.baselineActivitySequence
+            }
         val newestSequence = state.entries.values.maxOfOrNull { it.activitySequence } ?: return
+        val newestSupersededFailure =
+            state.entries.values
+                .asSequence()
+                .filter { entry ->
+                    entry.confirmedMessageIdHex == null &&
+                        entry.preview.deliveryState == ChatListMessageDeliveryStateFfi.FAILED &&
+                        entry.activitySequence > state.baselineActivitySequence &&
+                        entry.activitySequence < newestSequence
+                }.plus(state.failedFallbackEntry?.let(::sequenceOf).orEmpty())
+                .maxByOrNull { it.activitySequence }
+        state.failedFallbackEntry = newestSupersededFailure
         state.entries.entries.removeAll { (_, entry) ->
             entry.confirmedMessageIdHex == null &&
                 entry.preview.deliveryState == ChatListMessageDeliveryStateFfi.FAILED &&
@@ -3748,7 +3767,11 @@ class ChatsController private constructor(
         state: OptimisticChatListPreviewState,
     ) {
         pruneUnreachableFailedEntries(state)
-        val latestEntry = state.entries.values.maxByOrNull { it.activitySequence }
+        val latestEntry =
+            state.entries.values
+                .asSequence()
+                .plus(state.failedFallbackEntry?.let(::sequenceOf).orEmpty())
+                .maxByOrNull { it.activitySequence }
         val visibleEntry = latestEntry?.takeIf { it.activitySequence > state.baselineActivitySequence }
         chatRowsByGroup[rowKey] =
             visibleEntry?.let { entry ->
@@ -3759,7 +3782,11 @@ class ChatsController private constructor(
                 )
             } ?: state.baselineRow
         activitySequenceByGroup[rowKey] = visibleEntry?.activitySequence ?: state.baselineActivitySequence
-        if (state.entries.isEmpty() && state.confirmedActivitySequenceById.isEmpty()) {
+        if (
+            state.entries.isEmpty() &&
+            state.failedFallbackEntry == null &&
+            state.confirmedActivitySequenceById.isEmpty()
+        ) {
             optimisticChatListPreviewByGroup.remove(rowKey)
         }
     }
@@ -4579,6 +4606,9 @@ class ChatsController private constructor(
                     rememberBaselineActivitySequence(state, row, baselineActivitySequence)
                 }
             }
+        if (state.failedFallbackEntry?.preview?.messageIdHex == preview.messageIdHex) {
+            state.failedFallbackEntry = null
+        }
         state.entries[preview.messageIdHex] =
             OptimisticChatListPreviewEntry(
                 preview = preview,
@@ -4597,6 +4627,10 @@ class ChatsController private constructor(
         val rowKey = chatRowKey(groupIdHex)
         val state = optimisticChatListPreviewByGroup[rowKey].takeIf { accountRef != null } ?: return
         val entry = state.entries[optimisticMessageIdHex] ?: return
+        state.failedFallbackEntry =
+            state.failedFallbackEntry?.takeIf {
+                it.activitySequence >= entry.activitySequence
+            }
         state.confirmedActivitySequenceById[confirmedMessageIdHex] = entry.activitySequence
         while (state.confirmedActivitySequenceById.size > MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY) {
             state.confirmedActivitySequenceById.remove(state.confirmedActivitySequenceById.keys.first())
@@ -4663,7 +4697,10 @@ class ChatsController private constructor(
     ) {
         val rowKey = chatRowKey(groupIdHex)
         val state = optimisticChatListPreviewByGroup[rowKey].takeIf { accountRef != null } ?: return
-        if (state.entries.remove(optimisticMessageIdHex) == null) return
+        val removedEntry = state.entries.remove(optimisticMessageIdHex) != null
+        val removedFallback = state.failedFallbackEntry?.preview?.messageIdHex == optimisticMessageIdHex
+        if (removedFallback) state.failedFallbackEntry = null
+        if (!removedEntry && !removedFallback) return
         materializeOptimisticChatListPreview(rowKey, state)
         scheduleRecompute()
     }

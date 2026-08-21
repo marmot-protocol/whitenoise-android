@@ -523,6 +523,99 @@ class OptimisticSentPreviewOrderingTest {
     }
 
     @Test
+    fun abandonedSendFallsBackToTheStillFailedEarlierSend() {
+        val controller = controllerWithRows(row("chat-a", "Alpha", 10uL), row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-1", "pending 1", 20uL))
+        controller.failOptimisticSentPreview("chat-b", "temp-1")
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-2", "pending 2", 30uL))
+        controller.rollbackOptimisticSentPreview("chat-b", "temp-2")
+        controller.setChatListVisible(true)
+
+        val failedRow =
+            controller.items
+                .single { it.id == "chat-b" }
+                .projection
+                ?.lastMessage
+        assertEquals("temp-1", failedRow?.messageIdHex)
+        assertEquals(ChatListMessageDeliveryStateFfi.FAILED, failedRow?.deliveryState)
+    }
+
+    @Test
+    fun abandonedNewerFailureFallsBackToTheStillFailedEarlierSend() {
+        val controller = controllerWithRows(row("chat-a", "Alpha", 10uL), row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-1", "pending 1", 20uL))
+        controller.failOptimisticSentPreview("chat-b", "temp-1")
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-2", "pending 2", 30uL))
+        controller.failOptimisticSentPreview("chat-b", "temp-2")
+        controller.rollbackOptimisticSentPreview("chat-b", "temp-2")
+        controller.setChatListVisible(true)
+
+        val failedRow =
+            controller.items
+                .single { it.id == "chat-b" }
+                .projection
+                ?.lastMessage
+        assertEquals("temp-1", failedRow?.messageIdHex)
+        assertEquals(ChatListMessageDeliveryStateFfi.FAILED, failedRow?.deliveryState)
+    }
+
+    @Test
+    fun confirmedNewerSendStillSupersedesTheEarlierFailure() {
+        val controller = controllerWithRows(row("chat-a", "Alpha", 10uL), row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-1", "pending 1", 20uL))
+        controller.failOptimisticSentPreview("chat-b", "temp-1")
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-2", "pending 2", 30uL))
+        controller.commitOptimisticSentPreview("chat-b", "temp-2", "confirmed-2")
+        controller.setChatListVisible(true)
+
+        val confirmedRow =
+            controller.items
+                .single { it.id == "chat-b" }
+                .projection
+                ?.lastMessage
+        assertEquals("confirmed-2", confirmedRow?.messageIdHex)
+        assertEquals(ChatListMessageDeliveryStateFfi.DELIVERED, confirmedRow?.deliveryState)
+    }
+
+    @Test
+    fun authoritativeEchoForFailedFallbackDoesNotHideTheNewerPendingSend() {
+        val controller = controllerWithRows(row("chat-a", "Alpha", 10uL), row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-1", "pending 1", 20uL))
+        controller.failOptimisticSentPreview("chat-b", "temp-1")
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-2", "pending 2", 30uL))
+        applySubscriptionChatListRow(
+            controller,
+            row("chat-b", "Zulu", 20uL).copy(
+                lastMessage =
+                    preview(
+                        "echoed-1",
+                        "pending 1",
+                        20uL,
+                        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    ),
+            ),
+            ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+        )
+        controller.setChatListVisible(true)
+
+        val pendingRow =
+            controller.items
+                .single { it.id == "chat-b" }
+                .projection
+                ?.lastMessage
+        assertEquals("temp-2", pendingRow?.messageIdHex)
+        assertEquals(ChatListMessageDeliveryStateFfi.PENDING, pendingRow?.deliveryState)
+    }
+
+    @Test
     fun retryReappliesThePendingPreviewInPlace() {
         val controller = controllerWithRows(row("chat-a", "Alpha", 30uL), row("chat-b", "Zulu", 10uL))
 
