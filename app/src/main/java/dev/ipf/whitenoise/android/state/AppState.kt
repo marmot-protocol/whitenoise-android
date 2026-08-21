@@ -5820,14 +5820,19 @@ class WhiteNoiseAppState private constructor(
         appUnlockPromptRequestId += 1
     }
 
-    fun markAppUnlockSucceeded(nowMillis: Long = System.currentTimeMillis()) {
+    fun markAppUnlockSucceeded(
+        nowMillis: Long = System.currentTimeMillis(),
+        dismissRetainedVisibleConversation: Boolean = true,
+    ) {
         val normalizedNow = nowMillis.coerceAtLeast(0L)
         lastAppUnlockAtMillis = normalizedNow
         AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
         appLockScreenVisible = false
         appUnlockError = null
         resumePendingInviteNotificationIdentityRefreshes()
-        dismissVisibleConversationNotifications()
+        if (dismissRetainedVisibleConversation) {
+            dismissVisibleConversationNotifications()
+        }
     }
 
     fun markAppUnlockFailed(message: AppText = AppText.Resource(R.string.app_lock_auth_cancelled)) {
@@ -7039,7 +7044,10 @@ class WhiteNoiseAppState private constructor(
         applyApplicationLanguageTag(normalized)
     }
 
-    fun setAppInForeground(foreground: Boolean) {
+    fun setAppInForeground(
+        foreground: Boolean,
+        dismissRetainedVisibleConversation: Boolean = true,
+    ) {
         // Backgrounding flips off suppression without forgetting the still-open
         // chat; returning to the same Activity then resumes foreground
         // suppression without waiting for an unchanged Compose effect to re-run.
@@ -7050,7 +7058,9 @@ class WhiteNoiseAppState private constructor(
         AppUpdateForegroundState.isForeground = foreground
         if (foreground) {
             maybeShowAppLockForForeground()
-            dismissVisibleConversationNotifications()
+            if (dismissRetainedVisibleConversation) {
+                dismissVisibleConversationNotifications()
+            }
         } else {
             recordAppLockBackgrounded()
             conversationDictation.onAppBackgrounded()
@@ -7081,6 +7091,11 @@ class WhiteNoiseAppState private constructor(
         notificationScope.launch {
             dismissConversationNotifications(target.accountRef, target.groupIdHex)
         }
+    }
+
+    /** Complete a plain foreground resume after Activity intent routing settles. */
+    internal fun dismissRetainedVisibleConversationNotifications() {
+        dismissVisibleConversationNotifications()
     }
 
     /**
@@ -7127,7 +7142,7 @@ class WhiteNoiseAppState private constructor(
             // the read anchor isn't ready yet or the mark-read is deduped, so a
             // reaction/message notification could otherwise survive until the
             // second open (issue #803).
-            dismissConversationNotificationsOnOpen(activeConversationAccountRef, groupIdHex, ::dismissConversationNotifications)
+            dismissConversationNotificationsOnOpen(accountRef, groupIdHex, ::dismissConversationNotifications)
         }
         appStateDebug {
             "active conversation=${groupIdHex?.take(8) ?: "<none>"} account=${activeConversationAccountRef?.take(8) ?: "<none>"}"

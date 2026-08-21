@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.state.reconciledConversationEntryUnreadCount
 internal data class ConversationEntryUnreadSnapshot(
     val count: Int,
     val firstUnreadMessageId: String?,
+    val projectionCaptured: Boolean = true,
 )
 
 /** Keep the entry marker fixed for the lifetime of this conversation open. */
@@ -98,8 +99,9 @@ internal fun rememberConversationEntryUnreadSnapshot(
         // the entry divider while this conversation remains open.
         projectionHolder.frozen = currentProjection
     }
+    val projectionCaptured = projectionHolder.frozen != null
     val entryProjection = projectionHolder.frozen ?: currentProjection
-    return remember(controllerIdentity, entryProjection, timeline.isNotEmpty()) {
+    return remember(controllerIdentity, entryProjection, timeline.isNotEmpty(), projectionCaptured) {
         val count =
             if (timeline.isEmpty()) {
                 entryProjection.count
@@ -113,6 +115,7 @@ internal fun rememberConversationEntryUnreadSnapshot(
         val firstUnreadIndex = firstUnreadReceivedIndex(timeline, count)
         ConversationEntryUnreadSnapshot(
             count = count,
+            projectionCaptured = projectionCaptured,
             firstUnreadMessageId =
                 if (count <= 0) {
                     null

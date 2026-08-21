@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -85,6 +86,47 @@ class NotificationAccountIsolationNavigationTest {
     }
 
     @Test
+    fun notificationForegroundResumeDoesNotDismissRetainedSourceConversationCards() {
+        val gate = RouteOrderGate(preloadFinishesFirst = true)
+        val appState = appState(fakeMarmot(gate))
+        appState.setAppInForeground(true)
+        runBlocking { appState.setActiveConversation(SOURCE_ACCOUNT, SHARED_GROUP) }
+        appState.setAppInForeground(false)
+        val sourceKeys = postConversationCards(SOURCE_ACCOUNT, "source-invite")
+        postConversationCards(TARGET_ACCOUNT, "target-invite")
+        val routed = routedTarget(TARGET_ACCOUNT)
+        val handled = AtomicBoolean(false)
+
+        // MainActivity defers the retained A-conversation cleanup for a
+        // notification-owned foreground entry. MainShell must then clear only
+        // B's destination cards, even if its local preload wins activation.
+        appState.setAppInForeground(
+            foreground = true,
+            dismissRetainedVisibleConversation = false,
+        )
+        composeRule.setContent {
+            var inboundTarget by remember { mutableStateOf(routed.notificationTarget) }
+            WhiteNoiseTheme {
+                MainShell(
+                    appState = appState,
+                    inboundNotificationTarget = inboundTarget,
+                    inboundNotificationRequestId = routed.notificationRequestId,
+                    onNotificationTargetHandled = { _, _ ->
+                        handled.set(true)
+                        inboundTarget = null
+                    },
+                )
+            }
+        }
+
+        awaitCondition { handled.get() }
+        awaitCondition {
+            manager.activeNotifications.map { it.tag to it.id }.toSet() == sourceKeys.toSet()
+        }
+        gate.releaseActivation.countDown()
+    }
+
+    @Test
     fun ordinaryConversation_accountSwitchInvalidatesOwnershipBeforeDestinationDismissal() {
         val renderedAccount = mutableStateOf<String?>(SOURCE_ACCOUNT)
         val navigationAccountStable = mutableStateOf(true)
@@ -117,7 +159,8 @@ class NotificationAccountIsolationNavigationTest {
 
     @Test
     fun mainShell_ordinaryConversationAccountSwitchPreservesDestinationCards() {
-        val appState = appState(fakeMarmot(RouteOrderGate(preloadFinishesFirst = true)))
+        val gate = RouteOrderGate(preloadFinishesFirst = true)
+        val appState = appState(fakeMarmot(gate))
         postConversationCards(SOURCE_ACCOUNT, "source-invite")
         val targetKeys = postConversationCards(TARGET_ACCOUNT, "target-invite")
         val routed = routedTarget(SOURCE_ACCOUNT)
@@ -150,6 +193,7 @@ class NotificationAccountIsolationNavigationTest {
         awaitCondition {
             manager.activeNotifications.map { it.tag to it.id }.toSet() == targetKeys.toSet()
         }
+        gate.releaseActivation.countDown()
     }
 
     private fun verifyInactiveAccountTapIsolation(preloadFinishesFirst: Boolean) {

@@ -140,12 +140,32 @@ class ConversationEntryUnreadSnapshotTest {
                 )
         }
         composeRule.waitForIdle()
-        assertEquals(ConversationEntryUnreadSnapshot(count = 0, firstUnreadMessageId = null), snapshot[0])
+        assertEquals(
+            ConversationEntryUnreadSnapshot(
+                count = 0,
+                firstUnreadMessageId = null,
+                projectionCaptured = false,
+            ),
+            snapshot[0],
+        )
 
         composeRule.runOnUiThread {
             projectionUnread.value = 2
             projectionFirstUnread.value = "first-unread"
             projectionAvailable.value = true
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(
+            ConversationEntryUnreadSnapshot(count = 2, firstUnreadMessageId = "first-unread"),
+            snapshot[0],
+        )
+
+        composeRule.runOnUiThread {
+            // Simulate the durable mark-read row landing immediately after the
+            // notification destination captured its entry projection.
+            projectionUnread.value = 0
+            projectionFirstUnread.value = null
         }
         composeRule.waitForIdle()
 

@@ -495,6 +495,11 @@ internal fun ConversationScreen(
     // fresh id so an already-mounted conversation re-runs its first-unread
     // anchor; it also implies current membership while verification catches up.
     notificationOpenRequestId: Long = 0L,
+    // Persist the notification's read-through cursor only after this screen
+    // freezes the pre-read projection. This keeps the entry divider stable
+    // without giving up the durable notification-tap read behavior (#1016).
+    notificationReadThroughMessageId: String? = null,
+    onNotificationUnreadBoundaryCaptured: (String) -> Unit = {},
     onFirstFrameCommitted: () -> Unit = {},
     // True only when this conversation was just created in the same navigation
     // step (issue #321) — drives a one-shot composer focus + keyboard raise so
@@ -563,6 +568,16 @@ internal fun ConversationScreen(
         )
     val entryUnreadCount = entryUnreadSnapshot.count
     val entryFirstUnreadMessageId = entryUnreadSnapshot.firstUnreadMessageId
+    LaunchedEffect(
+        entryUnreadSessionIdentity,
+        notificationReadThroughMessageId,
+        entryUnreadSnapshot.projectionCaptured,
+    ) {
+        val messageId = notificationReadThroughMessageId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        if (entryUnreadSnapshot.projectionCaptured) {
+            onNotificationUnreadBoundaryCaptured(messageId)
+        }
+    }
     val collapseLongMessages = appState.collapseLongMessagesInGroup(chat.group.groupIdHex)
     // When the developer streaming-debug toggle flips, re-publish the timeline.
     // Turning it off drops the transient QUIC debug rows so they don't linger.
