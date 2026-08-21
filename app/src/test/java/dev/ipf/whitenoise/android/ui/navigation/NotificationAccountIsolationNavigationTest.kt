@@ -36,6 +36,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -44,10 +45,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLooper
 import java.lang.reflect.Proxy
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 
 /** Full Compose-route regression coverage for the inactive-account race in #2191. */
 @RunWith(RobolectricTestRunner::class)
@@ -84,25 +85,34 @@ class NotificationAccountIsolationNavigationTest {
     }
 
     @Test
-    fun ordinaryConversation_activeAccountChangeResynchronizesNotificationOwnership() {
-        val activeAccount = mutableStateOf(SOURCE_ACCOUNT)
-        val observedOwnership = AtomicReference<Pair<String?, String?>>()
+    fun ordinaryConversation_accountSwitchInvalidatesOwnershipBeforeDestinationDismissal() {
+        val renderedAccount = mutableStateOf<String?>(SOURCE_ACCOUNT)
+        val navigationAccountStable = mutableStateOf(true)
+        val observedOwnership = CopyOnWriteArrayList<Pair<String?, String?>>()
 
         composeRule.setContent {
             ConversationNotificationOwnershipEffect(
                 selectedChatId = SHARED_GROUP,
                 selectedGroupIdHex = SHARED_GROUP,
-                selectedPinnedAccountRef = null,
-                activeAccountRef = activeAccount.value,
+                renderedChatId = SHARED_GROUP,
+                renderedAccountRef = renderedAccount.value,
+                navigationAccountStable = navigationAccountStable.value,
                 onOwnershipChanged = { accountRef, groupIdHex ->
-                    observedOwnership.set(accountRef to groupIdHex)
+                    observedOwnership += accountRef to groupIdHex
                 },
             )
         }
 
-        awaitCondition { observedOwnership.get() == (SOURCE_ACCOUNT to SHARED_GROUP) }
-        composeRule.runOnIdle { activeAccount.value = TARGET_ACCOUNT }
-        awaitCondition { observedOwnership.get() == (TARGET_ACCOUNT to SHARED_GROUP) }
+        awaitCondition { observedOwnership.lastOrNull() == (SOURCE_ACCOUNT to SHARED_GROUP) }
+        composeRule.runOnIdle {
+            // The active account has flipped, but MainShell has not yet cleared
+            // the ordinary selection. Its new controller/account calculation
+            // must not turn that stale selection into destination ownership.
+            renderedAccount.value = TARGET_ACCOUNT
+            navigationAccountStable.value = false
+        }
+        awaitCondition { observedOwnership.lastOrNull() == (null to null) }
+        assertFalse(observedOwnership.contains(TARGET_ACCOUNT to SHARED_GROUP))
     }
 
     private fun verifyInactiveAccountTapIsolation(preloadFinishesFirst: Boolean) {

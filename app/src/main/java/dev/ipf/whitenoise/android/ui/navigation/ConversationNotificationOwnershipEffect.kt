@@ -10,24 +10,22 @@ import androidx.compose.runtime.rememberUpdatedState
 internal fun ConversationNotificationOwnershipEffect(
     selectedChatId: String?,
     selectedGroupIdHex: String?,
-    selectedPinnedAccountRef: String?,
-    activeAccountRef: String?,
+    renderedChatId: String?,
+    renderedAccountRef: String?,
+    navigationAccountStable: Boolean,
     onOwnershipChanged: suspend (accountRef: String?, groupIdHex: String?) -> Unit,
 ) {
     val resolvedAccountRef =
-        selectedChatId?.let {
-            conversationControllerAccountRef(
-                selectedPinnedAccountRef = selectedPinnedAccountRef,
-                pendingAccountRef = null,
-                exitingAccountRef = null,
-                activeAccountRef = activeAccountRef,
-            )
+        renderedAccountRef.takeIf {
+            navigationAccountStable &&
+                selectedChatId != null &&
+                selectedChatId == renderedChatId
         }
     val currentOnOwnershipChanged by rememberUpdatedState(onOwnershipChanged)
-    LaunchedEffect(selectedChatId, selectedGroupIdHex, resolvedAccountRef) {
+    LaunchedEffect(selectedChatId, selectedGroupIdHex, renderedChatId, resolvedAccountRef) {
         currentOnOwnershipChanged(
             resolvedAccountRef,
-            selectedGroupIdHex.takeIf { selectedChatId != null },
+            selectedGroupIdHex.takeIf { resolvedAccountRef != null },
         )
     }
 }

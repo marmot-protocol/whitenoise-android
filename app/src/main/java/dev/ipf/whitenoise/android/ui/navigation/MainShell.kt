@@ -1227,18 +1227,6 @@ internal fun MainShell(
         }
     }
 
-    // Follow the selection directly so a chat-to-chat switch never hops
-    // through null — a notification update landing in that hop would beat
-    // suppression and post for the conversation being opened.
-    ConversationNotificationOwnershipEffect(
-        selectedChatId = selectedChat?.id,
-        selectedGroupIdHex = selectedChat?.group?.groupIdHex,
-        selectedPinnedAccountRef = selectedChatOpenContext.pinnedAccountRef,
-        activeAccountRef = appState.activeAccountRef,
-    ) { accountRef, groupIdHex ->
-        appState.setActiveConversation(accountRef, groupIdHex)
-    }
-
     // Upgrade a provisional open (targeted groupDetails read) to the
     // authoritative chat-list row when it arrives — once, without re-navigation.
     LaunchedEffect(
@@ -1542,6 +1530,21 @@ internal fun MainShell(
     val conversationController =
         selectedOrPendingConversationController
             ?: accountOwnedExitingConversationContent?.controller
+    // Follow the selected controller directly so a chat-to-chat switch never
+    // hops through null. The account-stability guard is essential: during an
+    // ordinary account switch the old selection survives for one composition,
+    // but it is no longer rendered. Never rebind that stale group to the new
+    // account and dismiss the destination account's notifications. A routed
+    // early open remains stable through its pinned-account exception above.
+    ConversationNotificationOwnershipEffect(
+        selectedChatId = selectedChat?.id,
+        selectedGroupIdHex = selectedChat?.group?.groupIdHex,
+        renderedChatId = controllerChat?.id,
+        renderedAccountRef = selectedOrPendingConversationController?.boundAccountRef,
+        navigationAccountStable = navAccountStable,
+    ) { accountRef, groupIdHex ->
+        appState.setActiveConversation(accountRef, groupIdHex)
+    }
     // Preloading, selected, and outgoing routes can briefly own different
     // controllers during a rapid Back -> open gesture. Keep each instance alive
     // for as long as any route slot references it; a single "current" effect
