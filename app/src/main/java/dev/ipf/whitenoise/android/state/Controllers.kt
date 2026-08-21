@@ -7061,6 +7061,7 @@ class ConversationController(
     private val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     private val timelineOrder = mutableListOf<String>()
     private val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
+    private val durableAcceptanceCallbacks = mutableMapOf<String, () -> Unit>()
     private val initialTimeline =
         initialConversationTimeline(
             preview = initialTimelinePreview,
@@ -8122,6 +8123,7 @@ class ConversationController(
                 timelineOrder = optimisticOrder,
                 retentionAtSendSeconds = retentionAtSendSeconds,
             )
+        durableAcceptanceCallbacks[optimisticKey] = onDurablyAccepted
         messageById[tempId] = optimistic
         publishTimelineFromIndexes()
         // Bump the chat-list row's preview in the same synchronous block as the
@@ -8189,7 +8191,7 @@ class ConversationController(
                     )
                     publishTextWithRetry(replyTarget, account, trimmed, trace, traceStartMs)
                 }
-            onDurablyAccepted()
+            completeDurableAcceptance(optimisticKey)
             val reconciliation =
                 reconcileSuccessfulTextSend(
                     summaryMessageIds = summary.messageIds,
@@ -8247,6 +8249,7 @@ class ConversationController(
                 // surfacing the raw backend error.
                 rollbackOptimisticChatListPreview(tempId)
                 optimisticMessages.remove(optimisticKey)
+                durableAcceptanceCallbacks.remove(optimisticKey)
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
                 forgetSendTrace(tempId)
@@ -9127,6 +9130,10 @@ class ConversationController(
     // path putting the message back as Failed.
     private val discardedDuringRetry = mutableSetOf<String>()
 
+    private fun completeDurableAcceptance(optimisticKey: String) {
+        durableAcceptanceCallbacks.remove(optimisticKey)?.invoke()
+    }
+
     private fun rollbackOptimisticChatListPreview(optimisticMessageIdHex: String) {
         appState.rollbackOptimisticSentPreview(conversationAccountRef, group.groupIdHex, optimisticMessageIdHex)
     }
@@ -9620,6 +9627,7 @@ class ConversationController(
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
                 }
+                completeDurableAcceptance(key)
                 transferRetentionAtSend(tempId, committedProjection.messageIdHex)
                 appState.commitOptimisticSentPreview(
                     accountRef = conversationAccountRef,
@@ -9651,6 +9659,7 @@ class ConversationController(
                     sendTrace(retryTrace, "manual-retry", 0L, context = arrayOf("reply" to (replyTarget != null)))
                     publishTextWithRetry(replyTarget, account, text, retryTrace, retryTraceStartMs)
                 }
+            completeDurableAcceptance(key)
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; drop the result entirely.
                 optimisticMessages.remove(key)
@@ -9753,6 +9762,7 @@ class ConversationController(
         }
         rollbackOptimisticChatListPreview(tempId)
         optimisticMessages.remove(key)
+        durableAcceptanceCallbacks.remove(key)
         messageById.remove(tempId)
         retentionAtSendByMessageId.remove(tempId)
         // Free any retained attachment bytes for a discarded media send.

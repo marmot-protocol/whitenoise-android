@@ -2689,10 +2689,6 @@ class WhiteNoiseAppState private constructor(
             )
         }
 
-    fun clearDraftAfterSuccessfulSend(groupIdHex: String) {
-        captureDraftForSend(groupIdHex)?.let(::clearDraftAfterSuccessfulSend)
-    }
-
     internal fun clearDraftAfterSuccessfulSend(pendingClear: DraftSendClearToken) {
         val accountRef = pendingClear.accountRef
         val groupIdHex = pendingClear.groupIdHex

@@ -86,6 +86,49 @@ class ConversationSendRetryIntegrationTest {
         }
 
     @Test
+    fun successfulManualRetryClearsTheDraftCapturedByTheInitialSend() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("retry me"))
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot =
+                        GroupMemberSnapshot(
+                            listOf(
+                                AppGroupMemberRecordFfi(
+                                    memberIdHex = ACCOUNT_ID,
+                                    account = ACCOUNT_REF,
+                                    local = true,
+                                ),
+                            ),
+                        ),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        if (attempts == 1) {
+                            throw MarmotKitException.Publish("relay rejected event")
+                        }
+                        SendSummaryFfi(
+                            published = 1u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            appState.sendConversationText(controller, "retry me")
+            assertEquals("retry me", appState.draftFor(GROUP_ID))
+
+            controller.retryFailedSend(controller.timeline.single())
+
+            assertEquals(null, appState.draftFor(GROUP_ID))
+            assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+        }
+
+    @Test
     fun acceptedPendingClearsTheCapturedComposerDraft() =
         runTest {
             val appState = appState()

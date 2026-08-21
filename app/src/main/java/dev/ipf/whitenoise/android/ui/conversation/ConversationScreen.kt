@@ -3595,7 +3595,6 @@ internal fun ConversationScreen(
         onCaptionAccepted = { seededCaption ->
             if (composerTextState.valueState.value.text == seededCaption) {
                 composerTextState.valueState.value = TextFieldValue("")
-                appState.clearDraftAfterSuccessfulSend(controller.group.groupIdHex)
             }
         },
         onAddPhotos = {
@@ -3605,7 +3604,6 @@ internal fun ConversationScreen(
         },
         onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
         onAfterSend = {
-            appState.clearDraftAfterSuccessfulSend(controller.group.groupIdHex)
             revealSentMessage(bottomTimelineIndex)
         },
     )
