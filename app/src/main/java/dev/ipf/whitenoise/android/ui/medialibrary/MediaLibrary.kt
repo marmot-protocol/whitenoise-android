@@ -104,6 +104,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresent
 import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
+import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
@@ -185,37 +186,87 @@ internal fun rememberSharedMediaTiles(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
     myAccountId: String? = appState.activeAccount?.accountIdHex,
-): SharedMediaTiles =
-    key(controller, myAccountId) {
+): SharedMediaTiles {
+    val timeline = controller.timeline
+    val deletedMessageIds = controller.deletedMessageIds
+    val pendingTimelineRemovedMessageIds = controller.pendingTimelineRemovedMessageIds
+    val retentionExpiries =
+        remember(timeline) {
+            timeline.mapNotNull { it.record.retentionExpiresAt?.takeIf { expiry -> expiry > 0uL } }
+        }
+    val nowSeconds = rememberForwardEligibilityNowSeconds(retentionExpiries)
+    return key(
+        controller,
+        myAccountId,
+        timeline,
+        deletedMessageIds,
+        pendingTimelineRemovedMessageIds,
+        nowSeconds,
+    ) {
         // The build sweep is O(N) over the timeline; run it off the composition
-        // thread and surface an empty result until it lands (consumers treat empty
-        // as "hide section / empty tabs", so the brief initial state is graceful).
+        // thread. Re-keying on every visibility input also clears a stale result
+        // synchronously, so deleted or expired media cannot remain swipeable while
+        // the replacement projection is still being built.
         val tiles by produceState(
-            initialValue =
-                SharedMediaTiles(
-                    emptyList(),
-                    emptyList(),
-                    emptyList(),
-                    emptyList(),
-                    emptyList(),
-                    emptyList(),
-                    emptyList(),
-                    emptyList(),
-                    emptyList(),
-                    emptyList(),
-                    hasOther = false,
-                ),
-            controller.timeline,
+            initialValue = emptySharedMediaTiles(),
+            timeline,
+            deletedMessageIds,
+            pendingTimelineRemovedMessageIds,
             myAccountId,
+            nowSeconds,
         ) {
-            val timelineSnapshot = controller.timeline
+            val timelineSnapshot = timeline
             value =
                 withContext(Dispatchers.Default) {
-                    buildTiles(timelineSnapshot, myAccountId)
+                    buildVisibleSharedMediaTiles(
+                        messages = timelineSnapshot,
+                        myAccountId = myAccountId,
+                        deletedMessageIds = deletedMessageIds,
+                        pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds,
+                        nowSeconds = nowSeconds,
+                    )
                 }
         }
         tiles
     }
+}
+
+private fun emptySharedMediaTiles() =
+    SharedMediaTiles(
+        images = emptyList(),
+        videos = emptyList(),
+        voice = emptyList(),
+        files = emptyList(),
+        urls = emptyList(),
+        imageSections = emptyList(),
+        videoSections = emptyList(),
+        voiceSections = emptyList(),
+        fileSections = emptyList(),
+        urlSections = emptyList(),
+        hasOther = false,
+    )
+
+internal fun buildVisibleSharedMediaTiles(
+    messages: List<TimelineMessage>,
+    myAccountId: String?,
+    deletedMessageIds: Set<String>,
+    pendingTimelineRemovedMessageIds: Set<String>,
+    nowSeconds: ULong,
+): SharedMediaTiles =
+    buildTiles(
+        messages =
+            messages.filter { message ->
+                val record = message.record
+                MessageProjector.isChatKind(record.kind) &&
+                    message.projected?.deleted != true &&
+                    !MessageProjector.isDeleted(record.messageIdHex, deletedMessageIds) &&
+                    record.messageIdHex !in pendingTimelineRemovedMessageIds &&
+                    record.retentionExpiresAt
+                        ?.takeIf { it > 0uL }
+                        ?.let { it > nowSeconds } != false
+            },
+        myAccountId = myAccountId,
+    )
 
 // Pure tile projection extracted from the composable so it can run on a
 // background dispatcher. Projected rows carry authoritative typed media;

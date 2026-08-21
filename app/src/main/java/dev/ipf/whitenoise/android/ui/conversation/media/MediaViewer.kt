@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrokenImage
@@ -41,6 +42,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -132,6 +135,84 @@ private data class MediaViewerPageKey(
 )
 
 private fun MediaViewerPage.key(): MediaViewerPageKey = MediaViewerPageKey(messageIdHex, attachmentIndex)
+
+private fun MediaViewerPage.saveableKey(): String = "${messageIdHex.length}:$messageIdHex:$attachmentIndex"
+
+internal data class MediaViewerPagerSelection(
+    val pagerState: PagerState,
+    val currentPageIndex: Int,
+    val currentPage: MediaViewerPage,
+)
+
+@Composable
+internal fun rememberMediaViewerPagerSelection(
+    pages: List<MediaViewerPage>,
+    startIndex: Int,
+): MediaViewerPagerSelection {
+    require(pages.isNotEmpty()) { "Media viewer pages must not be empty" }
+    val initialPageIndex = clampViewerPageIndex(startIndex, pages.size)
+    var visiblePageKey by remember { mutableStateOf(pages[initialPageIndex].key()) }
+    var visiblePageIndex by remember { mutableIntStateOf(initialPageIndex) }
+    val preservedIndex = pages.indexOfFirst { it.key() == visiblePageKey }
+    val restoredIndex =
+        if (preservedIndex >= 0) {
+            preservedIndex
+        } else {
+            clampViewerPageIndex(visiblePageIndex, pages.size)
+        }
+    // Shared-media projection is asynchronous. Recreate the pager at the
+    // preserved attachment as part of the same composition where the fallback
+    // list expands, so neither content nor metadata can bind to the old numeric
+    // index for a frame.
+    val pagerState =
+        key(pages) {
+            rememberPagerState(
+                initialPage = restoredIndex,
+                pageCount = { pages.size },
+            )
+        }
+    LaunchedEffect(pagerState, pages) {
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { page ->
+                val settledIndex = clampViewerPageIndex(page, pages.size)
+                visiblePageIndex = settledIndex
+                visiblePageKey = pages[settledIndex].key()
+            }
+    }
+    val pagerPageIndex = clampViewerPageIndex(pagerState.currentPage, pages.size)
+    val currentPageIndex =
+        pages
+            .indexOfFirst { it.key() == visiblePageKey }
+            .takeIf { it >= 0 }
+            ?: pagerPageIndex
+    return MediaViewerPagerSelection(
+        pagerState = pagerState,
+        currentPageIndex = currentPageIndex,
+        currentPage = pages[currentPageIndex],
+    )
+}
+
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+@Composable
+internal fun StableMediaViewerPager(
+    pages: List<MediaViewerPage>,
+    selection: MediaViewerPagerSelection,
+    modifier: Modifier,
+    userScrollEnabled: Boolean,
+    pageContent: @Composable (page: MediaViewerPage, isCurrent: Boolean) -> Unit,
+) {
+    val currentPageKey = selection.currentPage.key()
+    HorizontalPager(
+        state = selection.pagerState,
+        modifier = modifier,
+        key = { page -> pages[clampViewerPageIndex(page, pages.size)].saveableKey() },
+        userScrollEnabled = userScrollEnabled,
+    ) { page ->
+        val pageDescriptor = pages[clampViewerPageIndex(page, pages.size)]
+        pageContent(pageDescriptor, pageDescriptor.key() == currentPageKey)
+    }
+}
 
 /**
  * Select the gallery opened by an inline visual attachment.
@@ -237,30 +318,9 @@ internal fun FullScreenMediaViewer(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val pagerState =
-        rememberPagerState(
-            initialPage = clampViewerPageIndex(startIndex, pages.size),
-            pageCount = { pages.size },
-        )
-    var visiblePageKey by remember { mutableStateOf(pages[clampViewerPageIndex(startIndex, pages.size)].key()) }
-    LaunchedEffect(pages) {
-        // Shared-media projection is asynchronous. Preserve the attachment the
-        // user is looking at when the fallback one-message list expands into
-        // the full conversation gallery (or when a new image arrives).
-        val preservedIndex = pages.indexOfFirst { it.key() == visiblePageKey }
-        if (preservedIndex >= 0 && preservedIndex != pagerState.currentPage) {
-            pagerState.scrollToPage(preservedIndex)
-        }
-        snapshotFlow { pagerState.settledPage }
-            .distinctUntilChanged()
-            .collect { page ->
-                visiblePageKey = pages[clampViewerPageIndex(page, pages.size)].key()
-            }
-    }
-    // pagerState outlives a shrinking pages list (album reconcile): currentPage
-    // isn't re-clamped to the new lastIndex for a frame, so clamp at the read.
-    val currentPageIndex = clampViewerPageIndex(pagerState.currentPage, pages.size)
-    val currentPage = pages[currentPageIndex]
+    val pagerSelection = rememberMediaViewerPagerSelection(pages, startIndex)
+    val currentPageIndex = pagerSelection.currentPageIndex
+    val currentPage = pagerSelection.currentPage
     val currentReference = currentPage.reference
     val currentAttachmentIndex = currentPage.attachmentIndex
     val currentMessageIdHex = currentPage.messageIdHex
@@ -271,7 +331,7 @@ internal fun FullScreenMediaViewer(
     // never moves. Page change resets to identity below.
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    LaunchedEffect(pagerState.currentPage) {
+    LaunchedEffect(currentPage.messageIdHex, currentPage.attachmentIndex) {
         val reset = resetViewerTransform()
         scale = reset.scale
         offset = reset.offset
@@ -353,22 +413,22 @@ internal fun FullScreenMediaViewer(
             },
             snackbarHostState = snackbarHostState,
         ) {
-            HorizontalPager(
-                state = pagerState,
+            StableMediaViewerPager(
+                pages = pages,
+                selection = pagerSelection,
                 modifier = Modifier.fillMaxSize(),
                 // Disable pager swipe while the visible page is zoomed in —
                 // otherwise the pan gesture and the pager's swipe both want
                 // the horizontal drag. At scale 1× the pager wins.
                 userScrollEnabled = viewerPagerScrollEnabled(scale),
-            ) { page ->
-                val pageDescriptor = pages[clampViewerPageIndex(page, pages.size)]
+            ) { pageDescriptor, isCurrent ->
                 if (MediaReferenceSupport.isVideoMedia(pageDescriptor.reference)) {
                     VideoViewerPage(
                         controller = controller,
                         messageIdHex = pageDescriptor.messageIdHex,
                         attachmentIndex = pageDescriptor.attachmentIndex,
                         reference = pageDescriptor.reference,
-                        isCurrent = page == pagerState.currentPage,
+                        isCurrent = isCurrent,
                         mine = pageDescriptor.mine,
                     )
                 } else {
@@ -377,12 +437,12 @@ internal fun FullScreenMediaViewer(
                         messageIdHex = pageDescriptor.messageIdHex,
                         attachmentIndex = pageDescriptor.attachmentIndex,
                         reference = pageDescriptor.reference,
-                        scale = if (page == pagerState.currentPage) scale else 1f,
-                        offset = if (page == pagerState.currentPage) offset else Offset.Zero,
-                        onScaleChange = { if (page == pagerState.currentPage) scale = it },
-                        onOffsetChange = { if (page == pagerState.currentPage) offset = it },
+                        scale = if (isCurrent) scale else 1f,
+                        offset = if (isCurrent) offset else Offset.Zero,
+                        onScaleChange = { if (isCurrent) scale = it },
+                        onOffsetChange = { if (isCurrent) offset = it },
                         mine = pageDescriptor.mine,
-                        isCurrent = page == pagerState.currentPage,
+                        isCurrent = isCurrent,
                     )
                 }
             }
