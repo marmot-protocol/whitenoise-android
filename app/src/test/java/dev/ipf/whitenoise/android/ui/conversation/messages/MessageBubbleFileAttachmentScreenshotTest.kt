@@ -45,13 +45,16 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -65,6 +68,16 @@ class MessageBubbleFileAttachmentScreenshotTest {
     private val appState = appState()
     private val controller = ConversationController(appState = appState, initialGroup = group())
     private val composerTextState = ComposerTextState(TextFieldValue(""))
+
+    @Before
+    fun setDeterministicTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    @After
+    fun restoreTimeZone() {
+        TimeZone.setDefault(ORIGINAL_TIME_ZONE)
+    }
 
     @Test
     fun realMessageBubblePathKeepsFileCardsReadableAcrossParentVariants() {
@@ -215,8 +228,8 @@ class MessageBubbleFileAttachmentScreenshotTest {
                 sourceEpoch = 1uL,
                 retentionSeconds = null,
                 retentionExpiresAt = null,
-                recordedAt = index.toULong(),
-                receivedAt = index.toULong(),
+                recordedAt = (ONE_AM_UTC_EPOCH_SECONDS + index).toULong(),
+                receivedAt = (ONE_AM_UTC_EPOCH_SECONDS + index).toULong(),
             )
         val projected =
             TimelineMessageRecordFfi(
@@ -229,8 +242,8 @@ class MessageBubbleFileAttachmentScreenshotTest {
                 contentTokens = markdown(caption),
                 kind = 9uL,
                 tags = mediaTags,
-                timelineAt = index.toULong(),
-                receivedAt = index.toULong(),
+                timelineAt = (ONE_AM_UTC_EPOCH_SECONDS + index).toULong(),
+                receivedAt = (ONE_AM_UTC_EPOCH_SECONDS + index).toULong(),
                 replyToMessageIdHex = PARENT_MESSAGE_ID.takeIf { hasReply },
                 replyPreview = replyPreview().takeIf { hasReply },
                 mediaJson = null,
@@ -352,6 +365,8 @@ class MessageBubbleFileAttachmentScreenshotTest {
     }
 
     private companion object {
+        val ORIGINAL_TIME_ZONE: TimeZone = TimeZone.getDefault()
+        const val ONE_AM_UTC_EPOCH_SECONDS = 3_600
         const val ACCOUNT_REF = "personal"
         val ACCOUNT_ID = "01" + "00".repeat(31)
         val SENDER_ID = "02" + "00".repeat(31)
