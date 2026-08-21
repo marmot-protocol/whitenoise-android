@@ -9546,8 +9546,12 @@ class ConversationController(
         priority: AttachmentDownloadPriority,
     ): ByteArray {
         val account = conversationAccountRef ?: error("no active account")
+        val request = AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex)
+        if (priority == AttachmentDownloadPriority.Interactive) {
+            appState.enqueueAttachmentDownload(request, priority)
+        }
         return appState.downloadAttachmentPlaintext(
-            request = AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+            request = request,
             reference = reference,
             priority = priority,
         )

@@ -190,6 +190,40 @@ internal fun MediaVideoGridTile(
         }
     }
 
+    suspend fun dispatchReadyVideo() {
+        val playableFile =
+            withContext(Dispatchers.IO) {
+                validatedAttachmentCacheFile(localFile)
+            }
+        if (playableFile == null) {
+            localFile = null
+            posterBitmap = null
+            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+            return
+        }
+        localFile = playableFile
+        failed = false
+        onTap(playableFile)
+    }
+
+    persistedAttachmentOpenEffect(
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        sourceEpoch = epoch,
+        controller = controller,
+        appState = appState,
+        isReady = { localFile != null },
+        ensureMaterialization = {
+            if (failed) {
+                failed = false
+                reloadToken++
+            }
+            interactiveDownloadRequested = true
+            startDownload = true
+        },
+        dispatchOpen = { dispatchReadyVideo() },
+    )
+
     LaunchedEffect(localFile) {
         val f = localFile ?: return@LaunchedEffect
         if (posterBitmap != null) return@LaunchedEffect
@@ -227,37 +261,12 @@ internal fun MediaVideoGridTile(
                     val f = localFile
                     when {
                         f != null ->
-                            scope.launch {
-                                val playableFile =
-                                    withContext(Dispatchers.IO) {
-                                        validatedAttachmentCacheFile(f)
-                                    } ?: runCatching {
-                                        materializeVideoAttachment(
-                                            context = context,
-                                            controller = controller,
-                                            messageIdHex = messageIdHex,
-                                            attachmentIndex = attachmentIndex,
-                                            reference = reference,
-                                            mine = mine,
-                                        )
-                                    }.getOrElse { error ->
-                                        if (error is CancellationException) throw error
-                                        localFile = null
-                                        failed = true
-                                        return@launch
-                                    }
-                                localFile = playableFile
-                                failed = false
-                                onTap(playableFile)
-                            }
+                            scope.launch { dispatchReadyVideo() }
                         failed -> {
-                            interactiveDownloadRequested = true
-                            failed = false
-                            reloadToken++
+                            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
                         }
                         else -> {
-                            interactiveDownloadRequested = true
-                            startDownload = true
+                            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
                         }
                     }
                 },
@@ -433,6 +442,7 @@ internal fun MediaVideoBubble(
         )
     }
     var interactiveDownloadRequested by remember(pillKey) { mutableStateOf(false) }
+    var reloadToken by remember(pillKey, epoch) { mutableStateOf(0) }
 
     LaunchedEffect(
         pillKey,
@@ -440,6 +450,7 @@ internal fun MediaVideoBubble(
         startDownload,
         cachedPlaintextOnEntry,
         interactiveDownloadRequested,
+        reloadToken,
     ) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
@@ -478,6 +489,41 @@ internal fun MediaVideoBubble(
         }
         loading = false
     }
+
+    suspend fun dispatchReadyVideo() {
+        val playableFile =
+            withContext(Dispatchers.IO) {
+                validatedAttachmentCacheFile(localFile)
+            }
+        if (playableFile == null) {
+            localFile = null
+            posterBitmap = null
+            durationMs = 0L
+            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+            return
+        }
+        localFile = playableFile
+        failed = false
+        playerOpen = true
+    }
+
+    persistedAttachmentOpenEffect(
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        sourceEpoch = epoch,
+        controller = controller,
+        appState = appState,
+        isReady = { localFile != null },
+        ensureMaterialization = {
+            if (failed) {
+                failed = false
+                reloadToken++
+            }
+            interactiveDownloadRequested = true
+            startDownload = true
+        },
+        dispatchOpen = { dispatchReadyVideo() },
+    )
 
     LaunchedEffect(localFile) {
         val f = localFile ?: return@LaunchedEffect
@@ -568,49 +614,8 @@ internal fun MediaVideoBubble(
                             onClick = {
                                 when {
                                     uploadFailed -> onRetryUpload?.invoke()
-                                    loading -> interactiveDownloadRequested = true
-                                    else ->
-                                        scope.launch {
-                                            interactiveDownloadRequested = true
-                                            val retainedFile =
-                                                withContext(Dispatchers.IO) {
-                                                    validatedAttachmentCacheFile(localFile)
-                                                }
-                                            if (retainedFile != null && !failed) {
-                                                playerOpen = true
-                                                return@launch
-                                            }
-                                            if (localFile != null) {
-                                                localFile = null
-                                                posterBitmap = null
-                                                durationMs = 0L
-                                            }
-                                            startDownload = true
-                                            loading = true
-                                            runCatching {
-                                                materializeVideoAttachment(
-                                                    context = context,
-                                                    controller = controller,
-                                                    messageIdHex = messageIdHex,
-                                                    attachmentIndex = attachmentIndex,
-                                                    reference = reference,
-                                                    mine = mine,
-                                                )
-                                            }.onSuccess { file ->
-                                                localFile = file
-                                                failed = false
-                                                playerOpen = true
-                                            }.onFailure {
-                                                if (it is CancellationException) throw it
-                                                Log.w(
-                                                    "MediaVideoBubble",
-                                                    "manual materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
-                                                    it,
-                                                )
-                                                failed = true
-                                            }
-                                            loading = false
-                                        }
+                                    loading -> controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                                    else -> scope.launch { dispatchReadyVideo() }
                                 }
                             },
                         ),

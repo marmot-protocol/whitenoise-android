@@ -284,6 +284,24 @@ internal fun MediaImageBubble(
         }
     }
 
+    persistedAttachmentOpenEffect(
+        messageIdHex = key,
+        attachmentIndex = attachmentIndex,
+        sourceEpoch = epoch,
+        controller = controller,
+        appState = appState,
+        isReady = { presentation != null },
+        ensureMaterialization = {
+            if (failed) {
+                failed = false
+                reloadToken++
+            }
+            interactiveDownloadRequested = true
+            startDownload = true
+        },
+        dispatchOpen = { viewerOpen = true },
+    )
+
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = visualMediaBubbleShape(attachedToCaption),
@@ -343,9 +361,7 @@ internal fun MediaImageBubble(
                                 icon = Icons.Default.Refresh,
                                 contentDescription = stringResource(R.string.media_tap_to_retry),
                                 onClick = {
-                                    failed = false
-                                    interactiveDownloadRequested = true
-                                    reloadToken++
+                                    controller.requestAttachmentOpen(key, attachmentIndex)
                                 },
                             )
                         !startDownload ->
@@ -353,8 +369,7 @@ internal fun MediaImageBubble(
                                 icon = Icons.Default.ArrowDownward,
                                 contentDescription = stringResource(R.string.media_tap_to_download),
                                 onClick = {
-                                    interactiveDownloadRequested = true
-                                    startDownload = true
+                                    controller.requestAttachmentOpen(key, attachmentIndex)
                                 },
                             )
                         else ->
@@ -365,7 +380,9 @@ internal fun MediaImageBubble(
                                         .size(48.dp)
                                         .clickable(
                                             onClickLabel = stringResource(R.string.media_tap_to_download),
-                                            onClick = { interactiveDownloadRequested = true },
+                                            onClick = {
+                                                controller.requestAttachmentOpen(key, attachmentIndex)
+                                            },
                                         ),
                             ) {
                                 CircularProgressIndicator(
@@ -669,27 +686,37 @@ internal fun MediaImageGridTile(
         }
     }
 
+    persistedAttachmentOpenEffect(
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        sourceEpoch = reference.sourceEpoch,
+        controller = controller,
+        appState = appState,
+        isReady = { presentation != null },
+        ensureMaterialization = {
+            if (failed) {
+                failed = false
+                reloadToken++
+            }
+            interactiveDownloadRequested = true
+            startDownload = true
+        },
+        dispatchOpen = { onTap() },
+    )
+
     Box(
         modifier =
             modifier.combinedClickable(
                 onLongClick = onLongPress,
                 // Two modes:
                 //   - Bytes ready (`bitmap != null`): tap opens the viewer.
-                //   - Auto-download gated: tap flips startDownload, so the
-                //     first tap fetches and the next tap (once decoded)
-                //     opens the viewer. Same UX as the single-image bubble.
+                //   - Bytes pending: tap persists interactive open intent, so
+                //     the promoted transfer opens once after verified decode.
                 onClick = {
                     if (presentation != null) {
                         onTap()
-                    } else if (!startDownload) {
-                        interactiveDownloadRequested = true
-                        startDownload = true
-                    } else if (failed) {
-                        interactiveDownloadRequested = true
-                        failed = false
-                        reloadToken++
                     } else {
-                        interactiveDownloadRequested = true
+                        controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
                     }
                 },
             ),
@@ -727,9 +754,7 @@ internal fun MediaImageGridTile(
                             icon = Icons.Default.Refresh,
                             contentDescription = stringResource(R.string.media_tap_to_retry),
                             onClick = {
-                                interactiveDownloadRequested = true
-                                failed = false
-                                reloadToken++
+                                controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
                             },
                         )
                     !startDownload ->
@@ -737,8 +762,7 @@ internal fun MediaImageGridTile(
                             icon = Icons.Default.ArrowDownward,
                             contentDescription = stringResource(R.string.media_tap_to_download),
                             onClick = {
-                                interactiveDownloadRequested = true
-                                startDownload = true
+                                controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
                             },
                         )
                     else ->

@@ -15,19 +15,12 @@ class AttachmentDownloadProductionWiringTest {
         assertEquals(2, keyedEffects(image, "interactiveDownloadRequested"))
         assertEquals(2, keyedEffects(video, "interactiveDownloadRequested"))
         assertEquals(1, keyedEffects(voice, "interactiveDownloadRequested"))
-        assertTrue(
-            "Image loading progress must promote the transfer when tapped",
-            ".clickable( onClickLabel = stringResource(R.string.media_tap_to_download), " +
-                "onClick = { interactiveDownloadRequested = true }, )" in image,
-        )
-        assertTrue(
-            "Video loading progress must promote the transfer when tapped",
-            "loading -> interactiveDownloadRequested = true" in video,
-        )
-        assertTrue(
-            "Voice loading progress must promote the transfer when tapped",
-            "if (loading) { interactiveDownloadRequested = true return@combinedClickable }" in voice,
-        )
+        assertEquals(2, occurrences(image, "persistedAttachmentOpenEffect("))
+        assertEquals(2, occurrences(video, "persistedAttachmentOpenEffect("))
+        assertEquals(1, occurrences(voice, "persistedAttachmentOpenEffect("))
+        assertTrue(occurrences(image, "requestAttachmentOpen(") >= 5)
+        assertTrue(occurrences(video, "requestAttachmentOpen(") >= 4)
+        assertTrue(occurrences(voice, "requestAttachmentOpen(") >= 2)
     }
 
     @Test
@@ -41,6 +34,26 @@ class AttachmentDownloadProductionWiringTest {
         assertEquals(1, keyedRemembers(voice, "automaticDownloadsPaused"))
     }
 
+    @Test
+    fun everyInteractiveControllerDownloadHasDurableTerminalCleanup() {
+        val controller = projectSource("state/Controllers.kt").normalized()
+        val worker = projectSource("state/AttachmentDownloadWorker.kt").normalized()
+
+        assertTrue(
+            "Interactive controller downloads must enqueue durable work before the direct transfer",
+            "if (priority == AttachmentDownloadPriority.Interactive) { " +
+                "appState.enqueueAttachmentDownload(request, priority) } " +
+                "return appState.downloadAttachmentPlaintext(" in controller,
+        )
+        val retryDecision = worker.indexOf("if (shouldRetryAttachmentDownloadWork(")
+        val terminalCleanup = worker.indexOf("intentStore.setInteractive(request, interactive = false)", retryDecision)
+        val terminalFailure = worker.indexOf("Result.failure()", terminalCleanup)
+        assertTrue(
+            "A terminal worker failure must clear persisted interactive priority",
+            retryDecision >= 0 && terminalCleanup > retryDecision && terminalFailure > terminalCleanup,
+        )
+    }
+
     private fun keyedEffects(
         source: String,
         key: String,
@@ -51,11 +64,18 @@ class AttachmentDownloadProductionWiringTest {
         key: String,
     ): Int = Regex("remember\\([^)]*\\b$key\\b[^)]*\\)").findAll(source).count()
 
-    private fun source(fileName: String): String =
+    private fun occurrences(
+        source: String,
+        needle: String,
+    ): Int = source.windowed(needle.length).count { it == needle }
+
+    private fun source(fileName: String): String = projectSource("ui/conversation/media/$fileName")
+
+    private fun projectSource(relativePath: String): String =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/$fileName"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/$fileName"),
-        ).firstOrNull(File::isFile)?.readText() ?: error("Missing $fileName source file")
+            File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
+        ).firstOrNull(File::isFile)?.readText() ?: error("Missing $relativePath source file")
 
     private fun String.normalized(): String = replace(Regex("\\s+"), " ")
 }
