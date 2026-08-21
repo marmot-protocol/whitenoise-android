@@ -33,13 +33,7 @@ class VoiceRecordingControllerTest {
 
     @Test
     fun recordingFocusRequestIsStoredOnlyAfterGrant() {
-        val source =
-            listOf(
-                File("src/main/java/dev/ipf/whitenoise/android/audio/VoiceRecordingController.kt"),
-                File("app/src/main/java/dev/ipf/whitenoise/android/audio/VoiceRecordingController.kt"),
-            ).firstOrNull { it.exists() }?.readText()
-                ?: error("Missing VoiceRecordingController.kt source file")
-        val body = source.kotlinFunctionBody("requestRecordingFocus")
+        val body = voiceRecordingControllerSource().kotlinFunctionBody("requestRecordingFocus")
 
         assertTrue(
             "requestRecordingFocus should only retain the focus request after AudioManager grants it",
@@ -47,4 +41,26 @@ class VoiceRecordingControllerTest {
                 body.indexOf("requestAudioFocus(req)") < body.indexOf("focusRequest = req"),
         )
     }
+
+    @Test
+    fun abortedRestartClearsStateAndReleasesAnIdleMicrophoneLease() {
+        val source = voiceRecordingControllerSource()
+        val start = source.kotlinFunctionBody("start")
+        val cleanup = source.kotlinFunctionBody("completeRestart")
+
+        assertTrue(
+            "the restart cleanup must release its lease when no recorder took ownership",
+            "finally" in start &&
+                "completeRestart()" in start &&
+                "restarting = false" in cleanup &&
+                "if (!isRecording && recorder == null) releaseMicrophoneLease()" in cleanup,
+        )
+    }
+
+    private fun voiceRecordingControllerSource(): String =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/audio/VoiceRecordingController.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/audio/VoiceRecordingController.kt"),
+        ).firstOrNull { it.exists() }?.readText()
+            ?: error("Missing VoiceRecordingController.kt source file")
 }

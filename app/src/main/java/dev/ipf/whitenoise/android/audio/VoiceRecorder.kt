@@ -21,11 +21,24 @@ import java.io.File
  *
  * NOT thread-safe. Call from a single owner — the composer's coroutine.
  */
-class VoiceRecorder(
+internal interface VoiceRecordingSession {
+    fun start()
+
+    fun stop(): VoiceRecordingResult?
+
+    fun cancel()
+}
+
+internal data class VoiceRecordingResult(
+    val file: File,
+    val durationMs: Long,
+)
+
+internal class VoiceRecorder(
     private val context: Context,
     private val outputFile: File,
     private val bitrateBps: Int = DEFAULT_BITRATE_BPS,
-) {
+) : VoiceRecordingSession {
     private var recorder: MediaRecorder? = null
     private var startedAtNanos: Long = 0L
 
@@ -36,7 +49,7 @@ class VoiceRecorder(
      * primed (typically a missing permission or a busy mic) — the caller
      * surfaces a toast and skips the send.
      */
-    fun start() {
+    override fun start() {
         require(recorder == null) { "VoiceRecorder.start called twice" }
         outputFile.parentFile?.mkdirs()
         // API 31+ has a context-aware ctor that lets the platform attribute
@@ -78,7 +91,7 @@ class VoiceRecorder(
      * unusable). The recorder is released either way; safe to discard the
      * instance after.
      */
-    fun stop(): Result? {
+    override fun stop(): VoiceRecordingResult? {
         val r = recorder ?: return null
         recorder = null
         return try {
@@ -89,7 +102,7 @@ class VoiceRecorder(
                 runCatching { outputFile.delete() }
                 null
             } else {
-                Result(outputFile, durationMs)
+                VoiceRecordingResult(outputFile, durationMs)
             }
         } catch (t: Throwable) {
             // MediaRecorder.stop() throws RuntimeException when stop is
@@ -107,18 +120,13 @@ class VoiceRecorder(
      * Abort the recording and discard the file. Safe to call at any time —
      * a no-op when not recording.
      */
-    fun cancel() {
+    override fun cancel() {
         val r = recorder ?: return
         recorder = null
         runCatching { r.stop() }
         runCatching { r.release() }
         runCatching { outputFile.delete() }
     }
-
-    data class Result(
-        val file: File,
-        val durationMs: Long,
-    )
 
     companion object {
         const val SAMPLE_RATE_HZ = 16_000

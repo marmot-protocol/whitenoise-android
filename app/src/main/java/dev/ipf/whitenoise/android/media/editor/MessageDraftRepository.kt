@@ -379,6 +379,16 @@ internal class MessageDraftCoordinatedOperations(
         groupIdHex: String,
     ): MessageDraftGeneration = mutationGenerations.advance(DraftKey(accountRef, groupIdHex))
 
+    fun acceptMutationIfCurrent(
+        accountRef: String,
+        groupIdHex: String,
+        expected: MessageDraftGeneration,
+    ): MessageDraftGeneration? =
+        mutationGenerations.advanceIfCurrent(
+            key = DraftKey(accountRef, groupIdHex),
+            expected = expected,
+        )
+
     fun generation(
         accountRef: String,
         groupIdHex: String,
@@ -463,6 +473,16 @@ internal class MessageDraftMutationGenerations {
             val next = (values[key] ?: 0L) + 1L
             values[key] = next
             MessageDraftGeneration(next)
+        }
+
+    fun advanceIfCurrent(
+        key: DraftKey,
+        expected: MessageDraftGeneration,
+    ): MessageDraftGeneration? =
+        synchronized(lock) {
+            val current = values[key] ?: 0L
+            if (current != expected.value) return@synchronized null
+            MessageDraftGeneration(current + 1L).also { values[key] = it.value }
         }
 
     fun current(key: DraftKey) = synchronized(lock) { MessageDraftGeneration(values[key] ?: 0L) }

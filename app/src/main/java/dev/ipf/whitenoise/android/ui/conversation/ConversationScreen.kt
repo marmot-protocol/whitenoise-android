@@ -1475,6 +1475,7 @@ internal fun ConversationScreen(
                 // Read at record-start (the controller is not re-keyed on the
                 // quality state) so a setting change applies to the next clip.
                 bitrateProvider = { appState.mediaQuality.audioBitrateBps },
+                microphoneCaptures = appState.microphoneCaptureCoordinator,
             )
         }
     DisposableEffect(voiceRecordingController) {
@@ -2681,11 +2682,18 @@ internal fun ConversationScreen(
             externalRevision = appState.inboundShareRevision,
             editingMessageId = controller.editingMessageId,
         )
+    val composerDictationRevision =
+        appState.activeAccountRef?.let { accountRef ->
+            appState.conversationDictation.completionRevision(
+                accountRef = accountRef,
+                groupIdHex = controller.group.groupIdHex,
+            )
+        } ?: 0
     val composerTextState =
         rememberComposerTextState(
             draftKey = controller.group.groupIdHex,
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-            externalRevision = composerShareRevision,
+            externalRevision = composerShareRevision + composerDictationRevision,
         )
     val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 

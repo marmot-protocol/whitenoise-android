@@ -40,6 +40,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -258,7 +261,8 @@ private fun AttachmentActionTile(
         modifier =
             modifier
                 .clip(RoundedCornerShape(Radii.lg))
-                .clickable(onClick = onClick)
+                .semantics(mergeDescendants = true) { contentDescription = label }
+                .clickable(role = Role.Button, onClick = onClick)
                 .padding(vertical = Dimens.spaceXs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),

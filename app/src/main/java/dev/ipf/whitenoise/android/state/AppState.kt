@@ -55,6 +55,7 @@ import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.RetentionSweepGroupOutcomeFfi
 import dev.ipf.marmotkit.RetentionSweepStatusFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -63,6 +64,10 @@ import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.amber.AmberSignerController
+import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
+import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
+import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsAudioFocusOwner
 import dev.ipf.whitenoise.android.audio.tts.TtsController
@@ -107,6 +112,7 @@ import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
 import dev.ipf.whitenoise.android.media.editor.MarmotMessageDraftGateway
 import dev.ipf.whitenoise.android.media.editor.MessageDraftConditionalDeleteResult
+import dev.ipf.whitenoise.android.media.editor.MessageDraftGeneration
 import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
@@ -1600,6 +1606,37 @@ class WhiteNoiseAppState private constructor(
 
     private val appContext = context.applicationContext
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
+    private val dictationMicrophoneOwner = Any()
+    internal val conversationDictation: ConversationDictationController by lazy {
+        ConversationDictationController(
+            context = appContext,
+            readDraft = ::conversationDictationDraftSnapshot,
+            writeDraft = ::setConversationDictationDraftIfCurrent,
+            targetAvailable = { accountRef, groupIdHex ->
+                accounts.any { it.label == accountRef && it.signedOut != true } &&
+                    (activeAccountRef != accountRef || chatsController?.containsGroup(groupIdHex) != false)
+            },
+            targetValidator = { accountRef, groupIdHex ->
+                if (accounts.none { it.label == accountRef && it.signedOut != true }) {
+                    false
+                } else {
+                    runCatchingCancellable {
+                        marmotIo {
+                            groupDetails(accountRef, groupIdHex).group.selfMembership == SelfMembershipFfi.MEMBER
+                        }
+                    }.getOrDefault(false)
+                }
+            },
+            targetValidationScope = mutationsScope,
+            onBeforeRecognition = {
+                VoicePlaybackController.pause()
+                stopSpeaking()
+            },
+            tryAcquireMicrophone = { microphoneCaptureCoordinator.tryAcquire(dictationMicrophoneOwner) },
+            releaseMicrophone = { microphoneCaptureCoordinator.release(dictationMicrophoneOwner) },
+        )
+    }
     private val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
     internal val editorSessionStore: EditorSessionStore = EditorSessionStore.create(appContext)
@@ -2562,8 +2599,52 @@ class WhiteNoiseAppState private constructor(
         value: TextFieldValue,
     ) {
         val account = activeAccountRef ?: return
-        draftStore.set(account, groupIdHex, value)
-        draftWriter.submit(account, groupIdHex, value.text)
+        setDraftForAccount(account, groupIdHex, value)
+    }
+
+    private fun setDraftForAccount(
+        accountRef: String,
+        groupIdHex: String,
+        value: TextFieldValue,
+    ) {
+        draftStore.set(accountRef, groupIdHex, value)
+        draftWriter.submit(accountRef, groupIdHex, value.text)
+    }
+
+    private fun conversationDictationDraftSnapshot(
+        accountRef: String,
+        groupIdHex: String,
+    ): ConversationDictationDraftSnapshot {
+        // A repository/attachment mutation can advance the generation from a
+        // worker while this main-thread lifecycle cache is read. Take a second
+        // generation sample and retry once so the pair normally describes one
+        // stable observation; the conditional write still fails closed if a
+        // later mutation wins the race.
+        repeat(2) {
+            val before = draftWriter.generation(accountRef, groupIdHex)
+            val value = draftStore.getDraft(accountRef, groupIdHex)?.textFieldValue ?: TextFieldValue("")
+            val after = draftWriter.generation(accountRef, groupIdHex)
+            if (before == after) return ConversationDictationDraftSnapshot(value, after.value)
+        }
+        val latest = draftWriter.generation(accountRef, groupIdHex)
+        val value = draftStore.getDraft(accountRef, groupIdHex)?.textFieldValue ?: TextFieldValue("")
+        return ConversationDictationDraftSnapshot(value, latest.value)
+    }
+
+    private fun setConversationDictationDraftIfCurrent(
+        accountRef: String,
+        groupIdHex: String,
+        expectedRevision: Long,
+        value: TextFieldValue,
+    ): Boolean {
+        draftWriter.submitIfCurrent(
+            accountRef = accountRef,
+            groupIdHex = groupIdHex,
+            expected = MessageDraftGeneration(expectedRevision),
+            content = value.text,
+        ) ?: return false
+        draftStore.set(accountRef, groupIdHex, value)
+        return true
     }
 
     /** Hydrates the selected composer from MDK without retaining attachment plaintext in Android state. */
@@ -5269,6 +5350,7 @@ class WhiteNoiseAppState private constructor(
         // In-memory plaintext is dropped synchronously here; the on-disk wipe
         // is awaited in this suspend path so it isn't an orphaned background task.
         val signedOutRef = activeAccountRef ?: return null
+        conversationDictation.onAccountUnavailable(signedOutRef)
         stopTtsForRemovedAccount(signedOutRef)
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
@@ -5338,6 +5420,7 @@ class WhiteNoiseAppState private constructor(
     // One cancellation-safe bracket owns wipe, editor purge, account switch, and recovery.
     suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
         val wipedRef = activeAccountRef ?: return null
+        conversationDictation.onAccountUnavailable(wipedRef)
         clearInMemoryMediaCaches()
         clearConversationShortcutSurfaces()
         try {
@@ -6918,6 +7001,7 @@ class WhiteNoiseAppState private constructor(
             dismissVisibleConversationNotifications()
         } else {
             recordAppLockBackgrounded()
+            conversationDictation.onAppBackgrounded()
             mutationsScope.launch { draftWriter.flush() }
             // Read-aloud is foreground-only in v1 (no mediaPlayback FGS):
             // spoken private messages must not continue after an app switch.
@@ -6956,6 +7040,7 @@ class WhiteNoiseAppState private constructor(
      */
     fun onTaskRemoved() {
         updateNotificationSuppression(suppression.onTaskRemoved())
+        conversationDictation.cancel()
         mutationsScope.launch { draftWriter.flush() }
     }
 
@@ -8213,6 +8298,7 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ) {
+        if (accountRef != null) conversationDictation.onTargetRemoved(accountRef, groupIdHex)
         val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return
         val activeAccountIdHex = activeAccount?.accountIdHex
         synchronized(groupMemberSnapshotLock) {

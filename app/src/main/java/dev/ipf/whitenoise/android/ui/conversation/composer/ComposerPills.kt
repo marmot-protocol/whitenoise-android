@@ -34,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -111,6 +112,7 @@ internal fun ComposerPill(
     onPickFromGallery: (() -> Unit)?,
     onPickDocument: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    onDictation: (() -> Unit)? = null,
     // Gate inputs only: the sheet these open lives in ComposerBar, but the
     // attach button must appear whenever ANY attachment action is wired, not
     // just gallery/document.
@@ -268,6 +270,7 @@ internal fun ComposerPill(
     val expandedLayout = multilineControls || expansionMode != ComposerExpansionMode.Automatic
     val compactTrailingReserve =
         4.dp +
+            (if (onDictation != null) 48.dp else 0.dp) +
             (if (hasAttachmentAction) 36.dp else 0.dp) +
             (if (trailingAction != null) 44.dp else 0.dp)
     val expandedHeightModifier =
@@ -426,8 +429,28 @@ internal fun ComposerPill(
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)
-                        .height(44.dp),
+                        .height(if (onDictation != null) 48.dp else 44.dp),
             ) {
+                if (onDictation != null) {
+                    IconButton(
+                        onClick = onDictation,
+                        enabled = inputContentVisible,
+                        modifier =
+                            Modifier
+                                .size(48.dp)
+                                .alpha(if (inputContentVisible) 1f else 0f)
+                                .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                    ) {
+                        // A waveform keeps text dictation visually distinct from
+                        // the plain microphone used by hold-to-record voice notes.
+                        Icon(
+                            Icons.Default.GraphicEq,
+                            contentDescription = stringResource(R.string.dictate_text),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(21.dp),
+                        )
+                    }
+                }
                 if (hasAttachmentAction) {
                     IconButton(
                         onClick = onAttachmentsToggle,
