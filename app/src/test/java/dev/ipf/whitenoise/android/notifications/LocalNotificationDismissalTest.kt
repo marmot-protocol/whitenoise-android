@@ -149,7 +149,7 @@ class LocalNotificationDismissalTest {
     }
 
     @Test
-    fun notificationRoutedOpenBeforeAccountSwitchKeepsSourceAccountCards() {
+    fun pinnedConversationOwnerDismissalKeepsSourceAccountCards() {
         val sourceAccount = "account-a"
         val targetAccount = "account-b"
         val sharedGroup = "group-shared-by-both-accounts"
