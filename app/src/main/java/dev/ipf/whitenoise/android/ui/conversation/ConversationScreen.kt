@@ -182,6 +182,8 @@ import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsShari
 import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
+import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
+import dev.ipf.whitenoise.android.ui.medialibrary.toViewerPages
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -810,6 +812,13 @@ internal fun ConversationScreen(
         remember(controller.timeline) {
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         }
+    val conversationMedia =
+        rememberSharedMediaTiles(
+            controller = controller,
+            appState = appState,
+            myAccountId = conversationSelfAccountIdHex,
+        )
+    val conversationImagePages = remember(conversationMedia.images) { conversationMedia.images.toViewerPages() }
     val renderedTimelineAnchorKeys =
         remember(renderedTimeline) {
             renderedTimeline.map { it.id to it.record.messageIdHex }
@@ -3276,6 +3285,7 @@ internal fun ConversationScreen(
                                     },
                                     appState = appState,
                                     controller = controller,
+                                    conversationImagePages = conversationImagePages,
                                     eventCardResolver = eventCardResolver,
                                     documentSaveFallback = documentSaveFallback,
                                     composerTextState = composerTextState,

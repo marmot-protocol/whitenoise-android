@@ -166,6 +166,7 @@ internal fun MediaImageBubble(
     attachmentIndex: Int,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    conversationImagePages: List<MediaViewerPage>,
     mine: Boolean,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
@@ -418,16 +419,17 @@ internal fun MediaImageBubble(
     }
 
     if (viewerOpen) {
-        FullScreenImageViewer(
+        ConversationMediaViewer(
             controller = controller,
             appState = appState,
+            conversationImagePages = conversationImagePages,
             messageIdHex = key,
             attachments = listOf(IndexedValue(attachmentIndex, reference)),
-            startIndex = 0,
-            onDismiss = { viewerOpen = false },
+            tappedAttachmentIndex = attachmentIndex,
             sender = record.sender,
             recordedAt = record.recordedAt,
             mine = mine,
+            onDismiss = { viewerOpen = false },
         )
     }
 }
@@ -507,6 +509,7 @@ internal fun MediaVisualGridBubble(
     attachments: List<IndexedValue<MediaAttachmentReferenceFfi>>,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    conversationImagePages: List<MediaViewerPage>,
     mine: Boolean,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
@@ -516,12 +519,11 @@ internal fun MediaVisualGridBubble(
     // Show up to four tiles before collapsing the remainder into a "+N"
     // overlay on the fourth tile, matching the image grid (#527).
     val visible = attachments.take(4)
-    val overflow = (attachments.size - visible.size).coerceAtLeast(0)
-    var viewerOpenAt by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
+    var viewerOpenAttachmentIndex by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
 
     val tileAt: @Composable (Int, Modifier) -> Unit = { tileIndex, tileModifier ->
         val entry = visible[tileIndex]
-        val showOverflow = tileIndex == visible.lastIndex && overflow > 0
+        val showOverflow = tileIndex == visible.lastIndex && attachments.size > visible.size
         if (MediaReferenceSupport.isVideoMedia(entry.value)) {
             MediaVideoGridTile(
                 messageIdHex = record.messageIdHex,
@@ -530,8 +532,8 @@ internal fun MediaVisualGridBubble(
                 controller = controller,
                 appState = appState,
                 mine = mine,
-                onTap = { _ -> viewerOpenAt = tileIndex },
-                overflowCount = if (showOverflow) overflow else 0,
+                onTap = { _ -> viewerOpenAttachmentIndex = entry.index },
+                overflowCount = if (showOverflow) attachments.size - visible.size else 0,
                 modifier = tileModifier,
                 onLongPress = onLongPress,
                 uploading = uploading,
@@ -544,8 +546,8 @@ internal fun MediaVisualGridBubble(
                 controller = controller,
                 appState = appState,
                 mine = mine,
-                onTap = { viewerOpenAt = tileIndex },
-                overflowCount = if (showOverflow) overflow else 0,
+                onTap = { viewerOpenAttachmentIndex = entry.index },
+                overflowCount = if (showOverflow) attachments.size - visible.size else 0,
                 modifier = tileModifier,
                 onLongPress = onLongPress,
                 uploading = uploading,
@@ -562,22 +564,18 @@ internal fun MediaVisualGridBubble(
         MasonryImageLayout(visibleCount = visible.size, onLongPress = onLongPress, tile = tileAt)
     }
 
-    viewerOpenAt?.let { tileIndex ->
-        // Unified viewer walks the full attachments list — each page picks
-        // its renderer (image vs video) by MIME, swipes between siblings
-        // regardless of type. mine threads through so an own optimistic
-        // overflow video (>4 tiles) materialises from retained bytes
-        // instead of trying an FFI download at epoch=0.
-        FullScreenImageViewer(
+    viewerOpenAttachmentIndex?.let { tappedAttachmentIndex ->
+        ConversationMediaViewer(
             controller = controller,
             appState = appState,
+            conversationImagePages = conversationImagePages,
             messageIdHex = record.messageIdHex,
             attachments = attachments,
-            startIndex = tileIndex,
-            onDismiss = { viewerOpenAt = null },
+            tappedAttachmentIndex = tappedAttachmentIndex,
             sender = record.sender,
             recordedAt = record.recordedAt,
             mine = mine,
+            onDismiss = { viewerOpenAttachmentIndex = null },
         )
     }
 }

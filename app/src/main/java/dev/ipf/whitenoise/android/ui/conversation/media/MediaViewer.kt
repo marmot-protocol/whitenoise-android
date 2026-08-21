@@ -46,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -78,7 +79,7 @@ import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
 import dev.ipf.whitenoise.android.ui.common.viewerPagerScrollEnabled
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -120,32 +121,100 @@ internal data class MediaViewerPage(
     val recordedAt: ULong,
 )
 
-// Album wrapper preserving the original call shape: a single message's
-// attachments, one `mine` flag. The three conversation bubble callsites use
-// this; it just projects the album onto per-page descriptors.
+internal data class MediaViewerGallery(
+    val pages: List<MediaViewerPage>,
+    val startIndex: Int,
+)
+
+private data class MediaViewerPageKey(
+    val messageIdHex: String,
+    val attachmentIndex: Int,
+)
+
+private fun MediaViewerPage.key(): MediaViewerPageKey = MediaViewerPageKey(messageIdHex, attachmentIndex)
+
+/**
+ * Select the gallery opened by an inline visual attachment.
+ *
+ * Image-only messages use the conversation's shared-media image order (newest
+ * first), while mixed image/video albums retain their message-local paging
+ * contract. The current message pages are merged when the asynchronous shared
+ * projection has not caught up yet, which keeps optimistic own sends openable.
+ */
+internal fun visualMediaViewerGallery(
+    conversationImagePages: List<MediaViewerPage>,
+    messagePages: List<MediaViewerPage>,
+    tappedAttachmentIndex: Int,
+): MediaViewerGallery {
+    val tappedPage =
+        messagePages.firstOrNull { it.attachmentIndex == tappedAttachmentIndex }
+            ?: messagePages.firstOrNull()
+    return when {
+        tappedPage == null -> MediaViewerGallery(conversationImagePages, 0)
+        messagePages.any { MediaReferenceSupport.isVideoMedia(it.reference) } ->
+            MediaViewerGallery(
+                pages = messagePages,
+                startIndex = messagePages.indexOf(tappedPage),
+            )
+        else -> {
+            val currentMessageId = tappedPage.messageIdHex
+            val projectedKeys = conversationImagePages.mapTo(HashSet()) { it.messageIdHex to it.attachmentIndex }
+            val currentMessageFullyProjected =
+                messagePages.all { (it.messageIdHex to it.attachmentIndex) in projectedKeys }
+            val pages =
+                if (currentMessageFullyProjected) {
+                    conversationImagePages
+                } else {
+                    // buildTiles() reverses the flattened timeline projection, so an
+                    // album's attachment order is reversed in the shared-media grid.
+                    val currentPages = messagePages.asReversed()
+                    val otherPages = conversationImagePages.filterNot { it.messageIdHex == currentMessageId }
+                    val insertAt =
+                        otherPages
+                            .indexOfFirst { it.recordedAt < tappedPage.recordedAt }
+                            .takeIf { it >= 0 }
+                            ?: otherPages.size
+                    otherPages.subList(0, insertAt) + currentPages + otherPages.subList(insertAt, otherPages.size)
+                }
+            val startIndex =
+                pages
+                    .indexOfFirst {
+                        it.messageIdHex == currentMessageId && it.attachmentIndex == tappedAttachmentIndex
+                    }.coerceAtLeast(0)
+            MediaViewerGallery(pages, startIndex)
+        }
+    }
+}
+
 @Composable
-internal fun FullScreenImageViewer(
+@Suppress("FunctionNaming")
+internal fun ConversationMediaViewer(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    conversationImagePages: List<MediaViewerPage>,
     messageIdHex: String,
     attachments: List<IndexedValue<MediaAttachmentReferenceFfi>>,
-    startIndex: Int,
-    onDismiss: () -> Unit,
+    tappedAttachmentIndex: Int,
     sender: String,
     recordedAt: ULong,
-    mine: Boolean = false,
+    mine: Boolean,
+    onDismiss: () -> Unit,
 ) {
-    val pages =
+    val messagePages =
         remember(messageIdHex, attachments, mine, sender, recordedAt) {
             attachments.map { entry ->
                 MediaViewerPage(messageIdHex, entry.index, entry.value, mine, sender, recordedAt)
             }
         }
+    val gallery =
+        remember(conversationImagePages, messagePages, tappedAttachmentIndex) {
+            visualMediaViewerGallery(conversationImagePages, messagePages, tappedAttachmentIndex)
+        }
     FullScreenMediaViewer(
         controller = controller,
         appState = appState,
-        pages = pages,
-        startIndex = startIndex,
+        pages = gallery.pages,
+        startIndex = gallery.startIndex,
         onDismiss = onDismiss,
     )
 }
@@ -173,6 +242,21 @@ internal fun FullScreenMediaViewer(
             initialPage = clampViewerPageIndex(startIndex, pages.size),
             pageCount = { pages.size },
         )
+    var visiblePageKey by remember { mutableStateOf(pages[clampViewerPageIndex(startIndex, pages.size)].key()) }
+    LaunchedEffect(pages) {
+        // Shared-media projection is asynchronous. Preserve the attachment the
+        // user is looking at when the fallback one-message list expands into
+        // the full conversation gallery (or when a new image arrives).
+        val preservedIndex = pages.indexOfFirst { it.key() == visiblePageKey }
+        if (preservedIndex >= 0 && preservedIndex != pagerState.currentPage) {
+            pagerState.scrollToPage(preservedIndex)
+        }
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { page ->
+                visiblePageKey = pages[clampViewerPageIndex(page, pages.size)].key()
+            }
+    }
     // pagerState outlives a shrinking pages list (album reconcile): currentPage
     // isn't re-clamped to the new lastIndex for a frame, so clamp at the read.
     val currentPageIndex = clampViewerPageIndex(pagerState.currentPage, pages.size)

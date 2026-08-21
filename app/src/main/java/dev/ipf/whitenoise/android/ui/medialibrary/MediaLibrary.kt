@@ -53,6 +53,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -183,37 +184,38 @@ internal data class SharedMediaTiles(
 internal fun rememberSharedMediaTiles(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
-): SharedMediaTiles {
-    val myAccountId = appState.activeAccount?.accountIdHex
-    // The build sweep is O(N) over the timeline; run it off the composition
-    // thread and surface an empty result until it lands (consumers treat empty
-    // as "hide section / empty tabs", so the brief initial state is graceful).
-    val tiles by produceState(
-        initialValue =
-            SharedMediaTiles(
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                hasOther = false,
-            ),
-        controller.timeline,
-        myAccountId,
-    ) {
-        val timelineSnapshot = controller.timeline
-        value =
-            withContext(Dispatchers.Default) {
-                buildTiles(timelineSnapshot, myAccountId)
-            }
+    myAccountId: String? = appState.activeAccount?.accountIdHex,
+): SharedMediaTiles =
+    key(controller, myAccountId) {
+        // The build sweep is O(N) over the timeline; run it off the composition
+        // thread and surface an empty result until it lands (consumers treat empty
+        // as "hide section / empty tabs", so the brief initial state is graceful).
+        val tiles by produceState(
+            initialValue =
+                SharedMediaTiles(
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    hasOther = false,
+                ),
+            controller.timeline,
+            myAccountId,
+        ) {
+            val timelineSnapshot = controller.timeline
+            value =
+                withContext(Dispatchers.Default) {
+                    buildTiles(timelineSnapshot, myAccountId)
+                }
+        }
+        tiles
     }
-    return tiles
-}
 
 // Pure tile projection extracted from the composable so it can run on a
 // background dispatcher. Projected rows carry authoritative typed media;
@@ -472,7 +474,7 @@ internal fun SharedMediaSection(
 // Project resolved image/video tiles onto the per-page descriptors the
 // full-screen viewer pages over. Order is preserved (the tiles are already
 // newest-first), so the gallery swipes newest → oldest matching the grid.
-private fun List<SharedMediaTile>.toViewerPages(): List<MediaViewerPage> =
+internal fun List<SharedMediaTile>.toViewerPages(): List<MediaViewerPage> =
     map { MediaViewerPage(it.messageIdHex, it.attachmentIndex, it.reference, it.mine, it.sender, it.recordedAt) }
 
 private enum class MediaTab(

@@ -113,6 +113,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNo
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBubbleWidth
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
@@ -264,6 +265,7 @@ internal fun MessageBubble(
     item: TimelineMessage,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    conversationImagePages: List<MediaViewerPage> = emptyList(),
     eventCardResolver: NostrEventCardResolver? = null,
     documentSaveFallback: DocumentSaveFallback? = null,
     // #1206: shared composer text state so the full-screen reader's composer
@@ -1600,6 +1602,7 @@ internal fun MessageBubble(
                                         record = record,
                                         controller = controller,
                                         appState = appState,
+                                        conversationImagePages = conversationImagePages,
                                         bubbleMedia = bubbleMedia,
                                         sharedLocation = sharedLocation,
                                         sharedContact = sharedContact,
@@ -1663,6 +1666,7 @@ internal fun MessageBubble(
                                         record = record,
                                         controller = controller,
                                         appState = appState,
+                                        conversationImagePages = conversationImagePages,
                                         bubbleMedia = bubbleMedia,
                                         sharedLocation = sharedLocation,
                                         sharedContact = sharedContact,
