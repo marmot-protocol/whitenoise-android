@@ -410,6 +410,7 @@ internal class ConversationMediaSender(
             onRejected()
             return
         }
+        val pendingDraftClear = appState.captureDraftForSend(controller.group.groupIdHex)
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
         appState.launchMutation {
             val prepared = prepareStagedAttachments(imageSlots, documentUris, preparedImageAttachments)
@@ -432,7 +433,16 @@ internal class ConversationMediaSender(
             }
             onAccepted()
             onAfterSend()
-            seeded.forEach { controller.uploadQueued(it) }
+            val clearDraftAfterDurableAcceptance: (() -> Unit)? =
+                pendingDraftClear?.let { pendingClear ->
+                    { appState.clearDraftAfterSuccessfulSend(pendingClear) }
+                }
+            seeded.forEachIndexed { index, queued ->
+                controller.uploadQueued(
+                    seeded = queued,
+                    onDurablyAccepted = if (index == 0) clearDraftAfterDurableAcceptance else null,
+                )
+            }
         }
     }
 

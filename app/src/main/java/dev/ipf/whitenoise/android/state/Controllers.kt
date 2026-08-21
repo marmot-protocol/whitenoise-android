@@ -7061,6 +7061,8 @@ class ConversationController(
     private val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     private val timelineOrder = mutableListOf<String>()
     private val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
+    private val durableAcceptanceCallbacks =
+        appState.durableAcceptanceCallbacks(conversationAccountRef, initialGroup.groupIdHex)
     private val initialTimeline =
         initialConversationTimeline(
             preview = initialTimelinePreview,
@@ -8022,18 +8024,20 @@ class ConversationController(
     }
 
     /**
-     * Send a text message. [onAccepted] runs only once the optimistic bubble
-     * has been committed to the projection and published — i.e. the send has
-     * actually started. The caller uses it to clear the input/draft and scroll
-     * to newest. It is deliberately NOT invoked when a guard rejects the send
-     * (no account yet, blank text, unknown/non-member state, or a terminal group)
-     * so the UI keeps the user's text instead of clearing it into the void.
+     * Send a text message. [onAccepted] runs once the optimistic bubble has
+     * been committed to the projection and published — i.e. the send has
+     * visibly started. [onDurablyAccepted] runs only after MDK returns a typed
+     * accepted disposition, so the caller can delete the persisted composer
+     * draft without losing a pre-acceptance send across process death. Neither
+     * callback runs when a guard rejects the send (no account yet, blank text,
+     * unknown/non-member state, or a terminal group).
      * The edit path also leaves [onAccepted] uncalled: the composer restores its
      * pre-edit draft via the `editingMessageId` LaunchedEffect, not by clearing.
      */
     suspend fun send(
         text: String,
         onAccepted: () -> Unit = {},
+        onDurablyAccepted: () -> Unit = {},
     ) {
         val trimmed = text.trim()
         val accountRef = conversationAccountRef
@@ -8120,6 +8124,7 @@ class ConversationController(
                 timelineOrder = optimisticOrder,
                 retentionAtSendSeconds = retentionAtSendSeconds,
             )
+        durableAcceptanceCallbacks[optimisticKey] = onDurablyAccepted
         messageById[tempId] = optimistic
         publishTimelineFromIndexes()
         // Bump the chat-list row's preview in the same synchronous block as the
@@ -8187,6 +8192,7 @@ class ConversationController(
                     )
                     publishTextWithRetry(replyTarget, account, trimmed, trace, traceStartMs)
                 }
+            completeDurableAcceptance(optimisticKey)
             val reconciliation =
                 reconcileSuccessfulTextSend(
                     summaryMessageIds = summary.messageIds,
@@ -8244,6 +8250,7 @@ class ConversationController(
                 // surfacing the raw backend error.
                 rollbackOptimisticChatListPreview(tempId)
                 optimisticMessages.remove(optimisticKey)
+                durableAcceptanceCallbacks.remove(optimisticKey)
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
                 forgetSendTrace(tempId)
@@ -8499,13 +8506,21 @@ class ConversationController(
             receivedAt = now,
         )
 
-    /** Drive the upload + publish for a previously [queueAttachments]-seeded slot. */
-    suspend fun uploadQueued(seeded: QueuedAttachmentSend) {
+    /**
+     * Drive the upload + publish for a previously [queueAttachments]-seeded slot.
+     * [onDurablyAccepted] survives controller replacement and runs once MDK
+     * accepts the logical send, including accepted-pending ownership.
+     */
+    suspend fun uploadQueued(
+        seeded: QueuedAttachmentSend,
+        onDurablyAccepted: (() -> Unit)? = null,
+    ) {
         // `activeUploadKeys` was added at `queueAttachments` time so that
         // EVERY seeded slot — even the ones still waiting for an earlier
         // upload to finish — survives a dispose-time
         // `clearRetainedUploads`. Removal happens at performMediaUpload's
         // terminal paths.
+        onDurablyAccepted?.let { durableAcceptanceCallbacks.putIfAbsent(seeded.key, it) }
         performMediaUpload(seeded.account, seeded.key, seeded.tempId, seeded.optimisticOrder, seeded.optimistic)
     }
 
@@ -8536,6 +8551,7 @@ class ConversationController(
                 )
             ) {
                 optimisticMessages.remove(key)
+                durableAcceptanceCallbacks.remove(key)
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
                 retainedMediaUploads.remove(key)
@@ -8604,6 +8620,7 @@ class ConversationController(
                 // unreferenced Blossom blob is inert).
                 if (discardedDuringRetry.remove(key)) {
                     optimisticMessages.remove(key)
+                    durableAcceptanceCallbacks.remove(key)
                     messageById.remove(tempId)
                     retentionAtSendByMessageId.remove(tempId)
                     retainedMediaUploads.remove(key)
@@ -8627,6 +8644,7 @@ class ConversationController(
                             sendMediaAttachments(account, group.groupIdHex, references, retained.caption)
                         }
                     }
+                completeDurableAcceptance(key)
                 if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
                     // MDK now owns a durable, unpublished media intent. It still
                     // returns the canonical app-event id, which lets a later
@@ -8816,6 +8834,7 @@ class ConversationController(
                 if (throwable is CancellationException) throw throwable
                 if (discardedDuringRetry.remove(key)) {
                     optimisticMessages.remove(key)
+                    durableAcceptanceCallbacks.remove(key)
                     messageById.remove(tempId)
                     retentionAtSendByMessageId.remove(tempId)
                     retainedMediaUploads.remove(key)
@@ -9123,6 +9142,10 @@ class ConversationController(
     // record, so a discard during retry doesn't get clobbered by the catch
     // path putting the message back as Failed.
     private val discardedDuringRetry = mutableSetOf<String>()
+
+    private fun completeDurableAcceptance(optimisticKey: String) {
+        durableAcceptanceCallbacks.remove(optimisticKey)?.invoke()
+    }
 
     private fun rollbackOptimisticChatListPreview(optimisticMessageIdHex: String) {
         appState.rollbackOptimisticSentPreview(conversationAccountRef, group.groupIdHex, optimisticMessageIdHex)
@@ -9617,6 +9640,7 @@ class ConversationController(
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
                 }
+                completeDurableAcceptance(key)
                 transferRetentionAtSend(tempId, committedProjection.messageIdHex)
                 appState.commitOptimisticSentPreview(
                     accountRef = conversationAccountRef,
@@ -9648,6 +9672,7 @@ class ConversationController(
                     sendTrace(retryTrace, "manual-retry", 0L, context = arrayOf("reply" to (replyTarget != null)))
                     publishTextWithRetry(replyTarget, account, text, retryTrace, retryTraceStartMs)
                 }
+            completeDurableAcceptance(key)
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; drop the result entirely.
                 optimisticMessages.remove(key)
@@ -9692,6 +9717,7 @@ class ConversationController(
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; don't restore the Failed bubble.
                 optimisticMessages.remove(key)
+                durableAcceptanceCallbacks.remove(key)
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
                 rollbackOptimisticChatListPreview(tempId)
@@ -9744,8 +9770,13 @@ class ConversationController(
         val status = current?.status ?: item.status
         val tempId = current?.record?.messageIdHex ?: item.record.messageIdHex
         when (status) {
-            MessageStatus.Failed -> Unit
-            MessageStatus.Pending -> if (current != null) discardedDuringRetry.add(key)
+            MessageStatus.Failed -> durableAcceptanceCallbacks.remove(key)
+            MessageStatus.Pending ->
+                if (current != null) {
+                    discardedDuringRetry.add(key)
+                } else {
+                    durableAcceptanceCallbacks.remove(key)
+                }
             else -> return
         }
         rollbackOptimisticChatListPreview(tempId)

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -19,6 +20,8 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -32,6 +35,226 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], qualifiers = "en")
 class ConversationSendRetryIntegrationTest {
     @Test
+    fun durableAcceptanceClearsTheCapturedComposerDraft() {
+        val appState = appState()
+        appState.setDraft(GROUP_ID, TextFieldValue("hello"))
+        val pendingClear = requireNotNull(appState.captureDraftForSend(GROUP_ID))
+
+        appState.clearDraftAfterSuccessfulSend(pendingClear)
+
+        assertEquals(null, appState.draftFor(GROUP_ID))
+    }
+
+    @Test
+    fun durableAcceptanceDoesNotClearANewerComposerDraft() {
+        val appState = appState()
+        appState.setDraft(GROUP_ID, TextFieldValue("first message"))
+        val pendingClear = requireNotNull(appState.captureDraftForSend(GROUP_ID))
+        appState.setDraft(GROUP_ID, TextFieldValue("next message"))
+
+        appState.clearDraftAfterSuccessfulSend(pendingClear)
+
+        assertEquals("next message", appState.draftFor(GROUP_ID))
+    }
+
+    @Test
+    fun preAcceptanceFailureKeepsTheComposerDraftForRehydration() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("survives restart"))
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        throw MarmotKitException.Publish("relay rejected event")
+                    },
+                )
+
+            appState.sendConversationText(controller, "survives restart")
+
+            assertEquals("survives restart", appState.draftFor(GROUP_ID))
+            assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+        }
+
+    @Test
+    fun successfulManualRetryClearsTheDraftCapturedByTheInitialSend() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("retry me"))
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        if (attempts == 1) {
+                            throw MarmotKitException.Publish("relay rejected event")
+                        }
+                        SendSummaryFfi(
+                            published = 1u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            appState.sendConversationText(controller, "retry me")
+            assertEquals("retry me", appState.draftFor(GROUP_ID))
+
+            controller.retryFailedSend(controller.timeline.single())
+
+            assertEquals(null, appState.draftFor(GROUP_ID))
+            assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+        }
+
+    @Test
+    fun successfulRetryFromReplacementControllerClearsTheInitiallyCapturedDraft() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("retry after navigation"))
+            val failedController =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        throw MarmotKitException.Publish("relay rejected event")
+                    },
+                )
+
+            appState.sendConversationText(failedController, "retry after navigation")
+            assertEquals("retry after navigation", appState.draftFor(GROUP_ID))
+            assertEquals(MessageStatus.Failed, failedController.timeline.single().status)
+
+            val replacementController =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        SendSummaryFfi(
+                            published = 1u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            replacementController.retryFailedSend(replacementController.timeline.single())
+
+            assertEquals(null, appState.draftFor(GROUP_ID))
+            assertEquals(MessageStatus.Sent, replacementController.timeline.single().status)
+        }
+
+    @Test
+    fun discardingAnInFlightRetryStillClearsTheDraftAfterDurableAcceptance() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("discard while retrying"))
+            val retryStarted = CompletableDeferred<Unit>()
+            val acceptRetry = CompletableDeferred<Unit>()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        if (attempts == 1) {
+                            throw MarmotKitException.Publish("relay rejected event")
+                        }
+                        retryStarted.complete(Unit)
+                        acceptRetry.await()
+                        SendSummaryFfi(
+                            published = 1u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            appState.sendConversationText(controller, "discard while retrying")
+            val failedItem = controller.timeline.single()
+            val retry = async { controller.retryFailedSend(failedItem) }
+            retryStarted.await()
+
+            controller.discardFailedSend(failedItem)
+            assertEquals(emptyList<TimelineMessage>(), controller.timeline)
+            assertEquals("discard while retrying", appState.draftFor(GROUP_ID))
+
+            acceptRetry.complete(Unit)
+            retry.await()
+
+            assertEquals(null, appState.draftFor(GROUP_ID))
+            assertEquals(emptyList<TimelineMessage>(), controller.timeline)
+        }
+
+    @Test
+    fun acceptedPendingClearsTheCapturedComposerDraft() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("queued safely"))
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        assertEquals("queued safely", appState.draftFor(GROUP_ID))
+                        SendSummaryFfi(
+                            published = 0u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            appState.sendConversationText(controller, "queued safely")
+
+            assertEquals(null, appState.draftFor(GROUP_ID))
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+        }
+
+    @Test
+    fun acceptedPendingSeparatesOptimisticAndDurableAcceptanceCallbacks() =
+        runTest {
+            val callbacks = mutableListOf<String>()
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        assertEquals(listOf("optimistic"), callbacks)
+                        SendSummaryFfi(
+                            published = 0u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            controller.send(
+                text = "hello",
+                onAccepted = { callbacks += "optimistic" },
+                onDurablyAccepted = { callbacks += "durable" },
+            )
+
+            assertEquals(listOf("optimistic", "durable"), callbacks)
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+        }
+
+    @Test
     fun optimisticRetentionHintSurvivesPendingToSentWithoutStartingTheCountdown() =
         runTest {
             lateinit var controller: ConversationController
@@ -39,16 +262,7 @@ class ConversationSendRetryIntegrationTest {
                 ConversationController(
                     appState = appState(),
                     initialGroup = group(disappearingMessageSecs = 30uL),
-                    initialMemberSnapshot =
-                        GroupMemberSnapshot(
-                            listOf(
-                                AppGroupMemberRecordFfi(
-                                    memberIdHex = ACCOUNT_ID,
-                                    account = ACCOUNT_REF,
-                                    local = true,
-                                ),
-                            ),
-                        ),
+                    initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
                         val pending = controller.timeline.single()
                         assertEquals(MessageStatus.Pending, pending.status)
@@ -88,16 +302,7 @@ class ConversationSendRetryIntegrationTest {
                 ConversationController(
                     appState = appState(),
                     initialGroup = group(disappearingMessageSecs = 30uL),
-                    initialMemberSnapshot =
-                        GroupMemberSnapshot(
-                            listOf(
-                                AppGroupMemberRecordFfi(
-                                    memberIdHex = ACCOUNT_ID,
-                                    account = ACCOUNT_REF,
-                                    local = true,
-                                ),
-                            ),
-                        ),
+                    initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
                         controller.testApplyLiveTimelineChangesAndRegisterStreams(
                             listOf(
@@ -138,16 +343,7 @@ class ConversationSendRetryIntegrationTest {
                 ConversationController(
                     appState = appState(),
                     initialGroup = group(),
-                    initialMemberSnapshot =
-                        GroupMemberSnapshot(
-                            listOf(
-                                AppGroupMemberRecordFfi(
-                                    memberIdHex = ACCOUNT_ID,
-                                    account = ACCOUNT_REF,
-                                    local = true,
-                                ),
-                            ),
-                        ),
+                    initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { replyTarget, account, groupIdHex, text ->
                         attempts += 1
                         assertEquals(null, replyTarget)
@@ -202,6 +398,17 @@ class ConversationSendRetryIntegrationTest {
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,
+        )
+
+    private fun memberSnapshot() =
+        GroupMemberSnapshot(
+            listOf(
+                AppGroupMemberRecordFfi(
+                    memberIdHex = ACCOUNT_ID,
+                    account = ACCOUNT_REF,
+                    local = true,
+                ),
+            ),
         )
 
     private fun group(disappearingMessageSecs: ULong = 0uL) =

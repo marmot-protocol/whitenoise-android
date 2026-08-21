@@ -2693,7 +2693,7 @@ internal fun ConversationScreen(
         rememberComposerTextState(
             draftKey = controller.group.groupIdHex,
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-            externalRevision = composerShareRevision + composerDictationRevision,
+            externalRevision = composerShareRevision to composerDictationRevision,
         )
     val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 
@@ -2972,7 +2972,6 @@ internal fun ConversationScreen(
                 composerTextState = composerTextState,
                 composerAttachmentSheet = composerAttachmentSheet,
                 onAfterSend = {
-                    appState.clearDraftAfterSuccessfulSend(controller.group.groupIdHex)
                     revealSentMessage()
                 },
                 onPickFromGallery = {
@@ -3596,7 +3595,6 @@ internal fun ConversationScreen(
         onCaptionAccepted = { seededCaption ->
             if (composerTextState.valueState.value.text == seededCaption) {
                 composerTextState.valueState.value = TextFieldValue("")
-                appState.clearDraftAfterSuccessfulSend(controller.group.groupIdHex)
             }
         },
         onAddPhotos = {
@@ -3606,7 +3604,6 @@ internal fun ConversationScreen(
         },
         onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
         onAfterSend = {
-            appState.clearDraftAfterSuccessfulSend(controller.group.groupIdHex)
             revealSentMessage(bottomTimelineIndex)
         },
     )
