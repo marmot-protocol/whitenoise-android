@@ -98,6 +98,11 @@ internal fun MediaFileBubble(
     val noOpenAppMessage = stringResource(R.string.media_no_app_to_open)
     val couldntOpenMessage = stringResource(R.string.media_couldnt_open)
     val couldntLoadMessage = stringResource(R.string.media_couldnt_load)
+    val noInstallerMessage = stringResource(R.string.media_apk_no_installer)
+    val installPermissionDeniedMessage = stringResource(R.string.media_apk_permission_denied)
+    val installPermissionUnavailableMessage = stringResource(R.string.media_apk_permission_unavailable)
+    val installUnsupportedMessage = stringResource(R.string.media_apk_install_unsupported)
+    val invalidPackageMessage = stringResource(R.string.media_apk_invalid)
     // Reconcile the controller-owned transfer presentation against cache
     // hydration/eviction. This probe never owns or cancels a running transfer.
     val cacheRevision by appState.mediaCacheRevision.collectAsState()
@@ -156,13 +161,23 @@ internal fun MediaFileBubble(
                                 // the durable worker; the next tap then reuses L2.
                                 if (!lifecycleOwner.lifecycle.awaitResumedOrDestroyed()) return@launch
                                 val outcome =
-                                    openAttachment(file, reference.mediaType)
+                                    openAttachment(file, reference.mediaType, reference.fileName)
                                 when (outcome) {
                                     OpenAttachmentResult.Opened -> Unit
                                     OpenAttachmentResult.NoHandler -> {
                                         appState.present(noOpenAppMessage)
                                     }
+                                    OpenAttachmentResult.NoInstaller -> appState.present(noInstallerMessage)
+                                    OpenAttachmentResult.InstallPermissionDenied,
                                     OpenAttachmentResult.InstallPermissionRequired,
+                                    -> appState.present(installPermissionDeniedMessage)
+                                    OpenAttachmentResult.InstallPermissionUnavailable -> {
+                                        appState.present(installPermissionUnavailableMessage, copyable = true)
+                                    }
+                                    OpenAttachmentResult.InstallUnsupported -> appState.present(installUnsupportedMessage)
+                                    OpenAttachmentResult.InvalidPackage -> appState.present(invalidPackageMessage)
+                                    OpenAttachmentResult.MissingArtifact,
+                                    OpenAttachmentResult.SecurityFailure,
                                     OpenAttachmentResult.Error,
                                     -> {
                                         appState.present(couldntOpenMessage, copyable = true)
@@ -216,10 +231,20 @@ internal fun MediaFileBubble(
                         mine = mine,
                     ) { appState.present(couldntLoadMessage) } ?: return@openExternal
                 if (!lifecycleOwner.lifecycle.awaitResumedOrDestroyed()) return@openExternal
-                when (openAttachment(file, reference.mediaType)) {
+                when (openAttachment(file, reference.mediaType, reference.fileName)) {
                     OpenAttachmentResult.Opened -> Unit
                     OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
+                    OpenAttachmentResult.NoInstaller -> appState.present(noInstallerMessage)
+                    OpenAttachmentResult.InstallPermissionDenied,
                     OpenAttachmentResult.InstallPermissionRequired,
+                    -> appState.present(installPermissionDeniedMessage)
+                    OpenAttachmentResult.InstallPermissionUnavailable -> {
+                        appState.present(installPermissionUnavailableMessage, copyable = true)
+                    }
+                    OpenAttachmentResult.InstallUnsupported -> appState.present(installUnsupportedMessage)
+                    OpenAttachmentResult.InvalidPackage -> appState.present(invalidPackageMessage)
+                    OpenAttachmentResult.MissingArtifact,
+                    OpenAttachmentResult.SecurityFailure,
                     OpenAttachmentResult.Error,
                     -> appState.present(couldntOpenMessage, copyable = true)
                 }

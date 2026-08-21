@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.content.ActivityNotFoundException
+import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -8,6 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.nio.file.Files
 
 class AttachmentPresentationTest {
     @Test
@@ -118,12 +121,53 @@ class AttachmentPresentationTest {
     }
 
     @Test
-    fun presentationNeverChangesTheMimeUsedForExternalOpen() {
-        val originalMime = "application/vnd.android.package-archive"
+    fun verifiedApkFilenameRefinesOnlyGenericOpenMime() {
+        var archiveChecks = 0
+        val validArchive = {
+            archiveChecks += 1
+            true
+        }
 
-        assertEquals("APK", resolveAttachmentPresentation(originalMime, "release.apk").formatLabel)
-        assertEquals(originalMime, attachmentOpenMime(originalMime))
-        assertEquals("application/octet-stream", attachmentOpenMime(""))
+        assertEquals(
+            AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME),
+            classifyAttachmentOpen("", "../release.APK", validArchive),
+        )
+        assertEquals(
+            AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME),
+            classifyAttachmentOpen(" Application/Octet-Stream ; charset=binary ", "release.apk", validArchive),
+        )
+        assertEquals(
+            AttachmentOpenClassification.Ready("application/pdf"),
+            classifyAttachmentOpen("application/pdf", "misleading.apk", validArchive),
+        )
+        assertEquals(2, archiveChecks)
+    }
+
+    @Test
+    fun genericApkFilenameRejectsAnArtifactThatIsNotAnAndroidPackage() {
+        assertEquals(
+            AttachmentOpenClassification.InvalidAndroidPackage,
+            classifyAttachmentOpen(GENERIC_BINARY_MIME, "release.apk") { false },
+        )
+    }
+
+    @Test
+    fun nonApkAndExplicitPackageMimeDoNotNeedFilenameInference() {
+        var archiveChecks = 0
+        val unexpectedCheck = {
+            archiveChecks += 1
+            false
+        }
+
+        assertEquals(
+            AttachmentOpenClassification.Ready(GENERIC_BINARY_MIME),
+            classifyAttachmentOpen("", "notes.pdf", unexpectedCheck),
+        )
+        assertEquals(
+            AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME),
+            classifyAttachmentOpen(" Application/Vnd.Android.Package-Archive ", "payload.bin", unexpectedCheck),
+        )
+        assertEquals(0, archiveChecks)
     }
 
     @Test
@@ -174,15 +218,16 @@ class AttachmentPresentationTest {
     fun installerPermissionReturnRetriesTheOriginalAttachmentOpen() =
         runTest {
             val source = File("agent-build.apk")
-            val openRequests = mutableListOf<Pair<File, String>>()
+            val openRequests = mutableListOf<Triple<File, String, String>>()
             var permissionRequests = 0
 
             val result =
                 openAttachmentWithInstallerPermission(
                     source = source,
                     mediaType = ANDROID_PACKAGE_MIME,
-                    open = { requestedSource, requestedMediaType ->
-                        openRequests += requestedSource to requestedMediaType
+                    fileName = "agent-build.apk",
+                    open = { requestedSource, requestedMediaType, requestedFileName ->
+                        openRequests += Triple(requestedSource, requestedMediaType, requestedFileName)
                         if (openRequests.size == 1) {
                             OpenAttachmentResult.InstallPermissionRequired
                         } else {
@@ -197,10 +242,105 @@ class AttachmentPresentationTest {
 
             assertEquals(OpenAttachmentResult.Opened, result)
             assertEquals(
-                listOf(source to ANDROID_PACKAGE_MIME, source to ANDROID_PACKAGE_MIME),
+                listOf(
+                    Triple(source, ANDROID_PACKAGE_MIME, "agent-build.apk"),
+                    Triple(source, ANDROID_PACKAGE_MIME, "agent-build.apk"),
+                ),
                 openRequests,
             )
             assertEquals(1, permissionRequests)
+        }
+
+    @Test
+    fun deniedInstallerPermissionDoesNotRetryOrReportGenericFailure() =
+        runTest {
+            var opens = 0
+            val result =
+                openAttachmentWithInstallerPermission(
+                    source = File("agent-build.apk"),
+                    mediaType = GENERIC_BINARY_MIME,
+                    fileName = "agent-build.apk",
+                    open = { _, _, _ ->
+                        opens += 1
+                        OpenAttachmentResult.InstallPermissionRequired
+                    },
+                    requestInstallPermission = { false },
+                )
+
+            assertEquals(OpenAttachmentResult.InstallPermissionDenied, result)
+            assertEquals(1, opens)
+        }
+
+    @Test
+    fun unavailableInstallerSettingsDoesNotRetry() =
+        runTest {
+            var opens = 0
+            val result =
+                openAttachmentWithInstallerPermission(
+                    source = File("agent-build.apk"),
+                    mediaType = ANDROID_PACKAGE_MIME,
+                    fileName = "agent-build.apk",
+                    open = { _, _, _ ->
+                        opens += 1
+                        OpenAttachmentResult.InstallPermissionRequired
+                    },
+                    requestInstallPermission = { throw ActivityNotFoundException("missing settings") },
+                )
+
+            assertEquals(OpenAttachmentResult.InstallPermissionUnavailable, result)
+            assertEquals(1, opens)
+        }
+
+    @Test
+    fun unexpectedInstallerSettingsRuntimeFailureIsDeterministic() =
+        runTest {
+            val result =
+                openAttachmentWithInstallerPermission(
+                    source = File("agent-build.apk"),
+                    mediaType = ANDROID_PACKAGE_MIME,
+                    fileName = "agent-build.apk",
+                    open = { _, _, _ -> OpenAttachmentResult.InstallPermissionRequired },
+                    requestInstallPermission = { throw UnsupportedOperationException("platform failure") },
+                )
+
+            assertEquals(OpenAttachmentResult.InstallPermissionUnavailable, result)
+        }
+
+    @Test
+    fun installerPermissionRoundTripPinsTheExactArtifactUntilRetryCompletes() =
+        runTest {
+            val directory = Files.createTempDirectory("installer-permission-artifact").toFile()
+            val source = File(directory, "agent-build.apk").apply { writeText("verified attachment") }
+            var opens = 0
+            try {
+                val result =
+                    openAttachmentWithInstallerPermission(
+                        source = source,
+                        mediaType = ANDROID_PACKAGE_MIME,
+                        fileName = "agent-build.apk",
+                        open = { requestedSource, _, _ ->
+                            opens += 1
+                            assertTrue(requestedSource.exists())
+                            if (opens == 1) {
+                                OpenAttachmentResult.InstallPermissionRequired
+                            } else {
+                                OpenAttachmentResult.Opened
+                            }
+                        },
+                        requestInstallPermission = {
+                            AttachmentPlaintextCache.trimDirectoryToByteCap(directory, 0L)
+                            assertTrue(source.exists())
+                            true
+                        },
+                    )
+
+                assertEquals(OpenAttachmentResult.Opened, result)
+                assertEquals(2, opens)
+                AttachmentPlaintextCache.trimDirectoryToByteCap(directory, 0L)
+                assertFalse(source.exists())
+            } finally {
+                directory.deleteRecursively()
+            }
         }
 
     @Test

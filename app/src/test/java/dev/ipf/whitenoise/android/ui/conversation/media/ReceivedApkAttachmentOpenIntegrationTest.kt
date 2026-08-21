@@ -1,0 +1,288 @@
+package dev.ipf.whitenoise.android.ui.conversation.media
+
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.test.runTest
+import org.junit.After
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
+class ReceivedApkAttachmentOpenIntegrationTest {
+    private val artifacts = mutableListOf<File>()
+
+    @Before
+    fun setUp() {
+        clearFileProviderStrategyCache()
+        // Robolectric lazily parses FileProvider roots and cannot perform that
+        // package-manager lookup from Dispatchers.IO. Android's provider is
+        // thread-safe; warm the test shadow on the runner thread first.
+        val seed = artifact("provider-roots.seed").apply { writeText("seed") }
+        fileProviderUri(applicationContext(), seed)
+    }
+
+    @After
+    fun tearDown() {
+        artifacts.forEach(File::delete)
+        clearFileProviderStrategyCache()
+    }
+
+    @Test
+    fun installerPermissionRecoveryTargetsThisApplicationPackage() {
+        val context = applicationContext()
+
+        val intent = androidPackageInstallPermissionIntent(context)
+
+        assertEquals(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, intent.action)
+        assertEquals("package:${context.packageName}", intent.data?.toString())
+    }
+
+    @Test
+    fun correctlyTypedGenericAndBlankReceivedApksLaunchTheInstallerIntent() =
+        runTest {
+            listOf(ANDROID_PACKAGE_MIME, GENERIC_BINARY_MIME, "").forEachIndexed { index, advertisedMime ->
+                val source = validApkArtifact("received-$index.apk")
+                val context = RecordingContext(applicationContext())
+
+                val result =
+                    openAttachmentExternally(
+                        context = context,
+                        source = source,
+                        mediaType = advertisedMime,
+                        fileName = "../WhiteNoise-release.APK",
+                        selfUpdateEnabled = true,
+                        sdkInt = 36,
+                        canRequestPackageInstalls = { true },
+                    )
+
+                assertEquals(OpenAttachmentResult.Opened, result)
+                val intent = requireNotNull(context.startedIntent)
+                assertEquals(Intent.ACTION_VIEW, intent.action)
+                assertEquals(ANDROID_PACKAGE_MIME, intent.type)
+                assertTrue(intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+                assertTrue(intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+                assertEquals(intent.data, intent.clipData?.getItemAt(0)?.uri)
+                val opened =
+                    applicationContext()
+                        .contentResolver
+                        .openInputStream(requireNotNull(intent.data))
+                        ?.use { it.readBytes() }
+                assertNotNull(opened)
+                assertArrayEquals(source.readBytes(), opened)
+            }
+        }
+
+    @Test
+    fun genericApkNameWithNonApkArtifactIsRejectedBeforeDispatch() =
+        runTest {
+            val context = RecordingContext(applicationContext())
+            val invalidArtifacts =
+                listOf(
+                    artifact("not-an-apk.bin").apply { writeText("not a zip") },
+                    zipWithManifest("plain-manifest.zip", "<manifest />".toByteArray()),
+                    zipWithManifest(
+                        "forged-header.zip",
+                        byteArrayOf(0x03, 0x00, 0x08, 0x00, 0x7f, 0x00, 0x00, 0x00),
+                    ),
+                )
+
+            invalidArtifacts.forEach { source ->
+                val result =
+                    openAttachmentExternally(
+                        context = context,
+                        source = source,
+                        mediaType = GENERIC_BINARY_MIME,
+                        fileName = "release.apk",
+                        selfUpdateEnabled = true,
+                        canRequestPackageInstalls = { true },
+                    )
+                assertEquals(OpenAttachmentResult.InvalidPackage, result)
+            }
+            assertNull(context.startedIntent)
+        }
+
+    @Test
+    fun conflictingNonGenericMimeNeverUsesFilenameInference() =
+        runTest {
+            val source = artifact("misleading.bin").apply { writeText("ordinary document") }
+            val context = RecordingContext(applicationContext())
+
+            val result =
+                openAttachmentExternally(
+                    context = context,
+                    source = source,
+                    mediaType = "application/pdf",
+                    fileName = "release.apk",
+                    selfUpdateEnabled = true,
+                    canRequestPackageInstalls = { true },
+                )
+
+            assertEquals(OpenAttachmentResult.Opened, result)
+            assertEquals("application/pdf", context.startedIntent?.type)
+        }
+
+    @Test
+    fun zapstorePermissionAndPlayPolicyAreExplicitBeforeInstallerLaunch() =
+        runTest {
+            val source = validApkArtifact("policy.apk")
+            val zapstoreContext = RecordingContext(applicationContext())
+            val playContext = RecordingContext(applicationContext())
+
+            val zapstoreResult =
+                openAttachmentExternally(
+                    context = zapstoreContext,
+                    source = source,
+                    mediaType = GENERIC_BINARY_MIME,
+                    fileName = "policy.apk",
+                    selfUpdateEnabled = true,
+                    sdkInt = 36,
+                    canRequestPackageInstalls = { false },
+                )
+            val playResult =
+                openAttachmentExternally(
+                    context = playContext,
+                    source = source,
+                    mediaType = ANDROID_PACKAGE_MIME,
+                    fileName = "policy.apk",
+                    selfUpdateEnabled = false,
+                    sdkInt = 36,
+                    canRequestPackageInstalls = { false },
+                )
+
+            assertEquals(OpenAttachmentResult.InstallPermissionRequired, zapstoreResult)
+            assertEquals(OpenAttachmentResult.InstallUnsupported, playResult)
+            assertNull(zapstoreContext.startedIntent)
+            assertNull(playContext.startedIntent)
+        }
+
+    @Test
+    fun missingInstallerAndRevokedUriGrantHaveDistinctOutcomes() =
+        runTest {
+            val source = validApkArtifact("failures.apk")
+
+            val noInstaller =
+                openAttachmentExternally(
+                    context = RecordingContext(applicationContext(), ActivityNotFoundException()),
+                    source = source,
+                    mediaType = ANDROID_PACKAGE_MIME,
+                    fileName = "failures.apk",
+                    selfUpdateEnabled = true,
+                    canRequestPackageInstalls = { true },
+                )
+            val securityFailure =
+                openAttachmentExternally(
+                    context = RecordingContext(applicationContext(), SecurityException("revoked grant")),
+                    source = source,
+                    mediaType = ANDROID_PACKAGE_MIME,
+                    fileName = "failures.apk",
+                    selfUpdateEnabled = true,
+                    canRequestPackageInstalls = { true },
+                )
+
+            assertEquals(OpenAttachmentResult.NoInstaller, noInstaller)
+            assertEquals(OpenAttachmentResult.SecurityFailure, securityFailure)
+        }
+
+    @Test
+    fun trimmedArtifactHasAStableMissingOutcomeWithoutLaunching() =
+        runTest {
+            val missing = artifact("trimmed.apk")
+            val context = RecordingContext(applicationContext())
+
+            val result =
+                openAttachmentExternally(
+                    context = context,
+                    source = missing,
+                    mediaType = ANDROID_PACKAGE_MIME,
+                    fileName = "trimmed.apk",
+                    selfUpdateEnabled = true,
+                    canRequestPackageInstalls = { true },
+                )
+
+            assertEquals(OpenAttachmentResult.MissingArtifact, result)
+            assertNull(context.startedIntent)
+        }
+
+    @Test
+    fun conversationAndMediaLibraryPassFilenameIntoTheVerifiedOpener() {
+        val bubble = projectFile("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaFileBubble.kt").readText()
+        val library = projectFile("app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt").readText()
+        val normalizedLibrary = library.replace(Regex("\\s+"), " ")
+
+        assertTrue(
+            Regex("openAttachment\\(file, reference\\.mediaType, reference\\.fileName\\)")
+                .findAll(bubble)
+                .count() >= 2,
+        )
+        assertTrue(
+            normalizedLibrary.contains(
+                "openAttachment( fetchFile(), row.reference.mediaType, row.reference.fileName, )",
+            ),
+        )
+    }
+
+    private fun validApkArtifact(name: String): File =
+        zipWithManifest(
+            name,
+            byteArrayOf(0x03, 0x00, 0x08, 0x00, 0x08, 0x00, 0x00, 0x00),
+        )
+
+    private fun zipWithManifest(
+        name: String,
+        manifestBytes: ByteArray,
+    ): File =
+        artifact(name).also { file ->
+            ZipOutputStream(file.outputStream()).use { archive ->
+                archive.putNextEntry(ZipEntry("AndroidManifest.xml"))
+                archive.write(manifestBytes)
+                archive.closeEntry()
+            }
+        }
+
+    private fun artifact(name: String): File {
+        val directory = File(applicationContext().cacheDir, "shared_media").apply { mkdirs() }
+        return File(directory, "issue-2196-${System.nanoTime()}-$name").also(artifacts::add)
+    }
+
+    private fun applicationContext(): Context = RuntimeEnvironment.getApplication()
+
+    private fun projectFile(path: String): File =
+        listOf(File(path), File("../$path"))
+            .firstOrNull(File::exists)
+            ?: File(path)
+
+    private fun clearFileProviderStrategyCache() {
+        val cacheField = FileProvider::class.java.getDeclaredField("sCache").apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST")
+        (cacheField.get(null) as MutableMap<String, *>).clear()
+    }
+
+    private class RecordingContext(
+        base: Context,
+        private val launchFailure: RuntimeException? = null,
+    ) : ContextWrapper(base) {
+        var startedIntent: Intent? = null
+            private set
+
+        override fun startActivity(intent: Intent) {
+            launchFailure?.let { throw it }
+            startedIntent = intent
+        }
+    }
+}

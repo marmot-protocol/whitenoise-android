@@ -888,6 +888,11 @@
     <string name="media_no_app_to_open">Bu dosyayı açacak uygulama yok</string>
     <string name="media_couldnt_open">Dosya açılamadı</string>
     <string name="media_couldnt_load">Dosya yüklenemedi. Yeniden denemek için dokunun.</string>
+    <string name="media_apk_no_installer">Bu cihazda kullanılabilir bir paket yükleyici yok</string>
+    <string name="media_apk_permission_denied">Sistem ayarlarında White Noise uygulamasından yüklemeye izin verin, ardından APK\'ya tekrar dokunun</string>
+    <string name="media_apk_permission_unavailable">Uygulama yükleme sistem ayarı açılamadı</string>
+    <string name="media_apk_install_unsupported">Bu sürüm APK eklerini yükleyemez. Dosyayı kaydedip güvenilir bir yükleyiciyle açın.</string>
+    <string name="media_apk_invalid">Bu dosya APK olarak adlandırılmış ancak geçerli bir Android paketi değil</string>
     <string name="media_open">Aç</string>
     <string name="media_file_too_large">Dosya eklenemeyecek kadar büyük</string>
     <string name="media_album_too_large">Seçim gönderilemeyecek kadar büyük</string>

@@ -888,6 +888,11 @@
     <string name="media_no_app_to_open">Aucune application installée pour ouvrir ce fichier</string>
     <string name="media_couldnt_open">Impossible d\'ouvrir le fichier</string>
     <string name="media_couldnt_load">Impossible de charger le fichier. Touchez pour réessayer.</string>
+    <string name="media_apk_no_installer">Aucun programme d’installation de paquets n’est disponible sur cet appareil</string>
+    <string name="media_apk_permission_denied">Autorisez l’installation d’applications depuis White Noise dans les paramètres système, puis appuyez à nouveau sur l’APK</string>
+    <string name="media_apk_permission_unavailable">Impossible d’ouvrir le paramètre système d’installation des applications</string>
+    <string name="media_apk_install_unsupported">Cette version ne peut pas installer les pièces jointes APK. Enregistrez le fichier et ouvrez-le avec un programme d’installation fiable.</string>
+    <string name="media_apk_invalid">Ce fichier porte un nom d’APK, mais ce n’est pas un paquet Android valide</string>
     <string name="media_open">Ouvrir</string>
     <string name="media_file_too_large">Fichier trop volumineux pour être joint</string>
     <string name="media_album_too_large">Sélection trop volumineuse pour être envoyée</string>

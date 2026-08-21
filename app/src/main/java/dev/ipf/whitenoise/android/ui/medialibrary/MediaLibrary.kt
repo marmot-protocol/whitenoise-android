@@ -903,6 +903,11 @@ private fun FileLibraryRow(
     var inFlight by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
     var menuOpen by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
     val noOpenAppMessage = stringResource(R.string.media_no_app_to_open)
+    val noInstallerMessage = stringResource(R.string.media_apk_no_installer)
+    val installPermissionDeniedMessage = stringResource(R.string.media_apk_permission_denied)
+    val installPermissionUnavailableMessage = stringResource(R.string.media_apk_permission_unavailable)
+    val installUnsupportedMessage = stringResource(R.string.media_apk_install_unsupported)
+    val invalidPackageMessage = stringResource(R.string.media_apk_invalid)
     val recordedAtLabel = rememberRelativeTimestamp(row.recordedAt)
     val presentation =
         remember(row.reference.mediaType, row.reference.fileName) {
@@ -953,7 +958,11 @@ private fun FileLibraryRow(
                     scope.launch {
                         val outcome =
                             runCatchingCancellable {
-                                openAttachment(fetchFile(), row.reference.mediaType)
+                                openAttachment(
+                                    fetchFile(),
+                                    row.reference.mediaType,
+                                    row.reference.fileName,
+                                )
                             }.getOrElse { error ->
                                 appState.presentFailure(
                                     R.string.media_couldnt_open,
@@ -966,9 +975,19 @@ private fun FileLibraryRow(
                         when (outcome) {
                             OpenAttachmentResult.Opened -> Unit
                             OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
-                            OpenAttachmentResult.InstallPermissionRequired ->
-                                appState.present(R.string.media_couldnt_open)
-                            OpenAttachmentResult.Error ->
+                            OpenAttachmentResult.NoInstaller -> appState.present(noInstallerMessage)
+                            OpenAttachmentResult.InstallPermissionDenied,
+                            OpenAttachmentResult.InstallPermissionRequired,
+                            -> appState.present(installPermissionDeniedMessage)
+                            OpenAttachmentResult.InstallPermissionUnavailable -> {
+                                appState.present(installPermissionUnavailableMessage)
+                            }
+                            OpenAttachmentResult.InstallUnsupported -> appState.present(installUnsupportedMessage)
+                            OpenAttachmentResult.InvalidPackage -> appState.present(invalidPackageMessage)
+                            OpenAttachmentResult.MissingArtifact,
+                            OpenAttachmentResult.SecurityFailure,
+                            OpenAttachmentResult.Error,
+                            ->
                                 appState.presentFailure(
                                     R.string.media_couldnt_open,
                                     "MEDIA_LIBRARY_FILE_OPEN",

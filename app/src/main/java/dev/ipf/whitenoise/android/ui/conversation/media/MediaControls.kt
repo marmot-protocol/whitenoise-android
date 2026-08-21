@@ -26,7 +26,19 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 
-internal enum class OpenAttachmentResult { Opened, InstallPermissionRequired, NoHandler, Error }
+internal enum class OpenAttachmentResult {
+    Opened,
+    InstallPermissionRequired,
+    InstallPermissionDenied,
+    InstallPermissionUnavailable,
+    InstallUnsupported,
+    InvalidPackage,
+    MissingArtifact,
+    NoInstaller,
+    NoHandler,
+    SecurityFailure,
+    Error,
+}
 
 /**
  * Circular tap target overlaid on a media bubble. Used for both the

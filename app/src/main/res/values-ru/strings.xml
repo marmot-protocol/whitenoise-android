@@ -928,6 +928,11 @@
     <string name="media_no_app_to_open">Нет приложения для открытия этого файла</string>
     <string name="media_couldnt_open">Не удалось открыть файл</string>
     <string name="media_couldnt_load">Не удалось загрузить файл. Нажмите, чтобы повторить попытку.</string>
+    <string name="media_apk_no_installer">На этом устройстве нет доступного установщика пакетов</string>
+    <string name="media_apk_permission_denied">Разрешите установку из White Noise в системных настройках, затем снова нажмите на APK</string>
+    <string name="media_apk_permission_unavailable">Не удалось открыть системную настройку для установки приложений</string>
+    <string name="media_apk_install_unsupported">Эта версия не может устанавливать вложения APK. Сохраните файл и откройте его в доверенном установщике.</string>
+    <string name="media_apk_invalid">Файл называется как APK, но не является допустимым пакетом Android</string>
     <string name="media_open">Открыть</string>
     <string name="media_file_too_large">Файл слишком большой для отправки</string>
     <string name="media_album_too_large">Выбор слишком большой для отправки</string>
