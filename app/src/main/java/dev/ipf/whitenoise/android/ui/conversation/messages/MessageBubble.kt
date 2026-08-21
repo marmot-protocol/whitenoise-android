@@ -358,8 +358,8 @@ internal fun MessageBubble(
     val bubbleContentColor = colorFromArgb(bubblePresentation.contentArgb)
     // #414: "you were mentioned" treatment. A received (not mine), live
     // message whose markdown body @-mentions the current
-    // account gets a left-edge accent line so a self-mention is spottable while
-    // scrolling. Keyed on the body tokens + account so a late account switch /
+    // account gets a logical-start outer-frame accent so a self-mention is
+    // spottable while scrolling. Keyed on the body tokens + account so a late account switch /
     // profile load re-evaluates. The resolver is the FFI bech32→hex encoding;
     // the detection walk itself is the pure documentMentionsAccount.
     val selfAccountIdHex = appState.activeAccount?.accountIdHex
