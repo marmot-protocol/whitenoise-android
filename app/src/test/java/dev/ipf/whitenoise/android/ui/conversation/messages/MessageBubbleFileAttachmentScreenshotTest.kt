@@ -8,11 +8,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -44,6 +43,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -55,9 +56,10 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h1100dp-mdpi")
+@OptIn(ExperimentalCoroutinesApi::class)
 class MessageBubbleFileAttachmentScreenshotTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createComposeRule(effectContext = UnconfinedTestDispatcher())
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val appState = appState()
@@ -86,7 +88,7 @@ class MessageBubbleFileAttachmentScreenshotTest {
 
         composeRule.setContent {
             WhiteNoiseTheme {
-                Column(Modifier.width(360.dp).testTag(GALLERY_TAG)) {
+                Column(Modifier.width(360.dp)) {
                     FileMessage(incoming)
                     FileMessage(outgoing)
                     FileMessage(captionedReply)
@@ -110,7 +112,9 @@ class MessageBubbleFileAttachmentScreenshotTest {
         assertFileCardWidth(CONSTRAINED_FILE, 212f)
         assertFileCardWidth(MULTI_FIRST_FILE, 240f)
         assertFileCardWidth(MULTI_SECOND_FILE, 240f)
-        composeRule.onNodeWithTag(GALLERY_TAG).captureRoboImage(SNAPSHOT_PATH)
+        // Capture the fixed-size root rather than a cropped semantics node. Cropped native-graphics
+        // capture can fail in Skia's PNG stream encoder on Linux even after all layout assertions pass.
+        composeRule.onRoot().captureRoboImage(SNAPSHOT_PATH)
     }
 
     private fun assertFileCardWidth(
@@ -360,7 +364,6 @@ class MessageBubbleFileAttachmentScreenshotTest {
         const val CONSTRAINED_FILE = "constrained-width-file.pdf"
         const val MULTI_FIRST_FILE = "multiple-first.pdf"
         const val MULTI_SECOND_FILE = "multiple-second.pdf"
-        const val GALLERY_TAG = "message-bubble-file-width-gallery"
         const val SNAPSHOT_PATH = "src/test/snapshots/message_bubble_file_attachment_width.png"
     }
 }
