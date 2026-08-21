@@ -23,6 +23,10 @@ class ForegroundConversationDismissalCoordinatorTest {
 
         assertFalse(coordinator.consumeShouldDismissOnResume())
         assertFalse(coordinator.shouldDismissAfterUnlock())
+
+        coordinator.onNotificationRouteHandled()
+
+        assertTrue(coordinator.shouldDismissAfterUnlock())
     }
 
     @Test
@@ -44,6 +48,16 @@ class ForegroundConversationDismissalCoordinatorTest {
         coordinator.onStart(hasPendingNotificationRoute = false)
 
         assertTrue(coordinator.consumeShouldDismissOnResume())
+        assertTrue(coordinator.shouldDismissAfterUnlock())
+    }
+
+    @Test
+    fun handledNotificationWhileAlreadyResumedDoesNotPoisonLaterUnlock() {
+        val coordinator = ForegroundConversationDismissalCoordinator()
+
+        coordinator.onNotificationRouteObserved()
+        coordinator.onNotificationRouteHandled()
+
         assertTrue(coordinator.shouldDismissAfterUnlock())
     }
 }

@@ -139,6 +139,7 @@ class NotificationAccountIsolationNavigationTest {
                 renderedChatId = SHARED_GROUP,
                 renderedAccountRef = renderedAccount.value,
                 navigationAccountStable = navigationAccountStable.value,
+                timelineVisible = true,
                 onOwnershipChanged = { accountRef, groupIdHex ->
                     observedOwnership += accountRef to groupIdHex
                 },
@@ -155,6 +156,62 @@ class NotificationAccountIsolationNavigationTest {
         }
         awaitCondition { observedOwnership.lastOrNull() == (null to null) }
         assertFalse(observedOwnership.contains(TARGET_ACCOUNT to SHARED_GROUP))
+    }
+
+    @Test
+    fun hiddenTimeline_staysUnownedWhenNavigationBecomesStable() {
+        val navigationAccountStable = mutableStateOf(false)
+        val timelineVisible = mutableStateOf(false)
+        val observedOwnership = CopyOnWriteArrayList<Pair<String?, String?>>()
+
+        composeRule.setContent {
+            ConversationNotificationOwnershipEffect(
+                selectedChatId = SHARED_GROUP,
+                selectedGroupIdHex = SHARED_GROUP,
+                renderedChatId = SHARED_GROUP,
+                renderedAccountRef = TARGET_ACCOUNT,
+                navigationAccountStable = navigationAccountStable.value,
+                timelineVisible = timelineVisible.value,
+                onOwnershipChanged = { accountRef, groupIdHex ->
+                    observedOwnership += accountRef to groupIdHex
+                },
+            )
+        }
+
+        awaitCondition { observedOwnership.lastOrNull() == (null to null) }
+        composeRule.runOnIdle { navigationAccountStable.value = true }
+        awaitCondition { observedOwnership.lastOrNull() == (null to null) }
+        assertFalse(observedOwnership.contains(TARGET_ACCOUNT to SHARED_GROUP))
+
+        composeRule.runOnIdle { timelineVisible.value = true }
+        awaitCondition { observedOwnership.lastOrNull() == (TARGET_ACCOUNT to SHARED_GROUP) }
+    }
+
+    @Test
+    fun backFromTargetConversationClearsOwnershipWithoutPublishingSourceAccount() {
+        val selectedChatId = mutableStateOf<String?>(SHARED_GROUP)
+        val observedOwnership = CopyOnWriteArrayList<Pair<String?, String?>>()
+
+        composeRule.setContent {
+            ConversationNotificationOwnershipEffect(
+                selectedChatId = selectedChatId.value,
+                selectedGroupIdHex = selectedChatId.value,
+                renderedChatId = SHARED_GROUP,
+                renderedAccountRef = TARGET_ACCOUNT,
+                navigationAccountStable = true,
+                timelineVisible = true,
+                onOwnershipChanged = { accountRef, groupIdHex ->
+                    observedOwnership += accountRef to groupIdHex
+                },
+            )
+        }
+
+        awaitCondition { observedOwnership.lastOrNull() == (TARGET_ACCOUNT to SHARED_GROUP) }
+
+        composeRule.runOnIdle { selectedChatId.value = null }
+
+        awaitCondition { observedOwnership.lastOrNull() == (null to null) }
+        assertFalse(observedOwnership.contains(SOURCE_ACCOUNT to SHARED_GROUP))
     }
 
     @Test

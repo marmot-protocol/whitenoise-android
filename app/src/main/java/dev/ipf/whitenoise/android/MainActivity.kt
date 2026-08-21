@@ -144,6 +144,7 @@ class MainActivity : AppCompatActivity() {
             )
         ) {
             inboundNotificationTarget = null
+            foregroundConversationDismissal.onNotificationRouteHandled()
         }
     }
 
@@ -418,6 +419,15 @@ internal class ForegroundConversationDismissalCoordinator {
     fun onNotificationRouteObserved() {
         currentForegroundNotificationOwned = true
         if (resumePending) notificationRouteObserved = true
+    }
+
+    /**
+     * The route now owns the visible conversation directly. Clear only the
+     * unlock guard; the pending resume decision still needs to remember that
+     * this foreground entry came from a notification.
+     */
+    fun onNotificationRouteHandled() {
+        currentForegroundNotificationOwned = false
     }
 
     fun consumeShouldDismissOnResume(): Boolean {

@@ -139,6 +139,11 @@ internal data class ConversationTransitionContent(
     val openedAsDmHint: Boolean,
 )
 
+private data class ConversationTimelineVisibility(
+    val controller: ConversationController,
+    val visible: Boolean,
+)
+
 internal fun conversationControllerAccountRef(
     selectedPinnedAccountRef: String?,
     pendingAccountRef: String?,
@@ -1517,6 +1522,14 @@ internal fun MainShell(
     val conversationController =
         selectedOrPendingConversationController
             ?: accountOwnedExitingConversationContent?.controller
+    var conversationTimelineVisibility by remember {
+        mutableStateOf<ConversationTimelineVisibility?>(null)
+    }
+    val selectedConversationTimelineVisible =
+        conversationTimelineVisibility
+            ?.takeIf { it.controller === selectedOrPendingConversationController }
+            ?.visible
+            ?: true
     // Follow the selected controller directly so a chat-to-chat switch never
     // hops through null. The account-stability guard is essential: during an
     // ordinary account switch the old selection survives for one composition,
@@ -1529,6 +1542,7 @@ internal fun MainShell(
         renderedChatId = controllerChat?.id,
         renderedAccountRef = selectedOrPendingConversationController?.boundAccountRef,
         navigationAccountStable = navAccountStable,
+        timelineVisible = selectedConversationTimelineVisible,
     ) { accountRef, groupIdHex ->
         appState.setActiveConversation(accountRef, groupIdHex)
     }
@@ -1738,6 +1752,38 @@ internal fun MainShell(
                     val content = requireNotNull(animatedConversation)
                     val chat = content.chat
                     val scrollKey = conversationScrollKey(content.accountRef, chat.group.groupIdHex)
+                    val notificationReadThroughCommitter =
+                        remember(
+                            content.controller,
+                            content.openContext.notificationOpenRequestId,
+                            content.openContext.notificationRouteTraceRequestId,
+                            content.openContext.notificationReadThroughMessageId,
+                        ) {
+                            NotificationReadThroughCommitter(
+                                content.openContext.notificationReadThroughMessageId
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { messageIdHex ->
+                                        NotificationReadThroughTarget(
+                                            accountRef = content.accountRef,
+                                            groupIdHex = chat.group.groupIdHex,
+                                            messageIdHex = messageIdHex,
+                                        )
+                                    },
+                            )
+                        }
+                    val commitNotificationReadThrough: (NotificationReadThroughTarget) -> Unit = { target ->
+                        appState.launchMutation {
+                            appState.markNotificationMessageRead(
+                                accountRef = target.accountRef,
+                                groupIdHex = target.groupIdHex,
+                                messageIdHex = target.messageIdHex,
+                            )
+                        }
+                    }
+                    NotificationReadThroughCommitOnDispose(
+                        committer = notificationReadThroughCommitter,
+                        onCommit = commitNotificationReadThrough,
+                    )
                     ConversationScreen(
                         appState = appState,
                         chat = chat,
@@ -1747,14 +1793,15 @@ internal fun MainShell(
                         ttsFocusSessionId = content.openContext.ttsFocusSessionId,
                         notificationOpenRequestId = content.openContext.notificationOpenRequestId,
                         notificationReadThroughMessageId = content.openContext.notificationReadThroughMessageId,
-                        onNotificationUnreadBoundaryCaptured = { messageIdHex ->
-                            appState.launchMutation {
-                                appState.markNotificationMessageRead(
-                                    accountRef = content.accountRef,
-                                    groupIdHex = chat.group.groupIdHex,
-                                    messageIdHex = messageIdHex,
+                        onNotificationUnreadBoundaryCaptured = {
+                            notificationReadThroughCommitter.commit(commitNotificationReadThrough)
+                        },
+                        onNotificationTimelineVisibilityChanged = { visible ->
+                            conversationTimelineVisibility =
+                                ConversationTimelineVisibility(
+                                    controller = content.controller,
+                                    visible = visible,
                                 )
-                            }
                         },
                         onFirstFrameCommitted = {
                             content.openContext.notificationRouteTraceRequestId?.let { requestId ->
@@ -1785,15 +1832,16 @@ internal fun MainShell(
                             // open receives its chat-list projection. The entry
                             // divider no longer matters once the route is closed,
                             // so durably commit the tap's read cursor here (#1016).
-                            content.openContext.notificationReadThroughMessageId?.let { messageIdHex ->
-                                appState.launchMutation {
-                                    appState.markNotificationMessageRead(
-                                        accountRef = content.accountRef,
-                                        groupIdHex = chat.group.groupIdHex,
-                                        messageIdHex = messageIdHex,
-                                    )
-                                }
-                            }
+                            notificationReadThroughCommitter.commit(commitNotificationReadThrough)
+                            // Invalidate notification ownership before retaining
+                            // the outgoing screen for its Back animation. That
+                            // retained screen must never republish its account.
+                            conversationTimelineVisibility =
+                                ConversationTimelineVisibility(
+                                    controller = content.controller,
+                                    visible = false,
+                                )
+                            appState.clearActiveConversation()
                             // Flush the hidden list before exposing it, so the first
                             // drawn return frame already has the optimistic preview
                             // in its final recency slot (#900).
