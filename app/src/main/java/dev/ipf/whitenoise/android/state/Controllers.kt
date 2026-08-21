@@ -8620,6 +8620,7 @@ class ConversationController(
                 // unreferenced Blossom blob is inert).
                 if (discardedDuringRetry.remove(key)) {
                     optimisticMessages.remove(key)
+                    durableAcceptanceCallbacks.remove(key)
                     messageById.remove(tempId)
                     retentionAtSendByMessageId.remove(tempId)
                     retainedMediaUploads.remove(key)
@@ -8833,6 +8834,7 @@ class ConversationController(
                 if (throwable is CancellationException) throw throwable
                 if (discardedDuringRetry.remove(key)) {
                     optimisticMessages.remove(key)
+                    durableAcceptanceCallbacks.remove(key)
                     messageById.remove(tempId)
                     retentionAtSendByMessageId.remove(tempId)
                     retainedMediaUploads.remove(key)
@@ -9715,6 +9717,7 @@ class ConversationController(
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; don't restore the Failed bubble.
                 optimisticMessages.remove(key)
+                durableAcceptanceCallbacks.remove(key)
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
                 rollbackOptimisticChatListPreview(tempId)
@@ -9767,13 +9770,17 @@ class ConversationController(
         val status = current?.status ?: item.status
         val tempId = current?.record?.messageIdHex ?: item.record.messageIdHex
         when (status) {
-            MessageStatus.Failed -> Unit
-            MessageStatus.Pending -> if (current != null) discardedDuringRetry.add(key)
+            MessageStatus.Failed -> durableAcceptanceCallbacks.remove(key)
+            MessageStatus.Pending ->
+                if (current != null) {
+                    discardedDuringRetry.add(key)
+                } else {
+                    durableAcceptanceCallbacks.remove(key)
+                }
             else -> return
         }
         rollbackOptimisticChatListPreview(tempId)
         optimisticMessages.remove(key)
-        durableAcceptanceCallbacks.remove(key)
         messageById.remove(tempId)
         retentionAtSendByMessageId.remove(tempId)
         // Free any retained attachment bytes for a discarded media send.

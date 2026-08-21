@@ -2693,7 +2693,7 @@ internal fun ConversationScreen(
         rememberComposerTextState(
             draftKey = controller.group.groupIdHex,
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-            externalRevision = composerShareRevision + composerDictationRevision,
+            externalRevision = composerShareRevision to composerDictationRevision,
         )
     val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 

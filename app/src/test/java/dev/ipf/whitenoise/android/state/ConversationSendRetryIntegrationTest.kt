@@ -20,6 +20,8 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -64,16 +66,7 @@ class ConversationSendRetryIntegrationTest {
                 ConversationController(
                     appState = appState,
                     initialGroup = group(),
-                    initialMemberSnapshot =
-                        GroupMemberSnapshot(
-                            listOf(
-                                AppGroupMemberRecordFfi(
-                                    memberIdHex = ACCOUNT_ID,
-                                    account = ACCOUNT_REF,
-                                    local = true,
-                                ),
-                            ),
-                        ),
+                    initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
                         throw MarmotKitException.Publish("relay rejected event")
                     },
@@ -95,16 +88,7 @@ class ConversationSendRetryIntegrationTest {
                 ConversationController(
                     appState = appState,
                     initialGroup = group(),
-                    initialMemberSnapshot =
-                        GroupMemberSnapshot(
-                            listOf(
-                                AppGroupMemberRecordFfi(
-                                    memberIdHex = ACCOUNT_ID,
-                                    account = ACCOUNT_REF,
-                                    local = true,
-                                ),
-                            ),
-                        ),
+                    initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
                         attempts += 1
                         if (attempts == 1) {
@@ -169,6 +153,51 @@ class ConversationSendRetryIntegrationTest {
         }
 
     @Test
+    fun discardingAnInFlightRetryStillClearsTheDraftAfterDurableAcceptance() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("discard while retrying"))
+            val retryStarted = CompletableDeferred<Unit>()
+            val acceptRetry = CompletableDeferred<Unit>()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        if (attempts == 1) {
+                            throw MarmotKitException.Publish("relay rejected event")
+                        }
+                        retryStarted.complete(Unit)
+                        acceptRetry.await()
+                        SendSummaryFfi(
+                            published = 1u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            appState.sendConversationText(controller, "discard while retrying")
+            val failedItem = controller.timeline.single()
+            val retry = async { controller.retryFailedSend(failedItem) }
+            retryStarted.await()
+
+            controller.discardFailedSend(failedItem)
+            assertEquals(emptyList<TimelineMessage>(), controller.timeline)
+            assertEquals("discard while retrying", appState.draftFor(GROUP_ID))
+
+            acceptRetry.complete(Unit)
+            retry.await()
+
+            assertEquals(null, appState.draftFor(GROUP_ID))
+            assertEquals(emptyList<TimelineMessage>(), controller.timeline)
+        }
+
+    @Test
     fun acceptedPendingClearsTheCapturedComposerDraft() =
         runTest {
             val appState = appState()
@@ -177,16 +206,7 @@ class ConversationSendRetryIntegrationTest {
                 ConversationController(
                     appState = appState,
                     initialGroup = group(),
-                    initialMemberSnapshot =
-                        GroupMemberSnapshot(
-                            listOf(
-                                AppGroupMemberRecordFfi(
-                                    memberIdHex = ACCOUNT_ID,
-                                    account = ACCOUNT_REF,
-                                    local = true,
-                                ),
-                            ),
-                        ),
+                    initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
                         assertEquals("queued safely", appState.draftFor(GROUP_ID))
                         SendSummaryFfi(
@@ -212,16 +232,7 @@ class ConversationSendRetryIntegrationTest {
                 ConversationController(
                     appState = appState(),
                     initialGroup = group(),
-                    initialMemberSnapshot =
-                        GroupMemberSnapshot(
-                            listOf(
-                                AppGroupMemberRecordFfi(
-                                    memberIdHex = ACCOUNT_ID,
-                                    account = ACCOUNT_REF,
-                                    local = true,
-                                ),
-                            ),
-                        ),
+                    initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
                         assertEquals(listOf("optimistic"), callbacks)
                         SendSummaryFfi(
@@ -251,16 +262,7 @@ class ConversationSendRetryIntegrationTest {
                 ConversationController(
                     appState = appState(),
                     initialGroup = group(disappearingMessageSecs = 30uL),
-                    initialMemberSnapshot =
-                        GroupMemberSnapshot(
-                            listOf(
-                                AppGroupMemberRecordFfi(
-                                    memberIdHex = ACCOUNT_ID,
-                                    account = ACCOUNT_REF,
-                                    local = true,
-                                ),
-                            ),
-                        ),
+                    initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
                         val pending = controller.timeline.single()
                         assertEquals(MessageStatus.Pending, pending.status)
@@ -300,16 +302,7 @@ class ConversationSendRetryIntegrationTest {
                 ConversationController(
                     appState = appState(),
                     initialGroup = group(disappearingMessageSecs = 30uL),
-                    initialMemberSnapshot =
-                        GroupMemberSnapshot(
-                            listOf(
-                                AppGroupMemberRecordFfi(
-                                    memberIdHex = ACCOUNT_ID,
-                                    account = ACCOUNT_REF,
-                                    local = true,
-                                ),
-                            ),
-                        ),
+                    initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
                         controller.testApplyLiveTimelineChangesAndRegisterStreams(
                             listOf(
@@ -350,16 +343,7 @@ class ConversationSendRetryIntegrationTest {
                 ConversationController(
                     appState = appState(),
                     initialGroup = group(),
-                    initialMemberSnapshot =
-                        GroupMemberSnapshot(
-                            listOf(
-                                AppGroupMemberRecordFfi(
-                                    memberIdHex = ACCOUNT_ID,
-                                    account = ACCOUNT_REF,
-                                    local = true,
-                                ),
-                            ),
-                        ),
+                    initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { replyTarget, account, groupIdHex, text ->
                         attempts += 1
                         assertEquals(null, replyTarget)

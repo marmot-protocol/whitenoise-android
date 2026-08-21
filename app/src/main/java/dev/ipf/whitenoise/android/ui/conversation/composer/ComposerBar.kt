@@ -294,7 +294,7 @@ private val composerImePaneHeightMemory = mutableStateMapOf<Int, Dp>()
 internal fun rememberComposerTextState(
     draftKey: Any?,
     initialDraft: TextFieldValue = TextFieldValue(""),
-    externalRevision: Int = 0,
+    externalRevision: Any? = 0,
 ): ComposerTextState = remember(draftKey, externalRevision) { ComposerTextState(initialDraft) }
 
 @OptIn(ExperimentalLayoutApi::class)

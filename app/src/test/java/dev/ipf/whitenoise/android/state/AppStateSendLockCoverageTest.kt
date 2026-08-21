@@ -236,13 +236,19 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
-    fun failedSendDiscardTracksPendingOnlyWhenRetryStillExists() {
+    fun failedSendDiscardRetainsCallbackOnlyWhileRetryStillExists() {
         val body = controllerFunctionBody("discardFailedSend")
+        val pendingRetryBranch =
+            Regex(
+                """MessageStatus\.Pending\s*->\s*if \(current != null\) \{\s*""" +
+                    """discardedDuringRetry\.add\(key\)\s*\}\s*else \{\s*""" +
+                    """durableAcceptanceCallbacks\.remove\(key\)""",
+            )
 
         assertTrue(
-            "discardFailedSend must not retain a discardedDuringRetry key after the retry entry has already completed",
+            "discardFailedSend must retain callback cleanup only while a pending retry can still accept",
             "val current = optimisticMessages[key]" in body &&
-                "MessageStatus.Pending -> if (current != null) discardedDuringRetry.add(key)" in body,
+                pendingRetryBranch.containsMatchIn(body),
         )
     }
 

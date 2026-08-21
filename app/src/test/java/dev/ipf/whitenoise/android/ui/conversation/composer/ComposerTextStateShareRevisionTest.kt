@@ -96,4 +96,36 @@ class ComposerTextStateShareRevisionTest {
             )
         }
     }
+
+    @Test
+    fun independentExternalRevisionsCannotAliasWhenTheirSumMatches() {
+        var persistedDraft by mutableStateOf(TextFieldValue("dictated", TextRange(8)))
+        var shareRevision by mutableIntStateOf(0)
+        var dictationRevision by mutableIntStateOf(1)
+        lateinit var composerState: ComposerTextState
+
+        composeRule.setContent {
+            composerState =
+                rememberComposerTextState(
+                    draftKey = "group-1",
+                    initialDraft = persistedDraft,
+                    externalRevision = shareRevision to dictationRevision,
+                )
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            persistedDraft = TextFieldValue("shared", TextRange(6))
+            shareRevision = 1
+            dictationRevision = 0
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            assertEquals(
+                TextFieldValue("shared", TextRange(6)),
+                composerState.valueState.value,
+            )
+        }
+    }
 }
