@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -129,6 +130,7 @@ internal fun MediaVoiceBubble(
             ),
         )
     }
+    var interactiveDownloadRequested by remember(pillKey) { mutableStateOf(false) }
 
     val playback by remember(pillKey) {
         dev.ipf.whitenoise.android.audio.VoicePlaybackController.state
@@ -219,6 +221,12 @@ internal fun MediaVoiceBubble(
                 attachmentIndex = attachmentIndex,
                 reference = reference,
                 mine = mine,
+                priority =
+                    if (interactiveDownloadRequested) {
+                        AttachmentDownloadPriority.Interactive
+                    } else {
+                        AttachmentDownloadPriority.Automatic
+                    },
             )
         }.onSuccess { file ->
             localFile = file
@@ -277,6 +285,7 @@ internal fun MediaVoiceBubble(
                                 // gated effect fetch it, rather than fetch+play in
                                 // one tap. Mirrors the video bubble's tap-to-fetch.
                                 if (!startDownload && localFile == null) {
+                                    interactiveDownloadRequested = true
                                     startDownload = true
                                     return@combinedClickable
                                 }
@@ -286,6 +295,7 @@ internal fun MediaVoiceBubble(
                                     return@combinedClickable
                                 }
                                 scope.launch {
+                                    interactiveDownloadRequested = true
                                     val retainedFile =
                                         withContext(Dispatchers.IO) {
                                             validatedAttachmentCacheFile(localFile)
@@ -456,6 +466,7 @@ internal suspend fun materializeVoiceAttachment(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
+    priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
 ): java.io.File =
     materializeVoiceAttachment(
         context = context,
@@ -472,7 +483,7 @@ internal suspend fun materializeVoiceAttachment(
                 } else {
                     null
                 }
-            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference, priority)
         },
     )
 

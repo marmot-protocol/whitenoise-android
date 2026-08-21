@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.playbackErrorInvalidatesAttachmentCache
+import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -136,6 +137,7 @@ internal fun MediaVideoGridTile(
             ),
         )
     }
+    var interactiveDownloadRequested by remember(messageIdHex, attachmentIndex) { mutableStateOf(false) }
     var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(0) }
 
     LaunchedEffect(messageIdHex, attachmentIndex, epoch, startDownload, reloadToken, cachedPlaintextOnEntry) {
@@ -158,6 +160,12 @@ internal fun MediaVideoGridTile(
                 attachmentIndex = attachmentIndex,
                 reference = reference,
                 mine = mine,
+                priority =
+                    if (interactiveDownloadRequested) {
+                        AttachmentDownloadPriority.Interactive
+                    } else {
+                        AttachmentDownloadPriority.Automatic
+                    },
             )
         }.onSuccess { f ->
             localFile = f
@@ -229,10 +237,14 @@ internal fun MediaVideoGridTile(
                                 onTap(playableFile)
                             }
                         failed -> {
+                            interactiveDownloadRequested = true
                             failed = false
                             reloadToken++
                         }
-                        else -> startDownload = true
+                        else -> {
+                            interactiveDownloadRequested = true
+                            startDownload = true
+                        }
                     }
                 },
             ),
@@ -401,6 +413,7 @@ internal fun MediaVideoBubble(
             ),
         )
     }
+    var interactiveDownloadRequested by remember(pillKey) { mutableStateOf(false) }
 
     LaunchedEffect(pillKey, epoch, startDownload, cachedPlaintextOnEntry) {
         if (localFile != null) return@LaunchedEffect
@@ -423,6 +436,12 @@ internal fun MediaVideoBubble(
                 attachmentIndex = attachmentIndex,
                 reference = reference,
                 mine = mine,
+                priority =
+                    if (interactiveDownloadRequested) {
+                        AttachmentDownloadPriority.Interactive
+                    } else {
+                        AttachmentDownloadPriority.Automatic
+                    },
             )
         }.onSuccess { f ->
             localFile = f
@@ -527,6 +546,7 @@ internal fun MediaVideoBubble(
                                     loading -> Unit
                                     else ->
                                         scope.launch {
+                                            interactiveDownloadRequested = true
                                             val retainedFile =
                                                 withContext(Dispatchers.IO) {
                                                     validatedAttachmentCacheFile(localFile)
@@ -738,6 +758,7 @@ internal suspend fun materializeVideoAttachment(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
+    priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
 ): java.io.File =
     materializeVideoAttachment(
         context = context,
@@ -754,7 +775,7 @@ internal suspend fun materializeVideoAttachment(
                 } else {
                     null
                 }
-            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference, priority)
         },
     )
 

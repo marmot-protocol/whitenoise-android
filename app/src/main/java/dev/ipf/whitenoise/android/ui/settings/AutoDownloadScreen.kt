@@ -17,7 +17,9 @@ import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.SignalCellularAlt
+import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -38,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -81,6 +84,8 @@ internal fun AutoDownloadDataScreen(
     onBack: () -> Unit,
 ) {
     var dialogNetwork by remember { mutableStateOf<MediaAutoDownloadNetwork?>(null) }
+    var confirmStopAutomatic by remember { mutableStateOf(false) }
+    val automaticPaused = appState.automaticAttachmentDownloadsPaused()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -117,6 +122,39 @@ internal fun AutoDownloadDataScreen(
                 }
             }
             item {
+                SettingsGroup(title = stringResource(R.string.media_auto_download_backlog_title), icon = Icons.Filled.StopCircle) {
+                    item {
+                        SettingsRow(
+                            title =
+                                stringResource(
+                                    if (automaticPaused) {
+                                        R.string.media_auto_download_restart
+                                    } else {
+                                        R.string.media_auto_download_stop
+                                    },
+                                ),
+                            subtitle =
+                                stringResource(
+                                    if (automaticPaused) {
+                                        R.string.media_auto_download_restart_subtitle
+                                    } else {
+                                        R.string.media_auto_download_stop_subtitle
+                                    },
+                                ),
+                            icon = if (automaticPaused) Icons.Filled.RestartAlt else Icons.Filled.StopCircle,
+                            modifier = Modifier.testTag(AUTO_DOWNLOAD_BACKLOG_ACTION_TAG),
+                            onClick = {
+                                if (automaticPaused) {
+                                    appState.restartAutomaticAttachmentDownloads()
+                                } else {
+                                    confirmStopAutomatic = true
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+            item {
                 MediaQualityGroup(appState)
             }
             item {
@@ -140,7 +178,29 @@ internal fun AutoDownloadDataScreen(
             onDismiss = { dialogNetwork = null },
         )
     }
+    if (confirmStopAutomatic) {
+        AlertDialog(
+            onDismissRequest = { confirmStopAutomatic = false },
+            title = { Text(stringResource(R.string.media_auto_download_stop)) },
+            text = { Text(stringResource(R.string.media_auto_download_stop_confirmation)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        appState.stopAutomaticAttachmentDownloads()
+                        confirmStopAutomatic = false
+                    },
+                ) { Text(stringResource(R.string.media_auto_download_stop_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmStopAutomatic = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
 }
+
+internal const val AUTO_DOWNLOAD_BACKLOG_ACTION_TAG = "auto_download_backlog_action"
 
 // Locale-aware list of the types enabled for [network], or "none".
 @Composable

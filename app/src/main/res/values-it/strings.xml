@@ -927,6 +927,13 @@
     <string name="group_image_search_preview_subtitle_ready">Tocca «Usa questa immagine» per applicare</string>
     <string name="media_auto_download_title">Download automatico dei media</string>
     <string name="media_auto_download_subtitle">I documenti e i video di grandi dimensioni possono consumare molti dati. Scegli cosa scaricare automaticamente su ogni connessione.</string>
+    <string name="media_auto_download_backlog_title">Coda dei download</string>
+    <string name="media_auto_download_stop">Interrompi download automatici</string>
+    <string name="media_auto_download_stop_subtitle">Cancella i download automatici in coda; quelli attivi e richiesti continuano</string>
+    <string name="media_auto_download_stop_confirmation">Vengono cancellati solo i download automatici in coda per questo account. I download attivi e i file toccati continuano.</string>
+    <string name="media_auto_download_stop_action">Interrompi solo automatici</string>
+    <string name="media_auto_download_restart">Riavvia download automatici</string>
+    <string name="media_auto_download_restart_subtitle">Consenti di nuovo i download automatici</string>
     <string name="network_wifi">Wi-Fi</string>
     <string name="network_mobile">Dati mobili</string>
     <string name="network_roaming">Roaming</string>

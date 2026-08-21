@@ -927,6 +927,13 @@
     <string name="group_image_search_preview_subtitle_ready">Toque em \"Usar esta imagem\" para aplicar</string>
     <string name="media_auto_download_title">Baixar mídia automaticamente</string>
     <string name="media_auto_download_subtitle">Documentos e vídeos grandes podem consumir muitos dados. Escolha o que é baixado automaticamente em cada conexão.</string>
+    <string name="media_auto_download_backlog_title">Fila de downloads</string>
+    <string name="media_auto_download_stop">Parar downloads automáticos</string>
+    <string name="media_auto_download_stop_subtitle">Limpa downloads automáticos na fila; downloads ativos e solicitados continuam</string>
+    <string name="media_auto_download_stop_confirmation">Isso limpa apenas os downloads automáticos na fila desta conta. Downloads ativos e arquivos tocados continuam.</string>
+    <string name="media_auto_download_stop_action">Parar somente automáticos</string>
+    <string name="media_auto_download_restart">Reiniciar downloads automáticos</string>
+    <string name="media_auto_download_restart_subtitle">Permitir novos downloads automáticos novamente</string>
     <string name="network_wifi">Wi-Fi</string>
     <string name="network_mobile">Dados móveis</string>
     <string name="network_roaming">Roaming</string>

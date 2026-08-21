@@ -2,10 +2,15 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicLong
+
+internal enum class AttachmentDownloadPriority {
+    Automatic,
+    Interactive,
+}
 
 /**
  * Bounded gate for decrypted attachment fetches.
@@ -29,14 +34,81 @@ internal class AttachmentDownloadGate(
         require(parallelism > 0) { "parallelism must be positive" }
     }
 
-    private val semaphore = Semaphore(parallelism)
+    private data class Waiter(
+        val key: String,
+        val accountRef: String?,
+        var priority: AttachmentDownloadPriority,
+        val admitted: CompletableDeferred<Unit> = CompletableDeferred(),
+        var ownsPermit: Boolean = false,
+    )
+
+    private val lock = Any()
+    private val automatic = ArrayDeque<Waiter>()
+    private val interactive = ArrayDeque<Waiter>()
+    private val requestsByKey = mutableMapOf<String, Waiter>()
+    private val anonymousKey = AtomicLong()
+    private var activePermits = 0
+    private var consecutiveInteractiveAdmissions = 0
+    private val maxPermits = parallelism
 
     /**
      * Acquires one raw permit. Kept available for tests and for any future
      * one-shot internal callers; media downloads should normally use
      * [withRetryingPermit] so transient FFI/Blossom races can self-heal.
      */
-    suspend fun <T> withPermit(block: suspend () -> T): T = semaphore.withPermit { block() }
+    suspend fun <T> withPermit(block: suspend () -> T): T =
+        withPermit(
+            key = "anonymous-${anonymousKey.incrementAndGet()}",
+            accountRef = null,
+            priority = AttachmentDownloadPriority.Automatic,
+            block = block,
+        )
+
+    suspend fun <T> withPermit(
+        key: String,
+        accountRef: String?,
+        priority: AttachmentDownloadPriority,
+        block: suspend () -> T,
+    ): T {
+        val waiter = acquire(key, accountRef, priority)
+        try {
+            return block()
+        } finally {
+            release(waiter)
+        }
+    }
+
+    /** Moves a queued automatic identity to the interactive lane without creating another waiter. */
+    fun promote(key: String): Boolean =
+        synchronized(lock) {
+            val waiter = requestsByKey[key] ?: return@synchronized false
+            if (waiter.ownsPermit || waiter.priority == AttachmentDownloadPriority.Interactive) {
+                return@synchronized true
+            }
+            automatic.remove(waiter)
+            waiter.priority = AttachmentDownloadPriority.Interactive
+            interactive.addLast(waiter)
+            true
+        }
+
+    /** Cancels only automatic requests that have not acquired a permit. */
+    fun cancelQueuedAutomatic(accountRef: String): Int {
+        val cancelled =
+            synchronized(lock) {
+                automatic
+                    .filter { it.accountRef == accountRef && !it.ownsPermit }
+                    .also { waiters ->
+                        waiters.forEach { waiter ->
+                            automatic.remove(waiter)
+                            requestsByKey.remove(waiter.key, waiter)
+                        }
+                    }
+            }
+        cancelled.forEach { waiter ->
+            waiter.admitted.cancel(CancellationException("automatic attachment backlog stopped"))
+        }
+        return cancelled.size
+    }
 
     suspend fun <T> withRetryingPermit(
         maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
@@ -66,8 +138,87 @@ internal class AttachmentDownloadGate(
         }
     }
 
+    private suspend fun acquire(
+        key: String,
+        accountRef: String?,
+        priority: AttachmentDownloadPriority,
+    ): Waiter {
+        val waiter = Waiter(key, accountRef, priority)
+        val admittedImmediately =
+            synchronized(lock) {
+                check(requestsByKey.putIfAbsent(key, waiter) == null) {
+                    "attachment key is already active or queued: $key"
+                }
+                if (activePermits < maxPermits && automatic.isEmpty() && interactive.isEmpty()) {
+                    activePermits += 1
+                    waiter.ownsPermit = true
+                    true
+                } else {
+                    lane(priority).addLast(waiter)
+                    false
+                }
+            }
+        if (admittedImmediately) return waiter
+        try {
+            waiter.admitted.await()
+            return waiter
+        } catch (cancellation: CancellationException) {
+            synchronized(lock) {
+                if (waiter.ownsPermit) {
+                    waiter.ownsPermit = false
+                    activePermits -= 1
+                    requestsByKey.remove(waiter.key, waiter)
+                    admitAvailableLocked()
+                } else {
+                    lane(waiter.priority).remove(waiter)
+                    requestsByKey.remove(waiter.key, waiter)
+                }
+            }
+            throw cancellation
+        }
+    }
+
+    private fun release(waiter: Waiter) {
+        synchronized(lock) {
+            if (!waiter.ownsPermit) return
+            waiter.ownsPermit = false
+            activePermits -= 1
+            requestsByKey.remove(waiter.key, waiter)
+            admitAvailableLocked()
+        }
+    }
+
+    private fun admitAvailableLocked() {
+        while (activePermits < maxPermits) {
+            val next = nextWaiterLocked() ?: return
+            next.ownsPermit = true
+            activePermits += 1
+            next.admitted.complete(Unit)
+        }
+    }
+
+    private fun nextWaiterLocked(): Waiter? {
+        val admitAutomatic =
+            automatic.isNotEmpty() &&
+                (interactive.isEmpty() || consecutiveInteractiveAdmissions >= MAX_INTERACTIVE_BURST)
+        return if (admitAutomatic) {
+            consecutiveInteractiveAdmissions = 0
+            automatic.removeFirst()
+        } else {
+            interactive.removeFirstOrNull()?.also { consecutiveInteractiveAdmissions += 1 }
+                ?: automatic.removeFirstOrNull()?.also { consecutiveInteractiveAdmissions = 0 }
+        }
+    }
+
+    private fun lane(priority: AttachmentDownloadPriority): ArrayDeque<Waiter> =
+        when (priority) {
+            AttachmentDownloadPriority.Automatic -> automatic
+            AttachmentDownloadPriority.Interactive -> interactive
+        }
+
     internal companion object {
         const val DEFAULT_PARALLELISM = 3
+        const val MAX_INTERACTIVE_BURST = 3
         const val DEFAULT_MAX_ATTEMPTS = 3
         const val DEFAULT_INITIAL_RETRY_BACKOFF_MILLIS = 150L
         const val DEFAULT_MAX_RETRY_BACKOFF_MILLIS = 600L

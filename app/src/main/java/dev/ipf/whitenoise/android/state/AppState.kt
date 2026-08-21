@@ -2444,6 +2444,10 @@ class WhiteNoiseAppState private constructor(
     // retries keep transient queued-behind failures from sticking tiles in
     // `failed` before the user has a chance to see the media.
     private val attachmentDownloadGate = AttachmentDownloadGate()
+    private val attachmentDownloadIntents = AttachmentDownloadIntentStore(preferences)
+    private var attachmentDownloadPolicyRevision by mutableStateOf(0)
+    internal var attachmentOpenIntentRevision by mutableStateOf(0)
+        private set
     private val conversationStateRetention = ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES)
 
     val shareStaging: ShareStagingStore = ShareStagingStore()
@@ -3986,10 +3990,17 @@ class WhiteNoiseAppState private constructor(
      */
     internal fun memoizedDownload(
         cacheKey: String,
+        request: AttachmentTransferRequest,
+        priority: AttachmentDownloadPriority,
         block: suspend CoroutineScope.() -> ByteArray,
     ): Deferred<ByteArray> {
         synchronized(inFlightDownloadsLock) {
-            inFlightDownloads[cacheKey]?.takeIf { it.isActive }?.let { return it }
+            inFlightDownloads[cacheKey]?.takeIf { it.isActive }?.let { active ->
+                if (priority == AttachmentDownloadPriority.Interactive) {
+                    attachmentDownloadGate.promote(cacheKey)
+                }
+                return active
+            }
             val deferred =
                 mutationsScope.async {
                     // Cap concurrent attachment fetches so an N-tile album
@@ -4001,7 +4012,11 @@ class WhiteNoiseAppState private constructor(
                     // The gate is acquired inside the Deferred so callers only
                     // suspend at `await()`.
                     val downloadScope = this
-                    attachmentDownloadGate.withPermit { downloadScope.block() }
+                    attachmentDownloadGate.withPermit(
+                        key = cacheKey,
+                        accountRef = request.accountRef,
+                        priority = priority,
+                    ) { downloadScope.block() }
                 }
             inFlightDownloads[cacheKey] = deferred
             // Drop the map entry via `invokeOnCompletion` (fires AFTER the
@@ -4035,8 +4050,46 @@ class WhiteNoiseAppState private constructor(
                     record.attachmentIndex.toInt() == request.attachmentIndex
             }?.reference
 
-    internal fun enqueueAttachmentDownload(request: AttachmentTransferRequest) {
-        AttachmentDownloadWorker.enqueue(appContext, request)
+    internal fun enqueueAttachmentDownload(
+        request: AttachmentTransferRequest,
+        priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
+    ) {
+        if (priority == AttachmentDownloadPriority.Interactive) {
+            attachmentDownloadIntents.markInteractive(request)
+            attachmentDownloadGate.promote(request.cacheKey())
+        }
+        AttachmentDownloadWorker.enqueue(appContext, request, priority)
+    }
+
+    internal fun requestAttachmentOpen(request: AttachmentTransferRequest) {
+        attachmentDownloadIntents.markOpenIntent(request)
+        enqueueAttachmentDownload(request, AttachmentDownloadPriority.Interactive)
+        attachmentOpenIntentRevision += 1
+    }
+
+    internal fun hasAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean = attachmentDownloadIntents.hasOpenIntent(request)
+
+    internal fun consumeAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean = attachmentDownloadIntents.consumeOpenIntent(request)
+
+    fun automaticAttachmentDownloadsPaused(): Boolean {
+        attachmentDownloadPolicyRevision
+        return activeAccountRef?.let(attachmentDownloadIntents::isAutomaticPaused) == true
+    }
+
+    fun stopAutomaticAttachmentDownloads() {
+        val accountRef = activeAccountRef ?: return
+        attachmentDownloadIntents.pauseAutomatic(accountRef)
+        attachmentDownloadPolicyRevision += 1
+        attachmentDownloadGate.cancelQueuedAutomatic(accountRef)
+        mutationsScope.launch {
+            AttachmentDownloadWorker.cancelQueuedAutomatic(appContext, accountRef)
+        }
+    }
+
+    fun restartAutomaticAttachmentDownloads() {
+        val accountRef = activeAccountRef ?: return
+        attachmentDownloadIntents.restartAutomatic(accountRef)
+        attachmentDownloadPolicyRevision += 1
     }
 
     /** True only when plaintext is retained in L1 or the encrypted L2 cache. */
@@ -4069,6 +4122,7 @@ class WhiteNoiseAppState private constructor(
     internal suspend fun downloadAttachmentPlaintext(
         request: AttachmentTransferRequest,
         reference: MediaAttachmentReferenceFfi,
+        priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
     ): ByteArray {
         val cacheKey =
             mediaCacheKey(
@@ -4085,10 +4139,20 @@ class WhiteNoiseAppState private constructor(
                             cacheMediaPlaintext(cacheKey, onDisk)
                         }
                     }
-        if (cached != null) return cached
+        if (cached != null) {
+            if (priority == AttachmentDownloadPriority.Interactive) {
+                attachmentDownloadIntents.clearInteractive(request)
+            }
+            return cached
+        }
+
+        if (priority == AttachmentDownloadPriority.Interactive) {
+            attachmentDownloadIntents.markInteractive(request)
+            attachmentDownloadGate.promote(cacheKey)
+        }
 
         val deferred =
-            memoizedDownload(cacheKey) {
+            memoizedDownload(cacheKey, request, priority) {
                 val publicationToken = diskMediaCache.capturePublicationToken()
                 val result =
                     runCatchingCancellable {
@@ -4126,12 +4190,19 @@ class WhiteNoiseAppState private constructor(
                 }
                 result.plaintext
             }
-        return deferred.await()
+        return deferred.await().also {
+            if (priority == AttachmentDownloadPriority.Interactive) {
+                attachmentDownloadIntents.clearInteractive(request)
+            }
+        }
     }
 
-    internal suspend fun downloadAttachmentForDurableWork(request: AttachmentTransferRequest): Boolean {
+    internal suspend fun downloadAttachmentForDurableWork(
+        request: AttachmentTransferRequest,
+        priority: AttachmentDownloadPriority,
+    ): Boolean {
         val reference = resolveAttachmentReference(request) ?: throw AttachmentReferenceNotReadyException()
-        downloadAttachmentPlaintext(request, reference)
+        downloadAttachmentPlaintext(request, reference, priority)
         return hasCachedAttachmentAfterHydration(request)
     }
 
@@ -6679,7 +6750,9 @@ class WhiteNoiseAppState private constructor(
      * automatically given the active account's matrix and every network the
      * live connection currently matches (most-restrictive rule, issue #407).
      */
-    fun shouldAutoDownloadMedia(type: MediaAutoDownloadType): Boolean = mediaAutoDownloadMatrix.shouldAutoDownload(type, activeNetworkTypes())
+    fun shouldAutoDownloadMedia(type: MediaAutoDownloadType): Boolean =
+        !automaticAttachmentDownloadsPaused() &&
+            mediaAutoDownloadMatrix.shouldAutoDownload(type, activeNetworkTypes())
 
     /**
      * True when the device currently has an active network connection. Used to
@@ -8894,7 +8967,11 @@ class WhiteNoiseAppState private constructor(
     private suspend fun scheduleIncomingDocumentDownloads(update: NotificationUpdateFfi) {
         val messageIdHex = update.messageIdHex
         val isIncomingMessage = update.trigger == NotificationTriggerFfi.NEW_MESSAGE && !update.isFromSelf
-        if (isIncomingMessage && messageIdHex != null) {
+        if (
+            isIncomingMessage &&
+            messageIdHex != null &&
+            !attachmentDownloadIntents.isAutomaticPaused(update.accountRef)
+        ) {
             val matrix = loadMediaAutoDownloadMatrix(update.accountRef)
             if (matrix.shouldAutoDownload(MediaAutoDownloadType.Document, activeNetworkTypes())) {
                 val records =

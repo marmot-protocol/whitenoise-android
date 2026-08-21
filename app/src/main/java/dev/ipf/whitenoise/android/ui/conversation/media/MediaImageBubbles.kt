@@ -55,6 +55,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.media.Thumbhash
+import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
@@ -214,6 +215,7 @@ internal fun MediaImageBubble(
     var startDownload by remember(key, attachmentIndex, appState.mediaAutoDownloadMatrix) {
         mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image))
     }
+    var interactiveDownloadRequested by remember(key, attachmentIndex) { mutableStateOf(false) }
 
     LaunchedEffect(key, attachmentIndex, epoch, startDownload, reloadToken) {
         if (presentation != null) return@LaunchedEffect // already have decoded pixels
@@ -235,7 +237,18 @@ internal fun MediaImageBubble(
         if (pendingBytes == null && epoch == 0uL) return@LaunchedEffect
         failed = false
         try {
-            val data = pendingBytes ?: controller.downloadAttachment(key, attachmentIndex, reference)
+            val data =
+                pendingBytes
+                    ?: controller.downloadAttachment(
+                        key,
+                        attachmentIndex,
+                        reference,
+                        if (interactiveDownloadRequested) {
+                            AttachmentDownloadPriority.Interactive
+                        } else {
+                            AttachmentDownloadPriority.Automatic
+                        },
+                    )
             val decoded =
                 decodeMessageAttachmentImage(
                     bytes = data,
@@ -324,6 +337,7 @@ internal fun MediaImageBubble(
                                 contentDescription = stringResource(R.string.media_tap_to_retry),
                                 onClick = {
                                     failed = false
+                                    interactiveDownloadRequested = true
                                     reloadToken++
                                 },
                             )
@@ -331,7 +345,10 @@ internal fun MediaImageBubble(
                             MediaCircleAction(
                                 icon = Icons.Default.ArrowDownward,
                                 contentDescription = stringResource(R.string.media_tap_to_download),
-                                onClick = { startDownload = true },
+                                onClick = {
+                                    interactiveDownloadRequested = true
+                                    startDownload = true
+                                },
                             )
                         else ->
                             CircularProgressIndicator(
@@ -574,6 +591,7 @@ internal fun MediaImageGridTile(
     var startDownload by remember(tileSlot, appState.mediaAutoDownloadMatrix) {
         mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image))
     }
+    var interactiveDownloadRequested by remember(tileSlot) { mutableStateOf(false) }
 
     LaunchedEffect(decodeKey, startDownload, reloadToken) {
         if (presentation != null) return@LaunchedEffect
@@ -590,7 +608,18 @@ internal fun MediaImageGridTile(
         if (pendingBytes == null && reference.sourceEpoch == 0uL) return@LaunchedEffect
         failed = false
         try {
-            val data = pendingBytes ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+            val data =
+                pendingBytes
+                    ?: controller.downloadAttachment(
+                        messageIdHex,
+                        attachmentIndex,
+                        reference,
+                        if (interactiveDownloadRequested) {
+                            AttachmentDownloadPriority.Interactive
+                        } else {
+                            AttachmentDownloadPriority.Automatic
+                        },
+                    )
             val decoded =
                 decodeMessageAttachmentImage(
                     bytes = data,
@@ -630,7 +659,12 @@ internal fun MediaImageGridTile(
                     if (presentation != null) {
                         onTap()
                     } else if (!startDownload) {
+                        interactiveDownloadRequested = true
                         startDownload = true
+                    } else if (failed) {
+                        interactiveDownloadRequested = true
+                        failed = false
+                        reloadToken++
                     }
                 },
             ),

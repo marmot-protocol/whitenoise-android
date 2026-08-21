@@ -9,6 +9,7 @@ import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
@@ -31,6 +32,8 @@ internal data class AttachmentTransferRequest(
     val messageIdHex: String,
     val attachmentIndex: Int,
 )
+
+internal fun AttachmentTransferRequest.cacheKey(): String = mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex)
 
 internal object AttachmentDownloadWorkData {
     private const val KEY_ACCOUNT_REF = "account_ref"
@@ -74,10 +77,19 @@ internal fun attachmentDownloadWorkName(request: AttachmentTransferRequest): Str
             request.messageIdHex.lowercase(),
             request.attachmentIndex.toString(),
         ).joinToString("\u0000")
-    val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray())
-    return "attachment_download_" +
-        digest.joinToString("") { byte -> "%02x".format(byte.toInt() and BYTE_MASK) }
+    return "attachment_download_${attachmentIdentityDigest(canonical)}"
 }
+
+internal fun attachmentIdentityDigest(value: String): String =
+    MessageDigest
+        .getInstance("SHA-256")
+        .digest(value.toByteArray())
+        .joinToString("") { byte -> "%02x".format(byte.toInt() and BYTE_MASK) }
+
+internal fun attachmentAutomaticAccountTag(accountRef: String): String = "attachment_download_auto_account_${attachmentIdentityDigest(accountRef)}"
+
+internal fun attachmentIdentityTag(request: AttachmentTransferRequest): String =
+    "attachment_download_identity_${attachmentIdentityDigest(attachmentDownloadWorkName(request))}"
 
 internal fun shouldRetryAttachmentDownloadWork(
     runAttemptCount: Int,
@@ -85,6 +97,13 @@ internal fun shouldRetryAttachmentDownloadWork(
 ): Boolean =
     runAttemptCount < AttachmentDownloadWorker.MAX_RETRY_ATTEMPTS &&
         (failure is AttachmentReferenceNotReadyException || isTransientAttachmentDownloadFailure(failure))
+
+internal fun shouldCancelQueuedAutomaticWork(
+    state: WorkInfo.State,
+    hasInteractiveIntent: Boolean,
+): Boolean =
+    state in setOf(WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED) &&
+        !hasInteractiveIntent
 
 internal class AttachmentReferenceNotReadyException : IllegalStateException("attachment reference is not projected yet")
 
@@ -102,13 +121,27 @@ class AttachmentDownloadWorker(
         val request = AttachmentDownloadWorkData.decode(inputData)
         val application = applicationContext as? WhiteNoiseApplication
         if (request == null || application == null) return Result.failure()
+        val intentStore =
+            AttachmentDownloadIntentStore(
+                applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
+            )
+        val priority =
+            if (intentStore.isInteractive(request)) {
+                AttachmentDownloadPriority.Interactive
+            } else {
+                AttachmentDownloadPriority.Automatic
+            }
+        if (priority == AttachmentDownloadPriority.Automatic && intentStore.isAutomaticPaused(request.accountRef)) {
+            return Result.success()
+        }
         return try {
             withContext(Dispatchers.Main.immediate) {
                 application.appState.ensureNotificationRuntimeStarted()
             }
-            if (!application.appState.downloadAttachmentForDurableWork(request)) {
+            if (!application.appState.downloadAttachmentForDurableWork(request, priority)) {
                 throw java.io.IOException("attachment did not reach encrypted cache")
             }
+            intentStore.clearInteractive(request)
             Result.success()
         } catch (cancel: CancellationException) {
             throw cancel
@@ -122,6 +155,11 @@ class AttachmentDownloadWorker(
             if (shouldRetryAttachmentDownloadWork(runAttemptCount, expectedFailure)) {
                 Result.retry()
             } else {
+                // A terminal worker must not leave an identity permanently
+                // immune to a later automatic-backlog stop. The durable open
+                // intent remains; returning to the bubble can explicitly
+                // promote and retry it again.
+                intentStore.clearInteractive(request)
                 Result.failure()
             }
         }
@@ -132,11 +170,19 @@ class AttachmentDownloadWorker(
         private const val TAG = "DMAttachmentWorker"
         private const val BACKOFF_SECONDS = 30L
         private const val LOG_ID_PREFIX_LENGTH = 8
+        private const val PREFERENCES_NAME = "whitenoise"
 
         internal fun enqueue(
             context: Context,
             request: AttachmentTransferRequest,
+            priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
         ) {
+            val intentStore =
+                AttachmentDownloadIntentStore(
+                    context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
+                )
+            if (priority == AttachmentDownloadPriority.Automatic && intentStore.isAutomaticPaused(request.accountRef)) return
+            if (priority == AttachmentDownloadPriority.Interactive) intentStore.markInteractive(request)
             val work =
                 OneTimeWorkRequestBuilder<AttachmentDownloadWorker>()
                     .setInputData(AttachmentDownloadWorkData.encode(request))
@@ -147,7 +193,12 @@ class AttachmentDownloadWorker(
                             .setRequiresStorageNotLow(true)
                             .build(),
                     ).setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_SECONDS, TimeUnit.SECONDS)
-                    .build()
+                    .addTag(attachmentIdentityTag(request))
+                    .apply {
+                        if (priority == AttachmentDownloadPriority.Automatic) {
+                            addTag(attachmentAutomaticAccountTag(request.accountRef))
+                        }
+                    }.build()
             runCatching {
                 WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
                     attachmentDownloadWorkName(request),
@@ -155,6 +206,29 @@ class AttachmentDownloadWorker(
                     work,
                 )
             }.onFailure { Log.w(TAG, "failed to enqueue durable attachment download", it) }
+        }
+
+        internal suspend fun cancelQueuedAutomatic(
+            context: Context,
+            accountRef: String,
+        ): Int {
+            val appContext = context.applicationContext
+            val manager = WorkManager.getInstance(appContext)
+            val intentStore =
+                AttachmentDownloadIntentStore(
+                    appContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
+                )
+            val queued =
+                withContext(Dispatchers.IO) {
+                    manager.getWorkInfosByTag(attachmentAutomaticAccountTag(accountRef)).get()
+                }.filter { info ->
+                    shouldCancelQueuedAutomaticWork(
+                        state = info.state,
+                        hasInteractiveIntent = intentStore.containsInteractiveTag(info.tags),
+                    )
+                }
+            queued.forEach { manager.cancelWorkById(it.id) }
+            return queued.size
         }
     }
 }
