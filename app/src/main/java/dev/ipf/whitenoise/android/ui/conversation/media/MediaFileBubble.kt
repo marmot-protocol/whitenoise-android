@@ -174,7 +174,9 @@ internal fun MediaFileBubble(
                                     OpenAttachmentResult.InstallPermissionUnavailable -> {
                                         appState.present(installPermissionUnavailableMessage, copyable = true)
                                     }
-                                    OpenAttachmentResult.InstallUnsupported -> appState.present(installUnsupportedMessage)
+                                    OpenAttachmentResult.InstallUnsupported -> {
+                                        appState.present(installUnsupportedMessage)
+                                    }
                                     OpenAttachmentResult.InvalidPackage -> appState.present(invalidPackageMessage)
                                     OpenAttachmentResult.MissingArtifact,
                                     OpenAttachmentResult.SecurityFailure,

@@ -221,8 +221,11 @@ class ReceivedApkAttachmentOpenIntegrationTest {
 
     @Test
     fun conversationAndMediaLibraryPassFilenameIntoTheVerifiedOpener() {
-        val bubble = projectFile("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaFileBubble.kt").readText()
-        val library = projectFile("app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt").readText()
+        val conversationMediaPath = "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media"
+        val bubble = projectFile("$conversationMediaPath/MediaFileBubble.kt").readText()
+        val library =
+            projectFile("app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt")
+                .readText()
         val normalizedLibrary = library.replace(Regex("\\s+"), " ")
 
         assertTrue(
