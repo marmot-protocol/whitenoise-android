@@ -11,7 +11,7 @@ internal class ConversationExitCoordinator {
     var awaitingImeDismiss: Boolean = false
         private set
 
-    private var completed = false
+    private var completing = false
 
     fun requestExit(
         imeIsOpen: Boolean,
@@ -19,7 +19,7 @@ internal class ConversationExitCoordinator {
         clearComposerFocus: () -> Unit,
         navigate: () -> Unit,
     ) {
-        if (completed || awaitingImeDismiss) return
+        if (completing || awaitingImeDismiss) return
 
         hideIme()
         if (imeIsOpen) {
@@ -43,9 +43,13 @@ internal class ConversationExitCoordinator {
         clearComposerFocus: () -> Unit,
         navigate: () -> Unit,
     ) {
-        if (completed) return
-        completed = true
-        clearComposerFocus()
-        navigate()
+        if (completing) return
+        completing = true
+        try {
+            clearComposerFocus()
+            navigate()
+        } finally {
+            completing = false
+        }
     }
 }

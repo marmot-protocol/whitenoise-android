@@ -11,16 +11,18 @@ class ConversationExitCoordinatorTest {
     fun imeVisibleExitWaitsForInsetReleaseBeforeClearingFocusAndNavigating() {
         val events = mutableListOf<String>()
         val coordinator = ConversationExitCoordinator()
-        val draft = "multiline\ndraft"
-        val replyTarget = "reply-message-id"
-        val editTarget = "edit-message-id"
-        val stagedAttachment = "content://attachment"
 
         coordinator.requestExit(
             imeIsOpen = true,
             hideIme = { events += "hide-ime" },
             clearComposerFocus = { events += "clear-focus" },
             navigate = { events += "navigate" },
+        )
+        coordinator.requestExit(
+            imeIsOpen = true,
+            hideIme = { events += "hide-ime-again" },
+            clearComposerFocus = { events += "clear-focus-again" },
+            navigate = { events += "navigate-again" },
         )
 
         assertEquals(listOf("hide-ime"), events)
@@ -31,19 +33,9 @@ class ConversationExitCoordinatorTest {
             clearComposerFocus = { events += "clear-focus" },
             navigate = { events += "navigate" },
         )
-        coordinator.requestExit(
-            imeIsOpen = false,
-            hideIme = { events += "hide-ime-again" },
-            clearComposerFocus = { events += "clear-focus-again" },
-            navigate = { events += "navigate-again" },
-        )
 
         assertEquals(listOf("hide-ime", "clear-focus", "navigate"), events)
         assertFalse(coordinator.awaitingImeDismiss)
-        assertEquals("multiline\ndraft", draft)
-        assertEquals("reply-message-id", replyTarget)
-        assertEquals("edit-message-id", editTarget)
-        assertEquals("content://attachment", stagedAttachment)
     }
 
     @Test
@@ -59,6 +51,33 @@ class ConversationExitCoordinatorTest {
         )
 
         assertEquals(listOf("hide-ime", "clear-focus", "navigate"), events)
+    }
+
+    @Test
+    fun completedExitStartsFreshCycleForSameRetainedCoordinator() {
+        val events = mutableListOf<String>()
+        val coordinator = ConversationExitCoordinator()
+
+        repeat(2) { cycle ->
+            coordinator.requestExit(
+                imeIsOpen = false,
+                hideIme = { events += "hide-ime-$cycle" },
+                clearComposerFocus = { events += "clear-focus-$cycle" },
+                navigate = { events += "navigate-$cycle" },
+            )
+        }
+
+        assertEquals(
+            listOf(
+                "hide-ime-0",
+                "clear-focus-0",
+                "navigate-0",
+                "hide-ime-1",
+                "clear-focus-1",
+                "navigate-1",
+            ),
+            events,
+        )
     }
 
     @Test
