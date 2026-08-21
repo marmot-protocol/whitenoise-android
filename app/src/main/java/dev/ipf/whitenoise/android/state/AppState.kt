@@ -1,13 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
-import android.app.LocaleManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
-import android.os.LocaleList
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.StringRes
@@ -2211,7 +2209,7 @@ class WhiteNoiseAppState private constructor(
     )
         private set
 
-    var languageTag by mutableStateOf(preferences.getString(LANGUAGE_TAG_KEY, null).orEmpty())
+    var languageTag by mutableStateOf(preferences.getString(APP_LANGUAGE_TAG_KEY, null).orEmpty())
         private set
 
     var toast by mutableStateOf<ToastMessage?>(null)
@@ -6983,8 +6981,8 @@ class WhiteNoiseAppState private constructor(
     fun updateLanguageTag(tag: String) {
         val normalized = tag.trim()
         languageTag = normalized
-        preferences.edit().putString(LANGUAGE_TAG_KEY, normalized).apply()
-        applyLanguageTag(normalized)
+        preferences.edit().putString(APP_LANGUAGE_TAG_KEY, normalized).apply()
+        applyApplicationLanguageTag(normalized)
     }
 
     fun setAppInForeground(foreground: Boolean) {
@@ -9456,12 +9454,6 @@ class WhiteNoiseAppState private constructor(
         return started
     }
 
-    private fun applyLanguageTag(tag: String) {
-        appContext
-            .getSystemService(LocaleManager::class.java)
-            .applicationLocales = LocaleList.forLanguageTags(tag)
-    }
-
     private fun cachedUserProfile(accountIdHex: String): UserProfileMetadataFfi? = synchronized(profilePresentationLock) { userProfiles[accountIdHex] }
 
     private fun profilePresentation(accountIdHex: String): ProfilePresentation {
@@ -9648,7 +9640,6 @@ class WhiteNoiseAppState private constructor(
     // coroutines can execute immediately on another thread and must not observe
     // fields declared later in this class before their initializers have run.
     init {
-        applyLanguageTag(languageTag)
         if (startPlatformServices) {
             if (BuildConfig.SELF_UPDATE_ENABLED) {
                 // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
@@ -9717,7 +9708,6 @@ class WhiteNoiseAppState private constructor(
         // 24 MiB so large documents are durable without being retained on the
         // JVM heap after the active open/download operation finishes.
         private const val DISK_MEDIA_CACHE_MAX_ENTRY_BYTES: Long = 64L * 1024L * 1024L
-        private const val LANGUAGE_TAG_KEY = "language_tag"
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
         private const val PROFILE_PRESENTATION_WARM_FANOUT = 6
         private const val PROFILE_REFRESH_FANOUT = 6

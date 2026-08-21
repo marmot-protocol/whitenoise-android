@@ -14,6 +14,7 @@ import android.net.Uri
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
+import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 internal enum class ImageAnimationStatus {
@@ -468,7 +469,7 @@ object MediaPipeline {
     ): Drawable? {
         if (bytes.isEmpty()) return null
         return try {
-            val source = ImageDecoder.createSource(bytes)
+            val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes))
             val drawable =
                 ImageDecoder.decodeDrawable(source) { decoder, info, _ ->
                     val width = info.size.width

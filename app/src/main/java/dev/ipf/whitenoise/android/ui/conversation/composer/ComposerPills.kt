@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.net.Uri
+import android.os.Build
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
+import androidx.activity.compose.BackHandler
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -147,34 +150,18 @@ internal fun ComposerPill(
     val latestOnHeightDrag by rememberUpdatedState(onHeightDrag)
     val latestOnHeightDragStopped by rememberUpdatedState(onHeightDragStopped)
     var composerFocused by remember { mutableStateOf(false) }
-    val backDispatcher = LocalView.current.findOnBackInvokedDispatcher()
     // Gesture/predictive Back reaches the IME before the activity's ordinary
     // BackHandler. While this field owns focus, register ahead of the IME so an
     // explicit Back clears focus; IME-only geometry changes (including a
     // keyboard-to-voice handoff) never invoke this callback.
-    DisposableEffect(preImeBackEnabled, composerFocused, backDispatcher, overlayBackRegistrar) {
-        val unregister =
-            if (preImeBackEnabled && composerFocused) {
-                val callback = OnBackInvokedCallback { latestOnPreImeBack() }
-                when {
-                    overlayBackRegistrar != null ->
-                        overlayBackRegistrar.register(OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
-                    backDispatcher != null -> {
-                        backDispatcher.registerOnBackInvokedCallback(
-                            OnBackInvokedDispatcher.PRIORITY_OVERLAY,
-                            callback,
-                        )
-                        val unregisterCallback: () -> Unit = {
-                            backDispatcher.unregisterOnBackInvokedCallback(callback)
-                        }
-                        unregisterCallback
-                    }
-                    else -> null
-                }
-            } else {
-                null
-            }
-        onDispose { unregister?.invoke() }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        ComposerPlatformPreImeBackHandler(
+            enabled = preImeBackEnabled && composerFocused,
+            onBack = { latestOnPreImeBack() },
+            overlayBackRegistrar = overlayBackRegistrar,
+        )
+    } else {
+        BackHandler(enabled = preImeBackEnabled && composerFocused) { latestOnPreImeBack() }
     }
     val pasteImageReceiver =
         remember(context) {
@@ -529,5 +516,41 @@ internal fun ComposerPill(
                 }
             }
         }
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+@Composable
+@Suppress("FunctionNaming")
+private fun ComposerPlatformPreImeBackHandler(
+    enabled: Boolean,
+    onBack: () -> Unit,
+    overlayBackRegistrar: ComposerOverlayBackRegistrar?,
+) {
+    val latestOnBack by rememberUpdatedState(onBack)
+    val backDispatcher = LocalView.current.findOnBackInvokedDispatcher()
+    DisposableEffect(enabled, backDispatcher, overlayBackRegistrar) {
+        val unregister =
+            if (enabled) {
+                val callback = OnBackInvokedCallback { latestOnBack() }
+                when {
+                    overlayBackRegistrar != null ->
+                        overlayBackRegistrar.register(OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
+                    backDispatcher != null -> {
+                        backDispatcher.registerOnBackInvokedCallback(
+                            OnBackInvokedDispatcher.PRIORITY_OVERLAY,
+                            callback,
+                        )
+                        val unregisterCallback: () -> Unit = {
+                            backDispatcher.unregisterOnBackInvokedCallback(callback)
+                        }
+                        unregisterCallback
+                    }
+                    else -> null
+                }
+            } else {
+                null
+            }
+        onDispose { unregister?.invoke() }
     }
 }

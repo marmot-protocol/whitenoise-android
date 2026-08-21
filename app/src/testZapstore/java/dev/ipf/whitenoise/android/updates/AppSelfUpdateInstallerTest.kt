@@ -26,7 +26,7 @@ class AppSelfUpdateInstallerTest {
 
     @Test
     fun packageInstallsAreAllowedBeforeAndroidO() {
-        // The minSdk 34 manifest cannot load in an API 25 Robolectric sandbox, so override only this branch input.
+        // The minSdk 30 manifest cannot load in an API 25 Robolectric sandbox, so override only this branch input.
         val originalSdk = Build.VERSION.SDK_INT
         shadowOf(context.packageManager).setCanRequestPackageInstalls(false)
         ReflectionHelpers.setStaticField(

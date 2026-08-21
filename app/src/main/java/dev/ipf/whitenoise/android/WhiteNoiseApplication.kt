@@ -5,6 +5,8 @@ import android.util.Log
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.applyApplicationLanguageTag
+import dev.ipf.whitenoise.android.state.persistedApplicationLanguageTag
 import dev.ipf.whitenoise.android.ui.createRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.updates.AppUpdateWorker
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -39,6 +41,9 @@ class WhiteNoiseApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // AppCompat must receive custom-stored locales before MainActivity's
+        // onCreate on API 32 and lower so it can wrap the Activity context.
+        applyApplicationLanguageTag(persistedApplicationLanguageTag(this))
         VoicePlaybackController.attach(this)
         // Coarse background prune of expired disappearing messages in closed
         // conversations (#745). KEEP-policy unique work, so this just ensures

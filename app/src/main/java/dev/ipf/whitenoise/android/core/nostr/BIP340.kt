@@ -7,7 +7,7 @@ import java.util.Locale
 internal object BIP340 {
     private val zero = BigInteger.ZERO
     private val one = BigInteger.ONE
-    private val two = BigInteger.TWO
+    private val two = BigInteger.valueOf(2)
     private val three = BigInteger.valueOf(3)
     private val seven = BigInteger.valueOf(7)
     private val p = BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16)

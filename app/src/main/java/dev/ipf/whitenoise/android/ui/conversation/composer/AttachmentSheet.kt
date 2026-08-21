@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import android.os.Build
 import android.view.RoundedCorner
 import android.view.View
 import androidx.compose.foundation.clickable
@@ -124,6 +125,7 @@ private fun rememberComposerAttachmentPaneBottomCorners(): ComposerAttachmentPan
 }
 
 private fun readBottomRoundedCornerRadii(view: View): Pair<Int, Int> {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return 0 to 0
     val insets = view.rootWindowInsets
     val bottomLeft = insets?.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_LEFT)?.radius ?: 0
     val bottomRight = insets?.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_RIGHT)?.radius ?: 0

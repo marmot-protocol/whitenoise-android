@@ -24,7 +24,7 @@ import android.os.VibrationEffect
  * for a custom child. The channel id remains deterministic so legacy children,
  * the post path, and settings deep links all resolve the same user-owned channel.
  *
- * Conversation channels require API 30; the app's minSdk is above that, so the
+ * Conversation channels require API 30; the app's minSdk is exactly that, so the
  * APIs are always available here.
  */
 object ConversationNotificationChannels {

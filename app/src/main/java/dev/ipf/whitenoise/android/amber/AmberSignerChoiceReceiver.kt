@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.service.chooser.ChooserResult
+import androidx.core.content.IntentCompat
 
 /** Receives the system chooser's trusted component selection for NIP-55 login. */
 class AmberSignerChoiceReceiver : BroadcastReceiver() {
@@ -21,10 +22,10 @@ class AmberSignerChoiceReceiver : BroadcastReceiver() {
 
 internal fun chosenSignerComponent(intent: Intent): ComponentName? {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-        val result = intent.getParcelableExtra(Intent.EXTRA_CHOOSER_RESULT, ChooserResult::class.java)
+        val result = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_CHOOSER_RESULT, ChooserResult::class.java)
         if (result?.type == ChooserResult.CHOOSER_RESULT_SELECTED_COMPONENT) {
             return result.selectedComponent
         }
     }
-    return intent.getParcelableExtra(Intent.EXTRA_CHOSEN_COMPONENT, ComponentName::class.java)
+    return IntentCompat.getParcelableExtra(intent, Intent.EXTRA_CHOSEN_COMPONENT, ComponentName::class.java)
 }

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.IntentCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -49,7 +50,12 @@ class AmberSignerRelayActivity : ComponentActivity() {
 
         if (signerLaunched) return
 
-        val signerIntent = intent.getParcelableExtra(AmberSignerRelay.EXTRA_SIGNER_INTENT, Intent::class.java)
+        val signerIntent =
+            IntentCompat.getParcelableExtra(
+                intent,
+                AmberSignerRelay.EXTRA_SIGNER_INTENT,
+                Intent::class.java,
+            )
         if (requestId == null || signerIntent == null) {
             finishLaunchFailure()
             return

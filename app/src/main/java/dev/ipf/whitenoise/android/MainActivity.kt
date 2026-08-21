@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.DisposableEffect
@@ -22,7 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
-import androidx.fragment.app.FragmentActivity
 import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
@@ -46,7 +46,7 @@ import dev.ipf.whitenoise.android.ui.common.retainSecureFlag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.updates.AppUpdateNavigation
 
-class MainActivity : FragmentActivity() {
+class MainActivity : AppCompatActivity() {
     private var inboundProfilePayload by mutableStateOf<String?>(null)
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
     private var inboundNotificationRequestId by mutableStateOf(0L)

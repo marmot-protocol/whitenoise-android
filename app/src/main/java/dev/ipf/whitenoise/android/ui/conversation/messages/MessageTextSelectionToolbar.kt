@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.os.Build
 import androidx.compose.foundation.text.contextmenu.builder.item
 import androidx.compose.foundation.text.contextmenu.data.ProcessTextKey
 import androidx.compose.foundation.text.contextmenu.modifier.appendTextContextMenuComponents
@@ -48,10 +49,14 @@ internal fun Modifier.appendSpeakAloudTextContextMenuAction(
 internal fun systemReadAloudProcessTextKeyIds(context: Context): Set<Int> {
     val intent = Intent(Intent.ACTION_PROCESS_TEXT).setType("text/plain")
     val availableActivities =
-        context.packageManager
-            .queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
-            .filter { it.isAvailableTo(context) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.queryIntentActivities(intent, 0)
+        }
     return availableActivities
+        .filter { it.isAvailableTo(context) }
         .mapIndexedNotNull { index, resolveInfo -> index.takeIf { resolveInfo.isReadAloudActivity() } }
         .toSet()
 }
