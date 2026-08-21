@@ -1207,6 +1207,7 @@ internal fun ConversationScreen(
     val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val exitCoordinator = rememberConversationExitCoordinator(chat.id, onBack)
     val scope = rememberCoroutineScope()
     val eventCardResolver =
         remember(controller, appState, conversationAccountRef, appState.runtimeGeneration) {
@@ -2064,7 +2065,7 @@ internal fun ConversationScreen(
                 composerDismissInProgress = true
                 keyboardController?.hide()
             }
-            ConversationBackAction.NAVIGATE_UP -> onBack()
+            ConversationBackAction.NAVIGATE_UP -> exitCoordinator.exit()
         }
     }
 
@@ -2809,7 +2810,7 @@ internal fun ConversationScreen(
                 openedAsDmHint = openedAsDmHint,
                 openDetailsDescription = openDetailsDescription,
                 onOpenDetails = { showDetails = true },
-                onBack = onBack,
+                onBack = exitCoordinator::exit,
                 menuOpen = menuOpen,
                 onMenuOpenChange = { menuOpen = it },
                 onOpenSearch = {
@@ -2958,7 +2959,7 @@ internal fun ConversationScreen(
                 controller = controller,
                 appState = appState,
                 messageTextCopy = messageTextCopy,
-                onBack = onBack,
+                onBack = exitCoordinator::exit,
                 initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
                 onDraftChange = { appState.setDraft(controller.group.groupIdHex, it) },
                 composerTextState = composerTextState,
@@ -3036,7 +3037,7 @@ internal fun ConversationScreen(
                 },
                 onComposerPreImeBack = {
                     if (composerDismissInProgress) {
-                        onBack()
+                        exitCoordinator.exit()
                     } else {
                         composerDismissInProgress = true
                         keyboardController?.hide()
@@ -3282,7 +3283,7 @@ internal fun ConversationScreen(
                                     onQuickReactionsReset = { resetQuickReactionEmojis() },
                                     onReplyPreviewClick = { navigateToReplyTarget(it) },
                                     composerGate = composerGate,
-                                    onBack = onBack,
+                                    onBack = exitCoordinator::exit,
                                     mentionCandidates = mentionPicker.candidates,
                                     mentionPickerEnabled = mentionPicker.enabled,
                                     collapseLongMessages = collapseLongMessages,
@@ -3504,7 +3505,7 @@ internal fun ConversationScreen(
             onConfirm = {
                 pendingTopBarLeaveAction = null
                 appState.launchMutation {
-                    if (controller.leaveGroup()) onBack()
+                    if (controller.leaveGroup()) exitCoordinator.exit()
                 }
             },
             onDismiss = { pendingTopBarLeaveAction = null },
