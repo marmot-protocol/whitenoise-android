@@ -1818,7 +1818,7 @@
     <ID>TooManyFunctions:IdentityFormatter.kt:IdentityFormatter</ID>
     <ID>TooManyFunctions:LocalNotificationFormatter.kt:LocalNotificationFormatter</ID>
     <ID>TooManyFunctions:LocalNotificationPresenter.kt:LocalNotificationPresenter</ID>
-    <ID>TooManyFunctions:MainActivity.kt:MainActivity : FragmentActivity</ID>
+    <ID>TooManyFunctions:MainActivity.kt:MainActivity : AppCompatActivity</ID>
     <ID>TooManyFunctions:MarkdownRenderer.kt:dev.ipf.whitenoise.android.ui.MarkdownRenderer.kt</ID>
     <ID>TooManyFunctions:MediaInventory.kt:MediaInventory</ID>
     <ID>TooManyFunctions:MediaIo.kt:dev.ipf.whitenoise.android.ui.conversation.media.MediaIo.kt</ID>

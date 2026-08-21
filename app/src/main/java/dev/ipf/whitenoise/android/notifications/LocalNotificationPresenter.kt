@@ -1,13 +1,11 @@
 package dev.ipf.whitenoise.android.notifications
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -20,7 +18,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
-import androidx.core.content.ContextCompat
 import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
@@ -123,11 +120,7 @@ class LocalNotificationPresenter(
         shortcutLastUsed.clear()
     }
 
-    fun canPostNotifications(): Boolean =
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.POST_NOTIFICATIONS,
-        ) == PackageManager.PERMISSION_GRANTED
+    fun canPostNotifications(): Boolean = notificationPermissionGranted(context)
 
     // Opening / reading a conversation clears every card for it: the
     // accumulating message card, separate typed sibling cards, and any pending

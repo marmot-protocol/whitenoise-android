@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.share
 
 import android.content.Intent
 import android.net.Uri
+import androidx.core.content.IntentCompat
 
 /**
  * Parsed inbound share payload from [Intent.ACTION_SEND] or
@@ -57,13 +58,14 @@ private fun Intent.extractShareText(): String? =
         ?.takeIf { it.isNotEmpty() }
 
 private fun Intent.extractSingleStream(): List<Uri> {
-    val stream = getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java) ?: return emptyList()
+    val stream = IntentCompat.getParcelableExtra(this, Intent.EXTRA_STREAM, Uri::class.java) ?: return emptyList()
     return listOfNotNull(stream.takeIf { !it.toString().isBlank() })
 }
 
 private fun Intent.extractMultipleStreams(): List<Uri> {
+    val streamUris = IntentCompat.getParcelableArrayListExtra(this, Intent.EXTRA_STREAM, Uri::class.java)
     val fromExtra =
-        getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        streamUris
             ?.mapNotNull { uri -> uri.takeIf { !it.toString().isBlank() } }
             .orEmpty()
     val clip = clipData

@@ -1,28 +1,22 @@
 package dev.ipf.whitenoise.android.updates
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.NotificationChannels
+import dev.ipf.whitenoise.android.notifications.notificationPermissionGranted
 
 class AppUpdateNotifier(
     private val context: Context,
 ) {
-    fun canPostNotifications(): Boolean =
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.POST_NOTIFICATIONS,
-        ) == PackageManager.PERMISSION_GRANTED
+    fun canPostNotifications(): Boolean = notificationPermissionGranted(context)
 
     @SuppressLint("MissingPermission")
     fun show(info: AppUpdateInfo): Boolean {

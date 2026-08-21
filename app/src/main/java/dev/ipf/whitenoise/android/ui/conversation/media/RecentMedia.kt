@@ -5,6 +5,7 @@ import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
 import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -63,33 +64,49 @@ internal data class RecentMediaItem(
 )
 
 /**
- * Runtime permissions to request for the recent-media strip. On Android 14+
- * (our minSdk) that's the granular media reads plus the partial-access grant,
- * so "Select photos" still populates the strip. No legacy READ_EXTERNAL_STORAGE.
+ * Runtime permissions to request for the recent-media strip. Android 11/12
+ * use the shared-storage read grant, Android 13 uses granular media reads, and
+ * Android 14+ adds the partial-access grant so "Select photos" can populate it.
  */
-internal fun recentMediaReadPermissions(): Array<String> =
-    arrayOf(
-        Manifest.permission.READ_MEDIA_IMAGES,
-        Manifest.permission.READ_MEDIA_VIDEO,
-        Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
-    )
+internal fun recentMediaReadPermissions(sdkInt: Int = Build.VERSION.SDK_INT): Array<String> =
+    when {
+        sdkInt >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
+            arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VIDEO,
+                Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+            )
+        sdkInt >= Build.VERSION_CODES.TIRAMISU ->
+            arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VIDEO,
+            )
+        else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
 
-/** Any of full-images/full-video/partial-visual grant is enough to read some recents. */
-internal fun recentMediaGrantAllowsRead(grants: Map<String, Boolean>): Boolean =
-    grants[Manifest.permission.READ_MEDIA_IMAGES] == true ||
-        grants[Manifest.permission.READ_MEDIA_VIDEO] == true ||
-        grants[Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED] == true
+/** Any platform-appropriate media grant is enough to read some recents. */
+internal fun recentMediaGrantAllowsRead(
+    grants: Map<String, Boolean>,
+    sdkInt: Int = Build.VERSION.SDK_INT,
+): Boolean = recentMediaReadPermissions(sdkInt).any { grants[it] == true }
 
-internal fun hasRecentMediaAccess(context: Context): Boolean =
-    recentMediaReadPermissions().any {
+internal fun hasRecentMediaAccess(
+    context: Context,
+    sdkInt: Int = Build.VERSION.SDK_INT,
+): Boolean =
+    recentMediaReadPermissions(sdkInt).any {
         ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
     }
 
-internal fun hasPartialRecentMediaAccess(context: Context): Boolean =
-    ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
-    ) == PackageManager.PERMISSION_GRANTED &&
+internal fun hasPartialRecentMediaAccess(
+    context: Context,
+    sdkInt: Int = Build.VERSION.SDK_INT,
+): Boolean =
+    sdkInt >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+        ) == PackageManager.PERMISSION_GRANTED &&
         !(
             ContextCompat.checkSelfPermission(
                 context,
@@ -186,9 +203,7 @@ internal fun RecentMediaStrip(
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
             granted = recentMediaGrantAllowsRead(grants) || hasRecentMediaAccess(context)
-            partialAccess =
-                grants[Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED] == true ||
-                hasPartialRecentMediaAccess(context)
+            partialAccess = hasPartialRecentMediaAccess(context)
             refreshToken++
         }
 

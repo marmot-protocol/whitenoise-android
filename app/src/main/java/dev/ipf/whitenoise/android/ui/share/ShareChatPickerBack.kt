@@ -2,11 +2,13 @@
 
 package dev.ipf.whitenoise.android.ui.share
 
+import android.os.Build
 import android.window.BackEvent
 import android.window.OnBackAnimationCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -55,7 +57,7 @@ internal fun ShareChatPickerBackAwareScreen(
                 .fillMaxSize()
                 .shareChatPickerPredictiveBackScale(animatedPredictiveBackProgress),
     ) {
-        if (overlayBack) {
+        if (overlayBack && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             ShareChatPickerOverlayBackHandler(
                 onProgress = onProgress,
                 onCommit = onBackCommit,
@@ -93,6 +95,7 @@ private fun ShareChatPickerPredictiveBackHandler(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 internal fun shareChatPickerOverlayBackAnimationCallback(
     onProgress: (Float) -> Unit,
     onCommit: () -> Unit,
@@ -117,6 +120,7 @@ internal fun shareChatPickerOverlayBackAnimationCallback(
     }
 
 @Composable
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 private fun ShareChatPickerOverlayBackHandler(
     onProgress: (Float) -> Unit,
     onCommit: () -> Unit,

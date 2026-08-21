@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.ui.design
 
+import android.os.Build
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.activity.compose.BackHandler
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -98,14 +100,12 @@ internal fun KeyboardSafePopup(
     val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
     Box {
         if (!expanded) return@Box
-        val backDispatcher = LocalView.current.findOnBackInvokedDispatcher()
-        DisposableEffect(backDispatcher) {
-            if (backDispatcher == null) return@DisposableEffect onDispose {}
-            val callback = OnBackInvokedCallback { currentOnDismissRequest() }
-            backDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
-            onDispose { backDispatcher.unregisterOnBackInvokedCallback(callback) }
-        }
-        if (backDispatcher == null) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            KeyboardSafePopupPlatformBackHandler(
+                priority = OnBackInvokedDispatcher.PRIORITY_OVERLAY,
+                onBack = { currentOnDismissRequest() },
+            )
+        } else {
             BackHandler(enabled = true) { currentOnDismissRequest() }
         }
         // Scrim popup: composed before the content popup so content renders on top.
@@ -130,5 +130,25 @@ internal fun KeyboardSafePopup(
             properties = keyboardSafePopupProperties,
             content = content,
         )
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+@Composable
+@Suppress("FunctionNaming")
+private fun KeyboardSafePopupPlatformBackHandler(
+    priority: Int,
+    onBack: () -> Unit,
+) {
+    val currentOnBack by rememberUpdatedState(onBack)
+    val backDispatcher = LocalView.current.findOnBackInvokedDispatcher()
+    DisposableEffect(backDispatcher, priority) {
+        if (backDispatcher == null) return@DisposableEffect onDispose {}
+        val callback = OnBackInvokedCallback { currentOnBack() }
+        backDispatcher.registerOnBackInvokedCallback(priority, callback)
+        onDispose { backDispatcher.unregisterOnBackInvokedCallback(callback) }
+    }
+    if (backDispatcher == null) {
+        BackHandler(enabled = true) { currentOnBack() }
     }
 }

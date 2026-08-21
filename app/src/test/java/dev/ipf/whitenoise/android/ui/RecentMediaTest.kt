@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import android.os.Build
 import dev.ipf.whitenoise.android.ui.conversation.media.recentMediaGrantAllowsRead
 import dev.ipf.whitenoise.android.ui.conversation.media.recentMediaReadPermissions
 import org.junit.Assert.assertFalse
@@ -18,31 +19,64 @@ class RecentMediaTest {
 
     @Test
     fun fullImageGrantUnlocksTheStrip() {
-        assertTrue(recentMediaGrantAllowsRead(mapOf(images to true, video to false, partial to false)))
+        assertTrue(
+            recentMediaGrantAllowsRead(
+                mapOf(images to true, video to false, partial to false),
+                Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+            ),
+        )
     }
 
     @Test
     fun partialVisualGrantAloneUnlocksTheStrip() {
-        assertTrue(recentMediaGrantAllowsRead(mapOf(images to false, video to false, partial to true)))
+        assertTrue(
+            recentMediaGrantAllowsRead(
+                mapOf(images to false, video to false, partial to true),
+                Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+            ),
+        )
     }
 
     @Test
     fun videoOnlyGrantUnlocksTheStrip() {
-        assertTrue(recentMediaGrantAllowsRead(mapOf(video to true)))
+        assertTrue(recentMediaGrantAllowsRead(mapOf(video to true), Build.VERSION_CODES.TIRAMISU))
     }
 
     @Test
     fun fullDenialKeepsTheStripClosed() {
-        assertFalse(recentMediaGrantAllowsRead(mapOf(images to false, video to false, partial to false)))
-        assertFalse(recentMediaGrantAllowsRead(emptyMap()))
+        assertFalse(
+            recentMediaGrantAllowsRead(
+                mapOf(images to false, video to false, partial to false),
+                Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+            ),
+        )
+        assertFalse(recentMediaGrantAllowsRead(emptyMap(), Build.VERSION_CODES.R))
     }
 
     @Test
-    fun requestsGranularMediaPermissionsNotLegacyStorage() {
-        val perms = recentMediaReadPermissions().toList()
+    fun requestsGranularAndPartialMediaPermissionsOnAndroid14() {
+        val perms = recentMediaReadPermissions(Build.VERSION_CODES.UPSIDE_DOWN_CAKE).toList()
         assertTrue(perms.contains(images))
         assertTrue(perms.contains(video))
         assertTrue(perms.contains(partial))
         assertFalse(perms.contains("android.permission.READ_EXTERNAL_STORAGE"))
+    }
+
+    @Test
+    fun requestsGranularMediaPermissionsWithoutPartialAccessOnAndroid13() {
+        val perms = recentMediaReadPermissions(Build.VERSION_CODES.TIRAMISU).toList()
+        assertTrue(perms.contains(images))
+        assertTrue(perms.contains(video))
+        assertFalse(perms.contains(partial))
+        assertFalse(perms.contains("android.permission.READ_EXTERNAL_STORAGE"))
+    }
+
+    @Test
+    fun requestsLegacySharedStorageReadOnAndroid11And12() {
+        val legacy = "android.permission.READ_EXTERNAL_STORAGE"
+
+        assertTrue(recentMediaReadPermissions(Build.VERSION_CODES.R).contentEquals(arrayOf(legacy)))
+        assertTrue(recentMediaReadPermissions(Build.VERSION_CODES.S_V2).contentEquals(arrayOf(legacy)))
+        assertTrue(recentMediaGrantAllowsRead(mapOf(legacy to true), Build.VERSION_CODES.R))
     }
 }

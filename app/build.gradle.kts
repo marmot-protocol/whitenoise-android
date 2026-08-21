@@ -234,7 +234,7 @@ android {
 
     defaultConfig {
         applicationId = "dev.ipf.whitenoise.android"
-        minSdk = 34
+        minSdk = 30
         targetSdk = 36
         versionCode = 9
         versionName = "2026.8.13"
@@ -832,6 +832,7 @@ dependencies {
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.fragment)
     implementation(libs.osmdroid.android)
     implementation(libs.androidx.compose.material3)

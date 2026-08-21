@@ -349,8 +349,8 @@ private val globalSearchDatePresets =
         GlobalSearchDatePresetOption(
             R.string.global_search_date_custom,
             GlobalSearchDateFilterSelection.Custom(
-                LocalDate.EPOCH,
-                LocalDate.EPOCH,
+                LocalDate.ofEpochDay(0),
+                LocalDate.ofEpochDay(0),
                 ZoneId.of("UTC"),
             ),
         ),

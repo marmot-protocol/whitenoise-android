@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
+import android.os.Build
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -96,9 +97,15 @@ object Nip55 {
     ): Boolean {
         val versionName =
             runCatching {
-                context.packageManager
-                    .getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
-                    .versionName
+                val packageManager = context.packageManager
+                val packageInfo =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        packageManager.getPackageInfo(packageName, 0)
+                    }
+                packageInfo.versionName
             }.getOrNull()
         return amberVersionSupportsGroupedApprovals(packageName, versionName)
     }

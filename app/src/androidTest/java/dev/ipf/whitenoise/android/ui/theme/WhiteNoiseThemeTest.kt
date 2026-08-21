@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.theme
 
+import android.os.Build
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -8,6 +9,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.state.WCAG_AA_NORMAL_TEXT_CONTRAST
 import dev.ipf.whitenoise.android.state.contrastRatio
@@ -83,6 +85,7 @@ class WhiteNoiseThemeTest {
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.S)
     fun dynamicPrimaryRolesArePreservedWithoutCustomAccent() {
         var scheme: ColorScheme? = null
         val expected =
@@ -108,6 +111,28 @@ class WhiteNoiseThemeTest {
             assertEquals(expected.onPrimaryContainer, actual.onPrimaryContainer)
             assertEquals(expected.inversePrimary, actual.inversePrimary)
             assertEquals(expected.surfaceTint, actual.surfaceTint)
+        }
+    }
+
+    @Test
+    @SdkSuppress(maxSdkVersion = Build.VERSION_CODES.R)
+    fun dynamicColorFallsBackToBrandPaletteBeforeApi31() {
+        var scheme: ColorScheme? = null
+
+        composeRule.setContent {
+            WhiteNoiseTheme(
+                darkTheme = false,
+                dynamicColor = true,
+            ) {
+                val colorScheme = MaterialTheme.colorScheme
+                SideEffect { scheme = colorScheme }
+            }
+        }
+
+        composeRule.runOnIdle {
+            val actual = requireNotNull(scheme)
+            assertEquals(Color(0xFF06B6D4), actual.primary)
+            assertEquals(Color(0xFF06B6D4), actual.primaryContainer)
         }
     }
 
