@@ -334,10 +334,12 @@ class VideoAttachmentCacheStateTest {
             "Could not locate MediaVideoBubble boundaries in MediaVideo.kt; update this regression test"
         }
         val bubble = source.substring(bubbleStart, bubbleEnd)
+        val needsPoster = bubble.indexOf("val needsPoster = posterBitmap == null")
+        val posterExtraction = bubble.indexOf("withContext(Dispatchers.IO)", startIndex = needsPoster)
 
         assertTrue(
             "MediaVideoBubble must decide whether it needs a poster before leaving the Compose thread",
-            bubble.indexOf("val needsPoster = posterBitmap == null") in 0 until bubble.indexOf("withContext(Dispatchers.IO)"),
+            needsPoster >= 0 && posterExtraction > needsPoster,
         )
         assertTrue(
             "a cached poster must bypass getScaledFrameAtTime while duration metadata is still read",
