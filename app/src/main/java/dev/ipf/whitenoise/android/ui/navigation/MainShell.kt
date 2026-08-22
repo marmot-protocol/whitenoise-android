@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationMessageDirectLoadOut
 import dev.ipf.whitenoise.android.notifications.NotificationMessagePreload
 import dev.ipf.whitenoise.android.notifications.NotificationMessagePreloadState
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
+import dev.ipf.whitenoise.android.notifications.NotificationRouteFirstFrameGate
 import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
 import dev.ipf.whitenoise.android.notifications.NotificationRouteTraceSection
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
@@ -57,11 +58,13 @@ import dev.ipf.whitenoise.android.notifications.notificationPreloadStuckLoading
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
 import dev.ipf.whitenoise.android.notifications.retryInviteAuthoritativeLoad
 import dev.ipf.whitenoise.android.notifications.runInactiveNotificationRouteStage
+import dev.ipf.whitenoise.android.notifications.shouldDeferNotificationChatListBind
 import dev.ipf.whitenoise.android.notifications.stateFor
 import dev.ipf.whitenoise.android.share.EncryptedPendingShareRequestStore
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.resolveShareDirectGroupId
 import dev.ipf.whitenoise.android.share.shouldPresentInboundShare
+import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -453,6 +456,21 @@ internal fun MainShell(
     var notificationEarlyOpenRequestId by remember(appState.runtimeGeneration) {
         mutableLongStateOf(0L)
     }
+    var notificationFirstFrameGate by remember(appState.runtimeGeneration) {
+        mutableStateOf<NotificationRouteFirstFrameGate?>(null)
+    }
+
+    fun releaseNotificationFirstFrameGate(requestId: Long? = null) {
+        val gate = notificationFirstFrameGate ?: return
+        if (requestId != null && gate.requestId != requestId) return
+        gate.release()
+        notificationFirstFrameGate = null
+    }
+
+    DisposableEffect(appState.runtimeGeneration, notificationFirstFrameGate) {
+        val ownedGate = notificationFirstFrameGate
+        onDispose { ownedGate?.release() }
+    }
     var previousPendingProfileNpub by remember { mutableStateOf<String?>(null) }
     val supersedePendingGroupCreateOpen: () -> Unit = {
         shellNavState =
@@ -531,6 +549,8 @@ internal fun MainShell(
         }
     }
     val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
+    val deferNotificationChatListBind =
+        shouldDeferNotificationChatListBind(notificationFirstFrameGate, appState.activeAccountRef)
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
 
@@ -547,7 +567,9 @@ internal fun MainShell(
         appState.activeAccountRef,
         appState.runtimeGeneration,
         chatsController.retryGeneration,
+        deferNotificationChatListBind,
     ) {
+        if (deferNotificationChatListBind) return@LaunchedEffect
         chatsController.bind(
             accountRef = appState.activeAccountRef,
             preserveLoadedContent = chatsController.retryGeneration > 0L,
@@ -638,11 +660,13 @@ internal fun MainShell(
                     armedNotificationRequestId != 0L &&
                     selectedChatOpenContext.notificationRouteTraceRequestId != armedNotificationRequestId
                 ) {
+                    releaseNotificationFirstFrameGate(armedNotificationRequestId)
                     NotificationRouteTrace.finishRequest(armedNotificationRequestId)
                 }
                 return@LaunchedEffect
             }
         if (routingRequestId != armedNotificationRequestId) {
+            releaseNotificationFirstFrameGate(armedNotificationRequestId)
             supersedePendingTtsDestinationNavigation()
             armedNotificationRequestId = routingRequestId
             shellNavState = armShellNotificationRequest(shellNavState, profileGroupForegroundState)
@@ -737,6 +761,10 @@ internal fun MainShell(
             )
             NotificationRouteTrace.beginPhase(
                 requestId = routingRequestId,
+                sectionName = NotificationRouteTraceSection.TARGET_TIMELINE,
+            )
+            NotificationRouteTrace.beginPhase(
+                requestId = routingRequestId,
                 sectionName = NotificationRouteTraceSection.FIRST_CONVERSATION_FRAME,
             )
             selectedChat = chatItem
@@ -805,6 +833,15 @@ internal fun MainShell(
                             state = NotificationMessagePreloadState.Loading,
                         )
                 }
+                val firstFrameGate =
+                    if (canPreload) {
+                        NotificationRouteFirstFrameGate(
+                            requestId = routingRequestId,
+                            accountRef = step.accountRef,
+                        ).also { notificationFirstFrameGate = it }
+                    } else {
+                        null
+                    }
 
                 val activateAccount: suspend () -> Unit = {
                     NotificationRouteTrace.beginPhase(
@@ -820,6 +857,13 @@ internal fun MainShell(
                                 appState.setActiveAccount(
                                     label = step.accountRef,
                                     shouldActivate = { switchStillCurrent() },
+                                    preloadPolicy =
+                                        if (firstFrameGate != null) {
+                                            AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST
+                                        } else {
+                                            AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT
+                                        },
+                                    awaitPostActivationWork = { firstFrameGate?.awaitRelease() },
                                     onActivated = {
                                         NotificationRouteTrace.endPhase(
                                             requestId = routingRequestId,
@@ -866,7 +910,12 @@ internal fun MainShell(
                             // local read re-fires the routing effect, which
                             // commits the conversation open immediately while
                             // the switch keeps settling behind it (#586).
-                            onPreload = { notificationMessagePreload = it },
+                            onPreload = {
+                                notificationMessagePreload = it
+                                if (it.state is NotificationMessagePreloadState.Failed) {
+                                    releaseNotificationFirstFrameGate(routingRequestId)
+                                }
+                            },
                         )
                     } else {
                         activateAccount()
@@ -882,6 +931,7 @@ internal fun MainShell(
                             selectedChatOpenContext.notificationRouteTraceRequestId == routingRequestId
                         notificationMessagePreload = null
                         notificationEarlyOpenRequestId = 0L
+                        releaseNotificationFirstFrameGate(routingRequestId)
                         routingNotification = false
                         if (!earlyOpened || stillInsideEarlyOpen) {
                             fallBackToChatList()
@@ -900,6 +950,7 @@ internal fun MainShell(
                         // pin the loading overlay forever. Release both.
                         if (notificationPreloadStuckLoading(notificationMessagePreload, preloadKey)) {
                             notificationMessagePreload = null
+                            releaseNotificationFirstFrameGate(routingRequestId)
                             if (currentInboundNotificationRequestId == routingRequestId) {
                                 routingNotification = false
                             }
@@ -993,6 +1044,7 @@ internal fun MainShell(
                     }
             }
             NotificationNavStep.MissingAccount -> {
+                releaseNotificationFirstFrameGate(routingRequestId)
                 routingNotification = false
                 fallBackToChatList()
                 appState.present(R.string.toast_notification_account_unavailable)
@@ -1000,6 +1052,7 @@ internal fun MainShell(
                 NotificationRouteTrace.finishRequest(routingRequestId)
             }
             NotificationNavStep.MissingConversation -> {
+                releaseNotificationFirstFrameGate(routingRequestId)
                 routingNotification = false
                 fallBackToChatList()
                 appState.present(R.string.toast_notification_conversation_unavailable)
@@ -1574,9 +1627,27 @@ internal fun MainShell(
     LaunchedEffect(
         conversationController,
         conversationController?.isLoading,
+        conversationController?.hasPublishedAuthoritativeTimeline,
+        conversationController?.error,
+        conversationController?.terminalConversationUnavailable,
         selectedChatOpenContext.notificationRouteTraceRequestId,
     ) {
         val requestId = selectedChatOpenContext.notificationRouteTraceRequestId ?: return@LaunchedEffect
+        if (conversationController?.error != null || conversationController?.terminalConversationUnavailable == true) {
+            releaseNotificationFirstFrameGate(requestId)
+            NotificationRouteTrace.finishRequest(requestId)
+            return@LaunchedEffect
+        }
+        if (conversationController?.hasPublishedAuthoritativeTimeline == true) {
+            NotificationRouteTrace.endPhase(
+                requestId = requestId,
+                sectionName = NotificationRouteTraceSection.TARGET_TIMELINE,
+            )
+            NotificationRouteTrace.beginPhase(
+                requestId = requestId,
+                sectionName = NotificationRouteTraceSection.INITIAL_ANCHOR,
+            )
+        }
         if (conversationController != null && !conversationController.isLoading) {
             NotificationRouteTrace.endPhase(
                 requestId = requestId,
@@ -1805,6 +1876,11 @@ internal fun MainShell(
                         },
                         onFirstFrameCommitted = {
                             content.openContext.notificationRouteTraceRequestId?.let { requestId ->
+                                releaseNotificationFirstFrameGate(requestId)
+                                NotificationRouteTrace.endPhase(
+                                    requestId = requestId,
+                                    sectionName = NotificationRouteTraceSection.INITIAL_ANCHOR,
+                                )
                                 NotificationRouteTrace.endPhase(
                                     requestId = requestId,
                                     sectionName = NotificationRouteTraceSection.FIRST_CONVERSATION_FRAME,
@@ -1856,6 +1932,7 @@ internal fun MainShell(
                             // until the next notification. finishRequest is a no-op
                             // for an already-finished request.
                             content.openContext.notificationRouteTraceRequestId?.let {
+                                releaseNotificationFirstFrameGate(it)
                                 NotificationRouteTrace.finishRequest(it)
                             }
                             exitingConversationContent = content

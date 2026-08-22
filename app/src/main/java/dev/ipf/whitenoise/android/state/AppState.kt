@@ -1487,6 +1487,20 @@ private data class PendingAccountSwitchTrace(
     val startedAtMs: Long,
 )
 
+enum class AccountSwitchPreloadPolicy {
+    FULL_LOCAL_SNAPSHOT,
+    TARGET_CONVERSATION_FIRST,
+}
+
+internal fun shouldLoadAccountSwitchLocalSnapshot(
+    switchingAccounts: Boolean,
+    activationStillWanted: Boolean,
+    preloadPolicy: AccountSwitchPreloadPolicy,
+): Boolean =
+    switchingAccounts &&
+        activationStillWanted &&
+        preloadPolicy == AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT
+
 /**
  * One-shot handoff of MDK's authoritative local projection across the
  * active-account composition boundary. This is deliberately not a retained
@@ -5011,6 +5025,11 @@ class WhiteNoiseAppState private constructor(
 
     private fun isAccountSwitchCurrent(generation: Long) = accountSwitchHandoff.isCurrent(generation)
 
+    private fun isCurrentPostActivationAccountSwitch(
+        label: String,
+        generation: Long,
+    ): Boolean = activeAccountRef == label && isAccountSwitchCurrent(generation)
+
     private fun ensureAccountSwitchRequestIsCurrent(generation: Long) {
         if (!isAccountSwitchCurrent(generation)) throw AccountSwitchSnapshotSuperseded()
     }
@@ -5147,6 +5166,8 @@ class WhiteNoiseAppState private constructor(
         label: String,
         deferUnreadRefresh: Boolean = false,
         shouldActivate: () -> Boolean = { true },
+        preloadPolicy: AccountSwitchPreloadPolicy = AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT,
+        awaitPostActivationWork: suspend () -> Unit = {},
         onActivated: () -> Unit = {},
     ) {
         val requestGeneration = accountSwitchHandoff.beginRequest()
@@ -5178,7 +5199,7 @@ class WhiteNoiseAppState private constructor(
         val activationStillWanted =
             shouldActivate() && isAccountSwitchCurrent(requestGeneration)
         val localSnapshot =
-            if (switchingAccounts && activationStillWanted) {
+            if (shouldLoadAccountSwitchLocalSnapshot(switchingAccounts, activationStillWanted, preloadPolicy)) {
                 loadAccountSwitchLocalSnapshot(label, requestGeneration)
             } else {
                 null
@@ -5208,10 +5229,18 @@ class WhiteNoiseAppState private constructor(
         // dismiss/reset navigation now, while the process-lifetime mutation keeps
         // the profile/privacy/notification/push work below alive in the background.
         onActivated()
-        accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
-        configurePrivacyRuntime()
-        refreshLocalNotificationSettings()
-        syncNativePushRegistrationIfEnabled()
+        // An inactive-account notification already owns a precise local target.
+        // Its first readable transcript must not compete with broad profile,
+        // notification, or push refreshes. Ordinary account switches use the
+        // immediate default; the notification route releases this after the
+        // target frame, on failure, or when superseded.
+        awaitPostActivationWork()
+        if (isCurrentPostActivationAccountSwitch(label, requestGeneration)) {
+            accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
+            configurePrivacyRuntime()
+            refreshLocalNotificationSettings()
+            syncNativePushRegistrationIfEnabled()
+        }
     }
 
     /**

@@ -219,6 +219,27 @@ class ConversationEntryUnreadSnapshotTest {
         }
 
     @Test
+    fun notificationBacklogsOfOneFiveAndTenAllResolveOldestUnread() =
+        runTest {
+            listOf(1, 5, 10).forEach { unreadCount ->
+                val timeline = (1..unreadCount).map { index -> received("unread-$index") }
+
+                val resolved =
+                    resolveConversationEntryUnreadMessageId(
+                        snapshot =
+                            ConversationEntryUnreadSnapshot(
+                                count = unreadCount,
+                                firstUnreadMessageId = "unread-1",
+                            ),
+                        timeline = { timeline },
+                        loadUntilMessageAvailable = { error("loaded oldest unread must not page") },
+                    )
+
+                assertEquals("backlog=$unreadCount", "unread-1", resolved)
+            }
+        }
+
+    @Test
     fun failedAuthoritativeLoadFallsBackToLoadedUnreadBoundary() =
         runTest {
             val timeline = listOf(received("fallback"), received("newest"))

@@ -1003,6 +1003,32 @@ class NotificationTargetTest {
             assertTrue(followUpFinished)
         }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun notificationFirstFrameGateDefersBroadWorkUntilReadableFrame() =
+        runTest {
+            val gate = NotificationRouteFirstFrameGate(requestId = 71L, accountRef = "acct-b")
+            var broadWorkStarted = false
+            val broadWork =
+                launch {
+                    gate.awaitRelease()
+                    broadWorkStarted = true
+                }
+
+            runCurrent()
+            assertFalse("broad account work must stay outside the target-frame path", broadWorkStarted)
+            assertTrue(shouldDeferNotificationChatListBind(gate, activeAccountRef = "acct-b"))
+            assertFalse(shouldDeferNotificationChatListBind(gate, activeAccountRef = "acct-a"))
+
+            gate.release()
+            gate.release()
+            runCurrent()
+
+            assertTrue(broadWorkStarted)
+            assertTrue(broadWork.isCompleted)
+            assertFalse(shouldDeferNotificationChatListBind(gate, activeAccountRef = "acct-b"))
+        }
+
     @Test
     fun exactPreloadPreventsBroadListAbsenceFromWinningTheRoute() {
         assertFalse(
