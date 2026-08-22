@@ -1290,10 +1290,48 @@ class ConversationScrollCoordinatorTest {
     }
 
     @Test
+    fun conversationScreenRejectsSupersededReplyAndSearchNavigationAtPagingBoundaries() {
+        val screen = sourceFile("ConversationScreen.kt").readText()
+        val replyNavigation =
+            screen
+                .substringAfter("fun navigateToReplyTarget(item: TimelineMessage)")
+                .substringBefore("fun jumpToNextUnreadMention")
+        val searchNavigation =
+            screen
+                .substringAfter("fun scrollToSearchMatch(match: ConversationSearchMatch)")
+                .substringBefore("// Step the cursor")
+        val searchCallbacks =
+            screen
+                .substringAfter("onSearchQueryChange = {")
+                .substringBefore("onCloseSearch = ::closeSearch")
+
+        assertTrue(
+            "reply navigation must register with the shared owner",
+            "targetNavigation.begin()" in replyNavigation,
+        )
+        assertTrue(
+            "reply navigation must re-check ownership after paging and before centering",
+            replyNavigation.indexOf("val available = controller.loadUntilMessageAvailable") <
+                replyNavigation.lastIndexOf("if (!navigationRequest.isCurrent())") &&
+                replyNavigation.lastIndexOf("if (!navigationRequest.isCurrent())") <
+                replyNavigation.indexOf("centerTimelineItemAt"),
+        )
+        assertEquals(2, Regex("targetNavigation.begin\\(\\)").findAll(searchNavigation).count())
+        assertEquals(
+            2,
+            Regex("if \\(!available \\|\\| !navigationRequest.isCurrent\\(\\)\\)")
+                .findAll(searchNavigation)
+                .count(),
+        )
+        assertEquals(2, Regex("targetNavigation.cancel\\(\\)").findAll(searchCallbacks).count())
+    }
+
+    @Test
     fun conversationScreenHighlightsOnlyCompletedCenteringCommands() {
         val screen = sourceFile("ConversationScreen.kt").readText()
 
-        assertEquals(3, Regex("if \\(!centered\\)").findAll(screen).count())
+        assertEquals(2, Regex("if \\(!centered\\)").findAll(screen).count())
+        assertEquals(1, Regex("if \\(centered && navigationRequest.isCurrent\\(\\)\\)").findAll(screen).count())
     }
 
     @Test

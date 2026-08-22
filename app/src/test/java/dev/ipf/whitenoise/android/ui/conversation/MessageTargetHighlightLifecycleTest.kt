@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -15,6 +16,48 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MessageTargetHighlightLifecycleTest {
+    @Test
+    fun replyLoadSupersededBySearchCannotCenterTheStaleReply() =
+        runTest {
+            val navigation = MessageTargetNavigationOwner()
+            val replyLoadStarted = CompletableDeferred<Unit>()
+            val releaseReplyLoad = CompletableDeferred<Unit>()
+            val centeredTargets = mutableListOf<String>()
+
+            val replyJob =
+                launch {
+                    val request = navigation.begin()
+                    if (!request.isCurrent()) return@launch
+                    replyLoadStarted.complete(Unit)
+                    releaseReplyLoad.await()
+                    if (!request.isCurrent()) return@launch
+                    centeredTargets += "reply"
+                }
+            replyLoadStarted.await()
+
+            val searchJob =
+                launch {
+                    val request = navigation.begin()
+                    if (!request.isCurrent()) return@launch
+                    centeredTargets += "search"
+                }
+            searchJob.join()
+            releaseReplyLoad.complete(Unit)
+            joinAll(replyJob, searchJob)
+
+            assertEquals(listOf("search"), centeredTargets)
+        }
+
+    @Test
+    fun clearingSearchInvalidatesItsPendingTargetNavigation() {
+        val navigation = MessageTargetNavigationOwner()
+        val request = navigation.begin()
+
+        navigation.cancel()
+
+        assertFalse(request.isCurrent())
+    }
+
     @Test
     fun targetIsActiveDuringOperationAndBoundedPostSettleDwell() =
         runTest {

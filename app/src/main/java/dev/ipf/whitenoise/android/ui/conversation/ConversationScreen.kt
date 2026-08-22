@@ -217,6 +217,7 @@ private class ConversationNavigationState(
     var initialTimelineBackfillNoProgress by mutableStateOf(false)
     var initialTimelineBackfillRetryGeneration by mutableStateOf(0L)
     val targetHighlight = MessageTargetHighlightLifecycle()
+    val targetNavigation = MessageTargetNavigationOwner()
     var navigateReplyJob by mutableStateOf<Job?>(null)
     var searchOpen by mutableStateOf(false)
     var searchQuery by mutableStateOf("")
@@ -230,6 +231,7 @@ private class ConversationNavigationState(
     fun cancelJobs() {
         searchJob?.cancel()
         navigateReplyJob?.cancel()
+        targetNavigation.cancel()
         targetHighlight.clear()
     }
 }
@@ -1698,17 +1700,23 @@ internal fun ConversationScreen(
     }
 
     fun navigateToReplyTarget(item: TimelineMessage) {
+        navigationState.searchJob?.cancel()
         navigationState.targetHighlight.clear()
         navigationState.navigateReplyJob?.cancel()
+        val navigationRequest = navigationState.targetNavigation.begin()
         navigationState.navigateReplyJob =
             scope.launch {
+                if (!navigationRequest.isCurrent()) return@launch
                 val targetMessageId = controller.replyTargetMessageId(item)
                 if (targetMessageId == null) {
                     appState.present(R.string.toast_original_message_unavailable)
                     return@launch
                 }
                 navigationState.targetHighlight.highlightWhile(targetMessageId) {
-                    if (!controller.loadUntilMessageAvailable(targetMessageId)) {
+                    if (!navigationRequest.isCurrent()) return@highlightWhile false
+                    val available = controller.loadUntilMessageAvailable(targetMessageId)
+                    if (!navigationRequest.isCurrent()) return@highlightWhile false
+                    if (!available) {
                         appState.present(R.string.toast_original_message_unavailable)
                         return@highlightWhile false
                     }
@@ -1722,6 +1730,7 @@ internal fun ConversationScreen(
                         appState.present(R.string.toast_original_message_unavailable)
                         return@highlightWhile false
                     }
+                    if (!navigationRequest.isCurrent()) return@highlightWhile false
                     val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
                     centerTimelineItemAt(
                         targetMessageId,
@@ -1735,11 +1744,16 @@ internal fun ConversationScreen(
 
     fun jumpToNextUnreadMention() {
         val targetMessageId = unreadMentionMessageIds.firstOrNull() ?: return
+        navigationState.searchJob?.cancel()
         navigationState.targetHighlight.clear()
         navigationState.navigateReplyJob?.cancel()
+        val navigationRequest = navigationState.targetNavigation.begin()
         navigationState.navigateReplyJob =
             scope.launch {
-                if (!controller.loadUntilMessageAvailable(targetMessageId)) {
+                if (!navigationRequest.isCurrent()) return@launch
+                val available = controller.loadUntilMessageAvailable(targetMessageId)
+                if (!navigationRequest.isCurrent()) return@launch
+                if (!available) {
                     appState.present(R.string.toast_original_message_unavailable)
                     return@launch
                 }
@@ -1751,6 +1765,7 @@ internal fun ConversationScreen(
                     appState.present(R.string.toast_original_message_unavailable)
                     return@launch
                 }
+                if (!navigationRequest.isCurrent()) return@launch
                 val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
                 val centered =
                     centerTimelineItemAt(
@@ -1960,32 +1975,42 @@ internal fun ConversationScreen(
         }
     }
 
-    suspend fun centerLoadedSearchMessage(messageIdHex: String) {
+    suspend fun centerLoadedSearchMessage(
+        messageIdHex: String,
+        navigationRequest: MessageTargetNavigationOwner.Request,
+    ) {
+        if (!navigationRequest.isCurrent()) return
         val timelineIndex =
             controller.timeline
                 .filterNot { MessageProjector.isEdit(it.record) }
                 .indexOfFirst { it.record.messageIdHex == messageIdHex }
-        if (timelineIndex < 0) return
-        val liveOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-        val centered =
-            centerTimelineItemAt(
-                messageIdHex,
-                1 + liveOlderHeaderCount + timelineIndex,
-                ConversationScrollReason.Search,
-            )
-        if (!centered) return
-        showTransientMessageHighlight(messageIdHex)
+        if (timelineIndex >= 0 && navigationRequest.isCurrent()) {
+            val liveOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+            val centered =
+                centerTimelineItemAt(
+                    messageIdHex,
+                    1 + liveOlderHeaderCount + timelineIndex,
+                    ConversationScrollReason.Search,
+                )
+            if (centered && navigationRequest.isCurrent()) {
+                showTransientMessageHighlight(messageIdHex)
+            }
+        }
     }
 
     fun scrollToSearchMatch(match: ConversationSearchMatch) {
         val previousSearchJob = navigationState.searchJob
         previousSearchJob?.cancel()
+        navigationState.navigateReplyJob?.cancel()
         navigationState.targetHighlight.clear()
+        val navigationRequest = navigationState.targetNavigation.begin()
         navigationState.searchJob =
             scope.launch {
                 previousSearchJob?.join()
-                if (!controller.loadSearchResultMessageAvailable(match)) return@launch
-                centerLoadedSearchMessage(match.messageIdHex)
+                if (!navigationRequest.isCurrent()) return@launch
+                val available = controller.loadSearchResultMessageAvailable(match)
+                if (!available || !navigationRequest.isCurrent()) return@launch
+                centerLoadedSearchMessage(match.messageIdHex, navigationRequest)
             }
     }
 
@@ -1994,12 +2019,16 @@ internal fun ConversationScreen(
     fun scrollToSearchMatch(messageIdHex: String) {
         val previousSearchJob = navigationState.searchJob
         previousSearchJob?.cancel()
+        navigationState.navigateReplyJob?.cancel()
         navigationState.targetHighlight.clear()
+        val navigationRequest = navigationState.targetNavigation.begin()
         navigationState.searchJob =
             scope.launch {
                 previousSearchJob?.join()
-                if (!controller.loadUntilMessageAvailable(messageIdHex)) return@launch
-                centerLoadedSearchMessage(messageIdHex)
+                if (!navigationRequest.isCurrent()) return@launch
+                val available = controller.loadUntilMessageAvailable(messageIdHex)
+                if (!available || !navigationRequest.isCurrent()) return@launch
+                centerLoadedSearchMessage(messageIdHex, navigationRequest)
             }
     }
 
@@ -2020,6 +2049,8 @@ internal fun ConversationScreen(
         navigationState.searchPinnedMatchId = null
         val previousSearchJob = navigationState.searchJob
         previousSearchJob?.cancel()
+        navigationState.navigateReplyJob?.cancel()
+        navigationState.targetNavigation.cancel()
         val expectedRestoreIntent = scrollCoordinator.intentToken
         navigationState.targetHighlight.clear()
         // A deep search jump can evict the original viewport from the capped
@@ -2801,6 +2832,8 @@ internal fun ConversationScreen(
                 onSearchQueryChange = {
                     navigationState.searchJob?.cancel()
                     navigationState.searchJob = null
+                    navigationState.navigateReplyJob?.cancel()
+                    navigationState.targetNavigation.cancel()
                     navigationState.targetHighlight.clear()
                     navigationState.searchQuery = it
                     navigationState.searchPinnedMatchId = null
@@ -2808,6 +2841,8 @@ internal fun ConversationScreen(
                 onClearSearch = {
                     navigationState.searchJob?.cancel()
                     navigationState.searchJob = null
+                    navigationState.navigateReplyJob?.cancel()
+                    navigationState.targetNavigation.cancel()
                     navigationState.targetHighlight.clear()
                     navigationState.searchQuery = ""
                     navigationState.searchPinnedMatchId = null

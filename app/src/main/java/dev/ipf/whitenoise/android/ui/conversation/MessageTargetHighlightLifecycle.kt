@@ -9,6 +9,31 @@ internal const val MESSAGE_TARGET_HIGHLIGHT_DWELL_MILLIS = 900L
 internal const val TRANSIENT_MESSAGE_HIGHLIGHT_DWELL_MILLIS = 1_500L
 
 /**
+ * Monotonic owner shared by reply, mention, and search navigation. Cancelling a
+ * coroutine is still best-effort when a paging boundary swallows cancellation;
+ * this token gives every operation an explicit stale check before it pages or
+ * starts a scroll.
+ */
+internal class MessageTargetNavigationOwner {
+    private var owner = 0L
+
+    fun begin(): Request {
+        val requestOwner = ++owner
+        return Request { owner == requestOwner }
+    }
+
+    fun cancel() {
+        owner += 1L
+    }
+
+    internal class Request(
+        private val current: () -> Boolean,
+    ) {
+        fun isCurrent(): Boolean = current()
+    }
+}
+
+/**
  * Latest-wins owner for a message target cue. The same owner spans target
  * loading, programmatic scrolling, the post-settle dwell, and cancellation so
  * an older navigation's cleanup can never clear a newer target.
