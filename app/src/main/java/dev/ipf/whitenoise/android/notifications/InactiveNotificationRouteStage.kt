@@ -40,6 +40,15 @@ internal fun notificationMessageRouteChatListReady(
                 )
         )
 
+/** A failed pre-activation read gets one exact retry after the target account becomes active. */
+internal fun shouldRetryNotificationMessageLoadAfterActivation(
+    preloadState: NotificationMessagePreloadState<*>?,
+    routingRequestId: Long,
+    retriedRequestId: Long?,
+): Boolean =
+    preloadState is NotificationMessagePreloadState.Failed &&
+        retriedRequestId != routingRequestId
+
 /**
  * Runs the notification's targeted local read alongside account activation.
  *

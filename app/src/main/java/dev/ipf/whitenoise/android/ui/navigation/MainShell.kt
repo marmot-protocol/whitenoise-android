@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
 import dev.ipf.whitenoise.android.notifications.retryInviteAuthoritativeLoad
 import dev.ipf.whitenoise.android.notifications.runInactiveNotificationRouteStage
 import dev.ipf.whitenoise.android.notifications.shouldDeferNotificationChatListBind
+import dev.ipf.whitenoise.android.notifications.shouldRetryNotificationMessageLoadAfterActivation
 import dev.ipf.whitenoise.android.notifications.stateFor
 import dev.ipf.whitenoise.android.share.EncryptedPendingShareRequestStore
 import dev.ipf.whitenoise.android.share.ShareRequest
@@ -459,6 +460,9 @@ internal fun MainShell(
     var notificationFirstFrameGate by remember(appState.runtimeGeneration) {
         mutableStateOf<NotificationRouteFirstFrameGate?>(null)
     }
+    var notificationActiveRetryRequestId by remember(appState.runtimeGeneration) {
+        mutableStateOf<Long?>(null)
+    }
 
     fun releaseNotificationFirstFrameGate(requestId: Long? = null) {
         val gate = notificationFirstFrameGate ?: return
@@ -667,6 +671,7 @@ internal fun MainShell(
             }
         if (routingRequestId != armedNotificationRequestId) {
             releaseNotificationFirstFrameGate(armedNotificationRequestId)
+            notificationActiveRetryRequestId = null
             supersedePendingTtsDestinationNavigation()
             armedNotificationRequestId = routingRequestId
             shellNavState = armShellNotificationRequest(shellNavState, profileGroupForegroundState)
@@ -966,10 +971,40 @@ internal fun MainShell(
                         commitNotificationConversationOpen(preloadState.item)
                     }
                     NotificationMessagePreloadState.Failed -> {
-                        // Do not immediately repeat a failed local read. Keep the
-                        // target pending so the broad list can settle and prove
-                        // whether the conversation is missing.
-                        routingNotification = false
+                        // The inactive-account read may fail while account
+                        // activation is still taking ownership of the native
+                        // runtime. Retry the exact group once now that the target
+                        // account is active. Keep the stable routing surface up;
+                        // if this retry also fails, the broad list remains the
+                        // authoritative fallback without flashing it first.
+                        if (
+                            shouldRetryNotificationMessageLoadAfterActivation(
+                                preloadState = preloadState,
+                                routingRequestId = routingRequestId,
+                                retriedRequestId = notificationActiveRetryRequestId,
+                            )
+                        ) {
+                            notificationActiveRetryRequestId = routingRequestId
+                            when (
+                                val outcome =
+                                    loadNotificationMessageDirectly {
+                                        NotificationRouteTrace.tracePhase(
+                                            requestId = routingRequestId,
+                                            sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
+                                        ) {
+                                            appState.loadNotificationChatListItem(
+                                                accountRef = target.accountRef,
+                                                groupIdHex = target.groupIdHex,
+                                            )
+                                        }
+                                    }
+                            ) {
+                                is NotificationMessageDirectLoadOutcome.OpenConversation -> {
+                                    commitNotificationConversationOpen(outcome.item)
+                                }
+                                NotificationMessageDirectLoadOutcome.AwaitChatList -> Unit
+                            }
+                        }
                     }
                     null -> {
                         when (

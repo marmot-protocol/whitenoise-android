@@ -868,6 +868,31 @@ class NotificationTargetTest {
             )
         }
 
+    @Test
+    fun failedInactivePreloadRetriesOnceAfterAccountActivation() {
+        assertTrue(
+            shouldRetryNotificationMessageLoadAfterActivation(
+                preloadState = NotificationMessagePreloadState.Failed,
+                routingRequestId = 72L,
+                retriedRequestId = null,
+            ),
+        )
+        assertFalse(
+            shouldRetryNotificationMessageLoadAfterActivation(
+                preloadState = NotificationMessagePreloadState.Failed,
+                routingRequestId = 72L,
+                retriedRequestId = 72L,
+            ),
+        )
+        assertFalse(
+            shouldRetryNotificationMessageLoadAfterActivation(
+                preloadState = NotificationMessagePreloadState.Loading,
+                routingRequestId = 72L,
+                retriedRequestId = null,
+            ),
+        )
+    }
+
     @Test(expected = CancellationException::class)
     fun directMessageLoadPropagatesCancellation() =
         runTest {

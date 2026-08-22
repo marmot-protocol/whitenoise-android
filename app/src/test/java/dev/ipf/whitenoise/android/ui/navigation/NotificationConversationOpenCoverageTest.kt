@@ -73,10 +73,27 @@ class NotificationConversationOpenCoverageTest {
                 "releaseNotificationFirstFrameGate(requestId)",
                 startIndex = firstFrameCallback,
             )
+        val failedPreload = source.indexOf("NotificationMessagePreloadState.Failed ->")
+        val activeRetry =
+            source.indexOf(
+                "shouldRetryNotificationMessageLoadAfterActivation(",
+                startIndex = failedPreload,
+            )
+        val retryDirectLoad = source.indexOf("loadNotificationMessageDirectly {", startIndex = activeRetry)
+        val retryOpen = source.indexOf("commitNotificationConversationOpen(outcome.item)", startIndex = retryDirectLoad)
+        val retryBranchEnd = source.indexOf("null ->", startIndex = failedPreload)
+        val exposesChatListDuringRetry =
+            source
+                .indexOf("routingNotification = false", startIndex = failedPreload)
+                .let { it in failedPreload until retryBranchEnd }
 
         assertTrue("the production switch route must own a first-frame priority gate", gateCreated >= 0)
         assertTrue("notification activation must select target-first preload", prioritySwitch > gateCreated)
         assertTrue("the broad chat-list bind must honor the priority window", broadBindGuard >= 0)
         assertTrue("the readable conversation frame must release deferred work", release > firstFrameCallback)
+        assertTrue("a failed inactive preload must retry after activation", activeRetry > failedPreload)
+        assertTrue("the active-account retry must perform an exact local load", retryDirectLoad > activeRetry)
+        assertTrue("a successful active-account retry must open the conversation", retryOpen > retryDirectLoad)
+        assertTrue("the chat list must stay hidden during active retry", !exposesChatListDuringRetry)
     }
 }
