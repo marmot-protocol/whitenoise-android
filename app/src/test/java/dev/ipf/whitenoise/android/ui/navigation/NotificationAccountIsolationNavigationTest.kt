@@ -282,7 +282,13 @@ class NotificationAccountIsolationNavigationTest {
         }
 
         awaitCondition { handled.get() }
-        awaitCondition {
+        awaitCondition(
+            failureMessage = {
+                val activeKeys = manager.activeNotifications.map { it.tag to it.id }.toSet()
+                "source cards were not dismissed while destination cards remained: " +
+                    "active=$activeKeys source=${sourceKeys.toSet()} target=${targetKeys.toSet()}"
+            },
+        ) {
             val activeKeys = manager.activeNotifications.map { it.tag to it.id }.toSet()
             sourceKeys.none { it in activeKeys } && targetKeys.all { it in activeKeys }
         }
@@ -480,7 +486,10 @@ class NotificationAccountIsolationNavigationTest {
                 },
             ).build()
 
-    private fun awaitCondition(condition: () -> Boolean) {
+    private fun awaitCondition(
+        failureMessage: (() -> String)? = null,
+        condition: () -> Boolean,
+    ) {
         val deadlineNanos =
             System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(ROUTE_TIMEOUT_MILLIS)
         while (System.nanoTime() <= deadlineNanos) {
@@ -493,7 +502,9 @@ class NotificationAccountIsolationNavigationTest {
             Thread.sleep(POLL_INTERVAL_MILLIS)
             ShadowLooper.idleMainLooper(POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
         }
-        throw AssertionError("Condition not met within ${ROUTE_TIMEOUT_MILLIS}ms")
+        throw AssertionError(
+            failureMessage?.invoke() ?: "Condition not met within ${ROUTE_TIMEOUT_MILLIS}ms",
+        )
     }
 
     private fun groupDetails() =
@@ -637,7 +648,11 @@ class NotificationAccountIsolationNavigationTest {
         val MESSAGE_ID = "d4".repeat(32)
         const val TAP_TOKEN = "trusted-test-token"
         const val TEST_CHANNEL = "notification-account-isolation-test"
-        const val ROUTE_TIMEOUT_MILLIS = 10_000L
+
+        // CI runs the entire Robolectric/Compose corpus in the same worker;
+        // individual route cases have reached eight seconds under contention.
+        // Keep a bounded margin without slowing successful polling paths.
+        const val ROUTE_TIMEOUT_MILLIS = 30_000L
         const val POLL_INTERVAL_MILLIS = 20L
     }
 }
