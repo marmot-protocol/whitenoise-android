@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -86,6 +87,39 @@ class ChatListFirstFrameProfileScreenshotTest {
             composeRule
                 .onNodeWithTag(SCREENSHOT_TAG)
                 .captureRoboImage("src/test/snapshots/chat_list_first_frame_cached_dm_profile_light.png")
+        }
+
+    @Test
+    fun pinnedAccountDraftOwnsTheChatRowPreview() =
+        runTest {
+            val appState = appState()
+            appState.warmProfilePresentationsBlocking(listOf(PEER_ID))
+            appState.draftStore.set(ACCOUNT_REF, GROUP_ID, TextFieldValue("wrong active-account draft"))
+            appState.draftStore.set(PINNED_ACCOUNT_REF, GROUP_ID, TextFieldValue(PINNED_DRAFT))
+            assertEquals(PINNED_DRAFT, appState.draftFor(PINNED_ACCOUNT_REF, GROUP_ID))
+
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = false) {
+                    Surface(color = MaterialTheme.colorScheme.background) {
+                        Box(Modifier.fillMaxWidth().testTag(PINNED_DRAFT_SCREENSHOT_TAG)) {
+                            ChatRow(
+                                item = directChatItem(),
+                                appState = appState,
+                                accountRef = PINNED_ACCOUNT_REF,
+                                interactionsEnabled = false,
+                                onClick = {},
+                                onOpenProfile = {},
+                            )
+                        }
+                    }
+                }
+            }
+
+            composeRule.waitForIdle()
+            composeRule.onNodeWithText(PINNED_DRAFT, substring = true).assertExists()
+            composeRule
+                .onNodeWithTag(PINNED_DRAFT_SCREENSHOT_TAG)
+                .captureRoboImage("src/test/snapshots/chat_list_pinned_account_draft_light.png")
         }
 
     private fun appState(): WhiteNoiseAppState {
@@ -181,7 +215,10 @@ class ChatListFirstFrameProfileScreenshotTest {
 
     private companion object {
         const val SCREENSHOT_TAG = "chat-list-first-frame-cached-dm-profile"
+        const val PINNED_DRAFT_SCREENSHOT_TAG = "chat-list-pinned-account-draft"
         const val ACCOUNT_REF = "primary"
+        const val PINNED_ACCOUNT_REF = "notification-target"
+        const val PINNED_DRAFT = "Pinned account draft"
         val ACCOUNT_ID = "11".repeat(32)
         val PEER_ID = "22".repeat(32)
         val GROUP_ID = "44".repeat(32)

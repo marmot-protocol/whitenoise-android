@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -54,6 +55,36 @@ class ConversationControllerAccountPinningTest {
 
             assertEquals(TARGET_REF, sendAccount)
             assertEquals(TARGET_REF, controller.boundAccountRef)
+        }
+
+    @Test
+    fun pinnedConversationDraftAndDurableClearStayWithTheTargetAccount() =
+        runTest {
+            val appState = appState(activeAccountRef = PREVIOUS_REF)
+            appState.setDraft(PREVIOUS_REF, GROUP_ID, TextFieldValue("previous-account draft"))
+            appState.setDraft(TARGET_REF, GROUP_ID, TextFieldValue("target-account draft"))
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = targetMemberSnapshot(),
+                    accountRefOverride = TARGET_REF,
+                    textPublisher = { _, account, _, _ ->
+                        assertEquals(TARGET_REF, account)
+                        SendSummaryFfi(
+                            published = 1u,
+                            messageIds = listOf(MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            assertEquals("target-account draft", appState.draftFor(controller.boundAccountRef, GROUP_ID))
+            appState.sendConversationText(controller, "target-account draft")
+
+            assertEquals(null, appState.draftFor(TARGET_REF, GROUP_ID))
+            assertEquals("previous-account draft", appState.draftFor(PREVIOUS_REF, GROUP_ID))
         }
 
     @Test

@@ -2594,22 +2594,26 @@ class WhiteNoiseAppState private constructor(
     val activeAccount: AccountSummaryFfi?
         get() = activeAccountRef?.let { ref -> accounts.firstOrNull { it.label == ref } }
 
-    /** Convenience: return the active account's draft for [groupIdHex], or null. */
-    fun draftFor(groupIdHex: String): String? = draftSnapshotFor(groupIdHex)?.textFieldValue?.text
+    /** Return [accountRef]'s draft for [groupIdHex], or null when the conversation is unbound. */
+    fun draftFor(
+        accountRef: String?,
+        groupIdHex: String,
+    ): String? = draftSnapshotFor(accountRef, groupIdHex)?.textFieldValue?.text
 
-    /** Convenience: return the active account's restored composer draft for [groupIdHex]. */
-    fun draftSnapshotFor(groupIdHex: String): ComposerDraftSnapshot? {
-        val account = activeAccountRef ?: return null
-        return draftStore.getDraft(account, groupIdHex)
-    }
+    /** Return [accountRef]'s restored composer draft for [groupIdHex]. */
+    fun draftSnapshotFor(
+        accountRef: String?,
+        groupIdHex: String,
+    ): ComposerDraftSnapshot? = accountRef?.let { draftStore.getDraft(it, groupIdHex) }
 
-    /** Convenience: write the active account's draft for [groupIdHex]. Empty/blank clears. */
+    /** Write [accountRef]'s draft for [groupIdHex]. Empty/blank clears. */
     fun setDraft(
+        accountRef: String?,
         groupIdHex: String,
         value: TextFieldValue,
     ) {
-        val account = activeAccountRef ?: return
-        setDraftForAccount(account, groupIdHex, value)
+        accountRef ?: return
+        setDraftForAccount(accountRef, groupIdHex, value)
     }
 
     private fun setDraftForAccount(
@@ -2658,14 +2662,16 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Hydrates the selected composer from MDK without retaining attachment plaintext in Android state. */
-    fun loadDraft(groupIdHex: String) {
-        val accountRef = activeAccountRef ?: return
+    fun loadDraft(
+        accountRef: String?,
+        groupIdHex: String,
+    ) {
+        accountRef ?: return
         val generation = draftWriter.generation(accountRef, groupIdHex)
         mutationsScope.launch {
             draftWriter
                 .loadIfCurrent(accountRef, groupIdHex, generation)
                 ?.onSuccess { draft ->
-                    if (activeAccountRef != accountRef) return@onSuccess
                     if (!draftWriter.isCurrent(accountRef, groupIdHex, generation)) return@onSuccess
                     draftStore.replaceFromAuthoritative(
                         accountRef,
@@ -2678,17 +2684,15 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    // Deliberately active-account keyed, matching setDraft/draftFor/loadDraft
-    // and the chat-list row's own read. Clearing under the conversation's
-    // pinned account instead would delete a draft nothing reads and leave the
-    // one the composer actually wrote in place — see the follow-up on making
-    // the whole draft pipeline conversation-keyed.
-    internal fun captureDraftForSend(groupIdHex: String): DraftSendClearToken? =
-        activeAccountRef?.let { accountRef ->
+    internal fun captureDraftForSend(
+        accountRef: String?,
+        groupIdHex: String,
+    ): DraftSendClearToken? =
+        accountRef?.let {
             DraftSendClearToken(
-                accountRef = accountRef,
+                accountRef = it,
                 groupIdHex = groupIdHex,
-                generation = draftWriter.generation(accountRef, groupIdHex),
+                generation = draftWriter.generation(it, groupIdHex),
             )
         }
 
@@ -2722,7 +2726,7 @@ class WhiteNoiseAppState private constructor(
         text: String,
         onAccepted: () -> Unit = {},
     ) {
-        val pendingClear = captureDraftForSend(controller.group.groupIdHex)
+        val pendingClear = captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         controller.send(
             text = text,
             onAccepted = onAccepted,

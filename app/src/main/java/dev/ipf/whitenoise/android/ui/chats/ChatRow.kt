@@ -98,6 +98,7 @@ internal fun chatListItemAvatarAccount(item: ChatListItem): String? =
 internal fun ChatListRow(
     item: ChatListItem,
     appState: WhiteNoiseAppState,
+    accountRef: String? = appState.activeAccountRef,
     isMuted: Boolean,
     interactionsEnabled: Boolean = true,
     selectionMode: Boolean,
@@ -118,6 +119,7 @@ internal fun ChatListRow(
     ChatRow(
         item = item,
         appState = appState,
+        accountRef = accountRef,
         selectionMode = selectionMode,
         selected = selected,
         onClick =
@@ -167,6 +169,7 @@ private fun highlightedSnippet(
 internal fun ChatRow(
     item: ChatListItem,
     appState: WhiteNoiseAppState,
+    accountRef: String? = appState.activeAccountRef,
     onClick: () -> Unit,
     onOpenProfile: (String) -> Unit,
     onLongClick: (() -> Unit)? = null,
@@ -309,7 +312,7 @@ internal fun ChatRow(
                 }
             },
             supportingContent = supportingContent@{
-                val draft = appState.draftFor(item.group.groupIdHex)?.takeIf { it.isNotBlank() }
+                val draft = appState.draftFor(accountRef, item.group.groupIdHex)?.takeIf { it.isNotBlank() }
                 // Tokens only ever describe the last message's body, so they're
                 // ignored whenever the line shows something else (invite copy,
                 // draft). When the controller hasn't parsed yet (or the parse

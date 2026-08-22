@@ -43,7 +43,7 @@ class ConversationSendRetryIntegrationTest {
     fun durableAcceptanceClearsTheCapturedComposerDraft() {
         val appState = appState()
         appState.setDraft(GROUP_ID, TextFieldValue("hello"))
-        val pendingClear = requireNotNull(appState.captureDraftForSend(GROUP_ID))
+        val pendingClear = requireNotNull(appState.captureDraftForSend(ACCOUNT_REF, GROUP_ID))
 
         appState.clearDraftAfterSuccessfulSend(pendingClear)
 
@@ -54,7 +54,7 @@ class ConversationSendRetryIntegrationTest {
     fun durableAcceptanceDoesNotClearANewerComposerDraft() {
         val appState = appState()
         appState.setDraft(GROUP_ID, TextFieldValue("first message"))
-        val pendingClear = requireNotNull(appState.captureDraftForSend(GROUP_ID))
+        val pendingClear = requireNotNull(appState.captureDraftForSend(ACCOUNT_REF, GROUP_ID))
         appState.setDraft(GROUP_ID, TextFieldValue("next message"))
 
         appState.clearDraftAfterSuccessfulSend(pendingClear)
@@ -670,6 +670,13 @@ class ConversationSendRetryIntegrationTest {
         retentionSeconds = retentionSeconds,
         retentionExpiresAt = retentionExpiresAt,
     )
+
+    private fun WhiteNoiseAppState.draftFor(groupIdHex: String): String? = draftFor(ACCOUNT_REF, groupIdHex)
+
+    private fun WhiteNoiseAppState.setDraft(
+        groupIdHex: String,
+        value: TextFieldValue,
+    ) = setDraft(ACCOUNT_REF, groupIdHex, value)
 
     private class TestDraftPersistence : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()
