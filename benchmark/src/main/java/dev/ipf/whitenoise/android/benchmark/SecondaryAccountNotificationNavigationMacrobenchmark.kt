@@ -78,11 +78,18 @@ class SecondaryAccountNotificationNavigationMacrobenchmark {
         val maximum = sorted.last()
         val identityFailures = samples.count { !it.succeeded }
         val budgetFailures = samples.count { it.durationMs > WARM_ROUTE_BUDGET_MS }
-        check(identityFailures == 0 && budgetFailures == 0) {
-            "Secondary-account notification route exceeded ${WARM_ROUTE_BUDGET_MS}ms: " +
+        val failureReasons =
+            buildList {
+                if (identityFailures > 0) {
+                    add("destinationIdentityFailures=$identityFailures/${sorted.size}")
+                }
+                if (budgetFailures > 0) {
+                    add("latencyBudgetFailures=$budgetFailures/${sorted.size} over ${WARM_ROUTE_BUDGET_MS}ms")
+                }
+            }
+        check(failureReasons.isEmpty()) {
+            "Secondary-account notification route failed: ${failureReasons.joinToString()}. " +
                 "median=${median}ms p95=${p95}ms max=${maximum}ms " +
-                "budgetFailures=$budgetFailures/${sorted.size} " +
-                "identityFailures=$identityFailures/${sorted.size}. " +
                 "Inspect targetedPreload, accountActivation, groupDetails, controllerBind, " +
                 "initialAnchor, and firstConversationFrame slices."
         }

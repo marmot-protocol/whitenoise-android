@@ -54,6 +54,7 @@ import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_INITIAL_LOADING_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.ConversationInitialLoadingOverlay
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -149,7 +150,9 @@ class ConversationImeCollapseFocusTest {
     fun exactNotificationTargetOwnsTheRealConversationScreensFirstReadableViewport() {
         val appState = appState()
         val group = group()
-        val messages = (1..12).map(::notificationTimelineMessage)
+        // Keep enough history on both sides that a tail/unread anchor cannot
+        // accidentally leave the exact target somewhere in the viewport.
+        val messages = (1..40).map(::notificationTimelineMessage)
         messages.forEach { message ->
             appState.optimisticMessages(ACCOUNT_REF, GROUP_ID)[message.id] = message
         }
@@ -191,6 +194,22 @@ class ConversationImeCollapseFocusTest {
 
             composeRule.waitUntil(timeoutMillis = 5_000) { firstFrameCommitted }
             composeRule.onNodeWithText(NOTIFICATION_TARGET_TEXT).assertIsDisplayed()
+            val transcriptBounds =
+                composeRule
+                    .onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE)
+                    .fetchSemanticsNode()
+                    .boundsInRoot
+            val targetBounds =
+                composeRule
+                    .onNodeWithText(NOTIFICATION_TARGET_TEXT)
+                    .fetchSemanticsNode()
+                    .boundsInRoot
+            assertEquals(
+                "the exact notification target must own the centered production viewport",
+                transcriptBounds.center.y,
+                targetBounds.center.y,
+                targetBounds.height / 2f,
+            )
             composeRule
                 .onRoot()
                 .captureRoboImage("src/test/snapshots/conversation_notification_target_screen_first_frame_light.png")
@@ -592,11 +611,11 @@ class ConversationImeCollapseFocusTest {
         const val ACCOUNT_REF = "personal"
         const val DRAFT = "draft text"
         const val CACHED_MESSAGE = "Cached hello on the first frame"
-        const val NOTIFICATION_TARGET_INDEX = 7
+        const val NOTIFICATION_TARGET_INDEX = 20
         const val NOTIFICATION_TARGET_TEXT = "Exact notification target"
         val ACCOUNT_ID = "01" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
         val NOTIFICATION_SENDER_ID = "02" + "00".repeat(31)
-        val NOTIFICATION_TARGET_ID = "07" + "00".repeat(31)
+        val NOTIFICATION_TARGET_ID = "14" + "00".repeat(31)
     }
 }
