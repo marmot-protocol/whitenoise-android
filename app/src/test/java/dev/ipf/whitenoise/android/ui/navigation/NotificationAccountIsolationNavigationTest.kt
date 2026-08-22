@@ -260,7 +260,7 @@ class NotificationAccountIsolationNavigationTest {
     fun mainShell_ordinaryConversationAccountSwitchPreservesDestinationCards() {
         val gate = RouteOrderGate(preloadFinishesFirst = true)
         val appState = appState(fakeMarmot(gate))
-        postConversationCards(SOURCE_ACCOUNT, "source-invite")
+        val sourceKeys = postConversationCards(SOURCE_ACCOUNT, "source-invite")
         val targetKeys = postConversationCards(TARGET_ACCOUNT, "target-invite")
         val routed = routedTarget(SOURCE_ACCOUNT)
         val handled = AtomicBoolean(false)
@@ -284,7 +284,7 @@ class NotificationAccountIsolationNavigationTest {
         awaitCondition { handled.get() }
         awaitCondition {
             val activeKeys = manager.activeNotifications.map { it.tag to it.id }.toSet()
-            targetKeys.all { it in activeKeys }
+            sourceKeys.none { it in activeKeys } && targetKeys.all { it in activeKeys }
         }
         assertEquals(SOURCE_ACCOUNT, appState.activeAccountRef)
 
