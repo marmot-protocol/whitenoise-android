@@ -18,6 +18,18 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class AttachmentTransferCoordinatorTest {
     @Test
+    fun availabilityPublishedAfterRegistrationBeforeSuspensionIsNotLost() =
+        runBlocking {
+            val signals = AttachmentAvailabilitySignals()
+            val registeredSignal = signals.register("file")
+
+            signals.onRefresh("file", available = false)
+            signals.onRefresh("file", available = true)
+
+            withTimeout(1_000) { registeredSignal.await() }
+        }
+
+    @Test
     fun availabilitySignalIsFreshAndAttachmentSpecific() =
         runBlocking {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)

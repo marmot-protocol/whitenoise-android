@@ -1,15 +1,14 @@
 package dev.ipf.whitenoise.android.state
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 
 /**
  * Presentation state for one received attachment transfer.
@@ -52,7 +51,6 @@ internal class AttachmentTransferCoordinator(
     ): StateFlow<AttachmentTransferState> =
         synchronized(lock) {
             observerCounts[key] = (observerCounts[key] ?: 0) + 1
-            availabilitySignals.acquire(key)
             stateFlow(key, initiallyAvailable).asStateFlow()
         }
 
@@ -75,7 +73,15 @@ internal class AttachmentTransferCoordinator(
 
     /** Waits for a fresh retained/cache-confirmed completion for exactly one attachment key. */
     suspend fun awaitNextAvailability(key: String) {
-        synchronized(lock) { availabilitySignals.acquire(key) }.first()
+        val waiter = synchronized(lock) { availabilitySignals.register(key) }
+        try {
+            waiter.await()
+        } finally {
+            synchronized(lock) {
+                availabilitySignals.unregister(key, waiter)
+                retireStateIfUnused(key)
+            }
+        }
     }
 
     /** Refreshes availability without disturbing a download already in flight. */
@@ -194,7 +200,11 @@ internal class AttachmentTransferCoordinator(
         }
 
     private fun retireStateIfUnused(key: String) {
-        if (observerCounts[key] == 0 && active[key]?.isCompleted != false) {
+        if (
+            observerCounts[key] == 0 &&
+            active[key]?.isCompleted != false &&
+            !availabilitySignals.hasWaiters(key)
+        ) {
             observerCounts.remove(key)
             terminalGenerations.remove(key)
             states.remove(key)
@@ -222,13 +232,28 @@ internal class AttachmentTransferCoordinator(
             }
 }
 
-private class AttachmentAvailabilitySignals {
-    private val signals = mutableMapOf<String, MutableSharedFlow<Unit>>()
+internal class AttachmentAvailabilitySignals {
+    private val waiters = mutableMapOf<String, MutableSet<CompletableDeferred<Unit>>>()
     private val lastCacheAvailability = mutableMapOf<String, Boolean>()
 
-    fun acquire(key: String): MutableSharedFlow<Unit> = signals.getOrPut(key, ::newAvailabilitySignal)
+    fun register(key: String): CompletableDeferred<Unit> =
+        CompletableDeferred<Unit>().also { waiter ->
+            waiters.getOrPut(key, ::mutableSetOf).add(waiter)
+        }
 
-    private fun newAvailabilitySignal(): MutableSharedFlow<Unit> = MutableSharedFlow(extraBufferCapacity = 1)
+    fun unregister(
+        key: String,
+        waiter: CompletableDeferred<Unit>,
+    ) {
+        waiters[key]?.let { registered ->
+            registered.remove(waiter)
+            if (registered.isEmpty()) {
+                waiters.remove(key)
+            }
+        }
+    }
+
+    fun hasWaiters(key: String): Boolean = waiters[key].isNullOrEmpty().not()
 
     fun onRefresh(
         key: String,
@@ -239,7 +264,7 @@ private class AttachmentAvailabilitySignals {
             lastCacheAvailability[key] = available
         }
         if (available == true && previous != true) {
-            signals[key]?.tryEmit(Unit)
+            completeWaiters(key)
         }
     }
 
@@ -250,7 +275,7 @@ private class AttachmentAvailabilitySignals {
         when (state) {
             AttachmentTransferState.Available -> {
                 lastCacheAvailability[key] = true
-                signals[key]?.tryEmit(Unit)
+                completeWaiters(key)
             }
             AttachmentTransferState.NotRetained -> lastCacheAvailability[key] = false
             else -> Unit
@@ -258,8 +283,12 @@ private class AttachmentAvailabilitySignals {
     }
 
     fun retire(key: String) {
-        signals.remove(key)
+        waiters.remove(key)?.forEach { it.cancel() }
         lastCacheAvailability.remove(key)
+    }
+
+    private fun completeWaiters(key: String) {
+        waiters.remove(key)?.forEach { it.complete(Unit) }
     }
 }
 
