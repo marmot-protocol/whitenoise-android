@@ -41,15 +41,15 @@ class ConversationShortcutsTest {
     }
 
     @Test
-    fun accountRemovalPlan_isScopedAndPreservesOtherAndLegacyShortcuts() {
+    fun accountRemovalPlan_removesOwnedAndUnscopedLegacyShortcutsButPreservesOtherAccount() {
         val accountA = shortcut("account-a", "group-a")
         val accountB = shortcut("account-b", "group-b")
         val legacy = shortcut("account-a", "legacy", includeAccountScope = false)
 
         val plan = accountConversationShortcutCleanupPlan(listOf(accountA, accountB, legacy), "account-a")
 
-        assertEquals(listOf(accountA.id), plan.dynamicIds)
-        assertEquals(listOf(accountA.id), plan.longLivedIds)
+        assertEquals(listOf(accountA.id, legacy.id), plan.dynamicIds)
+        assertEquals(listOf(accountA.id, legacy.id), plan.longLivedIds)
     }
 
     @Test

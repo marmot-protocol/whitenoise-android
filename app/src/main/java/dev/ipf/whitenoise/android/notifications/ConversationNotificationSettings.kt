@@ -246,6 +246,7 @@ internal fun conversationSettingsShortcut(
         .setLocusId(LocusIdCompat(shortcutId))
         .setPerson(person)
         .setLongLived(true)
+        .setExtras(checkNotNull(conversationShortcutAccountExtras(accountRef)))
         .build()
 }
 

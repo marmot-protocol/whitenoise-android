@@ -167,6 +167,10 @@ class ConversationNotificationSettingsTest {
         )
         val shortcut = ShortcutManagerCompat.getDynamicShortcuts(app).single { it.id == shortcutId }
         assertEquals("Green Orca", shortcut.longLabel.toString())
+        assertEquals(
+            conversationShortcutAccountScope("account-a"),
+            shortcut.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA),
+        )
         assertNotNull(
             conversationSettingsShortcut(
                 context = app,

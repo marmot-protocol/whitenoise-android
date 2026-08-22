@@ -7,39 +7,39 @@ import java.io.File
 /** Pins shortcut privacy cleanup at account lifecycle boundaries that require the real FFI to execute. */
 class ConversationShortcutLifecycleCoverageTest {
     @Test
-    fun accountSwitchClearsShortcutSurfacesBeforeChangingActiveAccount() {
+    fun accountSwitchHidesDirectShareBeforeChangingActiveAccount() {
         val body = appStateSection("suspend fun setActiveAccount", "private fun clearInMemoryMediaCaches")
-        val clearIndex = body.indexOf("clearConversationShortcutSurfaces()")
+        val clearIndex = body.indexOf("hideConversationShortcutsFromDirectShare()")
         val switchIndex = body.indexOf("activeAccountRef = label")
 
         assertTrue(
-            "account switches must clear prior-account conversation shortcuts before changing the active account",
+            "account switches must hide prior-account Direct Share targets before changing the active account",
             clearIndex >= 0 && switchIndex > clearIndex,
         )
     }
 
     @Test
-    fun nonDestructiveSignOutClearsShortcutSurfaces() {
+    fun nonDestructiveSignOutClearsOnlyTheSignedOutAccountsShortcutSurfaces() {
         val body = appStateSection("suspend fun signOutActiveAccount", "suspend fun exportActiveAccountNsec")
 
         assertTrue(
-            "sign-out must clear dynamic and long-lived conversation shortcuts",
-            "clearConversationShortcutSurfaces()" in body,
+            "sign-out must clear dynamic and long-lived shortcuts for the signed-out account",
+            "clearConversationShortcutsForAccount(signedOutRef)" in body,
         )
     }
 
     @Test
-    fun destructiveLastAccountWipeClearsShortcutSurfaces() {
+    fun destructiveLastAccountWipeClearsOnlyTheWipedAccountsShortcutSurfaces() {
         val body =
             appStateSection(
                 "suspend fun signOutAndWipeActiveAccount",
                 "suspend fun exportEncryptedSecretKeyBackup",
             )
-        val clearIndex = body.indexOf("clearConversationShortcutSurfaces()")
+        val clearIndex = body.indexOf("clearConversationShortcutsForAccount(wipedRef)")
         val wipeIndex = body.indexOf("signOutAndWipe(wipedRef)")
 
         assertTrue(
-            "destructive wipe must clear shortcuts before removing the account, including the last account",
+            "destructive wipe must clear only the wiped account's shortcuts before removing it",
             clearIndex >= 0 && wipeIndex > clearIndex,
         )
     }

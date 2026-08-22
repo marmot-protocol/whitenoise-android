@@ -52,8 +52,13 @@ internal fun conversationShortcutIdsForAccount(
     val accountScope = conversationShortcutAccountScope(accountRef) ?: return emptyList()
     return shortcuts
         .filter { shortcut ->
-            isConversationShortcutId(shortcut.id) &&
-                shortcut.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA) == accountScope
+            if (!isConversationShortcutId(shortcut.id)) return@filter false
+            val ownerScope = shortcut.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA)
+            // Older app versions did not stamp account ownership. There is no
+            // sound way to attribute those retained shortcuts during a wipe,
+            // so remove them conservatively rather than leak signed-out chat
+            // metadata through Android's cached conversation surfaces.
+            ownerScope.isNullOrBlank() || ownerScope == accountScope
         }.map { it.id }
         .distinct()
 }
