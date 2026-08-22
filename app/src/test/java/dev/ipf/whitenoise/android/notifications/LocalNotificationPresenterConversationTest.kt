@@ -120,6 +120,10 @@ class LocalNotificationPresenterConversationTest {
         val shortcut = checkNotNull(publishedShortcut)
         assertTrue(conversationShortcutIsRich(shortcut))
         assertFalse(shortcut.categories?.contains(CONVERSATION_SHARE_TARGET_CATEGORY) == true)
+        assertEquals(
+            conversationShortcutAccountScope("account-a"),
+            shortcut.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA),
+        )
     }
 
     @Test
@@ -185,7 +189,7 @@ class LocalNotificationPresenterConversationTest {
                 shortNpub = { "npub1test" },
             )
         }
-        presenter.clearConversationShortcuts()
+        presenter.hideConversationShortcutsFromDirectShare()
         runBlocking {
             presenter.show(
                 update(isMention = false),
@@ -217,7 +221,6 @@ class LocalNotificationPresenterConversationTest {
                 maxShortcutCount = { 4 },
                 setDynamicShortcuts = { shortcuts -> synced = shortcuts.single() },
                 existingShortcuts = { listOf(rich) },
-                removeLongLivedShortcuts = { },
             )
         publisher.publish(
             accountRef = "account-a",

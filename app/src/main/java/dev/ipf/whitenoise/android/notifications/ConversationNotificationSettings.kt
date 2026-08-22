@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.PersistableBundle
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
@@ -53,6 +54,22 @@ internal fun conversationShortcutId(
     if (accountRef.isBlank() || groupIdHex.isBlank()) return null
     return CONVERSATION_SHORTCUT_PREFIX + sha256Hex("$accountRef\u0000$groupIdHex").take(32)
 }
+
+internal const val CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA =
+    "dev.ipf.whitenoise.android.shortcut.ACCOUNT_SCOPE"
+
+internal fun conversationShortcutAccountScope(accountRef: String): String? {
+    if (accountRef.isBlank()) return null
+    return sha256Hex("account\u0000$accountRef").take(32)
+}
+
+internal fun conversationShortcutAccountExtras(accountRef: String): PersistableBundle? =
+    conversationShortcutAccountScope(accountRef)?.let(::conversationShortcutAccountScopeExtras)
+
+internal fun conversationShortcutAccountScopeExtras(accountScope: String): PersistableBundle =
+    PersistableBundle().apply {
+        putString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA, accountScope)
+    }
 
 @SuppressLint("InlinedApi")
 internal fun conversationNotificationSettingsIntent(

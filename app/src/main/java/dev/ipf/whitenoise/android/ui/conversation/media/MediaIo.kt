@@ -28,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.cancellation.CancellationException
 
 /** Saves a nullable Uri across process death (camera capture round-trip). */
 internal val NullableUriSaver: Saver<android.net.Uri?, String> =
@@ -265,6 +266,8 @@ private suspend fun openReadyAttachment(
             try {
                 val uri = withContext(Dispatchers.IO) { fileProviderUri(context.applicationContext, source) }
                 launchAttachmentViewIntent(context, uri, mediaType)
+            } catch (error: CancellationException) {
+                throw error
             } catch (_: SecurityException) {
                 OpenAttachmentResult.SecurityFailure
             } catch (_: IllegalArgumentException) {
@@ -283,6 +286,8 @@ private fun launchAttachmentViewIntent(
     return try {
         context.startActivity(intent)
         OpenAttachmentResult.Opened
+    } catch (error: CancellationException) {
+        throw error
     } catch (_: ActivityNotFoundException) {
         if (mediaType == ANDROID_PACKAGE_MIME) {
             OpenAttachmentResult.NoInstaller

@@ -114,10 +114,22 @@ class LocalNotificationPresenter(
         NotificationChannels.ensureChannels(context)
     }
 
-    fun clearConversationShortcuts() {
-        clearAllConversationShortcuts(context)
+    fun hideConversationShortcutsFromDirectShare() {
+        hideConversationShortcutsFromDirectShare(context)
         shortcutSnapshots.clear()
         shortcutLastUsed.clear()
+    }
+
+    fun clearConversationShortcutsForAccount(accountRef: String) {
+        clearConversationShortcutsForAccount(context, accountRef)
+        val accountScope = conversationShortcutAccountScope(accountRef) ?: return
+        shortcutSnapshots
+            .filterValues { it.accountScope == accountScope }
+            .keys
+            .forEach { shortcutId ->
+                shortcutSnapshots.remove(shortcutId)
+                shortcutLastUsed.remove(shortcutId)
+            }
     }
 
     fun canPostNotifications(): Boolean = notificationPermissionGranted(context)
@@ -1252,9 +1264,11 @@ class LocalNotificationPresenter(
                         ?.longLabel
                         ?.toString()
             val title = preferredConversationShortcutTitle(candidateTitle, existingTitle)
+            val accountScope = conversationShortcutAccountScope(update.accountRef) ?: return
             val snapshot =
                 ConversationShortcutSnapshot(
                     shortcutId = shortcutId,
+                    accountScope = accountScope,
                     shortLabel = title.take(24).ifBlank { context.getString(R.string.app_name) },
                     longLabel = title,
                     notificationTag = content.notificationTag,
@@ -1326,6 +1340,7 @@ class LocalNotificationPresenter(
                 .setLocusId(locusId)
                 .setPerson(sender)
                 .setLongLived(true)
+                .setExtras(conversationShortcutAccountScopeExtras(snapshot.accountScope))
         if (directShareEligible) {
             builder.setCategories(setOf(CONVERSATION_SHARE_TARGET_CATEGORY))
         }
@@ -1460,6 +1475,7 @@ private data class MessagingPostContext(
 
 private data class ConversationShortcutSnapshot(
     val shortcutId: String,
+    val accountScope: String,
     val shortLabel: String,
     val longLabel: String,
     val notificationTag: String,

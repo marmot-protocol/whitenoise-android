@@ -19,27 +19,80 @@ internal fun conversationShortcutIds(shortcuts: List<ShortcutInfoCompat>): List<
         .filter(::isConversationShortcutId)
         .distinct()
 
+internal data class ConversationShortcutCleanupPlan(
+    val dynamicIds: List<String>,
+    val longLivedIds: List<String>,
+)
+
+internal fun directShareConversationShortcutCleanupPlan(dynamicShortcuts: List<ShortcutInfoCompat>): ConversationShortcutCleanupPlan =
+    ConversationShortcutCleanupPlan(
+        dynamicIds = conversationShortcutIds(dynamicShortcuts),
+        longLivedIds = emptyList(),
+    )
+
 /**
- * Remove every conversation shortcut from dynamic and long-lived/cached Direct
- * Share surfaces. Call on account switch and last-account wipe so another
- * account's chats cannot linger in the share target list.
+ * Hide every conversation from Direct Share without deleting its long-lived
+ * Android conversation. Removing a long-lived shortcut also deletes its
+ * conversation channel and active notifications, so account switching must
+ * never use the destructive API.
  */
-internal fun clearAllConversationShortcuts(context: Context) {
-    val conversationIds =
-        conversationShortcutIds(
-            runCatching {
-                ShortcutManagerCompat.getShortcuts(
-                    context,
-                    ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or
-                        ShortcutManagerCompat.FLAG_MATCH_CACHED or
-                        ShortcutManagerCompat.FLAG_MATCH_PINNED,
-                )
-            }.getOrElse {
-                ShortcutManagerCompat.getDynamicShortcuts(context)
-            },
+internal fun hideConversationShortcutsFromDirectShare(context: Context) {
+    val plan =
+        directShareConversationShortcutCleanupPlan(
+            runCatching { ShortcutManagerCompat.getDynamicShortcuts(context) }.getOrDefault(emptyList()),
         )
-    if (conversationIds.isEmpty()) return
-    runCatching { ShortcutManagerCompat.removeDynamicShortcuts(context, conversationIds) }
-    runCatching { ShortcutManagerCompat.removeLongLivedShortcuts(context, conversationIds) }
-    runCatching { ShortcutManagerCompat.disableShortcuts(context, conversationIds, "") }
+    if (plan.dynamicIds.isEmpty()) return
+    runCatching { ShortcutManagerCompat.removeDynamicShortcuts(context, plan.dynamicIds) }
+}
+
+internal fun conversationShortcutIdsForAccount(
+    shortcuts: List<ShortcutInfoCompat>,
+    accountRef: String,
+): List<String> {
+    val accountScope = conversationShortcutAccountScope(accountRef) ?: return emptyList()
+    return shortcuts
+        .filter { shortcut ->
+            isConversationShortcutId(shortcut.id) &&
+                shortcut.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA) == accountScope
+        }.map { it.id }
+        .distinct()
+}
+
+internal fun accountConversationShortcutCleanupPlan(
+    shortcuts: List<ShortcutInfoCompat>,
+    accountRef: String,
+): ConversationShortcutCleanupPlan {
+    val accountIds = conversationShortcutIdsForAccount(shortcuts, accountRef)
+    return ConversationShortcutCleanupPlan(
+        dynamicIds = accountIds,
+        longLivedIds = accountIds,
+    )
+}
+
+/** Destructively remove only the shortcuts owned by a signed-out or wiped account. */
+internal fun clearConversationShortcutsForAccount(
+    context: Context,
+    accountRef: String,
+) {
+    val plan =
+        accountConversationShortcutCleanupPlan(
+            shortcuts =
+                runCatching {
+                    ShortcutManagerCompat.getShortcuts(
+                        context,
+                        ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or
+                            ShortcutManagerCompat.FLAG_MATCH_CACHED or
+                            ShortcutManagerCompat.FLAG_MATCH_PINNED,
+                    )
+                }.getOrElse {
+                    ShortcutManagerCompat.getDynamicShortcuts(context)
+                },
+            accountRef = accountRef,
+        )
+    if (plan.dynamicIds.isNotEmpty()) {
+        runCatching { ShortcutManagerCompat.removeDynamicShortcuts(context, plan.dynamicIds) }
+    }
+    if (plan.longLivedIds.isNotEmpty()) {
+        runCatching { ShortcutManagerCompat.removeLongLivedShortcuts(context, plan.longLivedIds) }
+    }
 }

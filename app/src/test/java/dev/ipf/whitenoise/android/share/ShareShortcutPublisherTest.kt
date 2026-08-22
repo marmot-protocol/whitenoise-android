@@ -4,6 +4,8 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA
+import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountScope
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.state.ChatListItem
 import org.junit.Assert.assertEquals
@@ -44,6 +46,10 @@ class ShareShortcutPublisherTest {
             shortcut?.categories?.contains(
                 dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY,
             ) == true,
+        )
+        assertEquals(
+            conversationShortcutAccountScope("acct"),
+            shortcut?.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA),
         )
         assertNull(shortcut?.intent?.getStringExtra("dev.ipf.whitenoise.android.extra.DIRECT_SHARE_GROUP_ID"))
     }
@@ -88,7 +94,6 @@ class ShareShortcutPublisherTest {
                 maxShortcutCount = { 2 },
                 setDynamicShortcuts = { shortcuts -> publishedIds += shortcuts.map { it.id } },
                 existingShortcuts = { emptyList() },
-                removeLongLivedShortcuts = { },
             )
         val chats =
             listOf(
@@ -107,26 +112,25 @@ class ShareShortcutPublisherTest {
     }
 
     @Test
-    fun publish_removesStaleLongLivedConversationShortcuts() {
+    fun publish_doesNotRepublishAnotherAccountsCachedShortcut() {
         val context = RuntimeEnvironment.getApplication()
         val stale =
             buildShareShortcut(
                 context,
                 ShareShortcutTarget(accountRef = "other-account", groupIdHex = "stale", title = "Stale"),
             )!!
-        var removed = emptyList<String>()
+        var published = emptyList<String>()
         val publisher =
             ShareShortcutPublisher(
                 context = context,
                 maxShortcutCount = { 1 },
-                setDynamicShortcuts = { },
+                setDynamicShortcuts = { published = it.map { shortcut -> shortcut.id } },
                 existingShortcuts = { listOf(stale) },
-                removeLongLivedShortcuts = { removed = it },
             )
 
         publisher.publish("acct", listOf(chat("g1", pending = false))) { it.group.name }
 
-        assertEquals(listOf(stale.id), removed)
+        assertEquals(listOf(conversationShortcutId("acct", "g1")), published)
     }
 }
 

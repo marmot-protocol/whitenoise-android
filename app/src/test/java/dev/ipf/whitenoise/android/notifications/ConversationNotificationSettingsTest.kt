@@ -35,6 +35,16 @@ class ConversationNotificationSettingsTest {
     }
 
     @Test
+    fun conversationShortcutAccountScopeIsStableAndDoesNotExposeTheAccountRef() {
+        val scope = conversationShortcutAccountScope("account-a")
+
+        assertEquals(scope, conversationShortcutAccountScope("account-a"))
+        assertNotEquals(scope, conversationShortcutAccountScope("account-b"))
+        assertNotEquals("account-a", scope)
+        assertNull(conversationShortcutAccountScope(" "))
+    }
+
+    @Test
     fun globalIntentTargetsTheExactChannelWithoutConversationScope() {
         val intent = notificationChannelSettingsIntent(context, NotificationChannelSpec.REACTIONS.id)
 
