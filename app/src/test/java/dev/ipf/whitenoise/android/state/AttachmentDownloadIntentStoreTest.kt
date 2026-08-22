@@ -66,9 +66,17 @@ class AttachmentDownloadIntentStoreTest {
     @Test
     fun failedDiskCommitKeepsTheIntentPendingAcrossStoreRecreation() {
         AttachmentDownloadIntentStore(preferences).markOpenIntent(REQUEST_A)
-        val store = AttachmentDownloadIntentStore(CommitFailingSharedPreferences(preferences))
+        val failingPreferences = CommitFailingSharedPreferences(preferences)
+        val store = AttachmentDownloadIntentStore(failingPreferences)
+        var observedMissingBeforeRecovery = false
+        failingPreferences.onFailedCommit = {
+            assertFalse(store.hasOpenIntent(REQUEST_A))
+            observedMissingBeforeRecovery = true
+        }
 
         assertFalse(store.consumeOpenIntent(REQUEST_A))
+        assertTrue(observedMissingBeforeRecovery)
+        assertTrue(failingPreferences.recoveryApplied)
         assertTrue(store.hasOpenIntent(REQUEST_A))
         assertTrue(AttachmentDownloadIntentStore(preferences).hasOpenIntent(REQUEST_A))
 
@@ -93,23 +101,66 @@ class AttachmentDownloadIntentStoreTest {
 private class CommitFailingSharedPreferences(
     private val delegate: SharedPreferences,
 ) : SharedPreferences by delegate {
-    override fun edit(): SharedPreferences.Editor = CommitFailingEditor(delegate.edit())
+    private val visibleStringSets = mutableMapOf<String, Set<String>?>()
+    var onFailedCommit: (() -> Unit)? = null
+    var recoveryApplied: Boolean = false
+        private set
+
+    override fun getStringSet(
+        key: String?,
+        defValues: Set<String>?,
+    ): Set<String>? =
+        synchronized(visibleStringSets) {
+            if (key != null && visibleStringSets.containsKey(key)) {
+                visibleStringSets[key]?.toSet()
+            } else {
+                delegate.getStringSet(key, defValues)?.toSet()
+            }
+        }
+
+    override fun edit(): SharedPreferences.Editor = CommitFailingEditor(this, delegate.edit())
+
+    private fun publishInMemory(values: Map<String, Set<String>?>) {
+        synchronized(visibleStringSets) {
+            values.forEach { (key, value) -> visibleStringSets[key] = value?.toSet() }
+        }
+    }
+
+    private fun restore(
+        values: Map<String, Set<String>?>,
+        delegateEditor: SharedPreferences.Editor,
+    ) {
+        publishInMemory(values)
+        values.forEach { (key, value) -> delegateEditor.putStringSet(key, value) }
+        delegateEditor.apply()
+        recoveryApplied = true
+    }
 
     private class CommitFailingEditor(
-        private val delegate: SharedPreferences.Editor,
-    ) : SharedPreferences.Editor by delegate {
+        private val owner: CommitFailingSharedPreferences,
+        private val delegateEditor: SharedPreferences.Editor,
+    ) : SharedPreferences.Editor by delegateEditor {
+        private val stringSets = mutableMapOf<String, Set<String>?>()
+
         override fun putStringSet(
             key: String?,
             values: Set<String>?,
         ): SharedPreferences.Editor {
-            delegate.putStringSet(key, values)
+            if (key != null) stringSets[key] = values?.toSet()
             return this
         }
 
         override fun commit(): Boolean {
-            // Leave both the delegate's in-memory and durable state unchanged.
-            // The production store must report that consumption did not occur.
+            // Android may publish the staged removal to its in-memory map even
+            // when the durable write fails. Expose that state to the store,
+            // while leaving the delegate's persisted value untouched.
+            owner.publishInMemory(stringSets)
+            owner.onFailedCommit?.invoke()
             return false
+        }
+
+        override fun apply() {
+            owner.restore(stringSets, delegateEditor)
         }
     }
 }
