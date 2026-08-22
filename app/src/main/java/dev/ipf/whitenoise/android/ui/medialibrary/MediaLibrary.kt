@@ -151,6 +151,7 @@ internal data class MediaMonthSection<T>(
 )
 
 internal data class SharedMediaTiles(
+    val visuals: List<SharedMediaTile>,
     val images: List<SharedMediaTile>,
     val videos: List<SharedMediaTile>,
     val voice: List<SharedMediaRow>,
@@ -233,6 +234,7 @@ internal fun rememberSharedMediaTiles(
 
 private fun emptySharedMediaTiles() =
     SharedMediaTiles(
+        visuals = emptyList(),
         images = emptyList(),
         videos = emptyList(),
         voice = emptyList(),
@@ -275,6 +277,7 @@ private fun buildTiles(
     messages: List<TimelineMessage>,
     myAccountId: String?,
 ): SharedMediaTiles {
+    val visuals = ArrayList<SharedMediaTile>()
     val images = ArrayList<SharedMediaTile>()
     val videos = ArrayList<SharedMediaTile>()
     val voice = ArrayList<SharedMediaRow>()
@@ -282,22 +285,14 @@ private fun buildTiles(
     for (message in messages) {
         val record = message.record
         val mine = MessageProjector.isMine(record, myAccountId)
-        val references =
-            message.projected?.media
-                ?: MediaReferenceSupport.parseAllImetaTags(
-                    tags = record.tags,
-                    sourceEpoch = record.sourceEpoch ?: 0uL,
-                )
+        val references = message.mediaReferences()
         references.forEachIndexed { index, reference ->
             when {
-                MediaReferenceSupport.isImageMedia(reference) ->
-                    images.add(
-                        SharedMediaTile(record.messageIdHex, index, reference, mine, record.recordedAt, record.sender, isVideo = false),
-                    )
-                MediaReferenceSupport.isVideoMedia(reference) ->
-                    videos.add(
-                        SharedMediaTile(record.messageIdHex, index, reference, mine, record.recordedAt, record.sender, isVideo = true),
-                    )
+                MediaReferenceSupport.isImageMedia(reference) || MediaReferenceSupport.isVideoMedia(reference) -> {
+                    val tile = message.toSharedMediaTile(index, reference, mine)
+                    visuals.add(tile)
+                    if (tile.isVideo) videos.add(tile) else images.add(tile)
+                }
                 MediaReferenceSupport.isAudioMedia(reference) ->
                     voice.add(
                         SharedMediaRow(record.messageIdHex, index, reference, mine, record.recordedAt, record.sender),
@@ -310,6 +305,7 @@ private fun buildTiles(
         }
     }
     // Newest first for the grids and the vertical lists.
+    visuals.reverse()
     images.reverse()
     videos.reverse()
     voice.reverse()
@@ -321,6 +317,7 @@ private fun buildTiles(
     // count toward `hasOther` — otherwise a links-only conversation would show
     // the "View shared media" entry into a library with every tab empty.
     return SharedMediaTiles(
+        visuals = visuals,
         images = images,
         videos = videos,
         voice = voice,
@@ -334,6 +331,27 @@ private fun buildTiles(
         hasOther = voice.isNotEmpty() || files.isNotEmpty() || urls.isNotEmpty(),
     )
 }
+
+private fun TimelineMessage.mediaReferences(): List<MediaAttachmentReferenceFfi> =
+    projected?.media
+        ?: MediaReferenceSupport.parseAllImetaTags(
+            tags = record.tags,
+            sourceEpoch = record.sourceEpoch ?: 0uL,
+        )
+
+private fun TimelineMessage.toSharedMediaTile(
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+) = SharedMediaTile(
+    record.messageIdHex,
+    attachmentIndex,
+    reference,
+    mine,
+    record.recordedAt,
+    record.sender,
+    isVideo = MediaReferenceSupport.isVideoMedia(reference),
+)
 
 // Month bucketing keyed off the local-time calendar so the separators match
 // what the user sees on each message. `recordedAt` is epoch SECONDS.

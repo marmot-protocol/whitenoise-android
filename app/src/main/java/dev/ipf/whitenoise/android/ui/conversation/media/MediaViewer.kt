@@ -25,7 +25,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
@@ -37,7 +36,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -62,6 +60,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,6 +71,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
+import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -87,6 +88,22 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
+ * Upgrade receive-side compatibility references before a transfer. Timeline
+ * fallback records can temporarily carry sourceEpoch=0; passing that value to
+ * MarmotKit can never succeed and previously left visual media spinning.
+ */
+internal suspend fun authoritativeVisualMediaReference(
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+    resolve: suspend () -> MediaAttachmentReferenceFfi,
+): MediaAttachmentReferenceFfi =
+    if (mine || reference.sourceEpoch != 0uL) {
+        reference
+    } else {
+        resolve()
+    }
+
+/**
  * Resolve the decrypted bytes for an attachment, preferring the retained
  * plaintext in `pendingAttachmentsList` for own optimistic sends so the
  * viewer / save / share paths don't spin while waiting for the projection
@@ -98,6 +115,7 @@ internal suspend fun attachmentBytes(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
+    priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
 ): ByteArray {
     if (mine) {
         controller
@@ -107,7 +125,11 @@ internal suspend fun attachmentBytes(
             ?.takeIf { it.isNotEmpty() }
             ?.let { return it }
     }
-    return controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+    val resolvedReference =
+        authoritativeVisualMediaReference(reference, mine) {
+            controller.authoritativeAttachmentReference(messageIdHex, attachmentIndex, reference)
+        }
+    return controller.downloadAttachment(messageIdHex, attachmentIndex, resolvedReference, priority)
 }
 
 // One page of the full-screen media viewer. Unlike the original single-album
@@ -199,13 +221,20 @@ internal fun StableMediaViewerPager(
     pages: List<MediaViewerPage>,
     selection: MediaViewerPagerSelection,
     modifier: Modifier,
+    pagePositionDescription: String?,
     userScrollEnabled: Boolean,
     pageContent: @Composable (page: MediaViewerPage, isCurrent: Boolean) -> Unit,
 ) {
     val currentPageKey = selection.currentPage.key()
+    val pagerModifier =
+        if (pagePositionDescription == null) {
+            modifier
+        } else {
+            modifier.semantics { stateDescription = pagePositionDescription }
+        }
     HorizontalPager(
         state = selection.pagerState,
-        modifier = modifier,
+        modifier = pagerModifier,
         key = { page -> pages[clampViewerPageIndex(page, pages.size)].saveableKey() },
         userScrollEnabled = userScrollEnabled,
     ) { page ->
@@ -217,13 +246,13 @@ internal fun StableMediaViewerPager(
 /**
  * Select the gallery opened by an inline visual attachment.
  *
- * Image-only messages use the conversation's shared-media image order (newest
- * first), while mixed image/video albums retain their message-local paging
- * contract. The current message pages are merged when the asynchronous shared
- * projection has not caught up yet, which keeps optimistic own sends openable.
+ * Visual messages use the conversation's shared-media image/video order
+ * (newest first). The current message pages are merged when the asynchronous
+ * shared projection has not caught up yet, which keeps optimistic own sends
+ * openable.
  */
 internal fun visualMediaViewerGallery(
-    conversationImagePages: List<MediaViewerPage>,
+    conversationVisualPages: List<MediaViewerPage>,
     messagePages: List<MediaViewerPage>,
     tappedAttachmentIndex: Int,
 ): MediaViewerGallery {
@@ -231,25 +260,20 @@ internal fun visualMediaViewerGallery(
         messagePages.firstOrNull { it.attachmentIndex == tappedAttachmentIndex }
             ?: messagePages.firstOrNull()
     return when {
-        tappedPage == null -> MediaViewerGallery(conversationImagePages, 0)
-        messagePages.any { MediaReferenceSupport.isVideoMedia(it.reference) } ->
-            MediaViewerGallery(
-                pages = messagePages,
-                startIndex = messagePages.indexOf(tappedPage),
-            )
+        tappedPage == null -> MediaViewerGallery(conversationVisualPages, 0)
         else -> {
             val currentMessageId = tappedPage.messageIdHex
-            val projectedKeys = conversationImagePages.mapTo(HashSet()) { it.messageIdHex to it.attachmentIndex }
+            val projectedKeys = conversationVisualPages.mapTo(HashSet()) { it.messageIdHex to it.attachmentIndex }
             val currentMessageFullyProjected =
                 messagePages.all { (it.messageIdHex to it.attachmentIndex) in projectedKeys }
             val pages =
                 if (currentMessageFullyProjected) {
-                    conversationImagePages
+                    conversationVisualPages
                 } else {
                     // buildTiles() reverses the flattened timeline projection, so an
                     // album's attachment order is reversed in the shared-media grid.
                     val currentPages = messagePages.asReversed()
-                    val otherPages = conversationImagePages.filterNot { it.messageIdHex == currentMessageId }
+                    val otherPages = conversationVisualPages.filterNot { it.messageIdHex == currentMessageId }
                     val insertAt =
                         otherPages
                             .indexOfFirst { it.recordedAt < tappedPage.recordedAt }
@@ -272,7 +296,7 @@ internal fun visualMediaViewerGallery(
 internal fun ConversationMediaViewer(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
-    conversationImagePages: List<MediaViewerPage>,
+    conversationVisualPages: List<MediaViewerPage>,
     messageIdHex: String,
     attachments: List<IndexedValue<MediaAttachmentReferenceFfi>>,
     tappedAttachmentIndex: Int,
@@ -288,8 +312,8 @@ internal fun ConversationMediaViewer(
             }
         }
     val gallery =
-        remember(conversationImagePages, messagePages, tappedAttachmentIndex) {
-            visualMediaViewerGallery(conversationImagePages, messagePages, tappedAttachmentIndex)
+        remember(conversationVisualPages, messagePages, tappedAttachmentIndex) {
+            visualMediaViewerGallery(conversationVisualPages, messagePages, tappedAttachmentIndex)
         }
     FullScreenMediaViewer(
         controller = controller,
@@ -321,6 +345,12 @@ internal fun FullScreenMediaViewer(
     val pagerSelection = rememberMediaViewerPagerSelection(pages, startIndex)
     val currentPageIndex = pagerSelection.currentPageIndex
     val currentPage = pagerSelection.currentPage
+    val pagePositionDescription =
+        if (pages.size > 1) {
+            stringResource(R.string.media_viewer_page_position, currentPageIndex + 1, pages.size)
+        } else {
+            null
+        }
     val currentReference = currentPage.reference
     val currentAttachmentIndex = currentPage.attachmentIndex
     val currentMessageIdHex = currentPage.messageIdHex
@@ -349,8 +379,6 @@ internal fun FullScreenMediaViewer(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         MediaViewerFrame(
-            pageIndex = currentPageIndex,
-            pageCount = pages.size,
             senderLabel = appState.displayName(currentPage.sender),
             recordedAtLabel = currentRecordedAtLabel,
             onDismiss = onDismiss,
@@ -417,6 +445,7 @@ internal fun FullScreenMediaViewer(
                 pages = pages,
                 selection = pagerSelection,
                 modifier = Modifier.fillMaxSize(),
+                pagePositionDescription = pagePositionDescription,
                 // Disable pager swipe while the visible page is zoomed in —
                 // otherwise the pan gesture and the pager's swipe both want
                 // the horizontal drag. At scale 1× the pager wins.
@@ -452,8 +481,6 @@ internal fun FullScreenMediaViewer(
 
 @Composable
 internal fun MediaViewerFrame(
-    pageIndex: Int,
-    pageCount: Int,
     senderLabel: String,
     recordedAtLabel: String,
     onDismiss: () -> Unit,
@@ -482,13 +509,6 @@ internal fun MediaViewerFrame(
         ) {
             IconButton(onClick = onDismiss) {
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
-            }
-            if (pageCount > 1) {
-                Text(
-                    text = "${pageIndex + 1} / $pageCount",
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelLarge,
-                )
             }
             Row {
                 IconButton(onClick = onSave) {
@@ -684,25 +704,10 @@ internal fun ViewerPage(
             null ->
                 when {
                     viewerFailed ->
-                        Column(
-                            modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.BrokenImage,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(48.dp),
-                            )
-                            Text(
-                                stringResource(R.string.media_save_failed),
-                                color = Color.White,
-                            )
-                            TextButton(onClick = { viewerReloadToken += 1 }) {
-                                Text(stringResource(R.string.media_tap_to_retry), color = Color.White)
-                            }
-                        }
+                        MediaViewerLoadFailed(
+                            onRetry = { viewerReloadToken += 1 },
+                            modifier = Modifier.align(Alignment.Center),
+                        )
                     else ->
                         CircularProgressIndicator(
                             modifier = Modifier.align(Alignment.Center),

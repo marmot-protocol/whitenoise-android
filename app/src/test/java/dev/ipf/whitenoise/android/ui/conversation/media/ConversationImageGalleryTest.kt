@@ -15,7 +15,7 @@ class ConversationImageGalleryTest {
 
         val gallery =
             visualMediaViewerGallery(
-                conversationImagePages = listOf(newest, tapped, oldest),
+                conversationVisualPages = listOf(newest, tapped, oldest),
                 messagePages = listOf(tapped),
                 tappedAttachmentIndex = 0,
             )
@@ -34,7 +34,7 @@ class ConversationImageGalleryTest {
 
         val gallery =
             visualMediaViewerGallery(
-                conversationImagePages = sharedMediaOrder,
+                conversationVisualPages = sharedMediaOrder,
                 messagePages = listOf(albumFirst, albumSecond),
                 tappedAttachmentIndex = 0,
             )
@@ -49,7 +49,7 @@ class ConversationImageGalleryTest {
 
         val gallery =
             visualMediaViewerGallery(
-                conversationImagePages = listOf(only),
+                conversationVisualPages = listOf(only),
                 messagePages = listOf(only),
                 tappedAttachmentIndex = 0,
             )
@@ -65,7 +65,7 @@ class ConversationImageGalleryTest {
 
         val gallery =
             visualMediaViewerGallery(
-                conversationImagePages = listOf(confirmed),
+                conversationVisualPages = listOf(confirmed),
                 messagePages = listOf(optimistic),
                 tappedAttachmentIndex = 0,
             )
@@ -76,19 +76,21 @@ class ConversationImageGalleryTest {
     }
 
     @Test
-    fun mixedImageVideoAlbumKeepsItsMessageLocalPagingContract() {
+    fun mixedImageVideoAlbumUsesTheConversationVisualGallery() {
+        val newerVideo = page("newer-video", attachmentIndex = 0, recordedAt = 300uL, mediaType = "video/mp4")
         val image = page("mixed", attachmentIndex = 0, recordedAt = 200uL)
         val video = page("mixed", attachmentIndex = 1, recordedAt = 200uL, mediaType = "video/mp4")
         val otherImage = page("other", attachmentIndex = 0, recordedAt = 100uL)
+        val conversationVisualOrder = listOf(newerVideo, video, image, otherImage)
 
         val gallery =
             visualMediaViewerGallery(
-                conversationImagePages = listOf(image, otherImage),
+                conversationVisualPages = conversationVisualOrder,
                 messagePages = listOf(image, video),
                 tappedAttachmentIndex = 1,
             )
 
-        assertEquals(listOf(image, video), gallery.pages)
+        assertEquals(conversationVisualOrder, gallery.pages)
         assertEquals(1, gallery.startIndex)
     }
 

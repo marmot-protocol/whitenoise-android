@@ -847,6 +847,7 @@
     <string name="media_save">保存</string>
     <string name="media_saved">已保存到相册</string>
     <string name="media_save_failed">无法保存图片</string>
+    <string name="media_viewer_page_position">第 %1$d 个媒体，共 %2$d 个</string>
     <string name="close">关闭</string>
     <string name="add_caption">添加说明…</string>
     <string name="attach_take_photo">拍照</string>

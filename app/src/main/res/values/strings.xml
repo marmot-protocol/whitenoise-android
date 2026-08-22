@@ -1122,6 +1122,7 @@
     <string name="media_save">Save</string>
     <string name="media_saved">Saved to gallery</string>
     <string name="media_save_failed">Couldn\'t save image</string>
+    <string name="media_viewer_page_position">Media %1$d of %2$d</string>
     <string name="close">Close</string>
     <string name="add_caption">Add a caption…</string>
     <string name="attach_take_photo">Take photo</string>

@@ -818,7 +818,7 @@ internal fun ConversationScreen(
             appState = appState,
             myAccountId = conversationSelfAccountIdHex,
         )
-    val conversationImagePages = remember(conversationMedia.images) { conversationMedia.images.toViewerPages() }
+    val conversationVisualPages = remember(conversationMedia.visuals) { conversationMedia.visuals.toViewerPages() }
     val renderedTimelineAnchorKeys =
         remember(renderedTimeline) {
             renderedTimeline.map { it.id to it.record.messageIdHex }
@@ -3285,7 +3285,7 @@ internal fun ConversationScreen(
                                     },
                                     appState = appState,
                                     controller = controller,
-                                    conversationImagePages = conversationImagePages,
+                                    conversationVisualPages = conversationVisualPages,
                                     eventCardResolver = eventCardResolver,
                                     documentSaveFallback = documentSaveFallback,
                                     composerTextState = composerTextState,

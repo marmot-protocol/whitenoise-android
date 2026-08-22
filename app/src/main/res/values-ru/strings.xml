@@ -901,6 +901,7 @@
     <string name="media_save">Сохранить</string>
     <string name="media_saved">Сохранено в галерею</string>
     <string name="media_save_failed">Не удалось сохранить изображение</string>
+    <string name="media_viewer_page_position">Медиафайл %1$d из %2$d</string>
     <string name="close">Закрыть</string>
     <string name="add_caption">Добавить подпись…</string>
     <string name="attach_take_photo">Сделать фото</string>

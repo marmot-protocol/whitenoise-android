@@ -157,15 +157,6 @@ internal fun MediaVideoGridTile(
     ) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
-        // Re-probe the decrypted-byte cache right before using the epoch-0 bypass;
-        // the remembered entry snapshot only decides initial UI/download policy.
-        if (
-            !mine &&
-            epoch == 0uL &&
-            !controller.hasCachedAttachment(messageIdHex, attachmentIndex)
-        ) {
-            return@LaunchedEffect
-        }
         runCatching {
             materializeVideoAttachment(
                 context = context,
@@ -183,6 +174,11 @@ internal fun MediaVideoGridTile(
             if (it is kotlinx.coroutines.CancellationException) {
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
+                Log.w(
+                    "MediaVideoGridTile",
+                    "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
+                    it,
+                )
                 failed = true
             }
         }
@@ -452,15 +448,6 @@ internal fun MediaVideoBubble(
     ) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
-        // Re-probe the decrypted-byte cache right before using the epoch-0 bypass;
-        // the remembered entry snapshot only decides initial UI/download policy.
-        if (
-            !mine &&
-            epoch == 0uL &&
-            !controller.hasCachedAttachment(messageIdHex, attachmentIndex)
-        ) {
-            return@LaunchedEffect
-        }
         loading = true
         runCatching {
             materializeVideoAttachment(
@@ -734,6 +721,7 @@ internal fun MediaVideoBubble(
                                     messageIdHex = messageIdHex,
                                     attachmentIndex = attachmentIndex,
                                     reference = reference,
+                                    mine = mine,
                                 )
                                 localFile = null
                                 posterBitmap = null
@@ -788,12 +776,16 @@ internal suspend fun materializeVideoAttachment(
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
     priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
-): java.io.File =
-    materializeVideoAttachment(
+): java.io.File {
+    val resolvedReference =
+        authoritativeVisualMediaReference(reference, mine) {
+            controller.authoritativeAttachmentReference(messageIdHex, attachmentIndex, reference)
+        }
+    return materializeVideoAttachment(
         context = context,
         messageIdHex = messageIdHex,
         attachmentIndex = attachmentIndex,
-        reference = reference,
+        reference = resolvedReference,
         resolveBytes = {
             val retained =
                 if (mine) {
@@ -804,9 +796,10 @@ internal suspend fun materializeVideoAttachment(
                 } else {
                     null
                 }
-            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference, priority)
+            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, resolvedReference, priority)
         },
     )
+}
 
 private suspend fun materializeVideoAttachmentOnce(
     attachmentKey: String,
@@ -853,12 +846,17 @@ private suspend fun clearVideoAttachmentCacheAfterPlaybackFailure(
     messageIdHex: String,
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
 ) {
+    val resolvedReference =
+        authoritativeVisualMediaReference(reference, mine) {
+            controller.authoritativeAttachmentReference(messageIdHex, attachmentIndex, reference)
+        }
     val attachmentKey =
         AttachmentCachePublication.attachmentKey(
             messageIdHex = messageIdHex,
             attachmentIndex = attachmentIndex,
-            sourceEpoch = reference.sourceEpoch,
+            sourceEpoch = resolvedReference.sourceEpoch,
         )
     invalidateVideoAttachmentCacheAfterPlaybackFailure(
         attachmentKey = attachmentKey,
@@ -867,7 +865,7 @@ private suspend fun clearVideoAttachmentCacheAfterPlaybackFailure(
                 context = context,
                 messageIdHex = messageIdHex,
                 attachmentIndex = attachmentIndex,
-                reference = reference,
+                reference = resolvedReference,
             ),
     ) {
         controller.evictCachedAttachment(messageIdHex, attachmentIndex)
@@ -888,6 +886,7 @@ private suspend fun rematerializeVideoAttachmentAfterPlaybackFailure(
         messageIdHex = messageIdHex,
         attachmentIndex = attachmentIndex,
         reference = reference,
+        mine = mine,
     )
     return materializeVideoAttachment(
         context = context,
@@ -1079,9 +1078,8 @@ private fun FullscreenVideoPlayer(
  * One page of the full-screen pager. Owns its own download + decode + pan/zoom
  * state so swiping to a sibling page doesn't carry zoom across, and disposing
  * the page recycles the multi-MB native bitmap instead of leaning on GC. The
- * pager prefetches one page either side by default, which is why
- * `LaunchedEffect` doesn't need to wait for "page becomes visible" — it
- * downloads as soon as the page composes.
+ * pager precomposes one page either side by default, so transfer and playback
+ * are gated on [isCurrent] to avoid concurrent downloads and decoders.
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
@@ -1130,14 +1128,13 @@ internal fun VideoViewerPage(
     ) {
         mutableStateOf(false)
     }
-    LaunchedEffect(messageIdHex, attachmentIndex, reference.sourceEpoch) {
+    var loadFailed by remember(messageIdHex, attachmentIndex, reference.sourceEpoch) { mutableStateOf(false) }
+    var reloadToken by remember(messageIdHex, attachmentIndex, reference.sourceEpoch) { mutableStateOf(0) }
+    LaunchedEffect(messageIdHex, attachmentIndex, reference.sourceEpoch, isCurrent, reloadToken) {
+        if (!isCurrent) return@LaunchedEffect
         if (localFile != null) return@LaunchedEffect
         if (playbackInvalidated) return@LaunchedEffect
-        // Receive-side: skip epoch=0 (FFI download would error). Own
-        // optimistic sends still have their bytes in pendingAttachmentsList
-        // even at epoch=0, so we let materializeVideoAttachment short-
-        // circuit through the retained-bytes path with mine=true.
-        if (!mine && reference.sourceEpoch == 0uL) return@LaunchedEffect
+        loadFailed = false
         runCatching {
             materializeVideoAttachment(
                 context = context,
@@ -1148,49 +1145,46 @@ internal fun VideoViewerPage(
                 mine = mine,
             )
         }.onSuccess { localFile = it }
+            .onFailure {
+                if (it is CancellationException) throw it
+                Log.w("VideoViewerPage", "materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)
+                loadFailed = true
+            }
     }
     val file = localFile
     if (file == null) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-            when {
-                cacheInvalidating ->
-                    CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
-                playbackInvalidated ->
-                    Icon(
-                        Icons.Default.Refresh,
-                        contentDescription = stringResource(R.string.voice_message_failed),
-                        tint = Color.White,
-                        modifier =
-                            Modifier
-                                .size(48.dp)
-                                .clickable(enabled = !cacheInvalidating) {
-                                    cacheInvalidating = true
-                                    playbackRecoveryJob.value =
-                                        scope.launch {
-                                            try {
-                                                localFile =
-                                                    rematerializeVideoAttachmentAfterPlaybackFailure(
-                                                        context = context,
-                                                        controller = controller,
-                                                        messageIdHex = messageIdHex,
-                                                        attachmentIndex = attachmentIndex,
-                                                        reference = reference,
-                                                        mine = mine,
-                                                    )
-                                                playbackInvalidated = false
-                                            } catch (t: Throwable) {
-                                                if (t is CancellationException) throw t
-                                                playbackInvalidated = true
-                                            } finally {
-                                                cacheInvalidating = false
-                                            }
-                                        }
-                                },
-                    )
-                else ->
-                    CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
-            }
-        }
+        VideoViewerUnavailable(
+            cacheInvalidating = cacheInvalidating,
+            playbackInvalidated = playbackInvalidated,
+            loadFailed = loadFailed,
+            onPlaybackRetry = {
+                cacheInvalidating = true
+                playbackRecoveryJob.value =
+                    scope.launch {
+                        try {
+                            localFile =
+                                rematerializeVideoAttachmentAfterPlaybackFailure(
+                                    context = context,
+                                    controller = controller,
+                                    messageIdHex = messageIdHex,
+                                    attachmentIndex = attachmentIndex,
+                                    reference = reference,
+                                    mine = mine,
+                                )
+                            playbackInvalidated = false
+                        } catch (t: Throwable) {
+                            if (t is CancellationException) throw t
+                            playbackInvalidated = true
+                        } finally {
+                            cacheInvalidating = false
+                        }
+                    }
+            },
+            onLoadRetry = {
+                loadFailed = false
+                reloadToken++
+            },
+        )
         return
     }
     val exo =
@@ -1222,6 +1216,7 @@ internal fun VideoViewerPage(
                                                 messageIdHex = messageIdHex,
                                                 attachmentIndex = attachmentIndex,
                                                 reference = reference,
+                                                mine = mine,
                                             )
                                             localFile = null
                                         } catch (t: Throwable) {
@@ -1267,4 +1262,32 @@ internal fun VideoViewerPage(
         },
         onRelease = { playerView -> playerView.player = null },
     )
+}
+
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+private fun VideoViewerUnavailable(
+    cacheInvalidating: Boolean,
+    playbackInvalidated: Boolean,
+    loadFailed: Boolean,
+    onPlaybackRetry: () -> Unit,
+    onLoadRetry: () -> Unit,
+) {
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        when {
+            cacheInvalidating -> CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
+            playbackInvalidated ->
+                Icon(
+                    Icons.Default.Refresh,
+                    contentDescription = stringResource(R.string.voice_message_failed),
+                    tint = Color.White,
+                    modifier = Modifier.size(48.dp).clickable(onClick = onPlaybackRetry),
+                )
+            loadFailed -> MediaViewerLoadFailed(onRetry = onLoadRetry)
+            else -> CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
+        }
+    }
 }

@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.projectedTimelineMessage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class SharedMediaVisibilityTest {
@@ -40,11 +41,39 @@ class SharedMediaVisibilityTest {
         )
     }
 
+    @Test
+    fun visualMediaPreservesCombinedNewestFirstOrder() {
+        val messages =
+            listOf(
+                imageMessage("old-image", recordedAt = 100uL),
+                imageMessage("middle-video", recordedAt = 200uL, mediaType = "video/mp4"),
+                imageMessage("new-image", recordedAt = 300uL),
+            )
+
+        val tiles =
+            buildVisibleSharedMediaTiles(
+                messages = messages,
+                myAccountId = null,
+                deletedMessageIds = emptySet(),
+                pendingTimelineRemovedMessageIds = emptySet(),
+                nowSeconds = 400uL,
+            )
+
+        assertEquals(
+            listOf("new-image", "middle-video", "old-image"),
+            tiles.visuals.map { it.messageIdHex },
+        )
+        assertFalse(tiles.visuals.first().isVideo)
+        assertEquals(true, tiles.visuals[1].isVideo)
+    }
+
     private fun imageMessage(
         id: String,
         kind: ULong = 9uL,
         retentionExpiresAt: ULong? = null,
         projectedDeleted: Boolean = false,
+        recordedAt: ULong = 1uL,
+        mediaType: String = "image/jpeg",
     ): TimelineMessage {
         val record =
             AppMessageRecordFfi(
@@ -64,31 +93,33 @@ class SharedMediaVisibilityTest {
                 sourceEpoch = null,
                 retentionSeconds = null,
                 retentionExpiresAt = retentionExpiresAt,
-                recordedAt = 1uL,
+                recordedAt = recordedAt,
                 receivedAt = 1uL,
             )
         val message = projectedTimelineMessage(record)
         return message.copy(
             projected =
                 requireNotNull(message.projected).copy(
-                    media = listOf(reference(id)),
+                    media = listOf(reference(id, mediaType)),
                     deleted = projectedDeleted,
                     retentionExpiresAt = retentionExpiresAt,
                 ),
         )
     }
 
-    private fun reference(id: String) =
-        MediaAttachmentReferenceFfi(
-            locators = emptyList(),
-            ciphertextSha256 = "aa".repeat(32),
-            plaintextSha256 = "bb".repeat(32),
-            nonceHex = "cc".repeat(12),
-            fileName = "$id.jpg",
-            mediaType = "image/jpeg",
-            version = EncryptedMediaVersionFfi.V1,
-            sourceEpoch = 1uL,
-            dim = null,
-            thumbhash = null,
-        )
+    private fun reference(
+        id: String,
+        mediaType: String,
+    ) = MediaAttachmentReferenceFfi(
+        locators = emptyList(),
+        ciphertextSha256 = "aa".repeat(32),
+        plaintextSha256 = "bb".repeat(32),
+        nonceHex = "cc".repeat(12),
+        fileName = if (mediaType.startsWith("video/")) "$id.mp4" else "$id.jpg",
+        mediaType = mediaType,
+        version = EncryptedMediaVersionFfi.V1,
+        sourceEpoch = 1uL,
+        dim = null,
+        thumbhash = null,
+    )
 }

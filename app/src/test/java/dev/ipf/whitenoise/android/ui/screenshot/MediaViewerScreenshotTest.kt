@@ -19,6 +19,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerGallery
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerLoadFailed
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.media.visualMediaViewerGallery
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -43,8 +44,6 @@ class MediaViewerScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 MediaViewerFrame(
-                    pageIndex = 0,
-                    pageCount = 3,
                     senderLabel = "Alex",
                     recordedAtLabel = "Jul 16, 2026, 3:45 PM",
                     onDismiss = {},
@@ -64,11 +63,34 @@ class MediaViewerScreenshotTest {
     }
 
     @Test
+    fun mediaViewerFailedFrameOffersRetry() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                MediaViewerFrame(
+                    senderLabel = "Alex",
+                    recordedAtLabel = "Jul 16, 2026, 3:45 PM",
+                    onDismiss = {},
+                    onSave = {},
+                    onShare = {},
+                    snackbarHostState = remember { SnackbarHostState() },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    MediaViewerLoadFailed(
+                        onRetry = {},
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_failed_frame.png")
+    }
+
+    @Test
     fun mediaViewerFallbackGalleryUsesTheTappedPageMetadata() {
         val tapped = page("tapped", sender = "Blair", recordedAt = 200uL)
         val gallery =
             visualMediaViewerGallery(
-                conversationImagePages = emptyList(),
+                conversationVisualPages = emptyList(),
                 messagePages = listOf(tapped),
                 tappedAttachmentIndex = tapped.attachmentIndex,
             )
@@ -119,7 +141,7 @@ class MediaViewerScreenshotTest {
         val tapped = page("tapped", sender = "Blair", recordedAt = 200uL)
         val oldest = page("oldest", sender = "Casey", recordedAt = 100uL)
         return visualMediaViewerGallery(
-            conversationImagePages = listOf(newest, tapped, oldest),
+            conversationVisualPages = listOf(newest, tapped, oldest),
             messagePages = listOf(tapped),
             tappedAttachmentIndex = tapped.attachmentIndex,
         )
@@ -136,8 +158,6 @@ class MediaViewerScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 MediaViewerFrame(
-                    pageIndex = currentPageIndex,
-                    pageCount = gallery.pages.size,
                     senderLabel = currentPage.sender,
                     recordedAtLabel = recordedAtLabel,
                     onDismiss = {},

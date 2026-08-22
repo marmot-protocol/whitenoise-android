@@ -8,6 +8,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -51,6 +54,7 @@ class MediaViewerPagerRecompositionTest {
                 pages = pages,
                 selection = selection,
                 modifier = Modifier.fillMaxSize(),
+                pagePositionDescription = null,
                 userScrollEnabled = false,
             ) { page, isCurrent ->
                 if (isCurrent) {
@@ -73,6 +77,34 @@ class MediaViewerPagerRecompositionTest {
             assertTrue(mountedMessageIds.isNotEmpty())
             assertEquals(setOf("tapped"), mountedMessageIds.toSet())
         }
+    }
+
+    @Test
+    fun pagePositionIsExposedToAccessibility() {
+        val pages = listOf(page("newer"), page("current"), page("older"))
+
+        composeRule.setContent {
+            StableMediaViewerPager(
+                pages = pages,
+                selection = rememberMediaViewerPagerSelection(pages, startIndex = 1),
+                modifier = Modifier.fillMaxSize().testTag(PAGER_TAG),
+                pagePositionDescription = "Media 2 of 3",
+                userScrollEnabled = false,
+            ) { page, isCurrent ->
+                if (isCurrent) {
+                    Text(page.messageIdHex)
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(PAGER_TAG)
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    "Media 2 of 3",
+                ),
+            )
     }
 
     private fun page(messageIdHex: String) =
@@ -99,5 +131,6 @@ class MediaViewerPagerRecompositionTest {
 
     private companion object {
         const val CURRENT_PAGE_TAG = "current-media-viewer-page"
+        const val PAGER_TAG = "media-viewer-pager"
     }
 }

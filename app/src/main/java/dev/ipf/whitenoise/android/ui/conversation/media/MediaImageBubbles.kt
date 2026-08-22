@@ -166,7 +166,7 @@ internal fun MediaImageBubble(
     attachmentIndex: Int,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
-    conversationImagePages: List<MediaViewerPage>,
+    conversationVisualPages: List<MediaViewerPage>,
     mine: Boolean,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
@@ -239,31 +239,17 @@ internal fun MediaImageBubble(
     LaunchedEffect(key, attachmentIndex, epoch, materializationIntent, reloadToken) {
         if (presentation != null) return@LaunchedEffect // already have decoded pixels
         if (!startDownload) return@LaunchedEffect
-        // Own optimistic sends still have their bytes only in the pending list
-        // (the projection hasn't reconciled them into the L1 cache yet). Use those
-        // directly so the bubble paints during the upload window instead of hanging
-        // on a missing-epoch FFI.
-        val pendingBytes =
-            if (mine) {
-                controller.pendingAttachmentsList(key).getOrNull(attachmentIndex)?.plaintextBytes
-            } else {
-                null
-            }
-        // A legacy compatibility record may lack a recoverable source epoch.
-        // Calling downloadMedia with epoch=0 would fail, so wait for a projected
-        // row instead. Own optimistic sends already hold their pending bytes and
-        // can render without invoking the native downloader.
-        if (pendingBytes == null && epoch == 0uL) return@LaunchedEffect
         failed = false
         try {
             val data =
-                pendingBytes
-                    ?: controller.downloadAttachment(
-                        key,
-                        attachmentIndex,
-                        reference,
-                        materializationIntent.priority,
-                    )
+                attachmentBytes(
+                    controller = controller,
+                    messageIdHex = key,
+                    attachmentIndex = attachmentIndex,
+                    reference = reference,
+                    mine = mine,
+                    priority = materializationIntent.priority,
+                )
             val decoded =
                 decodeMessageAttachmentImage(
                     bytes = data,
@@ -422,7 +408,7 @@ internal fun MediaImageBubble(
         ConversationMediaViewer(
             controller = controller,
             appState = appState,
-            conversationImagePages = conversationImagePages,
+            conversationVisualPages = conversationVisualPages,
             messageIdHex = key,
             attachments = listOf(IndexedValue(attachmentIndex, reference)),
             tappedAttachmentIndex = attachmentIndex,
@@ -509,7 +495,7 @@ internal fun MediaVisualGridBubble(
     attachments: List<IndexedValue<MediaAttachmentReferenceFfi>>,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
-    conversationImagePages: List<MediaViewerPage>,
+    conversationVisualPages: List<MediaViewerPage>,
     mine: Boolean,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
@@ -568,7 +554,7 @@ internal fun MediaVisualGridBubble(
         ConversationMediaViewer(
             controller = controller,
             appState = appState,
-            conversationImagePages = conversationImagePages,
+            conversationVisualPages = conversationVisualPages,
             messageIdHex = record.messageIdHex,
             attachments = attachments,
             tappedAttachmentIndex = tappedAttachmentIndex,
@@ -652,26 +638,17 @@ internal fun MediaImageGridTile(
     LaunchedEffect(decodeKey, materializationIntent, reloadToken) {
         if (presentation != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
-        val pendingBytes =
-            if (mine) {
-                controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.plaintextBytes
-            } else {
-                null
-            }
-        // Pre-confirm own albums: bytes live in pendingAttachmentsList and the
-        // FFI imeta isn't ready yet, so skip the sourceEpoch guard for that
-        // path. After reconcile, downloadAttachment hits the cache instead.
-        if (pendingBytes == null && reference.sourceEpoch == 0uL) return@LaunchedEffect
         failed = false
         try {
             val data =
-                pendingBytes
-                    ?: controller.downloadAttachment(
-                        messageIdHex,
-                        attachmentIndex,
-                        reference,
-                        materializationIntent.priority,
-                    )
+                attachmentBytes(
+                    controller = controller,
+                    messageIdHex = messageIdHex,
+                    attachmentIndex = attachmentIndex,
+                    reference = reference,
+                    mine = mine,
+                    priority = materializationIntent.priority,
+                )
             val decoded =
                 decodeMessageAttachmentImage(
                     bytes = data,
