@@ -18,6 +18,8 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
@@ -355,6 +357,7 @@ class NotificationAccountIsolationNavigationTest {
             accountIdHexResolver = { null },
             accounts = listOf(account(SOURCE_ACCOUNT, SOURCE_ID), account(TARGET_ACCOUNT, TARGET_ID)),
             activeAccountRef = SOURCE_ACCOUNT,
+            notificationChatListProjectionReader = { _, groupIdHex -> chatListRow(groupIdHex) },
         ).also { state ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
@@ -496,6 +499,40 @@ class NotificationAccountIsolationNavigationTest {
             disbanded = false,
             welcomerAccountIdHex = null,
             viaWelcomeMessageIdHex = null,
+        )
+
+    private fun chatListRow(groupIdHex: String) =
+        ChatListRowFfi(
+            selfMembership = SelfMembershipFfi.MEMBER,
+            unreadMentionCount = 0uL,
+            unreadMention = false,
+            groupIdHex = groupIdHex,
+            archived = false,
+            pendingConfirmation = false,
+            title = "Shared group",
+            groupName = "Shared group",
+            avatarUrl = null,
+            avatar = null,
+            lastMessage = null,
+            unreadCount = 3uL,
+            hasUnread = true,
+            firstUnreadMessageIdHex = MESSAGE_ID,
+            lastReadMessageIdHex = null,
+            lastReadTimelineAt = null,
+            conversationCreatedAt = 0uL,
+            activitySortAt = 0uL,
+            updatedAt = 0uL,
+            leaveRequestPending = false,
+            leaveRequestedAtMs = null,
+            manuallyMarkedUnread = false,
+            conversationKind = ChatConversationKindFfi.GROUP,
+            muted = false,
+            mutedUntilMs = null,
+            pinned = false,
+            pinnedPosition = null,
+            lifecycleState = GroupLifecycleStateFfi.STABLE,
+            disbanding = false,
+            disbandRequest = null,
         )
 
     private fun account(

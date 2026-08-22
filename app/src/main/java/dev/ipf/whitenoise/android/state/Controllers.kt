@@ -2943,6 +2943,24 @@ internal fun chatListItemFromAuthoritativeGroupDetails(
 }
 
 /**
+ * Combine the targeted group-details read used by notification routing with the
+ * same account's pre-read chat-list projection. A message-notification open
+ * must carry this projection into its first frame: opening from group details
+ * alone leaves unread state unknown until the broad list binds, by which point
+ * notification read-through may already have advanced the durable cursor.
+ */
+internal fun chatListItemFromNotificationProjection(
+    details: GroupDetailsFfi,
+    activeAccountIdHex: String?,
+    projection: ChatListRowFfi,
+): ChatListItem {
+    require(details.group.groupIdHex.equals(projection.groupIdHex, ignoreCase = true)) {
+        "notification projection belongs to another group"
+    }
+    return chatListItemFromAuthoritativeGroupDetails(details, activeAccountIdHex).copy(projection = projection)
+}
+
+/**
  * When a provisional open (no chat-list row yet) is already foregrounded,
  * upgrade [open] to the authoritative projected row exactly once when it
  * arrives — no second navigation event and no duplicate list row.
