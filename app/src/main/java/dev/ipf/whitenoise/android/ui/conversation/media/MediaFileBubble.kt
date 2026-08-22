@@ -141,7 +141,13 @@ internal fun MediaFileBubble(
     // is therefore re-created by rotation, navigation return, or process
     // recreation, joins the same transfer, and atomically consumes the intent
     // immediately before the one external viewer launch.
-    LaunchedEffect(pillKey, appState.attachmentOpenIntentRevision, cacheRevision) {
+    LaunchedEffect(
+        controller,
+        pillKey,
+        reference.sourceEpoch,
+        appState.attachmentOpenIntentRevision,
+        lifecycleOwner,
+    ) {
         if (!controller.hasAttachmentOpenIntent(messageIdHex, attachmentIndex)) return@LaunchedEffect
         openRequested = true
         try {

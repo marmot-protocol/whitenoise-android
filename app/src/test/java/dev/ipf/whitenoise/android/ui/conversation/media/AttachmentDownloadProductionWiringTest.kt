@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -44,6 +45,19 @@ class AttachmentDownloadProductionWiringTest {
         assertTrue(
             ".semantics { contentDescription = downloadLabel } .clickable( " +
                 "onClickLabel = downloadLabel," in image,
+        )
+    }
+
+    @Test
+    fun fileOpenEffectIsNotRestartedByUnrelatedCacheMutations() {
+        val file = source("MediaFileBubble.kt").normalized()
+
+        assertTrue(
+            "LaunchedEffect( controller, pillKey, reference.sourceEpoch, " +
+                "appState.attachmentOpenIntentRevision, lifecycleOwner," in file,
+        )
+        assertFalse(
+            "appState.attachmentOpenIntentRevision, cacheRevision" in file,
         )
     }
 
