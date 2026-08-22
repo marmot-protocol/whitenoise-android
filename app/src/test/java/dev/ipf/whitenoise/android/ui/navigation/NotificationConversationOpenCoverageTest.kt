@@ -82,12 +82,22 @@ class NotificationConversationOpenCoverageTest {
         val retryDirectLoad = source.indexOf("loadNotificationMessageDirectly {", startIndex = activeRetry)
         val retryOpen = source.indexOf("commitNotificationConversationOpen(outcome.item)", startIndex = retryDirectLoad)
         val retryBranchEnd = source.indexOf("null ->", startIndex = failedPreload)
+        assertTrue("the retry branch boundary must follow its successful open", retryBranchEnd > retryOpen)
         val exposesChatListDuringRetry =
             source
                 .indexOf("routingNotification = false", startIndex = failedPreload)
                 .let { it in failedPreload until retryBranchEnd }
+        val targetFirstEligibility = source.indexOf("val canUseTargetFirst =")
+        val signedInPreloadEligibility = source.indexOf("val canPreload =", startIndex = targetFirstEligibility)
+        val signedOutGate = source.indexOf("if (canUseTargetFirst) {", startIndex = signedInPreloadEligibility)
 
         assertTrue("the production switch route must own a first-frame priority gate", gateCreated >= 0)
+        assertTrue(
+            "target-first gating must be decided independently of signed-in preload eligibility",
+            targetFirstEligibility >= 0 &&
+                signedInPreloadEligibility > targetFirstEligibility &&
+                signedOutGate > signedInPreloadEligibility,
+        )
         assertTrue("notification activation must select target-first preload", prioritySwitch > gateCreated)
         assertTrue("the broad chat-list bind must honor the priority window", broadBindGuard >= 0)
         assertTrue("the readable conversation frame must release deferred work", release > firstFrameCallback)

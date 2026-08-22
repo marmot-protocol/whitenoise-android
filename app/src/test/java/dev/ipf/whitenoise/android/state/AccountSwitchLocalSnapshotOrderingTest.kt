@@ -241,6 +241,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val body = setActiveAccountSection()
         val policyGate = body.indexOf("shouldLoadAccountSwitchLocalSnapshot(")
         val broadSnapshot = body.indexOf("loadAccountSwitchLocalSnapshot(label, requestGeneration)")
+        val policyElse = body.indexOf("} else {", startIndex = policyGate)
         val activated = body.indexOf("onActivated()")
         val firstFrameGate = body.indexOf("awaitPostActivationWork()", startIndex = activated)
         val staleGuard =
@@ -254,7 +255,10 @@ class AccountSwitchLocalSnapshotOrderingTest {
             "only ordinary switches may load the broad local snapshot",
             "preloadPolicy == AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT" in policy,
         )
-        assertTrue("broad account preload must be policy-gated", policyGate >= 0 && broadSnapshot > policyGate)
+        assertTrue(
+            "broad account preload must be inside the policy-controlled branch",
+            policyGate >= 0 && broadSnapshot > policyGate && policyElse > broadSnapshot,
+        )
         assertTrue("the target account must activate before waiting for its readable frame", firstFrameGate > activated)
         assertTrue("superseded deferred work must be rejected after the wait", staleGuard > firstFrameGate)
         assertTrue("profile warming must stay outside the target first-frame path", profile > staleGuard)

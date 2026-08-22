@@ -826,8 +826,11 @@ internal fun MainShell(
                                 notificationEarlyOpenRequestId == routingRequestId
                         )
                 val preloadKey = notificationMessagePreloadKey
-                val canPreload =
+                val canUseTargetFirst =
                     preloadKey != null &&
+                        appState.accounts.any { it.label == step.accountRef }
+                val canPreload =
+                    canUseTargetFirst &&
                         appState.accounts.any {
                             it.label == step.accountRef && it.isSignedInSigningAccount()
                         }
@@ -839,7 +842,7 @@ internal fun MainShell(
                         )
                 }
                 val firstFrameGate =
-                    if (canPreload) {
+                    if (canUseTargetFirst) {
                         NotificationRouteFirstFrameGate(
                             requestId = routingRequestId,
                             accountRef = step.accountRef,
