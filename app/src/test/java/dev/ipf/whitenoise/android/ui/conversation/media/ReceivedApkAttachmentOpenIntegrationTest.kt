@@ -21,6 +21,7 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlin.coroutines.cancellation.CancellationException
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -220,6 +221,33 @@ class ReceivedApkAttachmentOpenIntegrationTest {
         }
 
     @Test
+    fun attachmentOpenCancellationEscapesTheProductionPath() =
+        runTest {
+            val source = artifact("cancelled.pdf").apply { writeText("document") }
+            val cancellationContexts =
+                listOf(
+                    CancellingApplicationContext(applicationContext()),
+                    RecordingContext(applicationContext(), CancellationException("cancel launch")),
+                )
+
+            cancellationContexts.forEach { context ->
+                var cancellationEscaped = false
+                try {
+                    openAttachmentExternally(
+                        context = context,
+                        source = source,
+                        mediaType = "application/pdf",
+                        fileName = "cancelled.pdf",
+                    )
+                } catch (_: CancellationException) {
+                    cancellationEscaped = true
+                }
+
+                assertTrue(cancellationEscaped)
+            }
+        }
+
+    @Test
     fun conversationAndMediaLibraryPassFilenameIntoTheVerifiedOpener() {
         val conversationMediaPath = "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media"
         val bubble = projectFile("$conversationMediaPath/MediaFileBubble.kt").readText()
@@ -286,5 +314,11 @@ class ReceivedApkAttachmentOpenIntegrationTest {
             launchFailure?.let { throw it }
             startedIntent = intent
         }
+    }
+
+    private class CancellingApplicationContext(
+        base: Context,
+    ) : ContextWrapper(base) {
+        override fun getApplicationContext(): Context = throw CancellationException("test cancellation")
     }
 }

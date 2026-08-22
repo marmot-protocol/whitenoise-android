@@ -7,9 +7,9 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
+import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountExtras
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.conversationShortcutIsRich
-import dev.ipf.whitenoise.android.notifications.isConversationShortcutId
 import dev.ipf.whitenoise.android.notifications.notificationConversationIcon
 import dev.ipf.whitenoise.android.notifications.preferredConversationShortcutTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -68,6 +68,7 @@ internal fun buildShareShortcut(
         ).setIntent(buildShareShortcutIntent(context))
         .setLongLived(true)
         .setCategories(setOf(CONVERSATION_SHARE_TARGET_CATEGORY))
+        .setExtras(checkNotNull(conversationShortcutAccountExtras(target.accountRef)))
         .build()
 }
 
@@ -84,9 +85,6 @@ class ShareShortcutPublisher(
             context,
             ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or ShortcutManagerCompat.FLAG_MATCH_CACHED,
         )
-    },
-    private val removeLongLivedShortcuts: (List<String>) -> Unit = { ids ->
-        ShortcutManagerCompat.removeLongLivedShortcuts(context, ids)
     },
 ) {
     /**
@@ -106,19 +104,6 @@ class ShareShortcutPublisher(
         val targets = selectShareShortcutTargets(accountRef, chats, limit, displayTitle)
         val existing = existingShortcuts()
         val existingById = existing.associateBy { it.id }
-        val desiredIds =
-            targets
-                .mapNotNull { target -> conversationShortcutId(accountRef, target.groupIdHex) }
-                .toSet()
-        val staleLongLivedIds =
-            existing
-                .map { it.id }
-                .filter(::isConversationShortcutId)
-                .filterNot(desiredIds::contains)
-                .distinct()
-        if (staleLongLivedIds.isNotEmpty()) {
-            removeLongLivedShortcuts(staleLongLivedIds)
-        }
         val shortcuts =
             if (targets.isEmpty()) {
                 emptyList()

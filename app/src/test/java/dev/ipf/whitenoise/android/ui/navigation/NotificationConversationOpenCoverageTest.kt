@@ -39,4 +39,15 @@ class NotificationConversationOpenCoverageTest {
 
         assertEquals(73L, opened.notificationRouteTraceRequestId)
     }
+
+    @Test
+    fun notificationOpenCarriesDurableReadThroughUntilUnreadBoundaryCapture() {
+        val opened =
+            nextNotificationConversationOpenContext(
+                current = ConversationOpenContext(),
+                notificationReadThroughMessageId = "message-1",
+            )
+
+        assertEquals("message-1", opened.notificationReadThroughMessageId)
+    }
 }

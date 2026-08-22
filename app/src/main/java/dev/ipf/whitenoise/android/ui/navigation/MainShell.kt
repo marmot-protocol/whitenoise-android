@@ -99,6 +99,10 @@ internal data class ConversationOpenContext(
     val ttsFocusSessionId: Long? = null,
     val notificationOpenRequestId: Long = 0L,
     val notificationRouteTraceRequestId: Long? = null,
+    // Message notification taps advance this cursor only after the destination
+    // freezes its pre-read unread projection. Back commits it immediately when
+    // the user leaves before that boundary becomes available (#1016/#2191).
+    val notificationReadThroughMessageId: String? = null,
     // Non-null only when a notification-routed conversation opened before its
     // account switch landed (#586). The conversation controller and scroll key
     // bind to this account — never the still-switching active account — so the
@@ -133,6 +137,11 @@ internal data class ConversationTransitionContent(
     val openContext: ConversationOpenContext,
     val justCreated: Boolean,
     val openedAsDmHint: Boolean,
+)
+
+private data class ConversationTimelineVisibility(
+    val controller: ConversationController,
+    val visible: Boolean,
 )
 
 internal fun conversationControllerAccountRef(
@@ -291,10 +300,12 @@ internal fun nextNotificationConversationOpenContext(
     current: ConversationOpenContext,
     notificationRouteTraceRequestId: Long? = null,
     pinnedAccountRef: String? = null,
+    notificationReadThroughMessageId: String? = null,
 ): ConversationOpenContext =
     ConversationOpenContext(
         notificationOpenRequestId = current.notificationOpenRequestId + 1L,
         notificationRouteTraceRequestId = notificationRouteTraceRequestId,
+        notificationReadThroughMessageId = notificationReadThroughMessageId,
         pinnedAccountRef = pinnedAccountRef,
     )
 
@@ -715,6 +726,7 @@ internal fun MainShell(
                     current = selectedChatOpenContext,
                     notificationRouteTraceRequestId = routingRequestId,
                     pinnedAccountRef = pinnedAccountRef,
+                    notificationReadThroughMessageId = target.messageIdHex,
                 )
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
@@ -730,18 +742,6 @@ internal fun MainShell(
             selectedChat = chatItem
             routingNotification = false
             onNotificationTargetHandled(target, routingRequestId)
-        }
-
-        fun markNotificationTargetRead() {
-            target.messageIdHex?.let { messageIdHex ->
-                appState.launchMutation {
-                    appState.markNotificationMessageRead(
-                        accountRef = target.accountRef,
-                        groupIdHex = target.groupIdHex,
-                        messageIdHex = messageIdHex,
-                    )
-                }
-            }
         }
 
         fun fallBackToChatList() {
@@ -912,7 +912,6 @@ internal fun MainShell(
                 when (val preloadState = notificationMessagePreload.stateFor(notificationMessagePreloadKey)) {
                     NotificationMessagePreloadState.Loading -> Unit
                     is NotificationMessagePreloadState.Ready -> {
-                        markNotificationTargetRead()
                         commitNotificationConversationOpen(preloadState.item)
                     }
                     NotificationMessagePreloadState.Failed -> {
@@ -937,7 +936,6 @@ internal fun MainShell(
                                 }
                         ) {
                             is NotificationMessageDirectLoadOutcome.OpenConversation -> {
-                                markNotificationTargetRead()
                                 commitNotificationConversationOpen(outcome.item)
                             }
                             NotificationMessageDirectLoadOutcome.AwaitChatList -> {
@@ -987,12 +985,6 @@ internal fun MainShell(
             is NotificationNavStep.OpenConversation -> {
                 notificationChatItem(step.groupIdHex)
                     ?.let { item ->
-                        // Opening from a message notification explicitly reads
-                        // up to the notified message. Persist that cursor outside
-                        // the conversation composition so a quick back press
-                        // cannot cancel the scroll-driven mark-read before it
-                        // reaches the store (#1016).
-                        if (step.readThroughMessageIdHex != null) markNotificationTargetRead()
                         commitNotificationConversationOpen(item)
                     }
                     ?: run {
@@ -1225,13 +1217,6 @@ internal fun MainShell(
         if (hasRestoredSelectedChat) {
             savedSelectedGroupIdHex = selectedChat?.group?.groupIdHex
         }
-    }
-
-    // Follow the selection directly so a chat-to-chat switch never hops
-    // through null — a notification update landing in that hop would beat
-    // suppression and post for the conversation being opened.
-    LaunchedEffect(selectedChat?.id) {
-        appState.setActiveConversation(selectedChat?.group?.groupIdHex)
     }
 
     // Upgrade a provisional open (targeted groupDetails read) to the
@@ -1537,6 +1522,30 @@ internal fun MainShell(
     val conversationController =
         selectedOrPendingConversationController
             ?: accountOwnedExitingConversationContent?.controller
+    var conversationTimelineVisibility by remember {
+        mutableStateOf<ConversationTimelineVisibility?>(null)
+    }
+    val selectedConversationTimelineVisible =
+        conversationTimelineVisibility
+            ?.takeIf { it.controller === selectedOrPendingConversationController }
+            ?.visible
+            ?: true
+    // Follow the selected controller directly so a chat-to-chat switch never
+    // hops through null. The account-stability guard is essential: during an
+    // ordinary account switch the old selection survives for one composition,
+    // but it is no longer rendered. Never rebind that stale group to the new
+    // account and dismiss the destination account's notifications. A routed
+    // early open remains stable through its pinned-account exception above.
+    ConversationNotificationOwnershipEffect(
+        selectedChatId = selectedChat?.id,
+        selectedGroupIdHex = selectedChat?.group?.groupIdHex,
+        renderedChatId = controllerChat?.id,
+        renderedAccountRef = selectedOrPendingConversationController?.boundAccountRef,
+        navigationAccountStable = navAccountStable,
+        timelineVisible = selectedConversationTimelineVisible,
+    ) { accountRef, groupIdHex ->
+        appState.setActiveConversation(accountRef, groupIdHex)
+    }
     // Preloading, selected, and outgoing routes can briefly own different
     // controllers during a rapid Back -> open gesture. Keep each instance alive
     // for as long as any route slot references it; a single "current" effect
@@ -1743,6 +1752,38 @@ internal fun MainShell(
                     val content = requireNotNull(animatedConversation)
                     val chat = content.chat
                     val scrollKey = conversationScrollKey(content.accountRef, chat.group.groupIdHex)
+                    val notificationReadThroughCommitter =
+                        remember(
+                            content.controller,
+                            content.openContext.notificationOpenRequestId,
+                            content.openContext.notificationRouteTraceRequestId,
+                            content.openContext.notificationReadThroughMessageId,
+                        ) {
+                            NotificationReadThroughCommitter(
+                                content.openContext.notificationReadThroughMessageId
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { messageIdHex ->
+                                        NotificationReadThroughTarget(
+                                            accountRef = content.accountRef,
+                                            groupIdHex = chat.group.groupIdHex,
+                                            messageIdHex = messageIdHex,
+                                        )
+                                    },
+                            )
+                        }
+                    val commitNotificationReadThrough: (NotificationReadThroughTarget) -> Unit = { target ->
+                        appState.launchMutation {
+                            appState.markNotificationMessageRead(
+                                accountRef = target.accountRef,
+                                groupIdHex = target.groupIdHex,
+                                messageIdHex = target.messageIdHex,
+                            )
+                        }
+                    }
+                    NotificationReadThroughCommitOnDispose(
+                        committer = notificationReadThroughCommitter,
+                        onCommit = commitNotificationReadThrough,
+                    )
                     ConversationScreen(
                         appState = appState,
                         chat = chat,
@@ -1751,6 +1792,17 @@ internal fun MainShell(
                         focusMessageRequestId = content.openContext.focusMessageRequestId,
                         ttsFocusSessionId = content.openContext.ttsFocusSessionId,
                         notificationOpenRequestId = content.openContext.notificationOpenRequestId,
+                        notificationReadThroughMessageId = content.openContext.notificationReadThroughMessageId,
+                        onNotificationUnreadBoundaryCaptured = {
+                            notificationReadThroughCommitter.commit(commitNotificationReadThrough)
+                        },
+                        onNotificationTimelineVisibilityChanged = { visible ->
+                            conversationTimelineVisibility =
+                                ConversationTimelineVisibility(
+                                    controller = content.controller,
+                                    visible = visible,
+                                )
+                        },
                         onFirstFrameCommitted = {
                             content.openContext.notificationRouteTraceRequestId?.let { requestId ->
                                 NotificationRouteTrace.endPhase(
@@ -1776,6 +1828,20 @@ internal fun MainShell(
                             }
                         },
                         onBack = {
+                            // A very quick Back can leave before the provisional
+                            // open receives its chat-list projection. The entry
+                            // divider no longer matters once the route is closed,
+                            // so durably commit the tap's read cursor here (#1016).
+                            notificationReadThroughCommitter.commit(commitNotificationReadThrough)
+                            // Invalidate notification ownership before retaining
+                            // the outgoing screen for its Back animation. That
+                            // retained screen must never republish its account.
+                            conversationTimelineVisibility =
+                                ConversationTimelineVisibility(
+                                    controller = content.controller,
+                                    visible = false,
+                                )
+                            appState.clearActiveConversation()
                             // Flush the hidden list before exposing it, so the first
                             // drawn return frame already has the optimistic preview
                             // in its final recency slot (#900).

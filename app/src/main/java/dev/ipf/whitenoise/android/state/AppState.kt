@@ -5197,7 +5197,7 @@ class WhiteNoiseAppState private constructor(
         if (switchingAccounts) {
             clearInMemoryMediaCaches()
             clearCrossAccountCaches()
-            clearConversationShortcutSurfaces()
+            hideConversationShortcutsFromDirectShare()
             localSnapshot?.profiles?.forEach(::applyAccountSwitchProfileSeed)
             accountSwitchHandoff.publish(requestGeneration, localSnapshot)
         }
@@ -5485,8 +5485,19 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private fun clearConversationShortcutSurfaces() {
-        localNotificationPresenter.clearConversationShortcuts()
+    private suspend fun hideConversationShortcutsFromDirectShare() {
+        withContext(Dispatchers.IO) {
+            localNotificationPresenter.hideConversationShortcutsFromDirectShare()
+        }
+    }
+
+    private suspend fun clearConversationShortcutsForAccount(
+        accountRef: String,
+        includeUnscopedLegacy: Boolean,
+    ) {
+        withContext(Dispatchers.IO) {
+            localNotificationPresenter.clearConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
+        }
     }
 
     /**
@@ -5542,7 +5553,10 @@ class WhiteNoiseAppState private constructor(
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
-        clearConversationShortcutSurfaces()
+        clearConversationShortcutsForAccount(
+            accountRef = signedOutRef,
+            includeUnscopedLegacy = accounts.none { it.label != signedOutRef && it.isSignedInSigningAccount() },
+        )
         // The account is signed out engine-side once this returns; no code
         // below may issue further account-scoped FFI calls for signedOutRef.
         val engineOutcome =
@@ -5609,7 +5623,10 @@ class WhiteNoiseAppState private constructor(
         val wipedRef = activeAccountRef ?: return null
         conversationDictation.onAccountUnavailable(wipedRef)
         clearInMemoryMediaCaches()
-        clearConversationShortcutSurfaces()
+        clearConversationShortcutsForAccount(
+            accountRef = wipedRef,
+            includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },
+        )
         try {
             val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
             val wipeResult =
@@ -5955,14 +5972,19 @@ class WhiteNoiseAppState private constructor(
         appUnlockPromptRequestId += 1
     }
 
-    fun markAppUnlockSucceeded(nowMillis: Long = System.currentTimeMillis()) {
+    fun markAppUnlockSucceeded(
+        nowMillis: Long = System.currentTimeMillis(),
+        dismissRetainedVisibleConversation: Boolean = true,
+    ) {
         val normalizedNow = nowMillis.coerceAtLeast(0L)
         lastAppUnlockAtMillis = normalizedNow
         AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
         appLockScreenVisible = false
         appUnlockError = null
         resumePendingInviteNotificationIdentityRefreshes()
-        dismissVisibleConversationNotifications()
+        if (dismissRetainedVisibleConversation) {
+            dismissVisibleConversationNotifications()
+        }
     }
 
     fun markAppUnlockFailed(message: AppText = AppText.Resource(R.string.app_lock_auth_cancelled)) {
@@ -7176,7 +7198,10 @@ class WhiteNoiseAppState private constructor(
         applyApplicationLanguageTag(normalized)
     }
 
-    fun setAppInForeground(foreground: Boolean) {
+    fun setAppInForeground(
+        foreground: Boolean,
+        dismissRetainedVisibleConversation: Boolean = true,
+    ) {
         // Backgrounding flips off suppression without forgetting the still-open
         // chat; returning to the same Activity then resumes foreground
         // suppression without waiting for an unchanged Compose effect to re-run.
@@ -7187,7 +7212,9 @@ class WhiteNoiseAppState private constructor(
         AppUpdateForegroundState.isForeground = foreground
         if (foreground) {
             maybeShowAppLockForForeground()
-            dismissVisibleConversationNotifications()
+            if (dismissRetainedVisibleConversation) {
+                dismissVisibleConversationNotifications()
+            }
         } else {
             recordAppLockBackgrounded()
             conversationDictation.onAppBackgrounded()
@@ -7220,6 +7247,11 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Complete a plain foreground resume after Activity intent routing settles. */
+    internal fun dismissRetainedVisibleConversationNotifications() {
+        dismissVisibleConversationNotifications()
+    }
+
     /**
      * Reset the in-memory foreground/visible-conversation suppression state when
      * the app's task is swiped away from recents. A running foreground service
@@ -7233,11 +7265,16 @@ class WhiteNoiseAppState private constructor(
         mutationsScope.launch { draftWriter.flush() }
     }
 
-    private fun applyActiveConversationTransition(groupIdHex: String?) {
-        // The chat screen always runs under the active account, so capture it
-        // when opening; closing (null) clears both halves via the transition.
+    private fun applyActiveConversationTransition(
+        accountRef: String?,
+        groupIdHex: String?,
+    ) {
+        // Notification routing can render a conversation under its pinned
+        // account before that account becomes active. Keep suppression and
+        // dismissal tied to the account that owns the visible controller;
+        // closing (null) clears both halves via the transition.
         updateNotificationSuppression(
-            suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) activeAccountRef else null),
+            suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) accountRef else null),
         )
         if (groupIdHex != null) {
             synchronized(conversationStateLock) {
@@ -7246,8 +7283,11 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    suspend fun setActiveConversation(groupIdHex: String?) {
-        applyActiveConversationTransition(groupIdHex)
+    suspend fun setActiveConversation(
+        accountRef: String?,
+        groupIdHex: String?,
+    ) {
+        applyActiveConversationTransition(accountRef, groupIdHex)
         if (groupIdHex != null) {
             // Clear the conversation's tray cards on the first open, regardless
             // of whether mark-read later advances the read watermark. The
@@ -7256,7 +7296,7 @@ class WhiteNoiseAppState private constructor(
             // the read anchor isn't ready yet or the mark-read is deduped, so a
             // reaction/message notification could otherwise survive until the
             // second open (issue #803).
-            dismissConversationNotificationsOnOpen(activeConversationAccountRef, groupIdHex, ::dismissConversationNotifications)
+            dismissConversationNotificationsOnOpen(accountRef, groupIdHex, ::dismissConversationNotifications)
         }
         appStateDebug {
             "active conversation=${groupIdHex?.take(8) ?: "<none>"} account=${activeConversationAccountRef?.take(8) ?: "<none>"}"
@@ -7264,7 +7304,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     fun clearActiveConversation() {
-        applyActiveConversationTransition(null)
+        applyActiveConversationTransition(accountRef = null, groupIdHex = null)
         appStateDebug {
             "active conversation=<none> account=${activeConversationAccountRef?.take(8) ?: "<none>"}"
         }
@@ -8737,12 +8777,41 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Request-scoped local read that may run while [accountRef] is activating.
-     * The caller must not publish the returned item until that account is active.
+     * An early-open caller must pin the returned item and controller to this
+     * account until activation lands; it must never infer ownership from the
+     * still-active source account.
      */
     suspend fun preloadNotificationChatListItem(
         accountRef: String,
         groupIdHex: String,
-    ): ChatListItem = loadAuthoritativeChatListItem(accountRef, groupIdHex)
+    ): ChatListItem =
+        coroutineScope {
+            // These are independent SQLite-backed reads. Start both before
+            // awaiting either so the exact unread projection does not give up
+            // the fast inactive-account route introduced for #586.
+            val details = async { marmotIo { groupDetails(accountRef, groupIdHex) } }
+            val projection = async { loadNotificationChatListProjection(accountRef, groupIdHex) }
+            val activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
+            chatListItemFromNotificationProjection(
+                details = details.await(),
+                activeAccountIdHex = activeAccountIdHex,
+                projection = projection.await(),
+            )
+        }
+
+    /**
+     * Read the notification target's exact pre-read chat-list row. Failure or a
+     * missing row intentionally fails the targeted fast path so navigation waits
+     * for the broad authoritative list instead of opening with a fabricated zero
+     * unread count.
+     */
+    private suspend fun loadNotificationChatListProjection(
+        accountRef: String,
+        groupIdHex: String,
+    ): ChatListRowFfi =
+        marmotIo { chatListRow(accountRef, groupIdHex) }
+            ?.takeIf { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+            ?: throw NoSuchElementException("notification chat-list projection unavailable")
 
     private suspend fun loadAuthoritativeChatListItem(
         accountRef: String,

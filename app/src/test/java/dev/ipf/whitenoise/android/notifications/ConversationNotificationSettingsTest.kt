@@ -35,6 +35,16 @@ class ConversationNotificationSettingsTest {
     }
 
     @Test
+    fun conversationShortcutAccountScopeIsStableAndDoesNotExposeTheAccountRef() {
+        val scope = conversationShortcutAccountScope("account-a")
+
+        assertEquals(scope, conversationShortcutAccountScope("account-a"))
+        assertNotEquals(scope, conversationShortcutAccountScope("account-b"))
+        assertNotEquals("account-a", scope)
+        assertNull(conversationShortcutAccountScope(" "))
+    }
+
+    @Test
     fun globalIntentTargetsTheExactChannelWithoutConversationScope() {
         val intent = notificationChannelSettingsIntent(context, NotificationChannelSpec.REACTIONS.id)
 
@@ -157,6 +167,10 @@ class ConversationNotificationSettingsTest {
         )
         val shortcut = ShortcutManagerCompat.getDynamicShortcuts(app).single { it.id == shortcutId }
         assertEquals("Green Orca", shortcut.longLabel.toString())
+        assertEquals(
+            conversationShortcutAccountScope("account-a"),
+            shortcut.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA),
+        )
         assertNotNull(
             conversationSettingsShortcut(
                 context = app,

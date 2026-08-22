@@ -55,6 +55,7 @@ class MainActivity : AppCompatActivity() {
     private var appUnlockPromptActive = false
     private var appLockBackgroundSecureFlagRetained = false
     private var recentsPreferenceSecureFlagRetained = false
+    private val foregroundConversationDismissal = ForegroundConversationDismissalCoordinator()
     private val allowChatScreenshotsCallback: (Boolean) -> Unit = { enabled ->
         applyRecentsPreferenceSecureFlag(allowChatScreenshots = enabled)
     }
@@ -143,6 +144,7 @@ class MainActivity : AppCompatActivity() {
             )
         ) {
             inboundNotificationTarget = null
+            foregroundConversationDismissal.onNotificationRouteHandled()
         }
     }
 
@@ -210,6 +212,7 @@ class MainActivity : AppCompatActivity() {
                     ),
             )
         if (parsedTarget != null) {
+            foregroundConversationDismissal.onNotificationRouteObserved()
             NotificationRouteTrace.startRequest(routing.notificationRequestId)
         }
         inboundNotificationTarget = routing.notificationTarget
@@ -227,7 +230,17 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         if (::appState.isInitialized) {
-            appState.setAppInForeground(true)
+            // A stopped Activity receives onStart before onNewIntent when a
+            // notification brings its existing task forward. Defer the
+            // retained-conversation dismissal until onResume has observed
+            // whether this foreground entry is actually routing elsewhere.
+            foregroundConversationDismissal.onStart(
+                hasPendingNotificationRoute = inboundNotificationTarget != null,
+            )
+            appState.setAppInForeground(
+                foreground = true,
+                dismissRetainedVisibleConversation = false,
+            )
             applyRecentsPreferenceSecureFlag(appState.allowChatScreenshotsInChats)
             if (!appState.appLockScreenVisible) releaseAppLockBackgroundSecureFlag()
         }
@@ -241,6 +254,9 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (::appState.isInitialized) {
+            if (foregroundConversationDismissal.consumeShouldDismissOnResume()) {
+                appState.dismissRetainedVisibleConversationNotifications()
+            }
             applyRecentsPreferenceSecureFlag(appState.allowChatScreenshotsInChats)
             if (!appState.appLockScreenVisible) releaseAppLockBackgroundSecureFlag()
         }
@@ -287,7 +303,10 @@ class MainActivity : AppCompatActivity() {
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         appUnlockPromptActive = false
-                        appState.markAppUnlockSucceeded()
+                        appState.markAppUnlockSucceeded(
+                            dismissRetainedVisibleConversation =
+                                foregroundConversationDismissal.shouldDismissAfterUnlock(),
+                        )
                         releaseAppLockBackgroundSecureFlag()
                     }
 
@@ -377,6 +396,49 @@ class MainActivity : AppCompatActivity() {
     ) {
         window.setBackgroundDrawable(ColorDrawable(preComposeWindowBackgroundFor(themeMode, systemDarkTheme)))
     }
+}
+
+/**
+ * Distinguishes a plain foreground resume from a notification-owned route.
+ *
+ * Android can deliver the notification intent after [MainActivity.onStart], so
+ * the decision is consumed only from onResume. Intents received while the
+ * Activity is already resumed do not arm a later, unrelated foreground entry.
+ */
+internal class ForegroundConversationDismissalCoordinator {
+    private var resumePending = false
+    private var notificationRouteObserved = false
+    private var currentForegroundNotificationOwned = false
+
+    fun onStart(hasPendingNotificationRoute: Boolean) {
+        resumePending = true
+        notificationRouteObserved = hasPendingNotificationRoute
+        currentForegroundNotificationOwned = hasPendingNotificationRoute
+    }
+
+    fun onNotificationRouteObserved() {
+        currentForegroundNotificationOwned = true
+        if (resumePending) notificationRouteObserved = true
+    }
+
+    /**
+     * The route now owns the visible conversation directly. Clear only the
+     * unlock guard; the pending resume decision still needs to remember that
+     * this foreground entry came from a notification.
+     */
+    fun onNotificationRouteHandled() {
+        currentForegroundNotificationOwned = false
+    }
+
+    fun consumeShouldDismissOnResume(): Boolean {
+        if (!resumePending) return false
+        val shouldDismiss = !notificationRouteObserved
+        resumePending = false
+        notificationRouteObserved = false
+        return shouldDismiss
+    }
+
+    fun shouldDismissAfterUnlock(): Boolean = !currentForegroundNotificationOwned
 }
 
 internal const val MAX_RETAINED_SYSTEM_SPLASH_MILLIS = 1_500L

@@ -184,4 +184,30 @@ class MainShellContentRouteTest {
             ),
         )
     }
+
+    @Test
+    fun selectedNotificationConversationKeepsItsPinnedAccountUntilTheSwitchLands() {
+        assertEquals(
+            "account-b",
+            conversationControllerAccountRef(
+                selectedPinnedAccountRef = "account-b",
+                pendingAccountRef = null,
+                exitingAccountRef = null,
+                activeAccountRef = "account-a",
+            ),
+        )
+    }
+
+    @Test
+    fun ordinarySelectedConversationUsesTheActiveAccount() {
+        assertEquals(
+            "account-a",
+            conversationControllerAccountRef(
+                selectedPinnedAccountRef = null,
+                pendingAccountRef = null,
+                exitingAccountRef = null,
+                activeAccountRef = "account-a",
+            ),
+        )
+    }
 }

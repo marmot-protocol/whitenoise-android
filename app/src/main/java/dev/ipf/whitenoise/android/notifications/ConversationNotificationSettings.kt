@@ -229,6 +229,7 @@ internal fun conversationSettingsShortcut(
         .setLocusId(LocusIdCompat(shortcutId))
         .setPerson(person)
         .setLongLived(true)
+        .setExtras(checkNotNull(conversationShortcutAccountExtras(accountRef)))
         .build()
 }
 
@@ -244,7 +245,7 @@ private fun appDetailsSettingsIntent(context: Context): Intent =
 
 private fun Context.tryStartActivity(intent: Intent): Boolean = runCatching { startActivity(intent) }.isSuccess
 
-private fun sha256Hex(value: String): String =
+internal fun sha256Hex(value: String): String =
     MessageDigest
         .getInstance("SHA-256")
         .digest(value.toByteArray(Charsets.UTF_8))

@@ -8,6 +8,8 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
+import dev.ipf.whitenoise.android.state.dismissConversationNotificationsOnOpen
+import dev.ipf.whitenoise.android.ui.navigation.conversationControllerAccountRef
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -144,6 +146,52 @@ class LocalNotificationDismissalTest {
 
         val remaining = manager.activeNotifications.map { it.tag to it.id }
         assertEquals(listOf(other.tag to other.id), remaining)
+    }
+
+    @Test
+    fun pinnedConversationOwnerDismissalKeepsSourceAccountCards() {
+        val sourceAccount = "account-a"
+        val targetAccount = "account-b"
+        val sharedGroup = "group-shared-by-both-accounts"
+        val sourceKeys = postConversationCards(sourceAccount, sharedGroup, "invite-source")
+        postConversationCards(targetAccount, sharedGroup, "invite-target")
+        val lateSourceInvite = "invite-source-during-route" to 42
+        val postedLateSourceInvite = AtomicBoolean(false)
+        val presenter =
+            LocalNotificationPresenter(context) { notificationManager ->
+                if (postedLateSourceInvite.compareAndSet(false, true)) {
+                    notificationManager.notify(
+                        lateSourceInvite.first,
+                        lateSourceInvite.second,
+                        notification(
+                            extras =
+                                Bundle().apply {
+                                    putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, sourceAccount)
+                                    putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, sharedGroup)
+                                },
+                        ),
+                    )
+                }
+                notificationManager.activeNotifications
+            }
+        val visibleAccount =
+            conversationControllerAccountRef(
+                selectedPinnedAccountRef = targetAccount,
+                pendingAccountRef = null,
+                exitingAccountRef = null,
+                activeAccountRef = sourceAccount,
+            )
+
+        runBlocking {
+            dismissConversationNotificationsOnOpen(visibleAccount, sharedGroup) { accountRef, groupIdHex ->
+                presenter.dismissConversationMessages(accountRef, groupIdHex)
+            }
+        }
+
+        assertEquals(
+            (sourceKeys + lateSourceInvite).toSet(),
+            manager.activeNotifications.map { it.tag to it.id }.toSet(),
+        )
     }
 
     @Test
@@ -390,6 +438,33 @@ class LocalNotificationDismissalTest {
             .setContentTitle("Test")
             .apply { if (extras != null) addExtras(extras) }
             .build()
+
+    private fun postConversationCards(
+        accountRef: String,
+        groupIdHex: String,
+        inviteTag: String,
+    ): List<Pair<String?, Int>> {
+        val keys =
+            listOf(
+                LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex),
+                LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex),
+                LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex),
+                LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex),
+            )
+        keys.forEach { key -> manager.notify(key.tag, key.id, notification()) }
+        manager.notify(
+            inviteTag,
+            41,
+            notification(
+                extras =
+                    Bundle().apply {
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, accountRef)
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, groupIdHex)
+                    },
+            ),
+        )
+        return keys.map { it.tag to it.id } + (inviteTag to 41)
+    }
 
     private companion object {
         const val TEST_CHANNEL = "dismissal-test"
