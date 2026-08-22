@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming") // Jetpack Compose functions intentionally use PascalCase.
+
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.icu.text.ListFormatter
@@ -17,7 +19,9 @@ import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.SignalCellularAlt
+import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -38,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -81,6 +86,8 @@ internal fun AutoDownloadDataScreen(
     onBack: () -> Unit,
 ) {
     var dialogNetwork by remember { mutableStateOf<MediaAutoDownloadNetwork?>(null) }
+    var confirmStopAutomatic by remember { mutableStateOf(false) }
+    val automaticPaused = appState.automaticAttachmentDownloadsPaused()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -93,45 +100,19 @@ internal fun AutoDownloadDataScreen(
             )
         },
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            item {
-                Text(
-                    text = stringResource(R.string.media_auto_download_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 4.dp),
-                )
-            }
-            item {
-                SettingsGroup(title = stringResource(R.string.media_auto_download_title), icon = Icons.Filled.Download) {
-                    MediaAutoDownloadNetwork.entries.forEach { network ->
-                        item {
-                            SettingsRow(
-                                title = stringResource(network.labelRes),
-                                subtitle = enabledTypesLabel(appState, network),
-                                icon = network.rowIcon,
-                                onClick = { dialogNetwork = network },
-                            )
-                        }
-                    }
+        AutoDownloadSettingsList(
+            appState = appState,
+            automaticPaused = automaticPaused,
+            contentPadding = padding,
+            onNetworkSelected = { dialogNetwork = it },
+            onBacklogAction = {
+                if (automaticPaused) {
+                    appState.restartAutomaticAttachmentDownloads()
+                } else {
+                    confirmStopAutomatic = true
                 }
-            }
-            item {
-                MediaQualityGroup(appState)
-            }
-            item {
-                // Privacy floor + video/audio carve-out. The size knob and metadata
-                // strip are orthogonal: photos never send location/device metadata,
-                // including Original's source-byte path. Video and picked audio
-                // currently send as-is.
-                Text(
-                    text = stringResource(R.string.media_quality_footer),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 4.dp),
-                )
-            }
-        }
+            },
+        )
     }
     dialogNetwork?.let { network ->
         MediaTypesDialog(
@@ -140,7 +121,134 @@ internal fun AutoDownloadDataScreen(
             onDismiss = { dialogNetwork = null },
         )
     }
+    if (confirmStopAutomatic) {
+        StopAutomaticDownloadsDialog(
+            onConfirm = {
+                appState.stopAutomaticAttachmentDownloads()
+                confirmStopAutomatic = false
+            },
+            onDismiss = { confirmStopAutomatic = false },
+        )
+    }
 }
+
+@Composable
+private fun AutoDownloadSettingsList(
+    appState: WhiteNoiseAppState,
+    automaticPaused: Boolean,
+    contentPadding: androidx.compose.foundation.layout.PaddingValues,
+    onNetworkSelected: (MediaAutoDownloadNetwork) -> Unit,
+    onBacklogAction: () -> Unit,
+) {
+    LazyColumn(
+        Modifier.fillMaxSize().padding(contentPadding).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item { AutoDownloadIntroduction() }
+        item { AutoDownloadNetworkGroup(appState, onNetworkSelected) }
+        item { AutoDownloadBacklogGroup(automaticPaused, onBacklogAction) }
+        item { MediaQualityGroup(appState) }
+        item { AutoDownloadPrivacyFooter() }
+    }
+}
+
+@Composable
+private fun AutoDownloadIntroduction() {
+    Text(
+        text = stringResource(R.string.media_auto_download_subtitle),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 4.dp),
+    )
+}
+
+@Composable
+private fun AutoDownloadNetworkGroup(
+    appState: WhiteNoiseAppState,
+    onNetworkSelected: (MediaAutoDownloadNetwork) -> Unit,
+) {
+    SettingsGroup(
+        title = stringResource(R.string.media_auto_download_title),
+        icon = Icons.Filled.Download,
+    ) {
+        MediaAutoDownloadNetwork.entries.forEach { network ->
+            item {
+                SettingsRow(
+                    title = stringResource(network.labelRes),
+                    subtitle = enabledTypesLabel(appState, network),
+                    icon = network.rowIcon,
+                    onClick = { onNetworkSelected(network) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutoDownloadBacklogGroup(
+    automaticPaused: Boolean,
+    onBacklogAction: () -> Unit,
+) {
+    val titleRes =
+        if (automaticPaused) R.string.media_auto_download_restart else R.string.media_auto_download_stop
+    val subtitleRes =
+        if (automaticPaused) {
+            R.string.media_auto_download_restart_subtitle
+        } else {
+            R.string.media_auto_download_stop_subtitle
+        }
+    SettingsGroup(
+        title = stringResource(R.string.media_auto_download_backlog_title),
+        icon = Icons.Filled.StopCircle,
+    ) {
+        item {
+            SettingsRow(
+                title = stringResource(titleRes),
+                subtitle = stringResource(subtitleRes),
+                icon = if (automaticPaused) Icons.Filled.RestartAlt else Icons.Filled.StopCircle,
+                modifier = Modifier.testTag(AUTO_DOWNLOAD_BACKLOG_ACTION_TAG),
+                onClick = onBacklogAction,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AutoDownloadPrivacyFooter() {
+    // Privacy floor + video/audio carve-out. The size knob and metadata strip
+    // are orthogonal: photos never send location/device metadata, including
+    // Original's source-byte path. Video and picked audio currently send as-is.
+    Text(
+        text = stringResource(R.string.media_quality_footer),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 4.dp),
+    )
+}
+
+@Composable
+private fun StopAutomaticDownloadsDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.media_auto_download_stop)) },
+        text = { Text(stringResource(R.string.media_auto_download_stop_confirmation)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.media_auto_download_stop_action))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+internal const val AUTO_DOWNLOAD_BACKLOG_ACTION_TAG = "auto_download_backlog_action"
 
 // Locale-aware list of the types enabled for [network], or "none".
 @Composable

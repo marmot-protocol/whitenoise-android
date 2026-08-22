@@ -927,6 +927,13 @@
     <string name="group_image_search_preview_subtitle_ready">Touchez « Utiliser cette image » pour appliquer</string>
     <string name="media_auto_download_title">Téléchargement auto des médias</string>
     <string name="media_auto_download_subtitle">Les documents et les vidéos volumineuses peuvent consommer beaucoup de données. Choisissez ce qui se télécharge automatiquement sur chaque connexion.</string>
+    <string name="media_auto_download_backlog_title">File de téléchargements</string>
+    <string name="media_auto_download_stop">Arrêter les téléchargements automatiques</string>
+    <string name="media_auto_download_stop_subtitle">Efface les téléchargements automatiques en attente ; les actifs et ceux demandés continuent</string>
+    <string name="media_auto_download_stop_confirmation">Seuls les téléchargements automatiques en attente de ce compte seront effacés. Les téléchargements actifs et les fichiers touchés continuent.</string>
+    <string name="media_auto_download_stop_action">Arrêter seulement les automatiques</string>
+    <string name="media_auto_download_restart">Relancer les téléchargements automatiques</string>
+    <string name="media_auto_download_restart_subtitle">Autoriser de nouveau les téléchargements automatiques</string>
     <string name="network_wifi">Wi-Fi</string>
     <string name="network_mobile">Données mobiles</string>
     <string name="network_roaming">Itinérance</string>

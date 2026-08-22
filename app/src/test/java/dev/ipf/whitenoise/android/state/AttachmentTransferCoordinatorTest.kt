@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -9,12 +10,53 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
 
 class AttachmentTransferCoordinatorTest {
+    @Test
+    fun availabilityPublishedAfterRegistrationBeforeSuspensionIsNotLost() =
+        runBlocking {
+            val signals = AttachmentAvailabilitySignals()
+            val registeredSignal = signals.register("file")
+
+            signals.onRefresh("file", available = false)
+            signals.onRefresh("file", available = true)
+
+            withTimeout(1_000) { registeredSignal.await() }
+        }
+
+    @Test
+    fun availabilitySignalIsFreshAndAttachmentSpecific() =
+        runBlocking {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+            try {
+                val coordinator = AttachmentTransferCoordinator(scope)
+                coordinator.acquireState("file", initiallyAvailable = true)
+                coordinator.refresh("file") { true }
+                val availability =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        coordinator.awaitNextAvailability("file")
+                    }
+
+                assertFalse(availability.isCompleted)
+                coordinator.acquireState("other", initiallyAvailable = false)
+                coordinator.refresh("other") { true }
+                assertFalse(availability.isCompleted)
+
+                coordinator.refresh("file") { true }
+                assertFalse(availability.isCompleted)
+                coordinator.refresh("file") { false }
+                coordinator.refresh("file") { true }
+                availability.await()
+            } finally {
+                scope.cancel()
+            }
+        }
+
     @Test
     fun autoDownloadAndTapShareOneTransferOwner() =
         runBlocking {

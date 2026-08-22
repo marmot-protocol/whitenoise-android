@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -39,6 +40,7 @@ internal class AttachmentTransferCoordinator(
 ) {
     private val lock = Any()
     private val states = mutableMapOf<String, MutableStateFlow<AttachmentTransferState>>()
+    private val availabilitySignals = AttachmentAvailabilitySignals()
     private val active = mutableMapOf<String, Deferred<ByteArray>>()
     private val terminalGenerations = mutableMapOf<String, Long>()
     private val observerCounts = mutableMapOf<String, Int>()
@@ -69,6 +71,19 @@ internal class AttachmentTransferCoordinator(
             stateFlow(key, initiallyAvailable).asStateFlow()
         }
 
+    /** Waits for a fresh retained/cache-confirmed completion for exactly one attachment key. */
+    suspend fun awaitNextAvailability(key: String) {
+        val waiter = synchronized(lock) { availabilitySignals.register(key) }
+        try {
+            waiter.await()
+        } finally {
+            synchronized(lock) {
+                availabilitySignals.unregister(key, waiter)
+                retireStateIfUnused(key)
+            }
+        }
+    }
+
     /** Refreshes availability without disturbing a download already in flight. */
     suspend fun refresh(
         key: String,
@@ -82,6 +97,7 @@ internal class AttachmentTransferCoordinator(
             // never let that stale result overwrite the completion state.
             val state = currentStateForRefresh(key, generation) ?: return
             state.value = refreshedState(state.value, available)
+            availabilitySignals.onRefresh(key, available)
         }
     }
 
@@ -169,7 +185,8 @@ internal class AttachmentTransferCoordinator(
     ) {
         synchronized(lock) {
             state.value = value
-            advanceTerminalGeneration(key)
+            terminalGenerations[key] = (terminalGenerations[key] ?: 0L) + 1L
+            availabilitySignals.onTerminal(key, value)
         }
     }
 
@@ -182,15 +199,16 @@ internal class AttachmentTransferCoordinator(
             false
         }
 
-    private fun advanceTerminalGeneration(key: String) {
-        terminalGenerations[key] = (terminalGenerations[key] ?: 0L) + 1L
-    }
-
     private fun retireStateIfUnused(key: String) {
-        if (observerCounts[key] == 0 && active[key]?.isCompleted != false) {
+        if (
+            observerCounts[key] == 0 &&
+            active[key]?.isCompleted != false &&
+            !availabilitySignals.hasWaiters(key)
+        ) {
             observerCounts.remove(key)
             terminalGenerations.remove(key)
             states.remove(key)
+            availabilitySignals.retire(key)
         }
     }
 
@@ -212,6 +230,66 @@ internal class AttachmentTransferCoordinator(
                     state.value = AttachmentTransferState.Available
                 }
             }
+}
+
+internal class AttachmentAvailabilitySignals {
+    private val waiters = mutableMapOf<String, MutableSet<CompletableDeferred<Unit>>>()
+    private val lastCacheAvailability = mutableMapOf<String, Boolean>()
+
+    fun register(key: String): CompletableDeferred<Unit> =
+        CompletableDeferred<Unit>().also { waiter ->
+            waiters.getOrPut(key, ::mutableSetOf).add(waiter)
+        }
+
+    fun unregister(
+        key: String,
+        waiter: CompletableDeferred<Unit>,
+    ) {
+        waiters[key]?.let { registered ->
+            registered.remove(waiter)
+            if (registered.isEmpty()) {
+                waiters.remove(key)
+            }
+        }
+    }
+
+    fun hasWaiters(key: String): Boolean = waiters[key].isNullOrEmpty().not()
+
+    fun onRefresh(
+        key: String,
+        available: Boolean?,
+    ) {
+        val previous = lastCacheAvailability[key]
+        if (available != null) {
+            lastCacheAvailability[key] = available
+        }
+        if (available == true && previous != true) {
+            completeWaiters(key)
+        }
+    }
+
+    fun onTerminal(
+        key: String,
+        state: AttachmentTransferState,
+    ) {
+        when (state) {
+            AttachmentTransferState.Available -> {
+                lastCacheAvailability[key] = true
+                completeWaiters(key)
+            }
+            AttachmentTransferState.NotRetained -> lastCacheAvailability[key] = false
+            else -> Unit
+        }
+    }
+
+    fun retire(key: String) {
+        waiters.remove(key)?.forEach { it.cancel() }
+        lastCacheAvailability.remove(key)
+    }
+
+    private fun completeWaiters(key: String) {
+        waiters.remove(key)?.forEach { it.complete(Unit) }
+    }
 }
 
 private suspend fun probeForRefresh(probe: suspend () -> Boolean): Boolean? =

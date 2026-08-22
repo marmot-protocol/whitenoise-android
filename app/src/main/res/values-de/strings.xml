@@ -927,6 +927,13 @@
     <string name="group_image_search_preview_subtitle_ready">Auf „Dieses Bild verwenden" tippen, um zu übernehmen</string>
     <string name="media_auto_download_title">Medien automatisch herunterladen</string>
     <string name="media_auto_download_subtitle">Dokumente und große Videos können viele Daten verbrauchen. Lege fest, was bei welcher Verbindung automatisch heruntergeladen wird.</string>
+    <string name="media_auto_download_backlog_title">Download-Warteschlange</string>
+    <string name="media_auto_download_stop">Automatische Downloads stoppen</string>
+    <string name="media_auto_download_stop_subtitle">Wartende automatische Downloads löschen; aktive und angetippte Downloads laufen weiter</string>
+    <string name="media_auto_download_stop_confirmation">Nur wartende automatische Downloads für dieses Konto werden gelöscht. Aktive Downloads und angetippte Dateien laufen weiter.</string>
+    <string name="media_auto_download_stop_action">Nur automatische stoppen</string>
+    <string name="media_auto_download_restart">Automatische Downloads neu starten</string>
+    <string name="media_auto_download_restart_subtitle">Neue automatische Downloads wieder zulassen</string>
     <string name="network_wifi">WLAN</string>
     <string name="network_mobile">Mobile Daten</string>
     <string name="network_roaming">Roaming</string>

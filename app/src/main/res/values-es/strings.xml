@@ -927,6 +927,13 @@
     <string name="group_image_search_preview_subtitle_ready">Toca «Usar esta imagen» para aplicar</string>
     <string name="media_auto_download_title">Descarga automática de medios</string>
     <string name="media_auto_download_subtitle">Los documentos y los vídeos grandes pueden consumir muchos datos. Elige qué se descarga automáticamente en cada conexión.</string>
+    <string name="media_auto_download_backlog_title">Cola de descargas</string>
+    <string name="media_auto_download_stop">Detener descargas automáticas</string>
+    <string name="media_auto_download_stop_subtitle">Borra las descargas automáticas en cola; las activas y las solicitadas continúan</string>
+    <string name="media_auto_download_stop_confirmation">Solo se borran las descargas automáticas en cola de esta cuenta. Las descargas activas y los archivos que tocaste continúan.</string>
+    <string name="media_auto_download_stop_action">Detener solo automáticas</string>
+    <string name="media_auto_download_restart">Reiniciar descargas automáticas</string>
+    <string name="media_auto_download_restart_subtitle">Volver a permitir nuevas descargas automáticas</string>
     <string name="network_wifi">Wi-Fi</string>
     <string name="network_mobile">Datos móviles</string>
     <string name="network_roaming">Itinerancia</string>

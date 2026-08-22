@@ -5,6 +5,9 @@ import android.util.Log
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import java.io.File
 
 private const val LOG_ID_PREFIX_LENGTH = 8
@@ -41,27 +44,43 @@ internal suspend fun materializeMediaFile(
 }
 
 /**
- * [materializeMediaFile] with the shared failure affordance every tap path
- * needs: a failed materialization tells the user instead of dead-ending, and
- * the next tap retries.
+ * Keeps a persisted viewer intent alive when the foreground attempt fails but
+ * durable work can still publish the same attachment into the encrypted cache.
  */
-internal suspend fun materializeMediaFileOrNotify(
-    context: Context,
-    controller: ConversationController,
-    messageIdHex: String,
-    attachmentIndex: Int,
-    reference: MediaAttachmentReferenceFfi,
-    mine: Boolean,
-    notifyFailure: () -> Unit,
-): File? =
-    materializeMediaFile(
-        context = context,
-        controller = controller,
-        messageIdHex = messageIdHex,
-        attachmentIndex = attachmentIndex,
-        reference = reference,
-        mine = mine,
-    ) ?: null.also { notifyFailure() }
+internal suspend fun <T> materializePersistedAttachmentOpen(
+    materialize: suspend () -> T?,
+    durableAvailabilityExpected: Boolean,
+    awaitNextDurableAvailability: suspend () -> Unit,
+    onWaitingForDurableAvailability: () -> Unit,
+    onTerminalFailure: () -> Unit,
+): T? =
+    coroutineScope {
+        var waitingReported = false
+        var artifact: T?
+        do {
+            val freshAvailability =
+                if (durableAvailabilityExpected) {
+                    async(start = CoroutineStart.UNDISPATCHED) { awaitNextDurableAvailability() }
+                } else {
+                    null
+                }
+            artifact = materialize()
+            if (artifact != null) {
+                freshAvailability?.cancel()
+            } else {
+                if (!waitingReported) {
+                    onWaitingForDurableAvailability()
+                    waitingReported = true
+                }
+                if (freshAvailability == null) {
+                    onTerminalFailure()
+                    return@coroutineScope null
+                }
+                freshAvailability.await()
+            }
+        } while (artifact == null)
+        artifact
+    }
 
 /** Loads bounded reader content while sharing the controller's durable attachment transfer. */
 internal suspend fun loadMediaFileBytes(

@@ -9428,6 +9428,14 @@ class ConversationController(
         }
     }
 
+    /** Suspends until this attachment, rather than any process-wide cache key, becomes available. */
+    internal suspend fun awaitNextAttachmentAvailability(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ) {
+        attachmentTransfers.awaitNextAvailability(attachmentTransferKey(messageIdHex, attachmentIndex))
+    }
+
     /**
      * Request one controller-owned transfer. Auto-download and tap-to-open
      * callers receive the same [Deferred], while truthful post-load probing
@@ -9438,23 +9446,65 @@ class ConversationController(
         attachmentIndex: Int,
         reference: MediaAttachmentReferenceFfi,
         retainedPlaintext: ByteArray? = null,
+        priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
     ): Deferred<ByteArray> {
         val account = conversationAccountRef
         if (retainedPlaintext == null && reference.sourceEpoch != 0uL && account != null) {
             appState.enqueueAttachmentDownload(
                 AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+                priority,
             )
         }
         return attachmentTransfers.request(
             key = attachmentTransferKey(messageIdHex, attachmentIndex),
             load = {
                 retainedPlaintext
-                    ?: downloadAttachment(messageIdHex, attachmentIndex, reference)
+                    ?: downloadAttachment(messageIdHex, attachmentIndex, reference, priority)
             },
             availableAfterLoad = {
                 retainedPlaintext != null ||
                     hasCachedAttachmentAfterHydration(messageIdHex, attachmentIndex)
             },
+        )
+    }
+
+    internal fun requestAttachmentOpen(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ) {
+        val account = conversationAccountRef ?: return
+        appState.requestAttachmentOpen(
+            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+        )
+    }
+
+    internal fun hasAttachmentOpenIntent(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): Boolean {
+        val account = conversationAccountRef ?: return false
+        return appState.hasAttachmentOpenIntent(
+            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+        )
+    }
+
+    internal suspend fun consumeAttachmentOpenIntent(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): Boolean {
+        val account = conversationAccountRef ?: return false
+        return appState.consumeAttachmentOpenIntent(
+            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+        )
+    }
+
+    internal fun restoreAttachmentOpenIntent(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ) {
+        val account = conversationAccountRef ?: return
+        appState.restoreAttachmentOpenIntent(
+            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
         )
     }
 
@@ -9507,17 +9557,35 @@ class ConversationController(
      * so re-opening a conversation doesn't re-download media already fetched
      * this session. Throws on download/decrypt failure — the caller surfaces it.
      */
+    internal suspend fun downloadAttachment(
+        messageIdHex: String,
+        attachmentIndex: Int,
+        reference: MediaAttachmentReferenceFfi,
+        priority: AttachmentDownloadPriority,
+    ): ByteArray {
+        val account = conversationAccountRef ?: error("no active account")
+        val request = AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex)
+        if (priority == AttachmentDownloadPriority.Interactive) {
+            appState.enqueueAttachmentDownload(request, priority)
+        }
+        return appState.downloadAttachmentPlaintext(
+            request = request,
+            reference = reference,
+            priority = priority,
+        )
+    }
+
     suspend fun downloadAttachment(
         messageIdHex: String,
         attachmentIndex: Int,
         reference: MediaAttachmentReferenceFfi,
-    ): ByteArray {
-        val account = conversationAccountRef ?: error("no active account")
-        return appState.downloadAttachmentPlaintext(
-            request = AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
-            reference = reference,
+    ): ByteArray =
+        downloadAttachment(
+            messageIdHex,
+            attachmentIndex,
+            reference,
+            AttachmentDownloadPriority.Interactive,
         )
-    }
 
     /** Decoded thumbnail for [messageIdHex] if one is cached (renders with no
      *  spinner). Null when unanchored or not yet decoded. */

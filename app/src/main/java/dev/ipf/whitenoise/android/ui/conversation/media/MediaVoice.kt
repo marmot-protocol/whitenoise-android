@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -109,26 +110,36 @@ internal fun MediaVoiceBubble(
         remember(pillKey, epoch, reference.mediaType) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
+    val retainedPlaintextOnEntry =
+        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
     var totalDurationMs by remember(pillKey, epoch) { mutableStateOf(0) }
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
-    // Auto-download gate (#407): own clips always materialize (bytes are
-    // cached from the send), incoming honor the Audio matrix row unless the
-    // attachment is already local. A cached voice file or controller plaintext
+    // Auto-download gate (#407): retained/cached own clips always materialize;
+    // a cache-missing own clip waits during an explicit backlog pause. Incoming
+    // clips honor the Audio matrix row unless the attachment is already local.
+    // A cached voice file or controller plaintext
     // cache means re-entering the chat should start at Play instead of showing
-    // a fake Download affordance. Re-keyed on the matrix so flipping a toggle
-    // re-gates an un-fetched clip. A tap on the bubble flips this to true so
-    // manual fetch/playback is always available even when auto-download is off.
-    var startDownload by remember(pillKey, epoch, appState.mediaAutoDownloadMatrix) {
-        mutableStateOf(
-            shouldStartVoiceAttachmentDownload(
-                mine = mine,
-                audioAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio),
-                hasCachedAttachment = cachedPlaintextOnEntry,
-                hasCachedFile = localFile != null,
-            ),
+    // a fake Download affordance. Policy can grant an idle intent but cannot
+    // revoke accepted work; a tap promotes the intent so manual fetch/playback
+    // remains available even when auto-download is off.
+    val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    val policyAllowsMaterialization =
+        shouldStartVoiceAttachmentDownload(
+            mine = mine,
+            audioAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio),
+            automaticDownloadsPaused = automaticDownloadsPaused,
+            hasCachedAttachment = cachedPlaintextOnEntry,
+            hasCachedFile = localFile != null,
+            hasRetainedPlaintext = retainedPlaintextOnEntry,
         )
-    }
+    var materializationIntent by
+        rememberAttachmentMaterializationIntent(
+            identity = "$messageIdHex#$attachmentIndex",
+            policyAllowsMaterialization = policyAllowsMaterialization,
+        )
+    val startDownload = materializationIntent.shouldMaterialize
+    var reloadToken by remember(pillKey, epoch) { mutableStateOf(0) }
 
     val playback by remember(pillKey) {
         dev.ipf.whitenoise.android.audio.VoicePlaybackController.state
@@ -185,7 +196,38 @@ internal fun MediaVoiceBubble(
         realWaveform = null
         totalDurationMs = 0
         failed = true
-        startDownload = mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio)
+        val retryAllowedByPolicy =
+            shouldStartVoiceAttachmentDownload(
+                mine = mine,
+                audioAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio),
+                automaticDownloadsPaused = automaticDownloadsPaused,
+                hasCachedAttachment = false,
+                hasCachedFile = false,
+                hasRetainedPlaintext = retainedPlaintextOnEntry,
+            )
+        materializationIntent =
+            AttachmentMaterializationIntent.Idle.withPolicyAllowed(retryAllowedByPolicy)
+    }
+
+    suspend fun playReadyVoice(file: java.io.File) {
+        val playableFile =
+            withContext(Dispatchers.IO) {
+                validatedAttachmentCacheFile(file)
+            }
+        if (playableFile == null) {
+            localFile = null
+            realWaveform = null
+            totalDurationMs = 0
+            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+            return
+        }
+        localFile = playableFile
+        val playbackResult =
+            dev.ipf.whitenoise.android.audio.VoicePlaybackController
+                .play(pillKey, playableFile, ownerKey = controller.group.groupIdHex)
+        if (shouldInvalidateVoiceAttachmentCache(playbackResult)) {
+            clearBadVoiceCache("playback start failed")
+        }
     }
 
     LaunchedEffect(pillKey, epoch, reference.mediaType) {
@@ -196,11 +238,11 @@ internal fun MediaVoiceBubble(
         }
     }
 
-    LaunchedEffect(pillKey, epoch, startDownload) {
+    LaunchedEffect(pillKey, epoch, materializationIntent, reloadToken) {
         if (localFile != null) return@LaunchedEffect
         // Honor the auto-download gate: when Audio is off for the active
         // connection the clip waits behind a Download affordance until the
-        // user opts in (tap flips startDownload=true). Manual playback below
+        // user opts in (tap promotes the intent). Manual playback below
         // stays available regardless.
         if (!startDownload) return@LaunchedEffect
         // Receive-side imeta-parsed refs start with sourceEpoch=0 until the
@@ -209,7 +251,7 @@ internal fun MediaVoiceBubble(
         // Skip + retry once the projection rebinds the bubble with a real
         // epoch. Own sends keep epoch 0 valid (retained bytes short-circuit).
         if (!mine && reference.sourceEpoch == 0uL) return@LaunchedEffect
-        val instant = mine || controller.hasCachedAttachment(messageIdHex, attachmentIndex)
+        val instant = retainedPlaintextOnEntry || controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         if (!instant) loading = true
         runCatching {
             materializeVoiceAttachment(
@@ -219,17 +261,49 @@ internal fun MediaVoiceBubble(
                 attachmentIndex = attachmentIndex,
                 reference = reference,
                 mine = mine,
+                priority = materializationIntent.priority,
             )
         }.onSuccess { file ->
             localFile = file
             failed = false
         }.onFailure {
-            if (it is kotlinx.coroutines.CancellationException) throw it
-            Log.w("MediaVoiceBubble", "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)
-            failed = true
+            if (it is kotlinx.coroutines.CancellationException) {
+                materializationIntent = materializationIntent.afterProducerCancellation(it)
+            } else {
+                Log.w(
+                    "MediaVoiceBubble",
+                    "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
+                    it,
+                )
+                failed = true
+            }
         }
         loading = false
     }
+
+    persistedAttachmentOpenEffect(
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        sourceEpoch = epoch,
+        controller = controller,
+        appState = appState,
+        isReady = { localFile != null },
+        ensureMaterialization = {
+            if (failed) {
+                failed = false
+                reloadToken++
+            }
+            materializationIntent = materializationIntent.afterInteractiveRequest()
+        },
+        dispatchOpen = {
+            val file = localFile
+            if (file == null) {
+                controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+            } else {
+                playReadyVoice(file)
+            }
+        },
+    )
 
     // Surface a cached duration as soon as the file is materialized so the
     // bubble shows "0:12" instead of "0:00" before the user taps Play.
@@ -268,59 +342,21 @@ internal fun MediaVoiceBubble(
                     Modifier
                         .size(48.dp)
                         .combinedClickable(
-                            enabled = !loading,
                             onLongClick = onLongPress,
                             onClick = {
-                                failed = false
-                                // First tap on an un-fetched, auto-download-off clip
-                                // is a Download affordance: opt in and let the
-                                // gated effect fetch it, rather than fetch+play in
-                                // one tap. Mirrors the video bubble's tap-to-fetch.
-                                if (!startDownload && localFile == null) {
-                                    startDownload = true
+                                if (loading || localFile == null) {
+                                    controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
                                     return@combinedClickable
                                 }
+                                failed = false
                                 if (isPlayingThis) {
                                     dev.ipf.whitenoise.android.audio.VoicePlaybackController
                                         .pause()
                                     return@combinedClickable
                                 }
                                 scope.launch {
-                                    val retainedFile =
-                                        withContext(Dispatchers.IO) {
-                                            validatedAttachmentCacheFile(localFile)
-                                        }
-                                    if (retainedFile == null && localFile != null) {
-                                        localFile = null
-                                        realWaveform = null
-                                        totalDurationMs = 0
-                                    }
-                                    val file =
-                                        retainedFile ?: runCatching {
-                                            loading = true
-                                            materializeVoiceAttachment(
-                                                context = context,
-                                                controller = controller,
-                                                messageIdHex = messageIdHex,
-                                                attachmentIndex = attachmentIndex,
-                                                reference = reference,
-                                                mine = mine,
-                                            )
-                                        }.onFailure {
-                                            if (it is kotlinx.coroutines.CancellationException) throw it
-                                            Log.w("MediaVoiceBubble", "materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)
-                                            failed = true
-                                        }.also { loading = false }
-                                            .getOrNull()
-
-                                    if (file == null) return@launch
-                                    localFile = file
-                                    val playbackResult =
-                                        dev.ipf.whitenoise.android.audio.VoicePlaybackController
-                                            .play(pillKey, file, ownerKey = controller.group.groupIdHex)
-                                    if (shouldInvalidateVoiceAttachmentCache(playbackResult)) {
-                                        clearBadVoiceCache("playback start failed")
-                                    }
+                                    val readyFile = localFile ?: return@launch
+                                    playReadyVoice(readyFile)
                                 }
                             },
                         ),
@@ -456,6 +492,7 @@ internal suspend fun materializeVoiceAttachment(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
+    priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
 ): java.io.File =
     materializeVoiceAttachment(
         context = context,
@@ -472,7 +509,7 @@ internal suspend fun materializeVoiceAttachment(
                 } else {
                     null
                 }
-            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference, priority)
         },
     )
 
@@ -571,9 +608,19 @@ private fun rememberCachedVoiceAttachmentFileState(
 internal fun shouldStartVoiceAttachmentDownload(
     mine: Boolean,
     audioAutoDownload: Boolean,
+    automaticDownloadsPaused: Boolean = false,
     hasCachedAttachment: Boolean,
     hasCachedFile: Boolean,
-): Boolean = mine || audioAutoDownload || hasCachedAttachment || hasCachedFile
+    hasRetainedPlaintext: Boolean = false,
+): Boolean =
+    shouldMaterializeAttachmentAutomatically(
+        mine = mine,
+        mediaAutoDownloadAllowed = audioAutoDownload,
+        automaticDownloadsPaused = automaticDownloadsPaused,
+        hasCachedAttachment = hasCachedAttachment,
+        hasMaterializedFile = hasCachedFile,
+        hasRetainedPlaintext = hasRetainedPlaintext,
+    )
 
 internal fun shouldInvalidateVoiceAttachmentCache(playbackResult: VoicePlaybackController.PlaybackStartResult): Boolean =
     playbackResult == VoicePlaybackController.PlaybackStartResult.PrepareFailed ||

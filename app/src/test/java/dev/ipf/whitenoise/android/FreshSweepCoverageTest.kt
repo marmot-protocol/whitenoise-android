@@ -246,18 +246,24 @@ class FreshSweepCoverageTest {
 
         assertTrue(
             "voice playback must rematerialize a retained file that LRU eviction removed",
-            "validatedAttachmentCacheFile(localFile)" in voiceBubble &&
-                "retainedFile ?: runCatching" in voiceBubble,
+            "validatedAttachmentCacheFile(file)" in voiceBubble &&
+                "localFile = null" in voiceBubble &&
+                "controller.requestAttachmentOpen(messageIdHex, attachmentIndex)" in voiceBubble &&
+                "persistedAttachmentOpenEffect(" in voiceBubble,
         )
         assertTrue(
             "video playback must rematerialize a retained file that LRU eviction removed",
             "validatedAttachmentCacheFile(localFile)" in videoBubble &&
-                "manual materialize failed" in videoBubble,
+                "localFile = null" in videoBubble &&
+                "controller.requestAttachmentOpen(messageIdHex, attachmentIndex)" in videoBubble &&
+                "persistedAttachmentOpenEffect(" in videoBubble,
         )
         assertTrue(
             "album video tiles must rematerialize an evicted retained file before opening",
-            "validatedAttachmentCacheFile(f)" in videoGridTile &&
-                "materializeVideoAttachment(" in videoGridTile &&
+            "validatedAttachmentCacheFile(localFile)" in videoGridTile &&
+                "localFile = null" in videoGridTile &&
+                "controller.requestAttachmentOpen(messageIdHex, attachmentIndex)" in videoGridTile &&
+                "persistedAttachmentOpenEffect(" in videoGridTile &&
                 "onTap(playableFile)" in videoGridTile,
         )
     }

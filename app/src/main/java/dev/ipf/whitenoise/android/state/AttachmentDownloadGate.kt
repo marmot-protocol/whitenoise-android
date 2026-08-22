@@ -2,10 +2,18 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicLong
+
+internal enum class AttachmentDownloadPriority {
+    Automatic,
+    Interactive,
+}
+
+/** Signals that Stop automatic downloads removed this request before admission. */
+internal class AutomaticBacklogStoppedException : CancellationException("automatic attachment backlog stopped")
 
 /**
  * Bounded gate for decrypted attachment fetches.
@@ -29,14 +37,113 @@ internal class AttachmentDownloadGate(
         require(parallelism > 0) { "parallelism must be positive" }
     }
 
-    private val semaphore = Semaphore(parallelism)
+    private class Waiter(
+        val key: String,
+        val accountRef: String?,
+        var priority: AttachmentDownloadPriority,
+        val admitted: CompletableDeferred<Unit> = CompletableDeferred(),
+        var ownsPermit: Boolean = false,
+    )
+
+    /** Tracks stale replacements while enforcing one permit owner per caller key. */
+    private class KeyedWaiters {
+        private val entries = mutableMapOf<String, MutableList<Waiter>>()
+
+        fun forKey(key: String): List<Waiter>? = entries[key]
+
+        fun register(waiter: Waiter) {
+            entries.getOrPut(waiter.key) { mutableListOf() }.add(waiter)
+        }
+
+        fun unregister(waiter: Waiter) {
+            val waiters = entries[waiter.key] ?: return
+            waiters.removeAll { it === waiter }
+            if (waiters.isEmpty()) entries.remove(waiter.key)
+        }
+
+        fun canOwnPermit(waiter: Waiter): Boolean =
+            entries[waiter.key]
+                .orEmpty()
+                .none { sibling -> sibling !== waiter && sibling.ownsPermit }
+    }
+
+    private val lock = Any()
+    private val automatic = ArrayDeque<Waiter>()
+    private val interactive = ArrayDeque<Waiter>()
+    private val keyedWaiters = KeyedWaiters()
+    private val pendingPromotions = mutableSetOf<String>()
+    private val anonymousKey = AtomicLong()
+    private var activePermits = 0
+    private var consecutiveInteractiveAdmissions = 0
+    private val maxPermits = parallelism
 
     /**
      * Acquires one raw permit. Kept available for tests and for any future
      * one-shot internal callers; media downloads should normally use
      * [withRetryingPermit] so transient FFI/Blossom races can self-heal.
      */
-    suspend fun <T> withPermit(block: suspend () -> T): T = semaphore.withPermit { block() }
+    suspend fun <T> withPermit(block: suspend () -> T): T =
+        withPermit(
+            key = "anonymous-${anonymousKey.incrementAndGet()}",
+            accountRef = null,
+            priority = AttachmentDownloadPriority.Automatic,
+            block = block,
+        )
+
+    suspend fun <T> withPermit(
+        key: String,
+        accountRef: String?,
+        priority: AttachmentDownloadPriority,
+        block: suspend () -> T,
+    ): T {
+        val waiter = acquire(key, accountRef, priority)
+        try {
+            return block()
+        } finally {
+            release(waiter)
+        }
+    }
+
+    /**
+     * Moves a queued automatic identity to the interactive lane without creating another waiter.
+     * A promotion that wins the race with gate registration is retained until that key registers.
+     */
+    fun promote(key: String): Boolean =
+        synchronized(lock) {
+            val waiters =
+                keyedWaiters.forKey(key)
+                    ?: run {
+                        pendingPromotions.add(key)
+                        return@synchronized true
+                    }
+            waiters
+                .filter { !it.ownsPermit && it.priority == AttachmentDownloadPriority.Automatic }
+                .forEach { waiter ->
+                    automatic.remove(waiter)
+                    waiter.priority = AttachmentDownloadPriority.Interactive
+                    interactive.addLast(waiter)
+                }
+            true
+        }
+
+    /** Cancels only automatic requests that have not acquired a permit. */
+    fun cancelQueuedAutomatic(accountRef: String): Int {
+        val cancelled =
+            synchronized(lock) {
+                automatic
+                    .filter { it.accountRef == accountRef && !it.ownsPermit }
+                    .also { waiters ->
+                        waiters.forEach { waiter ->
+                            automatic.remove(waiter)
+                            keyedWaiters.unregister(waiter)
+                        }
+                    }
+            }
+        cancelled.forEach { waiter ->
+            waiter.admitted.cancel(AutomaticBacklogStoppedException())
+        }
+        return cancelled.size
+    }
 
     suspend fun <T> withRetryingPermit(
         maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
@@ -66,8 +173,105 @@ internal class AttachmentDownloadGate(
         }
     }
 
+    private suspend fun acquire(
+        key: String,
+        accountRef: String?,
+        priority: AttachmentDownloadPriority,
+    ): Waiter {
+        val waiter =
+            synchronized(lock) {
+                val promotedBeforeRegistration = pendingPromotions.remove(key)
+                val effectivePriority =
+                    if (
+                        priority == AttachmentDownloadPriority.Interactive ||
+                        promotedBeforeRegistration
+                    ) {
+                        AttachmentDownloadPriority.Interactive
+                    } else {
+                        AttachmentDownloadPriority.Automatic
+                    }
+                val registered = Waiter(key, accountRef, effectivePriority)
+                keyedWaiters.register(registered)
+                lane(effectivePriority).addLast(registered)
+                admitAvailableLocked()
+                registered
+            }
+        val admittedImmediately = waiter.ownsPermit
+        if (admittedImmediately) return waiter
+        try {
+            waiter.admitted.await()
+            return waiter
+        } catch (cancellation: CancellationException) {
+            synchronized(lock) {
+                if (waiter.ownsPermit) {
+                    waiter.ownsPermit = false
+                    activePermits -= 1
+                    keyedWaiters.unregister(waiter)
+                    admitAvailableLocked()
+                } else {
+                    lane(waiter.priority).remove(waiter)
+                    keyedWaiters.unregister(waiter)
+                }
+            }
+            throw cancellation
+        }
+    }
+
+    private fun release(waiter: Waiter) {
+        synchronized(lock) {
+            if (!waiter.ownsPermit) return
+            waiter.ownsPermit = false
+            activePermits -= 1
+            keyedWaiters.unregister(waiter)
+            admitAvailableLocked()
+        }
+    }
+
+    private fun admitAvailableLocked() {
+        while (activePermits < maxPermits) {
+            val next = nextWaiterLocked() ?: return
+            next.ownsPermit = true
+            activePermits += 1
+            next.admitted.complete(Unit)
+        }
+    }
+
+    private fun nextWaiterLocked(): Waiter? {
+        val nextAutomatic = automatic.firstOrNull(keyedWaiters::canOwnPermit)
+        val nextInteractive = interactive.firstOrNull(keyedWaiters::canOwnPermit)
+        val admitAutomatic =
+            nextAutomatic != null &&
+                (nextInteractive == null || consecutiveInteractiveAdmissions >= MAX_INTERACTIVE_BURST)
+        return if (admitAutomatic) {
+            consecutiveInteractiveAdmissions = 0
+            automatic.remove(nextAutomatic)
+            nextAutomatic
+        } else {
+            nextInteractive
+                ?.also {
+                    interactive.remove(it)
+                    consecutiveInteractiveAdmissions =
+                        if (nextAutomatic == null) {
+                            0
+                        } else {
+                            consecutiveInteractiveAdmissions + 1
+                        }
+                } ?: nextAutomatic?.also {
+                automatic.remove(it)
+                consecutiveInteractiveAdmissions = 0
+            }
+        }
+    }
+
+    private fun lane(priority: AttachmentDownloadPriority): ArrayDeque<Waiter> =
+        when (priority) {
+            AttachmentDownloadPriority.Automatic -> automatic
+            AttachmentDownloadPriority.Interactive -> interactive
+        }
+
     internal companion object {
         const val DEFAULT_PARALLELISM = 3
+        const val MAX_INTERACTIVE_BURST = 3
         const val DEFAULT_MAX_ATTEMPTS = 3
         const val DEFAULT_INITIAL_RETRY_BACKOFF_MILLIS = 150L
         const val DEFAULT_MAX_RETRY_BACKOFF_MILLIS = 600L

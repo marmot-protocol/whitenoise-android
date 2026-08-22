@@ -230,8 +230,7 @@ class ReceivedApkAttachmentOpenIntegrationTest {
 
         assertTrue(
             Regex("openAttachment\\(file, reference\\.mediaType, reference\\.fileName\\)")
-                .findAll(bubble)
-                .count() >= 2,
+                .containsMatchIn(bubble),
         )
         assertTrue(
             normalizedLibrary.contains(

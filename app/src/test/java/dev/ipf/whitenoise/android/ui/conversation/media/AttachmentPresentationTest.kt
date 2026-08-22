@@ -3,10 +3,13 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.content.ActivityNotFoundException
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
+import dev.ipf.whitenoise.android.state.AutomaticBacklogStoppedException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -342,6 +345,92 @@ class AttachmentPresentationTest {
                 directory.deleteRecursively()
             }
         }
+
+    @Test
+    fun explicitAutomaticPauseBlocksOnlyNetworkFallbacks() {
+        assertFalse(
+            shouldMaterializeAttachmentAutomatically(
+                mine = false,
+                mediaAutoDownloadAllowed = true,
+                automaticDownloadsPaused = true,
+            ),
+        )
+        assertFalse(
+            shouldMaterializeAttachmentAutomatically(
+                mine = true,
+                mediaAutoDownloadAllowed = false,
+                automaticDownloadsPaused = true,
+            ),
+        )
+        assertTrue(
+            shouldMaterializeAttachmentAutomatically(
+                mine = true,
+                mediaAutoDownloadAllowed = false,
+                automaticDownloadsPaused = true,
+                hasRetainedPlaintext = true,
+            ),
+        )
+        assertTrue(
+            shouldMaterializeAttachmentAutomatically(
+                mine = false,
+                mediaAutoDownloadAllowed = false,
+                automaticDownloadsPaused = true,
+                hasCachedAttachment = true,
+            ),
+        )
+        assertTrue(
+            shouldMaterializeAttachmentAutomatically(
+                mine = true,
+                mediaAutoDownloadAllowed = false,
+                automaticDownloadsPaused = false,
+            ),
+        )
+    }
+
+    @Test
+    fun policyTighteningDoesNotRevokeAutomaticOrInteractiveMaterialization() {
+        val automatic = AttachmentMaterializationIntent.Idle.withPolicyAllowed(allowed = true)
+        val interactive = automatic.afterInteractiveRequest()
+
+        assertEquals(
+            AttachmentMaterializationIntent.Automatic,
+            automatic.withPolicyAllowed(allowed = false),
+        )
+        assertEquals(
+            AttachmentMaterializationIntent.Interactive,
+            interactive.withPolicyAllowed(allowed = false),
+        )
+    }
+
+    @Test
+    fun queuedAutomaticCancellationReturnsToIdleUntilPolicyRestarts() {
+        val automatic = AttachmentMaterializationIntent.Idle.withPolicyAllowed(allowed = true)
+        val idle =
+            automatic.afterProducerCancellation(
+                AutomaticBacklogStoppedException(),
+            )
+
+        assertEquals(AttachmentMaterializationIntent.Idle, idle)
+        assertEquals(
+            AttachmentMaterializationIntent.Idle,
+            idle.withPolicyAllowed(allowed = false),
+        )
+        assertEquals(
+            AttachmentMaterializationIntent.Automatic,
+            idle.withPolicyAllowed(allowed = true),
+        )
+    }
+
+    @Test
+    fun ordinaryCompositionCancellationIsStillPropagated() {
+        val cancellation = CancellationException("composition disposed")
+        val failure =
+            runCatching {
+                AttachmentMaterializationIntent.Automatic.afterProducerCancellation(cancellation)
+            }.exceptionOrNull()
+
+        assertSame(cancellation, failure)
+    }
 
     @Test
     fun unresolvedCacheStateNeverStartsAnAutomaticDownload() {

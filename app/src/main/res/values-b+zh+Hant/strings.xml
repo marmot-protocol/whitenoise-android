@@ -913,6 +913,13 @@
     <string name="group_image_search_preview_subtitle_ready">點按「使用此圖片」以套用</string>
     <string name="media_auto_download_title">自動下載媒體</string>
     <string name="media_auto_download_subtitle">文件和大型影片可能會消耗大量數據。請選擇在每種連線下自動下載的內容。</string>
+    <string name="media_auto_download_backlog_title">下載佇列</string>
+    <string name="media_auto_download_stop">停止自動下載</string>
+    <string name="media_auto_download_stop_subtitle">清除排隊中的自動下載；進行中及已點選的下載會繼續</string>
+    <string name="media_auto_download_stop_confirmation">這只會清除該帳戶排隊中的自動下載。進行中的下載和您點選的檔案會繼續。</string>
+    <string name="media_auto_download_stop_action">只停止自動下載</string>
+    <string name="media_auto_download_restart">重新啟動自動下載</string>
+    <string name="media_auto_download_restart_subtitle">再次允許新的自動下載</string>
     <string name="network_wifi">Wi-Fi</string>
     <string name="network_mobile">行動數據</string>
     <string name="network_roaming">漫遊</string>

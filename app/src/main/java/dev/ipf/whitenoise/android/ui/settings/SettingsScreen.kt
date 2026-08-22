@@ -688,11 +688,12 @@ internal fun SettingsRow(
     title: String,
     subtitle: String,
     icon: ImageVector? = null,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     ListItem(
         modifier =
-            Modifier
+            modifier
                 .settingsRowAmoledSurfaceBorder()
                 .clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),

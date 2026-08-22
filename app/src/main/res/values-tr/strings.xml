@@ -927,6 +927,13 @@
     <string name="group_image_search_preview_subtitle_ready">Uygulamak için \"Bu görseli kullan\"a dokunun</string>
     <string name="media_auto_download_title">Medyayı otomatik indir</string>
     <string name="media_auto_download_subtitle">Belgeler ve büyük videolar çok fazla veri kullanabilir. Her bağlantıda neyin otomatik indirileceğini seçin.</string>
+    <string name="media_auto_download_backlog_title">İndirme kuyruğu</string>
+    <string name="media_auto_download_stop">Otomatik indirmeleri durdur</string>
+    <string name="media_auto_download_stop_subtitle">Kuyruktaki otomatik indirmeleri temizler; etkin indirmeler ve dosyaya dokunarak başlatılan indirmeler sürer</string>
+    <string name="media_auto_download_stop_confirmation">Yalnızca bu hesabın kuyruktaki otomatik indirmeleri temizlenir. Etkin indirmeler ve bir dosyaya dokunarak başlattığınız indirmeler devam eder.</string>
+    <string name="media_auto_download_stop_action">Yalnızca otomatikleri durdur</string>
+    <string name="media_auto_download_restart">Otomatik indirmeleri yeniden başlat</string>
+    <string name="media_auto_download_restart_subtitle">Yeni otomatik indirmelere yeniden izin ver</string>
     <string name="network_wifi">Wi-Fi</string>
     <string name="network_mobile">Mobil veri</string>
     <string name="network_roaming">Dolaşım</string>

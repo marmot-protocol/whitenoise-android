@@ -1203,6 +1203,13 @@
     <string name="group_image_search_preview_subtitle_ready">Tap Use this image to apply</string>
     <string name="media_auto_download_title">Auto-download media</string>
     <string name="media_auto_download_subtitle">Documents and large videos can use a lot of data. Choose what downloads automatically on each connection.</string>
+    <string name="media_auto_download_backlog_title">Download queue</string>
+    <string name="media_auto_download_stop">Stop automatic downloads</string>
+    <string name="media_auto_download_stop_subtitle">Clear queued automatic downloads; active and tapped downloads continue</string>
+    <string name="media_auto_download_stop_confirmation">This clears only queued automatic downloads for this account. Active downloads and files you tapped keep going.</string>
+    <string name="media_auto_download_stop_action">Stop automatic only</string>
+    <string name="media_auto_download_restart">Restart automatic downloads</string>
+    <string name="media_auto_download_restart_subtitle">Allow new automatic downloads again</string>
     <string name="network_wifi">Wi-Fi</string>
     <string name="network_mobile">Mobile data</string>
     <string name="network_roaming">Roaming</string>

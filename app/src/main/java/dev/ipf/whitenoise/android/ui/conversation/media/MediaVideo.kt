@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.playbackErrorInvalidatesAttachmentCache
+import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -116,6 +117,8 @@ internal fun MediaVideoGridTile(
         remember(messageIdHex, attachmentIndex) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
+    val retainedPlaintextOnEntry =
+        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
     // MediaImageGridTile). A sourceEpoch upgrade re-keys this state, so without
     // the cache seed the poster would reset to null and flash back to the
@@ -126,19 +129,32 @@ internal fun MediaVideoGridTile(
     }
     var failed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
-    var startDownload by remember(messageIdHex, attachmentIndex, appState.mediaAutoDownloadMatrix) {
-        mutableStateOf(
-            shouldStartVideoAttachmentDownload(
-                mine = mine,
-                videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
-                hasCachedAttachment = cachedPlaintextOnEntry,
-                hasCachedFile = localFile != null,
-            ),
+    val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    val policyAllowsMaterialization =
+        shouldStartVideoAttachmentDownload(
+            mine = mine,
+            videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
+            automaticDownloadsPaused = automaticDownloadsPaused,
+            hasCachedAttachment = cachedPlaintextOnEntry,
+            hasCachedFile = localFile != null,
+            hasRetainedPlaintext = retainedPlaintextOnEntry,
         )
-    }
+    var materializationIntent by
+        rememberAttachmentMaterializationIntent(
+            identity = "$messageIdHex#$attachmentIndex",
+            policyAllowsMaterialization = policyAllowsMaterialization,
+        )
+    val startDownload = materializationIntent.shouldMaterialize
     var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(0) }
 
-    LaunchedEffect(messageIdHex, attachmentIndex, epoch, startDownload, reloadToken, cachedPlaintextOnEntry) {
+    LaunchedEffect(
+        messageIdHex,
+        attachmentIndex,
+        epoch,
+        materializationIntent,
+        reloadToken,
+        cachedPlaintextOnEntry,
+    ) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
         // Re-probe the decrypted-byte cache right before using the epoch-0 bypass;
@@ -158,15 +174,52 @@ internal fun MediaVideoGridTile(
                 attachmentIndex = attachmentIndex,
                 reference = reference,
                 mine = mine,
+                priority = materializationIntent.priority,
             )
         }.onSuccess { f ->
             localFile = f
             failed = false
         }.onFailure {
-            if (it is kotlinx.coroutines.CancellationException) throw it
-            failed = true
+            if (it is kotlinx.coroutines.CancellationException) {
+                materializationIntent = materializationIntent.afterProducerCancellation(it)
+            } else {
+                failed = true
+            }
         }
     }
+
+    suspend fun dispatchReadyVideo() {
+        val playableFile =
+            withContext(Dispatchers.IO) {
+                validatedAttachmentCacheFile(localFile)
+            }
+        if (playableFile == null) {
+            localFile = null
+            posterBitmap = null
+            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+            return
+        }
+        localFile = playableFile
+        failed = false
+        onTap(playableFile)
+    }
+
+    persistedAttachmentOpenEffect(
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        sourceEpoch = epoch,
+        controller = controller,
+        appState = appState,
+        isReady = { localFile != null },
+        ensureMaterialization = {
+            if (failed) {
+                failed = false
+                reloadToken++
+            }
+            materializationIntent = materializationIntent.afterInteractiveRequest()
+        },
+        dispatchOpen = { dispatchReadyVideo() },
+    )
 
     LaunchedEffect(localFile) {
         val f = localFile ?: return@LaunchedEffect
@@ -205,34 +258,13 @@ internal fun MediaVideoGridTile(
                     val f = localFile
                     when {
                         f != null ->
-                            scope.launch {
-                                val playableFile =
-                                    withContext(Dispatchers.IO) {
-                                        validatedAttachmentCacheFile(f)
-                                    } ?: runCatching {
-                                        materializeVideoAttachment(
-                                            context = context,
-                                            controller = controller,
-                                            messageIdHex = messageIdHex,
-                                            attachmentIndex = attachmentIndex,
-                                            reference = reference,
-                                            mine = mine,
-                                        )
-                                    }.getOrElse { error ->
-                                        if (error is CancellationException) throw error
-                                        localFile = null
-                                        failed = true
-                                        return@launch
-                                    }
-                                localFile = playableFile
-                                failed = false
-                                onTap(playableFile)
-                            }
+                            scope.launch { dispatchReadyVideo() }
                         failed -> {
-                            failed = false
-                            reloadToken++
+                            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
                         }
-                        else -> startDownload = true
+                        else -> {
+                            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                        }
                     }
                 },
             ),
@@ -372,6 +404,8 @@ internal fun MediaVideoBubble(
         remember(pillKey) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
+    val retainedPlaintextOnEntry =
+        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
@@ -388,21 +422,34 @@ internal fun MediaVideoBubble(
     // Mirrors the image bubble's auto-download gate, but already-local bytes
     // bypass the network-spend policy so chat re-entry starts at Play instead
     // of showing a fake Download affordance. When the policy says no for an
-    // uncached video (e.g. Wi-Fi-only on cellular), a tap flips
-    // startDownload=true so the user always has a path to fetch — never
+    // uncached video (e.g. Wi-Fi-only on cellular), a tap promotes the
+    // materialization intent so the user always has a path to fetch — never
     // "looks present but can't be opened". See PR #191 reviewer feedback.
-    var startDownload by remember(pillKey, appState.mediaAutoDownloadMatrix) {
-        mutableStateOf(
-            shouldStartVideoAttachmentDownload(
-                mine = mine,
-                videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
-                hasCachedAttachment = cachedPlaintextOnEntry,
-                hasCachedFile = localFile != null,
-            ),
+    val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    val policyAllowsMaterialization =
+        shouldStartVideoAttachmentDownload(
+            mine = mine,
+            videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
+            automaticDownloadsPaused = automaticDownloadsPaused,
+            hasCachedAttachment = cachedPlaintextOnEntry,
+            hasCachedFile = localFile != null,
+            hasRetainedPlaintext = retainedPlaintextOnEntry,
         )
-    }
+    var materializationIntent by
+        rememberAttachmentMaterializationIntent(
+            identity = pillKey,
+            policyAllowsMaterialization = policyAllowsMaterialization,
+        )
+    val startDownload = materializationIntent.shouldMaterialize
+    var reloadToken by remember(pillKey, epoch) { mutableStateOf(0) }
 
-    LaunchedEffect(pillKey, epoch, startDownload, cachedPlaintextOnEntry) {
+    LaunchedEffect(
+        pillKey,
+        epoch,
+        materializationIntent,
+        cachedPlaintextOnEntry,
+        reloadToken,
+    ) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
         // Re-probe the decrypted-byte cache right before using the epoch-0 bypass;
@@ -423,17 +470,59 @@ internal fun MediaVideoBubble(
                 attachmentIndex = attachmentIndex,
                 reference = reference,
                 mine = mine,
+                priority = materializationIntent.priority,
             )
         }.onSuccess { f ->
             localFile = f
             failed = false
         }.onFailure {
-            if (it is kotlinx.coroutines.CancellationException) throw it
-            Log.w("MediaVideoBubble", "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)
-            failed = true
+            if (it is kotlinx.coroutines.CancellationException) {
+                materializationIntent = materializationIntent.afterProducerCancellation(it)
+            } else {
+                Log.w(
+                    "MediaVideoBubble",
+                    "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
+                    it,
+                )
+                failed = true
+            }
         }
         loading = false
     }
+
+    suspend fun dispatchReadyVideo() {
+        val playableFile =
+            withContext(Dispatchers.IO) {
+                validatedAttachmentCacheFile(localFile)
+            }
+        if (playableFile == null) {
+            localFile = null
+            posterBitmap = null
+            durationMs = 0L
+            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+            return
+        }
+        localFile = playableFile
+        failed = false
+        playerOpen = true
+    }
+
+    persistedAttachmentOpenEffect(
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        sourceEpoch = epoch,
+        controller = controller,
+        appState = appState,
+        isReady = { localFile != null },
+        ensureMaterialization = {
+            if (failed) {
+                failed = false
+                reloadToken++
+            }
+            materializationIntent = materializationIntent.afterInteractiveRequest()
+        },
+        dispatchOpen = { dispatchReadyVideo() },
+    )
 
     LaunchedEffect(localFile) {
         val f = localFile ?: return@LaunchedEffect
@@ -524,48 +613,8 @@ internal fun MediaVideoBubble(
                             onClick = {
                                 when {
                                     uploadFailed -> onRetryUpload?.invoke()
-                                    loading -> Unit
-                                    else ->
-                                        scope.launch {
-                                            val retainedFile =
-                                                withContext(Dispatchers.IO) {
-                                                    validatedAttachmentCacheFile(localFile)
-                                                }
-                                            if (retainedFile != null && !failed) {
-                                                playerOpen = true
-                                                return@launch
-                                            }
-                                            if (localFile != null) {
-                                                localFile = null
-                                                posterBitmap = null
-                                                durationMs = 0L
-                                            }
-                                            startDownload = true
-                                            loading = true
-                                            runCatching {
-                                                materializeVideoAttachment(
-                                                    context = context,
-                                                    controller = controller,
-                                                    messageIdHex = messageIdHex,
-                                                    attachmentIndex = attachmentIndex,
-                                                    reference = reference,
-                                                    mine = mine,
-                                                )
-                                            }.onSuccess { file ->
-                                                localFile = file
-                                                failed = false
-                                                playerOpen = true
-                                            }.onFailure {
-                                                if (it is CancellationException) throw it
-                                                Log.w(
-                                                    "MediaVideoBubble",
-                                                    "manual materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
-                                                    it,
-                                                )
-                                                failed = true
-                                            }
-                                            loading = false
-                                        }
+                                    loading -> controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                                    else -> scope.launch { dispatchReadyVideo() }
                                 }
                             },
                         ),
@@ -738,6 +787,7 @@ internal suspend fun materializeVideoAttachment(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
+    priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
 ): java.io.File =
     materializeVideoAttachment(
         context = context,
@@ -754,7 +804,7 @@ internal suspend fun materializeVideoAttachment(
                 } else {
                     null
                 }
-            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference, priority)
         },
     )
 
@@ -895,9 +945,19 @@ private fun rememberCachedVideoAttachmentFileState(
 internal fun shouldStartVideoAttachmentDownload(
     mine: Boolean,
     videoAutoDownload: Boolean,
+    automaticDownloadsPaused: Boolean = false,
     hasCachedAttachment: Boolean,
     hasCachedFile: Boolean,
-): Boolean = mine || videoAutoDownload || hasCachedAttachment || hasCachedFile
+    hasRetainedPlaintext: Boolean = false,
+): Boolean =
+    shouldMaterializeAttachmentAutomatically(
+        mine = mine,
+        mediaAutoDownloadAllowed = videoAutoDownload,
+        automaticDownloadsPaused = automaticDownloadsPaused,
+        hasCachedAttachment = hasCachedAttachment,
+        hasMaterializedFile = hasCachedFile,
+        hasRetainedPlaintext = hasRetainedPlaintext,
+    )
 
 private fun videoAttachmentCacheFile(
     context: android.content.Context,

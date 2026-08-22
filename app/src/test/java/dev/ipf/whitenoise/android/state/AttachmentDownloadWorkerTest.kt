@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.work.WorkInfo
 import dev.ipf.marmotkit.MarmotKitException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -7,6 +8,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AttachmentDownloadWorkerTest {
+    @Test
+    fun backlogStopCancelsOnlyQueuedAutomaticWork() {
+        assertTrue(shouldCancelQueuedAutomaticWork(WorkInfo.State.ENQUEUED, hasInteractiveIntent = false))
+        assertTrue(shouldCancelQueuedAutomaticWork(WorkInfo.State.BLOCKED, hasInteractiveIntent = false))
+        assertFalse(shouldCancelQueuedAutomaticWork(WorkInfo.State.RUNNING, hasInteractiveIntent = false))
+        assertFalse(shouldCancelQueuedAutomaticWork(WorkInfo.State.ENQUEUED, hasInteractiveIntent = true))
+        assertFalse(shouldCancelQueuedAutomaticWork(WorkInfo.State.SUCCEEDED, hasInteractiveIntent = false))
+    }
+
     @Test
     fun workDataRoundTripsOnlyTheMdkLookupIdentity() {
         val request =
@@ -42,6 +52,13 @@ class AttachmentDownloadWorkerTest {
         assertFalse(name.contains(request.accountRef))
         assertFalse(name.contains(request.groupIdHex))
         assertFalse(name.contains(request.messageIdHex))
+
+        val accountTag = attachmentAutomaticAccountTag(request.accountRef)
+        val identityTag = attachmentIdentityTag(request)
+        assertFalse(accountTag.contains(request.accountRef))
+        assertFalse(identityTag.contains(request.groupIdHex))
+        assertFalse(identityTag.contains(request.messageIdHex))
+        assertTrue(accountTag != attachmentAutomaticAccountTag("other-account"))
     }
 
     @Test
