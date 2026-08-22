@@ -165,6 +165,94 @@ class AttachmentDownloadPriorityQueueTest {
             }
         }
 
+    @Test
+    fun promotionBeforeAutomaticGateRegistrationIsStickyAndDoesNotDuplicateTheTransfer() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val releaseActive = CompletableDeferred<Unit>()
+                val published = CompletableDeferred<Unit>()
+                val allowRegistration = CompletableDeferred<Unit>()
+                val started = mutableListOf<String>()
+                var promotedExecutions = 0
+                val active =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("active", ACCOUNT, AttachmentDownloadPriority.Automatic) {
+                            started += "active"
+                            releaseActive.await()
+                        }
+                    }
+                val promoted =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        // Models AppState publishing the memoized Deferred before
+                        // its async body reaches gate registration.
+                        published.complete(Unit)
+                        allowRegistration.await()
+                        gate.withPermit("late-tap", ACCOUNT, AttachmentDownloadPriority.Automatic) {
+                            promotedExecutions++
+                            started += "late-tap"
+                        }
+                    }
+
+                published.await()
+                assertTrue(gate.promote("late-tap"))
+                val earlierAutomatic =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("automatic", ACCOUNT, AttachmentDownloadPriority.Automatic) {
+                            started += "automatic"
+                        }
+                    }
+                allowRegistration.complete(Unit)
+                releaseActive.complete(Unit)
+
+                active.await()
+                promoted.await()
+                earlierAutomatic.await()
+                assertEquals(listOf("active", "late-tap", "automatic"), started)
+                assertEquals(1, promotedExecutions)
+            }
+        }
+
+    @Test
+    fun interactiveOnlyAdmissionsDoNotCreateBurstDebtAgainstALaterTap() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                repeat(AttachmentDownloadGate.MAX_INTERACTIVE_BURST) { index ->
+                    gate.withPermit("warm-tap-$index", ACCOUNT, AttachmentDownloadPriority.Interactive) {}
+                }
+
+                val releaseHolder = CompletableDeferred<Unit>()
+                val started = mutableListOf<String>()
+                val holder =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("holder", ACCOUNT, AttachmentDownloadPriority.Interactive) {
+                            started += "holder"
+                            releaseHolder.await()
+                        }
+                    }
+                val automatic =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("automatic", ACCOUNT, AttachmentDownloadPriority.Automatic) {
+                            started += "automatic"
+                        }
+                    }
+                val tapped =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("tap", ACCOUNT, AttachmentDownloadPriority.Interactive) {
+                            started += "tap"
+                        }
+                    }
+
+                releaseHolder.complete(Unit)
+                holder.await()
+                tapped.await()
+                automatic.await()
+
+                assertEquals(listOf("holder", "tap", "automatic"), started)
+            }
+        }
+
     private companion object {
         const val ACCOUNT = "account-a"
         const val TEST_TIMEOUT = 5_000L

@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
@@ -152,14 +153,27 @@ internal fun MediaFileBubble(
         openRequested = true
         try {
             val file =
-                materializeMediaFileOrNotify(
-                    context = context,
-                    controller = controller,
-                    messageIdHex = messageIdHex,
-                    attachmentIndex = attachmentIndex,
-                    reference = reference,
-                    mine = mine,
-                ) { appState.present(couldntLoadMessage) } ?: return@LaunchedEffect
+                materializePersistedAttachmentOpen(
+                    materialize = {
+                        materializeMediaFileOrNotify(
+                            context = context,
+                            controller = controller,
+                            messageIdHex = messageIdHex,
+                            attachmentIndex = attachmentIndex,
+                            reference = reference,
+                            mine = mine,
+                        ) { appState.present(couldntLoadMessage) }
+                    },
+                    awaitDurableAvailability = {
+                        transferStateFlow.first { it == AttachmentTransferState.Available }
+                    },
+                    onWaitingForDurableAvailability = {
+                        // Keep the persisted intent, but allow another tap to
+                        // replace this wait with an immediate retry.
+                        openRequested = false
+                    },
+                ) ?: return@LaunchedEffect
+            openRequested = true
             if (!lifecycleOwner.lifecycle.awaitResumedOrDestroyed()) return@LaunchedEffect
             var openResult: OpenAttachmentResult? = null
             val dispatched =

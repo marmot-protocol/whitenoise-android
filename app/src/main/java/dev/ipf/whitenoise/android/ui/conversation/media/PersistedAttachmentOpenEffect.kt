@@ -6,11 +6,18 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -45,22 +52,58 @@ internal fun persistedAttachmentOpenEffect(
         if (!controller.hasAttachmentOpenIntent(messageIdHex, attachmentIndex)) {
             return@LaunchedEffect
         }
-        currentEnsureMaterialization.value()
-        dispatchAttachmentOpenWhenReady(
-            lifecycle = lifecycleOwner.lifecycle,
-            awaitReady = {
-                snapshotFlow { currentIsReady.value() }.first { it }
-            },
-            isReady = { currentIsReady.value() },
-            consume = {
-                controller.consumeAttachmentOpenIntent(messageIdHex, attachmentIndex)
-            },
-            restore = {
-                controller.restoreAttachmentOpenIntent(messageIdHex, attachmentIndex)
-            },
-            dispatch = { currentDispatchOpen.value() },
-        )
+        val transferState =
+            controller.attachmentTransferState(
+                messageIdHex = messageIdHex,
+                attachmentIndex = attachmentIndex,
+                initiallyAvailable = currentIsReady.value(),
+            )
+        val cacheProbe =
+            launch(start = CoroutineStart.UNDISPATCHED) {
+                appState.mediaCacheRevision.collect {
+                    controller.refreshAttachmentTransferState(messageIdHex, attachmentIndex)
+                }
+            }
+        try {
+            currentEnsureMaterialization.value()
+            dispatchAttachmentOpenWhenReady(
+                lifecycle = lifecycleOwner.lifecycle,
+                awaitReady = {
+                    awaitAttachmentReadyAfterDurableCompletion(
+                        readiness = snapshotFlow { currentIsReady.value() },
+                        transferState = transferState,
+                        ensureMaterialization = { currentEnsureMaterialization.value() },
+                    )
+                },
+                isReady = { currentIsReady.value() },
+                consume = {
+                    controller.consumeAttachmentOpenIntent(messageIdHex, attachmentIndex)
+                },
+                restore = {
+                    controller.restoreAttachmentOpenIntent(messageIdHex, attachmentIndex)
+                },
+                dispatch = { currentDispatchOpen.value() },
+            )
+        } finally {
+            cacheProbe.cancel()
+            controller.releaseAttachmentTransferState(messageIdHex, attachmentIndex)
+        }
     }
+}
+
+/** Re-enters visual materialization when durable work publishes this attachment as available. */
+internal suspend fun awaitAttachmentReadyAfterDurableCompletion(
+    readiness: Flow<Boolean>,
+    transferState: Flow<AttachmentTransferState>,
+    ensureMaterialization: () -> Unit,
+) {
+    readiness
+        .combine(transferState) { ready, state -> ready to state }
+        .onEach { (ready, state) ->
+            if (!ready && state == AttachmentTransferState.Available) {
+                ensureMaterialization()
+            }
+        }.first { (ready, _) -> ready }
 }
 
 /** Returns true only when this caller atomically consumed and dispatched the intent. */

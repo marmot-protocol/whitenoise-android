@@ -43,9 +43,13 @@ internal class AttachmentDownloadIntentStore(
             if (token !in current) return@synchronized false
             val committed = preferences.edit().putStringSet(OPEN_IDENTITIES, current - token).commit()
             if (!committed) {
-                Log.w(TAG, "Open-intent disk commit failed after the in-memory consume fence")
+                // SharedPreferences may expose the staged removal in memory
+                // even when its durable write fails. Fail closed and restore
+                // the token so this process cannot dispatch ahead of disk.
+                preferences.edit().putStringSet(OPEN_IDENTITIES, current).apply()
+                Log.w(TAG, "Open-intent disk commit failed; viewer dispatch remains pending")
             }
-            true
+            committed
         }
 
     private fun readSet(key: String): Set<String> = preferences.getStringSet(key, emptySet()).orEmpty().toSet()

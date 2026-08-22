@@ -3,10 +3,13 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -192,6 +195,105 @@ class AttachmentOpenLifecycleTest {
             assertFalse(dispatched)
             assertTrue(intentAvailable)
             assertTrue(reportedFailure is IllegalStateException)
+        }
+
+    @Test
+    fun foregroundFailureThenDurableCompletionDispatchesThePendingOpenExactlyOnce() =
+        runBlocking {
+            val transferState = MutableStateFlow(AttachmentTransferState.Failed)
+            var materializeAttempts = 0
+            var waitingForWorker = false
+            var intentAvailable = true
+            var dispatchCount = 0
+            val opening =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    val artifact =
+                        materializePersistedAttachmentOpen(
+                            materialize = {
+                                materializeAttempts++
+                                if (materializeAttempts == 1) null else "cached-file"
+                            },
+                            awaitDurableAvailability = {
+                                transferState.first { it == AttachmentTransferState.Available }
+                            },
+                            onWaitingForDurableAvailability = { waitingForWorker = true },
+                        ) ?: return@async false
+                    consumeAndDispatchAttachmentOpen(
+                        consume = {
+                            intentAvailable.also { intentAvailable = false }
+                        },
+                        restore = { intentAvailable = true },
+                        dispatch = {
+                            assertEquals("cached-file", artifact)
+                            dispatchCount++
+                        },
+                    )
+                }
+
+            assertTrue(waitingForWorker)
+            assertFalse(opening.isCompleted)
+            assertEquals(1, materializeAttempts)
+
+            transferState.value = AttachmentTransferState.Available
+
+            assertTrue(opening.await())
+            assertEquals(2, materializeAttempts)
+            assertEquals(1, dispatchCount)
+            assertFalse(intentAvailable)
+
+            val duplicate =
+                consumeAndDispatchAttachmentOpen(
+                    consume = { intentAvailable.also { intentAvailable = false } },
+                    restore = { intentAvailable = true },
+                    dispatch = { dispatchCount++ },
+                )
+            assertFalse(duplicate)
+            assertEquals(1, dispatchCount)
+        }
+
+    @Test
+    fun durableCompletionRestartsVisualMaterializationBeforeThePendingOpenDispatches() =
+        runBlocking {
+            val owner =
+                AttachmentLifecycleOwner().apply {
+                    moveTo(Lifecycle.Event.ON_START)
+                    moveTo(Lifecycle.Event.ON_RESUME)
+                }
+            val transferState = MutableStateFlow(AttachmentTransferState.Failed)
+            val ready = MutableStateFlow(false)
+            var ensureCount = 0
+            var intentAvailable = true
+            var dispatchCount = 0
+            val opening =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    dispatchAttachmentOpenWhenReady(
+                        lifecycle = owner.lifecycle,
+                        awaitReady = {
+                            awaitAttachmentReadyAfterDurableCompletion(
+                                readiness = ready,
+                                transferState = transferState,
+                                ensureMaterialization = {
+                                    ensureCount++
+                                    ready.value = true
+                                },
+                            )
+                        },
+                        isReady = { ready.value },
+                        consume = {
+                            intentAvailable.also { intentAvailable = false }
+                        },
+                        dispatch = { dispatchCount++ },
+                    )
+                }
+
+            assertFalse(opening.isCompleted)
+            assertEquals(0, ensureCount)
+            transferState.value = AttachmentTransferState.Available
+
+            assertTrue(opening.await())
+            assertEquals(1, ensureCount)
+            assertEquals(1, dispatchCount)
+            assertFalse(intentAvailable)
         }
 
     @Test(expected = CancellationException::class)

@@ -64,12 +64,16 @@ class AttachmentDownloadIntentStoreTest {
     }
 
     @Test
-    fun failedDiskCommitDoesNotDiscardTheAlreadyConsumedInMemoryIntent() {
+    fun failedDiskCommitKeepsTheIntentPendingAcrossStoreRecreation() {
         AttachmentDownloadIntentStore(preferences).markOpenIntent(REQUEST_A)
         val store = AttachmentDownloadIntentStore(CommitFailingSharedPreferences(preferences))
 
-        assertTrue(store.consumeOpenIntent(REQUEST_A))
-        assertFalse(store.hasOpenIntent(REQUEST_A))
+        assertFalse(store.consumeOpenIntent(REQUEST_A))
+        assertTrue(store.hasOpenIntent(REQUEST_A))
+        assertTrue(AttachmentDownloadIntentStore(preferences).hasOpenIntent(REQUEST_A))
+
+        assertTrue(AttachmentDownloadIntentStore(preferences).consumeOpenIntent(REQUEST_A))
+        assertFalse(AttachmentDownloadIntentStore(preferences).hasOpenIntent(REQUEST_A))
     }
 
     private companion object {
@@ -103,7 +107,8 @@ private class CommitFailingSharedPreferences(
         }
 
         override fun commit(): Boolean {
-            delegate.commit()
+            // Leave both the delegate's in-memory and durable state unchanged.
+            // The production store must report that consumption did not occur.
             return false
         }
     }

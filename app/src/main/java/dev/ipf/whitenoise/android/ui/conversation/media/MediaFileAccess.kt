@@ -63,6 +63,21 @@ internal suspend fun materializeMediaFileOrNotify(
         mine = mine,
     ) ?: null.also { notifyFailure() }
 
+/**
+ * Keeps a persisted viewer intent alive when the foreground attempt fails but
+ * durable work can still publish the same attachment into the encrypted cache.
+ */
+internal suspend fun <T> materializePersistedAttachmentOpen(
+    materialize: suspend () -> T?,
+    awaitDurableAvailability: suspend () -> Unit,
+    onWaitingForDurableAvailability: () -> Unit,
+): T? {
+    materialize()?.let { return it }
+    onWaitingForDurableAvailability()
+    awaitDurableAvailability()
+    return materialize()
+}
+
 /** Loads bounded reader content while sharing the controller's durable attachment transfer. */
 internal suspend fun loadMediaFileBytes(
     controller: ConversationController,

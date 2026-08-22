@@ -71,6 +71,7 @@ internal class AttachmentDownloadGate(
     private val automatic = ArrayDeque<Waiter>()
     private val interactive = ArrayDeque<Waiter>()
     private val keyedWaiters = KeyedWaiters()
+    private val pendingPromotions = mutableSetOf<String>()
     private val anonymousKey = AtomicLong()
     private var activePermits = 0
     private var consecutiveInteractiveAdmissions = 0
@@ -103,10 +104,18 @@ internal class AttachmentDownloadGate(
         }
     }
 
-    /** Moves a queued automatic identity to the interactive lane without creating another waiter. */
+    /**
+     * Moves a queued automatic identity to the interactive lane without creating another waiter.
+     * A promotion that wins the race with gate registration is retained until that key registers.
+     */
     fun promote(key: String): Boolean =
         synchronized(lock) {
-            val waiters = keyedWaiters.forKey(key) ?: return@synchronized false
+            val waiters =
+                keyedWaiters.forKey(key)
+                    ?: run {
+                        pendingPromotions.add(key)
+                        return@synchronized true
+                    }
             waiters
                 .filter { !it.ownsPermit && it.priority == AttachmentDownloadPriority.Automatic }
                 .forEach { waiter ->
@@ -169,14 +178,25 @@ internal class AttachmentDownloadGate(
         accountRef: String?,
         priority: AttachmentDownloadPriority,
     ): Waiter {
-        val waiter = Waiter(key, accountRef, priority)
-        val admittedImmediately =
+        val waiter =
             synchronized(lock) {
-                keyedWaiters.register(waiter)
-                lane(priority).addLast(waiter)
+                val promotedBeforeRegistration = pendingPromotions.remove(key)
+                val effectivePriority =
+                    if (
+                        priority == AttachmentDownloadPriority.Interactive ||
+                        promotedBeforeRegistration
+                    ) {
+                        AttachmentDownloadPriority.Interactive
+                    } else {
+                        AttachmentDownloadPriority.Automatic
+                    }
+                val registered = Waiter(key, accountRef, effectivePriority)
+                keyedWaiters.register(registered)
+                lane(effectivePriority).addLast(registered)
                 admitAvailableLocked()
-                waiter.ownsPermit
+                registered
             }
+        val admittedImmediately = waiter.ownsPermit
         if (admittedImmediately) return waiter
         try {
             waiter.admitted.await()
@@ -230,7 +250,12 @@ internal class AttachmentDownloadGate(
             nextInteractive
                 ?.also {
                     interactive.remove(it)
-                    consecutiveInteractiveAdmissions += 1
+                    consecutiveInteractiveAdmissions =
+                        if (nextAutomatic == null) {
+                            0
+                        } else {
+                            consecutiveInteractiveAdmissions + 1
+                        }
                 } ?: nextAutomatic?.also {
                 automatic.remove(it)
                 consecutiveInteractiveAdmissions = 0
