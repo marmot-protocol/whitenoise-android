@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.audio.kotlinFunctionBody
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -8,6 +10,34 @@ import java.io.File
 
 /** Regression coverage for issue #1698's local-ready account-switch boundary. */
 class AccountSwitchLocalSnapshotOrderingTest {
+    @Test
+    fun profileSeedSetIncludesEveryVisibleOtherAccountAndExcludesOverflow() {
+        val accounts =
+            (1..6).map { index ->
+                AccountSummaryFfi(
+                    label = "account-$index",
+                    accountIdHex = "id-$index",
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
+                )
+            }
+
+        val seeds =
+            accountSwitchProfileSeedIds(
+                directPeerIds = listOf("peer", "ID-1"),
+                accounts = accounts,
+                targetAccountRef = "account-2",
+            )
+
+        assertEquals(
+            listOf("peer", "ID-1", "id-3", "id-4"),
+            seeds,
+        )
+        assertEquals(MAX_TOP_BAR_OTHER_ACCOUNTS + 1, seeds.size)
+    }
+
     @Test
     fun bindPublishesLocalSnapshotsAndAFrameBeforeCatchUp() {
         val body = controllersSource().readText().kotlinFunctionBody("bind")
@@ -93,6 +123,24 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue("temporary subscriptions must close even for stale/cancelled loads", cleanup > profilesGuard)
         assertTrue("chat-list subscription must close", "chatListSubscription?.close()" in body)
         assertTrue("group subscription must close", "chatsSubscription?.close()" in body)
+    }
+
+    @Test
+    fun localProfileWarmUsesTheTargetAccountAndSharedTopBarLimit() {
+        val source = appStateSource().readText()
+        val snapshot = source.kotlinFunctionBody("loadAccountSwitchLocalSnapshot")
+        val loader = source.kotlinFunctionBody("loadAccountSwitchProfileSeeds")
+
+        assertTrue("the target ref must own the profile seed projection", "targetAccountRef = accountRef" in snapshot)
+        assertTrue("top-bar accounts must join direct-peer profile seeds", "accountSwitchProfileSeedIds" in loader)
+        val seedProjection =
+            source
+                .substringAfter("internal fun accountSwitchProfileSeedIds(")
+                .substringBefore("/**")
+        assertTrue(
+            "the shared top-bar limit must bound profile warming",
+            "take(MAX_TOP_BAR_OTHER_ACCOUNTS)" in seedProjection,
+        )
     }
 
     @Test

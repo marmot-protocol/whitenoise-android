@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.state.MAX_TOP_BAR_OTHER_ACCOUNTS
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.otherAccountAvatars
 import dev.ipf.whitenoise.android.ui.common.Avatar
@@ -91,10 +92,6 @@ fun AccountAvatarButton(
         }
     }
 }
-
-// Cap of non-active account avatars shown inline in the chat-list top bar; past
-// this the stack ends in a "+N" circle that opens the full switcher.
-private const val MAX_TOP_BAR_OTHER_ACCOUNTS = 3
 
 private val TOP_BAR_OTHER_ACCOUNT_SIZE = 34.dp
 

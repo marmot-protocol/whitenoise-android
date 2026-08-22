@@ -1274,29 +1274,64 @@ class ConversationScrollCoordinatorTest {
         }
 
     @Test
-    fun conversationScreenClearsOwnedHighlightsWhenNavigationIsCancelled() {
+    fun conversationScreenStartsReplyHighlightBeforeLoadingAndScrolling() {
         val screen = sourceFile("ConversationScreen.kt").readText()
-        val highlightFunction =
+        val replyNavigation =
             screen
-                .substringAfter("suspend fun showTransientMessageHighlight(messageId: String)")
-                .substringBefore("fun navigateToReplyTarget")
+                .substringAfter("fun navigateToReplyTarget(item: TimelineMessage)")
+                .substringBefore("fun jumpToNextUnreadMention")
+        val highlight = replyNavigation.indexOf("targetHighlight.highlightWhile(targetMessageId)")
+        val load = replyNavigation.indexOf("loadUntilMessageAvailable", startIndex = highlight)
+        val center = replyNavigation.indexOf("centerTimelineItemAt", startIndex = load)
 
-        assertTrue(screen.contains("var transientHighlightOwner by mutableStateOf<Any?>(null)"))
-        assertTrue(highlightFunction.contains("val owner = Any()"))
+        assertTrue("reply target highlighting must start before paging", highlight >= 0 && load > highlight)
+        assertTrue("the same highlight owner must span the scroll", center > load)
+        assertTrue(screen.contains("targetHighlight.clear()"))
+    }
+
+    @Test
+    fun conversationScreenRejectsSupersededReplyAndSearchNavigationAtPagingBoundaries() {
+        val screen = sourceFile("ConversationScreen.kt").readText()
+        val replyNavigation =
+            screen
+                .substringAfter("fun navigateToReplyTarget(item: TimelineMessage)")
+                .substringBefore("fun jumpToNextUnreadMention")
+        val searchNavigation =
+            screen
+                .substringAfter("fun scrollToSearchMatch(match: ConversationSearchMatch)")
+                .substringBefore("// Step the cursor")
+        val searchCallbacks =
+            screen
+                .substringAfter("onSearchQueryChange = {")
+                .substringBefore("onCloseSearch = ::closeSearch")
+
         assertTrue(
-            highlightFunction.contains(
-                "try {\n            delay(1_500L)\n        } finally {",
-            ),
+            "reply navigation must register with the shared owner",
+            "targetNavigation.begin()" in replyNavigation,
         )
-        assertTrue(highlightFunction.contains("if (navigationState.transientHighlightOwner === owner)"))
-        assertEquals(5, Regex("showTransientMessageHighlight\\(").findAll(screen).count())
+        assertTrue(
+            "reply navigation must re-check ownership after paging and before centering",
+            replyNavigation.indexOf("val available = controller.loadUntilMessageAvailable") <
+                replyNavigation.lastIndexOf("if (!navigationRequest.isCurrent())") &&
+                replyNavigation.lastIndexOf("if (!navigationRequest.isCurrent())") <
+                replyNavigation.indexOf("centerTimelineItemAt"),
+        )
+        assertEquals(2, Regex("targetNavigation.begin\\(\\)").findAll(searchNavigation).count())
+        assertEquals(
+            2,
+            Regex("if \\(!available \\|\\| !navigationRequest.isCurrent\\(\\)\\)")
+                .findAll(searchNavigation)
+                .count(),
+        )
+        assertEquals(2, Regex("targetNavigation.cancel\\(\\)").findAll(searchCallbacks).count())
     }
 
     @Test
     fun conversationScreenHighlightsOnlyCompletedCenteringCommands() {
         val screen = sourceFile("ConversationScreen.kt").readText()
 
-        assertEquals(4, Regex("if \\(!centered\\)").findAll(screen).count())
+        assertEquals(2, Regex("if \\(!centered\\)").findAll(screen).count())
+        assertEquals(1, Regex("if \\(centered && navigationRequest.isCurrent\\(\\)\\)").findAll(screen).count())
     }
 
     @Test

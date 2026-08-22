@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -71,6 +70,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -99,6 +99,8 @@ import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOr
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.flow.first
+
+internal const val COMPOSER_RESIZE_INDICATOR_TAG = "composer-resize-indicator"
 
 // BasicTextField (not Material3 TextField) so the pill height isn't pinned
 // to the 56dp filled-textfield minimum.
@@ -505,9 +507,9 @@ internal fun ComposerPill(
                 ) {
                     Box(
                         Modifier
-                            .offset(y = (-6).dp)
                             .width(36.dp)
                             .height(4.dp)
+                            .testTag(COMPOSER_RESIZE_INDICATOR_TAG)
                             .background(
                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                                 RoundedCornerShape(2.dp),

@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -10,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
@@ -30,6 +33,8 @@ import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
+internal const val MESSAGE_TARGET_HIGHLIGHT_FADE_MILLIS = 300
+
 /** Shared frame for caption and plain-text bubbles. */
 @Composable
 @Suppress("FunctionNaming")
@@ -44,6 +49,12 @@ internal fun MessageBubbleFrame(
     shape: Shape = RoundedCornerShape(18.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val highlightProgress =
+        animateFloatAsState(
+            targetValue = if (highlighted) 1f else 0f,
+            animationSpec = tween(durationMillis = MESSAGE_TARGET_HIGHLIGHT_FADE_MILLIS),
+            label = "messageTargetHighlight",
+        )
     val highlightColor =
         messageTargetHighlightColor(
             customBorderArgb = presentation.borderOverrideArgb,
@@ -51,9 +62,10 @@ internal fun MessageBubbleFrame(
         )
     val highlightModifier =
         messageTargetHighlightModifier(
-            highlighted = highlighted,
+            progress = highlightProgress,
             customBorderArgb = presentation.borderOverrideArgb,
             color = highlightColor,
+            enabled = !presentation.suppressBorder,
         )
     val mentionModifier =
         messageMentionFrameModifier(
@@ -70,7 +82,7 @@ internal fun MessageBubbleFrame(
         shape = shape,
         border =
             messageBubbleBorder(
-                highlighted = highlighted,
+                highlighted = false,
                 mine = mine,
                 customArgb = presentation.borderOverrideArgb,
                 persistedFailure = presentation.suppressBorder,
@@ -107,6 +119,12 @@ internal fun MediaCaptionFrame(
     media: @Composable ColumnScope.() -> Unit,
     caption: @Composable ColumnScope.() -> Unit,
 ) {
+    val highlightProgress =
+        animateFloatAsState(
+            targetValue = if (highlighted) 1f else 0f,
+            animationSpec = tween(durationMillis = MESSAGE_TARGET_HIGHLIGHT_FADE_MILLIS),
+            label = "mediaTargetHighlight",
+        )
     val highlightColor =
         messageTargetHighlightColor(
             customBorderArgb = presentation.borderOverrideArgb,
@@ -114,9 +132,10 @@ internal fun MediaCaptionFrame(
         )
     val highlightModifier =
         messageTargetHighlightModifier(
-            highlighted = highlighted,
+            progress = highlightProgress,
             customBorderArgb = presentation.borderOverrideArgb,
             color = highlightColor,
+            enabled = !presentation.suppressBorder,
         )
     val mentionModifier =
         messageMentionFrameModifier(
@@ -133,7 +152,7 @@ internal fun MediaCaptionFrame(
         shape = shape,
         border =
             messageBubbleBorder(
-                highlighted = highlighted,
+                highlighted = false,
                 mine = mine,
                 customArgb = presentation.borderOverrideArgb,
                 persistedFailure = presentation.suppressBorder,
@@ -241,19 +260,27 @@ internal fun messageTargetHighlightColor(
 ): Color = customBorderArgb?.let(::colorFromArgb) ?: fallback
 
 private fun messageTargetHighlightModifier(
-    highlighted: Boolean,
+    progress: State<Float>,
     customBorderArgb: Long?,
     color: Color,
+    enabled: Boolean,
 ): Modifier =
-    if (highlighted && customBorderArgb != null) {
+    if (enabled) {
         Modifier.drawWithContent {
             drawContent()
-            val inset = 4.dp.toPx()
+            val alpha = progress.value.coerceIn(0f, 1f)
+            if (alpha <= 0f) return@drawWithContent
+            val inset = if (customBorderArgb != null) 4.dp.toPx() else 1.dp.toPx()
             drawRoundRect(
-                color = color,
+                color = color.copy(alpha = alpha),
                 topLeft = Offset(inset, inset),
                 size = Size((size.width - inset * 2).coerceAtLeast(0f), (size.height - inset * 2).coerceAtLeast(0f)),
-                cornerRadius = CornerRadius(14.dp.toPx(), 14.dp.toPx()),
+                cornerRadius =
+                    if (customBorderArgb != null) {
+                        CornerRadius(14.dp.toPx(), 14.dp.toPx())
+                    } else {
+                        CornerRadius(17.dp.toPx(), 17.dp.toPx())
+                    },
                 style = Stroke(width = 2.dp.toPx()),
             )
         }

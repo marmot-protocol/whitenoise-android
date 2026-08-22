@@ -873,6 +873,9 @@ internal fun AccountSummaryFfi.isSignedInSigningAccount(): Boolean =
         label.isNotBlank() &&
         (localSigning || externalSigning)
 
+/** Inline account profiles that the chat-list top bar can render at once. */
+internal const val MAX_TOP_BAR_OTHER_ACCOUNTS = 3
+
 /**
  * Signed-in signing accounts other than [activeLabel], for the chat-list top
  * bar's one-tap switcher row. Signed-out, read-only (neither local nor
@@ -900,6 +903,23 @@ internal fun otherAccountAvatars(
             account.label != activeLabel
     }
 }
+
+/**
+ * Profiles that must be materialized before an account-switch composition is
+ * published. Direct-chat peers seed the target chat list, while the bounded
+ * account ids seed the other-account avatars rendered in its top bar.
+ */
+internal fun accountSwitchProfileSeedIds(
+    directPeerIds: List<String>,
+    accounts: List<AccountSummaryFfi>,
+    targetAccountRef: String,
+): List<String> =
+    (
+        directPeerIds +
+            otherAccountAvatars(accounts, targetAccountRef)
+                .take(MAX_TOP_BAR_OTHER_ACCOUNTS)
+                .map(AccountSummaryFfi::accountIdHex)
+    ).distinctBy { it.lowercase(Locale.ROOT) }
 
 /**
  * Whether the main shell should pop its in-shell navigation (Settings, an open
@@ -5039,7 +5059,13 @@ class WhiteNoiseAppState private constructor(
             recordAccountSwitchPreloadStage(accountRef, memberStage, rows.size)
 
             val activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
-            val profiles = loadAccountSwitchProfileSeeds(rows, memberIds, activeAccountIdHex)
+            val profiles =
+                loadAccountSwitchProfileSeeds(
+                    rows = rows,
+                    memberIds = memberIds,
+                    activeAccountIdHex = activeAccountIdHex,
+                    targetAccountRef = accountRef,
+                )
             ensureAccountSwitchRequestIsCurrent(generation)
             recordAccountSwitchPreloadStage(accountRef, "persisted-profiles-ready", rows.size)
             AccountSwitchLocalSnapshot(
@@ -5097,6 +5123,7 @@ class WhiteNoiseAppState private constructor(
         rows: List<ChatListRowFfi>,
         memberIds: List<AppGroupMemberIdsFfi>,
         activeAccountIdHex: String?,
+        targetAccountRef: String,
     ): List<AccountSwitchProfileSeed> {
         val rowsByGroup = rows.associateBy { it.groupIdHex.lowercase(Locale.ROOT) }
         val peerIds =
@@ -5105,9 +5132,10 @@ class WhiteNoiseAppState private constructor(
                     GroupProjector.isDm(row.conversationKind, memberCount, row.groupName)
                 } == true
             }
+        val profileIds = accountSwitchProfileSeedIds(peerIds, accounts, targetAccountRef)
         return coroutineScope {
             val gate = Semaphore(PROFILE_PRESENTATION_WARM_FANOUT)
-            peerIds
+            profileIds
                 .map { id -> async { gate.withPermit { loadAccountSwitchProfileSeed(id) } } }
                 .awaitAll()
         }

@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -215,8 +216,8 @@ private class ConversationNavigationState(
     var initialTimelineLoadStarted by mutableStateOf(false)
     var initialTimelineBackfillNoProgress by mutableStateOf(false)
     var initialTimelineBackfillRetryGeneration by mutableStateOf(0L)
-    var highlightedMessageId by mutableStateOf<String?>(null)
-    var transientHighlightOwner by mutableStateOf<Any?>(null)
+    val targetHighlight = MessageTargetHighlightLifecycle()
+    val targetNavigation = MessageTargetNavigationOwner()
     var navigateReplyJob by mutableStateOf<Job?>(null)
     var searchOpen by mutableStateOf(false)
     var searchQuery by mutableStateOf("")
@@ -230,7 +231,14 @@ private class ConversationNavigationState(
     fun cancelJobs() {
         searchJob?.cancel()
         navigateReplyJob?.cancel()
+        targetNavigation.cancel()
+        targetHighlight.clear()
     }
+}
+
+private fun LazyListLayoutInfo.isItemFullyVisible(index: Int): Boolean {
+    val item = visibleItemsInfo.firstOrNull { it.index == index } ?: return false
+    return item.offset >= viewportStartOffset && item.offset + item.size <= viewportEndOffset
 }
 
 private fun ConversationController.initialTimelineBackfillSnapshot() =
@@ -1604,6 +1612,7 @@ internal fun ConversationScreen(
         targetMessageId: String,
         fallbackTargetIndex: Int,
         reason: ConversationScrollReason,
+        skipIfFullyVisible: Boolean = false,
     ): Boolean {
         val completed =
             scrollCoordinator.programmaticJump(
@@ -1619,6 +1628,9 @@ internal fun ConversationScreen(
                     animateScrollToItem(targetIndex) {
                         currentTimelineListIndex(targetMessageId) ?: targetIndex
                     }
+                    return@programmaticJump
+                }
+                if (skipIfFullyVisible && layoutInfo.isItemFullyVisible(targetIndex)) {
                     return@programmaticJump
                 }
                 val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
@@ -1667,17 +1679,10 @@ internal fun ConversationScreen(
     }
 
     suspend fun showTransientMessageHighlight(messageId: String) {
-        val owner = Any()
-        navigationState.transientHighlightOwner = owner
-        navigationState.highlightedMessageId = messageId
-        try {
-            delay(1_500L)
-        } finally {
-            if (navigationState.transientHighlightOwner === owner) {
-                navigationState.transientHighlightOwner = null
-                navigationState.highlightedMessageId = null
-            }
-        }
+        navigationState.targetHighlight.highlightWhile(
+            messageId = messageId,
+            postSettleDwellMillis = TRANSIENT_MESSAGE_HIGHLIGHT_DWELL_MILLIS,
+        ) { true }
     }
 
     fun saveQuickReactionEmojis(choices: List<String>) {
@@ -1695,44 +1700,60 @@ internal fun ConversationScreen(
     }
 
     fun navigateToReplyTarget(item: TimelineMessage) {
-        navigationState.highlightedMessageId = null
+        navigationState.searchJob?.cancel()
+        navigationState.targetHighlight.clear()
         navigationState.navigateReplyJob?.cancel()
+        val navigationRequest = navigationState.targetNavigation.begin()
         navigationState.navigateReplyJob =
             scope.launch {
+                if (!navigationRequest.isCurrent()) return@launch
                 val targetMessageId = controller.replyTargetMessageId(item)
-                if (targetMessageId == null || !controller.loadUntilMessageAvailable(targetMessageId)) {
+                if (targetMessageId == null) {
                     appState.present(R.string.toast_original_message_unavailable)
                     return@launch
                 }
-                // Resolve the target in the rendered (edit-filtered) list the
-                // LazyColumn shows — an unfiltered index is off by the edits above it.
-                val timelineIndex =
-                    controller.timeline
-                        .filterNot { MessageProjector.isEdit(it.record) }
-                        .indexOfFirst { it.record.messageIdHex == targetMessageId }
-                if (timelineIndex < 0) {
-                    appState.present(R.string.toast_original_message_unavailable)
-                    return@launch
-                }
-                val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-                val centered =
+                navigationState.targetHighlight.highlightWhile(targetMessageId) {
+                    if (!navigationRequest.isCurrent()) return@highlightWhile false
+                    val available = controller.loadUntilMessageAvailable(targetMessageId)
+                    if (!navigationRequest.isCurrent()) return@highlightWhile false
+                    if (!available) {
+                        appState.present(R.string.toast_original_message_unavailable)
+                        return@highlightWhile false
+                    }
+                    // Resolve the target in the rendered (edit-filtered) list the
+                    // LazyColumn shows — an unfiltered index is off by the edits above it.
+                    val timelineIndex =
+                        controller.timeline
+                            .filterNot { MessageProjector.isEdit(it.record) }
+                            .indexOfFirst { it.record.messageIdHex == targetMessageId }
+                    if (timelineIndex < 0) {
+                        appState.present(R.string.toast_original_message_unavailable)
+                        return@highlightWhile false
+                    }
+                    if (!navigationRequest.isCurrent()) return@highlightWhile false
+                    val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
                     centerTimelineItemAt(
                         targetMessageId,
                         1 + olderMessagesHeaderCount + timelineIndex,
                         ConversationScrollReason.Reply,
+                        skipIfFullyVisible = true,
                     )
-                if (!centered) return@launch
-                showTransientMessageHighlight(targetMessageId)
+                }
             }
     }
 
     fun jumpToNextUnreadMention() {
         val targetMessageId = unreadMentionMessageIds.firstOrNull() ?: return
-        navigationState.highlightedMessageId = null
+        navigationState.searchJob?.cancel()
+        navigationState.targetHighlight.clear()
         navigationState.navigateReplyJob?.cancel()
+        val navigationRequest = navigationState.targetNavigation.begin()
         navigationState.navigateReplyJob =
             scope.launch {
-                if (!controller.loadUntilMessageAvailable(targetMessageId)) {
+                if (!navigationRequest.isCurrent()) return@launch
+                val available = controller.loadUntilMessageAvailable(targetMessageId)
+                if (!navigationRequest.isCurrent()) return@launch
+                if (!available) {
                     appState.present(R.string.toast_original_message_unavailable)
                     return@launch
                 }
@@ -1744,6 +1765,7 @@ internal fun ConversationScreen(
                     appState.present(R.string.toast_original_message_unavailable)
                     return@launch
                 }
+                if (!navigationRequest.isCurrent()) return@launch
                 val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
                 val centered =
                     centerTimelineItemAt(
@@ -1953,32 +1975,42 @@ internal fun ConversationScreen(
         }
     }
 
-    suspend fun centerLoadedSearchMessage(messageIdHex: String) {
+    suspend fun centerLoadedSearchMessage(
+        messageIdHex: String,
+        navigationRequest: MessageTargetNavigationOwner.Request,
+    ) {
+        if (!navigationRequest.isCurrent()) return
         val timelineIndex =
             controller.timeline
                 .filterNot { MessageProjector.isEdit(it.record) }
                 .indexOfFirst { it.record.messageIdHex == messageIdHex }
-        if (timelineIndex < 0) return
-        val liveOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-        val centered =
-            centerTimelineItemAt(
-                messageIdHex,
-                1 + liveOlderHeaderCount + timelineIndex,
-                ConversationScrollReason.Search,
-            )
-        if (!centered) return
-        showTransientMessageHighlight(messageIdHex)
+        if (timelineIndex >= 0 && navigationRequest.isCurrent()) {
+            val liveOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+            val centered =
+                centerTimelineItemAt(
+                    messageIdHex,
+                    1 + liveOlderHeaderCount + timelineIndex,
+                    ConversationScrollReason.Search,
+                )
+            if (centered && navigationRequest.isCurrent()) {
+                showTransientMessageHighlight(messageIdHex)
+            }
+        }
     }
 
     fun scrollToSearchMatch(match: ConversationSearchMatch) {
         val previousSearchJob = navigationState.searchJob
         previousSearchJob?.cancel()
-        navigationState.highlightedMessageId = null
+        navigationState.navigateReplyJob?.cancel()
+        navigationState.targetHighlight.clear()
+        val navigationRequest = navigationState.targetNavigation.begin()
         navigationState.searchJob =
             scope.launch {
                 previousSearchJob?.join()
-                if (!controller.loadSearchResultMessageAvailable(match)) return@launch
-                centerLoadedSearchMessage(match.messageIdHex)
+                if (!navigationRequest.isCurrent()) return@launch
+                val available = controller.loadSearchResultMessageAvailable(match)
+                if (!available || !navigationRequest.isCurrent()) return@launch
+                centerLoadedSearchMessage(match.messageIdHex, navigationRequest)
             }
     }
 
@@ -1987,12 +2019,16 @@ internal fun ConversationScreen(
     fun scrollToSearchMatch(messageIdHex: String) {
         val previousSearchJob = navigationState.searchJob
         previousSearchJob?.cancel()
-        navigationState.highlightedMessageId = null
+        navigationState.navigateReplyJob?.cancel()
+        navigationState.targetHighlight.clear()
+        val navigationRequest = navigationState.targetNavigation.begin()
         navigationState.searchJob =
             scope.launch {
                 previousSearchJob?.join()
-                if (!controller.loadUntilMessageAvailable(messageIdHex)) return@launch
-                centerLoadedSearchMessage(messageIdHex)
+                if (!navigationRequest.isCurrent()) return@launch
+                val available = controller.loadUntilMessageAvailable(messageIdHex)
+                if (!available || !navigationRequest.isCurrent()) return@launch
+                centerLoadedSearchMessage(messageIdHex, navigationRequest)
             }
     }
 
@@ -2013,8 +2049,10 @@ internal fun ConversationScreen(
         navigationState.searchPinnedMatchId = null
         val previousSearchJob = navigationState.searchJob
         previousSearchJob?.cancel()
+        navigationState.navigateReplyJob?.cancel()
+        navigationState.targetNavigation.cancel()
         val expectedRestoreIntent = scrollCoordinator.intentToken
-        navigationState.highlightedMessageId = null
+        navigationState.targetHighlight.clear()
         // A deep search jump can evict the original viewport from the capped
         // window. Page back to its durable local message before asking the
         // coordinator to restore the logical anchor and exact offset.
@@ -2794,14 +2832,18 @@ internal fun ConversationScreen(
                 onSearchQueryChange = {
                     navigationState.searchJob?.cancel()
                     navigationState.searchJob = null
-                    navigationState.highlightedMessageId = null
+                    navigationState.navigateReplyJob?.cancel()
+                    navigationState.targetNavigation.cancel()
+                    navigationState.targetHighlight.clear()
                     navigationState.searchQuery = it
                     navigationState.searchPinnedMatchId = null
                 },
                 onClearSearch = {
                     navigationState.searchJob?.cancel()
                     navigationState.searchJob = null
-                    navigationState.highlightedMessageId = null
+                    navigationState.navigateReplyJob?.cancel()
+                    navigationState.targetNavigation.cancel()
+                    navigationState.targetHighlight.clear()
                     navigationState.searchQuery = ""
                     navigationState.searchPinnedMatchId = null
                 },
@@ -3222,7 +3264,7 @@ internal fun ConversationScreen(
                                     eventCardResolver = eventCardResolver,
                                     documentSaveFallback = documentSaveFallback,
                                     composerTextState = composerTextState,
-                                    highlighted = messageId == navigationState.highlightedMessageId,
+                                    highlighted = messageId == navigationState.targetHighlight.highlightedMessageId,
                                     selectionMode = selectionMode,
                                     textSelectionMode = textSelectionMessageId == messageId,
                                     onTextSelectionModeChange = { enabled ->

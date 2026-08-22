@@ -40,6 +40,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -247,11 +249,13 @@ internal fun SettingsActionRow(
     title: String,
     modifier: Modifier = Modifier,
     value: String? = null,
+    supportingText: String? = null,
     enabled: Boolean = true,
     comingSoon: Boolean = false,
     inProgress: Boolean = false,
     iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     titleColor: Color = Color.Unspecified,
+    disabledReason: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
     Row(
@@ -264,6 +268,12 @@ internal fun SettingsActionRow(
                         Modifier
                     } else {
                         Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                    },
+                ).then(
+                    if (!enabled && disabledReason != null) {
+                        Modifier.semantics { stateDescription = disabledReason }
+                    } else {
+                        Modifier
                     },
                 ).padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm)
                 .alpha(if (enabled) 1f else 0.45f),
@@ -288,6 +298,15 @@ internal fun SettingsActionRow(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (supportingText != null) {
+                Text(
+                    supportingText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }

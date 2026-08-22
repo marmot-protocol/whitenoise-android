@@ -1013,13 +1013,22 @@ internal fun GroupDetailsScreen(
                     icon = Icons.Default.Schedule,
                     title = stringResource(R.string.disappearing_messages),
                     value = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
+                    supportingText =
+                        stringResource(
+                            if (canEdit) {
+                                R.string.disappearing_row_hint_admin
+                            } else {
+                                R.string.disappearing_row_hint_readonly
+                            },
+                        ),
+                    enabled = canEdit && !mutationsBlocked,
                     inProgress = activeMutation?.action == GroupMutationAction.DisappearingMessages,
-                    onClick =
-                        if (canEdit && !mutationsBlocked) {
-                            { showDisappearingPicker = true }
-                        } else {
-                            null
-                        },
+                    disabledReason =
+                        stringResource(R.string.disappearing_row_hint_readonly).takeUnless { canEdit },
+                    // Keep a disabled button semantic for role-gated rows. A
+                    // missing click action looked enabled but silently ignored
+                    // touch and accessibility activation (#2201).
+                    onClick = { showDisappearingPicker = true },
                 )
                 SettingsActionRow(
                     icon = Icons.Default.Palette,
