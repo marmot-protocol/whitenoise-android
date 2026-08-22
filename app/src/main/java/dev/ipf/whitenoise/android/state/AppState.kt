@@ -5356,9 +5356,12 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private suspend fun clearConversationShortcutsForAccount(accountRef: String) {
+    private suspend fun clearConversationShortcutsForAccount(
+        accountRef: String,
+        includeUnscopedLegacy: Boolean,
+    ) {
         withContext(Dispatchers.IO) {
-            localNotificationPresenter.clearConversationShortcutsForAccount(accountRef)
+            localNotificationPresenter.clearConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
         }
     }
 
@@ -5415,7 +5418,10 @@ class WhiteNoiseAppState private constructor(
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
-        clearConversationShortcutsForAccount(signedOutRef)
+        clearConversationShortcutsForAccount(
+            accountRef = signedOutRef,
+            includeUnscopedLegacy = accounts.none { it.label != signedOutRef && it.isSignedInSigningAccount() },
+        )
         // The account is signed out engine-side once this returns; no code
         // below may issue further account-scoped FFI calls for signedOutRef.
         val engineOutcome =
@@ -5482,7 +5488,10 @@ class WhiteNoiseAppState private constructor(
         val wipedRef = activeAccountRef ?: return null
         conversationDictation.onAccountUnavailable(wipedRef)
         clearInMemoryMediaCaches()
-        clearConversationShortcutsForAccount(wipedRef)
+        clearConversationShortcutsForAccount(
+            accountRef = wipedRef,
+            includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },
+        )
         try {
             val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
             val wipeResult =

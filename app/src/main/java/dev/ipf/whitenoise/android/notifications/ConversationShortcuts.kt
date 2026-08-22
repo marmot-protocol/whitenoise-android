@@ -22,12 +22,14 @@ internal fun conversationShortcutIds(shortcuts: List<ShortcutInfoCompat>): List<
 internal data class ConversationShortcutCleanupPlan(
     val dynamicIds: List<String>,
     val longLivedIds: List<String>,
+    val disabledIds: List<String>,
 )
 
 internal fun directShareConversationShortcutCleanupPlan(dynamicShortcuts: List<ShortcutInfoCompat>) =
     ConversationShortcutCleanupPlan(
         dynamicIds = conversationShortcutIds(dynamicShortcuts),
         longLivedIds = emptyList(),
+        disabledIds = emptyList(),
     )
 
 /**
@@ -45,20 +47,22 @@ internal fun hideConversationShortcutsFromDirectShare(context: Context) {
     runCatching { ShortcutManagerCompat.removeDynamicShortcuts(context, plan.dynamicIds) }
 }
 
+/**
+ * Select shortcuts that are provably owned by [accountRef]. Legacy shortcuts
+ * lack an owner stamp, so [includeUnscopedLegacy] is safe only when no other
+ * signed-in account remains and therefore cannot own one of those entries.
+ */
 internal fun conversationShortcutIdsForAccount(
     shortcuts: List<ShortcutInfoCompat>,
     accountRef: String,
+    includeUnscopedLegacy: Boolean,
 ): List<String> {
     val accountScope = conversationShortcutAccountScope(accountRef) ?: return emptyList()
     return shortcuts
         .filter { shortcut ->
             if (!isConversationShortcutId(shortcut.id)) return@filter false
             val ownerScope = shortcut.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA)
-            // Older app versions did not stamp account ownership. There is no
-            // sound way to attribute those retained shortcuts during a wipe,
-            // so remove them conservatively rather than leak signed-out chat
-            // metadata through Android's cached conversation surfaces.
-            ownerScope.isNullOrBlank() || ownerScope == accountScope
+            ownerScope == accountScope || (includeUnscopedLegacy && ownerScope.isNullOrBlank())
         }.map { it.id }
         .distinct()
 }
@@ -66,11 +70,13 @@ internal fun conversationShortcutIdsForAccount(
 internal fun accountConversationShortcutCleanupPlan(
     shortcuts: List<ShortcutInfoCompat>,
     accountRef: String,
+    includeUnscopedLegacy: Boolean,
 ): ConversationShortcutCleanupPlan {
-    val accountIds = conversationShortcutIdsForAccount(shortcuts, accountRef)
+    val accountIds = conversationShortcutIdsForAccount(shortcuts, accountRef, includeUnscopedLegacy)
     return ConversationShortcutCleanupPlan(
         dynamicIds = accountIds,
         longLivedIds = accountIds,
+        disabledIds = accountIds,
     )
 }
 
@@ -78,6 +84,7 @@ internal fun accountConversationShortcutCleanupPlan(
 internal fun clearConversationShortcutsForAccount(
     context: Context,
     accountRef: String,
+    includeUnscopedLegacy: Boolean,
 ) {
     val plan =
         accountConversationShortcutCleanupPlan(
@@ -93,7 +100,11 @@ internal fun clearConversationShortcutsForAccount(
                     ShortcutManagerCompat.getDynamicShortcuts(context)
                 },
             accountRef = accountRef,
+            includeUnscopedLegacy = includeUnscopedLegacy,
         )
+    if (plan.disabledIds.isNotEmpty()) {
+        runCatching { ShortcutManagerCompat.disableShortcuts(context, plan.disabledIds, "") }
+    }
     if (plan.dynamicIds.isNotEmpty()) {
         runCatching { ShortcutManagerCompat.removeDynamicShortcuts(context, plan.dynamicIds) }
     }

@@ -120,8 +120,11 @@ class LocalNotificationPresenter(
         shortcutLastUsed.clear()
     }
 
-    fun clearConversationShortcutsForAccount(accountRef: String) {
-        clearConversationShortcutsForAccount(context, accountRef)
+    fun clearConversationShortcutsForAccount(
+        accountRef: String,
+        includeUnscopedLegacy: Boolean,
+    ) {
+        clearConversationShortcutsForAccount(context, accountRef, includeUnscopedLegacy)
         val accountScope = conversationShortcutAccountScope(accountRef) ?: return
         shortcutSnapshots
             .filterValues { it.accountScope == accountScope }

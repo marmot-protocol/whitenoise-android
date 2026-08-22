@@ -24,7 +24,7 @@ class ConversationShortcutLifecycleCoverageTest {
 
         assertTrue(
             "sign-out must clear dynamic and long-lived shortcuts for the signed-out account",
-            "clearConversationShortcutsForAccount(signedOutRef)" in body,
+            "accountRef = signedOutRef" in body && "includeUnscopedLegacy = accounts.none" in body,
         )
     }
 
@@ -35,7 +35,7 @@ class ConversationShortcutLifecycleCoverageTest {
                 "suspend fun signOutAndWipeActiveAccount",
                 "suspend fun exportEncryptedSecretKeyBackup",
             )
-        val clearIndex = body.indexOf("clearConversationShortcutsForAccount(wipedRef)")
+        val clearIndex = body.indexOf("accountRef = wipedRef")
         val wipeIndex = body.indexOf("signOutAndWipe(wipedRef)")
 
         assertTrue(

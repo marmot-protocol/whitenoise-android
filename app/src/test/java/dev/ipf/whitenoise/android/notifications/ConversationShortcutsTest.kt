@@ -38,18 +38,78 @@ class ConversationShortcutsTest {
 
         assertEquals(listOf(accountA.id, accountB.id), plan.dynamicIds)
         assertTrue(plan.longLivedIds.isEmpty())
+        assertTrue(plan.disabledIds.isEmpty())
     }
 
     @Test
-    fun accountRemovalPlan_removesOwnedAndUnscopedLegacyShortcutsButPreservesOtherAccount() {
+    fun partialAccountRemovalPlan_preservesOtherAccountAndUnscopedLegacyShortcuts() {
         val accountA = shortcut("account-a", "group-a")
         val accountB = shortcut("account-b", "group-b")
-        val legacy = shortcut("account-a", "legacy", includeAccountScope = false)
+        val unscopedLegacy = shortcut("account-b", "legacy", includeAccountScope = false)
 
-        val plan = accountConversationShortcutCleanupPlan(listOf(accountA, accountB, legacy), "account-a")
+        val plan =
+            accountConversationShortcutCleanupPlan(
+                shortcuts = listOf(accountA, accountB, unscopedLegacy),
+                accountRef = "account-a",
+                includeUnscopedLegacy = false,
+            )
 
-        assertEquals(listOf(accountA.id, legacy.id), plan.dynamicIds)
-        assertEquals(listOf(accountA.id, legacy.id), plan.longLivedIds)
+        assertEquals(listOf(accountA.id), plan.dynamicIds)
+        assertEquals(listOf(accountA.id), plan.longLivedIds)
+        assertEquals(listOf(accountA.id), plan.disabledIds)
+    }
+
+    @Test
+    fun lastAccountRemovalPlan_removesUnscopedLegacyShortcuts() {
+        val accountA = shortcut("account-a", "group-a")
+        val unscopedLegacy = shortcut("account-a", "legacy", includeAccountScope = false)
+
+        val plan =
+            accountConversationShortcutCleanupPlan(
+                shortcuts = listOf(accountA, unscopedLegacy),
+                accountRef = "account-a",
+                includeUnscopedLegacy = true,
+            )
+
+        assertEquals(listOf(accountA.id, unscopedLegacy.id), plan.dynamicIds)
+        assertEquals(listOf(accountA.id, unscopedLegacy.id), plan.longLivedIds)
+        assertEquals(
+            "owned and legacy pinned copies must be disabled when no other account can own them",
+            listOf(accountA.id, unscopedLegacy.id),
+            plan.disabledIds,
+        )
+    }
+
+    @Test
+    fun accountRemovalPlan_disablesOwnedShortcutForPinnedCopies() {
+        val owned = shortcut("account-a", "pinned")
+
+        val plan =
+            accountConversationShortcutCleanupPlan(
+                shortcuts = listOf(owned),
+                accountRef = "account-a",
+                includeUnscopedLegacy = false,
+            )
+
+        assertEquals(
+            "owned IDs must be disabled so Android invalidates any user-pinned copy",
+            listOf(owned.id),
+            plan.disabledIds,
+        )
+    }
+
+    @Test
+    fun accountRemovalPlan_doesNotDisableAnotherAccountsPinnedCopy() {
+        val retained = shortcut("account-b", "pinned")
+
+        val plan =
+            accountConversationShortcutCleanupPlan(
+                shortcuts = listOf(retained),
+                accountRef = "account-a",
+                includeUnscopedLegacy = false,
+            )
+
+        assertTrue(plan.disabledIds.isEmpty())
     }
 
     @Test
