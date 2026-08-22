@@ -479,13 +479,17 @@ class NotificationAccountIsolationNavigationTest {
             ).build()
 
     private fun awaitCondition(condition: () -> Boolean) {
-        var elapsedMillis = 0L
-        while (elapsedMillis <= ROUTE_TIMEOUT_MILLIS) {
+        val deadlineNanos =
+            System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(ROUTE_TIMEOUT_MILLIS)
+        while (System.nanoTime() <= deadlineNanos) {
             composeRule.waitForIdle()
             ShadowLooper.idleMainLooper()
             if (condition()) return
+            // The route also uses real Dispatchers.IO/Default workers. Give
+            // those threads real wall-clock time rather than exhausting a
+            // synthetic timeout by advancing only Robolectric's main looper.
+            Thread.sleep(POLL_INTERVAL_MILLIS)
             ShadowLooper.idleMainLooper(POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
-            elapsedMillis += POLL_INTERVAL_MILLIS
         }
         throw AssertionError("Condition not met within ${ROUTE_TIMEOUT_MILLIS}ms")
     }

@@ -5350,12 +5350,16 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private fun hideConversationShortcutsFromDirectShare() {
-        localNotificationPresenter.hideConversationShortcutsFromDirectShare()
+    private suspend fun hideConversationShortcutsFromDirectShare() {
+        withContext(Dispatchers.IO) {
+            localNotificationPresenter.hideConversationShortcutsFromDirectShare()
+        }
     }
 
-    private fun clearConversationShortcutsForAccount(accountRef: String) {
-        localNotificationPresenter.clearConversationShortcutsForAccount(accountRef)
+    private suspend fun clearConversationShortcutsForAccount(accountRef: String) {
+        withContext(Dispatchers.IO) {
+            localNotificationPresenter.clearConversationShortcutsForAccount(accountRef)
+        }
     }
 
     /**
