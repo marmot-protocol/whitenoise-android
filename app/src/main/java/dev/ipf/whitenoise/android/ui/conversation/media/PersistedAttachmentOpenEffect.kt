@@ -8,6 +8,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -91,4 +92,21 @@ internal suspend fun consumeAndDispatchAttachmentOpen(
             .exceptionOrNull()
             ?.let(failure::addSuppressed)
         throw failure
+    }
+
+/** Reports a restored dispatch failure without turning it into an uncaught Compose effect failure. */
+@Suppress("TooGenericExceptionCaught") // The injected platform launcher can surface any non-cancellation failure.
+internal suspend fun consumeAndDispatchAttachmentOpenReportingFailure(
+    consume: suspend () -> Boolean,
+    restore: suspend () -> Unit,
+    dispatch: suspend () -> Unit,
+    onFailure: (Throwable) -> Unit,
+): Boolean =
+    try {
+        consumeAndDispatchAttachmentOpen(consume, restore, dispatch)
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (failure: Throwable) {
+        onFailure(failure)
+        false
     }

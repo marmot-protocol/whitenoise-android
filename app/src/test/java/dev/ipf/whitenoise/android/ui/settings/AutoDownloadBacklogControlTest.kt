@@ -73,9 +73,22 @@ class AutoDownloadBacklogControlTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/auto_download_paused_restart_light.png")
     }
 
-    private fun render() {
+    @Test
+    fun pausedAccountRestartBoundaryUsesDarkThemeColors() {
+        AttachmentDownloadIntentStore(preferences).pauseAutomatic(ACCOUNT_REF)
+
+        render(darkTheme = true)
+
+        composeRule
+            .onNodeWithText(context.getString(R.string.media_auto_download_restart))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/auto_download_paused_restart_dark.png")
+    }
+
+    private fun render(darkTheme: Boolean = false) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) {
+            WhiteNoiseTheme(darkTheme = darkTheme) {
                 AutoDownloadDataScreen(appState(), onBack = {})
             }
         }

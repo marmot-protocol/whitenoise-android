@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.width
@@ -156,11 +157,19 @@ internal fun MediaFileBubble(
             if (!lifecycleOwner.lifecycle.awaitResumedOrDestroyed()) return@LaunchedEffect
             var openResult: OpenAttachmentResult? = null
             val dispatched =
-                consumeAndDispatchAttachmentOpen(
+                consumeAndDispatchAttachmentOpenReportingFailure(
                     consume = { controller.consumeAttachmentOpenIntent(messageIdHex, attachmentIndex) },
                     restore = { controller.restoreAttachmentOpenIntent(messageIdHex, attachmentIndex) },
                     dispatch = {
                         openResult = openAttachment(file, reference.mediaType, reference.fileName)
+                    },
+                    onFailure = { failure ->
+                        Log.w(
+                            MEDIA_FILE_BUBBLE_TAG,
+                            "attachment viewer launch failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
+                            failure,
+                        )
+                        appState.present(couldntOpenMessage, copyable = true)
                     },
                 )
             if (!dispatched) return@LaunchedEffect
@@ -247,6 +256,8 @@ internal fun MediaFileBubble(
         )
     }
 }
+
+private const val MEDIA_FILE_BUBBLE_TAG = "MediaFileBubble"
 
 /** A tap during auto-download joins the existing transfer instead of being ignored. */
 internal fun canRequestAttachmentOpen(

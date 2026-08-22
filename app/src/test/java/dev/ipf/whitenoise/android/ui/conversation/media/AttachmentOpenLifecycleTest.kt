@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -171,6 +172,39 @@ class AttachmentOpenLifecycleTest {
             assertTrue(intentAvailable)
             assertEquals(1, restoreCount)
         }
+
+    @Test
+    fun reportedDispatchFailureRestoresTheIntentWithoutEscapingTheEffect() =
+        runBlocking {
+            var intentAvailable = true
+            var reportedFailure: Throwable? = null
+
+            val dispatched =
+                consumeAndDispatchAttachmentOpenReportingFailure(
+                    consume = {
+                        intentAvailable.also { intentAvailable = false }
+                    },
+                    restore = { intentAvailable = true },
+                    dispatch = { error("viewer launch failed") },
+                    onFailure = { reportedFailure = it },
+                )
+
+            assertFalse(dispatched)
+            assertTrue(intentAvailable)
+            assertTrue(reportedFailure is IllegalStateException)
+        }
+
+    @Test(expected = CancellationException::class)
+    fun dispatchCancellationStillPropagates() {
+        runBlocking {
+            consumeAndDispatchAttachmentOpenReportingFailure(
+                consume = { true },
+                restore = {},
+                dispatch = { throw CancellationException("viewer closed") },
+                onFailure = { error("cancellation must not be reported as a launch failure") },
+            )
+        }
+    }
 }
 
 private class AttachmentLifecycleOwner : LifecycleOwner {

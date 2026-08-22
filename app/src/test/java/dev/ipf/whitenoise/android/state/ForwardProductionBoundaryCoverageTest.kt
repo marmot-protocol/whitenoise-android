@@ -12,7 +12,8 @@ class ForwardProductionBoundaryCoverageTest {
         val body = appStateSource().readText().functionBody("startForwardMessages")
 
         assertTrue("resolveAttachmentReference(request)" in body)
-        assertTrue("downloadAttachmentPlaintext(request, reference)" in body)
+        assertTrue("priority = AttachmentDownloadPriority.Interactive" in body)
+        assertTrue("persistInteractiveIntent = false" in body)
         assertTrue("uploadMedia(" in body)
         assertTrue("send = false" in body)
         assertTrue("uploadedReferences[messageIndex]" in body)

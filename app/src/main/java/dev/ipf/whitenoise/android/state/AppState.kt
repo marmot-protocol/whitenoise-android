@@ -3327,7 +3327,14 @@ class WhiteNoiseAppState private constructor(
                         },
                         downloadPlaintext = { reference ->
                             requireCurrentAccount()
-                            downloadAttachmentPlaintext(request, reference).also { requireCurrentAccount() }
+                            // Forwarding owns its operation lifecycle: retain user-level queue priority
+                            // without creating a durable attachment-open intent that no Worker will clear.
+                            downloadAttachmentPlaintext(
+                                request = request,
+                                reference = reference,
+                                priority = AttachmentDownloadPriority.Interactive,
+                                persistInteractiveIntent = false,
+                            ).also { requireCurrentAccount() }
                         },
                     )
                 }
@@ -4134,7 +4141,10 @@ class WhiteNoiseAppState private constructor(
         request: AttachmentTransferRequest,
         reference: MediaAttachmentReferenceFfi,
         priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
+        persistInteractiveIntent: Boolean = true,
     ): ByteArray {
+        val tracksInteractiveIntent =
+            priority == AttachmentDownloadPriority.Interactive && persistInteractiveIntent
         val cacheKey =
             mediaCacheKey(
                 request.accountRef,
@@ -4151,14 +4161,16 @@ class WhiteNoiseAppState private constructor(
                         }
                     }
         if (cached != null) {
-            if (priority == AttachmentDownloadPriority.Interactive) {
+            if (tracksInteractiveIntent) {
                 attachmentDownloadIntents.setInteractive(request, interactive = false)
             }
             return cached
         }
 
         if (priority == AttachmentDownloadPriority.Interactive) {
-            attachmentDownloadIntents.setInteractive(request, interactive = true)
+            if (tracksInteractiveIntent) {
+                attachmentDownloadIntents.setInteractive(request, interactive = true)
+            }
             attachmentDownloadGate.promote(cacheKey)
         }
 
@@ -4167,7 +4179,7 @@ class WhiteNoiseAppState private constructor(
                 downloadAndCacheAttachment(request, reference, cacheKey)
             }
         return deferred.await().also {
-            if (priority == AttachmentDownloadPriority.Interactive) {
+            if (tracksInteractiveIntent) {
                 attachmentDownloadIntents.setInteractive(request, interactive = false)
             }
         }
