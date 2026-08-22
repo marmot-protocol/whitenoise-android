@@ -1543,7 +1543,6 @@ class WhiteNoiseAppState private constructor(
     private val marmotAccessObserver: (() -> Unit)?,
     private val marmotRuntimeFactory: (Context) -> AppMarmotRuntime,
     private val notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription,
-    private val notificationChatListProjectionReader: (suspend (String, String) -> ChatListRowFfi?)?,
     private val notificationDispatcher: CoroutineDispatcher,
     private val notificationReceiverTimeoutMillis: () -> Long,
     private val inboundShareTextStager: ((String, String, String) -> Unit)?,
@@ -1564,7 +1563,6 @@ class WhiteNoiseAppState private constructor(
             marmotAccessObserver = null,
             marmotRuntimeFactory = ::openMarmotRuntime,
             notificationSubscriber = ::subscribeToNotifications,
-            notificationChatListProjectionReader = null,
             notificationDispatcher = Dispatchers.IO,
             notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
             inboundShareTextStager = null,
@@ -1587,7 +1585,6 @@ class WhiteNoiseAppState private constructor(
         marmotAccessObserver: (() -> Unit)? = null,
         marmotRuntimeFactory: (Context) -> AppMarmotRuntime = ::openMarmotRuntime,
         notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription = ::subscribeToNotifications,
-        notificationChatListProjectionReader: (suspend (String, String) -> ChatListRowFfi?)? = null,
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
         inboundShareTextStager: ((String, String, String) -> Unit)? = null,
@@ -1604,7 +1601,6 @@ class WhiteNoiseAppState private constructor(
         marmotAccessObserver = marmotAccessObserver,
         marmotRuntimeFactory = marmotRuntimeFactory,
         notificationSubscriber = notificationSubscriber,
-        notificationChatListProjectionReader = notificationChatListProjectionReader,
         notificationDispatcher = notificationDispatcher,
         notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
         inboundShareTextStager = inboundShareTextStager,
@@ -8662,24 +8658,10 @@ class WhiteNoiseAppState private constructor(
     private suspend fun loadNotificationChatListProjection(
         accountRef: String,
         groupIdHex: String,
-    ): ChatListRowFfi {
-        notificationChatListProjectionReader?.let { reader ->
-            return reader(accountRef, groupIdHex)
-                ?.takeIf { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
-                ?: throw NoSuchElementException("notification chat-list projection unavailable")
-        }
-        var subscription: ChatListSubscription? = null
-        return try {
-            subscription = marmotIo { subscribeChatList(accountRef, includeArchived = true) }
-            withContext(Dispatchers.IO) { subscription.snapshot() }
-                .firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
-                ?: throw NoSuchElementException("notification chat-list projection unavailable")
-        } finally {
-            withContext(NonCancellable + Dispatchers.IO) {
-                runCatching { subscription?.close() }
-            }
-        }
-    }
+    ): ChatListRowFfi =
+        marmotIo { chatListRow(accountRef, groupIdHex) }
+            ?.takeIf { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+            ?: throw NoSuchElementException("notification chat-list projection unavailable")
 
     private suspend fun loadAuthoritativeChatListItem(
         accountRef: String,

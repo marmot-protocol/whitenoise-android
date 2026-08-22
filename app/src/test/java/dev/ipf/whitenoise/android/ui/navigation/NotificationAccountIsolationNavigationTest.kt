@@ -27,9 +27,11 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
+import dev.ipf.whitenoise.android.notifications.NotificationMessageDirectLoadOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
+import dev.ipf.whitenoise.android.notifications.loadNotificationMessageDirectly
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -52,6 +54,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Full Compose-route regression coverage for the inactive-account race in #2191. */
 @RunWith(RobolectricTestRunner::class)
@@ -85,6 +88,43 @@ class NotificationAccountIsolationNavigationTest {
     @Test
     fun inactiveAccountTap_activationFinishesBeforePreload_preservesSourceAccountCards() {
         verifyInactiveAccountTapIsolation(preloadFinishesFirst = false)
+    }
+
+    @Test
+    fun inactiveAccountPreload_readsExactProductionProjectionWhileSourceAccountIsActive() {
+        val gate = RouteOrderGate(preloadFinishesFirst = true)
+        val appState = appState(fakeMarmot(gate))
+
+        val item =
+            runBlocking {
+                appState.preloadNotificationChatListItem(TARGET_ACCOUNT, SHARED_GROUP)
+            }
+
+        assertEquals(SOURCE_ACCOUNT, appState.activeAccountRef)
+        assertEquals(3uL, item.projection?.unreadCount)
+        assertEquals(MESSAGE_ID, item.projection?.firstUnreadMessageIdHex)
+        assertEquals(1, gate.projectionReadCount.get())
+    }
+
+    @Test
+    fun inactiveAccountPreload_missingProjectionWaitsForBroadList() {
+        val gate =
+            RouteOrderGate(
+                preloadFinishesFirst = true,
+                projectionAvailable = false,
+            )
+        val appState = appState(fakeMarmot(gate))
+
+        val outcome =
+            runBlocking {
+                loadNotificationMessageDirectly {
+                    appState.preloadNotificationChatListItem(TARGET_ACCOUNT, SHARED_GROUP)
+                }
+            }
+
+        assertEquals(NotificationMessageDirectLoadOutcome.AwaitChatList, outcome)
+        assertEquals(SOURCE_ACCOUNT, appState.activeAccountRef)
+        assertEquals(1, gate.projectionReadCount.get())
     }
 
     @Test
@@ -357,7 +397,6 @@ class NotificationAccountIsolationNavigationTest {
             accountIdHexResolver = { null },
             accounts = listOf(account(SOURCE_ACCOUNT, SOURCE_ID), account(TARGET_ACCOUNT, TARGET_ID)),
             activeAccountRef = SOURCE_ACCOUNT,
-            notificationChatListProjectionReader = { _, groupIdHex -> chatListRow(groupIdHex) },
         ).also { state ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
@@ -378,6 +417,21 @@ class NotificationAccountIsolationNavigationTest {
                     }
                     gate.preloadCompleted.countDown()
                     groupDetails()
+                }
+                "chatListRow" -> {
+                    val accountRef = arguments?.firstOrNull() as? String
+                    val groupIdHex = arguments?.getOrNull(1) as? String
+                    check(accountRef == SOURCE_ACCOUNT || accountRef == TARGET_ACCOUNT) {
+                        "projection read used an unknown account"
+                    }
+                    check(groupIdHex == SHARED_GROUP) { "projection read used the wrong group" }
+                    if (accountRef == TARGET_ACCOUNT) {
+                        gate.projectionReadCount.incrementAndGet()
+                        if (!gate.projectionAvailable) {
+                            throw NoSuchElementException("notification chat-list projection unavailable")
+                        }
+                    }
+                    chatListRow(requireNotNull(groupIdHex))
                 }
                 "subscribeChatList" -> {
                     val accountRef = arguments?.firstOrNull() as? String
@@ -549,12 +603,14 @@ class NotificationAccountIsolationNavigationTest {
 
     private class RouteOrderGate(
         preloadFinishesFirst: Boolean,
+        val projectionAvailable: Boolean = true,
     ) {
         val preloadStarted = CountDownLatch(1)
         val preloadCompleted = CountDownLatch(1)
         val activationStarted = CountDownLatch(1)
         val releasePreload = CountDownLatch(if (preloadFinishesFirst) 0 else 1)
         val releaseActivation = CountDownLatch(if (preloadFinishesFirst) 1 else 0)
+        val projectionReadCount = AtomicInteger()
     }
 
     private object NoopDraftPersistence : DraftPersistence {
