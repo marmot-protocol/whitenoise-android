@@ -5,9 +5,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 
 /**
  * Presentation state for one received attachment transfer.
@@ -39,6 +41,7 @@ internal class AttachmentTransferCoordinator(
 ) {
     private val lock = Any()
     private val states = mutableMapOf<String, MutableStateFlow<AttachmentTransferState>>()
+    private val availabilitySignals = AttachmentAvailabilitySignals()
     private val active = mutableMapOf<String, Deferred<ByteArray>>()
     private val terminalGenerations = mutableMapOf<String, Long>()
     private val observerCounts = mutableMapOf<String, Int>()
@@ -49,6 +52,7 @@ internal class AttachmentTransferCoordinator(
     ): StateFlow<AttachmentTransferState> =
         synchronized(lock) {
             observerCounts[key] = (observerCounts[key] ?: 0) + 1
+            availabilitySignals.acquire(key)
             stateFlow(key, initiallyAvailable).asStateFlow()
         }
 
@@ -69,6 +73,11 @@ internal class AttachmentTransferCoordinator(
             stateFlow(key, initiallyAvailable).asStateFlow()
         }
 
+    /** Waits for a fresh retained/cache-confirmed completion for exactly one attachment key. */
+    suspend fun awaitNextAvailability(key: String) {
+        synchronized(lock) { availabilitySignals.acquire(key) }.first()
+    }
+
     /** Refreshes availability without disturbing a download already in flight. */
     suspend fun refresh(
         key: String,
@@ -82,6 +91,7 @@ internal class AttachmentTransferCoordinator(
             // never let that stale result overwrite the completion state.
             val state = currentStateForRefresh(key, generation) ?: return
             state.value = refreshedState(state.value, available)
+            availabilitySignals.onRefresh(key, available)
         }
     }
 
@@ -169,7 +179,8 @@ internal class AttachmentTransferCoordinator(
     ) {
         synchronized(lock) {
             state.value = value
-            advanceTerminalGeneration(key)
+            terminalGenerations[key] = (terminalGenerations[key] ?: 0L) + 1L
+            availabilitySignals.onTerminal(key, value)
         }
     }
 
@@ -182,15 +193,12 @@ internal class AttachmentTransferCoordinator(
             false
         }
 
-    private fun advanceTerminalGeneration(key: String) {
-        terminalGenerations[key] = (terminalGenerations[key] ?: 0L) + 1L
-    }
-
     private fun retireStateIfUnused(key: String) {
         if (observerCounts[key] == 0 && active[key]?.isCompleted != false) {
             observerCounts.remove(key)
             terminalGenerations.remove(key)
             states.remove(key)
+            availabilitySignals.retire(key)
         }
     }
 
@@ -212,6 +220,47 @@ internal class AttachmentTransferCoordinator(
                     state.value = AttachmentTransferState.Available
                 }
             }
+}
+
+private class AttachmentAvailabilitySignals {
+    private val signals = mutableMapOf<String, MutableSharedFlow<Unit>>()
+    private val lastCacheAvailability = mutableMapOf<String, Boolean>()
+
+    fun acquire(key: String): MutableSharedFlow<Unit> = signals.getOrPut(key, ::newAvailabilitySignal)
+
+    private fun newAvailabilitySignal(): MutableSharedFlow<Unit> = MutableSharedFlow(extraBufferCapacity = 1)
+
+    fun onRefresh(
+        key: String,
+        available: Boolean?,
+    ) {
+        val previous = lastCacheAvailability[key]
+        if (available != null) {
+            lastCacheAvailability[key] = available
+        }
+        if (available == true && previous != true) {
+            signals[key]?.tryEmit(Unit)
+        }
+    }
+
+    fun onTerminal(
+        key: String,
+        state: AttachmentTransferState,
+    ) {
+        when (state) {
+            AttachmentTransferState.Available -> {
+                lastCacheAvailability[key] = true
+                signals[key]?.tryEmit(Unit)
+            }
+            AttachmentTransferState.NotRetained -> lastCacheAvailability[key] = false
+            else -> Unit
+        }
+    }
+
+    fun retire(key: String) {
+        signals.remove(key)
+        lastCacheAvailability.remove(key)
+    }
 }
 
 private suspend fun probeForRefresh(probe: suspend () -> Boolean): Boolean? =

@@ -62,6 +62,16 @@ class AttachmentDownloadProductionWiringTest {
     }
 
     @Test
+    fun pendingFileOpenDoesNotReportFailureBeforeDurableCompletion() {
+        val file = source("MediaFileBubble.kt").normalized()
+
+        assertFalse("materializeMediaFileOrNotify(" in file)
+        assertTrue("materialize = { materializeMediaFile(" in file)
+        assertTrue("awaitNextDurableAvailability = { controller.awaitNextAttachmentAvailability(" in file)
+        assertTrue("onTerminalFailure = { appState.present(couldntLoadMessage) }" in file)
+    }
+
+    @Test
     fun everyInteractiveControllerDownloadHasDurableTerminalCleanup() {
         val controller = projectSource("state/Controllers.kt").normalized()
         val worker = projectSource("state/AttachmentDownloadWorker.kt").normalized()

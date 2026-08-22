@@ -9428,6 +9428,14 @@ class ConversationController(
         }
     }
 
+    /** Suspends until this attachment, rather than any process-wide cache key, becomes available. */
+    internal suspend fun awaitNextAttachmentAvailability(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ) {
+        attachmentTransfers.awaitNextAvailability(attachmentTransferKey(messageIdHex, attachmentIndex))
+    }
+
     /**
      * Request one controller-owned transfer. Auto-download and tap-to-open
      * callers receive the same [Deferred], while truthful post-load probing

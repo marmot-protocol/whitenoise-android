@@ -61,6 +61,23 @@ class AutoDownloadBacklogControlTest {
     }
 
     @Test
+    fun stopConfirmationUsesDarkThemeColors() {
+        render(darkTheme = true)
+
+        composeRule
+            .onNodeWithTag(AUTO_DOWNLOAD_BACKLOG_ACTION_TAG)
+            .performScrollTo()
+            .assertHasClickAction()
+            .performClick()
+
+        composeRule
+            .onNodeWithText(context.getString(R.string.media_auto_download_stop_confirmation))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.media_auto_download_stop_action)).assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/auto_download_stop_automatic_confirmation_dark.png")
+    }
+
+    @Test
     fun pausedAccountOffersAnExplicitRestartBoundary() {
         AttachmentDownloadIntentStore(preferences).pauseAutomatic(ACCOUNT_REF)
 

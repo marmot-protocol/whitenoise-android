@@ -34,7 +34,6 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
@@ -155,23 +154,25 @@ internal fun MediaFileBubble(
             val file =
                 materializePersistedAttachmentOpen(
                     materialize = {
-                        materializeMediaFileOrNotify(
+                        materializeMediaFile(
                             context = context,
                             controller = controller,
                             messageIdHex = messageIdHex,
                             attachmentIndex = attachmentIndex,
                             reference = reference,
                             mine = mine,
-                        ) { appState.present(couldntLoadMessage) }
+                        )
                     },
-                    awaitDurableAvailability = {
-                        transferStateFlow.first { it == AttachmentTransferState.Available }
+                    durableAvailabilityExpected = reference.sourceEpoch != 0uL,
+                    awaitNextDurableAvailability = {
+                        controller.awaitNextAttachmentAvailability(messageIdHex, attachmentIndex)
                     },
                     onWaitingForDurableAvailability = {
                         // Keep the persisted intent, but allow another tap to
                         // replace this wait with an immediate retry.
                         openRequested = false
                     },
+                    onTerminalFailure = { appState.present(couldntLoadMessage) },
                 ) ?: return@LaunchedEffect
             openRequested = true
             if (!lifecycleOwner.lifecycle.awaitResumedOrDestroyed()) return@LaunchedEffect

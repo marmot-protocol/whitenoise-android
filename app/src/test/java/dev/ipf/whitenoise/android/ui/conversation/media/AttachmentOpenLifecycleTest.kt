@@ -8,9 +8,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -201,8 +202,10 @@ class AttachmentOpenLifecycleTest {
     fun foregroundFailureThenDurableCompletionDispatchesThePendingOpenExactlyOnce() =
         runBlocking {
             val transferState = MutableStateFlow(AttachmentTransferState.Failed)
+            val freshAvailability = Channel<Unit>(Channel.RENDEZVOUS)
             var materializeAttempts = 0
             var waitingForWorker = false
+            var failureCount = 0
             var intentAvailable = true
             var dispatchCount = 0
             val opening =
@@ -213,10 +216,10 @@ class AttachmentOpenLifecycleTest {
                                 materializeAttempts++
                                 if (materializeAttempts == 1) null else "cached-file"
                             },
-                            awaitDurableAvailability = {
-                                transferState.first { it == AttachmentTransferState.Available }
-                            },
+                            durableAvailabilityExpected = true,
+                            awaitNextDurableAvailability = { freshAvailability.receive() },
                             onWaitingForDurableAvailability = { waitingForWorker = true },
+                            onTerminalFailure = { failureCount++ },
                         ) ?: return@async false
                     consumeAndDispatchAttachmentOpen(
                         consume = {
@@ -235,9 +238,11 @@ class AttachmentOpenLifecycleTest {
             assertEquals(1, materializeAttempts)
 
             transferState.value = AttachmentTransferState.Available
+            freshAvailability.send(Unit)
 
             assertTrue(opening.await())
             assertEquals(2, materializeAttempts)
+            assertEquals(0, failureCount)
             assertEquals(1, dispatchCount)
             assertFalse(intentAvailable)
 
@@ -249,6 +254,43 @@ class AttachmentOpenLifecycleTest {
                 )
             assertFalse(duplicate)
             assertEquals(1, dispatchCount)
+        }
+
+    @Test
+    fun staleAvailableStateDoesNotEndThePendingOpenBeforeAFreshCacheSignal() =
+        runBlocking {
+            val freshAvailability = Channel<Unit>(Channel.RENDEZVOUS)
+            val secondAttempt = CompletableDeferred<Unit>()
+            val thirdAttempt = CompletableDeferred<Unit>()
+            var materializeAttempts = 0
+            val opening =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    materializePersistedAttachmentOpen(
+                        materialize = {
+                            materializeAttempts++
+                            if (materializeAttempts == 2) secondAttempt.complete(Unit)
+                            if (materializeAttempts == 3) thirdAttempt.complete(Unit)
+                            if (materializeAttempts == 3) "cached-file" else null
+                        },
+                        durableAvailabilityExpected = true,
+                        awaitNextDurableAvailability = { freshAvailability.receive() },
+                        onWaitingForDurableAvailability = {},
+                        onTerminalFailure = {},
+                    )
+                }
+
+            assertFalse(opening.isCompleted)
+            assertEquals(1, materializeAttempts)
+
+            freshAvailability.send(Unit)
+            withTimeout(1_000) { secondAttempt.await() }
+            assertFalse(opening.isCompleted)
+            assertEquals(2, materializeAttempts)
+
+            freshAvailability.send(Unit)
+            withTimeout(1_000) { thirdAttempt.await() }
+            assertEquals("cached-file", opening.await())
+            assertEquals(3, materializeAttempts)
         }
 
     @Test
