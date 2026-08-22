@@ -12,9 +12,9 @@ class AttachmentDownloadProductionWiringTest {
         val video = source("MediaVideo.kt").normalized()
         val voice = source("MediaVoice.kt").normalized()
 
-        assertEquals(2, keyedEffects(image, "interactiveDownloadRequested"))
-        assertEquals(2, keyedEffects(video, "interactiveDownloadRequested"))
-        assertEquals(1, keyedEffects(voice, "interactiveDownloadRequested"))
+        assertEquals(2, occurrences(image, "afterInteractiveRequest()"))
+        assertEquals(2, occurrences(video, "afterInteractiveRequest()"))
+        assertEquals(1, occurrences(voice, "afterInteractiveRequest()"))
         assertEquals(2, occurrences(image, "persistedAttachmentOpenEffect("))
         assertEquals(2, occurrences(video, "persistedAttachmentOpenEffect("))
         assertEquals(1, occurrences(voice, "persistedAttachmentOpenEffect("))
@@ -24,14 +24,17 @@ class AttachmentDownloadProductionWiringTest {
     }
 
     @Test
-    fun restartReevaluatesEveryLatchedVisualMediaDownload() {
+    fun visualMediaPolicyUsesAMonotonicIntentAndHandlesQueuedCancellation() {
         val image = source("MediaImageBubbles.kt").normalized()
         val video = source("MediaVideo.kt").normalized()
         val voice = source("MediaVoice.kt").normalized()
 
-        assertEquals(2, keyedRemembers(image, "automaticDownloadsPaused"))
-        assertEquals(2, keyedRemembers(video, "automaticDownloadsPaused"))
-        assertEquals(1, keyedRemembers(voice, "automaticDownloadsPaused"))
+        assertEquals(2, occurrences(image, "rememberAttachmentMaterializationIntent("))
+        assertEquals(2, occurrences(video, "rememberAttachmentMaterializationIntent("))
+        assertEquals(1, occurrences(voice, "rememberAttachmentMaterializationIntent("))
+        assertEquals(2, occurrences(image, "afterProducerCancellation("))
+        assertEquals(2, occurrences(video, "afterProducerCancellation("))
+        assertEquals(1, occurrences(voice, "afterProducerCancellation("))
     }
 
     @Test
@@ -63,16 +66,6 @@ class AttachmentDownloadProductionWiringTest {
             retryDecision >= 0 && terminalCleanup > retryDecision && terminalFailure > terminalCleanup,
         )
     }
-
-    private fun keyedEffects(
-        source: String,
-        key: String,
-    ): Int = Regex("LaunchedEffect\\([^)]*\\b$key\\b[^)]*\\)").findAll(source).count()
-
-    private fun keyedRemembers(
-        source: String,
-        key: String,
-    ): Int = Regex("remember\\([^)]*\\b$key\\b[^)]*\\)").findAll(source).count()
 
     private fun occurrences(
         source: String,

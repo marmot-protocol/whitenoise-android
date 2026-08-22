@@ -130,34 +130,30 @@ internal fun MediaVideoGridTile(
     var failed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
-    var startDownload by remember(
-        messageIdHex,
-        attachmentIndex,
-        appState.mediaAutoDownloadMatrix,
-        automaticDownloadsPaused,
-    ) {
-        mutableStateOf(
-            shouldStartVideoAttachmentDownload(
-                mine = mine,
-                videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
-                automaticDownloadsPaused = automaticDownloadsPaused,
-                hasCachedAttachment = cachedPlaintextOnEntry,
-                hasCachedFile = localFile != null,
-                hasRetainedPlaintext = retainedPlaintextOnEntry,
-            ),
+    val policyAllowsMaterialization =
+        shouldStartVideoAttachmentDownload(
+            mine = mine,
+            videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
+            automaticDownloadsPaused = automaticDownloadsPaused,
+            hasCachedAttachment = cachedPlaintextOnEntry,
+            hasCachedFile = localFile != null,
+            hasRetainedPlaintext = retainedPlaintextOnEntry,
         )
-    }
-    var interactiveDownloadRequested by remember(messageIdHex, attachmentIndex) { mutableStateOf(false) }
+    var materializationIntent by
+        rememberAttachmentMaterializationIntent(
+            identity = "$messageIdHex#$attachmentIndex",
+            policyAllowsMaterialization = policyAllowsMaterialization,
+        )
+    val startDownload = materializationIntent.shouldMaterialize
     var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(0) }
 
     LaunchedEffect(
         messageIdHex,
         attachmentIndex,
         epoch,
-        startDownload,
+        materializationIntent,
         reloadToken,
         cachedPlaintextOnEntry,
-        interactiveDownloadRequested,
     ) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
@@ -178,19 +174,17 @@ internal fun MediaVideoGridTile(
                 attachmentIndex = attachmentIndex,
                 reference = reference,
                 mine = mine,
-                priority =
-                    if (interactiveDownloadRequested) {
-                        AttachmentDownloadPriority.Interactive
-                    } else {
-                        AttachmentDownloadPriority.Automatic
-                    },
+                priority = materializationIntent.priority,
             )
         }.onSuccess { f ->
             localFile = f
             failed = false
         }.onFailure {
-            if (it is kotlinx.coroutines.CancellationException) throw it
-            failed = true
+            if (it is kotlinx.coroutines.CancellationException) {
+                materializationIntent = materializationIntent.afterProducerCancellation(it)
+            } else {
+                failed = true
+            }
         }
     }
 
@@ -222,8 +216,7 @@ internal fun MediaVideoGridTile(
                 failed = false
                 reloadToken++
             }
-            interactiveDownloadRequested = true
-            startDownload = true
+            materializationIntent = materializationIntent.afterInteractiveRequest()
         },
         dispatchOpen = { dispatchReadyVideo() },
     )
@@ -429,35 +422,32 @@ internal fun MediaVideoBubble(
     // Mirrors the image bubble's auto-download gate, but already-local bytes
     // bypass the network-spend policy so chat re-entry starts at Play instead
     // of showing a fake Download affordance. When the policy says no for an
-    // uncached video (e.g. Wi-Fi-only on cellular), a tap flips
-    // startDownload=true so the user always has a path to fetch — never
+    // uncached video (e.g. Wi-Fi-only on cellular), a tap promotes the
+    // materialization intent so the user always has a path to fetch — never
     // "looks present but can't be opened". See PR #191 reviewer feedback.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
-    var startDownload by remember(
-        pillKey,
-        appState.mediaAutoDownloadMatrix,
-        automaticDownloadsPaused,
-    ) {
-        mutableStateOf(
-            shouldStartVideoAttachmentDownload(
-                mine = mine,
-                videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
-                automaticDownloadsPaused = automaticDownloadsPaused,
-                hasCachedAttachment = cachedPlaintextOnEntry,
-                hasCachedFile = localFile != null,
-                hasRetainedPlaintext = retainedPlaintextOnEntry,
-            ),
+    val policyAllowsMaterialization =
+        shouldStartVideoAttachmentDownload(
+            mine = mine,
+            videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
+            automaticDownloadsPaused = automaticDownloadsPaused,
+            hasCachedAttachment = cachedPlaintextOnEntry,
+            hasCachedFile = localFile != null,
+            hasRetainedPlaintext = retainedPlaintextOnEntry,
         )
-    }
-    var interactiveDownloadRequested by remember(pillKey) { mutableStateOf(false) }
+    var materializationIntent by
+        rememberAttachmentMaterializationIntent(
+            identity = pillKey,
+            policyAllowsMaterialization = policyAllowsMaterialization,
+        )
+    val startDownload = materializationIntent.shouldMaterialize
     var reloadToken by remember(pillKey, epoch) { mutableStateOf(0) }
 
     LaunchedEffect(
         pillKey,
         epoch,
-        startDownload,
+        materializationIntent,
         cachedPlaintextOnEntry,
-        interactiveDownloadRequested,
         reloadToken,
     ) {
         if (localFile != null) return@LaunchedEffect
@@ -480,20 +470,22 @@ internal fun MediaVideoBubble(
                 attachmentIndex = attachmentIndex,
                 reference = reference,
                 mine = mine,
-                priority =
-                    if (interactiveDownloadRequested) {
-                        AttachmentDownloadPriority.Interactive
-                    } else {
-                        AttachmentDownloadPriority.Automatic
-                    },
+                priority = materializationIntent.priority,
             )
         }.onSuccess { f ->
             localFile = f
             failed = false
         }.onFailure {
-            if (it is kotlinx.coroutines.CancellationException) throw it
-            Log.w("MediaVideoBubble", "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)
-            failed = true
+            if (it is kotlinx.coroutines.CancellationException) {
+                materializationIntent = materializationIntent.afterProducerCancellation(it)
+            } else {
+                Log.w(
+                    "MediaVideoBubble",
+                    "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
+                    it,
+                )
+                failed = true
+            }
         }
         loading = false
     }
@@ -527,8 +519,7 @@ internal fun MediaVideoBubble(
                 failed = false
                 reloadToken++
             }
-            interactiveDownloadRequested = true
-            startDownload = true
+            materializationIntent = materializationIntent.afterInteractiveRequest()
         },
         dispatchOpen = { dispatchReadyVideo() },
     )

@@ -115,7 +115,9 @@ class AttachmentDownloadPriorityQueueTest {
                 active.await()
                 promoted.await()
                 otherAccount.await()
+                val cancellation = runCatching { cancelled.await() }.exceptionOrNull()
                 assertTrue(cancelled.isCancelled)
+                assertTrue(cancellation is AutomaticBacklogStoppedException)
                 assertFalse("cancelled" in started)
                 assertEquals(listOf("active", "promoted", "other-account"), started)
             }

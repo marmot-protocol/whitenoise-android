@@ -120,28 +120,25 @@ internal fun MediaVoiceBubble(
     // clips honor the Audio matrix row unless the attachment is already local.
     // A cached voice file or controller plaintext
     // cache means re-entering the chat should start at Play instead of showing
-    // a fake Download affordance. Re-keyed on the matrix so flipping a toggle
-    // re-gates an un-fetched clip. A tap on the bubble flips this to true so
-    // manual fetch/playback is always available even when auto-download is off.
+    // a fake Download affordance. Policy can grant an idle intent but cannot
+    // revoke accepted work; a tap promotes the intent so manual fetch/playback
+    // remains available even when auto-download is off.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
-    var startDownload by remember(
-        pillKey,
-        epoch,
-        appState.mediaAutoDownloadMatrix,
-        automaticDownloadsPaused,
-    ) {
-        mutableStateOf(
-            shouldStartVoiceAttachmentDownload(
-                mine = mine,
-                audioAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio),
-                automaticDownloadsPaused = automaticDownloadsPaused,
-                hasCachedAttachment = cachedPlaintextOnEntry,
-                hasCachedFile = localFile != null,
-                hasRetainedPlaintext = retainedPlaintextOnEntry,
-            ),
+    val policyAllowsMaterialization =
+        shouldStartVoiceAttachmentDownload(
+            mine = mine,
+            audioAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio),
+            automaticDownloadsPaused = automaticDownloadsPaused,
+            hasCachedAttachment = cachedPlaintextOnEntry,
+            hasCachedFile = localFile != null,
+            hasRetainedPlaintext = retainedPlaintextOnEntry,
         )
-    }
-    var interactiveDownloadRequested by remember(pillKey) { mutableStateOf(false) }
+    var materializationIntent by
+        rememberAttachmentMaterializationIntent(
+            identity = "$messageIdHex#$attachmentIndex",
+            policyAllowsMaterialization = policyAllowsMaterialization,
+        )
+    val startDownload = materializationIntent.shouldMaterialize
     var reloadToken by remember(pillKey, epoch) { mutableStateOf(0) }
 
     val playback by remember(pillKey) {
@@ -199,7 +196,7 @@ internal fun MediaVoiceBubble(
         realWaveform = null
         totalDurationMs = 0
         failed = true
-        startDownload =
+        val retryAllowedByPolicy =
             shouldStartVoiceAttachmentDownload(
                 mine = mine,
                 audioAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio),
@@ -208,6 +205,8 @@ internal fun MediaVoiceBubble(
                 hasCachedFile = false,
                 hasRetainedPlaintext = retainedPlaintextOnEntry,
             )
+        materializationIntent =
+            AttachmentMaterializationIntent.Idle.withPolicyAllowed(retryAllowedByPolicy)
     }
 
     suspend fun playReadyVoice(file: java.io.File) {
@@ -239,11 +238,11 @@ internal fun MediaVoiceBubble(
         }
     }
 
-    LaunchedEffect(pillKey, epoch, startDownload, interactiveDownloadRequested, reloadToken) {
+    LaunchedEffect(pillKey, epoch, materializationIntent, reloadToken) {
         if (localFile != null) return@LaunchedEffect
         // Honor the auto-download gate: when Audio is off for the active
         // connection the clip waits behind a Download affordance until the
-        // user opts in (tap flips startDownload=true). Manual playback below
+        // user opts in (tap promotes the intent). Manual playback below
         // stays available regardless.
         if (!startDownload) return@LaunchedEffect
         // Receive-side imeta-parsed refs start with sourceEpoch=0 until the
@@ -262,20 +261,22 @@ internal fun MediaVoiceBubble(
                 attachmentIndex = attachmentIndex,
                 reference = reference,
                 mine = mine,
-                priority =
-                    if (interactiveDownloadRequested) {
-                        AttachmentDownloadPriority.Interactive
-                    } else {
-                        AttachmentDownloadPriority.Automatic
-                    },
+                priority = materializationIntent.priority,
             )
         }.onSuccess { file ->
             localFile = file
             failed = false
         }.onFailure {
-            if (it is kotlinx.coroutines.CancellationException) throw it
-            Log.w("MediaVoiceBubble", "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)
-            failed = true
+            if (it is kotlinx.coroutines.CancellationException) {
+                materializationIntent = materializationIntent.afterProducerCancellation(it)
+            } else {
+                Log.w(
+                    "MediaVoiceBubble",
+                    "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
+                    it,
+                )
+                failed = true
+            }
         }
         loading = false
     }
@@ -292,8 +293,7 @@ internal fun MediaVoiceBubble(
                 failed = false
                 reloadToken++
             }
-            interactiveDownloadRequested = true
-            startDownload = true
+            materializationIntent = materializationIntent.afterInteractiveRequest()
         },
         dispatchOpen = {
             val file = localFile

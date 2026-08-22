@@ -57,7 +57,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.media.Thumbhash
-import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
@@ -188,7 +187,7 @@ internal fun MediaImageBubble(
     //   - Bytes-level state (bitmap, failed, reloadToken): keyed on
     //     `sourceEpoch` so a typed-reference upgrade from imeta-fallback
     //     (epoch = 0) to the real listMedia value clears a stuck failure.
-    //   - User-interaction state (viewerOpen, startDownload): NOT keyed on
+    //   - User-interaction state (viewerOpen, materialization intent): NOT keyed on
     //     epoch, because we never want a background typed-ref upgrade to
     //     close a viewer the user just opened, or re-gate a download the
     //     user just consented to.
@@ -218,28 +217,25 @@ internal fun MediaImageBubble(
     val retainedPlaintextOnEntry =
         mine && controller.pendingAttachmentsList(key).getOrNull(attachmentIndex) != null
     // Auto-download gating (#10): retained/cached own bytes always render;
-    // a cache-missing own image bypasses the matrix only while the explicit
-    // account backlog pause is off. Incoming images honor the matrix.
+    // idle network fallback obeys policy. Once accepted, materialization stays
+    // latched across policy recomposition so an active UI waiter is not lost.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
-    var startDownload by remember(
-        key,
-        attachmentIndex,
-        appState.mediaAutoDownloadMatrix,
-        automaticDownloadsPaused,
-    ) {
-        mutableStateOf(
-            shouldMaterializeAttachmentAutomatically(
-                mine = mine,
-                mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
-                automaticDownloadsPaused = automaticDownloadsPaused,
-                hasCachedAttachment = cachedPlaintextOnEntry,
-                hasRetainedPlaintext = retainedPlaintextOnEntry,
-            ),
+    val policyAllowsMaterialization =
+        shouldMaterializeAttachmentAutomatically(
+            mine = mine,
+            mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
+            automaticDownloadsPaused = automaticDownloadsPaused,
+            hasCachedAttachment = cachedPlaintextOnEntry,
+            hasRetainedPlaintext = retainedPlaintextOnEntry,
         )
-    }
-    var interactiveDownloadRequested by remember(key, attachmentIndex) { mutableStateOf(false) }
+    var materializationIntent by
+        rememberAttachmentMaterializationIntent(
+            identity = "$key#$attachmentIndex",
+            policyAllowsMaterialization = policyAllowsMaterialization,
+        )
+    val startDownload = materializationIntent.shouldMaterialize
 
-    LaunchedEffect(key, attachmentIndex, epoch, startDownload, reloadToken, interactiveDownloadRequested) {
+    LaunchedEffect(key, attachmentIndex, epoch, materializationIntent, reloadToken) {
         if (presentation != null) return@LaunchedEffect // already have decoded pixels
         if (!startDownload) return@LaunchedEffect
         // Own optimistic sends still have their bytes only in the pending list
@@ -265,11 +261,7 @@ internal fun MediaImageBubble(
                         key,
                         attachmentIndex,
                         reference,
-                        if (interactiveDownloadRequested) {
-                            AttachmentDownloadPriority.Interactive
-                        } else {
-                            AttachmentDownloadPriority.Automatic
-                        },
+                        materializationIntent.priority,
                     )
             val decoded =
                 decodeMessageAttachmentImage(
@@ -286,9 +278,7 @@ internal fun MediaImageBubble(
                 failed = true
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
-            // Composable left composition or key changed — propagate. A
-            // cancelled effect isn't a download failure; the bubble is gone.
-            throw cancel
+            materializationIntent = materializationIntent.afterProducerCancellation(cancel)
         } catch (t: Throwable) {
             android.util.Log.w(
                 "MediaImageBubble",
@@ -311,8 +301,7 @@ internal fun MediaImageBubble(
                 failed = false
                 reloadToken++
             }
-            interactiveDownloadRequested = true
-            startDownload = true
+            materializationIntent = materializationIntent.afterInteractiveRequest()
         },
         dispatchOpen = { viewerOpen = true },
     )
@@ -619,7 +608,7 @@ internal fun MediaImageGridTile(
     // Two-bucket key model (mirrors `MediaImageBubble`):
     //   - `decodeKey` includes `sourceEpoch`, scoped to bytes-level state.
     //   - `tileSlot` omits the epoch, scoped to user-choice state
-    //     (startDownload) so a background ref upgrade can't re-gate a tile
+    //     (materialization intent) so a background ref upgrade can't re-gate a tile
     //     the user already consented to fetch.
     val decodeKey = "$messageIdHex#$attachmentIndex#${reference.sourceEpoch}"
     val tileSlot = "$messageIdHex#$attachmentIndex"
@@ -645,26 +634,24 @@ internal fun MediaImageGridTile(
     // Mirror the single-image bubble's auto-download gate (#10) so the
     // policy applies to album tiles too. Retained/cached outgoing bytes still
     // materialize during a pause, but a cache-missing network fallback waits
-    // for restart or a tap. Re-keyed so policy changes re-gate unloaded tiles.
+    // for restart or a tap. Tightening policy never abandons accepted work.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
-    var startDownload by remember(
-        tileSlot,
-        appState.mediaAutoDownloadMatrix,
-        automaticDownloadsPaused,
-    ) {
-        mutableStateOf(
-            shouldMaterializeAttachmentAutomatically(
-                mine = mine,
-                mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
-                automaticDownloadsPaused = automaticDownloadsPaused,
-                hasCachedAttachment = cachedPlaintextOnEntry,
-                hasRetainedPlaintext = retainedPlaintextOnEntry,
-            ),
+    val policyAllowsMaterialization =
+        shouldMaterializeAttachmentAutomatically(
+            mine = mine,
+            mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
+            automaticDownloadsPaused = automaticDownloadsPaused,
+            hasCachedAttachment = cachedPlaintextOnEntry,
+            hasRetainedPlaintext = retainedPlaintextOnEntry,
         )
-    }
-    var interactiveDownloadRequested by remember(tileSlot) { mutableStateOf(false) }
+    var materializationIntent by
+        rememberAttachmentMaterializationIntent(
+            identity = tileSlot,
+            policyAllowsMaterialization = policyAllowsMaterialization,
+        )
+    val startDownload = materializationIntent.shouldMaterialize
 
-    LaunchedEffect(decodeKey, startDownload, reloadToken, interactiveDownloadRequested) {
+    LaunchedEffect(decodeKey, materializationIntent, reloadToken) {
         if (presentation != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
         val pendingBytes =
@@ -685,11 +672,7 @@ internal fun MediaImageGridTile(
                         messageIdHex,
                         attachmentIndex,
                         reference,
-                        if (interactiveDownloadRequested) {
-                            AttachmentDownloadPriority.Interactive
-                        } else {
-                            AttachmentDownloadPriority.Automatic
-                        },
+                        materializationIntent.priority,
                     )
             val decoded =
                 decodeMessageAttachmentImage(
@@ -706,7 +689,7 @@ internal fun MediaImageGridTile(
                 failed = true
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
-            throw cancel
+            materializationIntent = materializationIntent.afterProducerCancellation(cancel)
         } catch (t: Throwable) {
             android.util.Log.w(
                 "MediaImageGridTile",
@@ -729,8 +712,7 @@ internal fun MediaImageGridTile(
                 failed = false
                 reloadToken++
             }
-            interactiveDownloadRequested = true
-            startDownload = true
+            materializationIntent = materializationIntent.afterInteractiveRequest()
         },
         dispatchOpen = { onTap() },
     )

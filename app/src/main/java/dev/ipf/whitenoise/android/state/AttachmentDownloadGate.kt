@@ -12,6 +12,9 @@ internal enum class AttachmentDownloadPriority {
     Interactive,
 }
 
+/** Signals that Stop automatic downloads removed this request before admission. */
+internal class AutomaticBacklogStoppedException : CancellationException("automatic attachment backlog stopped")
+
 /**
  * Bounded gate for decrypted attachment fetches.
  *
@@ -128,7 +131,7 @@ internal class AttachmentDownloadGate(
                     }
             }
         cancelled.forEach { waiter ->
-            waiter.admitted.cancel(CancellationException("automatic attachment backlog stopped"))
+            waiter.admitted.cancel(AutomaticBacklogStoppedException())
         }
         return cancelled.size
     }
