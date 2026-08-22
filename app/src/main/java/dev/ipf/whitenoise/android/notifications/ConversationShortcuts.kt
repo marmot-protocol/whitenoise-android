@@ -24,7 +24,7 @@ internal data class ConversationShortcutCleanupPlan(
     val longLivedIds: List<String>,
 )
 
-internal fun directShareConversationShortcutCleanupPlan(dynamicShortcuts: List<ShortcutInfoCompat>): ConversationShortcutCleanupPlan =
+internal fun directShareConversationShortcutCleanupPlan(dynamicShortcuts: List<ShortcutInfoCompat>) =
     ConversationShortcutCleanupPlan(
         dynamicIds = conversationShortcutIds(dynamicShortcuts),
         longLivedIds = emptyList(),
