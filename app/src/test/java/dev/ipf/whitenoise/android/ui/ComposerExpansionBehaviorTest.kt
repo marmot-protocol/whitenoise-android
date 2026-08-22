@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_INDICATOR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOverlayBackRegistrar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -103,6 +104,24 @@ class ComposerExpansionBehaviorTest {
         assertTrue("resize handle should meet the 48dp touch minimum", resize.height >= 48f)
         assertTrue("resize handle should stay wide", resize.width >= 96f)
         assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
+    }
+
+    @Test
+    fun visibleResizeIndicatorIsCenteredInsideItsUnchangedTouchTarget() {
+        render(longDraft())
+
+        val target = composerControlBounds(R.string.composer_resize)
+        val indicator =
+            composeRule
+                .onNodeWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val topGap = indicator.top - target.top
+        val bottomGap = target.bottom - indicator.bottom
+
+        assertTrue("visible handle breathing room should be balanced", abs(topGap - bottomGap) <= 1f)
+        assertTrue("resize target must retain its 48dp minimum", target.height >= 48f)
+        assertTrue("resize target must retain its 96dp width", target.width >= 96f)
     }
 
     @Test

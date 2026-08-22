@@ -1274,29 +1274,26 @@ class ConversationScrollCoordinatorTest {
         }
 
     @Test
-    fun conversationScreenClearsOwnedHighlightsWhenNavigationIsCancelled() {
+    fun conversationScreenStartsReplyHighlightBeforeLoadingAndScrolling() {
         val screen = sourceFile("ConversationScreen.kt").readText()
-        val highlightFunction =
+        val replyNavigation =
             screen
-                .substringAfter("suspend fun showTransientMessageHighlight(messageId: String)")
-                .substringBefore("fun navigateToReplyTarget")
+                .substringAfter("fun navigateToReplyTarget(item: TimelineMessage)")
+                .substringBefore("fun jumpToNextUnreadMention")
+        val highlight = replyNavigation.indexOf("targetHighlight.highlightWhile(targetMessageId)")
+        val load = replyNavigation.indexOf("loadUntilMessageAvailable", startIndex = highlight)
+        val center = replyNavigation.indexOf("centerTimelineItemAt", startIndex = load)
 
-        assertTrue(screen.contains("var transientHighlightOwner by mutableStateOf<Any?>(null)"))
-        assertTrue(highlightFunction.contains("val owner = Any()"))
-        assertTrue(
-            highlightFunction.contains(
-                "try {\n            delay(1_500L)\n        } finally {",
-            ),
-        )
-        assertTrue(highlightFunction.contains("if (navigationState.transientHighlightOwner === owner)"))
-        assertEquals(5, Regex("showTransientMessageHighlight\\(").findAll(screen).count())
+        assertTrue("reply target highlighting must start before paging", highlight >= 0 && load > highlight)
+        assertTrue("the same highlight owner must span the scroll", center > load)
+        assertTrue(screen.contains("targetHighlight.clear()"))
     }
 
     @Test
     fun conversationScreenHighlightsOnlyCompletedCenteringCommands() {
         val screen = sourceFile("ConversationScreen.kt").readText()
 
-        assertEquals(4, Regex("if \\(!centered\\)").findAll(screen).count())
+        assertEquals(3, Regex("if \\(!centered\\)").findAll(screen).count())
     }
 
     @Test

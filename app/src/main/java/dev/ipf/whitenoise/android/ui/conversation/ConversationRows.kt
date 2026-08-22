@@ -43,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -66,30 +67,43 @@ import java.time.format.FormatStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
+internal const val UNREAD_MESSAGES_DIVIDER_CONTENT_TAG = "unread-messages-divider-content"
+
 @Composable
 internal fun UnreadMessagesDivider(count: Int) {
     val text = pluralStringResource(R.plurals.unread_messages_count, count, count)
-    Row(
+    Box(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+                // The divider lives at the start of a LazyColumn slot. The
+                // preceding slot already contributes 8dp, so subtract that
+                // once from the visual top inset while retaining the 12dp
+                // bottom inset before the first unread message (#2162).
+                .padding(top = 4.dp, bottom = 12.dp),
     ) {
-        AppDivider(modifier = Modifier.weight(1f))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Row(
             modifier =
                 Modifier
-                    .padding(horizontal = 12.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(12.dp),
-                    ).padding(horizontal = 10.dp, vertical = 4.dp),
-        )
-        AppDivider(modifier = Modifier.weight(1f))
+                    .fillMaxWidth()
+                    .testTag(UNREAD_MESSAGES_DIVIDER_CONTENT_TAG),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AppDivider(modifier = Modifier.weight(1f))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier =
+                    Modifier
+                        .padding(horizontal = 12.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(12.dp),
+                        ).padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+            AppDivider(modifier = Modifier.weight(1f))
+        }
     }
 }
 
