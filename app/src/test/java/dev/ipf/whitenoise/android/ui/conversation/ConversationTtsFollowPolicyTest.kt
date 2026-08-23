@@ -478,6 +478,22 @@ class ConversationTtsFollowPolicyTest {
     }
 
     @Test
+    fun bottomClippedSentenceUsesViewportEndWithNonZeroOrigin() {
+        assertEquals(
+            TtsFollowViewportDecision.ScrollToItemOffset(1),
+            TtsFollowViewport.decide(
+                viewportStart = 200,
+                viewportEnd = 1_200,
+                itemOffset = 0,
+                sentenceTop = 1_100,
+                sentenceBottom = 1_201,
+                direction = TtsFollowDirection.Forward,
+                anchorAtTop = false,
+            ),
+        )
+    }
+
+    @Test
     fun oversizedMeasuredSentenceUsesTopAnchorInEitherDirection() {
         assertEquals(
             TtsFollowViewportDecision.ScrollToItemOffset(100),

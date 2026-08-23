@@ -470,7 +470,7 @@ internal object TtsFollowViewport {
         val sentenceFitsViewport = sentenceBottom - sentenceTop <= viewportEnd - viewportStart
         val targetOffset =
             if (!anchorAtTop && sentenceTop >= viewportStart && sentenceFitsViewport) {
-                sentenceBottom - itemOffset - (viewportEnd - viewportStart)
+                sentenceBottom - itemOffset - viewportEnd
             } else {
                 sentenceTop - itemOffset - viewportStart
             }
