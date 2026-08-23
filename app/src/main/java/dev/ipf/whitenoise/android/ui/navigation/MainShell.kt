@@ -926,9 +926,6 @@ internal fun MainShell(
                             // the switch keeps settling behind it (#586).
                             onPreload = {
                                 notificationMessagePreload = it
-                                if (it.state is NotificationMessagePreloadState.Failed) {
-                                    releaseNotificationFirstFrameGate(routingRequestId)
-                                }
                             },
                         )
                     } else {
@@ -1025,17 +1022,23 @@ internal fun MainShell(
                                     currentInboundNotificationTarget == target &&
                                     currentRuntimeGeneration == retryRuntimeGeneration
                                 ) {
-                                    notificationMessagePreload =
-                                        NotificationMessagePreload(
-                                            key = retryKey,
-                                            state =
-                                                when (outcome) {
-                                                    is NotificationMessageDirectLoadOutcome.OpenConversation ->
-                                                        NotificationMessagePreloadState.Ready(outcome.item)
-                                                    NotificationMessageDirectLoadOutcome.AwaitChatList ->
-                                                        NotificationMessagePreloadState.Failed
-                                                },
-                                        )
+                                    when (outcome) {
+                                        is NotificationMessageDirectLoadOutcome.OpenConversation -> {
+                                            notificationMessagePreload =
+                                                NotificationMessagePreload(
+                                                    key = retryKey,
+                                                    state = NotificationMessagePreloadState.Ready(outcome.item),
+                                                )
+                                        }
+                                        NotificationMessageDirectLoadOutcome.AwaitChatList -> {
+                                            notificationMessagePreload =
+                                                NotificationMessagePreload(
+                                                    key = retryKey,
+                                                    state = NotificationMessagePreloadState.Failed,
+                                                )
+                                            releaseNotificationFirstFrameGate(routingRequestId)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1061,6 +1064,7 @@ internal fun MainShell(
                             NotificationMessageDirectLoadOutcome.AwaitChatList -> {
                                 // A transient local-read failure does not consume the tap;
                                 // the existing chat-list state will re-fire this route.
+                                releaseNotificationFirstFrameGate(routingRequestId)
                                 routingNotification = false
                             }
                         }

@@ -328,9 +328,7 @@ class NotificationAccountIsolationNavigationTest {
             }
         }
 
-        awaitCondition {
-            gate.preloadStarted.count == 0L && gate.activationStarted.count == 0L
-        }
+        awaitCondition { gate.preloadStarted.count == 0L }
         manager.notify(lateSource.first, lateSource.second, notification(SOURCE_ACCOUNT))
 
         if (preloadFinishesFirst) {
@@ -353,6 +351,7 @@ class NotificationAccountIsolationNavigationTest {
             awaitCondition {
                 appState.activeAccountRef == TARGET_ACCOUNT
             }
+            assertEquals(1L, gate.broadBindStarted.count)
             assertEquals(
                 (sourceKeys + targetKeys + lateSource).toSet(),
                 manager.activeNotifications.map { it.tag to it.id }.toSet(),
@@ -466,7 +465,7 @@ class NotificationAccountIsolationNavigationTest {
                 "subscribeChatList" -> {
                     val accountRef = arguments?.firstOrNull() as? String
                     if (accountRef == TARGET_ACCOUNT) {
-                        gate.activationStarted.countDown()
+                        gate.broadBindStarted.countDown()
                         check(gate.releaseActivation.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
                             "activation gate timed out"
                         }
@@ -646,7 +645,7 @@ class NotificationAccountIsolationNavigationTest {
     ) {
         val preloadStarted = CountDownLatch(1)
         val preloadCompleted = CountDownLatch(1)
-        val activationStarted = CountDownLatch(1)
+        val broadBindStarted = CountDownLatch(1)
         val releasePreload = CountDownLatch(if (preloadFinishesFirst) 0 else 1)
         val releaseActivation = CountDownLatch(if (preloadFinishesFirst) 1 else 0)
         val projectionReadCount = AtomicInteger()
