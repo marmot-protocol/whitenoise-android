@@ -884,6 +884,7 @@ dependencies {
     // Roborazzi Compose screenshot tests run on the JVM via Robolectric, so the
     // Compose tooling + Roborazzi artifacts live on the unit-test classpath.
     testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.work.testing)
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.roborazzi.junit.rule)

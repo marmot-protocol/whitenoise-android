@@ -15,11 +15,13 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
 
-class AppUpdateWorker(
+class AppUpdateWorker internal constructor(
     appContext: Context,
     params: WorkerParameters,
+    private val repository: AppUpdateRepository,
 ) : CoroutineWorker(appContext, params) {
-    private val repository = AppUpdateRepository(appContext)
+    constructor(appContext: Context, params: WorkerParameters) :
+        this(appContext, params, AppUpdateRepository(appContext))
 
     override suspend fun doWork(): Result {
         if (shouldSkipForMeteredDataSaver(applicationContext)) return Result.success()
