@@ -340,17 +340,26 @@ class TtsControllerTest {
     }
 
     @Test
-    fun ownerSurrenderStopsWithoutRedundantlyReleasingFocus() {
+    fun ownerSurrenderPausesAtTheRetainedPosition() {
         val engine = FakeTtsSpeechEngine()
         val focus = FakeTtsAudioFocus()
         val controller = controller(focus)
         controller.attachEngine(engine)
-        controller.speak("One.", Locale.US)
+        controller.speak("One. Two.", Locale.US)
+        engine.complete(0)
 
+        // Another app took playback over (permanent focus loss): the session
+        // pauses at its retained position instead of being destroyed (#1484).
         focus.surrender()
 
-        assertTrue(controller.state.value is TtsState.Idle)
-        assertEquals(0, focus.releaseCalls)
+        val paused = controller.state.value as TtsState.Paused
+        assertEquals(1, paused.chunkIndex)
+        assertEquals(1, focus.releaseCalls)
+
+        // The retained session resumes exactly where the interruption left it.
+        controller.resume()
+        assertTrue(controller.state.value is TtsState.Speaking)
+        assertEquals(1, (controller.state.value as TtsState.Speaking).chunkIndex)
     }
 
     @Test

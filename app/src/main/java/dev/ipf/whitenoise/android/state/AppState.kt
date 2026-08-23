@@ -75,6 +75,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionSnapshot
 import dev.ipf.whitenoise.android.audio.tts.TtsHistoryPager
 import dev.ipf.whitenoise.android.audio.tts.TtsHistorySession
+import dev.ipf.whitenoise.android.audio.tts.TtsPlaybackForegroundService
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
@@ -1682,6 +1683,10 @@ class WhiteNoiseAppState private constructor(
             ttsSpeechAccountRef = activeAccountRef
             ttsAutoReadSessionKey = null
             ttsHistorySession.onSessionCleared()
+            // The session now exists, so the mediaPlayback service must too:
+            // it mirrors the controller, keeps playback alive across app
+            // switches, and stops itself when the controller goes terminal.
+            TtsPlaybackForegroundService.start(appContext)
         }
         return started
     }
@@ -7093,9 +7098,10 @@ class WhiteNoiseAppState private constructor(
             recordAppLockBackgrounded()
             conversationDictation.onAppBackgrounded()
             mutationsScope.launch { draftWriter.flush() }
-            // Read-aloud is foreground-only in v1 (no mediaPlayback FGS):
-            // spoken private messages must not continue after an app switch.
-            stopSpeaking()
+            // Read-aloud continues in the background: the mediaPlayback
+            // foreground service owns the session's lifecycle, its generic
+            // notification exposes the controls, and explicit dismissal (or
+            // task removal) is what ends it (#1484).
         }
         if (foreground) {
             refreshLocalNotificationPermission()

@@ -148,7 +148,7 @@ internal fun ConversationTtsAutoReadEffects(
 
     // Live continuation only extends the conversation-owned active session.
     LaunchedEffect(controller, chatId) {
-        var seededLastId = false
+        var cursor: ConversationAutoReadCursor? = null
         snapshotFlow {
             controller.timeline
                 .lastOrNull()
@@ -157,17 +157,23 @@ internal fun ConversationTtsAutoReadEffects(
         }.distinctUntilChanged()
             .collect { lastId ->
                 if (lastId == null) return@collect
-                if (!seededLastId) {
-                    seededLastId = true
-                    return@collect
-                }
+                val seen = cursor
+                // The cursor re-seeds whenever no owned active session exists,
+                // so a later session never replays arrivals from before it
+                // owned the queue.
+                cursor = conversationAutoReadCursor(controller.timeline)
+                if (seen == null) return@collect
                 if (!appState.ownsTtsAutoReadSession(controller.group.groupIdHex)) return@collect
                 val ttsState = appState.ttsController.state.value
                 if (ttsState !is TtsState.Speaking && ttsState !is TtsState.Paused) return@collect
-                val record = controller.timeline.lastOrNull()?.record ?: return@collect
-                if (record.messageIdHex != lastId) return@collect
-                val entry = projectEntry(record) ?: return@collect
-                appState.appendSpeech(entry, Locale.getDefault())
+                // One sync batch can advance the tail across several messages;
+                // append EVERY unseen speakable record in timeline order, not
+                // only the newest one. The queue deduplicates by message id,
+                // so a record observed twice cannot enqueue twice.
+                for (message in conversationMessagesAfterAutoReadCursor(controller.timeline, seen)) {
+                    val entry = projectEntry(message.record) ?: continue
+                    appState.appendSpeech(entry, Locale.getDefault())
+                }
             }
     }
 

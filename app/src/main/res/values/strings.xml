@@ -903,6 +903,15 @@
     <string name="background_connection_notification_hint">Long-press to hide this notification</string>
     <string name="notification_channel_background_connection">Background connection</string>
     <string name="notification_channel_background_connection_description">Keeps White Noise connected for local notifications</string>
+    <string name="notification_channel_read_aloud">Read aloud</string>
+    <string name="notification_channel_read_aloud_description">Playback controls while messages are read aloud</string>
+    <string name="tts_playback_notification_title">Reading aloud</string>
+    <string name="tts_playback_notification_text">White Noise is reading messages</string>
+    <string name="tts_playback_action_play">Play</string>
+    <string name="tts_playback_action_pause">Pause</string>
+    <string name="tts_playback_action_stop">Stop</string>
+    <string name="tts_playback_action_previous_message">Previous message</string>
+    <string name="tts_playback_action_next_message">Next message</string>
     <string name="background_connection_special_use_subtype" translatable="false">Restart the user-enabled encrypted message background connection after device boot or app update.</string>
     <string name="toast_restarting">Restarting</string>
     <string name="toast_identity_created">Identity created</string>
