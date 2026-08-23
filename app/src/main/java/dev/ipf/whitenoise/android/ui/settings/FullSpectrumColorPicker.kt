@@ -68,6 +68,7 @@ internal fun FullSpectrumColorPicker(
     onColorChanged: (Long) -> Unit,
     modifier: Modifier = Modifier,
     blueFree: Boolean = false,
+    isColorAccepted: (Long) -> Boolean = { true },
 ) {
     val displayedArgb = argb.blueFreeWhen(blueFree)
     val indicatorColor = if (blueFree) MaterialTheme.colorScheme.onSurface else Color.White
@@ -81,9 +82,11 @@ internal fun FullSpectrumColorPicker(
     }
 
     fun updateHsv(updated: HsvColor) {
+        val updatedArgb = updated.toOpaqueArgb().blueFreeWhen(blueFree)
+        if (!isColorAccepted(updatedArgb)) return
         hsv = updated
-        lastEmittedArgb = updated.toOpaqueArgb().blueFreeWhen(blueFree)
-        onColorChanged(lastEmittedArgb)
+        lastEmittedArgb = updatedArgb
+        onColorChanged(updatedArgb)
     }
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {

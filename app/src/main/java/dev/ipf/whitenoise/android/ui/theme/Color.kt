@@ -11,5 +11,5 @@ val OnHighlight = Color(0xFF001F28)
 
 // AMOLED surfaces keep a pure-black fill. Warm, blue-free strokes restore
 // object boundaries without driving the OLED panel's blue subpixels.
-internal val AmoledSurfaceBorder = Color(0xFF3D3500)
+internal val AmoledSurfaceBorder = Color(0xFF665A00)
 internal val AmoledEmphasizedSurfaceBorder = Color(0xFF665A00)

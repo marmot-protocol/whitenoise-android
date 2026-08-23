@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -153,6 +154,8 @@ internal fun OtherAccountAvatarsRow(
     val shown = others.take(MAX_TOP_BAR_OTHER_ACCOUNTS)
     val overflow = others.size - shown.size
     val layoutDirection = LocalLayoutDirection.current
+    val currentOnSwitchAccount by rememberUpdatedState(onSwitchAccount)
+    val currentOnOpenSwitcher by rememberUpdatedState(onOpenSwitcher)
     val switchAccountLabel = stringResource(R.string.switch_account)
     val unreadLabel = stringResource(R.string.account_unread_indicator)
     val actionLabels =
@@ -186,11 +189,11 @@ internal fun OtherAccountAvatarsRow(
                                 )
                             when {
                                 target == null -> Unit
-                                target in shown.indices -> onSwitchAccount(shown[target].label)
-                                target == shown.size -> onOpenSwitcher()
+                                target in shown.indices -> currentOnSwitchAccount(shown[target].label)
+                                target == shown.size -> currentOnOpenSwitcher()
                             }
                         },
-                        onLongPress = { onOpenSwitcher() },
+                        onLongPress = { currentOnOpenSwitcher() },
                     )
                 }.semantics(mergeDescendants = true) {
                     contentDescription = actionLabels.joinToString()

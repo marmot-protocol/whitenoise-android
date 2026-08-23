@@ -11,6 +11,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
+import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
 import dev.ipf.whitenoise.android.state.readableTextArgb
 import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -165,8 +166,10 @@ class MessageBubbleAmoledStyleTest {
         }
 
         composeRule.runOnIdle {
+            val expectedArgb = customArgb.withoutBlueChannel()
+            assertTrue(expectedArgb.isBlueFreeAccentVisible())
             assertEquals(2.dp, requireNotNull(highlightedBorder).width)
-            assertEquals(colorFromArgb(customArgb), borderColor(highlightedBorder))
+            assertEquals(colorFromArgb(expectedArgb), borderColor(highlightedBorder))
         }
     }
 

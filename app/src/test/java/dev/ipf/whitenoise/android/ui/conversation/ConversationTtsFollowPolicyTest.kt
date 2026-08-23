@@ -458,7 +458,7 @@ class ConversationTtsFollowPolicyTest {
     }
 
     @Test
-    fun fullyVisibleSentenceStaysPutAndClippedSentenceReturnsToTopAnchor() {
+    fun fullyVisibleSentenceStaysPutAndClippedSentenceUsesNearestEdge() {
         assertEquals(
             TtsFollowViewportDecision.Stay,
             decide(itemOffset = 0, sentenceTop = 350, sentenceBottom = 450),
@@ -468,8 +468,12 @@ class ConversationTtsFollowPolicyTest {
             decide(itemOffset = 0, sentenceTop = -50, sentenceBottom = 50),
         )
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(850),
+            TtsFollowViewportDecision.ScrollToItemOffset(50),
             decide(itemOffset = 0, sentenceTop = 850, sentenceBottom = 1_050),
+        )
+        assertEquals(
+            TtsFollowViewportDecision.ScrollToItemOffset(1),
+            decide(itemOffset = 0, sentenceTop = 900, sentenceBottom = 1_001),
         )
     }
 

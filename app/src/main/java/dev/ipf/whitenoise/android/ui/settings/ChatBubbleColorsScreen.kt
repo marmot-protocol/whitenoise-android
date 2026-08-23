@@ -385,12 +385,14 @@ internal fun TonalSwatchPicker(
             FullSpectrumColorPicker(
                 argb = pickerArgb,
                 blueFree = blueFree,
+                isColorAccepted = { argb ->
+                    val displayedArgb = displayArgb(argb)
+                    isSelectable(displayedArgb) && readableContentArgb(displayedArgb) != null
+                },
                 onColorChanged = { argb ->
                     val displayedArgb = displayArgb(argb)
-                    if (isSelectable(displayedArgb) && readableContentArgb(displayedArgb) != null) {
-                        customHex = "#%06X".format(Locale.ROOT, displayedArgb and BUBBLE_COLOR_RGB_MASK)
-                        onColorSelected(displayedArgb)
-                    }
+                    customHex = "#%06X".format(Locale.ROOT, displayedArgb and BUBBLE_COLOR_RGB_MASK)
+                    onColorSelected(displayedArgb)
                 },
             )
             OutlinedTextField(

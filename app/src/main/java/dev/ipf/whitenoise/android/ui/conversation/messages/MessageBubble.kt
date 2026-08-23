@@ -93,7 +93,9 @@ import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
+import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
@@ -143,11 +145,16 @@ internal fun messageBubbleBorder(
     persistedFailure: Boolean = false,
 ): BorderStroke? {
     val amoledAccent = amoledDirectionalAccentColor(mine)
+    val blueFreeCustomAccent =
+        customArgb
+            ?.withoutBlueChannel()
+            ?.takeIf(Long::isBlueFreeAccentVisible)
     return when {
         persistedFailure -> null
-        amoledAccent != null && customArgb != null -> BorderStroke(2.dp, colorFromArgb(customArgb))
+        amoledAccent != null && customArgb != null ->
+            BorderStroke(2.dp, blueFreeCustomAccent?.let(::colorFromArgb) ?: amoledAccent)
         highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
-        amoledAccent != null -> BorderStroke(2.dp, customArgb?.let(::colorFromArgb) ?: amoledAccent)
+        amoledAccent != null -> BorderStroke(2.dp, amoledAccent)
         else -> null
     }
 }
@@ -927,12 +934,14 @@ internal fun MessageBubble(
                         locale = locale,
                     )
                 }
-            appState.speakAloudAutoRead(
-                controller.group.groupIdHex,
-                entries,
-                locale,
-                startSentenceIndex,
-            )
+            val started =
+                appState.speakAloudAutoRead(
+                    controller.group.groupIdHex,
+                    entries,
+                    locale,
+                    startSentenceIndex,
+                )
+            if (!started) appState.present(R.string.tts_bar_error)
         }
     }
 

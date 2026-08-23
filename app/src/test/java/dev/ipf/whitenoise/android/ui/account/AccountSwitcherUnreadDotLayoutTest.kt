@@ -18,6 +18,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
@@ -85,6 +86,34 @@ class AccountSwitcherUnreadDotLayoutTest {
         }
 
         assertEquals(listOf("account-2", "account-3", "account-4"), switched)
+    }
+
+    @Test
+    fun stackGesturesUseLatestCallbacksAfterCallbackOnlyRecomposition() {
+        val appState = testAppState(accountCount = 2)
+        val callbackGeneration = mutableStateOf(0)
+        val switched = mutableListOf<String>()
+        val opened = mutableListOf<Int>()
+
+        composeRule.setContent {
+            val generation = callbackGeneration.value
+            WhiteNoiseTheme {
+                OtherAccountAvatarsRow(
+                    appState = appState,
+                    onSwitchAccount = { accountRef -> switched += "$generation:$accountRef" },
+                    onOpenSwitcher = { opened += generation },
+                )
+            }
+        }
+        composeRule.runOnIdle { callbackGeneration.value = 1 }
+
+        composeRule.onNodeWithTag(OTHER_ACCOUNT_STACK_TAG).performTouchInput {
+            click(center)
+            longClick(center)
+        }
+
+        assertEquals(listOf("1:account-2"), switched)
+        assertEquals(listOf(1), opened)
     }
 
     @Test

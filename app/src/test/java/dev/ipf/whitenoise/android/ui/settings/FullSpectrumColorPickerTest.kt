@@ -266,6 +266,36 @@ class FullSpectrumColorPickerTest {
     }
 
     @Test
+    fun amoledPickerRejectsInvisibleBlueFreeHueWithoutMovingControls() {
+        val initialArgb = 0xFFFF0000L
+        var latest = initialArgb
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                FullSpectrumColorPicker(
+                    argb = initialArgb,
+                    blueFree = true,
+                    isColorAccepted = { it != 0xFF000000L },
+                    onColorChanged = { latest = it },
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithContentDescription(string(R.string.color_picker_hue))
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                assertTrue(setProgress(240f))
+            }
+
+        val hueRange =
+            composeRule
+                .onNodeWithContentDescription(string(R.string.color_picker_hue))
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.ProgressBarRangeInfo]
+        assertEquals(0f, hueRange.current)
+        assertEquals(initialArgb, latest)
+    }
+
+    @Test
     fun invalidExactHexCannotApply() {
         composeRule.setContent {
             WhiteNoiseTheme {

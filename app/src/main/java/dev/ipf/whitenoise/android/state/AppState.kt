@@ -7332,7 +7332,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Publish Compose-owned visibility and its notification dismissal atomically. */
+    /** Publish Compose ownership immediately, then dismiss existing cards off the main thread. */
     fun setActiveConversationFromUi(
         accountRef: String?,
         groupIdHex: String?,
@@ -7341,13 +7341,15 @@ class WhiteNoiseAppState private constructor(
         // visible route even if a platform cancellation call fails.
         applyActiveConversationTransition(accountRef, groupIdHex)
         conversationOpenDismissalTarget(accountRef, groupIdHex)?.let { target ->
-            runCatching {
-                localNotificationPresenter.dismissConversationMessagesImmediately(
-                    target.accountRef,
-                    target.groupIdHex,
-                )
-            }.onFailure {
-                appStateDebug { "notification dismiss failed group=${target.groupIdHex.take(8)}" }
+            notificationScope.launch(notificationDispatcher) {
+                runCatching {
+                    localNotificationPresenter.dismissConversationMessagesImmediately(
+                        target.accountRef,
+                        target.groupIdHex,
+                    )
+                }.onFailure {
+                    appStateDebug { "notification dismiss failed group=${target.groupIdHex.take(8)}" }
+                }
             }
         }
         appStateDebug {

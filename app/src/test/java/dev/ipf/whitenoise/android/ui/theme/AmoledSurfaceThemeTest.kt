@@ -80,7 +80,7 @@ class AmoledSurfaceThemeTest {
 
     @Test
     fun amoledBorderTokensAreWarmAndBlueFree() {
-        assertEquals(Color(0xFF3D3500), AmoledSurfaceBorder)
+        assertEquals(Color(0xFF665A00), AmoledSurfaceBorder)
         assertEquals(Color(0xFF665A00), AmoledEmphasizedSurfaceBorder)
     }
 
@@ -127,6 +127,8 @@ class AmoledSurfaceThemeTest {
             assertContrastAtLeast(scheme.onSurfaceVariant, scheme.surface, WCAG_AA_NORMAL_TEXT_CONTRAST)
             assertContrastAtLeast(scheme.primary, scheme.background, MINIMUM_NON_TEXT_CONTRAST)
             assertContrastAtLeast(scheme.error, scheme.background, MINIMUM_NON_TEXT_CONTRAST)
+            assertContrastAtLeast(scheme.outline, scheme.surface, MINIMUM_NON_TEXT_CONTRAST)
+            assertContrastAtLeast(scheme.outlineVariant, scheme.surface, MINIMUM_NON_TEXT_CONTRAST)
             listOf(
                 scheme.onPrimary to scheme.primary,
                 scheme.onPrimaryContainer to scheme.primaryContainer,
