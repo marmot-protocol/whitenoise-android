@@ -82,7 +82,7 @@ class TtsEstimatedTimingLaneTest {
             val estimatedProgress =
                 (harness.controller.state.value as TtsState.Speaking).messageProgressFraction
 
-            harness.engine.range(index = 0, start = 5, end = 6)
+            harness.engine.range(index = 0, start = 0, end = 0)
 
             assertEquals(null, harness.store.verdicts[ENGINE_KEY])
             assertEquals(estimatedPassage, harness.controller.state.value.passage)

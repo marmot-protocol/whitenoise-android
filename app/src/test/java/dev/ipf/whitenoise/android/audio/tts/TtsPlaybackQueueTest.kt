@@ -104,7 +104,7 @@ class TtsPlaybackQueueTest {
             13 to 14,
         ).forEach { (start, end) ->
             queue.onRangeStart(staleId, start, end, 0)
-            assertEquals(TtsPassage("m1", 0), queue.state.value.passage)
+            assertEquals(hello, queue.state.value.passage)
         }
 
         queue.pause()
