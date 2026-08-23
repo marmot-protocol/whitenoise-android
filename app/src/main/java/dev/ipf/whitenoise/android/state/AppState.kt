@@ -7332,6 +7332,21 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /**
+     * Publish Compose-owned conversation visibility on the app notification
+     * scope. A route recomposition can cancel its `LaunchedEffect` immediately
+     * after the synchronous ownership transition; the notification dismissal
+     * must still finish once that conversation was visibly opened.
+     */
+    fun setActiveConversationFromUi(
+        accountRef: String?,
+        groupIdHex: String?,
+    ) {
+        notificationScope.launch {
+            setActiveConversation(accountRef, groupIdHex)
+        }
+    }
+
     fun clearActiveConversation() {
         applyActiveConversationTransition(accountRef = null, groupIdHex = null)
         appStateDebug {

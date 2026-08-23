@@ -1670,7 +1670,7 @@ internal fun MainShell(
         navigationAccountStable = navAccountStable,
         timelineVisible = selectedConversationTimelineVisible,
     ) { accountRef, groupIdHex ->
-        appState.setActiveConversation(accountRef, groupIdHex)
+        appState.setActiveConversationFromUi(accountRef, groupIdHex)
     }
     // Preloading, selected, and outgoing routes can briefly own different
     // controllers during a rapid Back -> open gesture. Keep each instance alive
