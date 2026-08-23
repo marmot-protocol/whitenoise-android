@@ -9,6 +9,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
@@ -27,6 +28,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,6 +62,23 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithText(context.getString(R.string.quick_action_video)).assertDoesNotExist()
         composeRule.onNodeWithText(context.getString(R.string.quick_action_add)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.quick_action_search)).assertIsDisplayed()
+
+        val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+        val add =
+            composeRule
+                .onNodeWithText(context.getString(R.string.quick_action_add))
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val search =
+            composeRule
+                .onNodeWithText(context.getString(R.string.quick_action_search))
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val actionGap = search.center.x - add.center.x
+        val actionMidpoint = (add.center.x + search.center.x) / 2f
+
+        assertTrue("Primary actions must remain a compact cluster", actionGap < root.width * 0.35f)
+        assertTrue("Primary actions must remain centered", kotlin.math.abs(actionMidpoint - root.center.x) < 1f)
     }
 
     @Test

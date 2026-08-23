@@ -953,21 +953,19 @@ internal fun GroupDetailsScreen(
                         Modifier
                             .fillMaxWidth()
                             .padding(horizontal = Dimens.spaceLg),
-                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXl, Alignment.CenterHorizontally),
                 ) {
                     GroupDetailsAddMemberAction(
                         visible = !isDm && canEdit,
                         rosterState = controller.memberRosterState,
                         mutationsBlocked = mutationsBlocked,
                         onClick = { showAddMember = true },
-                        modifier = Modifier.weight(1f),
                     )
                     if (onOpenSearch != null) {
                         QuickActionButton(
                             icon = Icons.Default.Search,
                             label = stringResource(R.string.quick_action_search),
                             onClick = onOpenSearch,
-                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
