@@ -44,6 +44,7 @@ internal enum class TtsFollowDirection {
 internal data class ConversationTtsFollowRequest(
     val target: ConversationTtsFollowTarget,
     val direction: TtsFollowDirection,
+    val anchorAtTop: Boolean,
 )
 
 internal data class ConversationTtsSentenceLayoutReport(
@@ -211,6 +212,8 @@ internal class ConversationTtsFollowPolicy private constructor(
     private var evaluatedTarget: ConversationTtsFollowTarget? = null
     private var pendingTarget: ConversationTtsFollowTarget? = null
     private var pendingDirection = TtsFollowDirection.Forward
+    private var pendingAnchorAtTop = false
+    private var restoredTargetNeedsTopAnchor = activeTarget != null
     private var retriedTarget: ConversationTtsFollowTarget? = null
     private var explicitRevealTarget: ConversationTtsFollowTarget? = null
     private var prepositionedTarget: ConversationTtsFollowTarget? = null
@@ -231,6 +234,7 @@ internal class ConversationTtsFollowPolicy private constructor(
         val previousMessageIndex = activeMessageIndex
         val newSession = sessionId != state.sessionId
         val newSentence = previousTarget != target
+        val newMessage = previousTarget?.messageIdHex != target.messageIdHex
         if (newSession) {
             activeDirection = TtsFollowDirection.Forward
         } else if (newSentence && previousTarget != null) {
@@ -273,8 +277,11 @@ internal class ConversationTtsFollowPolicy private constructor(
         if (automaticPending != null) {
             pendingTarget = automaticPending
             pendingDirection = activeDirection
+            pendingAnchorAtTop = newSession || newMessage || restoredTargetNeedsTopAnchor
+            restoredTargetNeedsTopAnchor = false
         } else if (explicitRevealTarget != target) {
             pendingTarget = null
+            pendingAnchorAtTop = false
         }
         showResumeAction = !isFollowEnabled
     }
@@ -290,6 +297,7 @@ internal class ConversationTtsFollowPolicy private constructor(
         correctedTarget = null
         pendingTarget = target
         pendingDirection = activeDirection
+        pendingAnchorAtTop = true
         return true
     }
 
@@ -297,7 +305,7 @@ internal class ConversationTtsFollowPolicy private constructor(
         val target = pendingTarget?.takeIf { isFollowEnabled } ?: return null
         pendingTarget = null
         evaluatedTarget = target
-        return ConversationTtsFollowRequest(target, pendingDirection)
+        return ConversationTtsFollowRequest(target, pendingDirection, pendingAnchorAtTop)
     }
 
     fun claimPendingTarget(): ConversationTtsFollowTarget? = claimPendingRequest()?.target
@@ -339,6 +347,8 @@ internal class ConversationTtsFollowPolicy private constructor(
         isFollowEnabled = false
         showResumeAction = true
         pendingTarget = null
+        pendingAnchorAtTop = false
+        restoredTargetNeedsTopAnchor = false
         explicitRevealTarget = null
     }
 
@@ -353,6 +363,7 @@ internal class ConversationTtsFollowPolicy private constructor(
         correctedTarget = null
         pendingTarget = target.takeIf { isSpeaking }
         pendingDirection = activeDirection
+        pendingAnchorAtTop = true
     }
 
     fun reset() {
@@ -362,6 +373,8 @@ internal class ConversationTtsFollowPolicy private constructor(
         activeDirection = TtsFollowDirection.Forward
         evaluatedTarget = null
         pendingTarget = null
+        pendingAnchorAtTop = false
+        restoredTargetNeedsTopAnchor = false
         retriedTarget = null
         explicitRevealTarget = null
         prepositionedTarget = null
@@ -433,9 +446,7 @@ internal sealed interface TtsFollowViewportDecision {
 
 /** Sentence anchor geometry independent of LazyColumn lifetime and recycling. */
 internal object TtsFollowViewport {
-    private const val BAND_EDGE_FRACTION = 0.20
-
-    @Suppress("ReturnCount")
+    @Suppress("ReturnCount", "UnusedParameter", "UNUSED_PARAMETER")
     fun decide(
         viewportStart: Int,
         viewportEnd: Int,
@@ -443,28 +454,21 @@ internal object TtsFollowViewport {
         sentenceTop: Int,
         sentenceBottom: Int,
         direction: TtsFollowDirection,
+        anchorAtTop: Boolean,
     ): TtsFollowViewportDecision {
         if (viewportEnd <= viewportStart || sentenceBottom <= sentenceTop) {
             return TtsFollowViewportDecision.Stay
         }
-        val viewportSize = viewportEnd - viewportStart
-        val bandStart = viewportStart + viewportSize * BAND_EDGE_FRACTION
-        val bandEnd = viewportEnd - viewportSize * BAND_EDGE_FRACTION
-        val sentenceHeight = sentenceBottom - sentenceTop
-        val bandHeight = bandEnd - bandStart
-        val targetOffset =
-            when {
-                sentenceHeight > bandHeight && direction == TtsFollowDirection.Reverse ->
-                    sentenceBottom - itemOffset - (bandEnd - viewportStart)
-                sentenceHeight > bandHeight ->
-                    sentenceTop - itemOffset - (bandStart - viewportStart)
-                sentenceTop < bandStart ->
-                    sentenceTop - itemOffset - (bandStart - viewportStart)
-                sentenceBottom > bandEnd ->
-                    sentenceBottom - itemOffset - (bandEnd - viewportStart)
-                else -> return TtsFollowViewportDecision.Stay
-            }
-        return TtsFollowViewportDecision.ScrollToItemOffset(targetOffset.roundToInt())
+        if (!anchorAtTop && sentenceTop >= viewportStart && sentenceBottom <= viewportEnd) {
+            return TtsFollowViewportDecision.Stay
+        }
+        // New sessions and message jumps establish a top anchor once. Later
+        // sentence changes leave the viewport alone while the complete
+        // sentence remains visible, then restore that same anchor with one
+        // bounded correction. Direction is intentionally irrelevant: reverse
+        // navigation should not revive the old bottom/middle-band contract.
+        val targetOffset = sentenceTop - itemOffset - viewportStart
+        return TtsFollowViewportDecision.ScrollToItemOffset(targetOffset)
     }
 
     /** Equal-fraction row estimate retained only for provisional remount positioning. */
@@ -477,8 +481,8 @@ internal object TtsFollowViewport {
         if (viewportSize <= 0) return 0
         val count = sentenceCount.coerceAtLeast(1)
         val index = sentenceIndex.coerceIn(0, count - 1)
-        val sentenceOffsetInItem = itemSize.coerceAtLeast(0) * ((index + 0.5) / count)
-        return (sentenceOffsetInItem - viewportSize / 2.0).roundToInt()
+        val sentenceOffsetInItem = itemSize.coerceAtLeast(0) * (index.toDouble() / count)
+        return sentenceOffsetInItem.roundToInt()
     }
 }
 
@@ -507,10 +511,11 @@ private suspend fun awaitCompleteTtsSentenceLayout(
         }.filterNotNull().first()
     }
 
-@Suppress("CyclomaticComplexMethod")
+@Suppress("CyclomaticComplexMethod", "LongMethod")
 internal suspend fun followTtsTargetInViewport(
     target: ConversationTtsFollowTarget,
     direction: TtsFollowDirection,
+    anchorAtTop: Boolean = false,
     itemKey: Any,
     targetIndex: Int,
     estimatedItemHeightPx: Int?,
@@ -569,6 +574,7 @@ internal suspend fun followTtsTargetInViewport(
                         sentenceTop = sentenceTop,
                         sentenceBottom = sentenceBottom,
                         direction = direction,
+                        anchorAtTop = anchorAtTop,
                     )
             ) {
                 TtsFollowViewportDecision.Stay -> completed = true

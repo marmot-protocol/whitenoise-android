@@ -359,7 +359,16 @@ private data class MarkdownBodyContext(
 internal typealias SelectableTextLayoutReporter =
     (key: Any, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates?) -> Unit
 
-internal typealias TtsLeafHighlightResolver = (leafId: String, renderedText: String) -> IntRange?
+internal data class TtsLeafHighlight(
+    val sentence: IntRange?,
+    val word: IntRange?,
+) {
+    val primaryRange: IntRange?
+        get() = word ?: sentence
+}
+
+internal typealias TtsLeafHighlightResolver =
+    (leafId: String, renderedText: String) -> TtsLeafHighlight?
 
 internal typealias TtsSentenceLayoutReporter =
     (leafId: String, renderedText: String, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates?) -> Unit
@@ -410,11 +419,11 @@ private fun MarkdownBodyText(
     val onCopyLink = LocalMarkdownLinkCopyHandler.current
     val copyLabel = stringResource(R.string.copy)
     val linkDestinations = remember(text) { markdownLinkDestinations(text) }
-    val reportsLinks = linkDestinations.isNotEmpty()
+    val reportsLinks = remember(text) { text.getLinkAnnotations(0, text.length).isNotEmpty() }
     val tracker = remember(leafId, text) { MarkdownTextLayoutTracker() }
     val highlightColor = ttsReadAloudHighlightColor()
     var layoutResult by remember(leafId, text) { mutableStateOf<TextLayoutResult?>(null) }
-    val highlightRange =
+    val highlight =
         remember(highlightResolver, leafId, text.text) {
             highlightResolver?.invoke(leafId, text.text)
         }
@@ -460,7 +469,7 @@ private fun MarkdownBodyText(
         modifier =
             modifier
                 .then(accessibilityModifier)
-                .ttsReadAloudHighlight(layoutResult, highlightRange, highlightColor)
+                .ttsReadAloudHighlight(layoutResult, highlight, highlightColor)
                 .onGloballyPositioned { coordinates ->
                     tracker.coordinates = coordinates
                     reportIfReady()
@@ -491,6 +500,37 @@ internal fun markdownLinkDestinationAt(
             )
         }
     }
+
+internal fun markdownHasLinkAnnotationAt(
+    layouts: Collection<MarkdownLinkTextLayout>,
+    positionInWindow: Offset,
+): Boolean =
+    layouts.any { textLayout ->
+        if (!textLayout.coordinates.isAttached || !textLayout.coordinates.boundsInWindow().contains(positionInWindow)) {
+            false
+        } else {
+            markdownHasLinkAnnotationAt(
+                textLayout.text,
+                textLayout.layoutResult,
+                textLayout.coordinates.windowToLocal(positionInWindow),
+            )
+        }
+    }
+
+@Suppress("ReturnCount")
+internal fun markdownHasLinkAnnotationAt(
+    text: AnnotatedString,
+    layoutResult: TextLayoutResult,
+    position: Offset,
+): Boolean {
+    if (text.isEmpty() || position.y !in 0f..layoutResult.size.height.toFloat()) return false
+    val line = layoutResult.getLineForVerticalPosition(position.y)
+    val lineLeft = minOf(layoutResult.getLineLeft(line), layoutResult.getLineRight(line))
+    val lineRight = maxOf(layoutResult.getLineLeft(line), layoutResult.getLineRight(line))
+    if (position.x !in lineLeft..lineRight) return false
+    val offset = layoutResult.getOffsetForPosition(position).coerceIn(0, text.lastIndex)
+    return text.getLinkAnnotations(offset, offset + 1).isNotEmpty()
+}
 
 internal fun markdownLinkDestinationAt(
     text: AnnotatedString,

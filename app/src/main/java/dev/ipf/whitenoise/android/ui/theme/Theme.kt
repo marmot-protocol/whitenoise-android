@@ -102,6 +102,62 @@ private val LightColorScheme =
         scrim = Color(0xFF000000),
     )
 
+// AMOLED is a deliberately blue-free reading palette, not just a set of black
+// surfaces. Every ColorScheme role is overridden explicitly so new Material
+// components cannot inherit a cyan or neutral-grey fallback from the base dark
+// scheme. Media and avatars remain unfiltered content.
+private val AmoledColorScheme =
+    DarkColorScheme.copy(
+        primary = Color(0xFFFFC400),
+        onPrimary = Color.Black,
+        primaryContainer = Color(0xFF493800),
+        onPrimaryContainer = Color(0xFFFFE600),
+        inversePrimary = Color(0xFFFFC400),
+        secondary = Color(0xFFE0B000),
+        onSecondary = Color.Black,
+        secondaryContainer = Color(0xFF493600),
+        onSecondaryContainer = Color(0xFFFFDC00),
+        tertiary = Color(0xFFF5E600),
+        onTertiary = Color.Black,
+        tertiaryContainer = Color(0xFF3E3900),
+        onTertiaryContainer = Color(0xFFF5E600),
+        background = Color.Black,
+        onBackground = Color(0xFFF5E600),
+        surface = Color.Black,
+        onSurface = Color(0xFFF5E600),
+        surfaceVariant = Color.Black,
+        onSurfaceVariant = Color(0xFFB0A000),
+        surfaceTint = Color.Transparent,
+        inverseSurface = Color.Black,
+        inverseOnSurface = Color(0xFFF5E600),
+        error = Color(0xFFFF5C00),
+        onError = Color.Black,
+        errorContainer = Color(0xFF4A1200),
+        onErrorContainer = Color(0xFFFFB000),
+        outline = AmoledEmphasizedSurfaceBorder,
+        outlineVariant = AmoledSurfaceBorder,
+        scrim = Color.Black,
+        surfaceBright = Color.Black,
+        surfaceDim = Color.Black,
+        surfaceContainer = Color.Black,
+        surfaceContainerHigh = Color.Black,
+        surfaceContainerHighest = Color.Black,
+        surfaceContainerLow = Color.Black,
+        surfaceContainerLowest = Color.Black,
+        primaryFixed = Color(0xFFFFE600),
+        primaryFixedDim = Color(0xFFFFC400),
+        onPrimaryFixed = Color.Black,
+        onPrimaryFixedVariant = Color.Black,
+        secondaryFixed = Color(0xFFFFDC00),
+        secondaryFixedDim = Color(0xFFE0B000),
+        onSecondaryFixed = Color.Black,
+        onSecondaryFixedVariant = Color.Black,
+        tertiaryFixed = Color(0xFFF5E600),
+        tertiaryFixedDim = Color(0xFFC9BD00),
+        onTertiaryFixed = Color.Black,
+        onTertiaryFixedVariant = Color.Black,
+    )
+
 // Route the existing brand corner radii (Radii) through MaterialTheme.shapes so
 // theme-aware M3 components (Button/Card/dialog/text-field/sheet) pick up
 // consistent corners instead of the violet-baseline defaults. Values mirror the
@@ -117,29 +173,9 @@ private val ShapeScheme =
         extraLarge = RoundedCornerShape(Radii.xl),
     )
 
-private fun ColorScheme.withAmoledSurfaces(amoledActive: Boolean): ColorScheme {
+private fun ColorScheme.withAmoledPalette(amoledActive: Boolean): ColorScheme {
     if (!amoledActive) return this
-
-    // Every full-screen and elevated surface stays pure black. Snackbars use
-    // inverse roles, so keep those black/readable too (#446).
-    return copy(
-        background = Color.Black,
-        surface = Color.Black,
-        surfaceContainerLowest = Color.Black,
-        surfaceContainerLow = Color.Black,
-        surfaceContainer = Color.Black,
-        surfaceContainerHigh = Color.Black,
-        surfaceContainerHighest = Color.Black,
-        surfaceVariant = Color.Black,
-        surfaceBright = Color.Black,
-        surfaceDim = Color.Black,
-        outline = AmoledEmphasizedSurfaceBorder,
-        outlineVariant = AmoledSurfaceBorder,
-        inverseSurface = Color.Black,
-        inverseOnSurface = onSurface,
-        inversePrimary = Highlight,
-        surfaceTint = Color.Transparent,
-    )
+    return AmoledColorScheme
 }
 
 private fun ColorScheme.withAccountAccent(
@@ -152,6 +188,7 @@ private fun ColorScheme.withAccountAccent(
                 customArgb = it,
                 defaultContainerArgb = primary.toOpaqueArgb(),
                 defaultContentArgb = onPrimary.toOpaqueArgb(),
+                blueFree = amoledActive,
             )
         } ?: return this
     val accent = Color(resolvedAccent.container)
@@ -204,7 +241,7 @@ fun WhiteNoiseTheme(
     val amoledActive = darkTheme && amoled
     val colorScheme =
         baseColorScheme
-            .withAmoledSurfaces(amoledActive)
+            .withAmoledPalette(amoledActive)
             .withAccountAccent(accentColorArgb, amoledActive)
 
     CompositionLocalProvider(LocalAmoledSurfaceTheme provides amoledActive) {

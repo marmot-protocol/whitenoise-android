@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
+import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -128,7 +129,7 @@ class MessageBubbleFrameTest {
         val presentation = customAmoledPresentation()
 
         assertEquals(
-            CUSTOM_BACKGROUND,
+            CUSTOM_BACKGROUND.withoutBlueChannel(),
             replyPreviewAccentArgb(
                 insideBubble = true,
                 customBubbleColorActive = true,
@@ -136,7 +137,7 @@ class MessageBubbleFrameTest {
             ),
         )
         assertEquals(
-            CUSTOM_BACKGROUND,
+            CUSTOM_BACKGROUND.withoutBlueChannel(),
             replyPreviewAccentArgb(
                 insideBubble = false,
                 customBubbleColorActive = true,
@@ -196,7 +197,7 @@ class MessageBubbleFrameTest {
 
         composeRule.waitForIdle()
         assertEquals(OPAQUE_BLACK_ARGB, presentation.backgroundArgb)
-        assertEquals(CUSTOM_BACKGROUND, presentation.borderOverrideArgb)
+        assertEquals(CUSTOM_BACKGROUND.withoutBlueChannel(), presentation.borderOverrideArgb)
         assertEquals(MENTION_ACCENT, presentation.mentionAccentArgb)
         assertEquals(OPAQUE_WHITE.toInt(), captionContentArgb.get())
         assertEquals(OPAQUE_WHITE.toInt(), plainContentArgb.get())

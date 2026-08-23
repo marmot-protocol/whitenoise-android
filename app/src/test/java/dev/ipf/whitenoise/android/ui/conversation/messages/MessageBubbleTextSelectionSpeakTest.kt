@@ -75,7 +75,7 @@ class MessageBubbleTextSelectionSpeakTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()
 
     @Test
-    fun longPressActionMenuSpeakQueuesThroughAppStateAtPressedSentence() {
+    fun longPressActionMenuSpeakQueuesThroughAppStateAtMessageTop() {
         val engine = FakeSessionEngine()
         val appState = appStateWithTts(engine)
         val item = timelineMessage("First sentence. Second sentence.")
@@ -106,6 +106,43 @@ class MessageBubbleTextSelectionSpeakTest {
         composeRule.onNodeWithText(app.getString(R.string.speak_aloud)).performClick()
         waitForTts(engine)
 
+        assertTrue(
+            engine.spoken
+                .first()
+                .text
+                .endsWith("First sentence."),
+        )
+    }
+
+    @Test
+    fun doubleTapMessageTextSeeksToThePressedSentence() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = timelineMessage("First sentence. Second sentence.")
+        val controller = conversationController(appState)
+        var actionMenuOpen by mutableStateOf(false)
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(
+                        item = item,
+                        controller = controller,
+                        appState = appState,
+                        textSelectionMode = false,
+                        onTextSelectionModeChange = {},
+                        isActionMenuOpen = actionMenuOpen,
+                        onActionMenuOpenChange = { actionMenuOpen = it },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        doubleTapOnMessageText("Second sentence")
+        waitForTts(engine)
+
+        assertFalse(actionMenuOpen)
         assertTrue(
             engine.spoken
                 .first()
@@ -331,6 +368,26 @@ class MessageBubbleTextSelectionSpeakTest {
     }
 
     private fun longPressOnMessageText(substring: String) {
+        val pressOnHost = messageTextPositionOnHost(substring)
+        composeRule.onNodeWithTag(MESSAGE_HOST_TAG).performTouchInput {
+            down(pressOnHost)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            up()
+        }
+    }
+
+    private fun doubleTapOnMessageText(substring: String) {
+        val pressOnHost = messageTextPositionOnHost(substring)
+        composeRule.onNodeWithTag(MESSAGE_HOST_TAG).performTouchInput {
+            down(pressOnHost)
+            up()
+            advanceEventTime(viewConfiguration.doubleTapMinTimeMillis + 10)
+            down(pressOnHost)
+            up()
+        }
+    }
+
+    private fun messageTextPositionOnHost(substring: String): Offset {
         val layoutResults = mutableListOf<TextLayoutResult>()
         composeRule
             .onNodeWithText(substring, substring = true, useUnmergedTree = true)
@@ -355,11 +412,7 @@ class MessageBubbleTextSelectionSpeakTest {
                 y = pressInRoot.y - hostBounds.top.value,
             )
 
-        composeRule.onNodeWithTag(MESSAGE_HOST_TAG).performTouchInput {
-            down(pressOnHost)
-            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
-            up()
-        }
+        return pressOnHost
     }
 
     private fun waitForTts(engine: FakeSessionEngine) {

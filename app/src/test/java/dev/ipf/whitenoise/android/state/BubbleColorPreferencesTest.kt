@@ -218,6 +218,32 @@ class BubbleColorPreferencesTest {
     }
 
     @Test
+    fun blueFreeActionColorResolverSanitizesBothCustomRoles() {
+        val resolved =
+            resolveActionColorArgb(
+                customArgb = 0xFF336699,
+                defaultContainerArgb = 0xFFFFC400,
+                defaultContentArgb = OPAQUE_BLACK_ARGB,
+                blueFree = true,
+            )
+
+        assertEquals(0xFF336600, resolved.container)
+        assertEquals(0, resolved.container and 0xFF)
+        assertEquals(0, resolved.content and 0xFF)
+        assertTrue(contrastRatio(resolved.content, resolved.container) >= WCAG_AA_NORMAL_TEXT_CONTRAST)
+
+        assertEquals(
+            ActionColorArgb(container = 0xFFFFC400, content = OPAQUE_BLACK_ARGB),
+            resolveActionColorArgb(
+                customArgb = 0xFF0000FF,
+                defaultContainerArgb = 0xFFFFC400,
+                defaultContentArgb = OPAQUE_BLACK_ARGB,
+                blueFree = true,
+            ),
+        )
+    }
+
+    @Test
     fun chatColorsAreLocalToAccountGroupAndSide() {
         BubbleColorPreferences.writeChatColor(preferences, " account-a ", " GROUP-A ", BubbleSide.Mine, 0xFFABCDEF)
 

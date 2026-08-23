@@ -237,6 +237,35 @@ class FullSpectrumColorPickerTest {
     }
 
     @Test
+    fun amoledPickerNeverSelectsBlue() {
+        var latest = 0xFFFF0000L
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                var selectedArgb by remember { mutableLongStateOf(latest) }
+                TonalSwatchPicker(
+                    selectedArgb = selectedArgb,
+                    onColorSelected = {
+                        latest = it
+                        selectedArgb = it
+                    },
+                    scopeKey = "amoled",
+                    theme = BubbleTheme.Amoled,
+                    slotKey = BubbleSide.Mine.name,
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(string(R.string.more_colors)).performClick()
+        composeRule
+            .onNodeWithContentDescription(string(R.string.color_picker_hue))
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                assertTrue(setProgress(240f))
+            }
+
+        composeRule.runOnIdle { assertEquals(0, latest and 0xFF) }
+    }
+
+    @Test
     fun invalidExactHexCannotApply() {
         composeRule.setContent {
             WhiteNoiseTheme {

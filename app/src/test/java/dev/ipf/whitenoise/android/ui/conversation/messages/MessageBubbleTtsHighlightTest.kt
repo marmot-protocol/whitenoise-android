@@ -26,6 +26,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
+import dev.ipf.whitenoise.android.ui.TtsLeafHighlight
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -63,7 +64,7 @@ class MessageBubbleTtsHighlightTest {
                 projection = projection,
                 locale = Locale.US,
             ) as TtsLeafHighlightResolver
-        var captured: IntRange? = null
+        var captured: TtsLeafHighlight? = null
         composeRule.setContent {
             WhiteNoiseTheme {
                 val highlight = resolver("plain", "Hello bright world.")
@@ -75,7 +76,8 @@ class MessageBubbleTtsHighlightTest {
             }
         }
         composeRule.waitForIdle()
-        assertEquals(6 until 12, captured)
+        assertEquals(0 until 19, captured?.sentence)
+        assertEquals(6 until 12, captured?.word)
     }
 
     @Test
@@ -273,7 +275,7 @@ class MessageBubbleTtsHighlightTest {
 @Composable
 private fun HighlightedPlainText(
     text: String,
-    highlightRange: IntRange?,
+    highlightRange: TtsLeafHighlight?,
     testTag: String? = null,
 ) {
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }

@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.speakableProjectionFromDocument
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
+import dev.ipf.whitenoise.android.ui.TtsLeafHighlight
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import java.util.Locale
 import kotlin.math.max
@@ -37,7 +38,13 @@ import kotlin.math.min
 
 internal val TtsReadAloudHighlightRangeKey = SemanticsPropertyKey<IntRange>("TtsReadAloudHighlightRange")
 
+internal val TtsReadAloudSentenceHighlightRangeKey =
+    SemanticsPropertyKey<IntRange>("TtsReadAloudSentenceHighlightRange")
+
 private var SemanticsPropertyReceiver.ttsReadAloudHighlightRange by TtsReadAloudHighlightRangeKey
+
+private var SemanticsPropertyReceiver.ttsReadAloudSentenceHighlightRange by
+    TtsReadAloudSentenceHighlightRangeKey
 
 internal data class TtsReadAloudProgress(
     val sentenceIndex: Int,
@@ -207,21 +214,34 @@ internal fun ttsHighlightTextRange(
 @Suppress("ReturnCount")
 internal fun Modifier.ttsReadAloudHighlight(
     layoutResult: TextLayoutResult?,
-    highlightRange: IntRange?,
+    highlight: TtsLeafHighlight?,
     color: Color,
 ): Modifier {
     val semanticsModifier =
-        if (highlightRange == null) {
+        if (highlight == null) {
             Modifier
         } else {
-            Modifier.semantics { ttsReadAloudHighlightRange = highlightRange }
+            Modifier.semantics {
+                highlight.primaryRange?.let { ttsReadAloudHighlightRange = it }
+                highlight.sentence?.let { ttsReadAloudSentenceHighlightRange = it }
+            }
         }
-    if (layoutResult == null || highlightRange == null) return this.then(semanticsModifier)
-    val range = ttsHighlightTextRange(highlightRange, layoutResult.layoutInput.text.length)
-    if (range.collapsed) return this.then(semanticsModifier)
+    if (layoutResult == null || highlight == null) return this.then(semanticsModifier)
+    val sentenceRange =
+        highlight.sentence?.let { ttsHighlightTextRange(it, layoutResult.layoutInput.text.length) }
+    val wordRange =
+        highlight.word?.let { ttsHighlightTextRange(it, layoutResult.layoutInput.text.length) }
+    if (sentenceRange?.collapsed != false && wordRange?.collapsed != false) return this.then(semanticsModifier)
     return this.then(semanticsModifier).drawBehind {
-        highlightBoundingBoxes(layoutResult, range).forEach { box ->
-            drawRect(color = color, topLeft = Offset(box.left, box.top), size = box.size)
+        sentenceRange?.takeUnless { it.collapsed }?.let { range ->
+            highlightBoundingBoxes(layoutResult, range).forEach { box ->
+                drawRect(color = color, topLeft = Offset(box.left, box.top), size = box.size)
+            }
+        }
+        wordRange?.takeUnless { it.collapsed }?.let { range ->
+            highlightBoundingBoxes(layoutResult, range).forEach { box ->
+                drawRect(color = color.copy(alpha = 0.72f), topLeft = Offset(box.left, box.top), size = box.size)
+            }
         }
     }
 }

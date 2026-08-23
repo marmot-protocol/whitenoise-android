@@ -6,17 +6,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -28,6 +32,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.chats.ConnectivityBannerState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -46,6 +51,62 @@ class AccountSwitcherUnreadDotLayoutTest {
 
     private val unreadDescription
         get() = context.getString(R.string.account_unread_indicator)
+
+    @Test
+    fun stackRoutesEveryVisibleSliceToItsAccountInLtrAndRtl() {
+        val width = 78f
+        val ltrExpected = listOf(0, 0, 1, 1, 2, 2)
+        val rtlExpected = ltrExpected.map { 2 - it }
+        val positions = listOf(1f, 21f, 22f, 43f, 44f, 77f)
+
+        assertEquals(
+            ltrExpected,
+            positions.map { accountStackTargetIndex(it, width, 3, LayoutDirection.Ltr) },
+        )
+        assertEquals(
+            rtlExpected,
+            positions.map { accountStackTargetIndex(it, width, 3, LayoutDirection.Rtl) },
+        )
+        assertEquals(1, accountStackTargetIndex(78f, width * 2f, 3, LayoutDirection.Ltr))
+    }
+
+    @Test
+    fun threeVisibleAccountsReceiveRapidCenterTapsWithoutNeighborDispatch() {
+        val switched = mutableListOf<String>()
+        renderTopBar(
+            appState = testAppState(accountCount = 4),
+            onSwitchAccount = switched::add,
+        )
+
+        composeRule.onNodeWithTag(OTHER_ACCOUNT_STACK_TAG).performTouchInput {
+            click(Offset(17f, centerY))
+            click(Offset(39f, centerY))
+            click(Offset(61f, centerY))
+        }
+
+        assertEquals(listOf("account-2", "account-3", "account-4"), switched)
+    }
+
+    @Test
+    fun stackExposesOneAccessibilityActionPerAccountAndOverflow() {
+        val switched = mutableListOf<String>()
+        var opened = 0
+        renderTopBar(
+            appState = testAppState(accountCount = 5),
+            onSwitchAccount = switched::add,
+            onOpenSwitcher = { opened++ },
+        )
+
+        val actions =
+            composeRule
+                .onNodeWithTag(OTHER_ACCOUNT_STACK_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+        actions.forEach { it.action() }
+
+        assertEquals(listOf("account-2", "account-3", "account-4"), switched)
+        assertEquals(1, opened)
+    }
 
     @Test
     fun threeAccountAdjacentUnreadDots_areNotOccludedByLaterStackedAvatars() {
@@ -109,7 +170,9 @@ class AccountSwitcherUnreadDotLayoutTest {
                 useUnmergedTree = true,
             ).assertIsDisplayed()
             .assertHasClickAction()
-        composeRule.onNodeWithTag(otherAccountUnreadDotTag("account-2")).assertDoesNotExist()
+        composeRule
+            .onNodeWithTag(otherAccountUnreadDotTag("account-2"), useUnmergedTree = true)
+            .assertDoesNotExist()
     }
 
     @Test
@@ -139,10 +202,15 @@ class AccountSwitcherUnreadDotLayoutTest {
         composeRule
             .onNodeWithContentDescription(unreadDescription, substring = true)
             .assertDoesNotExist()
-        composeRule.onNodeWithTag(otherAccountUnreadDotTag("account-2")).assertDoesNotExist()
-        composeRule.onNodeWithTag(otherAccountUnreadDotTag("account-3")).assertDoesNotExist()
+        composeRule
+            .onNodeWithTag(otherAccountUnreadDotTag("account-2"), useUnmergedTree = true)
+            .assertDoesNotExist()
+        composeRule
+            .onNodeWithTag(otherAccountUnreadDotTag("account-3"), useUnmergedTree = true)
+            .assertDoesNotExist()
     }
 
+    @Suppress("LongMethod")
     @Test
     fun switchingActiveAccount_movesUnreadDotOwnership() {
         val appStateHolder =
@@ -195,8 +263,12 @@ class AccountSwitcherUnreadDotLayoutTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag(otherAccountUnreadDotTag("account-2")).assertDoesNotExist()
-        composeRule.onNodeWithTag(otherAccountUnreadDotTag("personal")).assertDoesNotExist()
+        composeRule
+            .onNodeWithTag(otherAccountUnreadDotTag("account-2"), useUnmergedTree = true)
+            .assertDoesNotExist()
+        composeRule
+            .onNodeWithTag(otherAccountUnreadDotTag("personal"), useUnmergedTree = true)
+            .assertDoesNotExist()
         composeRule
             .onNode(
                 hasContentDescription(context.getString(R.string.open_settings), substring = true) and
@@ -219,11 +291,7 @@ class AccountSwitcherUnreadDotLayoutTest {
             dotTag = otherAccountUnreadDotTag("account-4"),
             ownerAvatarTag = otherAccountAvatarTag("account-4"),
             leftNeighborAvatarTag = otherAccountAvatarTag("account-3"),
-            rightNeighborBounds =
-                composeRule
-                    .onNodeWithContentDescription(context.getString(R.string.switch_account))
-                    .fetchSemanticsNode()
-                    .boundsInRoot,
+            rightNeighborBounds = boundsForTag(OTHER_ACCOUNT_OVERFLOW_TAG),
         )
     }
 
@@ -236,7 +304,9 @@ class AccountSwitcherUnreadDotLayoutTest {
                 },
         )
 
-        composeRule.onNodeWithTag(otherAccountUnreadDotTag("account-2")).assertDoesNotExist()
+        composeRule
+            .onNodeWithTag(otherAccountUnreadDotTag("account-2"), useUnmergedTree = true)
+            .assertDoesNotExist()
         composeRule
             .onNodeWithContentDescription(unreadDescription, substring = true, useUnmergedTree = true)
             .assertIsDisplayed()
@@ -245,6 +315,8 @@ class AccountSwitcherUnreadDotLayoutTest {
     private fun renderTopBar(
         appState: WhiteNoiseAppState,
         rtl: Boolean = false,
+        onSwitchAccount: (String) -> Unit = {},
+        onOpenSwitcher: () -> Unit = {},
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
@@ -261,8 +333,8 @@ class AccountSwitcherUnreadDotLayoutTest {
                             onSearchOpen = {},
                             onSearchClose = {},
                             onMic = {},
-                            onOpenSettings = {},
-                            onSwitchAccount = {},
+                            onOpenSettings = onOpenSwitcher,
+                            onSwitchAccount = onSwitchAccount,
                             connectivityState = ConnectivityBannerState.Hidden,
                         )
                     }
@@ -274,7 +346,7 @@ class AccountSwitcherUnreadDotLayoutTest {
 
     private fun boundsForTag(tag: String): Rect =
         composeRule
-            .onNodeWithTag(tag)
+            .onNodeWithTag(tag, useUnmergedTree = true)
             .fetchSemanticsNode()
             .boundsInRoot
 
@@ -287,7 +359,7 @@ class AccountSwitcherUnreadDotLayoutTest {
     ) {
         val dotBounds =
             composeRule
-                .onNodeWithTag(dotTag)
+                .onNodeWithTag(dotTag, useUnmergedTree = true)
                 .fetchSemanticsNode()
                 .boundsInRoot
         val ownerBounds = boundsForTag(ownerAvatarTag)

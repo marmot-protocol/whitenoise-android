@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.HsvColor
 import dev.ipf.whitenoise.android.state.opaqueArgbToHsv
+import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
 import java.util.Locale
 
@@ -58,25 +59,30 @@ private const val CHANNEL_KEYBOARD_STEP = 0.01f
 private val HUE_STOPS = List(HUE_STOP_COUNT) { index -> index * HUE_STOP_INTERVAL }
 private val CHANNEL_THUMB_RADIUS = 9.dp
 
-@Suppress("FunctionNaming")
+private fun Long.blueFreeWhen(enabled: Boolean): Long = if (enabled) withoutBlueChannel() else this
+
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun FullSpectrumColorPicker(
     argb: Long,
     onColorChanged: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    blueFree: Boolean = false,
 ) {
-    var hsv by remember { mutableStateOf(opaqueArgbToHsv(argb)) }
-    var lastEmittedArgb by remember { mutableLongStateOf(argb) }
-    LaunchedEffect(argb) {
-        if (argb != lastEmittedArgb) {
-            hsv = opaqueArgbToHsv(argb)
-            lastEmittedArgb = argb
+    val displayedArgb = argb.blueFreeWhen(blueFree)
+    val indicatorColor = if (blueFree) MaterialTheme.colorScheme.onSurface else Color.White
+    var hsv by remember { mutableStateOf(opaqueArgbToHsv(displayedArgb)) }
+    var lastEmittedArgb by remember { mutableLongStateOf(displayedArgb) }
+    LaunchedEffect(displayedArgb) {
+        if (displayedArgb != lastEmittedArgb) {
+            hsv = opaqueArgbToHsv(displayedArgb)
+            lastEmittedArgb = displayedArgb
         }
     }
 
     fun updateHsv(updated: HsvColor) {
         hsv = updated
-        lastEmittedArgb = updated.toOpaqueArgb()
+        lastEmittedArgb = updated.toOpaqueArgb().blueFreeWhen(blueFree)
         onColorChanged(lastEmittedArgb)
     }
 
@@ -89,9 +95,13 @@ internal fun FullSpectrumColorPicker(
             steps = HUE_STEP_COUNT,
             gradientColors =
                 HUE_STOPS.map { hue ->
-                    colorFromArgb(HsvColor(hue, 1f, 1f).toOpaqueArgb())
+                    HsvColor(hue, 1f, 1f)
+                        .toOpaqueArgb()
+                        .blueFreeWhen(blueFree)
+                        .let(::colorFromArgb)
                 },
             keyboardStep = HUE_KEYBOARD_STEP,
+            indicatorColor = indicatorColor,
             onValueChange = { updateHsv(hsv.copy(hue = it)) },
         )
         ColorChannel(
@@ -102,10 +112,15 @@ internal fun FullSpectrumColorPicker(
             steps = CHANNEL_STEP_COUNT,
             gradientColors =
                 listOf(
-                    colorFromArgb(hsv.copy(saturation = 0f).toOpaqueArgb()),
-                    colorFromArgb(hsv.copy(saturation = 1f).toOpaqueArgb()),
+                    colorFromArgb(
+                        hsv.copy(saturation = 0f).toOpaqueArgb().blueFreeWhen(blueFree),
+                    ),
+                    colorFromArgb(
+                        hsv.copy(saturation = 1f).toOpaqueArgb().blueFreeWhen(blueFree),
+                    ),
                 ),
             keyboardStep = CHANNEL_KEYBOARD_STEP,
+            indicatorColor = indicatorColor,
             onValueChange = { updateHsv(hsv.copy(saturation = it)) },
         )
         ColorChannel(
@@ -117,9 +132,12 @@ internal fun FullSpectrumColorPicker(
             gradientColors =
                 listOf(
                     Color.Black,
-                    colorFromArgb(hsv.copy(value = 1f).toOpaqueArgb()),
+                    colorFromArgb(
+                        hsv.copy(value = 1f).toOpaqueArgb().blueFreeWhen(blueFree),
+                    ),
                 ),
             keyboardStep = CHANNEL_KEYBOARD_STEP,
+            indicatorColor = indicatorColor,
             onValueChange = { updateHsv(hsv.copy(value = it)) },
         )
     }
@@ -135,6 +153,7 @@ private fun ColorChannel(
     steps: Int,
     gradientColors: List<Color>,
     keyboardStep: Float,
+    indicatorColor: Color,
     onValueChange: (Float) -> Unit,
 ) {
     val currentOnValueChange by rememberUpdatedState(onValueChange)
@@ -212,7 +231,7 @@ private fun ColorChannel(
                     indicatorRadius + fraction * (size.width - indicatorRadius * 2f),
                     size.height / 2f,
                 )
-            drawCircle(Color.White, radius = indicatorRadius, center = indicatorCenter)
+            drawCircle(indicatorColor, radius = indicatorRadius, center = indicatorCenter)
             drawCircle(
                 Color.Black.copy(alpha = 0.7f),
                 radius = indicatorRadius,

@@ -357,6 +357,7 @@ internal fun ConversationTtsFollowEffects(
                 followTtsTargetInViewport(
                     target = target,
                     direction = request.direction,
+                    anchorAtTop = request.anchorAtTop,
                     itemKey = row.id,
                     targetIndex = targetIndex,
                     estimatedItemHeightPx = itemHeight,

@@ -1,13 +1,12 @@
 package dev.ipf.whitenoise.android.ui.account
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -21,12 +20,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
@@ -104,16 +109,36 @@ private val TOP_BAR_OTHER_ACCOUNT_UNREAD_DOT_SIZE = 10.dp
 
 internal const val OTHER_ACCOUNT_AVATAR_TAG_PREFIX = "other-account-avatar-"
 
+internal const val OTHER_ACCOUNT_STACK_TAG = "other-account-stack"
+
+internal const val OTHER_ACCOUNT_OVERFLOW_TAG = "other-account-overflow"
+
 internal const val OTHER_ACCOUNT_UNREAD_DOT_TAG_PREFIX = "other-account-unread-dot-"
 
 internal fun otherAccountAvatarTag(accountLabel: String): String = "$OTHER_ACCOUNT_AVATAR_TAG_PREFIX$accountLabel"
 
 internal fun otherAccountUnreadDotTag(accountLabel: String): String = OTHER_ACCOUNT_UNREAD_DOT_TAG_PREFIX + accountLabel
 
+@Suppress("ReturnCount")
+internal fun accountStackTargetIndex(
+    positionX: Float,
+    width: Float,
+    targetCount: Int,
+    layoutDirection: LayoutDirection,
+): Int? {
+    if (targetCount <= 0 || width <= 0f || positionX !in 0f..width) return null
+    val avatarSize = TOP_BAR_OTHER_ACCOUNT_SIZE.value
+    val advance = avatarSize - TOP_BAR_OTHER_ACCOUNT_OVERLAP.value
+    val scaledAdvance = advance * (width / (avatarSize + advance * (targetCount - 1)))
+    val visualIndex = (positionX / scaledAdvance).toInt().coerceIn(0, targetCount - 1)
+    return if (layoutDirection == LayoutDirection.Ltr) visualIndex else targetCount - 1 - visualIndex
+}
+
 // Other signed-in accounts, stacked beside the active-account avatar (#343): tap
 // to switch (lands on that account's chat list), long-press for the full
 // switcher, each carrying its own unread dot. Hidden when the active account is
 // the only one signed in.
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun OtherAccountAvatarsRow(
     appState: WhiteNoiseAppState,
@@ -127,7 +152,74 @@ internal fun OtherAccountAvatarsRow(
     if (others.isEmpty()) return
     val shown = others.take(MAX_TOP_BAR_OTHER_ACCOUNTS)
     val overflow = others.size - shown.size
+    val layoutDirection = LocalLayoutDirection.current
+    val switchAccountLabel = stringResource(R.string.switch_account)
+    val unreadLabel = stringResource(R.string.account_unread_indicator)
+    val actionLabels =
+        shown.map { account ->
+            val title = appState.displayName(account.accountIdHex)
+            buildString {
+                append(switchAccountLabel)
+                append(": ")
+                append(title)
+                if (appState.accountShowsUnreadDot(account.label)) {
+                    append(", ")
+                    append(unreadLabel)
+                }
+            }
+        }
+    val targetCount = shown.size + if (overflow > 0) 1 else 0
     Row(
+        modifier =
+            Modifier
+                .testTag(OTHER_ACCOUNT_STACK_TAG)
+                .heightIn(min = 48.dp)
+                .pointerInput(shown.map { it.label }, overflow, layoutDirection) {
+                    detectTapGestures(
+                        onTap = { position ->
+                            val target =
+                                accountStackTargetIndex(
+                                    positionX = position.x,
+                                    width = size.width.toFloat(),
+                                    targetCount = targetCount,
+                                    layoutDirection = layoutDirection,
+                                )
+                            when {
+                                target == null -> Unit
+                                target in shown.indices -> onSwitchAccount(shown[target].label)
+                                target == shown.size -> onOpenSwitcher()
+                            }
+                        },
+                        onLongPress = { onOpenSwitcher() },
+                    )
+                }.semantics(mergeDescendants = true) {
+                    contentDescription = actionLabels.joinToString()
+                    onClick(label = switchAccountLabel) {
+                        onOpenSwitcher()
+                        true
+                    }
+                    onLongClick(label = switchAccountLabel) {
+                        onOpenSwitcher()
+                        true
+                    }
+                    customActions =
+                        shown.mapIndexed { index, account ->
+                            CustomAccessibilityAction(actionLabels[index]) {
+                                onSwitchAccount(account.label)
+                                true
+                            }
+                        } +
+                        if (overflow > 0) {
+                            listOf(
+                                CustomAccessibilityAction("$switchAccountLabel: +$overflow") {
+                                    onOpenSwitcher()
+                                    true
+                                },
+                            )
+                        } else {
+                            emptyList()
+                        }
+                },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(-TOP_BAR_OTHER_ACCOUNT_OVERLAP),
     ) {
@@ -139,17 +231,15 @@ internal fun OtherAccountAvatarsRow(
                 pictureUrl = appState.avatarUrl(account.accountIdHex),
                 showUnreadDot = appState.accountShowsUnreadDot(account.label),
                 unreadDotColor = accountActionColors(appState, account.label).container,
-                onClick = { onSwitchAccount(account.label) },
-                onLongClick = onOpenSwitcher,
             )
         }
         if (overflow > 0) {
-            OverflowAccountChip(count = overflow, onClick = onOpenSwitcher)
+            OverflowAccountChip(count = overflow)
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@Suppress("FunctionNaming")
 @Composable
 private fun OtherAccountAvatar(
     accountLabel: String,
@@ -158,17 +248,7 @@ private fun OtherAccountAvatar(
     pictureUrl: String?,
     showUnreadDot: Boolean,
     unreadDotColor: Color,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
 ) {
-    val switchDescription = "${stringResource(R.string.switch_account)}: $title"
-    val accountUnreadDescription = stringResource(R.string.account_unread_indicator)
-    val avatarContentDescription =
-        if (showUnreadDot) {
-            "$switchDescription, $accountUnreadDescription"
-        } else {
-            switchDescription
-        }
     Box(
         modifier =
             Modifier
@@ -181,9 +261,7 @@ private fun OtherAccountAvatar(
                     .matchParentSize()
                     // Ring in the bar background so stacked avatars read as separate.
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-                    .semantics { contentDescription = avatarContentDescription },
+                    .background(MaterialTheme.colorScheme.surface),
             contentAlignment = Alignment.Center,
         ) {
             Avatar(
@@ -211,19 +289,14 @@ private fun OtherAccountAvatar(
 }
 
 @Composable
-private fun OverflowAccountChip(
-    count: Int,
-    onClick: () -> Unit,
-) {
-    val description = stringResource(R.string.switch_account)
+private fun OverflowAccountChip(count: Int) {
     Box(
         modifier =
             Modifier
+                .testTag(OTHER_ACCOUNT_OVERFLOW_TAG)
                 .size(TOP_BAR_OTHER_ACCOUNT_SIZE)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surface)
-                .clickable(onClick = onClick)
-                .semantics { contentDescription = description },
+                .background(MaterialTheme.colorScheme.surface),
         contentAlignment = Alignment.Center,
     ) {
         Box(

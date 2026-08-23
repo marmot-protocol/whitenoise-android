@@ -54,9 +54,12 @@ import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
 import dev.ipf.whitenoise.android.state.OPAQUE_WHITE_ARGB
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
 import dev.ipf.whitenoise.android.state.parseOpaqueColorHex
+import dev.ipf.whitenoise.android.state.readableBlueFreeTextArgb
 import dev.ipf.whitenoise.android.state.readableTextArgb
 import dev.ipf.whitenoise.android.state.tonalBubbleColorPresets
+import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 import dev.ipf.whitenoise.android.ui.conversation.messages.BubblePresentationTokens
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
@@ -270,13 +273,33 @@ internal fun TonalSwatchPicker(
     @StringRes swatchContentDescriptionRes: Int = R.string.bubble_color_swatch_content_description,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val presets = remember { tonalBubbleColorPresets() }
+    val blueFree = theme == BubbleTheme.Amoled
+
+    fun displayArgb(argb: Long): Long = if (blueFree) argb.withoutBlueChannel() else argb
+
+    val readableContentArgb: (Long) -> Long? =
+        if (blueFree) ::readableBlueFreeTextArgb else ::readableTextArgb
+
+    fun isSelectable(argb: Long): Boolean = !blueFree || argb.isBlueFreeAccentVisible()
+
+    val displayedSelectedArgb = selectedArgb?.let(::displayArgb)?.takeIf(::isSelectable)
+    val presets =
+        remember(theme) {
+            tonalBubbleColorPresets()
+                .map(::displayArgb)
+                .filter(::isSelectable)
+                .distinct()
+        }
     var customExpanded by rememberSaveable(scopeKey, theme, slotKey) { mutableStateOf(false) }
     var customHex by rememberSaveable(scopeKey, theme, slotKey, selectedArgb) {
-        mutableStateOf(selectedArgb?.let { "#%06X".format(Locale.ROOT, it and BUBBLE_COLOR_RGB_MASK) } ?: "")
+        mutableStateOf(displayedSelectedArgb?.let { "#%06X".format(Locale.ROOT, it and BUBBLE_COLOR_RGB_MASK) } ?: "")
     }
     val parsedCustom = parseOpaqueColorHex(customHex)
-    val contrastSafeCustom = parsedCustom?.takeIf { readableTextArgb(it) != null }
+    val contrastSafeCustom =
+        parsedCustom
+            ?.let(::displayArgb)
+            ?.takeIf(::isSelectable)
+            ?.takeIf { readableContentArgb(it) != null }
     val moreColorsDescription = stringResource(R.string.more_colors)
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -286,7 +309,7 @@ internal fun TonalSwatchPicker(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             presets.forEach { argb ->
-                val selected = selectedArgb == argb
+                val selected = displayedSelectedArgb == argb
                 val swatchDescription =
                     stringResource(
                         swatchContentDescriptionRes,
@@ -300,7 +323,7 @@ internal fun TonalSwatchPicker(
                             width = if (selected) 3.dp else 1.dp,
                             color = swatchBorderColor(argb, selected, scheme),
                             shape = CircleShape,
-                        ).clickable { onColorSelected(argb) }
+                        ).clickable { onColorSelected(displayArgb(argb)) }
                         .semantics {
                             role = Role.RadioButton
                             this.selected = selected
@@ -314,8 +337,13 @@ internal fun TonalSwatchPicker(
                     ) {}
                 }
             }
-            val customSelected = selectedArgb != null && selectedArgb !in presets
-            val customContentArgb = selectedArgb?.takeIf { customSelected }?.let(::readableTextArgb)
+            val customSelected = displayedSelectedArgb != null && displayedSelectedArgb !in presets
+            val customContentArgb =
+                if (customSelected && displayedSelectedArgb != null) {
+                    readableContentArgb(displayedSelectedArgb)
+                } else {
+                    null
+                }
             Box(
                 Modifier
                     .size(48.dp)
@@ -333,8 +361,12 @@ internal fun TonalSwatchPicker(
                 contentAlignment = Alignment.Center,
             ) {
                 Surface(
-                    color = selectedArgb?.takeIf { customSelected }?.let { colorFromArgb(it) } ?: scheme.surface,
-                    contentColor = customContentArgb?.let { colorFromArgb(it) } ?: scheme.onSurface,
+                    color =
+                        displayedSelectedArgb
+                            ?.takeIf { customSelected }
+                            ?.let(::colorFromArgb)
+                            ?: scheme.surface,
+                    contentColor = customContentArgb?.let(::colorFromArgb) ?: scheme.onSurface,
                     shape = CircleShape,
                     modifier = Modifier.matchParentSize().padding(if (customSelected) 5.dp else 3.dp),
                 ) {
@@ -345,13 +377,19 @@ internal fun TonalSwatchPicker(
             }
         }
         if (customExpanded) {
-            val pickerArgb = parsedCustom ?: selectedArgb ?: presets.firstOrNull() ?: 0xFF06B6D4L
+            val pickerArgb =
+                parsedCustom?.let(::displayArgb)
+                    ?: displayedSelectedArgb
+                    ?: presets.firstOrNull()
+                    ?: scheme.primary.toArgb().toLong()
             FullSpectrumColorPicker(
                 argb = pickerArgb,
+                blueFree = blueFree,
                 onColorChanged = { argb ->
-                    if (readableTextArgb(argb) != null) {
-                        customHex = "#%06X".format(Locale.ROOT, argb and BUBBLE_COLOR_RGB_MASK)
-                        onColorSelected(argb)
+                    val displayedArgb = displayArgb(argb)
+                    if (isSelectable(displayedArgb) && readableContentArgb(displayedArgb) != null) {
+                        customHex = "#%06X".format(Locale.ROOT, displayedArgb and BUBBLE_COLOR_RGB_MASK)
+                        onColorSelected(displayedArgb)
                     }
                 },
             )

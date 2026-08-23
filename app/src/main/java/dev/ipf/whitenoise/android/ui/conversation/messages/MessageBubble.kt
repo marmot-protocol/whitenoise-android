@@ -126,6 +126,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromTe
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
+import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -381,10 +382,9 @@ internal fun MessageBubble(
     // the menu opens. The point seeds partial text selection; the bounds keep
     // the action surface visually attached to the bubble like Signal/Telegram.
     var longPressWindowPosition by remember(record.messageIdHex) { mutableStateOf<Offset?>(null) }
+    var selectionSeedVisibleOffset by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
     var actionMenuAnchorBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
-    var actionMenuVisibleText by remember(record.messageIdHex) { mutableStateOf("") }
-    var actionMenuVisibleOffset by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
     val rowCoordinates = remember(record.messageIdHex) { arrayOfNulls<LayoutCoordinates>(1) }
     val messageBoundsInWindow = remember(record.messageIdHex) { arrayOfNulls<IntRect>(1) }
     val actionAnchorBoundsModifier =
@@ -876,17 +876,6 @@ internal fun MessageBubble(
         onActionMenuOpenChange(false)
     }
 
-    fun captureActionMenuVisibleStart(pressInWindow: Offset?) {
-        val layouts = selectableTextLayouts.snapshot()
-        actionMenuVisibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
-        actionMenuVisibleOffset =
-            if (record.contentTokens.truncated) {
-                null
-            } else {
-                textOffsetAtWindowPosition(layouts, pressInWindow)
-            }
-    }
-
     suspend fun ttsEntry(entryRecord: AppMessageRecordFfi) =
         projectTtsSpeakableEntry(
             message = entryRecord,
@@ -907,29 +896,14 @@ internal fun MessageBubble(
     // session takes auto-read ownership so messages arriving while it speaks
     // continue the read. Falls back to just this bubble when its record has
     // left the loaded timeline. When text is selected or the action menu was
-    // opened from a hit-tested press, start at the containing visible sentence.
-    fun speakFromHere() {
+    // opened from a text selection, start at the containing visible sentence.
+    // The ordinary long-press action starts at the message top; only an
+    // explicit text double-tap supplies a seek offset (#2136).
+    fun startSpeakAloud(
+        visibleText: String? = null,
+        visibleOffset: Int? = null,
+    ) {
         if (deleted) return
-        val layouts = selectableTextLayouts.snapshot()
-        val selectionActive = textSelectionMode && messageTextSelectionState.selectedTexts.isNotEmpty()
-        val visibleText =
-            if (selectionActive) {
-                concatenatedVisibleText(layouts).ifBlank { displayedBody }
-            } else {
-                actionMenuVisibleText.ifBlank { concatenatedVisibleText(layouts).ifBlank { displayedBody } }
-            }
-        val visibleOffset =
-            if (record.contentTokens.truncated) {
-                null
-            } else if (selectionActive) {
-                visibleOffsetFromSelection(
-                    layouts = layouts,
-                    selectedTexts = messageTextSelectionState.selectedTexts,
-                    preferredVisibleOffset = actionMenuVisibleOffset,
-                )
-            } else {
-                actionMenuVisibleOffset
-            }
         val locale = java.util.Locale.getDefault()
         appState.launchMutation {
             val candidateRecords =
@@ -943,12 +917,16 @@ internal fun MessageBubble(
                 return@launchMutation
             }
             val startSentenceIndex =
-                speakableSentenceIndexAtVisibleOffset(
-                    visibleText = visibleText,
-                    speakableText = entries.first().text,
-                    visibleOffset = visibleOffset,
-                    locale = locale,
-                )
+                if (visibleText == null || visibleOffset == null) {
+                    0
+                } else {
+                    speakableSentenceIndexAtVisibleOffset(
+                        visibleText = visibleText,
+                        speakableText = entries.first().text,
+                        visibleOffset = visibleOffset,
+                        locale = locale,
+                    )
+                }
             appState.speakAloudAutoRead(
                 controller.group.groupIdHex,
                 entries,
@@ -956,6 +934,42 @@ internal fun MessageBubble(
                 startSentenceIndex,
             )
         }
+    }
+
+    fun speakFromHere() {
+        val layouts = selectableTextLayouts.snapshot()
+        val selectionActive = textSelectionMode && messageTextSelectionState.selectedTexts.isNotEmpty()
+        if (!selectionActive) {
+            startSpeakAloud()
+            return
+        }
+        val visibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
+        val visibleOffset =
+            if (record.contentTokens.truncated) {
+                null
+            } else {
+                visibleOffsetFromSelection(
+                    layouts = layouts,
+                    selectedTexts = messageTextSelectionState.selectedTexts,
+                    preferredVisibleOffset = selectionSeedVisibleOffset,
+                )
+            }
+        startSpeakAloud(visibleText, visibleOffset)
+    }
+
+    @Suppress("ComplexCondition", "ReturnCount")
+    fun seekSpeakAloudAt(pressInWindow: Offset) {
+        if (deleted || selectionMode || textSelectionMode || !canSpeakAloud) return
+        if (markdownHasLinkAnnotationAt(markdownLinkLayouts.values, pressInWindow)) return
+        val layouts = selectableTextLayouts.snapshot()
+        val visibleOffset =
+            if (record.contentTokens.truncated) {
+                null
+            } else {
+                textOffsetAtWindowPosition(layouts, pressInWindow)
+            } ?: return
+        val visibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
+        startSpeakAloud(visibleText, visibleOffset)
     }
 
     fun copyMarkdownLink(url: String) {
@@ -1086,6 +1100,16 @@ internal fun MessageBubble(
                             }
                         },
                     ).then(
+                        Modifier.observeMessageTextDoubleTap(
+                            enabled = !deleted && !selectionMode && !textSelectionMode && canSpeakAloud,
+                            onDoubleTap = { position ->
+                                val pressInWindow =
+                                    rowCoordinates[0]?.localToWindow(position)
+                                        ?: return@observeMessageTextDoubleTap
+                                seekSpeakAloudAt(pressInWindow)
+                            },
+                        ),
+                    ).then(
                         // Long-press lives in a raw pointerInput, not
                         // combinedClickable, so it WINS over inner media
                         // children (image/video/file/voice) that install their
@@ -1127,13 +1151,21 @@ internal fun MessageBubble(
                                         // opening so both the popover and text
                                         // selection seed at the finger (#326, #1370).
                                         longPressWindowPosition = windowPosition
+                                        selectionSeedVisibleOffset =
+                                            if (record.contentTokens.truncated) {
+                                                null
+                                            } else {
+                                                textOffsetAtWindowPosition(
+                                                    selectableTextLayouts.snapshot(),
+                                                    windowPosition,
+                                                )
+                                            }
                                         longPressWindowY = windowPosition.y
                                         actionMenuAnchorBounds = messageBoundsInWindow[0]
                                         // Freeze the rendered hit now. The bubble
                                         // can move while its popup is open; an old
                                         // window coordinate must never be re-hit-
                                         // tested against a different line later.
-                                        captureActionMenuVisibleStart(windowPosition)
                                         onActionMenuOpenChange(true)
                                     }
                                 },
@@ -1190,9 +1222,9 @@ internal fun MessageBubble(
                                     // Accessibility entry has no touch point;
                                     // anchor to the bubble top and seed the first word.
                                     longPressWindowPosition = null
+                                    selectionSeedVisibleOffset = null
                                     longPressWindowY = null
                                     actionMenuAnchorBounds = messageBoundsInWindow[0]
-                                    captureActionMenuVisibleStart(null)
                                     onActionMenuOpenChange(true)
                                     true
                                 }
@@ -1409,9 +1441,9 @@ internal fun MessageBubble(
                         {
                             if (!selectionMode && !textSelectionMode) {
                                 longPressWindowPosition = null
+                                selectionSeedVisibleOffset = null
                                 longPressWindowY = null
                                 actionMenuAnchorBounds = messageBoundsInWindow[0]
-                                captureActionMenuVisibleStart(null)
                                 onActionMenuOpenChange(true)
                             }
                         }
@@ -1487,9 +1519,9 @@ internal fun MessageBubble(
                                     onLongClick = {
                                         if (!deleted && !selectionMode && !textSelectionMode) {
                                             longPressWindowPosition = null
+                                            selectionSeedVisibleOffset = null
                                             longPressWindowY = null
                                             actionMenuAnchorBounds = messageBoundsInWindow[0]
-                                            captureActionMenuVisibleStart(null)
                                             onActionMenuOpenChange(true)
                                         }
                                     },

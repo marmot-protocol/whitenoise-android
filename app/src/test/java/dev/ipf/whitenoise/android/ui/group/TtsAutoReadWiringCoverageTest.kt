@@ -110,7 +110,7 @@ class TtsAutoReadWiringCoverageTest {
 
     @Test
     fun speakFromHereClaimsAutoReadOwnershipThroughAppState() {
-        val body = source("ui/conversation/messages/MessageBubble.kt").functionBody("speakFromHere")
+        val body = source("ui/conversation/messages/MessageBubble.kt").functionBody("startSpeakAloud")
 
         assertTrue(
             "speak-from-here must build bounded candidates",

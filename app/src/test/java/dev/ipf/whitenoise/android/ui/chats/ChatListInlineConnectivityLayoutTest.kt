@@ -25,6 +25,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.account.OTHER_ACCOUNT_STACK_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -179,7 +180,7 @@ class ChatListInlineConnectivityLayoutTest {
                 .boundsInRoot
         val overflowBounds =
             composeRule
-                .onNodeWithContentDescription(context.getString(R.string.switch_account))
+                .onNodeWithTag(OTHER_ACCOUNT_STACK_TAG)
                 .assertIsDisplayed()
                 .fetchSemanticsNode()
                 .boundsInRoot
