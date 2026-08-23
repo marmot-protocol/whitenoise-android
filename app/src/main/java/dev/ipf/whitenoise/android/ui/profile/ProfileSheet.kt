@@ -37,7 +37,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -46,7 +45,6 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -662,11 +660,11 @@ internal fun ProfileSheet(
                     }
                 }
             }
-            Row(
-                modifier = Modifier.testTag(PROFILE_QUICK_ACTIONS_TAG),
-                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
-            ) {
-                if (hex != null && !targetIsSelf) {
+            if (hex != null && !targetIsSelf) {
+                Row(
+                    modifier = Modifier.testTag(PROFILE_QUICK_ACTIONS_TAG),
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+                ) {
                     QuickActionButton(
                         icon = if (followRow.showsUnfollow) Icons.Default.PersonRemove else Icons.Default.PersonAdd,
                         label =
@@ -694,33 +692,21 @@ internal fun ProfileSheet(
                             }
                         },
                     )
+                    QuickActionButton(
+                        icon = Icons.AutoMirrored.Filled.Chat,
+                        label = stringResource(R.string.message),
+                        modifier = Modifier.testTag(PROFILE_MESSAGE_ACTION_TAG),
+                        enabled = !creatingChat,
+                        inProgress = creatingChat,
+                        // Opens the existing 1:1 DM, or starts a new one with this
+                        // person when none exists yet. The create runs in the
+                        // process-lifetime mutation scope (Main.immediate) so the MLS
+                        // commit + Nostr publish finish regardless; we keep the sheet up
+                        // with a spinner until the conversation is ready, then navigate
+                        // straight in — no dismiss-into-a-blank-gap.
+                        onClick = { openOrCreateProfileChat() },
+                    )
                 }
-                QuickActionButton(
-                    icon = Icons.AutoMirrored.Filled.Chat,
-                    label = stringResource(R.string.message),
-                    modifier = Modifier.testTag(PROFILE_MESSAGE_ACTION_TAG),
-                    enabled = hex != null && !creatingChat,
-                    inProgress = creatingChat,
-                    // Opens the existing 1:1 DM, or starts a new one with this
-                    // person when none exists yet. The create runs in the
-                    // process-lifetime mutation scope (Main.immediate) so the MLS
-                    // commit + Nostr publish finish regardless; we keep the sheet up
-                    // with a spinner until the conversation is ready, then navigate
-                    // straight in — no dismiss-into-a-blank-gap.
-                    onClick = { openOrCreateProfileChat() },
-                )
-                QuickActionButton(
-                    icon = Icons.Default.Call,
-                    label = stringResource(R.string.quick_action_audio),
-                    onClick = {},
-                    enabled = false,
-                )
-                QuickActionButton(
-                    icon = Icons.Default.Videocam,
-                    label = stringResource(R.string.quick_action_video),
-                    onClick = {},
-                    enabled = false,
-                )
             }
             startChatError?.let { error ->
                 StartChatErrorCard(
