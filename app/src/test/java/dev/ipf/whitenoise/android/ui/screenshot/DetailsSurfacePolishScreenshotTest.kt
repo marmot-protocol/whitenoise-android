@@ -121,6 +121,17 @@ class DetailsSurfacePolishScreenshotTest {
             fontScale = 2f,
         )
 
+    @Test
+    fun unresolvedProfileLargeFontDark() =
+        captureProfile(
+            snapshot = "profile_sheet_unresolved_full_large_dark.png",
+            npub = UNRESOLVED_NPUB,
+            targetHex = null,
+            profile = null,
+            darkTheme = true,
+            fontScale = 2f,
+        )
+
     private fun captureGroupDetails(
         snapshot: String,
         group: AppGroupRecordFfi,
@@ -154,14 +165,14 @@ class DetailsSurfacePolishScreenshotTest {
 
     private fun captureProfile(
         snapshot: String,
-        targetHex: String,
+        targetHex: String?,
         profile: UserProfileMetadataFfi?,
         darkTheme: Boolean,
         amoled: Boolean = false,
         fontScale: Float = 1f,
+        npub: String = if (targetHex == SELF_HEX) SELF_NPUB else PEER_NPUB,
     ) {
         val appState = appState(profileHex = targetHex, profile = profile)
-        val npub = if (targetHex == SELF_HEX) SELF_NPUB else PEER_NPUB
         appState.presentDiscoveredProfile(npub, profile)
 
         composeRule.setContent {
@@ -180,7 +191,7 @@ class DetailsSurfacePolishScreenshotTest {
         }
         composeRule.waitForIdle()
         assertUnavailableCallsAreAbsent()
-        if (targetHex == SELF_HEX) {
+        if (targetHex == null || targetHex == SELF_HEX) {
             composeRule.onNodeWithTag(PROFILE_QUICK_ACTIONS_TAG).assertDoesNotExist()
         } else {
             composeRule.onNodeWithTag(PROFILE_QUICK_ACTIONS_TAG).assertExists()
@@ -337,6 +348,7 @@ class DetailsSurfacePolishScreenshotTest {
         const val SELF_NPUB = "npub1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygse4sl3h"
         const val PEER_HEX = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         const val PEER_NPUB = "npub1424242424242424242424242424242424242424242424242424qamrcaj"
+        const val UNRESOLVED_NPUB = "npub1unresolvedprofile"
         const val PEER_SHORT_NPUB = "npub14242424...4qamrcaj"
         const val GROUP_HEX = "group-a"
         const val DM_HEX = "dm-a"
