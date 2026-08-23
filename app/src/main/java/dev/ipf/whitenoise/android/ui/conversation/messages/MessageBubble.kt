@@ -1023,6 +1023,17 @@ internal fun MessageBubble(
                             }
                     )
             )
+    val currentMessageTextDoubleTap =
+        rememberUpdatedState<(Offset) -> Unit> { position ->
+            val pressInWindow =
+                rowCoordinates[0]?.localToWindow(position)
+                    ?: return@rememberUpdatedState
+            seekSpeakAloudAt(pressInWindow)
+        }
+    val stableMessageTextDoubleTap =
+        remember {
+            { position: Offset -> currentMessageTextDoubleTap.value(position) }
+        }
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val selectionGutterWidth = if (selectionMode) messageBubbleSelectionGutterWidth else 0.dp
@@ -1102,12 +1113,7 @@ internal fun MessageBubble(
                     ).then(
                         Modifier.observeMessageTextDoubleTap(
                             enabled = !deleted && !selectionMode && !textSelectionMode && canSpeakAloud,
-                            onDoubleTap = { position ->
-                                val pressInWindow =
-                                    rowCoordinates[0]?.localToWindow(position)
-                                        ?: return@observeMessageTextDoubleTap
-                                seekSpeakAloudAt(pressInWindow)
-                            },
+                            onDoubleTap = stableMessageTextDoubleTap,
                         ),
                     ).then(
                         // Long-press lives in a raw pointerInput, not
