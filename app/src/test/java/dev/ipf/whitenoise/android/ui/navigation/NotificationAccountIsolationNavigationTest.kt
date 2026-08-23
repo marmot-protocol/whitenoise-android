@@ -259,6 +259,14 @@ class NotificationAccountIsolationNavigationTest {
     @Test
     fun mainShell_ordinaryConversationAccountSwitchPreservesDestinationCards() {
         val gate = RouteOrderGate(preloadFinishesFirst = true)
+        // This case verifies ordinary account-switch ownership after a routed
+        // conversation is visible; it does not exercise the inactive-account
+        // activation ordering covered by the two tests above. Let the broad
+        // controller bind complete so timeline ownership can be published
+        // before asserting notification dismissal. Holding this latch creates
+        // a circular wait under Roborazzi: ownership awaits the controller,
+        // while the test awaits ownership before releasing the controller.
+        gate.releaseActivation.countDown()
         val appState = appState(fakeMarmot(gate))
         val sourceKeys = postConversationCards(SOURCE_ACCOUNT, "source-invite")
         val targetKeys = postConversationCards(TARGET_ACCOUNT, "target-invite")
@@ -300,7 +308,6 @@ class NotificationAccountIsolationNavigationTest {
             val activeKeys = manager.activeNotifications.map { it.tag to it.id }.toSet()
             targetKeys.all { it in activeKeys }
         }
-        gate.releaseActivation.countDown()
     }
 
     private fun verifyInactiveAccountTapIsolation(preloadFinishesFirst: Boolean) {
