@@ -288,6 +288,70 @@ class TtsEstimatedTimingLaneTest {
             )
         }
 
+    @Test
+    fun resumeReArmsTheScheduleForTheResumedUtterance() =
+        runTest {
+            val harness = LaneHarness(this)
+            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
+            harness.engine.start(index = 0)
+            advanceTimeBy(150)
+            runCurrent()
+            harness.controller.pause()
+
+            harness.controller.resume()
+            // Resume re-enqueued the chunk as a fresh utterance.
+            harness.engine.start(index = harness.engine.spoken.lastIndex)
+            advanceTimeBy(150)
+            runCurrent()
+
+            assertEquals(
+                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+        }
+
+    @Test
+    fun anEngineErrorEndsTheScheduleWithTheSession() =
+        runTest {
+            val harness = LaneHarness(this)
+            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
+            harness.engine.start(index = 0)
+            runCurrent()
+
+            harness.engine.error(index = 0)
+            advanceTimeBy(5_000)
+            runCurrent()
+
+            assertTrue(harness.controller.state.value is TtsState.Error)
+        }
+
+    @Test
+    fun verdictsNeverCrossEngines() =
+        runTest {
+            val harness = LaneHarness(this)
+            // Engine A proves itself range-capable.
+            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
+            harness.engine.start(index = 0)
+            harness.engine.range(index = 0, start = 0, end = 5)
+            assertEquals(true, harness.store.verdicts[ENGINE_KEY])
+
+            // A different engine must not inherit A's verdict: the estimate
+            // runs for it while its own capability is unknown.
+            val second = FakeLaneEngine()
+            harness.controller.attachEngine(second, engineKey = "com.other.tts")
+            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
+            second.start(index = 0)
+            advanceTimeBy(150)
+            runCurrent()
+
+            assertEquals(
+                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+        }
+
     private fun plainEntry(
         text: String = "Hello world.",
         messageIdHex: String = "m1",
@@ -365,6 +429,7 @@ class TtsEstimatedTimingLaneTest {
         val appliedRates = mutableListOf<Float>()
         private var startCallback: ((String?) -> Unit)? = null
         private var doneCallback: ((String?) -> Unit)? = null
+        private var errorCallback: ((String?, Int) -> Unit)? = null
         private var rangeCallback: ((String?, Int, Int, Int) -> Unit)? = null
         private var stopCallback: ((String?, Boolean) -> Unit)? = null
 
@@ -383,6 +448,7 @@ class TtsEstimatedTimingLaneTest {
         ) {
             startCallback = onStart
             doneCallback = onDone
+            errorCallback = onError
             rangeCallback = onRangeStart
             stopCallback = onStop
         }
@@ -390,6 +456,7 @@ class TtsEstimatedTimingLaneTest {
         override fun clearCallbacks() {
             startCallback = null
             doneCallback = null
+            errorCallback = null
             rangeCallback = null
             stopCallback = null
         }
@@ -418,6 +485,10 @@ class TtsEstimatedTimingLaneTest {
             end: Int,
         ) {
             rangeCallback?.invoke(spoken[index].utteranceId, start, end, 0)
+        }
+
+        fun error(index: Int) {
+            errorCallback?.invoke(spoken[index].utteranceId, TextToSpeech.ERROR_SYNTHESIS)
         }
 
         fun stopped(index: Int) {
