@@ -7332,26 +7332,22 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /**
-     * Publish Compose-owned conversation visibility on the app notification
-     * scope. A route recomposition can cancel its `LaunchedEffect` immediately
-     * after the synchronous ownership transition; the notification dismissal
-     * must still finish once that conversation was visibly opened.
-     */
+    /** Publish Compose-owned visibility and its notification dismissal atomically. */
     fun setActiveConversationFromUi(
         accountRef: String?,
         groupIdHex: String?,
     ) {
-        // Publish ownership in the calling Compose effect before dispatching.
-        // A busy or queued main dispatcher may defer a scope launch; visibility
-        // suppression must still become authoritative immediately.
+        // Publish ownership first so suppression is authoritative for the
+        // visible route even if a platform cancellation call fails.
         applyActiveConversationTransition(accountRef, groupIdHex)
-        if (groupIdHex != null) {
-            // Start directly on the app-owned notification dispatcher so neither
-            // route-effect cancellation nor main-queue contention can strand the
-            // tray-card dismissal after the conversation becomes visible.
-            notificationScope.launch(notificationDispatcher) {
-                dismissConversationNotificationsOnOpen(accountRef, groupIdHex, ::dismissConversationNotifications)
+        conversationOpenDismissalTarget(accountRef, groupIdHex)?.let { target ->
+            runCatching {
+                localNotificationPresenter.dismissConversationMessagesImmediately(
+                    target.accountRef,
+                    target.groupIdHex,
+                )
+            }.onFailure {
+                appStateDebug { "notification dismiss failed group=${target.groupIdHex.take(8)}" }
             }
         }
         appStateDebug {
