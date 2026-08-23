@@ -743,11 +743,17 @@ internal fun MainShell(
                         chatItem.group.groupIdHex,
                     ),
                 ).state
-            // Opening before the account switch lands pins the conversation to
-            // the notification's own account (#586); the in-flight switch keeps
-            // running behind the already-rendered conversation.
-            val pinnedAccountRef = target.accountRef.takeIf { it != appState.activeAccountRef }
-            if (pinnedAccountRef != null) {
+            // Keep ownership pinned for every open produced by this account-
+            // switch request. The active ref can land a frame before this
+            // commit while the shell still remembers the source account; if we
+            // drop the pin in that window, the account-change reset closes the
+            // routed conversation before it can claim notification ownership.
+            val ownsNotificationAccountSwitch = notificationAccountSwitchRequestId == routingRequestId
+            val pinnedAccountRef =
+                target.accountRef.takeIf {
+                    ownsNotificationAccountSwitch || it != appState.activeAccountRef
+                }
+            if (ownsNotificationAccountSwitch) {
                 notificationEarlyOpenRequestId = routingRequestId
             }
             selectedChatOpenContext =
@@ -988,7 +994,20 @@ internal fun MainShell(
                             )
                         ) {
                             notificationActiveRetryRequestId = routingRequestId
-                            when (
+                            val retryKey = requireNotNull(notificationMessagePreloadKey)
+                            val retryRuntimeGeneration = appState.runtimeGeneration
+                            // Account activation can publish an empty broad
+                            // list while this exact retry is suspended. Keep
+                            // that absence non-authoritative until the retry
+                            // itself returns. Run it in the process mutation
+                            // scope because publishing Loading re-composes and
+                            // cancels this keyed routing effect.
+                            notificationMessagePreload =
+                                NotificationMessagePreload(
+                                    key = retryKey,
+                                    state = NotificationMessagePreloadState.Loading,
+                                )
+                            appState.launchMutation {
                                 val outcome =
                                     loadNotificationMessageDirectly {
                                         NotificationRouteTrace.tracePhase(
@@ -1001,11 +1020,23 @@ internal fun MainShell(
                                             )
                                         }
                                     }
-                            ) {
-                                is NotificationMessageDirectLoadOutcome.OpenConversation -> {
-                                    commitNotificationConversationOpen(outcome.item)
+                                if (
+                                    currentInboundNotificationRequestId == routingRequestId &&
+                                    currentInboundNotificationTarget == target &&
+                                    currentRuntimeGeneration == retryRuntimeGeneration
+                                ) {
+                                    notificationMessagePreload =
+                                        NotificationMessagePreload(
+                                            key = retryKey,
+                                            state =
+                                                when (outcome) {
+                                                    is NotificationMessageDirectLoadOutcome.OpenConversation ->
+                                                        NotificationMessagePreloadState.Ready(outcome.item)
+                                                    NotificationMessageDirectLoadOutcome.AwaitChatList ->
+                                                        NotificationMessagePreloadState.Failed
+                                                },
+                                        )
                                 }
-                                NotificationMessageDirectLoadOutcome.AwaitChatList -> Unit
                             }
                         }
                     }

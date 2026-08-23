@@ -81,7 +81,7 @@ class NotificationAccountIsolationNavigationTest {
     }
 
     @Test
-    fun inactiveAccountTap_preloadOpensBeforeActivation_preservesSourceAccountCards() {
+    fun inactiveAccountTap_preloadOpensBeforeBroadActivationWork_preservesSourceAccountCards() {
         verifyInactiveAccountTapIsolation(preloadFinishesFirst = true)
     }
 
@@ -334,11 +334,20 @@ class NotificationAccountIsolationNavigationTest {
         manager.notify(lateSource.first, lateSource.second, notification(SOURCE_ACCOUNT))
 
         if (preloadFinishesFirst) {
-            awaitCondition {
+            awaitCondition(
+                failureMessage = {
+                    "destination cards were not dismissed before activation: " +
+                        "active=${manager.activeNotifications.map { it.tag to it.id }.toSet()} " +
+                        "expected=${(sourceKeys + lateSource).toSet()}"
+                },
+            ) {
                 manager.activeNotifications.map { it.tag to it.id }.toSet() ==
                     (sourceKeys + lateSource).toSet()
             }
-            assertEquals(SOURCE_ACCOUNT, appState.activeAccountRef)
+            // setActiveAccount publishes the target ref before the gated broad
+            // chat-list subscription finishes. The direct conversation can
+            // already own and dismiss only its target cards in that window.
+            assertEquals(TARGET_ACCOUNT, appState.activeAccountRef)
             gate.releaseActivation.countDown()
         } else {
             awaitCondition {
@@ -351,16 +360,29 @@ class NotificationAccountIsolationNavigationTest {
             gate.releasePreload.countDown()
         }
 
+        verifyRouteCompletion(appState, gate, handled, (sourceKeys + lateSource).toSet())
+    }
+
+    private fun verifyRouteCompletion(
+        appState: WhiteNoiseAppState,
+        gate: RouteOrderGate,
+        handled: AtomicBoolean,
+        expectedNotificationKeys: Set<Pair<String?, Int>>,
+    ) {
         check(gate.preloadCompleted.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
             "notification preload did not complete"
         }
         awaitCondition { handled.get() }
-        awaitCondition {
-            appState.activeAccountRef == TARGET_ACCOUNT
-        }
-        awaitCondition {
-            manager.activeNotifications.map { it.tag to it.id }.toSet() ==
-                (sourceKeys + lateSource).toSet()
+        awaitCondition { appState.activeAccountRef == TARGET_ACCOUNT }
+        awaitCondition(
+            failureMessage = {
+                "destination cards were not dismissed after the routed open: " +
+                    "active=${manager.activeNotifications.map { it.tag to it.id }.toSet()} " +
+                    "expected=$expectedNotificationKeys runtimeGeneration=${appState.runtimeGeneration} " +
+                    "projectionReads=${gate.projectionReadCount.get()} handled=${handled.get()}"
+            },
+        ) {
+            manager.activeNotifications.map { it.tag to it.id }.toSet() == expectedNotificationKeys
         }
         assertEquals(TARGET_ACCOUNT, appState.activeAccountRef)
     }
