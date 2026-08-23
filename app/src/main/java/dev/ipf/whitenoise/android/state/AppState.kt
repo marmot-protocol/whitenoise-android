@@ -7342,8 +7342,20 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String?,
     ) {
-        notificationScope.launch {
-            setActiveConversation(accountRef, groupIdHex)
+        // Publish ownership in the calling Compose effect before dispatching.
+        // A busy or queued main dispatcher may defer a scope launch; visibility
+        // suppression must still become authoritative immediately.
+        applyActiveConversationTransition(accountRef, groupIdHex)
+        if (groupIdHex != null) {
+            // Start directly on the app-owned notification dispatcher so neither
+            // route-effect cancellation nor main-queue contention can strand the
+            // tray-card dismissal after the conversation becomes visible.
+            notificationScope.launch(notificationDispatcher) {
+                dismissConversationNotificationsOnOpen(accountRef, groupIdHex, ::dismissConversationNotifications)
+            }
+        }
+        appStateDebug {
+            "active conversation=${groupIdHex?.take(8) ?: "<none>"} account=${activeConversationAccountRef?.take(8) ?: "<none>"}"
         }
     }
 

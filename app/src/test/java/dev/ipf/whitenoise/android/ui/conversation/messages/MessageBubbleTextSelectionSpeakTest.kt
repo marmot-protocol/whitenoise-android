@@ -417,12 +417,8 @@ class MessageBubbleTextSelectionSpeakTest {
 
     private fun waitForTts(engine: FakeSessionEngine) {
         composeRule.waitForIdle()
-        composeRule.runOnIdle {
-            var attempts = 0
-            while (engine.spoken.isEmpty() && attempts < 50) {
-                Thread.sleep(20)
-                attempts++
-            }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            engine.spoken.isNotEmpty()
         }
         assertTrue(engine.spoken.isNotEmpty())
     }
