@@ -38,6 +38,9 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -52,6 +55,7 @@ import org.robolectric.shadows.ShadowLooper
 import java.lang.reflect.Proxy
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -310,6 +314,41 @@ class NotificationAccountIsolationNavigationTest {
         }
     }
 
+    @Test
+    fun visibleConversationCancellationDoesNotWaitForNotificationListenerDispatcher() {
+        val listenerExecutor = Executors.newSingleThreadExecutor()
+        val listenerDispatcher = listenerExecutor.asCoroutineDispatcher()
+        val listenerStarted = CountDownLatch(1)
+        val releaseListener = CountDownLatch(1)
+
+        try {
+            listenerExecutor.execute {
+                listenerStarted.countDown()
+                releaseListener.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+            }
+            check(listenerStarted.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                "notification listener dispatcher did not start"
+            }
+
+            val sourceKeys = postConversationCards(SOURCE_ACCOUNT, "source-invite")
+            val appState =
+                appState(
+                    marmot = fakeMarmot(RouteOrderGate(preloadFinishesFirst = true)),
+                    notificationDispatcher = listenerDispatcher,
+                )
+
+            appState.setActiveConversationFromUi(SOURCE_ACCOUNT, SHARED_GROUP)
+
+            awaitCondition {
+                val activeKeys = manager.activeNotifications.map { it.tag to it.id }.toSet()
+                sourceKeys.none { it in activeKeys }
+            }
+        } finally {
+            releaseListener.countDown()
+            listenerDispatcher.close()
+        }
+    }
+
     private fun verifyInactiveAccountTapIsolation(preloadFinishesFirst: Boolean) {
         val gate = RouteOrderGate(preloadFinishesFirst)
         val appState = appState(fakeMarmot(gate))
@@ -426,13 +465,17 @@ class NotificationAccountIsolationNavigationTest {
             .invoke(appState, accountRef)
     }
 
-    private fun appState(marmot: MarmotInterface): WhiteNoiseAppState =
+    private fun appState(
+        marmot: MarmotInterface,
+        notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
             draftStore = DraftStore(NoopDraftPersistence),
             accountIdHexResolver = { null },
             accounts = listOf(account(SOURCE_ACCOUNT, SOURCE_ID), account(TARGET_ACCOUNT, TARGET_ID)),
             activeAccountRef = SOURCE_ACCOUNT,
+            notificationDispatcher = notificationDispatcher,
         ).also { state ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
