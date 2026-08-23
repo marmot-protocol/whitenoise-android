@@ -656,6 +656,15 @@
     <string name="background_connection_notification_hint">Lange drücken, um diese Benachrichtigung auszublenden</string>
     <string name="notification_channel_background_connection">Hintergrundverbindung</string>
     <string name="notification_channel_background_connection_description">Hält White Noise für lokale Benachrichtigungen verbunden</string>
+    <string name="notification_channel_read_aloud">Vorlesen</string>
+    <string name="notification_channel_read_aloud_description">Wiedergabesteuerung beim Vorlesen von Nachrichten</string>
+    <string name="tts_playback_notification_title">Wird vorgelesen</string>
+    <string name="tts_playback_notification_text">White Noise liest Nachrichten vor</string>
+    <string name="tts_playback_action_play">Wiedergabe</string>
+    <string name="tts_playback_action_pause">Pausieren</string>
+    <string name="tts_playback_action_stop">Stopp</string>
+    <string name="tts_playback_action_previous_message">Vorherige Nachricht</string>
+    <string name="tts_playback_action_next_message">Nächste Nachricht</string>
     <string name="toast_restarting">Neustart</string>
     <string name="toast_identity_created">Identität erstellt</string>
     <string name="toast_couldnt_create_identity">Identität konnte nicht erstellt werden</string>

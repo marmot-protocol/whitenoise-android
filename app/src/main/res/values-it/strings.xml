@@ -656,6 +656,15 @@
     <string name="background_connection_notification_hint">Tieni premuta questa notifica per nasconderla</string>
     <string name="notification_channel_background_connection">Connessione in background</string>
     <string name="notification_channel_background_connection_description">Mantiene White Noise connesso per le notifiche locali</string>
+    <string name="notification_channel_read_aloud">Lettura ad alta voce</string>
+    <string name="notification_channel_read_aloud_description">Controlli di riproduzione durante la lettura ad alta voce dei messaggi</string>
+    <string name="tts_playback_notification_title">Lettura ad alta voce</string>
+    <string name="tts_playback_notification_text">White Noise sta leggendo i messaggi</string>
+    <string name="tts_playback_action_play">Riproduci</string>
+    <string name="tts_playback_action_pause">Metti in pausa</string>
+    <string name="tts_playback_action_stop">Interrompi</string>
+    <string name="tts_playback_action_previous_message">Messaggio precedente</string>
+    <string name="tts_playback_action_next_message">Messaggio successivo</string>
     <string name="toast_restarting">Riavvio</string>
     <string name="toast_identity_created">Identità creata</string>
     <string name="toast_couldnt_create_identity">Impossibile creare l’identità</string>
