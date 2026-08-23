@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
@@ -15,8 +16,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
 class WhiteNoiseApplication : Application() {
+    /**
+     * JVM WorkManager harnesses inject a pre-built [WhiteNoiseAppState] here so
+     * workers exercise real doWork() against stubbed notification/attachment paths.
+     */
+    internal var appStateFactory: ((Context) -> WhiteNoiseAppState)? = null
+
     val appState: WhiteNoiseAppState by lazy {
-        WhiteNoiseAppState(this)
+        appStateFactory?.invoke(this) ?: WhiteNoiseAppState(this)
     }
 
     val recentEmojiRecentsOwner by lazy {

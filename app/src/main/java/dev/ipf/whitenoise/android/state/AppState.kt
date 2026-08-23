@@ -2155,8 +2155,15 @@ class WhiteNoiseAppState private constructor(
     var appLockScreenVisible by mutableStateOf(false)
         private set
 
+    internal fun setAppLockScreenVisibleForWorkerTests(visible: Boolean) {
+        appLockScreenVisible = visible
+    }
+
     val notificationActionsAllowed: Boolean
         get() = notificationActionsAllowed(appLockScreenVisible)
+
+    /** JVM WorkManager harness override; null in production. */
+    internal var workerTestHooks: WorkerTestHooks? = null
 
     var appUnlockError by mutableStateOf<AppText?>(null)
         private set
@@ -4257,6 +4264,7 @@ class WhiteNoiseAppState private constructor(
         request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority,
     ): Boolean {
+        workerTestHooks?.downloadAttachmentForDurableWork?.let { return it(request, priority) }
         val reference = resolveAttachmentReference(request) ?: throw AttachmentReferenceNotReadyException()
         downloadAttachmentPlaintext(request, reference, priority)
         return hasCachedAttachmentAfterHydration(request)
@@ -4457,6 +4465,10 @@ class WhiteNoiseAppState private constructor(
     }
 
     suspend fun ensureNotificationRuntimeStarted() {
+        workerTestHooks?.ensureNotificationRuntimeStarted?.let {
+            it()
+            return
+        }
         if (!bootstrapCompleted) {
             bootstrap()
             val receiverReady = bootstrapCompleted && notificationReceiverActive.value
@@ -7343,6 +7355,10 @@ class WhiteNoiseAppState private constructor(
      * worker can run after a process death with no UI attached.
      */
     suspend fun sweepExpiredDisappearingMessages() {
+        workerTestHooks?.sweepExpiredDisappearingMessages?.let {
+            it()
+            return
+        }
         ensureNotificationRuntimeStarted()
         if (marmotRuntime == null) return
         val signedInAccounts = accounts.filter { it.isSignedInSigningAccount() }
@@ -7554,6 +7570,17 @@ class WhiteNoiseAppState private constructor(
         completionKey: String,
         recoveryScope: String,
     ): NotificationReplySendOutcome {
+        workerTestHooks?.sendNotificationReply?.let {
+            return it(
+                accountRef,
+                groupIdHex,
+                afterMessageIdHex,
+                text,
+                completionStore,
+                completionKey,
+                recoveryScope,
+            )
+        }
         val account = accountRef.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.NonRetryableFailure
         val group = groupIdHex.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.NonRetryableFailure
         if (!ConversationController.HEX_MESSAGE_ID.matches(afterMessageIdHex)) {
@@ -7637,24 +7664,30 @@ class WhiteNoiseAppState private constructor(
         messageIdHex: String,
         reaction: String,
     ): NotificationReactionSendOutcome {
+        val testOutcome =
+            workerTestHooks
+                ?.sendNotificationReaction
+                ?.invoke(accountRef, groupIdHex, messageIdHex, reaction)
+        if (testOutcome != null) return testOutcome
         val emoji = normalizeNotificationReaction(reaction)
         val validTarget =
             accountRef.isNotBlank() &&
                 groupIdHex.isNotBlank() &&
                 ConversationController.HEX_MESSAGE_ID.matches(messageIdHex)
-        if (!validTarget || emoji == null) {
-            return NotificationReactionSendOutcome.NonRetryableFailure
+        return if (!validTarget || emoji == null) {
+            NotificationReactionSendOutcome.NonRetryableFailure
+        } else {
+            runCatchingCancellable {
+                withGroupCommitLock(accountRef, groupIdHex) {
+                    marmotIo { reactToMessage(accountRef, groupIdHex, messageIdHex, emoji) }
+                    NotificationReactionSendOutcome.Sent
+                }
+            }.onFailure {
+                appStateDebug(it) {
+                    "notification reaction failed for group=${groupIdHex.take(8)}: ${it.readableMessage()}"
+                }
+            }.getOrElse(::notificationReactionSendFailureOutcome)
         }
-        return runCatchingCancellable {
-            withGroupCommitLock(accountRef, groupIdHex) {
-                marmotIo { reactToMessage(accountRef, groupIdHex, messageIdHex, emoji) }
-                NotificationReactionSendOutcome.Sent
-            }
-        }.onFailure {
-            appStateDebug(it) {
-                "notification reaction failed for group=${groupIdHex.take(8)}: ${it.readableMessage()}"
-            }
-        }.getOrElse(::notificationReactionSendFailureOutcome)
     }
 
     private suspend fun notificationReplyCommitState(
@@ -7718,6 +7751,9 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         messageIdHex: String,
     ): Boolean {
+        workerTestHooks?.markNotificationMessageRead?.let {
+            return it(accountRef, groupIdHex, messageIdHex)
+        }
         val account = accountRef.takeIf { it.isNotBlank() } ?: return false
         val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
         val message = messageIdHex.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) } ?: return false
