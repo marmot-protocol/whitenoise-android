@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.audio.tts
 import android.app.NotificationManager
 import android.app.Service
 import android.content.ComponentName
+import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Looper
@@ -24,6 +25,12 @@ import java.util.Locale
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class TtsPlaybackForegroundServiceTest {
+    private class RejectingForegroundStartContext(
+        base: Context,
+    ) : ContextWrapper(base) {
+        override fun startForegroundService(service: Intent): ComponentName? = throw IllegalStateException("blocked")
+    }
+
     private class ServiceHarness {
         val engine = FakeServiceEngine()
         var nextMessages = 0
@@ -135,10 +142,7 @@ class TtsPlaybackForegroundServiceTest {
 
     @Test
     fun platformStartRejectionIsContained() {
-        val rejectingContext =
-            object : ContextWrapper(RuntimeEnvironment.getApplication()) {
-                override fun startForegroundService(service: Intent): ComponentName? = throw IllegalStateException("blocked")
-            }
+        val rejectingContext = RejectingForegroundStartContext(RuntimeEnvironment.getApplication())
 
         assertFalse(TtsPlaybackForegroundService.start(rejectingContext))
     }
