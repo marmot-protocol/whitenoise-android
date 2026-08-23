@@ -137,8 +137,7 @@ class TtsPlaybackForegroundServiceTest {
     fun platformStartRejectionIsContained() {
         val rejectingContext =
             object : ContextWrapper(RuntimeEnvironment.getApplication()) {
-                override fun startForegroundService(service: Intent): ComponentName? =
-                    throw IllegalStateException("foreground start blocked")
+                override fun startForegroundService(service: Intent): ComponentName? = throw IllegalStateException("blocked")
             }
 
         assertFalse(TtsPlaybackForegroundService.start(rejectingContext))
