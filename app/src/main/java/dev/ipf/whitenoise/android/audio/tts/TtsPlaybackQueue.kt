@@ -627,6 +627,8 @@ internal class TtsPlaybackQueue(
         val callbackIndex = parseCurrentGenerationIndex(utteranceId) ?: return RangeApplication.Stale
         val speaking = _state.value as? TtsState.Speaking ?: return RangeApplication.Stale
         if (callbackIndex != currentIndex) return RangeApplication.Stale
+        val passage = rangeTracker.passageForRange(chunks[callbackIndex], start, end)
+        if (passage?.visibleWord?.isNotEmpty() != true) return RangeApplication.FallbackOnly
         val messageIndex = projection.messageIndexForChunk(callbackIndex)
         progress.applyRangeStart(
             chunkIndex = callbackIndex,
@@ -636,22 +638,12 @@ internal class TtsPlaybackQueue(
             messageSpeakableLength = messageSpeakableLength(messageIndex),
             sentenceFallback = sentenceFallbackProgress(callbackIndex),
         )
-        val passage = rangeTracker.passageForRange(chunks[callbackIndex], start, end)
         _state.value =
             speaking.copy(
                 messageProgressFraction = progress.fraction,
-                passage =
-                    if (passage?.visibleWord?.isNotEmpty() == true) {
-                        passage
-                    } else {
-                        speaking.passage
-                    },
+                passage = passage,
             )
-        return if (passage?.visibleWord?.isNotEmpty() == true) {
-            RangeApplication.VisibleWord
-        } else {
-            RangeApplication.FallbackOnly
-        }
+        return RangeApplication.VisibleWord
     }
 
     private fun isNavigable(): Boolean = _state.value is TtsState.Speaking || _state.value is TtsState.Paused

@@ -353,20 +353,21 @@ class TtsController internal constructor(
         if (chunk != null) {
             wordTicker.stop()
             val timing = activeTiming?.takeIf { it.utteranceId == utteranceId }
-            activeTiming = null
+            if (timing != null) activeTiming = null
             utteranceId?.let(utteranceRates::remove)
             if (timing != null) {
                 // onStart precedes audible speech by the same bounded lead-in
                 // used by the estimate. Learn only the audible interval.
-                val audibleElapsedMs =
-                    (clock() - timing.startedAt - TTS_ESTIMATED_AUDIO_LEAD_IN_MS).coerceAtLeast(1L)
-                val moved =
-                    paceCalibrator.observe(
-                        unitCount = TtsWordTimingEstimate.weightedLengthOf(chunk.text),
-                        elapsedMs = audibleElapsedMs,
-                        rate = timing.rate,
-                    )
-                if (moved) timingStore?.setMsPerUnitAt1x(engineKey, paceCalibrator.msPerUnitAt1x)
+                val elapsedSinceStart = clock() - timing.startedAt
+                if (elapsedSinceStart > TTS_ESTIMATED_AUDIO_LEAD_IN_MS) {
+                    val moved =
+                        paceCalibrator.observe(
+                            unitCount = TtsWordTimingEstimate.weightedLengthOf(chunk.text),
+                            elapsedMs = elapsedSinceStart - TTS_ESTIMATED_AUDIO_LEAD_IN_MS,
+                            rate = timing.rate,
+                        )
+                    if (moved) timingStore?.setMsPerUnitAt1x(engineKey, paceCalibrator.msPerUnitAt1x)
+                }
             }
             if (rangeProbe.onUtteranceDone(chunk.text.length)) {
                 timingStore?.setRangeVerdict(engineKey, false)
@@ -386,7 +387,7 @@ class TtsController internal constructor(
         // stop the ticker through stopEngine.
         if (queue.submittedChunk(utteranceId) != null) {
             wordTicker.stop()
-            activeTiming = null
+            if (activeTiming?.utteranceId == utteranceId) activeTiming = null
             utteranceId?.let(utteranceRates::remove)
         }
         queue.onError(utteranceId, errorCode)
@@ -421,7 +422,7 @@ class TtsController internal constructor(
         // Same staleness rule as onError: see there.
         if (queue.submittedChunk(utteranceId) != null) {
             wordTicker.stop()
-            activeTiming = null
+            if (activeTiming?.utteranceId == utteranceId) activeTiming = null
             utteranceId?.let(utteranceRates::remove)
         }
         queue.onStopped(utteranceId, interrupted)

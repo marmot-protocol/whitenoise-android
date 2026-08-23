@@ -78,12 +78,25 @@ class TtsEstimatedTimingLaneTest {
             harness.engine.start(index = 0)
             advanceTimeBy(150)
             runCurrent()
-            val estimatedWord = harness.controller.state.value.passage?.visibleWord
+            val estimatedPassage = harness.controller.state.value.passage
+            val estimatedProgress =
+                (harness.controller.state.value as TtsState.Speaking).messageProgressFraction
 
-            harness.engine.range(index = 0, start = 0, end = 0)
+            harness.engine.range(index = 0, start = 5, end = 6)
 
             assertEquals(null, harness.store.verdicts[ENGINE_KEY])
-            assertEquals(estimatedWord, harness.controller.state.value.passage?.visibleWord)
+            assertEquals(estimatedPassage, harness.controller.state.value.passage)
+            assertEquals(
+                estimatedProgress,
+                (harness.controller.state.value as TtsState.Speaking).messageProgressFraction,
+            )
+
+            advanceTimeBy(500)
+            runCurrent()
+            assertEquals(
+                listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
+                harness.controller.state.value.passage?.visibleWord,
+            )
         }
 
     @Test
