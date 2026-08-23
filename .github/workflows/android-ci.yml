@@ -147,7 +147,30 @@ jobs:
       # intentional UI change with `./gradlew :app:recordRoborazziDevZapstoreDebug`
       # or `:app:recordRoborazziDevPlayDebug` (see README "Screenshot tests").
       - name: Screenshot tests (Roborazzi)
-        run: ./gradlew :app:verifyRoborazziDevZapstoreDebug :app:verifyRoborazziDevPlayDebug --no-daemon --stacktrace
+        # Roborazzi's verify tasks depend on the variant unit-test tasks. Filter
+        # those tasks to baseline owners so this gate does not rerun the entire
+        # 5k-test suite after the dedicated unit-test step above. Most baseline
+        # owners follow the *ScreenshotTest convention; the explicit classes are
+        # legacy mixed-name tests that also capture committed snapshots.
+        run: |
+          ./gradlew \
+            :app:verifyRoborazziDevZapstoreDebug \
+            :app:verifyRoborazziDevPlayDebug \
+            --tests '*ScreenshotTest' \
+            --tests '*ConversationImeCollapseFocusTest' \
+            --tests '*NewGroupNameEmojiPickerTest' \
+            --tests '*ChatActionSheetTest' \
+            --tests '*ChatListPinnedBoundaryTest' \
+            --tests '*ChatListTtsTransportLayoutTest' \
+            --tests '*ConversationTtsFollowComposeTest' \
+            --tests '*BubbleCollapsibleFooterLayoutTest' \
+            --tests '*MessageBubbleEditedMarkdownTest' \
+            --tests '*GroupEditNameEmojiPickerTest' \
+            --tests '*MainShellTtsReturnTransitionTest' \
+            --tests '*ProfileAddToGroupsFlowTest' \
+            --tests '*AutoDownloadBacklogControlTest' \
+            --no-daemon \
+            --stacktrace
 
       - name: ktlint
         run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck --no-daemon --stacktrace
