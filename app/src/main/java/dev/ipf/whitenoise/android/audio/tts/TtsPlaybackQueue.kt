@@ -640,7 +640,12 @@ internal class TtsPlaybackQueue(
         _state.value =
             speaking.copy(
                 messageProgressFraction = progress.fraction,
-                passage = passage,
+                passage =
+                    if (passage?.visibleWord?.isNotEmpty() == true) {
+                        passage
+                    } else {
+                        speaking.passage
+                    },
             )
         return if (passage?.visibleWord?.isNotEmpty() == true) {
             RangeApplication.VisibleWord

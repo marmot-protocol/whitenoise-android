@@ -81,10 +81,9 @@ class TtsController internal constructor(
                 engine?.let {
                     val appliedRate = speechRate()
                     it.setSpeechRate(appliedRate)
+                    utteranceRates[utteranceId] = appliedRate
                     val result = it.speak(chunk.text, utteranceId)
-                    if (result == TextToSpeech.SUCCESS) {
-                        utteranceRates[utteranceId] = appliedRate
-                    } else {
+                    if (result != TextToSpeech.SUCCESS) {
                         utteranceRates.remove(utteranceId)
                     }
                     result

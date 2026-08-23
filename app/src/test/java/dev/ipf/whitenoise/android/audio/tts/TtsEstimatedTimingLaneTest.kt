@@ -70,21 +70,20 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun anUnusableEngineRangeDoesNotDisableTheEstimate() =
+    fun unusableEngineRangesDoNotDisableOrClobberTheEstimate() =
         runTest {
             val harness = LaneHarness(this)
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
 
             harness.engine.start(index = 0)
+            advanceTimeBy(150)
+            runCurrent()
+            val estimatedWord = harness.controller.state.value.passage?.visibleWord
+
             harness.engine.range(index = 0, start = 0, end = 0)
 
             assertEquals(null, harness.store.verdicts[ENGINE_KEY])
-            advanceTimeBy(150)
-            runCurrent()
-            assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
-                harness.controller.state.value.passage?.visibleWord,
-            )
+            assertEquals(estimatedWord, harness.controller.state.value.passage?.visibleWord)
         }
 
     @Test
@@ -186,6 +185,19 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
+    fun subLeadInUtteranceDoesNotCalibrate() =
+        runTest {
+            val harness = LaneHarness(this)
+            val text = "The quick brown fox jumps over the lazy dog while the calibrator listens carefully."
+            assertTrue(harness.controller.speak(listOf(plainEntry(text)), Locale.US))
+            harness.engine.start(index = 0)
+            advanceTimeBy(TTS_ESTIMATED_AUDIO_LEAD_IN_MS)
+            harness.engine.complete(index = 0)
+
+            assertTrue(harness.store.paces.isEmpty())
+        }
+
+    @Test
     fun pauseFreezesThePassageAndStopsTheSchedule() =
         runTest {
             val harness = LaneHarness(this)
@@ -216,6 +228,8 @@ class TtsEstimatedTimingLaneTest {
             runCurrent()
 
             assertEquals(TtsNavigationOutcome.Moved, harness.controller.skipNextMessage())
+            harness.engine.range(index = 0, start = 0, end = 5)
+            assertEquals(null, harness.store.verdicts[ENGINE_KEY])
 
             // Ticks armed for the first utterance are stale for the new
             // generation; the new message keeps its sentence-level passage.
