@@ -38,7 +38,9 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
@@ -410,9 +412,6 @@ class MessageBubbleTextSelectionSpeakTest {
 
     private fun waitForTts(engine: FakeSessionEngine) {
         composeRule.waitForIdle()
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            engine.spoken.isNotEmpty()
-        }
         assertTrue(engine.spoken.isNotEmpty())
     }
 
@@ -529,7 +528,12 @@ class MessageBubbleTextSelectionSpeakTest {
                     contentTokens =
                         MarkdownDocumentFfi(
                             truncated = false,
-                            blocks = emptyList(),
+                            blocks =
+                                listOf(
+                                    MarkdownBlockFfi.Paragraph(
+                                        inlines = listOf(MarkdownInlineFfi.Text(body)),
+                                    ),
+                                ),
                             blankLinesBefore = byteArrayOf(),
                         ),
                     kind = 9uL,
