@@ -110,6 +110,22 @@ class WhiteNoiseAppStateTtsAutoReadTest {
     }
 
     @Test
+    fun taskRemovalStopsManualSpeech() {
+        val appState = testAppState()
+        appState.ttsController.attachEngine(FakeSessionEngine())
+        assertTrue(
+            appState.speakAloud(
+                listOf(TtsSpeakableEntry("s", "Sender", "Private playback.")),
+                Locale.US,
+            ),
+        )
+
+        appState.onTaskRemoved()
+
+        assertTrue(appState.ttsController.state.value is TtsState.Idle)
+    }
+
+    @Test
     fun disablingAnotherChatDoesNotStopOwnedAutoReadSession() {
         val appState = testAppState()
         val engine = FakeSessionEngine()

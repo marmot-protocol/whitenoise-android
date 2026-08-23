@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.audio.tts
 
 import android.app.NotificationManager
 import android.app.Service
+import android.content.ComponentName
+import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Looper
 import android.speech.tts.TextToSpeech
@@ -125,8 +127,21 @@ class TtsPlaybackForegroundServiceTest {
         service.onStartCommand(Intent(RuntimeEnvironment.getApplication(), service::class.java), 0, 1)
         shadowOf(Looper.getMainLooper()).idle()
 
-        assertTrue(shadowOf(service as Service).isStoppedBySelf)
+        val shadowService = shadowOf(service as Service)
+        assertNotNull(shadowService.lastForegroundNotification)
+        assertTrue(shadowService.isStoppedBySelf)
         controller.destroy()
+    }
+
+    @Test
+    fun platformStartRejectionIsContained() {
+        val rejectingContext =
+            object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+                override fun startForegroundService(service: Intent): ComponentName? =
+                    throw IllegalStateException("foreground start blocked")
+            }
+
+        assertFalse(TtsPlaybackForegroundService.start(rejectingContext))
     }
 
     @Test

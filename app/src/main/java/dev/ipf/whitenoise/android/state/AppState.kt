@@ -1686,7 +1686,12 @@ class WhiteNoiseAppState private constructor(
             // The session now exists, so the mediaPlayback service must too:
             // it mirrors the controller, keeps playback alive across app
             // switches, and stops itself when the controller goes terminal.
-            TtsPlaybackForegroundService.start(appContext)
+            if (!TtsPlaybackForegroundService.start(appContext)) {
+                // A rejected foreground-service start must not leave private
+                // read-aloud running without its user-visible stop surface.
+                stopSpeaking()
+                return false
+            }
         }
         return started
     }
@@ -7142,6 +7147,9 @@ class WhiteNoiseAppState private constructor(
     fun onTaskRemoved() {
         updateNotificationSuppression(suppression.onTaskRemoved())
         conversationDictation.cancel()
+        // The app-state lifecycle is authoritative even if the TTS foreground
+        // service has not started yet or its start was rejected.
+        stopSpeaking()
         mutationsScope.launch { draftWriter.flush() }
     }
 

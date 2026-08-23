@@ -72,19 +72,29 @@ class TtsPlaybackForegroundService : Service() {
         startId: Int,
     ): Int {
         val host = hostResolver(this)
+        val model =
+            host
+                ?.controller
+                ?.state
+                ?.value
+                ?.let(TtsPlaybackSessionModel::from)
+                ?: TtsPlaybackSessionModel.from(TtsState.Idle())
+        // Every start enters through startForegroundService(), so promote before
+        // any early stop to satisfy Android's foreground-service deadline even
+        // when the host is unavailable or the session ended during startup.
+        startForeground(NOTIFICATION_ID, buildNotification(model))
         if (host == null) {
             stopSelf()
             return START_NOT_STICKY
         }
-        val model = TtsPlaybackSessionModel.from(host.controller.state.value)
         if (intent?.action == null && !model.isActive) {
             // Started for a session that already ended before the service came
-            // up — do not park a stale notification.
+            // up — do not park a stale notification. Stopping the service also
+            // removes the foreground notification.
             stopSelf()
             return START_NOT_STICKY
         }
         ensureSession(host)
-        startForeground(NOTIFICATION_ID, buildNotification(model))
         observe(host)
         intent?.action?.let { dispatchAction(host, it) }
         return START_NOT_STICKY
@@ -311,11 +321,13 @@ class TtsPlaybackForegroundService : Service() {
             }
         }
 
-        fun start(context: Context) {
-            context.startForegroundService(
-                Intent(context, TtsPlaybackForegroundService::class.java),
-            )
-        }
+        fun start(context: Context): Boolean =
+            runCatching {
+                context.startForegroundService(
+                    Intent(context, TtsPlaybackForegroundService::class.java),
+                )
+                true
+            }.getOrDefault(false)
 
         // Idempotence comes from the manager itself, not a process-static
         // flag: createNotificationChannel is a no-op for an existing id, and a
