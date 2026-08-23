@@ -58,9 +58,11 @@ class TtsPassageHighlightTest {
         val firstResolver = projectionResolver.resolverFor(firstPassage, "m1")
         val secondResolver = projectionResolver.resolverFor(secondPassage, "m1")
 
-        assertEquals(0 until 5, firstResolver("plain", projection.text))
+        assertEquals(0 until projection.text.length, firstResolver("plain", projection.text)?.sentence)
+        assertEquals(0 until 5, firstResolver("plain", projection.text)?.word)
         assertEquals(1, projectionResolver.cachedLeafCount)
-        assertEquals(6 until 12, secondResolver("plain", projection.text))
+        assertEquals(0 until projection.text.length, secondResolver("plain", projection.text)?.sentence)
+        assertEquals(6 until 12, secondResolver("plain", projection.text)?.word)
         assertEquals(1, projectionResolver.cachedLeafCount)
     }
 
@@ -239,7 +241,7 @@ class TtsPassageHighlightTest {
     }
 
     @Test
-    fun childLeafHighlightDoesNotApplyToAnotherRenderedLeaf() {
+    fun childWordHighlightKeepsTheSharedSentenceBackgroundOnSiblingLeaf() {
         val projection =
             markdownDocumentToSpeakableProjection(
                 MarkdownDocumentFfi(
@@ -264,15 +266,12 @@ class TtsPassageHighlightTest {
                 visibleWord = listOf(TtsVisibleTextSpan("b1/n0", 0, 4)),
             )
 
-        assertNull(
-            resolveTtsRenderedHighlight(
-                passage = passage,
-                messageIdHex = "m1",
-                projection = projection,
-                renderedLeafId = "b0",
-                renderedText = "Alpha",
-                locale = Locale.US,
-            ),
-        )
+        val highlight =
+            TtsHighlightProjectionResolver(projection, Locale.US)
+                .resolverFor(passage, "m1")
+                .invoke("b0", "Alpha")
+
+        assertEquals(0 until 5, highlight?.sentence)
+        assertNull(highlight?.word)
     }
 }

@@ -1,8 +1,9 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 
 /**
@@ -21,7 +22,7 @@ internal fun ConversationNotificationOwnershipEffect(
     renderedAccountRef: String?,
     navigationAccountStable: Boolean,
     timelineVisible: Boolean,
-    onOwnershipChanged: suspend (accountRef: String?, groupIdHex: String?) -> Unit,
+    onOwnershipChanged: (accountRef: String?, groupIdHex: String?) -> Unit,
 ) {
     val resolvedAccountRef =
         renderedAccountRef.takeIf {
@@ -30,11 +31,25 @@ internal fun ConversationNotificationOwnershipEffect(
                 selectedChatId != null &&
                 selectedChatId == renderedChatId
         }
-    val currentOnOwnershipChanged by rememberUpdatedState(onOwnershipChanged)
-    LaunchedEffect(selectedChatId, selectedGroupIdHex, renderedChatId, resolvedAccountRef, timelineVisible) {
-        currentOnOwnershipChanged(
-            resolvedAccountRef,
-            selectedGroupIdHex.takeIf { resolvedAccountRef != null },
+    val ownership =
+        ConversationNotificationOwnership(
+            accountRef = resolvedAccountRef,
+            groupIdHex = selectedGroupIdHex.takeIf { resolvedAccountRef != null },
         )
+    val currentOnOwnershipChanged by rememberUpdatedState(onOwnershipChanged)
+    val lastPublishedOwnership = remember { arrayOfNulls<ConversationNotificationOwnership>(1) }
+    // Ownership is part of the committed UI state. Publish it synchronously
+    // after a successful composition instead of queueing a coroutine that can
+    // lag behind an already-visible conversation on a saturated dispatcher.
+    SideEffect {
+        if (lastPublishedOwnership[0] != ownership) {
+            lastPublishedOwnership[0] = ownership
+            currentOnOwnershipChanged(ownership.accountRef, ownership.groupIdHex)
+        }
     }
 }
+
+private data class ConversationNotificationOwnership(
+    val accountRef: String?,
+    val groupIdHex: String?,
+)

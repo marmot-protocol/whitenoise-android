@@ -81,7 +81,11 @@ class ConversationTtsFollowPolicyTest {
         val earlier = speaking(sessionId = 1, sentenceIndex = 1)
         policy.observe(earlier, ownsSession = true)
         assertEquals(
-            ConversationTtsFollowRequest(earlier.followTarget(), TtsFollowDirection.Reverse),
+            ConversationTtsFollowRequest(
+                earlier.followTarget(),
+                TtsFollowDirection.Reverse,
+                anchorAtTop = false,
+            ),
             policy.claimPendingRequest(),
         )
 
@@ -121,13 +125,17 @@ class ConversationTtsFollowPolicyTest {
         policy.observe(earlier, ownsSession = true)
 
         assertEquals(
-            ConversationTtsFollowRequest(earlier.followTarget(), TtsFollowDirection.Reverse),
+            ConversationTtsFollowRequest(
+                earlier.followTarget(),
+                TtsFollowDirection.Reverse,
+                anchorAtTop = true,
+            ),
             policy.claimPendingRequest(),
         )
     }
 
     @Test
-    fun restoredReverseTargetKeepsBottomAnchorForOversizedSentence() {
+    fun restoredReverseTargetUsesTopAnchorForOversizedSentence() {
         val policy = ConversationTtsFollowPolicy()
         val later = speaking(sessionId = 1, sentenceIndex = 2)
         policy.observe(later, ownsSession = true)
@@ -150,6 +158,7 @@ class ConversationTtsFollowPolicyTest {
                 sentenceTop = 100,
                 sentenceBottom = 900,
                 direction = restoredRequest.direction,
+                anchorAtTop = restoredRequest.anchorAtTop,
             ),
         )
     }
@@ -172,12 +181,13 @@ class ConversationTtsFollowPolicyTest {
 
         assertEquals(TtsFollowDirection.Forward, restoredRequest.direction)
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(-100),
+            TtsFollowViewportDecision.ScrollToItemOffset(100),
             decide(
                 itemOffset = 0,
                 sentenceTop = 100,
                 sentenceBottom = 900,
                 direction = restoredRequest.direction,
+                anchorAtTop = restoredRequest.anchorAtTop,
             ),
         )
     }
@@ -448,29 +458,49 @@ class ConversationTtsFollowPolicyTest {
     }
 
     @Test
-    fun measuredSentenceUsesMinimumDeltaToEnterTheMiddleSixtyPercentBand() {
+    fun fullyVisibleSentenceStaysPutAndClippedSentenceUsesNearestEdge() {
         assertEquals(
             TtsFollowViewportDecision.Stay,
             decide(itemOffset = 0, sentenceTop = 350, sentenceBottom = 450),
         )
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(-150),
-            decide(itemOffset = 0, sentenceTop = 50, sentenceBottom = 150),
+            TtsFollowViewportDecision.ScrollToItemOffset(-50),
+            decide(itemOffset = 0, sentenceTop = -50, sentenceBottom = 50),
         )
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(100),
-            decide(itemOffset = 0, sentenceTop = 850, sentenceBottom = 900),
+            TtsFollowViewportDecision.ScrollToItemOffset(50),
+            decide(itemOffset = 0, sentenceTop = 850, sentenceBottom = 1_050),
+        )
+        assertEquals(
+            TtsFollowViewportDecision.ScrollToItemOffset(1),
+            decide(itemOffset = 0, sentenceTop = 900, sentenceBottom = 1_001),
         )
     }
 
     @Test
-    fun oversizedMeasuredSentenceUsesStableDirectionAnchor() {
+    fun bottomClippedSentenceUsesViewportEndWithNonZeroOrigin() {
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(-100),
+            TtsFollowViewportDecision.ScrollToItemOffset(1),
+            TtsFollowViewport.decide(
+                viewportStart = 200,
+                viewportEnd = 1_200,
+                itemOffset = 0,
+                sentenceTop = 1_100,
+                sentenceBottom = 1_201,
+                direction = TtsFollowDirection.Forward,
+                anchorAtTop = false,
+            ),
+        )
+    }
+
+    @Test
+    fun oversizedMeasuredSentenceUsesTopAnchorInEitherDirection() {
+        assertEquals(
+            TtsFollowViewportDecision.ScrollToItemOffset(100),
             decide(
                 itemOffset = 0,
                 sentenceTop = 100,
-                sentenceBottom = 900,
+                sentenceBottom = 1_100,
                 direction = TtsFollowDirection.Forward,
             ),
         )
@@ -479,8 +509,21 @@ class ConversationTtsFollowPolicyTest {
             decide(
                 itemOffset = 0,
                 sentenceTop = 100,
-                sentenceBottom = 900,
+                sentenceBottom = 1_100,
                 direction = TtsFollowDirection.Reverse,
+            ),
+        )
+    }
+
+    @Test
+    fun initialRevealTopAnchorsEvenWhenSentenceIsAlreadyFullyVisible() {
+        assertEquals(
+            TtsFollowViewportDecision.ScrollToItemOffset(350),
+            decide(
+                itemOffset = 0,
+                sentenceTop = 350,
+                sentenceBottom = 450,
+                anchorAtTop = true,
             ),
         )
     }
@@ -490,6 +533,7 @@ class ConversationTtsFollowPolicyTest {
         sentenceTop: Int,
         sentenceBottom: Int,
         direction: TtsFollowDirection = TtsFollowDirection.Forward,
+        anchorAtTop: Boolean = false,
     ): TtsFollowViewportDecision =
         TtsFollowViewport.decide(
             viewportStart = 0,
@@ -498,6 +542,7 @@ class ConversationTtsFollowPolicyTest {
             sentenceTop = sentenceTop,
             sentenceBottom = sentenceBottom,
             direction = direction,
+            anchorAtTop = anchorAtTop,
         )
 
     private fun speaking(

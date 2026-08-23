@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -234,6 +235,65 @@ class FullSpectrumColorPickerTest {
             }
         composeRule.onNodeWithText("#0000FF").assertExists()
         composeRule.runOnIdle { assertEquals(0xFF0000FFL, latest) }
+    }
+
+    @Test
+    fun amoledPickerNeverSelectsBlue() {
+        var latest = 0xFFFF0000L
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                var selectedArgb by remember { mutableLongStateOf(latest) }
+                TonalSwatchPicker(
+                    selectedArgb = selectedArgb,
+                    onColorSelected = {
+                        latest = it
+                        selectedArgb = it
+                    },
+                    scopeKey = "amoled",
+                    theme = BubbleTheme.Amoled,
+                    slotKey = BubbleSide.Mine.name,
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(string(R.string.more_colors)).performClick()
+        composeRule
+            .onNodeWithContentDescription(string(R.string.color_picker_hue))
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                assertFalse(setProgress(240f))
+            }
+
+        composeRule.runOnIdle { assertEquals(0, latest and 0xFF) }
+    }
+
+    @Test
+    fun amoledPickerRejectsInvisibleBlueFreeHueWithoutMovingControls() {
+        val initialArgb = 0xFFFF0000L
+        var latest = initialArgb
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                FullSpectrumColorPicker(
+                    argb = initialArgb,
+                    blueFree = true,
+                    isColorAccepted = { it != 0xFF000000L },
+                    onColorChanged = { latest = it },
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithContentDescription(string(R.string.color_picker_hue))
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                assertFalse(setProgress(240f))
+            }
+
+        val hueRange =
+            composeRule
+                .onNodeWithContentDescription(string(R.string.color_picker_hue))
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.ProgressBarRangeInfo]
+        assertEquals(0f, hueRange.current)
+        assertEquals(initialArgb, latest)
     }
 
     @Test

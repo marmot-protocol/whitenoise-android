@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -54,6 +55,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -75,7 +77,7 @@ class MessageBubbleTextSelectionSpeakTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()
 
     @Test
-    fun longPressActionMenuSpeakQueuesThroughAppStateAtPressedSentence() {
+    fun longPressActionMenuSpeakQueuesThroughAppStateAtMessageTop() {
         val engine = FakeSessionEngine()
         val appState = appStateWithTts(engine)
         val item = timelineMessage("First sentence. Second sentence.")
@@ -110,8 +112,40 @@ class MessageBubbleTextSelectionSpeakTest {
             engine.spoken
                 .first()
                 .text
-                .endsWith("Second sentence."),
+                .endsWith("First sentence."),
         )
+    }
+
+    @Test
+    fun doubleTapMessageTextSeeksToThePressedSentence() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = timelineMessage("First sentence. Second sentence.")
+        val controller = conversationController(appState)
+        var actionMenuOpen by mutableStateOf(false)
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(
+                        item = item,
+                        controller = controller,
+                        appState = appState,
+                        textSelectionMode = false,
+                        onTextSelectionModeChange = {},
+                        isActionMenuOpen = actionMenuOpen,
+                        onActionMenuOpenChange = { actionMenuOpen = it },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        doubleTapOnMessageText("Second sentence")
+        waitForTts(engine)
+
+        assertFalse(actionMenuOpen)
+        assertEquals("Second sentence.", engine.spoken.first().text)
     }
 
     @Test
@@ -331,6 +365,22 @@ class MessageBubbleTextSelectionSpeakTest {
     }
 
     private fun longPressOnMessageText(substring: String) {
+        val pressOnHost = messageTextPositionOnHost(substring)
+        composeRule.onNodeWithTag(MESSAGE_HOST_TAG).performTouchInput {
+            down(pressOnHost)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            up()
+        }
+    }
+
+    private fun doubleTapOnMessageText(substring: String) {
+        val pressOnHost = messageTextPositionOnHost(substring)
+        composeRule.onNodeWithTag(MESSAGE_HOST_TAG).performTouchInput {
+            doubleClick(pressOnHost)
+        }
+    }
+
+    private fun messageTextPositionOnHost(substring: String): Offset {
         val layoutResults = mutableListOf<TextLayoutResult>()
         composeRule
             .onNodeWithText(substring, substring = true, useUnmergedTree = true)
@@ -355,21 +405,13 @@ class MessageBubbleTextSelectionSpeakTest {
                 y = pressInRoot.y - hostBounds.top.value,
             )
 
-        composeRule.onNodeWithTag(MESSAGE_HOST_TAG).performTouchInput {
-            down(pressOnHost)
-            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
-            up()
-        }
+        return pressOnHost
     }
 
     private fun waitForTts(engine: FakeSessionEngine) {
         composeRule.waitForIdle()
-        composeRule.runOnIdle {
-            var attempts = 0
-            while (engine.spoken.isEmpty() && attempts < 50) {
-                Thread.sleep(20)
-                attempts++
-            }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            engine.spoken.isNotEmpty()
         }
         assertTrue(engine.spoken.isNotEmpty())
     }

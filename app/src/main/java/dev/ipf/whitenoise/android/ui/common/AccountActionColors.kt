@@ -26,6 +26,7 @@ internal fun accountActionColors(
             customArgb = theme?.let { appState.actionColorArgb(it, accountRef) },
             defaultContainerArgb = scheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
             defaultContentArgb = scheme.onPrimary.toArgb().toLong() and 0xFFFFFFFFL,
+            blueFree = theme == BubbleTheme.Amoled,
         )
     return AccountActionColors(
         container = Color(resolved.container),

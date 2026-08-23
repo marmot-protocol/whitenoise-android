@@ -38,6 +38,9 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -52,6 +55,7 @@ import org.robolectric.shadows.ShadowLooper
 import java.lang.reflect.Proxy
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -258,14 +262,14 @@ class NotificationAccountIsolationNavigationTest {
 
     @Test
     fun mainShell_ordinaryConversationAccountSwitchPreservesDestinationCards() {
-        val gate = RouteOrderGate(preloadFinishesFirst = true)
-        // This case verifies ordinary account-switch ownership after a routed
-        // conversation is visible; it does not exercise the inactive-account
-        // activation ordering covered by the two tests above. Let the broad
-        // controller bind complete so timeline ownership can be published
-        // before asserting notification dismissal. Holding this latch creates
-        // a circular wait under Roborazzi: ownership awaits the controller,
-        // while the test awaits ownership before releasing the controller.
+        val gate =
+            RouteOrderGate(
+                preloadFinishesFirst = true,
+                holdSourceBroadList = true,
+            )
+        // This case does not exercise inactive-account activation ordering.
+        // Let the destination broad bind complete after the explicit switch;
+        // the source broad bind stays held only until the direct route commits.
         gate.releaseActivation.countDown()
         val appState = appState(fakeMarmot(gate))
         val sourceKeys = postConversationCards(SOURCE_ACCOUNT, "source-invite")
@@ -283,6 +287,7 @@ class NotificationAccountIsolationNavigationTest {
                     inboundNotificationRequestId = routed.notificationRequestId,
                     onNotificationTargetHandled = { _, _ ->
                         handled.set(true)
+                        gate.releaseSourceBroadList.countDown()
                         inboundTarget = null
                     },
                 )
@@ -307,6 +312,41 @@ class NotificationAccountIsolationNavigationTest {
         awaitCondition {
             val activeKeys = manager.activeNotifications.map { it.tag to it.id }.toSet()
             targetKeys.all { it in activeKeys }
+        }
+    }
+
+    @Test
+    fun visibleConversationCancellationDoesNotWaitForNotificationListenerDispatcher() {
+        val listenerExecutor = Executors.newSingleThreadExecutor()
+        val listenerDispatcher = listenerExecutor.asCoroutineDispatcher()
+        val listenerStarted = CountDownLatch(1)
+        val releaseListener = CountDownLatch(1)
+
+        try {
+            listenerExecutor.execute {
+                listenerStarted.countDown()
+                releaseListener.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+            }
+            check(listenerStarted.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                "notification listener dispatcher did not start"
+            }
+
+            val sourceKeys = postConversationCards(SOURCE_ACCOUNT, "source-invite")
+            val appState =
+                appState(
+                    marmot = fakeMarmot(RouteOrderGate(preloadFinishesFirst = true)),
+                    notificationDispatcher = listenerDispatcher,
+                )
+
+            appState.setActiveConversationFromUi(SOURCE_ACCOUNT, SHARED_GROUP)
+
+            awaitCondition {
+                val activeKeys = manager.activeNotifications.map { it.tag to it.id }.toSet()
+                sourceKeys.none { it in activeKeys }
+            }
+        } finally {
+            releaseListener.countDown()
+            listenerDispatcher.close()
         }
     }
 
@@ -426,13 +466,17 @@ class NotificationAccountIsolationNavigationTest {
             .invoke(appState, accountRef)
     }
 
-    private fun appState(marmot: MarmotInterface): WhiteNoiseAppState =
+    private fun appState(
+        marmot: MarmotInterface,
+        notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
             draftStore = DraftStore(NoopDraftPersistence),
             accountIdHexResolver = { null },
             accounts = listOf(account(SOURCE_ACCOUNT, SOURCE_ID), account(TARGET_ACCOUNT, TARGET_ID)),
             activeAccountRef = SOURCE_ACCOUNT,
+            notificationDispatcher = notificationDispatcher,
         ).also { state ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
@@ -471,6 +515,11 @@ class NotificationAccountIsolationNavigationTest {
                 }
                 "subscribeChatList" -> {
                     val accountRef = arguments?.firstOrNull() as? String
+                    if (accountRef == SOURCE_ACCOUNT) {
+                        check(gate.releaseSourceBroadList.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                            "source broad-list gate timed out"
+                        }
+                    }
                     if (accountRef == TARGET_ACCOUNT) {
                         gate.broadBindStarted.countDown()
                         check(gate.releaseActivation.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
@@ -649,12 +698,14 @@ class NotificationAccountIsolationNavigationTest {
     private class RouteOrderGate(
         preloadFinishesFirst: Boolean,
         val projectionAvailable: Boolean = true,
+        holdSourceBroadList: Boolean = false,
     ) {
         val preloadStarted = CountDownLatch(1)
         val preloadCompleted = CountDownLatch(1)
         val broadBindStarted = CountDownLatch(1)
         val releasePreload = CountDownLatch(if (preloadFinishesFirst) 0 else 1)
         val releaseActivation = CountDownLatch(if (preloadFinishesFirst) 1 else 0)
+        val releaseSourceBroadList = CountDownLatch(if (holdSourceBroadList) 1 else 0)
         val projectionReadCount = AtomicInteger()
     }
 

@@ -170,6 +170,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
@@ -199,6 +200,7 @@ import java.net.IDN
 import java.net.InetAddress
 import java.net.URI
 import java.util.Locale
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
 import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
@@ -1463,6 +1465,16 @@ private const val FORWARD_BACKGROUND_RETRY_ATTEMPTS = 3
 private const val FORWARD_BACKGROUND_RETRY_DELAY_MS = 1_000L
 private const val FORWARD_TERMINAL_STATUS_DURATION_MS = 2_000L
 
+// NotificationManager cancellation must not run on main or wait behind the
+// long-lived listener and other blocking work on Dispatchers.IO. One ordered,
+// process-lifetime lane is sufficient because each transaction is bounded.
+private val processNotificationCardCancellationDispatcher: CoroutineDispatcher by lazy {
+    Executors
+        .newSingleThreadExecutor { task ->
+            Thread(task, "wn-notification-cancel").apply { isDaemon = true }
+        }.asCoroutineDispatcher()
+}
+
 internal fun appStateScopeExceptionHandler(
     report: (Throwable) -> Unit = { throwable ->
         Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure", throwable)
@@ -1578,6 +1590,7 @@ class WhiteNoiseAppState private constructor(
     private val marmotRuntimeFactory: (Context) -> AppMarmotRuntime,
     private val notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription,
     private val notificationDispatcher: CoroutineDispatcher,
+    private val notificationCardCancellationDispatcher: CoroutineDispatcher,
     private val notificationReceiverTimeoutMillis: () -> Long,
     private val inboundShareTextStager: ((String, String, String) -> Unit)?,
     preferencesOverride: SharedPreferences?,
@@ -1598,6 +1611,7 @@ class WhiteNoiseAppState private constructor(
             marmotRuntimeFactory = ::openMarmotRuntime,
             notificationSubscriber = ::subscribeToNotifications,
             notificationDispatcher = Dispatchers.IO,
+            notificationCardCancellationDispatcher = processNotificationCardCancellationDispatcher,
             notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
             inboundShareTextStager = null,
             preferencesOverride = null,
@@ -1620,6 +1634,7 @@ class WhiteNoiseAppState private constructor(
         marmotRuntimeFactory: (Context) -> AppMarmotRuntime = ::openMarmotRuntime,
         notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription = ::subscribeToNotifications,
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        notificationCardCancellationDispatcher: CoroutineDispatcher = processNotificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
         inboundShareTextStager: ((String, String, String) -> Unit)? = null,
         preferences: SharedPreferences? = null,
@@ -1636,6 +1651,7 @@ class WhiteNoiseAppState private constructor(
         marmotRuntimeFactory = marmotRuntimeFactory,
         notificationSubscriber = notificationSubscriber,
         notificationDispatcher = notificationDispatcher,
+        notificationCardCancellationDispatcher = notificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
         inboundShareTextStager = inboundShareTextStager,
         preferencesOverride = preferences,
@@ -7326,6 +7342,31 @@ class WhiteNoiseAppState private constructor(
             // reaction/message notification could otherwise survive until the
             // second open (issue #803).
             dismissConversationNotificationsOnOpen(accountRef, groupIdHex, ::dismissConversationNotifications)
+        }
+        appStateDebug {
+            "active conversation=${groupIdHex?.take(8) ?: "<none>"} account=${activeConversationAccountRef?.take(8) ?: "<none>"}"
+        }
+    }
+
+    /** Publish Compose ownership immediately, then dismiss existing cards off the main thread. */
+    fun setActiveConversationFromUi(
+        accountRef: String?,
+        groupIdHex: String?,
+    ) {
+        // Publish ownership first so suppression is authoritative for the
+        // visible route even if a platform cancellation call fails.
+        applyActiveConversationTransition(accountRef, groupIdHex)
+        conversationOpenDismissalTarget(accountRef, groupIdHex)?.let { target ->
+            notificationScope.launch(notificationCardCancellationDispatcher) {
+                runCatching {
+                    localNotificationPresenter.dismissConversationMessagesImmediately(
+                        target.accountRef,
+                        target.groupIdHex,
+                    )
+                }.onFailure {
+                    appStateDebug { "notification dismiss failed group=${target.groupIdHex.take(8)}" }
+                }
+            }
         }
         appStateDebug {
             "active conversation=${groupIdHex?.take(8) ?: "<none>"} account=${activeConversationAccountRef?.take(8) ?: "<none>"}"

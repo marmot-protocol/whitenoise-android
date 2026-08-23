@@ -11,7 +11,9 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
+import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
 import dev.ipf.whitenoise.android.state.readableTextArgb
+import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -141,8 +143,8 @@ class MessageBubbleAmoledStyleTest {
             assertEquals(expectedContentArgb, contentArgb)
             assertEquals(2.dp, requireNotNull(sentBorder).width)
             assertEquals(2.dp, requireNotNull(receivedBorder).width)
-            assertEquals(colorFromArgb(customArgb), borderColor(sentBorder))
-            assertEquals(colorFromArgb(customArgb), borderColor(receivedBorder))
+            assertEquals(colorFromArgb(customArgb.withoutBlueChannel()), borderColor(sentBorder))
+            assertEquals(colorFromArgb(customArgb.withoutBlueChannel()), borderColor(receivedBorder))
         }
     }
 
@@ -164,8 +166,10 @@ class MessageBubbleAmoledStyleTest {
         }
 
         composeRule.runOnIdle {
+            val expectedArgb = customArgb.withoutBlueChannel()
+            assertTrue(expectedArgb.isBlueFreeAccentVisible())
             assertEquals(2.dp, requireNotNull(highlightedBorder).width)
-            assertEquals(colorFromArgb(customArgb), borderColor(highlightedBorder))
+            assertEquals(colorFromArgb(expectedArgb), borderColor(highlightedBorder))
         }
     }
 

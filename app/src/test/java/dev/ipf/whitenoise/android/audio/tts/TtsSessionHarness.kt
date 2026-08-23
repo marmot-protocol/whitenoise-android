@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import java.util.Locale
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Session-level fixture shared by the read-aloud paging tests: the real
@@ -238,7 +239,7 @@ internal class FakeSessionEngine : TtsSpeechEngine {
         val utteranceId: String,
     )
 
-    val spoken = mutableListOf<Spoken>()
+    val spoken = CopyOnWriteArrayList<Spoken>()
     private var onDone: ((String?) -> Unit)? = null
 
     override fun setLanguage(locale: Locale): Int = TextToSpeech.LANG_AVAILABLE

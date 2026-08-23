@@ -36,7 +36,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -45,7 +44,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.coroutines.coroutineContext
 
 private const val EXTRA_EXPANDED_SINGLE_MESSAGE_BODY =
     "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_BODY"
@@ -145,28 +143,36 @@ class LocalNotificationPresenter(
     suspend fun dismissConversationMessages(
         accountRef: String,
         groupIdHex: String,
+    ): Boolean = withContext(Dispatchers.Default) { dismissConversationMessagesImmediately(accountRef, groupIdHex) }
+
+    /**
+     * Bounded cancellation transaction for a conversation that has just become
+     * visible. UI ownership publication uses this directly so a saturated worker
+     * pool cannot leave tray cards behind after the route is already displayed.
+     */
+    fun dismissConversationMessagesImmediately(
+        accountRef: String,
+        groupIdHex: String,
     ): Boolean {
         if (accountRef.isBlank() || groupIdHex.isBlank()) return false
-        return withContext(Dispatchers.Default) {
-            val manager = NotificationManagerCompat.from(context)
-            val message = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
-            val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
-            val mention = LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex)
-            val agentActivity = LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex)
-            listOf(message, reaction, mention, agentActivity).forEach { key ->
-                cancelSynchronized(manager, key.tag, key.id)
-            }
-            dismissInvitesForGroup(accountRef, groupIdHex)
-            notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
-            true
+        val manager = NotificationManagerCompat.from(context)
+        val message = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
+        val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
+        val mention = LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex)
+        val agentActivity = LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex)
+        listOf(message, reaction, mention, agentActivity).forEach { key ->
+            cancelSynchronized(manager, key.tag, key.id)
         }
+        dismissInvitesForGroup(accountRef, groupIdHex)
+        notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
+        return true
     }
 
     // Invite cards carry no per-conversation tag, so match them by the account +
     // group stamped into their extras and cancel each by its own (tag, id). Both
     // must match: the same group can exist in more than one local account, so the
     // group id alone would clear another account's invite for that group.
-    private suspend fun dismissInvitesForGroup(
+    private fun dismissInvitesForGroup(
         accountRef: String,
         groupIdHex: String,
     ) {
@@ -178,7 +184,7 @@ class LocalNotificationPresenter(
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Throwable) {
-                return
+                emptyArray()
             }
         val inviteNotifications =
             active.filter {
@@ -192,7 +198,6 @@ class LocalNotificationPresenter(
             }
         val compat = NotificationManagerCompat.from(context)
         inviteNotifications.forEach {
-            coroutineContext.ensureActive()
             ConversationCardPostSynchronizer.withLock(
                 it.tag.orEmpty(),
                 it.id,

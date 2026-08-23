@@ -3,7 +3,9 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import androidx.compose.ui.graphics.Color
 import dev.ipf.whitenoise.android.core.TimelineInvalidationPresentation
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
+import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
 import dev.ipf.whitenoise.android.state.readableTextArgb
+import dev.ipf.whitenoise.android.state.withoutBlueChannel
 
 internal fun colorFromArgb(argb: Long): Color = Color(argb)
 
@@ -74,7 +76,10 @@ internal fun resolveBubblePresentationArgb(
                 backgroundArgb = OPAQUE_BLACK_ARGB,
                 contentArgb = tokens.surfaceContentArgb,
                 mentionAccentArgb = tokens.mentionAccentArgb,
-                borderOverrideArgb = customArgb,
+                borderOverrideArgb =
+                    customArgb
+                        ?.withoutBlueChannel()
+                        ?.takeIf(Long::isBlueFreeAccentVisible),
             )
         customArgb != null ->
             BubblePresentation(

@@ -247,8 +247,9 @@ class ReactionSummaryChipAmoledStyleTest {
 
         composeRule.runOnIdle {
             assertEquals(expectedSafeAccent, borderColor(outgoingBorder))
-            assertNotEquals(configuredAccent, borderColor(outgoingBorder))
+            assertEquals(configuredAccent, borderColor(outgoingBorder))
             assertNotEquals(Color.Black, borderColor(outgoingBorder))
+            assertEquals(0f, borderColor(outgoingBorder).blue)
         }
     }
 

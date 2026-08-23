@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package dev.ipf.whitenoise.android.state
 
 import android.content.SharedPreferences
@@ -8,9 +10,13 @@ import kotlin.math.min
 import kotlin.math.pow
 
 internal const val WCAG_AA_NORMAL_TEXT_CONTRAST = 4.5
+internal const val WCAG_NON_TEXT_CONTRAST = 3.0
 internal const val OPAQUE_BLACK_ARGB = 0xFF000000L
 internal const val OPAQUE_WHITE_ARGB = 0xFFFFFFFFL
+internal const val BLUE_FREE_LIGHT_TEXT_ARGB = 0xFFF5E600L
 private const val ARGB_MASK = 0xFFFFFFFFL
+private const val BLUE_FREE_ARGB_MASK = 0xFFFFFF00L
+private const val BLUE_CHANNEL_MASK = 0xFFL
 
 internal enum class BubbleTheme {
     Light,
@@ -86,10 +92,34 @@ internal fun resolveActionColorArgb(
     customArgb: Long?,
     defaultContainerArgb: Long,
     defaultContentArgb: Long,
+    blueFree: Boolean = false,
 ): ActionColorArgb =
     customArgb
-        ?.let { custom -> readableTextArgb(custom)?.let { content -> ActionColorArgb(custom, content) } }
+        ?.let { custom ->
+            val container = if (blueFree) custom.withoutBlueChannel() else custom
+            if (blueFree && !container.isBlueFreeAccentVisible()) return@let null
+            val content = if (blueFree) readableBlueFreeTextArgb(container) else readableTextArgb(container)
+            content?.let { ActionColorArgb(container, it) }
+        }
         ?: ActionColorArgb(defaultContainerArgb, defaultContentArgb)
+
+internal fun Long.withoutBlueChannel(): Long = this and BLUE_FREE_ARGB_MASK
+
+internal fun Long.isBlueFreeAccentVisible(): Boolean =
+    this and BLUE_CHANNEL_MASK == 0L &&
+        contrastRatio(this, OPAQUE_BLACK_ARGB) >= WCAG_NON_TEXT_CONTRAST
+
+internal fun readableBlueFreeTextArgb(backgroundArgb: Long): Long? {
+    val background = normalizeOpaqueArgb(backgroundArgb)?.withoutBlueChannel() ?: return null
+    val blackContrast = contrastRatio(OPAQUE_BLACK_ARGB, background)
+    val warmContrast = contrastRatio(BLUE_FREE_LIGHT_TEXT_ARGB, background)
+    return when {
+        blackContrast >= warmContrast && blackContrast >= WCAG_AA_NORMAL_TEXT_CONTRAST -> OPAQUE_BLACK_ARGB
+        warmContrast >= WCAG_AA_NORMAL_TEXT_CONTRAST -> BLUE_FREE_LIGHT_TEXT_ARGB
+        blackContrast >= WCAG_AA_NORMAL_TEXT_CONTRAST -> OPAQUE_BLACK_ARGB
+        else -> null
+    }
+}
 
 /** Local-only appearance preferences. Chat keys are account-scoped so two local
  * identities can style the same Marmot group independently. */

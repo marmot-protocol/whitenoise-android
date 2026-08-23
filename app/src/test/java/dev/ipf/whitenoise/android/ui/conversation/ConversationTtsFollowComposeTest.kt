@@ -467,13 +467,12 @@ class ConversationTtsFollowComposeTest {
             val (sentenceBounds, viewportBounds) = targetLayout()
             val sentence = requireNotNull(sentenceBounds)
             val viewport = requireNotNull(viewportBounds)
-            val safeTop = viewport.top + viewport.height * 0.20f
-            val safeBottom = viewport.bottom - viewport.height * 0.20f
+            val topDelta = kotlin.math.abs(sentence.top - viewport.top)
             assertTrue(
-                "sentence top ${sentence.top} must be at or below safe top $safeTop in viewport $viewport",
-                sentence.top >= safeTop - 2f,
+                "sentence top ${sentence.top} must use viewport top ${viewport.top} in $viewport",
+                topDelta <= 2f,
             )
-            assertTrue("sentence bottom must be inside the measured safe band", sentence.bottom <= safeBottom + 2f)
+            assertTrue("sentence bottom must remain inside the viewport", sentence.bottom <= viewport.bottom + 2f)
         }
     }
 
@@ -511,6 +510,7 @@ class ConversationTtsFollowComposeTest {
             followTtsTargetInViewport(
                 target = followTarget(targetMessageId),
                 direction = TtsFollowDirection.Forward,
+                anchorAtTop = true,
                 itemKey = targetMessageId,
                 targetIndex = targetIndex,
                 estimatedItemHeightPx = estimatedItemHeightPx,
@@ -610,6 +610,7 @@ class ConversationTtsFollowComposeTest {
             followTtsTargetInViewport(
                 target = target,
                 direction = request.direction,
+                anchorAtTop = request.anchorAtTop,
                 itemKey = targetMessageId,
                 targetIndex = messages.indexOf(targetMessageId),
                 estimatedItemHeightPx = null,

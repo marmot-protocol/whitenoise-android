@@ -6,14 +6,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -94,8 +97,12 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
                 }
             }
 
-            composeRule.onNodeWithTag(otherAccountAvatarTag(STUDIO_REF)).assertIsDisplayed()
-            composeRule.onNodeWithTag(otherAccountAvatarTag(WORK_REF)).assertIsDisplayed()
+            composeRule
+                .onNodeWithTag(otherAccountAvatarTag(STUDIO_REF), useUnmergedTree = true)
+                .assertIsDisplayed()
+            composeRule
+                .onNodeWithTag(otherAccountAvatarTag(WORK_REF), useUnmergedTree = true)
+                .assertIsDisplayed()
             composeRule.onNodeWithContentDescription(STUDIO_NAME, substring = true).assertIsDisplayed()
             composeRule.onNodeWithContentDescription(WORK_NAME, substring = true).assertIsDisplayed()
             composeRule
@@ -103,22 +110,78 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
                 .captureRoboImage("src/test/snapshots/account_switch_first_frame_seeded_profiles_light.png")
         }
 
-    private fun appState() =
-        WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore(EmptyDraftPersistence),
-            accountIdHexResolver = { ACTIVE_ID },
-            accounts =
-                listOf(
-                    account(ACTIVE_REF, ACTIVE_ID),
-                    account(STUDIO_REF, STUDIO_ID),
-                    account(WORK_REF, WORK_ID),
-                ),
-            activeAccountRef = ACTIVE_REF,
-            profileReader = { accountId -> profile(accountId) },
-            profileDisplayNameReader = { accountId -> profileName(accountId) },
-            profileRefreshRequest = {},
-        )
+    @Test
+    fun overlappingAccountTargetsWithOverflowLtr() {
+        captureOverlappingAccountStack(LayoutDirection.Ltr, "account_switch_overlapping_targets_ltr.png")
+    }
+
+    @Test
+    fun overlappingAccountTargetsWithOverflowRtl() {
+        captureOverlappingAccountStack(LayoutDirection.Rtl, "account_switch_overlapping_targets_rtl.png")
+    }
+
+    private fun captureOverlappingAccountStack(
+        layoutDirection: LayoutDirection,
+        snapshotName: String,
+    ) {
+        val appState =
+            appState(
+                otherAccounts =
+                    listOf(
+                        account(STUDIO_REF, STUDIO_ID),
+                        account(WORK_REF, WORK_ID),
+                        account("travel", "44".repeat(32)),
+                        account("community", "55".repeat(32)),
+                        account("archive", "66".repeat(32)),
+                    ),
+            )
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                WhiteNoiseTheme(darkTheme = false) {
+                    Surface(color = MaterialTheme.colorScheme.background) {
+                        Box(Modifier.fillMaxWidth().testTag(SCREENSHOT_TAG)) {
+                            ChatListTopBar(
+                                appState = remember { appState },
+                                searchOpen = false,
+                                searchQuery = "",
+                                searchFocusRequester = remember { FocusRequester() },
+                                onSearchQueryChange = {},
+                                onSearchOpen = {},
+                                onSearchClose = {},
+                                onMic = {},
+                                onOpenSettings = {},
+                                onSwitchAccount = {},
+                                connectivityState = ConnectivityBannerState.Hidden,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(OTHER_ACCOUNT_OVERFLOW_TAG, useUnmergedTree = true).assertIsDisplayed()
+        composeRule
+            .onNodeWithTag(SCREENSHOT_TAG)
+            .captureRoboImage("src/test/snapshots/$snapshotName")
+    }
+
+    private fun appState(
+        otherAccounts: List<AccountSummaryFfi> =
+            listOf(
+                account(STUDIO_REF, STUDIO_ID),
+                account(WORK_REF, WORK_ID),
+            ),
+    ) = WhiteNoiseAppState(
+        context = context,
+        draftStore = DraftStore(EmptyDraftPersistence),
+        accountIdHexResolver = { ACTIVE_ID },
+        accounts =
+            listOf(account(ACTIVE_REF, ACTIVE_ID)) + otherAccounts,
+        activeAccountRef = ACTIVE_REF,
+        profileReader = { accountId -> profile(accountId) },
+        profileDisplayNameReader = { accountId -> profileName(accountId) },
+        profileRefreshRequest = {},
+    )
 
     private fun account(
         label: String,

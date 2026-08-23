@@ -128,17 +128,17 @@ class MessageMultiSelectCoverageTest {
         assertTrue(
             source.contains(
                 "if (!selectionMode && !textSelectionMode) { " +
-                    "longPressWindowPosition = null longPressWindowY = null " +
+                    "longPressWindowPosition = null selectionSeedVisibleOffset = null longPressWindowY = null " +
                     "actionMenuAnchorBounds = messageBoundsInWindow[0] " +
-                    "captureActionMenuVisibleStart(null) onActionMenuOpenChange(true)",
+                    "onActionMenuOpenChange(true)",
             ),
         )
         assertTrue(
             source.contains(
                 "if (!deleted && !selectionMode && !textSelectionMode) { " +
-                    "longPressWindowPosition = null longPressWindowY = null " +
+                    "longPressWindowPosition = null selectionSeedVisibleOffset = null longPressWindowY = null " +
                     "actionMenuAnchorBounds = messageBoundsInWindow[0] " +
-                    "captureActionMenuVisibleStart(null) onActionMenuOpenChange(true)",
+                    "onActionMenuOpenChange(true)",
             ),
         )
     }
