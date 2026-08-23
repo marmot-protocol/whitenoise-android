@@ -514,6 +514,19 @@ internal class TtsPlaybackQueue(
         }
     }
 
+    /**
+     * The exact engine payload of the utterance the queue is currently
+     * speaking, or null when [utteranceId] is stale, out of generation, or not
+     * the active chunk. This is the validation gate the estimated word-timing
+     * lane shares with real engine callbacks: an utterance that fails it must
+     * neither arm a schedule nor contribute a calibration sample.
+     */
+    fun submittedChunk(utteranceId: String?): TtsChunk? {
+        val index = parseCurrentGenerationIndex(utteranceId) ?: return null
+        val active = _state.value is TtsState.Speaking && index == currentIndex
+        return if (active) rangeTracker.submitted(index) else null
+    }
+
     fun onDone(utteranceId: String?) {
         val completedIndex = parseCurrentGenerationIndex(utteranceId) ?: return
         if (_state.value !is TtsState.Speaking || completedIndex != currentIndex) return

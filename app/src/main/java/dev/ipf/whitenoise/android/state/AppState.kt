@@ -1863,6 +1863,7 @@ class WhiteNoiseAppState private constructor(
         TtsController(
             audioFocus = TtsAudioFocusOwner(appContext),
             speechRate = { ttsRatePreferences.resolvedRate() },
+            timingStore = TtsTimingPreferences(appContext),
         )
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set
@@ -2069,7 +2070,10 @@ class WhiteNoiseAppState private constructor(
         if (handle === attachedTtsHandle) return
         attachedTtsHandle = handle
         if (handle != null) {
-            ttsController.attachEngine(AndroidTtsSpeechEngine(handle.textToSpeech))
+            ttsController.attachEngine(
+                AndroidTtsSpeechEngine(handle.textToSpeech),
+                engineKey = handle.enginePackage,
+            )
         } else {
             ttsController.detachEngine()
         }

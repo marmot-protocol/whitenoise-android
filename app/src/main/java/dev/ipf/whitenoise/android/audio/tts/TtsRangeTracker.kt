@@ -19,6 +19,9 @@ internal class TtsRangeTracker {
         submittedChunks.remove(chunkIndex)
     }
 
+    /** The exact engine payload recorded for [chunkIndex], if still tracked. */
+    fun submitted(chunkIndex: Int): TtsChunk? = submittedChunks[chunkIndex]
+
     fun fallbackPassage(chunk: TtsChunk): TtsPassage? =
         if (chunk.messageIdHex.isEmpty() || chunk.visibleSpans.isEmpty()) {
             null

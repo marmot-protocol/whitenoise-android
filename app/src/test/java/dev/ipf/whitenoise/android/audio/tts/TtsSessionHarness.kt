@@ -247,6 +247,7 @@ internal class FakeSessionEngine : TtsSpeechEngine {
     override fun setSpeechRate(rate: Float) = Unit
 
     override fun setCallbacks(
+        onStart: (String?) -> Unit,
         onDone: (String?) -> Unit,
         onError: (String?, Int) -> Unit,
         onRangeStart: (String?, Int, Int, Int) -> Unit,

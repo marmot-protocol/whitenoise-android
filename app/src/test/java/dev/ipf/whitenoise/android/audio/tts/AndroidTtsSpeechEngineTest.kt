@@ -17,19 +17,21 @@ class AndroidTtsSpeechEngineTest {
         val calls = mutableListOf<String>()
         val listener =
             androidTtsProgressListener(
+                onStart = { calls += "start:$it" },
                 onDone = { calls += "done:$it" },
                 onError = { id, code -> calls += "error:$id:$code" },
                 onRangeStart = { id, start, end, frame -> calls += "range:$id:$start:$end:$frame" },
                 onStop = { id, interrupted -> calls += "stop:$id:$interrupted" },
             )
 
+        listener.onStart("u1")
         listener.onRangeStart("u1", 2, 7, 11)
         listener.onStop("u1", true)
         listener.onDone("u1")
         listener.onError("u1", TextToSpeech.ERROR_NETWORK)
 
         assertEquals(
-            listOf("range:u1:2:7:11", "stop:u1:true", "done:u1", "error:u1:${TextToSpeech.ERROR_NETWORK}"),
+            listOf("start:u1", "range:u1:2:7:11", "stop:u1:true", "done:u1", "error:u1:${TextToSpeech.ERROR_NETWORK}"),
             calls,
         )
     }
@@ -60,6 +62,7 @@ class AndroidTtsSpeechEngineTest {
         val engine = AndroidTtsSpeechEngine(tts)
         var received: String? = null
         engine.setCallbacks(
+            onStart = {},
             onDone = {},
             onError = { _, _ -> },
             onRangeStart = { id, start, end, frame -> received = "$id:$start:$end:$frame" },
@@ -76,6 +79,7 @@ class AndroidTtsSpeechEngineTest {
         val tts = CapturingTextToSpeech(RuntimeEnvironment.getApplication())
         val engine = AndroidTtsSpeechEngine(tts)
         engine.setCallbacks(
+            onStart = {},
             onDone = {},
             onError = { _, _ -> },
             onRangeStart = { _, _, _, _ -> },
@@ -89,6 +93,7 @@ class AndroidTtsSpeechEngineTest {
 
     private fun listener(calls: MutableList<String>) =
         androidTtsProgressListener(
+            onStart = { calls += "start:$it" },
             onDone = { calls += "done:$it" },
             onError = { id, code -> calls += "error:$id:$code" },
             onRangeStart = { id, start, end, frame -> calls += "range:$id:$start:$end:$frame" },
