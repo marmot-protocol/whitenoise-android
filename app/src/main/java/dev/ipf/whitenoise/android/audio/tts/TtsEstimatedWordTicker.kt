@@ -27,6 +27,8 @@ import kotlinx.coroutines.launch
  * is. [emit] returning false stops the loop — the owner says so when a real
  * engine range takes over or the utterance ends.
  */
+internal const val TTS_ESTIMATED_AUDIO_LEAD_IN_MS = 160L
+
 internal class TtsEstimatedWordTicker(
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val clock: () -> Long = SystemClock::elapsedRealtime,
@@ -64,7 +66,7 @@ internal class TtsEstimatedWordTicker(
                     // latency so the first word is not highlighted early. The
                     // UI lead looks the word up slightly ahead of the audio
                     // clock to cover the publish→recompose→draw pipeline.
-                    val elapsed = clock() - startedAt - LEAD_IN_MS + UI_LEAD_MS
+                    val elapsed = clock() - startedAt - TTS_ESTIMATED_AUDIO_LEAD_IN_MS + UI_LEAD_MS
                     if (elapsed > horizonMs) return@launch
                     val word = words.lastOrNull { it.startMs <= elapsed }
                     if (word != null && word != published) {
@@ -91,9 +93,6 @@ internal class TtsEstimatedWordTicker(
     private companion object {
         /** Re-derive the active word at this cadence; small enough to never skip a short word. */
         const val TICK_MS = 48L
-
-        /** Audio-pipeline latency between "utterance started" and audible speech. */
-        const val LEAD_IN_MS = 160L
 
         /** Publish→recompose→draw takes a few dozen ms; look the word up slightly ahead. */
         const val UI_LEAD_MS = 70L

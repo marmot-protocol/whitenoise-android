@@ -70,6 +70,24 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
+    fun anUnusableEngineRangeDoesNotDisableTheEstimate() =
+        runTest {
+            val harness = LaneHarness(this)
+            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
+
+            harness.engine.start(index = 0)
+            harness.engine.range(index = 0, start = 0, end = 0)
+
+            assertEquals(null, harness.store.verdicts[ENGINE_KEY])
+            advanceTimeBy(150)
+            runCurrent()
+            assertEquals(
+                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
+                harness.controller.state.value.passage?.visibleWord,
+            )
+        }
+
+    @Test
     fun aPersistedCapableVerdictNeverArmsTheEstimate() =
         runTest {
             val harness = LaneHarness(this)
@@ -138,10 +156,33 @@ class TtsEstimatedTimingLaneTest {
 
             val learned = harness.store.paces[ENGINE_KEY]
             assertTrue("expected a persisted pace, got $learned", learned != null)
-            val expected = 6_000.0 / TtsWordTimingEstimate.weightedLengthOf(text)
+            val expected =
+                (6_000.0 - TTS_ESTIMATED_AUDIO_LEAD_IN_MS) /
+                    TtsWordTimingEstimate.weightedLengthOf(text)
             // One sample moves the estimate a quarter of the way from the default.
             val blended = 17.5 * 0.75 + expected * 0.25
             assertEquals(blended, learned!!, 0.5)
+        }
+
+    @Test
+    fun timingUsesTheRateAppliedWhenTheUtteranceWasEnqueued() =
+        runTest {
+            val harness = LaneHarness(this)
+            val text = "The quick brown fox jumps over the lazy dog while the calibrator listens carefully."
+            harness.rate = 1.0f
+            assertTrue(harness.controller.speak(listOf(plainEntry(text)), Locale.US))
+
+            harness.rate = 2.0f
+            harness.engine.start(index = 0)
+            advanceTimeBy(6_000)
+            harness.engine.complete(index = 0)
+
+            val expected =
+                (6_000.0 - TTS_ESTIMATED_AUDIO_LEAD_IN_MS) /
+                    TtsWordTimingEstimate.weightedLengthOf(text)
+            val blended = 17.5 * 0.75 + expected * 0.25
+            assertEquals(blended, harness.store.paces[ENGINE_KEY]!!, 0.5)
+            assertEquals(listOf(1.0f), harness.engine.appliedRates)
         }
 
     @Test
@@ -241,13 +282,14 @@ class TtsEstimatedTimingLaneTest {
     private class LaneHarness(
         scope: TestScope,
     ) {
+        var rate = 1.0f
         val engine = FakeLaneEngine()
         val store = FakeTimingStore()
         val controller =
             TtsController(
                 audioFocus = FakeLaneFocus(),
                 maxChunkLength = 4_000,
-                speechRate = { 1.0f },
+                speechRate = { rate },
                 timingStore = store,
                 wordTicker =
                     TtsEstimatedWordTicker(
@@ -292,6 +334,7 @@ class TtsEstimatedTimingLaneTest {
         )
 
         val spoken = mutableListOf<Spoken>()
+        val appliedRates = mutableListOf<Float>()
         private var startCallback: ((String?) -> Unit)? = null
         private var doneCallback: ((String?) -> Unit)? = null
         private var rangeCallback: ((String?, Int, Int, Int) -> Unit)? = null
@@ -299,7 +342,9 @@ class TtsEstimatedTimingLaneTest {
 
         override fun setLanguage(locale: Locale): Int = TextToSpeech.LANG_AVAILABLE
 
-        override fun setSpeechRate(rate: Float) = Unit
+        override fun setSpeechRate(rate: Float) {
+            appliedRates += rate
+        }
 
         override fun setCallbacks(
             onStart: (String?) -> Unit,

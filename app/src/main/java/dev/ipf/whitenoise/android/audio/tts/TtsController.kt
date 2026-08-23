@@ -63,7 +63,8 @@ class TtsController internal constructor(
     private var engineKey: String = ""
     private val rangeProbe = TtsRangeCapabilityProbe()
     private val paceCalibrator = TtsPaceCalibrator()
-    private var utteranceStartedAt: Long? = null
+    private val utteranceRates = mutableMapOf<String, Float>()
+    private var activeTiming: ActiveUtteranceTiming? = null
 
     // Locale of the active queue, retained so history pages loaded mid-session
     // chunk with the same sentence iterator the session started with.
@@ -72,12 +73,21 @@ class TtsController internal constructor(
         TtsPlaybackQueue(
             stopEngine = {
                 wordTicker.stop()
+                utteranceRates.clear()
+                activeTiming = null
                 engine?.stop()
             },
             enqueue = { chunk, utteranceId ->
                 engine?.let {
-                    it.setSpeechRate(speechRate())
-                    it.speak(chunk.text, utteranceId)
+                    val appliedRate = speechRate()
+                    it.setSpeechRate(appliedRate)
+                    val result = it.speak(chunk.text, utteranceId)
+                    if (result == TextToSpeech.SUCCESS) {
+                        utteranceRates[utteranceId] = appliedRate
+                    } else {
+                        utteranceRates.remove(utteranceId)
+                    }
+                    result
                 } ?: TextToSpeech.ERROR
             },
             onTerminal = audioFocus::release,
@@ -104,7 +114,8 @@ class TtsController internal constructor(
         paceCalibrator.reset(
             timingStore?.msPerUnitAt1x(engineKey) ?: TtsWordTimingEstimate.DEFAULT_MS_PER_UNIT_AT_1X,
         )
-        utteranceStartedAt = null
+        utteranceRates.clear()
+        activeTiming = null
         engine.setCallbacks(::onStart, ::onDone, ::onError, ::onRangeStart, ::onStop)
     }
 
@@ -116,7 +127,8 @@ class TtsController internal constructor(
         engine = null
         engineKey = ""
         rangeProbe.restore(null)
-        utteranceStartedAt = null
+        utteranceRates.clear()
+        activeTiming = null
     }
 
     @Synchronized
@@ -301,7 +313,8 @@ class TtsController internal constructor(
         // arms a schedule nor opens a calibration window.
         val chunk = queue.submittedChunk(utteranceId) ?: return
         rangeProbe.onUtteranceStart()
-        utteranceStartedAt = clock()
+        val appliedRate = utteranceId?.let(utteranceRates::get) ?: speechRate()
+        activeTiming = ActiveUtteranceTiming(utteranceId, clock(), appliedRate)
         if (rangeProbe.reportsRanges == true || utteranceId == null) return
         // Runs whenever the engine has not PROVEN it reports timing. Waiting
         // for the probe to prove the opposite would leave the first message or
@@ -314,7 +327,7 @@ class TtsController internal constructor(
                 TtsWordTimingEstimate.plan(
                     text = chunk.text,
                     locale = chunk.locale,
-                    rate = speechRate(),
+                    rate = appliedRate,
                     msPerUnitAt1x = paceCalibrator.msPerUnitAt1x,
                 ),
             emit = ::onEstimatedRange,
@@ -329,8 +342,8 @@ class TtsController internal constructor(
     ): Boolean {
         // A real engine range that arrived mid-utterance takes over permanently.
         if (rangeProbe.reportsRanges == true) return false
-        queue.onRangeStart(utteranceId, start, end, ESTIMATED_RANGE_FRAME)
-        return true
+        return queue.onRangeStart(utteranceId, start, end, ESTIMATED_RANGE_FRAME) !=
+            TtsPlaybackQueue.RangeApplication.Stale
     }
 
     @Synchronized
@@ -340,17 +353,19 @@ class TtsController internal constructor(
         val chunk = queue.submittedChunk(utteranceId)
         if (chunk != null) {
             wordTicker.stop()
-            val startedAt = utteranceStartedAt
-            utteranceStartedAt = null
-            if (startedAt != null) {
-                // The engine plays utterances serially, so start-to-done of one
-                // utterance is the time its audio took — one calibration sample
-                // in the same weighted unit the plan spends.
+            val timing = activeTiming?.takeIf { it.utteranceId == utteranceId }
+            activeTiming = null
+            utteranceId?.let(utteranceRates::remove)
+            if (timing != null) {
+                // onStart precedes audible speech by the same bounded lead-in
+                // used by the estimate. Learn only the audible interval.
+                val audibleElapsedMs =
+                    (clock() - timing.startedAt - TTS_ESTIMATED_AUDIO_LEAD_IN_MS).coerceAtLeast(1L)
                 val moved =
                     paceCalibrator.observe(
                         unitCount = TtsWordTimingEstimate.weightedLengthOf(chunk.text),
-                        elapsedMs = clock() - startedAt,
-                        rate = speechRate(),
+                        elapsedMs = audibleElapsedMs,
+                        rate = timing.rate,
                     )
                 if (moved) timingStore?.setMsPerUnitAt1x(engineKey, paceCalibrator.msPerUnitAt1x)
             }
@@ -372,7 +387,8 @@ class TtsController internal constructor(
         // stop the ticker through stopEngine.
         if (queue.submittedChunk(utteranceId) != null) {
             wordTicker.stop()
-            utteranceStartedAt = null
+            activeTiming = null
+            utteranceId?.let(utteranceRates::remove)
         }
         queue.onError(utteranceId, errorCode)
     }
@@ -384,14 +400,18 @@ class TtsController internal constructor(
         end: Int,
         frame: Int,
     ) {
-        // The first real range proves the engine reports timing; persist the
-        // verdict and silence the estimate before it can paint another word.
-        if (rangeProbe.reportsRanges != true) {
+        // Only an active callback that maps to a visible word proves range
+        // capability. Stale, zero-width, partial, or unmappable callbacks must
+        // not cancel the estimate or poison the persisted engine verdict.
+        val application = queue.onRangeStart(utteranceId, start, end, frame)
+        if (
+            application == TtsPlaybackQueue.RangeApplication.VisibleWord &&
+            rangeProbe.reportsRanges != true
+        ) {
             rangeProbe.onRangeStart()
             wordTicker.stop()
             timingStore?.setRangeVerdict(engineKey, true)
         }
-        queue.onRangeStart(utteranceId, start, end, frame)
     }
 
     @Synchronized
@@ -402,7 +422,8 @@ class TtsController internal constructor(
         // Same staleness rule as onError: see there.
         if (queue.submittedChunk(utteranceId) != null) {
             wordTicker.stop()
-            utteranceStartedAt = null
+            activeTiming = null
+            utteranceId?.let(utteranceRates::remove)
         }
         queue.onStopped(utteranceId, interrupted)
     }
@@ -490,6 +511,12 @@ class TtsController internal constructor(
             .takeIf(String::isNotEmpty)
             ?.let { "$it: ".length } ?: 0
 }
+
+private data class ActiveUtteranceTiming(
+    val utteranceId: String?,
+    val startedAt: Long,
+    val rate: Float,
+)
 
 internal const val TTS_PREVIEW_MAX_LENGTH = 120
 
