@@ -81,7 +81,7 @@ class NotificationAccountIsolationNavigationTest {
     }
 
     @Test
-    fun inactiveAccountTap_preloadOpensBeforeActivation_preservesSourceAccountCards() {
+    fun inactiveAccountTap_preloadOpensBeforeBroadActivationWork_preservesSourceAccountCards() {
         verifyInactiveAccountTapIsolation(preloadFinishesFirst = true)
     }
 
@@ -259,6 +259,14 @@ class NotificationAccountIsolationNavigationTest {
     @Test
     fun mainShell_ordinaryConversationAccountSwitchPreservesDestinationCards() {
         val gate = RouteOrderGate(preloadFinishesFirst = true)
+        // This case verifies ordinary account-switch ownership after a routed
+        // conversation is visible; it does not exercise the inactive-account
+        // activation ordering covered by the two tests above. Let the broad
+        // controller bind complete so timeline ownership can be published
+        // before asserting notification dismissal. Holding this latch creates
+        // a circular wait under Roborazzi: ownership awaits the controller,
+        // while the test awaits ownership before releasing the controller.
+        gate.releaseActivation.countDown()
         val appState = appState(fakeMarmot(gate))
         val sourceKeys = postConversationCards(SOURCE_ACCOUNT, "source-invite")
         val targetKeys = postConversationCards(TARGET_ACCOUNT, "target-invite")
@@ -300,7 +308,6 @@ class NotificationAccountIsolationNavigationTest {
             val activeKeys = manager.activeNotifications.map { it.tag to it.id }.toSet()
             targetKeys.all { it in activeKeys }
         }
-        gate.releaseActivation.countDown()
     }
 
     private fun verifyInactiveAccountTapIsolation(preloadFinishesFirst: Boolean) {
@@ -328,22 +335,30 @@ class NotificationAccountIsolationNavigationTest {
             }
         }
 
-        awaitCondition {
-            gate.preloadStarted.count == 0L && gate.activationStarted.count == 0L
-        }
+        awaitCondition { gate.preloadStarted.count == 0L }
         manager.notify(lateSource.first, lateSource.second, notification(SOURCE_ACCOUNT))
 
         if (preloadFinishesFirst) {
-            awaitCondition {
+            awaitCondition(
+                failureMessage = {
+                    "destination cards were not dismissed before activation: " +
+                        "active=${manager.activeNotifications.map { it.tag to it.id }.toSet()} " +
+                        "expected=${(sourceKeys + lateSource).toSet()}"
+                },
+            ) {
                 manager.activeNotifications.map { it.tag to it.id }.toSet() ==
                     (sourceKeys + lateSource).toSet()
             }
-            assertEquals(SOURCE_ACCOUNT, appState.activeAccountRef)
+            // setActiveAccount publishes the target ref before the gated broad
+            // chat-list subscription finishes. The direct conversation can
+            // already own and dismiss only its target cards in that window.
+            assertEquals(TARGET_ACCOUNT, appState.activeAccountRef)
             gate.releaseActivation.countDown()
         } else {
             awaitCondition {
                 appState.activeAccountRef == TARGET_ACCOUNT
             }
+            assertEquals(1L, gate.broadBindStarted.count)
             assertEquals(
                 (sourceKeys + targetKeys + lateSource).toSet(),
                 manager.activeNotifications.map { it.tag to it.id }.toSet(),
@@ -351,16 +366,29 @@ class NotificationAccountIsolationNavigationTest {
             gate.releasePreload.countDown()
         }
 
+        verifyRouteCompletion(appState, gate, handled, (sourceKeys + lateSource).toSet())
+    }
+
+    private fun verifyRouteCompletion(
+        appState: WhiteNoiseAppState,
+        gate: RouteOrderGate,
+        handled: AtomicBoolean,
+        expectedNotificationKeys: Set<Pair<String?, Int>>,
+    ) {
         check(gate.preloadCompleted.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
             "notification preload did not complete"
         }
         awaitCondition { handled.get() }
-        awaitCondition {
-            appState.activeAccountRef == TARGET_ACCOUNT
-        }
-        awaitCondition {
-            manager.activeNotifications.map { it.tag to it.id }.toSet() ==
-                (sourceKeys + lateSource).toSet()
+        awaitCondition { appState.activeAccountRef == TARGET_ACCOUNT }
+        awaitCondition(
+            failureMessage = {
+                "destination cards were not dismissed after the routed open: " +
+                    "active=${manager.activeNotifications.map { it.tag to it.id }.toSet()} " +
+                    "expected=$expectedNotificationKeys runtimeGeneration=${appState.runtimeGeneration} " +
+                    "projectionReads=${gate.projectionReadCount.get()} handled=${handled.get()}"
+            },
+        ) {
+            manager.activeNotifications.map { it.tag to it.id }.toSet() == expectedNotificationKeys
         }
         assertEquals(TARGET_ACCOUNT, appState.activeAccountRef)
     }
@@ -444,7 +472,7 @@ class NotificationAccountIsolationNavigationTest {
                 "subscribeChatList" -> {
                     val accountRef = arguments?.firstOrNull() as? String
                     if (accountRef == TARGET_ACCOUNT) {
-                        gate.activationStarted.countDown()
+                        gate.broadBindStarted.countDown()
                         check(gate.releaseActivation.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
                             "activation gate timed out"
                         }
@@ -624,7 +652,7 @@ class NotificationAccountIsolationNavigationTest {
     ) {
         val preloadStarted = CountDownLatch(1)
         val preloadCompleted = CountDownLatch(1)
-        val activationStarted = CountDownLatch(1)
+        val broadBindStarted = CountDownLatch(1)
         val releasePreload = CountDownLatch(if (preloadFinishesFirst) 0 else 1)
         val releaseActivation = CountDownLatch(if (preloadFinishesFirst) 1 else 0)
         val projectionReadCount = AtomicInteger()

@@ -11,6 +11,15 @@ import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.onElementOrNull
 import androidx.test.uiautomator.textAsString
 
+internal data class NotificationRouteSample(
+    val durationMs: Long,
+    val transcriptVisible: Boolean,
+    val expectedConversationVisible: Boolean,
+) {
+    val succeeded: Boolean
+        get() = transcriptVisible && expectedConversationVisible
+}
+
 internal class WhiteNoiseJourneys {
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
@@ -122,17 +131,53 @@ internal class WhiteNoiseJourneys {
         waitForTag(PerformanceTags.OPEN_GROUP_DETAILS, NETWORK_STATE_TIMEOUT_MS)
     }
 
+    /** Restores the same non-target account before every notification sample. */
+    fun activateNotificationSourceAccount(accountRef: String) {
+        val otherAccountAvatarTag = "other-account-avatar-$accountRef"
+        val avatar = findVisibleTag(otherAccountAvatarTag, NAVIGATION_SETTLE_TIMEOUT_MS)
+        if (avatar != null) {
+            avatar.click()
+            waitForVisibleTagAbsent(otherAccountAvatarTag, NOTIFICATION_ROUTE_TIMEOUT_MS)
+        }
+        waitForVisibleTag(PerformanceTags.NEW_MESSAGE, NOTIFICATION_ROUTE_TIMEOUT_MS)
+        waitForVisibleTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED, NOTIFICATION_ROUTE_TIMEOUT_MS)
+        device.waitForIdle()
+    }
+
     /**
-     * Opens a real notification whose target belongs to a signed-in inactive account.
-     * The fixture owner must leave the source account active before starting the run.
+     * Opens one fresh inactive-account notification and measures the first
+     * readable transcript, while independently validating the conversation.
      */
-    fun openSecondaryAccountNotification(notificationText: String): Long {
+    fun openSecondaryAccountNotification(
+        notificationText: String,
+        expectedConversationTitle: String,
+    ): NotificationRouteSample {
         device.openNotification()
         val notification = waitForText(notificationText)
         val intentDeliveryApproximationMs = SystemClock.elapsedRealtime()
         notification.click()
-        waitForTag(PerformanceTags.OPEN_GROUP_DETAILS, NOTIFICATION_ROUTE_TIMEOUT_MS)
-        return SystemClock.elapsedRealtime() - intentDeliveryApproximationMs
+        val diagnosticDeadlineMs = intentDeliveryApproximationMs + NOTIFICATION_ROUTE_DIAGNOSTIC_TIMEOUT_MS
+        val transcript =
+            findVisibleTag(
+                PerformanceTags.CONVERSATION_TRANSCRIPT_VISIBLE,
+                (diagnosticDeadlineMs - SystemClock.elapsedRealtime()).coerceAtLeast(0L),
+            )
+        val durationMs = SystemClock.elapsedRealtime() - intentDeliveryApproximationMs
+        val expectedConversation =
+            if (transcript == null) {
+                null
+            } else {
+                device.onElementOrNull(
+                    timeoutMs = (diagnosticDeadlineMs - SystemClock.elapsedRealtime()).coerceAtLeast(0L),
+                ) {
+                    textAsString() == expectedConversationTitle && isVisibleOnDisplay()
+                }
+            }
+        return NotificationRouteSample(
+            durationMs = durationMs,
+            transcriptVisible = transcript != null,
+            expectedConversationVisible = expectedConversation != null,
+        )
     }
 
     fun returnToChatList() {
@@ -197,6 +242,17 @@ internal class WhiteNoiseJourneys {
             "Timed out waiting for visible test tag '$tag'. " +
                 "Available performance tags: ${availablePerformanceTags()}."
         }
+
+    private fun waitForVisibleTagAbsent(
+        tag: String,
+        timeoutMs: Long,
+    ) {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        while (findVisibleTag(tag) != null && SystemClock.uptimeMillis() < deadline) {
+            SystemClock.sleep(SELECTOR_POLL_INTERVAL_MS)
+        }
+        check(findVisibleTag(tag) == null) { "Timed out waiting for visible test tag '$tag' to disappear." }
+    }
 
     private fun waitForEnabledTag(
         tag: String,
@@ -311,8 +367,10 @@ internal class WhiteNoiseJourneys {
         const val STARTUP_TIMEOUT_MS = 30_000L
         const val NETWORK_STATE_TIMEOUT_MS = 45_000L
         const val NOTIFICATION_ROUTE_TIMEOUT_MS = 10_000L
+        const val NOTIFICATION_ROUTE_DIAGNOSTIC_TIMEOUT_MS = 15_000L
         const val NAVIGATION_SETTLE_TIMEOUT_MS = 2_000L
         const val INPUT_METHOD_POLL_INTERVAL_MS = 100L
+        const val SELECTOR_POLL_INTERVAL_MS = 50L
         const val CONVERSATION_SCROLL_PASSES = 4
         const val CONVERSATION_SCROLL_STEPS = 20
     }

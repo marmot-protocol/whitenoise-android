@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationMessageDirectLoadOut
 import dev.ipf.whitenoise.android.notifications.NotificationMessagePreload
 import dev.ipf.whitenoise.android.notifications.NotificationMessagePreloadState
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
+import dev.ipf.whitenoise.android.notifications.NotificationRouteFirstFrameGate
 import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
 import dev.ipf.whitenoise.android.notifications.NotificationRouteTraceSection
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
@@ -57,11 +58,14 @@ import dev.ipf.whitenoise.android.notifications.notificationPreloadStuckLoading
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
 import dev.ipf.whitenoise.android.notifications.retryInviteAuthoritativeLoad
 import dev.ipf.whitenoise.android.notifications.runInactiveNotificationRouteStage
+import dev.ipf.whitenoise.android.notifications.shouldDeferNotificationChatListBind
+import dev.ipf.whitenoise.android.notifications.shouldRetryNotificationMessageLoadAfterActivation
 import dev.ipf.whitenoise.android.notifications.stateFor
 import dev.ipf.whitenoise.android.share.EncryptedPendingShareRequestStore
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.resolveShareDirectGroupId
 import dev.ipf.whitenoise.android.share.shouldPresentInboundShare
+import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -453,6 +457,24 @@ internal fun MainShell(
     var notificationEarlyOpenRequestId by remember(appState.runtimeGeneration) {
         mutableLongStateOf(0L)
     }
+    var notificationFirstFrameGate by remember(appState.runtimeGeneration) {
+        mutableStateOf<NotificationRouteFirstFrameGate?>(null)
+    }
+    var notificationActiveRetryRequestId by remember(appState.runtimeGeneration) {
+        mutableStateOf<Long?>(null)
+    }
+
+    fun releaseNotificationFirstFrameGate(requestId: Long? = null) {
+        val gate = notificationFirstFrameGate ?: return
+        if (requestId != null && gate.requestId != requestId) return
+        gate.release()
+        notificationFirstFrameGate = null
+    }
+
+    DisposableEffect(appState.runtimeGeneration, notificationFirstFrameGate) {
+        val ownedGate = notificationFirstFrameGate
+        onDispose { ownedGate?.release() }
+    }
     var previousPendingProfileNpub by remember { mutableStateOf<String?>(null) }
     val supersedePendingGroupCreateOpen: () -> Unit = {
         shellNavState =
@@ -531,6 +553,8 @@ internal fun MainShell(
         }
     }
     val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
+    val deferNotificationChatListBind =
+        shouldDeferNotificationChatListBind(notificationFirstFrameGate, appState.activeAccountRef)
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
 
@@ -547,7 +571,9 @@ internal fun MainShell(
         appState.activeAccountRef,
         appState.runtimeGeneration,
         chatsController.retryGeneration,
+        deferNotificationChatListBind,
     ) {
+        if (deferNotificationChatListBind) return@LaunchedEffect
         chatsController.bind(
             accountRef = appState.activeAccountRef,
             preserveLoadedContent = chatsController.retryGeneration > 0L,
@@ -638,11 +664,14 @@ internal fun MainShell(
                     armedNotificationRequestId != 0L &&
                     selectedChatOpenContext.notificationRouteTraceRequestId != armedNotificationRequestId
                 ) {
+                    releaseNotificationFirstFrameGate(armedNotificationRequestId)
                     NotificationRouteTrace.finishRequest(armedNotificationRequestId)
                 }
                 return@LaunchedEffect
             }
         if (routingRequestId != armedNotificationRequestId) {
+            releaseNotificationFirstFrameGate(armedNotificationRequestId)
+            notificationActiveRetryRequestId = null
             supersedePendingTtsDestinationNavigation()
             armedNotificationRequestId = routingRequestId
             shellNavState = armShellNotificationRequest(shellNavState, profileGroupForegroundState)
@@ -714,11 +743,17 @@ internal fun MainShell(
                         chatItem.group.groupIdHex,
                     ),
                 ).state
-            // Opening before the account switch lands pins the conversation to
-            // the notification's own account (#586); the in-flight switch keeps
-            // running behind the already-rendered conversation.
-            val pinnedAccountRef = target.accountRef.takeIf { it != appState.activeAccountRef }
-            if (pinnedAccountRef != null) {
+            // Keep ownership pinned for every open produced by this account-
+            // switch request. The active ref can land a frame before this
+            // commit while the shell still remembers the source account; if we
+            // drop the pin in that window, the account-change reset closes the
+            // routed conversation before it can claim notification ownership.
+            val ownsNotificationAccountSwitch = notificationAccountSwitchRequestId == routingRequestId
+            val pinnedAccountRef =
+                target.accountRef.takeIf {
+                    ownsNotificationAccountSwitch || it != appState.activeAccountRef
+                }
+            if (ownsNotificationAccountSwitch) {
                 notificationEarlyOpenRequestId = routingRequestId
             }
             selectedChatOpenContext =
@@ -734,6 +769,10 @@ internal fun MainShell(
             NotificationRouteTrace.beginPhase(
                 requestId = routingRequestId,
                 sectionName = NotificationRouteTraceSection.CONTROLLER_BIND,
+            )
+            NotificationRouteTrace.beginPhase(
+                requestId = routingRequestId,
+                sectionName = NotificationRouteTraceSection.TARGET_TIMELINE,
             )
             NotificationRouteTrace.beginPhase(
                 requestId = routingRequestId,
@@ -793,8 +832,11 @@ internal fun MainShell(
                                 notificationEarlyOpenRequestId == routingRequestId
                         )
                 val preloadKey = notificationMessagePreloadKey
-                val canPreload =
+                val canUseTargetFirst =
                     preloadKey != null &&
+                        appState.accounts.any { it.label == step.accountRef }
+                val canPreload =
+                    canUseTargetFirst &&
                         appState.accounts.any {
                             it.label == step.accountRef && it.isSignedInSigningAccount()
                         }
@@ -805,6 +847,15 @@ internal fun MainShell(
                             state = NotificationMessagePreloadState.Loading,
                         )
                 }
+                val firstFrameGate =
+                    if (canUseTargetFirst) {
+                        NotificationRouteFirstFrameGate(
+                            requestId = routingRequestId,
+                            accountRef = step.accountRef,
+                        ).also { notificationFirstFrameGate = it }
+                    } else {
+                        null
+                    }
 
                 val activateAccount: suspend () -> Unit = {
                     NotificationRouteTrace.beginPhase(
@@ -820,6 +871,13 @@ internal fun MainShell(
                                 appState.setActiveAccount(
                                     label = step.accountRef,
                                     shouldActivate = { switchStillCurrent() },
+                                    preloadPolicy =
+                                        if (firstFrameGate != null) {
+                                            AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST
+                                        } else {
+                                            AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT
+                                        },
+                                    awaitPostActivationWork = { firstFrameGate?.awaitRelease() },
                                     onActivated = {
                                         NotificationRouteTrace.endPhase(
                                             requestId = routingRequestId,
@@ -866,7 +924,9 @@ internal fun MainShell(
                             // local read re-fires the routing effect, which
                             // commits the conversation open immediately while
                             // the switch keeps settling behind it (#586).
-                            onPreload = { notificationMessagePreload = it },
+                            onPreload = {
+                                notificationMessagePreload = it
+                            },
                         )
                     } else {
                         activateAccount()
@@ -882,6 +942,7 @@ internal fun MainShell(
                             selectedChatOpenContext.notificationRouteTraceRequestId == routingRequestId
                         notificationMessagePreload = null
                         notificationEarlyOpenRequestId = 0L
+                        releaseNotificationFirstFrameGate(routingRequestId)
                         routingNotification = false
                         if (!earlyOpened || stillInsideEarlyOpen) {
                             fallBackToChatList()
@@ -900,6 +961,7 @@ internal fun MainShell(
                         // pin the loading overlay forever. Release both.
                         if (notificationPreloadStuckLoading(notificationMessagePreload, preloadKey)) {
                             notificationMessagePreload = null
+                            releaseNotificationFirstFrameGate(routingRequestId)
                             if (currentInboundNotificationRequestId == routingRequestId) {
                                 routingNotification = false
                             }
@@ -915,10 +977,71 @@ internal fun MainShell(
                         commitNotificationConversationOpen(preloadState.item)
                     }
                     NotificationMessagePreloadState.Failed -> {
-                        // Do not immediately repeat a failed local read. Keep the
-                        // target pending so the broad list can settle and prove
-                        // whether the conversation is missing.
-                        routingNotification = false
+                        // The inactive-account read may fail while account
+                        // activation is still taking ownership of the native
+                        // runtime. Retry the exact group once now that the target
+                        // account is active. Keep the stable routing surface up;
+                        // if this retry also fails, the broad list remains the
+                        // authoritative fallback without flashing it first.
+                        if (
+                            shouldRetryNotificationMessageLoadAfterActivation(
+                                preloadState = preloadState,
+                                routingRequestId = routingRequestId,
+                                retriedRequestId = notificationActiveRetryRequestId,
+                            )
+                        ) {
+                            notificationActiveRetryRequestId = routingRequestId
+                            val retryKey = requireNotNull(notificationMessagePreloadKey)
+                            val retryRuntimeGeneration = appState.runtimeGeneration
+                            // Account activation can publish an empty broad
+                            // list while this exact retry is suspended. Keep
+                            // that absence non-authoritative until the retry
+                            // itself returns. Run it in the process mutation
+                            // scope because publishing Loading re-composes and
+                            // cancels this keyed routing effect.
+                            notificationMessagePreload =
+                                NotificationMessagePreload(
+                                    key = retryKey,
+                                    state = NotificationMessagePreloadState.Loading,
+                                )
+                            appState.launchMutation {
+                                val outcome =
+                                    loadNotificationMessageDirectly {
+                                        NotificationRouteTrace.tracePhase(
+                                            requestId = routingRequestId,
+                                            sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
+                                        ) {
+                                            appState.loadNotificationChatListItem(
+                                                accountRef = target.accountRef,
+                                                groupIdHex = target.groupIdHex,
+                                            )
+                                        }
+                                    }
+                                if (
+                                    currentInboundNotificationRequestId == routingRequestId &&
+                                    currentInboundNotificationTarget == target &&
+                                    currentRuntimeGeneration == retryRuntimeGeneration
+                                ) {
+                                    when (outcome) {
+                                        is NotificationMessageDirectLoadOutcome.OpenConversation -> {
+                                            notificationMessagePreload =
+                                                NotificationMessagePreload(
+                                                    key = retryKey,
+                                                    state = NotificationMessagePreloadState.Ready(outcome.item),
+                                                )
+                                        }
+                                        NotificationMessageDirectLoadOutcome.AwaitChatList -> {
+                                            notificationMessagePreload =
+                                                NotificationMessagePreload(
+                                                    key = retryKey,
+                                                    state = NotificationMessagePreloadState.Failed,
+                                                )
+                                            releaseNotificationFirstFrameGate(routingRequestId)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                     null -> {
                         when (
@@ -941,6 +1064,7 @@ internal fun MainShell(
                             NotificationMessageDirectLoadOutcome.AwaitChatList -> {
                                 // A transient local-read failure does not consume the tap;
                                 // the existing chat-list state will re-fire this route.
+                                releaseNotificationFirstFrameGate(routingRequestId)
                                 routingNotification = false
                             }
                         }
@@ -993,6 +1117,7 @@ internal fun MainShell(
                     }
             }
             NotificationNavStep.MissingAccount -> {
+                releaseNotificationFirstFrameGate(routingRequestId)
                 routingNotification = false
                 fallBackToChatList()
                 appState.present(R.string.toast_notification_account_unavailable)
@@ -1000,6 +1125,7 @@ internal fun MainShell(
                 NotificationRouteTrace.finishRequest(routingRequestId)
             }
             NotificationNavStep.MissingConversation -> {
+                releaseNotificationFirstFrameGate(routingRequestId)
                 routingNotification = false
                 fallBackToChatList()
                 appState.present(R.string.toast_notification_conversation_unavailable)
@@ -1574,9 +1700,27 @@ internal fun MainShell(
     LaunchedEffect(
         conversationController,
         conversationController?.isLoading,
+        conversationController?.hasPublishedAuthoritativeTimeline,
+        conversationController?.error,
+        conversationController?.terminalConversationUnavailable,
         selectedChatOpenContext.notificationRouteTraceRequestId,
     ) {
         val requestId = selectedChatOpenContext.notificationRouteTraceRequestId ?: return@LaunchedEffect
+        if (conversationController?.error != null || conversationController?.terminalConversationUnavailable == true) {
+            releaseNotificationFirstFrameGate(requestId)
+            NotificationRouteTrace.finishRequest(requestId)
+            return@LaunchedEffect
+        }
+        if (conversationController?.hasPublishedAuthoritativeTimeline == true) {
+            NotificationRouteTrace.endPhase(
+                requestId = requestId,
+                sectionName = NotificationRouteTraceSection.TARGET_TIMELINE,
+            )
+            NotificationRouteTrace.beginPhase(
+                requestId = requestId,
+                sectionName = NotificationRouteTraceSection.INITIAL_ANCHOR,
+            )
+        }
         if (conversationController != null && !conversationController.isLoading) {
             NotificationRouteTrace.endPhase(
                 requestId = requestId,
@@ -1805,6 +1949,11 @@ internal fun MainShell(
                         },
                         onFirstFrameCommitted = {
                             content.openContext.notificationRouteTraceRequestId?.let { requestId ->
+                                releaseNotificationFirstFrameGate(requestId)
+                                NotificationRouteTrace.endPhase(
+                                    requestId = requestId,
+                                    sectionName = NotificationRouteTraceSection.INITIAL_ANCHOR,
+                                )
                                 NotificationRouteTrace.endPhase(
                                     requestId = requestId,
                                     sectionName = NotificationRouteTraceSection.FIRST_CONVERSATION_FRAME,
@@ -1856,6 +2005,7 @@ internal fun MainShell(
                             // until the next notification. finishRequest is a no-op
                             // for an already-finished request.
                             content.openContext.notificationRouteTraceRequestId?.let {
+                                releaseNotificationFirstFrameGate(it)
                                 NotificationRouteTrace.finishRequest(it)
                             }
                             exitingConversationContent = content

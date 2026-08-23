@@ -868,6 +868,31 @@ class NotificationTargetTest {
             )
         }
 
+    @Test
+    fun failedInactivePreloadRetriesOnceAfterAccountActivation() {
+        assertTrue(
+            shouldRetryNotificationMessageLoadAfterActivation(
+                preloadState = NotificationMessagePreloadState.Failed,
+                routingRequestId = 72L,
+                retriedRequestId = null,
+            ),
+        )
+        assertFalse(
+            shouldRetryNotificationMessageLoadAfterActivation(
+                preloadState = NotificationMessagePreloadState.Failed,
+                routingRequestId = 72L,
+                retriedRequestId = 72L,
+            ),
+        )
+        assertFalse(
+            shouldRetryNotificationMessageLoadAfterActivation(
+                preloadState = NotificationMessagePreloadState.Loading,
+                routingRequestId = 72L,
+                retriedRequestId = null,
+            ),
+        )
+    }
+
     @Test(expected = CancellationException::class)
     fun directMessageLoadPropagatesCancellation() =
         runTest {
@@ -1001,6 +1026,32 @@ class NotificationTargetTest {
             releaseFollowUp.complete(Unit)
             runCurrent()
             assertTrue(followUpFinished)
+        }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun notificationFirstFrameGateDefersBroadWorkUntilReadableFrame() =
+        runTest {
+            val gate = NotificationRouteFirstFrameGate(requestId = 71L, accountRef = "acct-b")
+            var broadWorkStarted = false
+            val broadWork =
+                launch {
+                    gate.awaitRelease()
+                    broadWorkStarted = true
+                }
+
+            runCurrent()
+            assertFalse("broad account work must stay outside the target-frame path", broadWorkStarted)
+            assertTrue(shouldDeferNotificationChatListBind(gate, activeAccountRef = "acct-b"))
+            assertFalse(shouldDeferNotificationChatListBind(gate, activeAccountRef = "acct-a"))
+
+            gate.release()
+            gate.release()
+            runCurrent()
+
+            assertTrue(broadWorkStarted)
+            assertTrue(broadWork.isCompleted)
+            assertFalse(shouldDeferNotificationChatListBind(gate, activeAccountRef = "acct-b"))
         }
 
     @Test
