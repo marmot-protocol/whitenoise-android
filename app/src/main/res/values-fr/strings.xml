@@ -861,6 +861,7 @@
     <string name="media_save">Enregistrer</string>
     <string name="media_saved">Enregistré dans la galerie</string>
     <string name="media_save_failed">Impossible d\'enregistrer l\'image</string>
+    <string name="media_viewer_page_position">Média %1$d sur %2$d</string>
     <string name="close">Fermer</string>
     <string name="add_caption">Ajouter une légende…</string>
     <string name="attach_take_photo">Prendre une photo</string>

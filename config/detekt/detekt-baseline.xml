@@ -301,7 +301,6 @@
     <ID>FunctionNaming:MediaVideo.kt:@Composable internal fun MediaVideoGridTile</ID>
     <ID>FunctionNaming:MediaVideo.kt:@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class) @Composable internal fun VideoViewerPage</ID>
     <ID>FunctionNaming:MediaVideo.kt:@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class) @Composable private fun FullscreenVideoPlayer</ID>
-    <ID>FunctionNaming:MediaViewer.kt:@Composable internal fun FullScreenImageViewer</ID>
     <ID>FunctionNaming:MediaViewer.kt:@Composable internal fun FullScreenMediaViewer</ID>
     <ID>FunctionNaming:MediaViewer.kt:@Composable internal fun MediaViewerFrame</ID>
     <ID>FunctionNaming:MediaViewer.kt:@Composable internal fun ViewerPage</ID>

@@ -861,6 +861,7 @@
     <string name="media_save">Speichern</string>
     <string name="media_saved">In Galerie gespeichert</string>
     <string name="media_save_failed">Bild konnte nicht gespeichert werden</string>
+    <string name="media_viewer_page_position">Medium %1$d von %2$d</string>
     <string name="close">Schließen</string>
     <string name="add_caption">Beschriftung hinzufügen…</string>
     <string name="attach_take_photo">Foto aufnehmen</string>

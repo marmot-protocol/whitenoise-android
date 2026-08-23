@@ -861,6 +861,7 @@
     <string name="media_save">Salva</string>
     <string name="media_saved">Salvato nella galleria</string>
     <string name="media_save_failed">Impossibile salvare l\'immagine</string>
+    <string name="media_viewer_page_position">Contenuto multimediale %1$d di %2$d</string>
     <string name="close">Chiudi</string>
     <string name="add_caption">Aggiungi una didascalia…</string>
     <string name="attach_take_photo">Scatta foto</string>

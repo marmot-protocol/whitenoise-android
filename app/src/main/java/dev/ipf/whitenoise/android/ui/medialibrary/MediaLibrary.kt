@@ -53,6 +53,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -103,6 +104,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresent
 import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
+import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
@@ -149,6 +151,7 @@ internal data class MediaMonthSection<T>(
 )
 
 internal data class SharedMediaTiles(
+    val visuals: List<SharedMediaTile>,
     val images: List<SharedMediaTile>,
     val videos: List<SharedMediaTile>,
     val voice: List<SharedMediaRow>,
@@ -183,37 +186,89 @@ internal data class SharedMediaTiles(
 internal fun rememberSharedMediaTiles(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    myAccountId: String? = appState.activeAccount?.accountIdHex,
 ): SharedMediaTiles {
-    val myAccountId = appState.activeAccount?.accountIdHex
-    // The build sweep is O(N) over the timeline; run it off the composition
-    // thread and surface an empty result until it lands (consumers treat empty
-    // as "hide section / empty tabs", so the brief initial state is graceful).
-    val tiles by produceState(
-        initialValue =
-            SharedMediaTiles(
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                hasOther = false,
-            ),
-        controller.timeline,
+    val timeline = controller.timeline
+    val deletedMessageIds = controller.deletedMessageIds
+    val pendingTimelineRemovedMessageIds = controller.pendingTimelineRemovedMessageIds
+    val retentionExpiries =
+        remember(timeline) {
+            timeline.mapNotNull { it.record.retentionExpiresAt?.takeIf { expiry -> expiry > 0uL } }
+        }
+    val nowSeconds = rememberForwardEligibilityNowSeconds(retentionExpiries)
+    return key(
+        controller,
         myAccountId,
+        timeline,
+        deletedMessageIds,
+        pendingTimelineRemovedMessageIds,
+        nowSeconds,
     ) {
-        val timelineSnapshot = controller.timeline
-        value =
-            withContext(Dispatchers.Default) {
-                buildTiles(timelineSnapshot, myAccountId)
-            }
+        // The build sweep is O(N) over the timeline; run it off the composition
+        // thread. Re-keying on every visibility input also clears a stale result
+        // synchronously, so deleted or expired media cannot remain swipeable while
+        // the replacement projection is still being built.
+        val tiles by produceState(
+            initialValue = emptySharedMediaTiles(),
+            timeline,
+            deletedMessageIds,
+            pendingTimelineRemovedMessageIds,
+            myAccountId,
+            nowSeconds,
+        ) {
+            val timelineSnapshot = timeline
+            value =
+                withContext(Dispatchers.Default) {
+                    buildVisibleSharedMediaTiles(
+                        messages = timelineSnapshot,
+                        myAccountId = myAccountId,
+                        deletedMessageIds = deletedMessageIds,
+                        pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds,
+                        nowSeconds = nowSeconds,
+                    )
+                }
+        }
+        tiles
     }
-    return tiles
 }
+
+private fun emptySharedMediaTiles() =
+    SharedMediaTiles(
+        visuals = emptyList(),
+        images = emptyList(),
+        videos = emptyList(),
+        voice = emptyList(),
+        files = emptyList(),
+        urls = emptyList(),
+        imageSections = emptyList(),
+        videoSections = emptyList(),
+        voiceSections = emptyList(),
+        fileSections = emptyList(),
+        urlSections = emptyList(),
+        hasOther = false,
+    )
+
+internal fun buildVisibleSharedMediaTiles(
+    messages: List<TimelineMessage>,
+    myAccountId: String?,
+    deletedMessageIds: Set<String>,
+    pendingTimelineRemovedMessageIds: Set<String>,
+    nowSeconds: ULong,
+): SharedMediaTiles =
+    buildTiles(
+        messages =
+            messages.filter { message ->
+                val record = message.record
+                MessageProjector.isChatKind(record.kind) &&
+                    message.projected?.deleted != true &&
+                    !MessageProjector.isDeleted(record.messageIdHex, deletedMessageIds) &&
+                    record.messageIdHex !in pendingTimelineRemovedMessageIds &&
+                    record.retentionExpiresAt
+                        ?.takeIf { it > 0uL }
+                        ?.let { it > nowSeconds } != false
+            },
+        myAccountId = myAccountId,
+    )
 
 // Pure tile projection extracted from the composable so it can run on a
 // background dispatcher. Projected rows carry authoritative typed media;
@@ -222,6 +277,7 @@ private fun buildTiles(
     messages: List<TimelineMessage>,
     myAccountId: String?,
 ): SharedMediaTiles {
+    val visuals = ArrayList<SharedMediaTile>()
     val images = ArrayList<SharedMediaTile>()
     val videos = ArrayList<SharedMediaTile>()
     val voice = ArrayList<SharedMediaRow>()
@@ -229,22 +285,14 @@ private fun buildTiles(
     for (message in messages) {
         val record = message.record
         val mine = MessageProjector.isMine(record, myAccountId)
-        val references =
-            message.projected?.media
-                ?: MediaReferenceSupport.parseAllImetaTags(
-                    tags = record.tags,
-                    sourceEpoch = record.sourceEpoch ?: 0uL,
-                )
+        val references = message.mediaReferences()
         references.forEachIndexed { index, reference ->
             when {
-                MediaReferenceSupport.isImageMedia(reference) ->
-                    images.add(
-                        SharedMediaTile(record.messageIdHex, index, reference, mine, record.recordedAt, record.sender, isVideo = false),
-                    )
-                MediaReferenceSupport.isVideoMedia(reference) ->
-                    videos.add(
-                        SharedMediaTile(record.messageIdHex, index, reference, mine, record.recordedAt, record.sender, isVideo = true),
-                    )
+                MediaReferenceSupport.isImageMedia(reference) || MediaReferenceSupport.isVideoMedia(reference) -> {
+                    val tile = message.toSharedMediaTile(index, reference, mine)
+                    visuals.add(tile)
+                    if (tile.isVideo) videos.add(tile) else images.add(tile)
+                }
                 MediaReferenceSupport.isAudioMedia(reference) ->
                     voice.add(
                         SharedMediaRow(record.messageIdHex, index, reference, mine, record.recordedAt, record.sender),
@@ -257,6 +305,7 @@ private fun buildTiles(
         }
     }
     // Newest first for the grids and the vertical lists.
+    visuals.reverse()
     images.reverse()
     videos.reverse()
     voice.reverse()
@@ -268,6 +317,7 @@ private fun buildTiles(
     // count toward `hasOther` — otherwise a links-only conversation would show
     // the "View shared media" entry into a library with every tab empty.
     return SharedMediaTiles(
+        visuals = visuals,
         images = images,
         videos = videos,
         voice = voice,
@@ -281,6 +331,27 @@ private fun buildTiles(
         hasOther = voice.isNotEmpty() || files.isNotEmpty() || urls.isNotEmpty(),
     )
 }
+
+private fun TimelineMessage.mediaReferences(): List<MediaAttachmentReferenceFfi> =
+    projected?.media
+        ?: MediaReferenceSupport.parseAllImetaTags(
+            tags = record.tags,
+            sourceEpoch = record.sourceEpoch ?: 0uL,
+        )
+
+private fun TimelineMessage.toSharedMediaTile(
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+) = SharedMediaTile(
+    record.messageIdHex,
+    attachmentIndex,
+    reference,
+    mine,
+    record.recordedAt,
+    record.sender,
+    isVideo = MediaReferenceSupport.isVideoMedia(reference),
+)
 
 // Month bucketing keyed off the local-time calendar so the separators match
 // what the user sees on each message. `recordedAt` is epoch SECONDS.
@@ -472,7 +543,7 @@ internal fun SharedMediaSection(
 // Project resolved image/video tiles onto the per-page descriptors the
 // full-screen viewer pages over. Order is preserved (the tiles are already
 // newest-first), so the gallery swipes newest → oldest matching the grid.
-private fun List<SharedMediaTile>.toViewerPages(): List<MediaViewerPage> =
+internal fun List<SharedMediaTile>.toViewerPages(): List<MediaViewerPage> =
     map { MediaViewerPage(it.messageIdHex, it.attachmentIndex, it.reference, it.mine, it.sender, it.recordedAt) }
 
 private enum class MediaTab(
