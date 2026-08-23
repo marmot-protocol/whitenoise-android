@@ -95,7 +95,8 @@ class TtsEstimatedTimingLaneTest {
             runCurrent()
             assertEquals(
                 listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
-                harness.controller.state.value.passage?.visibleWord,
+                harness.controller.state.value.passage
+                    ?.visibleWord,
             )
         }
 
