@@ -9,9 +9,12 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -65,12 +68,37 @@ class ProfileSheetEntryPointTest {
         assertEquals(listOf(PROFILE_FOLLOW_ACTION_TAG, PROFILE_MESSAGE_ACTION_TAG), ordered)
     }
 
+    @Test
+    fun unavailableCallActionsDoNotOccupyThePrimaryActionRow() {
+        renderProfile { it.presentProfile(TARGET_NPROFILE) }
+
+        composeRule.onNodeWithText(app.getString(R.string.quick_action_audio)).assertDoesNotExist()
+        composeRule.onNodeWithText(app.getString(R.string.quick_action_video)).assertDoesNotExist()
+        composeRule.onNodeWithText(app.getString(R.string.profile_follow)).assertExists()
+        composeRule.onNodeWithText(app.getString(R.string.message)).assertExists()
+    }
+
+    @Test
+    fun ownProfileDoesNotOfferContactActions() {
+        renderProfile { it.presentProfile(SELF_NPROFILE) }
+
+        composeRule.onNodeWithTag(PROFILE_QUICK_ACTIONS_TAG).assertDoesNotExist()
+        composeRule.onNodeWithText(app.getString(R.string.message)).assertDoesNotExist()
+        composeRule.onNodeWithText(app.getString(R.string.profile_follow)).assertDoesNotExist()
+    }
+
     private fun renderProfile(present: (WhiteNoiseAppState) -> Unit): WhiteNoiseAppState {
         val appState =
             WhiteNoiseAppState(
                 context = app,
                 draftStore = DraftStore(EmptyDraftPersistence()),
-                accountIdHexResolver = { reference -> reference.takeIf { it == TARGET_NPROFILE }?.let { TARGET_HEX } },
+                accountIdHexResolver = { reference ->
+                    when (reference) {
+                        TARGET_NPROFILE -> TARGET_HEX
+                        SELF_NPROFILE -> ACTIVE_ACCOUNT_HEX
+                        else -> null
+                    }
+                },
                 accounts = listOf(activeAccount()),
                 activeAccountRef = ACTIVE_ACCOUNT_REF,
             )
@@ -121,6 +149,7 @@ class ProfileSheetEntryPointTest {
         const val TARGET_HEX =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         const val TARGET_NPROFILE = "nprofile-test-alice"
+        const val SELF_NPROFILE = "nprofile-test-self"
         const val OWNER_SURFACE = "Chat list shell"
     }
 }

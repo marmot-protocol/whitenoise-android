@@ -53,6 +53,16 @@ class GroupDetailsEditNavigationTest {
     }
 
     @Test
+    fun unavailableCallActionsDoNotOccupyThePrimaryActionRow() {
+        render(controller(group()), onOpenSearch = {})
+
+        composeRule.onNodeWithText(context.getString(R.string.quick_action_audio)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.quick_action_video)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.quick_action_add)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.quick_action_search)).assertIsDisplayed()
+    }
+
+    @Test
     fun overflowEditAndAddDescriptionOpenTheSameEditor() {
         render(controller(group()))
 
@@ -117,7 +127,10 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithText(context.getString(R.string.group_name)).assertDoesNotExist()
     }
 
-    private fun render(testController: TestController) {
+    private fun render(
+        testController: TestController,
+        onOpenSearch: (() -> Unit)? = null,
+    ) {
         composeRule.setContent {
             WhiteNoiseTheme {
                 GroupDetailsScreen(
@@ -125,6 +138,7 @@ class GroupDetailsEditNavigationTest {
                     controller = testController.controller,
                     onBack = {},
                     onLeft = {},
+                    onOpenSearch = onOpenSearch,
                 )
             }
         }

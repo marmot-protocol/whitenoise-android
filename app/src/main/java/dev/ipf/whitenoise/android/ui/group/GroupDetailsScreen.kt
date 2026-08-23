@@ -32,7 +32,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.WrapText
 import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -49,7 +48,6 @@ import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -949,41 +947,29 @@ internal fun GroupDetailsScreen(
                 descriptionCopyValue = dmPeerNpub.takeIf { isDm },
             )
 
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Dimens.spaceLg),
-                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
-            ) {
-                QuickActionButton(
-                    icon = Icons.Default.Call,
-                    label = stringResource(R.string.quick_action_audio),
-                    onClick = {},
-                    enabled = false,
-                    modifier = Modifier.weight(1f),
-                )
-                QuickActionButton(
-                    icon = Icons.Default.Videocam,
-                    label = stringResource(R.string.quick_action_video),
-                    onClick = {},
-                    enabled = false,
-                    modifier = Modifier.weight(1f),
-                )
-                GroupDetailsAddMemberAction(
-                    visible = !isDm && canEdit,
-                    rosterState = controller.memberRosterState,
-                    mutationsBlocked = mutationsBlocked,
-                    onClick = { showAddMember = true },
-                    modifier = Modifier.weight(1f),
-                )
-                if (onOpenSearch != null) {
-                    QuickActionButton(
-                        icon = Icons.Default.Search,
-                        label = stringResource(R.string.quick_action_search),
-                        onClick = onOpenSearch,
+            if ((!isDm && canEdit) || onOpenSearch != null) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Dimens.spaceLg),
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+                ) {
+                    GroupDetailsAddMemberAction(
+                        visible = !isDm && canEdit,
+                        rosterState = controller.memberRosterState,
+                        mutationsBlocked = mutationsBlocked,
+                        onClick = { showAddMember = true },
                         modifier = Modifier.weight(1f),
                     )
+                    if (onOpenSearch != null) {
+                        QuickActionButton(
+                            icon = Icons.Default.Search,
+                            label = stringResource(R.string.quick_action_search),
+                            onClick = onOpenSearch,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
 
