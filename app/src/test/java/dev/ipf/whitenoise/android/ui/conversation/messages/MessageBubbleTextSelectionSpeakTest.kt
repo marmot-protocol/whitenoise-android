@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -54,6 +55,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -143,12 +145,7 @@ class MessageBubbleTextSelectionSpeakTest {
         waitForTts(engine)
 
         assertFalse(actionMenuOpen)
-        assertTrue(
-            engine.spoken
-                .first()
-                .text
-                .endsWith("Second sentence."),
-        )
+        assertEquals("Second sentence.", engine.spoken.first().text)
     }
 
     @Test
@@ -379,11 +376,7 @@ class MessageBubbleTextSelectionSpeakTest {
     private fun doubleTapOnMessageText(substring: String) {
         val pressOnHost = messageTextPositionOnHost(substring)
         composeRule.onNodeWithTag(MESSAGE_HOST_TAG).performTouchInput {
-            down(pressOnHost)
-            up()
-            advanceEventTime(viewConfiguration.doubleTapMinTimeMillis + 10)
-            down(pressOnHost)
-            up()
+            doubleClick(pressOnHost)
         }
     }
 
