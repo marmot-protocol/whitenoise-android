@@ -118,16 +118,34 @@ internal fun shouldCancelQueuedAutomaticWork(
 
 internal class AttachmentReferenceNotReadyException : IllegalStateException("attachment reference is not projected yet")
 
+internal typealias PerformDurableAttachmentDownload = suspend (
+    WhiteNoiseApplication,
+    AttachmentTransferRequest,
+    AttachmentDownloadPriority,
+) -> Boolean
+
 /**
  * Durable safety net for document downloads. Foreground UI callers still join
  * the same app-level in-flight Deferred for immediate response; this worker
  * makes the intent survive process death and verifies that the result reached
  * the encrypted disk cache before declaring success.
  */
-class AttachmentDownloadWorker(
-    appContext: Context,
-    params: WorkerParameters,
-) : CoroutineWorker(appContext, params) {
+class AttachmentDownloadWorker : CoroutineWorker {
+    private val performDownloadOverride: PerformDurableAttachmentDownload?
+
+    constructor(
+        appContext: Context,
+        params: WorkerParameters,
+    ) : this(appContext, params, null)
+
+    internal constructor(
+        appContext: Context,
+        params: WorkerParameters,
+        performDownloadOverride: PerformDurableAttachmentDownload?,
+    ) : super(appContext, params) {
+        this.performDownloadOverride = performDownloadOverride
+    }
+
     override suspend fun doWork(): Result {
         val request = AttachmentDownloadWorkData.decode(inputData)
         val application = applicationContext as? WhiteNoiseApplication
@@ -154,10 +172,7 @@ class AttachmentDownloadWorker(
         intentStore: AttachmentDownloadIntentStore,
     ): Result =
         try {
-            withContext(Dispatchers.Main.immediate) {
-                application.appState.ensureNotificationRuntimeStarted()
-            }
-            if (!application.appState.downloadAttachmentForDurableWork(request, priority)) {
+            if (!durableDownload(application, request, priority)) {
                 throw java.io.IOException("attachment did not reach encrypted cache")
             }
             intentStore.setInteractive(request, interactive = false)
@@ -182,6 +197,21 @@ class AttachmentDownloadWorker(
                 Result.failure()
             }
         }
+
+    private suspend fun durableDownload(
+        application: WhiteNoiseApplication,
+        request: AttachmentTransferRequest,
+        priority: AttachmentDownloadPriority,
+    ): Boolean {
+        val override = performDownloadOverride
+        if (override != null) {
+            return override(application, request, priority)
+        }
+        withContext(Dispatchers.Main.immediate) {
+            application.appState.ensureNotificationRuntimeStarted()
+        }
+        return application.appState.downloadAttachmentForDurableWork(request, priority)
+    }
 
     companion object {
         internal const val MAX_RETRY_ATTEMPTS = 1
