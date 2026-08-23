@@ -25,7 +25,7 @@ class NotificationGroupSystemTextCoverageTest {
 
     @Test
     fun postingNotificationKeepsConversationTitleForNonRenameSystemRows() {
-        val body = appStateFunctionBody("postNotificationUpdate")
+        val body = appStateFunctionBody("enrichPostedNotificationUpdate")
 
         assertTrue(
             "non-rename system rows should override body text without replacing the conversation title",

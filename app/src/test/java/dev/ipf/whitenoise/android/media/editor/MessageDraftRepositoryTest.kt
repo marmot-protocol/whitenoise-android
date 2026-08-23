@@ -12,11 +12,13 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("LargeClass") // One fixture exercises the repository's serialized mutation and generation race matrix.
 class MessageDraftRepositoryTest {
     @Test
     fun coalescedWriterPersistsOnlyLatestTextFromKeystrokeBurst() =
@@ -87,6 +89,77 @@ class MessageDraftRepositoryTest {
             writer.flush()
 
             assertEquals(MessageDraftConditionalDeleteResult.Superseded, result)
+            assertEquals("next draft", gateway.current?.content)
+        }
+
+    @Test
+    fun successfulSendCleanupInvalidatesAuthoritativeHydrationAlreadyInFlight() =
+        runTest {
+            val gateway = FakeDraftGateway(draft(content = "sent"))
+            val writer = writer(gateway)
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+            var cleanupGeneration: MessageDraftGeneration? = null
+            gateway.onRead = {
+                cleanupGeneration =
+                    writer.beginSuccessfulSendCleanup(
+                        accountRef = ACCOUNT,
+                        groupIdHex = GROUP,
+                        sentGeneration = sentGeneration,
+                    )
+            }
+
+            val staleHydration = writer.loadIfCurrent(ACCOUNT, GROUP, sentGeneration)
+            val deletion =
+                writer.deleteIfCurrent(
+                    accountRef = ACCOUNT,
+                    groupIdHex = GROUP,
+                    generation = requireNotNull(cleanupGeneration),
+                )
+
+            assertNull("a read captured before acceptance must not resurrect sent text", staleHydration)
+            assertTrue(deletion is MessageDraftConditionalDeleteResult.Applied)
+            assertNull(gateway.current)
+        }
+
+    @Test
+    fun successfulSendCleanupPreventsTheSentGenerationFromCommittingAProjection() =
+        runTest {
+            val writer = writer(FakeDraftGateway(draft(content = "sent")))
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+            val cleanupGeneration =
+                requireNotNull(writer.beginSuccessfulSendCleanup(ACCOUNT, GROUP, sentGeneration))
+            var staleProjectionCommitted = false
+            var cleanupProjectionCommitted = false
+
+            val staleWasCurrent =
+                writer.runIfCurrent(ACCOUNT, GROUP, sentGeneration) {
+                    staleProjectionCommitted = true
+                }
+            val cleanupWasCurrent =
+                writer.runIfCurrent(ACCOUNT, GROUP, cleanupGeneration) {
+                    cleanupProjectionCommitted = true
+                }
+
+            assertFalse(staleWasCurrent)
+            assertFalse(staleProjectionCommitted)
+            assertTrue(cleanupWasCurrent)
+            assertTrue(cleanupProjectionCommitted)
+        }
+
+    @Test
+    fun newerDraftSupersedesClaimedSuccessfulSendCleanup() =
+        runTest {
+            val gateway = FakeDraftGateway(draft(content = "sent"))
+            val writer = writer(gateway)
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+            val cleanupGeneration =
+                requireNotNull(writer.beginSuccessfulSendCleanup(ACCOUNT, GROUP, sentGeneration))
+
+            writer.submit(ACCOUNT, GROUP, "next draft")
+            val deletion = writer.deleteIfCurrent(ACCOUNT, GROUP, cleanupGeneration)
+            writer.flush()
+
+            assertEquals(MessageDraftConditionalDeleteResult.Superseded, deletion)
             assertEquals("next draft", gateway.current?.content)
         }
 

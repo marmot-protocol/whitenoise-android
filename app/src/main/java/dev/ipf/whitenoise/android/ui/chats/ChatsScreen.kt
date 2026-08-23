@@ -817,6 +817,11 @@ internal fun ChatsScreen(
             isActiveList = !showArchived,
             scrollCorrectionInProgress = headScrollCorrectionInProgress,
         )
+    val rowPlacementInProgress =
+        rememberChatListRowPlacementGate(
+            orderedRowIds = orderedVisibleChatIds,
+            pinnedBoundaryIndex = pinnedBoundary,
+        )
     val archivedUnreadCount =
         remember(controller.archivedItems) {
             controller.archivedItems.count { it.hasUnread }
@@ -1233,7 +1238,7 @@ internal fun ChatsScreen(
                                             accountRef = controller.boundAccountRef,
                                             isMuted =
                                                 item.engineMuted(),
-                                            interactionsEnabled = !headReorderInProgress,
+                                            interactionsEnabled = !headReorderInProgress && !rowPlacementInProgress,
                                             selectionMode = selectionMode,
                                             selected = item.id in selectedChatIds,
                                             bodyMatch = bodyMatch,

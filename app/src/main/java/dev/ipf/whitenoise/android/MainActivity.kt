@@ -70,7 +70,7 @@ class MainActivity : AppCompatActivity() {
         // Apply the pre-Compose theme here, not in attachBaseContext: the window
         // doesn't exist that early, so Activity.setTheme() NPEs on getWindow().
         // onCreate (before super) still runs before the first frame.
-        setTheme(preComposeThemeFor(readPersistedThemeMode(), initialSystemDarkTheme))
+        setTheme(preComposeThemeFor(firstFrameTheme(), initialSystemDarkTheme))
         super.onCreate(savedInstanceState)
         appState = (application as WhiteNoiseApplication).appState
         holdSplashThroughBootstrap(splashScreen, splashInstalledAtMs)
@@ -130,6 +130,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun firstFrameTheme(): AppThemeMode = RuntimePolicyHooks.allowThreadDiskReads(::readPersistedThemeMode)
 
     private fun handleNotificationTarget(
         handledTarget: NotificationTarget,

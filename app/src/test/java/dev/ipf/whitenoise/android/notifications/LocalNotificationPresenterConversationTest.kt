@@ -302,8 +302,8 @@ class LocalNotificationPresenterConversationTest {
         )
 
         assertUsefulInitialPost(posts)
-        assertTrue(shortcutWasPublishedBeforeFirstPost)
-        assertEquals(1, shortcutPublishCount)
+        assertFalse(shortcutWasPublishedBeforeFirstPost)
+        assertEquals(0, shortcutPublishCount)
 
         runBlocking { checkNotNull(pendingEnrichment).invoke() }
 
@@ -314,7 +314,7 @@ class LocalNotificationPresenterConversationTest {
         assertEquals(0, posts[1].third.defaults)
         assertNull(posts[1].third.sound)
         assertNotNull(publishedShortcut)
-        assertEquals(2, shortcutPublishCount)
+        assertEquals(1, shortcutPublishCount)
         val messages =
             checkNotNull(
                 NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posts[1].third),
@@ -325,7 +325,6 @@ class LocalNotificationPresenterConversationTest {
 
     private fun assertUsefulInitialPost(posts: List<Triple<String, Int, Notification>>) {
         assertEquals(1, posts.size)
-        assertNotNull(publishedShortcut)
         val notification = posts.single().third
         assertEquals(
             "hi",
@@ -969,6 +968,55 @@ class LocalNotificationPresenterConversationTest {
                 ?.messages
                 ?.map { it.text.toString() },
         )
+    }
+
+    @Test
+    fun silentEnrichmentReplacesCurrentMessageWithoutDuplicatingHistory() {
+        presenter.ensureChannels()
+        val incoming = update(isMention = false, messageIdHex = "same-message")
+
+        runBlocking {
+            presenter.show(
+                incoming,
+                shortNpub = { "npub1test" },
+            )
+            presenter.show(
+                incoming,
+                senderNameOverride = "Alice Enriched",
+                previewTextOverride = "enriched preview",
+                silentUpdate = true,
+                replaceCurrentMessage = true,
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        val notification = manager.activeNotifications.single().notification
+        assertEquals(
+            listOf("enriched preview"),
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(notification)
+                ?.messages
+                ?.map { it.text.toString() },
+        )
+        assertTrue(notification.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        assertTrue(presenter.isNotificationUpdateCurrentForEnrichment(incoming))
+    }
+
+    @Test
+    fun staleOrDismissedUpdateCannotBeginEnrichment() {
+        presenter.ensureChannels()
+        val older = update(isMention = false, messageIdHex = "older")
+        val newer = update(isMention = false, messageIdHex = "newer")
+
+        runBlocking {
+            presenter.show(older, shortNpub = { "npub1test" })
+            presenter.show(newer, shortNpub = { "npub1test" })
+        }
+
+        assertFalse(presenter.isNotificationUpdateCurrentForEnrichment(older))
+        assertTrue(presenter.isNotificationUpdateCurrentForEnrichment(newer))
+        manager.cancelAll()
+        assertFalse(presenter.isNotificationUpdateCurrentForEnrichment(newer))
     }
 
     @Test

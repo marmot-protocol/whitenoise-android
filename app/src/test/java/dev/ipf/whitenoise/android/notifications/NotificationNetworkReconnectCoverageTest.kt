@@ -203,10 +203,16 @@ class NotificationNetworkReconnectCoverageTest {
                 wipe.indexOf("prepareForDestructiveAccountWipe(wipedRef)") < wipe.lastIndexOf("} finally {") &&
                 wipe.lastIndexOf("networkNotificationRecoverySuppressed = false") > wipe.lastIndexOf("} finally {"),
         )
-        val post = appState.functionBody("postNotificationUpdate")
+        val post = appState.functionBody("enrichPostedNotificationUpdate")
+        val notificationGates =
+            appState
+                .substringAfter("private fun isNotificationGenerationPostAllowed")
+                .substringBefore("/**")
         assertTrue(
             "a wipe that starts during notification enrichment must block the final presenter write",
-            "!networkNotificationRecoverySuppressed" in post,
+            "isNotificationEnrichmentAllowed(update, postEpoch, engineMuted)" in post &&
+                "isNotificationGenerationPostAllowed(" in notificationGates &&
+                "!networkNotificationRecoverySuppressed" in notificationGates,
         )
     }
 

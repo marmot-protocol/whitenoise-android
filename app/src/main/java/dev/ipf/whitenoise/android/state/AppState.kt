@@ -61,6 +61,7 @@ import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.RuntimePolicyHooks
 import dev.ipf.whitenoise.android.amber.AmberSignerController
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
@@ -1096,12 +1097,14 @@ private data class PreWarmedNotificationAvatars(
     val groupAvatarUrl: String?,
 )
 
-/** Keeps cold-wake avatar work ahead of the first notification post. */
-internal suspend fun <T> postAfterNotificationAvatarPreWarm(
-    preWarm: suspend () -> T,
-    post: suspend (T) -> Unit,
-) {
-    post(preWarm())
+/** Posts the privacy-correct fallback card before scheduling optional enrichment. */
+internal suspend fun postBeforeNotificationEnrichment(
+    post: suspend () -> Boolean,
+    scheduleEnrichment: () -> Unit,
+): Boolean {
+    val posted = post()
+    if (posted) scheduleEnrichment()
+    return posted
 }
 
 enum class RelayListKind {
@@ -2577,6 +2580,7 @@ class WhiteNoiseAppState private constructor(
         )
     private val notificationScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    private val notificationEnrichmentGate = Semaphore(NOTIFICATION_ENRICHMENT_FANOUT)
     private var accountCatchUpJob: Job? = null
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
     private val accountSwitchHandoff = AccountSwitchLocalSnapshotHandoff()
@@ -2726,14 +2730,15 @@ class WhiteNoiseAppState private constructor(
             draftWriter
                 .loadIfCurrent(accountRef, groupIdHex, generation)
                 ?.onSuccess { draft ->
-                    if (!draftWriter.isCurrent(accountRef, groupIdHex, generation)) return@onSuccess
-                    draftStore.replaceFromAuthoritative(
-                        accountRef,
-                        groupIdHex,
-                        draft?.content,
-                        draft?.createdAtMs,
-                    )
-                    draftHydrationRevision += 1
+                    draftWriter.runIfCurrent(accountRef, groupIdHex, generation) {
+                        draftStore.replaceFromAuthoritative(
+                            accountRef,
+                            groupIdHex,
+                            draft?.content,
+                            draft?.createdAtMs,
+                        )
+                        draftHydrationRevision += 1
+                    }
                 }?.onFailure { appStateDebug(it) { "draft load failed group=${groupIdHex.take(8)}" } }
         }
     }
@@ -2754,15 +2759,24 @@ class WhiteNoiseAppState private constructor(
         val accountRef = pendingClear.accountRef
         val groupIdHex = pendingClear.groupIdHex
         val sentGeneration = pendingClear.generation
-        if (!draftWriter.isCurrent(accountRef, groupIdHex, sentGeneration)) return
-        draftStore.set(accountRef, groupIdHex, TextFieldValue(""))
+        val cleanupGeneration =
+            draftWriter.beginSuccessfulSendCleanup(accountRef, groupIdHex, sentGeneration) {
+                // Generation ownership and lifecycle projection clear are one
+                // atomic writer action, so a concurrent accepted mutation
+                // cannot be cleared after it becomes current.
+                draftStore.set(accountRef, groupIdHex, TextFieldValue(""))
+            }
+                ?: return
+        // Generation ownership is advanced first. Clearing the lifecycle
+        // projection afterward is therefore one-way: a read captured before
+        // durable acceptance can no longer rehydrate this sent text (#2225).
         mutationsScope.launch {
-            when (val deletion = draftWriter.deleteIfCurrent(accountRef, groupIdHex, sentGeneration)) {
+            when (val deletion = draftWriter.deleteIfCurrent(accountRef, groupIdHex, cleanupGeneration)) {
                 is MessageDraftConditionalDeleteResult.Applied -> {
                     when (val result = deletion.result) {
                         is MessageDraftMutationResult.Success -> {
-                            if (draftWriter.isCurrent(accountRef, groupIdHex, sentGeneration)) {
-                                draftStore.applyAuthoritativeTimestamp(accountRef, groupIdHex, null)
+                            draftWriter.runIfCurrent(accountRef, groupIdHex, cleanupGeneration) {
+                                draftStore.replaceFromAuthoritative(accountRef, groupIdHex, null, null)
                             }
                         }
                         is MessageDraftMutationResult.Failure ->
@@ -2813,6 +2827,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     fun marmot(): MarmotInterface {
+        RuntimePolicyHooks.noteSlowCall("marmot-ffi-access")
         marmotAccessObserver?.invoke()
         return requireNotNull(marmotRuntime) { "Marmot is not initialized" }.marmot
     }
@@ -9368,10 +9383,35 @@ class WhiteNoiseAppState private constructor(
             engineMuted = engineMuted,
         )
 
+    private fun isNotificationGenerationPostAllowed(
+        update: NotificationUpdateFfi,
+        postEpoch: Long,
+        engineMuted: Boolean,
+        requireUnlocked: Boolean,
+    ): Boolean {
+        val lockAllowsPost = !requireUnlocked || !appLockScreenVisible
+        val runtimeAllowsPost =
+            !networkNotificationRecoverySuppressed && notificationPostEpoch.isCurrent(postEpoch)
+        return lockAllowsPost && runtimeAllowsPost && shouldPostNotification(update, engineMuted)
+    }
+
+    private fun isNotificationEnrichmentAllowed(
+        update: NotificationUpdateFfi,
+        postEpoch: Long,
+        engineMuted: Boolean,
+    ): Boolean =
+        isNotificationGenerationPostAllowed(
+            update = update,
+            postEpoch = postEpoch,
+            engineMuted = engineMuted,
+            requireUnlocked = true,
+        ) &&
+            localNotificationPresenter.isNotificationUpdateCurrentForEnrichment(update)
+
     /**
      * Durable engine mute for the update's conversation, resolved once per
-     * update in [processNotificationUpdate] and threaded through pre-warm,
-     * the post decision, and the presenter's sync post-time re-check (which
+     * update in [processNotificationUpdate] and threaded through the initial
+     * post, optional enrichment, and the presenter's sync post-time re-check (which
      * cannot suspend). Prefers the active account's loaded projection;
      * otherwise reads the engine's notification settings directly, which also covers the
      * cold FCM process with no UI-owned controllers. Fail-open on errors: a
@@ -9393,13 +9433,11 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Starts sender and conversation image work as soon as the app-state
-     * notification subscription receives an ingested update. This path exists in
-     * a cold FCM process with no UI-owned [ChatsController], and it waits only for
-     * local projections — remote image work remains detached and bounded.
-     * Returns already-resolved URLs so the eventual post does not repeat FFI
-     * reads. Every remote-image launch re-checks the app lock after the preceding
-     * suspending local lookup.
+     * Resolves sender and conversation images only after the fallback card has
+     * posted. This path also exists in a cold FCM process with no UI-owned
+     * [ChatsController]; remote work remains detached and globally bounded.
+     * Every remote-image launch re-checks the app lock after the preceding
+     * suspending local lookup (#1995).
      */
     private suspend fun preWarmNotificationAvatars(
         update: NotificationUpdateFfi,
@@ -9472,125 +9510,167 @@ class WhiteNoiseAppState private constructor(
             soleMemberTitle = appContext.getString(R.string.just_you),
         )
 
-    private suspend fun postNotificationUpdate(
+    private suspend fun notificationEnrichedMediaKind(
+        update: NotificationUpdateFfi,
+        systemText: NotificationSystemText?,
+        previewTextOverride: String?,
+    ): ReplyMediaKind =
+        if (
+            systemText == null &&
+            LocalNotificationFormatter.needsPreviewTextResolution(update) &&
+            previewTextOverride.isNullOrBlank()
+        ) {
+            // A message with no resolvable text can be a captionless
+            // attachment; classify just those with one history read.
+            notificationMediaKind(update)
+        } else {
+            ReplyMediaKind.None
+        }
+
+    private suspend fun enrichPostedNotificationUpdate(
         update: NotificationUpdateFfi,
         preWarmedAvatars: PreWarmedNotificationAvatars,
         postEpoch: Long,
         engineMuted: Boolean,
-    ) {
-        val activeConversation = activeConversationGroupIdHex
+    ): Boolean {
+        if (!isNotificationEnrichmentAllowed(update, postEpoch, engineMuted)) return false
+        val senderNameOverride = notificationSenderName(update)
+        val systemText = notificationGroupSystemText(update, senderNameOverride)
+        val previewTextOverride =
+            systemText?.body ?: if (LocalNotificationFormatter.needsPreviewTextResolution(update)) {
+                notificationPreviewText(update.previewText)
+            } else {
+                null
+            }
+        val reactedToPreviewOverride =
+            if (LocalNotificationFormatter.needsReactedToPreviewResolution(update)) {
+                notificationPreviewText(update.reactedToPreview)
+            } else {
+                null
+            }
+        val mediaKind = notificationEnrichedMediaKind(update, systemText, previewTextOverride)
+        val senderAvatarUrl =
+            preWarmedAvatars.senderAvatarUrl
+                ?: bestEffortNotificationAvatarLookup { notificationSenderAvatarUrl(update) }
+        val conversationTitle = systemText?.title ?: notificationConversationTitle(update)
+        val conversationAvatarUrl =
+            notificationConversationAvatarUrl(update, senderAvatarUrl, preWarmedAvatars.groupAvatarUrl)
+        // A lock can arrive during any suspending enrichment above. Re-check
+        // after all app-state lookups so a silent update never reveals content.
+        return isNotificationEnrichmentAllowed(update, postEpoch, engineMuted) &&
+            localNotificationPresenter.show(
+                update,
+                conversationTitle,
+                senderNameOverride,
+                previewTextOverride,
+                reactedToPreviewOverride,
+                mediaKind,
+                recipientAccountSubtext =
+                    LocalNotificationFormatter.recipientAccountSubtext(
+                        signedInAccountCount = accounts.count { it.isSignedInSigningAccount() },
+                        recipientLabel = notificationRecipientName(update.accountRef),
+                    ),
+                directShareEligible = update.accountRef == activeAccountRef,
+                conversationAvatarUrl = conversationAvatarUrl,
+                senderAvatarUrl = senderAvatarUrl,
+                silentUpdate = true,
+                replaceCurrentMessage = true,
+                shortNpub = ::shortNpub,
+                isPostStillAllowed = {
+                    isNotificationEnrichmentAllowed(update, postEpoch, engineMuted)
+                },
+            )
+    }
+
+    private suspend fun postInitialNotificationUpdate(
+        update: NotificationUpdateFfi,
+        postEpoch: Long,
+        engineMuted: Boolean,
+    ): Boolean {
         val shouldPost = shouldPostNotification(update, engineMuted)
         appStateDebug {
-            "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +
-                "foreground=$appInForeground active=${activeConversation?.take(8) ?: "<none>"} " +
-                "activeAccount=${activeConversationAccountRef?.take(8) ?: "<none>"} " +
-                "updateAccount=${update.accountRef.take(8)} appLock=$appLockScreenVisible " +
-                "engineMuted=$engineMuted post=$shouldPost"
+            "notification eligibility outcome=${if (shouldPost) "post" else "skip"} " +
+                "trigger=${update.trigger} app_lock=$appLockScreenVisible engine_muted=$engineMuted"
         }
-        if (shouldPost) {
-            val skipEnrichmentForLock = appLockScreenVisible
-            val senderNameOverride = if (skipEnrichmentForLock) null else notificationSenderName(update)
-            val systemText = if (skipEnrichmentForLock) null else notificationGroupSystemText(update, senderNameOverride)
-            val previewTextOverride =
-                systemText?.body ?: if (!skipEnrichmentForLock && LocalNotificationFormatter.needsPreviewTextResolution(update)) {
-                    notificationPreviewText(update.previewText)
-                } else {
-                    null
-                }
-            val reactedToPreviewOverride =
-                if (!skipEnrichmentForLock && LocalNotificationFormatter.needsReactedToPreviewResolution(update)) {
-                    notificationPreviewText(update.reactedToPreview)
-                } else {
-                    null
-                }
-            // Only a message with no resolvable text preview can be a captionless
-            // attachment, so classify just those (a single history read) to name
-            // the media type in the body. Text messages never reach the fetch.
-            val mediaKind =
-                if (!skipEnrichmentForLock &&
-                    systemText == null &&
-                    LocalNotificationFormatter.needsPreviewTextResolution(update) &&
-                    previewTextOverride.isNullOrBlank()
-                ) {
-                    notificationMediaKind(update)
-                } else {
-                    ReplyMediaKind.None
-                }
-            val senderAvatarUrl =
-                if (skipEnrichmentForLock || appLockScreenVisible) {
-                    null
-                } else {
-                    preWarmedAvatars.senderAvatarUrl
-                        ?: bestEffortNotificationAvatarLookup { notificationSenderAvatarUrl(update) }
-                }
-            val conversationTitle =
-                if (skipEnrichmentForLock || appLockScreenVisible) {
-                    null
-                } else {
-                    systemText?.title ?: notificationConversationTitle(update)
-                }
-            val conversationAvatarUrl =
-                if (skipEnrichmentForLock || appLockScreenVisible) {
-                    null
-                } else {
-                    notificationConversationAvatarUrl(update, senderAvatarUrl, preWarmedAvatars.groupAvatarUrl)
-                }
-            // A lock can arrive during any suspending enrichment above. Re-check
-            // after all app-state lookups; if enrichment was skipped while locked,
-            // keep the post redacted even if the app has since unlocked.
-            val redactNotificationContent = skipEnrichmentForLock || appLockScreenVisible
-            val posted =
+        if (!shouldPost) return false
+
+        val redactContent = appLockScreenVisible
+
+        var posted =
+            localNotificationPresenter.show(
+                update = update,
+                redactContent = redactContent,
+                directShareEligible = !redactContent && update.accountRef == activeAccountRef,
+                shortNpub = ::shortNpub,
+                isPostStillAllowed = {
+                    isNotificationGenerationPostAllowed(
+                        update = update,
+                        postEpoch = postEpoch,
+                        engineMuted = engineMuted,
+                        requireUnlocked = !redactContent,
+                    )
+                },
+            )
+        var postedRedacted = redactContent
+        // Lock activation can race the suspending presenter setup. Retry only
+        // as a redacted card, under the same generation and eligibility gates.
+        if (!posted && !redactContent && appLockScreenVisible) {
+            postedRedacted = true
+            posted =
                 localNotificationPresenter.show(
-                    update,
-                    if (redactNotificationContent) null else conversationTitle,
-                    if (redactNotificationContent) null else senderNameOverride,
-                    if (redactNotificationContent) null else previewTextOverride,
-                    if (redactNotificationContent) null else reactedToPreviewOverride,
-                    if (redactNotificationContent) ReplyMediaKind.None else mediaKind,
-                    recipientAccountSubtext =
-                        if (redactNotificationContent) {
-                            null
-                        } else {
-                            LocalNotificationFormatter.recipientAccountSubtext(
-                                signedInAccountCount = accounts.count { it.isSignedInSigningAccount() },
-                                recipientLabel = notificationRecipientName(update.accountRef),
-                            )
-                        },
-                    redactContent = redactNotificationContent,
-                    directShareEligible = !redactNotificationContent && update.accountRef == activeAccountRef,
-                    conversationAvatarUrl = if (redactNotificationContent) null else conversationAvatarUrl,
-                    senderAvatarUrl = if (redactNotificationContent) null else senderAvatarUrl,
+                    update = update,
+                    redactContent = true,
                     shortNpub = ::shortNpub,
                     isPostStillAllowed = {
-                        !networkNotificationRecoverySuppressed &&
-                            notificationPostEpoch.isCurrent(postEpoch) &&
-                            shouldPostNotification(update, engineMuted)
+                        isNotificationGenerationPostAllowed(
+                            update = update,
+                            postEpoch = postEpoch,
+                            engineMuted = engineMuted,
+                            requireUnlocked = false,
+                        )
                     },
                 )
-            postedGroupInviteIdentity(
-                update = update,
-                posted = posted,
-                redactContent = redactNotificationContent,
-                displayedName = senderNameOverride ?: notificationDisplayNameHint(update.sender.displayName),
-            )?.let { identity ->
-                inviteNotificationIdentityRefreshStore.rememberPosted(
-                    update = identity.update,
-                    displayedName = identity.displayedName,
-                )
-                synchronized(profilePresentationLock) {
-                    profilePresentations[update.sender.accountIdHex]
-                }?.let { presentation ->
-                    scheduleInviteNotificationIdentityRefresh(update.sender.accountIdHex, presentation)
+        }
+        postedGroupInviteIdentity(
+            update = update,
+            posted = posted,
+            redactContent = postedRedacted,
+            displayedName = notificationDisplayNameHint(update.sender.displayName),
+        )?.let { identity ->
+            inviteNotificationIdentityRefreshStore.rememberPosted(
+                update = identity.update,
+                displayedName = identity.displayedName,
+            )
+        }
+        return posted
+    }
+
+    private fun scheduleNotificationEnrichment(
+        update: NotificationUpdateFfi,
+        postEpoch: Long,
+        engineMuted: Boolean,
+        receivedAtElapsedMs: Long,
+    ) {
+        notificationScope.launch(notificationDispatcher) {
+            notificationEnrichmentGate.withPermit {
+                if (!isNotificationEnrichmentAllowed(update, postEpoch, engineMuted)) {
+                    return@withPermit
+                }
+                val avatars = preWarmNotificationAvatars(update, engineMuted)
+                val enriched = enrichPostedNotificationUpdate(update, avatars, postEpoch, engineMuted)
+                appStateDebug {
+                    "notification timing stage=enrichment-complete " +
+                        "elapsed_ms=${(SystemClock.elapsedRealtime() - receivedAtElapsedMs).coerceAtLeast(0L)} " +
+                        "outcome=${if (enriched) "posted" else "stale"}"
                 }
             }
         }
-        // Coalesce the unread refresh across a burst instead of paying the
-        // chat-list + per-group roster cost once per update. The scheduler
-        // drains pending accounts off the subscription loop, so the loop stays
-        // free to process the next update (#729).
-        if (networkNotificationRecoverySuppressed) return
-        unreadRefreshScheduler.schedule(update.accountRef)
-        signalNotificationDrain()
+    }
+
+    private fun scheduleIncomingDocumentDownloadMaintenance(update: NotificationUpdateFfi) {
+        notificationScope.launch(notificationDispatcher) {
+            scheduleIncomingDocumentDownloads(update)
+        }
     }
 
     private fun signalNotificationDrain() {
@@ -9649,17 +9729,41 @@ class WhiteNoiseAppState private constructor(
     }
 
     private suspend fun processNotificationUpdate(update: NotificationUpdateFfi) {
+        val receivedAtElapsedMs = SystemClock.elapsedRealtime()
+        appStateDebug { "notification timing stage=subscription-received elapsed_ms=0 outcome=observed" }
         applyNotificationDisplayNameHint(update)
-        scheduleIncomingDocumentDownloads(update)
+        scheduleIncomingDocumentDownloadMaintenance(update)
         val postEpoch = notificationPostEpoch.capture()
-        // One durable-mute read per update: pre-warm, the post decision, and
-        // the presenter's post-time re-check all reuse it, so a burst costs
-        // one engine chat-list read per notification, not one per stage.
+        // One durable-mute read per update: the initial post, enrichment, and
+        // each synchronous post-time re-check reuse it.
         val engineMuted = engineNotificationMuted(update)
-        postAfterNotificationAvatarPreWarm(
-            preWarm = { preWarmNotificationAvatars(update, engineMuted) },
-            post = { avatars -> postNotificationUpdate(update, avatars, postEpoch, engineMuted) },
-        )
+        appStateDebug {
+            "notification timing stage=eligibility-complete " +
+                "elapsed_ms=${(SystemClock.elapsedRealtime() - receivedAtElapsedMs).coerceAtLeast(0L)} outcome=resolved"
+        }
+        val posted =
+            postBeforeNotificationEnrichment(
+                post = { postInitialNotificationUpdate(update, postEpoch, engineMuted) },
+                scheduleEnrichment = {
+                    scheduleNotificationEnrichment(update, postEpoch, engineMuted, receivedAtElapsedMs)
+                },
+            )
+        appStateDebug {
+            "notification timing stage=first-notify-returned " +
+                "elapsed_ms=${(SystemClock.elapsedRealtime() - receivedAtElapsedMs).coerceAtLeast(0L)} " +
+                "outcome=${if (posted) "posted" else "skipped"}"
+        }
+        schedulePostNotificationMaintenance(update)
+    }
+
+    private fun schedulePostNotificationMaintenance(update: NotificationUpdateFfi) {
+        // Coalesce the unread refresh across a burst instead of paying the
+        // chat-list + per-group roster cost once per update. The scheduler
+        // drains pending accounts off the subscription loop, so the loop stays
+        // free to process the next update (#729).
+        if (networkNotificationRecoverySuppressed) return
+        unreadRefreshScheduler.schedule(update.accountRef)
+        signalNotificationDrain()
     }
 
     private fun scheduleInviteNotificationIdentityRefresh(
@@ -10045,6 +10149,7 @@ class WhiteNoiseAppState private constructor(
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
         private const val PROFILE_PRESENTATION_WARM_FANOUT = 6
         private const val PROFILE_REFRESH_FANOUT = 6
+        private const val NOTIFICATION_ENRICHMENT_FANOUT = 4
 
         // Bulk account-unread refresh runs on cold start/account switch. Bound
         // both dimensions of the FFI fan-out: accounts and per-account rosters.

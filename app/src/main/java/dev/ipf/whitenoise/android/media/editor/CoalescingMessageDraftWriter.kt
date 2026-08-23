@@ -74,6 +74,36 @@ internal class CoalescingMessageDraftWriter(
         generation: MessageDraftGeneration,
     ): Boolean = drafts.coordinated.isCurrent(accountRef, groupIdHex, generation)
 
+    /**
+     * Claims successful-send cleanup as a new generation before Android clears
+     * its lifecycle projection. Any MDK hydration that started against the
+     * sent generation then fails its post-read currency check and cannot put
+     * the accepted text back into the composer or chat row (#2225).
+     */
+    fun beginSuccessfulSendCleanup(
+        accountRef: String,
+        groupIdHex: String,
+        sentGeneration: MessageDraftGeneration,
+        onClaimed: () -> Unit = {},
+    ): MessageDraftGeneration? =
+        synchronized(lock) {
+            drafts.coordinated
+                .acceptMutationIfCurrent(accountRef, groupIdHex, sentGeneration)
+                ?.also { onClaimed() }
+        }
+
+    fun runIfCurrent(
+        accountRef: String,
+        groupIdHex: String,
+        generation: MessageDraftGeneration,
+        block: () -> Unit,
+    ): Boolean =
+        synchronized(lock) {
+            if (!drafts.coordinated.isCurrent(accountRef, groupIdHex, generation)) return@synchronized false
+            block()
+            true
+        }
+
     suspend fun flush() {
         while (true) {
             val jobs = synchronized(lock) { pending.values.mapNotNull(Pending::job) }

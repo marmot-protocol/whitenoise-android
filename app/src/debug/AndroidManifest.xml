@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <application>
+    <application
+        android:name=".DebugWhiteNoiseApplication"
+        tools:replace="android:name">
         <service
             android:name=".notifications.NotificationTimingListenerService"
             android:exported="true"
@@ -11,5 +14,4 @@
             </intent-filter>
         </service>
     </application>
-
 </manifest>
