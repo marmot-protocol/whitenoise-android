@@ -69,6 +69,8 @@ class NotificationAccountIsolationNavigationTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val manager = context.getSystemService(NotificationManager::class.java)
+    private val notificationCardCancellationDispatcher =
+        Executors.newSingleThreadExecutor().asCoroutineDispatcher()
 
     @Before
     fun setUp() {
@@ -82,6 +84,7 @@ class NotificationAccountIsolationNavigationTest {
     fun tearDown() {
         manager.cancelAll()
         manager.deleteNotificationChannel(TEST_CHANNEL)
+        notificationCardCancellationDispatcher.close()
     }
 
     @Test
@@ -476,6 +479,7 @@ class NotificationAccountIsolationNavigationTest {
             accounts = listOf(account(SOURCE_ACCOUNT, SOURCE_ID), account(TARGET_ACCOUNT, TARGET_ID)),
             activeAccountRef = SOURCE_ACCOUNT,
             notificationDispatcher = notificationDispatcher,
+            notificationCardCancellationDispatcher = notificationCardCancellationDispatcher,
         ).also { state ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")

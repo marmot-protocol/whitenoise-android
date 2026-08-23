@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -259,7 +260,7 @@ class FullSpectrumColorPickerTest {
         composeRule
             .onNodeWithContentDescription(string(R.string.color_picker_hue))
             .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
-                assertTrue(setProgress(240f))
+                assertFalse(setProgress(240f))
             }
 
         composeRule.runOnIdle { assertEquals(0, latest and 0xFF) }
@@ -283,7 +284,7 @@ class FullSpectrumColorPickerTest {
         composeRule
             .onNodeWithContentDescription(string(R.string.color_picker_hue))
             .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
-                assertTrue(setProgress(240f))
+                assertFalse(setProgress(240f))
             }
 
         val hueRange =

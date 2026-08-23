@@ -81,12 +81,13 @@ internal fun FullSpectrumColorPicker(
         }
     }
 
-    fun updateHsv(updated: HsvColor) {
+    fun updateHsv(updated: HsvColor): Boolean {
         val updatedArgb = updated.toOpaqueArgb().blueFreeWhen(blueFree)
-        if (!isColorAccepted(updatedArgb)) return
+        if (!isColorAccepted(updatedArgb)) return false
         hsv = updated
         lastEmittedArgb = updatedArgb
         onColorChanged(updatedArgb)
+        return true
     }
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -157,7 +158,7 @@ private fun ColorChannel(
     gradientColors: List<Color>,
     keyboardStep: Float,
     indicatorColor: Color,
-    onValueChange: (Float) -> Unit,
+    onValueChange: (Float) -> Boolean,
 ) {
     val currentOnValueChange by rememberUpdatedState(onValueChange)
     val coercedValue = value.coerceIn(valueRange.start, valueRange.endInclusive)
@@ -185,8 +186,9 @@ private fun ColorChannel(
                                 Key.DirectionRight, Key.DirectionUp -> keyboardStep
                                 else -> return@onKeyEvent false
                             }
-                        currentOnValueChange((coercedValue + delta).coerceIn(valueRange.start, valueRange.endInclusive))
-                        true
+                        currentOnValueChange(
+                            (coercedValue + delta).coerceIn(valueRange.start, valueRange.endInclusive),
+                        )
                     }.focusable()
                     .semantics {
                         contentDescription = label
@@ -194,7 +196,6 @@ private fun ColorChannel(
                         progressBarRangeInfo = ProgressBarRangeInfo(coercedValue, valueRange, steps)
                         setProgress { target ->
                             currentOnValueChange(target.coerceIn(valueRange.start, valueRange.endInclusive))
-                            true
                         }
                     }.pointerInput(valueRange) {
                         awaitEachGesture {
