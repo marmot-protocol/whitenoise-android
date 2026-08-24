@@ -227,13 +227,15 @@ internal fun Modifier.ttsReadAloudHighlight(
             }
         }
     if (layoutResult == null || highlight == null) return this.then(semanticsModifier)
-    val sentenceRange =
-        highlight.sentence?.let { ttsHighlightTextRange(it, layoutResult.layoutInput.text.length) }
-    val wordRange =
-        highlight.word?.let { ttsHighlightTextRange(it, layoutResult.layoutInput.text.length) }
-    if (sentenceRange?.collapsed != false && wordRange?.collapsed != false) return this.then(semanticsModifier)
+    val textLength = layoutResult.layoutInput.text.length
+    val sentenceRanges =
+        highlight.sentenceRanges
+            .map { range -> ttsHighlightTextRange(range, textLength) }
+            .filterNot(TextRange::collapsed)
+    val wordRange = highlight.word?.let { ttsHighlightTextRange(it, textLength) }
+    if (sentenceRanges.isEmpty() && wordRange?.collapsed != false) return this.then(semanticsModifier)
     return this.then(semanticsModifier).drawBehind {
-        sentenceRange?.takeUnless { it.collapsed }?.let { range ->
+        sentenceRanges.forEach { range ->
             highlightBoundingBoxes(layoutResult, range).forEach { box ->
                 drawRect(color = color, topLeft = Offset(box.left, box.top), size = box.size)
             }

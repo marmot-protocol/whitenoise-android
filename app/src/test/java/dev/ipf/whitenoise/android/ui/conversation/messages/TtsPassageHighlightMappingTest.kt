@@ -193,6 +193,34 @@ class TtsPassageHighlightMappingTest {
     }
 
     @Test
+    fun omittedUrlKeepsSentenceBandOnBothRenderedSides() {
+        val rendered = "Check https://example.com/page now."
+        val projection = legacyTextToSpeakableProjection(rendered)
+        val passage =
+            TtsPassage(
+                messageIdHex = "m1",
+                sentenceIndex = 0,
+                projectionId = projection.projectionId,
+            )
+
+        val highlight =
+            createTtsLeafHighlightResolver(
+                passage = passage,
+                messageIdHex = "m1",
+                projection = projection,
+                locale = Locale.US,
+            )("plain", rendered)
+
+        // The URL is rendered but never spoken, so the spoken sentence covers
+        // two disjoint rendered pieces. Both keep the band; the URL does not.
+        assertEquals(
+            listOf(0 until rendered.indexOf("https"), rendered.indexOf("now.") until rendered.length),
+            highlight?.sentenceRanges,
+        )
+        assertEquals(0 until rendered.length, highlight?.sentence)
+    }
+
+    @Test
     fun repeatedWordUsesVisibleCoordinates() {
         val projection = legacyTextToSpeakableProjection("cat cat cat")
         val passage =

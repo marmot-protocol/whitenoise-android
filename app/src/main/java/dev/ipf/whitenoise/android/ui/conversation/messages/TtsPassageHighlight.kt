@@ -154,13 +154,21 @@ private fun resolveTtsRenderedHighlights(
             renderedText = renderedText,
             leafSpanCache = leafSpanCache,
         ) ?: return null
-    val sentence = sentenceHighlight(passage.sentenceIndex, mappedSpans, sentenceChunks)
+    // Every rendered range the sentence covers, not one contiguous span:
+    // rendered content the projection never speaks - an omitted URL, a list
+    // marker, collapsed punctuation - legitimately splits one spoken sentence
+    // into disjoint rendered pieces, and the same merge already feeds the
+    // follow geometry in sentenceLayoutFor.
+    val sentenceRanges =
+        sentenceSourceInterval(passage.sentenceIndex, sentenceChunks)
+            ?.let { sentence -> mappedSpans.sentenceRenderedRanges(sentence) }
+            .orEmpty()
     val word =
         passage.visibleWord
             .takeIf(List<TtsVisibleTextSpan>::isNotEmpty)
             ?.let { visibleWordHighlight(it, renderedLeafId, mappedSpans) }
-    return TtsLeafHighlight(sentence = sentence, word = word).takeIf {
-        it.sentence != null || it.word != null
+    return TtsLeafHighlight(sentenceRanges = sentenceRanges, word = word).takeIf {
+        it.sentenceRanges.isNotEmpty() || it.word != null
     }
 }
 
@@ -311,27 +319,6 @@ private fun visibleWordHighlight(
             visibleCursor = overlapEnd
         }
         if (visibleCursor != visibleSpan.end) return null
-    }
-    return contiguousRange(intervals)
-}
-
-@Suppress("ReturnCount")
-private fun sentenceHighlight(
-    sentenceIndex: Int,
-    mappedSpans: List<RenderedProjectionSpan>,
-    sentenceChunks: List<TtsChunk>,
-): IntRange? {
-    val sentence = sentenceSourceInterval(sentenceIndex, sentenceChunks) ?: return null
-    val intervals = ArrayList<RenderedInterval>()
-    for (mapped in mappedSpans) {
-        val overlapStart = max(sentence.start, mapped.source.spokenStart)
-        val overlapEnd = min(sentence.end, mapped.source.spokenEnd)
-        if (overlapStart >= overlapEnd) continue
-        intervals +=
-            RenderedInterval(
-                start = mapped.renderedStart + overlapStart - mapped.source.spokenStart,
-                end = mapped.renderedStart + overlapEnd - mapped.source.spokenStart,
-            )
     }
     return contiguousRange(intervals)
 }
