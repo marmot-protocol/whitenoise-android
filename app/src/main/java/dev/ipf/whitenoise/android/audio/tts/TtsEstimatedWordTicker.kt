@@ -85,7 +85,7 @@ internal class TtsEstimatedWordTicker(
         job = null
     }
 
-    /** Cancels the ticker permanently. */
+    /** Test/process teardown hook for releasing the ticker scope. */
     fun shutdown() {
         scope.cancel()
     }

@@ -310,27 +310,29 @@ class TtsController internal constructor(
     private fun onStart(utteranceId: String?) {
         // The queue's validation gate: a stale or superseded utterance neither
         // arms a schedule nor opens a calibration window.
-        val chunk = queue.submittedChunk(utteranceId) ?: return
+        val activeUtteranceId = utteranceId ?: return
+        val chunk = queue.submittedChunk(activeUtteranceId) ?: return
         rangeProbe.onUtteranceStart()
-        val appliedRate = utteranceId?.let(utteranceRates::get) ?: speechRate()
-        activeTiming = ActiveUtteranceTiming(utteranceId, clock(), appliedRate)
-        if (rangeProbe.reportsRanges == true || utteranceId == null) return
-        // Runs whenever the engine has not PROVEN it reports timing. Waiting
-        // for the probe to prove the opposite would leave the first message or
-        // two of every fresh session with no word highlight at all; running
-        // optimistically is safe because the first real range callback yields
-        // this schedule permanently.
-        wordTicker.start(
-            utteranceId = utteranceId,
-            words =
-                TtsWordTimingEstimate.plan(
-                    text = chunk.text,
-                    locale = chunk.locale,
-                    rate = appliedRate,
-                    msPerUnitAt1x = paceCalibrator.msPerUnitAt1x,
-                ),
-            emit = ::onEstimatedRange,
-        )
+        val appliedRate = utteranceRates[activeUtteranceId] ?: speechRate()
+        activeTiming = ActiveUtteranceTiming(activeUtteranceId, clock(), appliedRate)
+        if (rangeProbe.reportsRanges != true) {
+            // Runs whenever the engine has not PROVEN it reports timing. Waiting
+            // for the probe to prove the opposite would leave the first message or
+            // two of every fresh session with no word highlight at all; running
+            // optimistically is safe because the first real range callback yields
+            // this schedule permanently.
+            wordTicker.start(
+                utteranceId = activeUtteranceId,
+                words =
+                    TtsWordTimingEstimate.plan(
+                        text = chunk.text,
+                        locale = chunk.locale,
+                        rate = appliedRate,
+                        msPerUnitAt1x = paceCalibrator.msPerUnitAt1x,
+                    ),
+                emit = ::onEstimatedRange,
+            )
+        }
     }
 
     @Synchronized
@@ -357,7 +359,9 @@ class TtsController internal constructor(
             utteranceId?.let(utteranceRates::remove)
             if (timing != null) {
                 // onStart precedes audible speech by the same bounded lead-in
-                // used by the estimate. Learn only the audible interval.
+                // used by the estimate. Android guarantees onDone follows full
+                // playback, so learn that audible interval without inventing a
+                // second, engine-specific teardown deduction.
                 val elapsedSinceStart = clock() - timing.startedAt
                 if (elapsedSinceStart > TTS_ESTIMATED_AUDIO_LEAD_IN_MS) {
                     val moved =
@@ -403,7 +407,18 @@ class TtsController internal constructor(
         // Only an active callback that maps to a visible word proves range
         // capability. Stale, zero-width, partial, or unmappable callbacks must
         // not cancel the estimate or poison the persisted engine verdict.
-        val application = queue.onRangeStart(utteranceId, start, end, frame)
+        val application =
+            queue.onRangeStart(
+                utteranceId,
+                start,
+                end,
+                frame,
+                // While capability is unknown or known-silent, an unusable
+                // engine callback must not erase a word already painted by the
+                // estimate. Once the engine is confirmed capable, preserve the
+                // original engine-only behavior and fall back to the sentence.
+                retainVisibleWordOnFallback = rangeProbe.reportsRanges != true,
+            )
         if (
             application == TtsPlaybackQueue.RangeApplication.VisibleWord &&
             rangeProbe.reportsRanges != true

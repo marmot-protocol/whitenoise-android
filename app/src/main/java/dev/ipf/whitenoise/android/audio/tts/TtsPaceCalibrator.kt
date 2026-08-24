@@ -7,9 +7,11 @@ import kotlin.math.abs
  *
  * The estimated word highlight is only as good as its idea of the speaking
  * rate, and a fixed constant cannot be right for every voice. Each utterance's
- * start-to-done duration is one sample: the engine plays utterances serially,
- * so the span between `onStart` and `onDone` of the same utterance is the time
- * its audio took.
+ * start-to-done duration is one sample. Android defines `onStart` as arriving
+ * soon before audible playback and guarantees that all audio has played before
+ * `onDone`; the controller removes its matching bounded lead-in. Callback
+ * scheduling can still add positive slack, so short samples are rejected and
+ * each accepted sample is damped and clamped rather than trusted outright.
  *
  * UNITS: everything here is milliseconds per SPEECH UNIT — a tenth of a
  * syllable, the unit [TtsWordTimingEstimate] weighs words in. The rate must be

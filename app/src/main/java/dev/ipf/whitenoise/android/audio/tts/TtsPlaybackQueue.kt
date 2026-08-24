@@ -623,6 +623,7 @@ internal class TtsPlaybackQueue(
         start: Int,
         end: Int,
         @Suppress("UNUSED_PARAMETER") frame: Int = 0,
+        retainVisibleWordOnFallback: Boolean = false,
     ): RangeApplication {
         val callbackIndex = parseCurrentGenerationIndex(utteranceId) ?: return RangeApplication.Stale
         val speaking = _state.value as? TtsState.Speaking ?: return RangeApplication.Stale
@@ -644,8 +645,10 @@ internal class TtsPlaybackQueue(
                 passage =
                     if (passage?.visibleWord?.isNotEmpty() == true) {
                         passage
-                    } else {
+                    } else if (retainVisibleWordOnFallback) {
                         speaking.passage
+                    } else {
+                        passage
                     },
             )
         return if (passage?.visibleWord?.isNotEmpty() == true) {

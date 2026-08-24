@@ -2,7 +2,19 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import android.content.SharedPreferences
+import dev.ipf.whitenoise.android.audio.tts.TtsAudioFocusOwner
+import dev.ipf.whitenoise.android.audio.tts.TtsController
 import dev.ipf.whitenoise.android.audio.tts.TtsTimingStore
+
+internal fun createAppTtsController(
+    context: Context,
+    ratePreferences: TtsRatePreferences,
+): TtsController =
+    TtsController(
+        audioFocus = TtsAudioFocusOwner(context),
+        speechRate = { ratePreferences.resolvedRate() },
+        timingStore = TtsTimingPreferences(context),
+    )
 
 /**
  * Persisted per-engine timing capabilities: whether the engine reports word

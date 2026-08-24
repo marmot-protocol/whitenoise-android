@@ -121,6 +121,32 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
+    fun unusableRangeFromConfirmedCapableEngineClearsThePreviousWord() =
+        runTest {
+            val harness = LaneHarness(this)
+            harness.store.verdicts[ENGINE_KEY] = true
+            harness.controller.detachEngine()
+            harness.controller.attachEngine(harness.engine, engineKey = ENGINE_KEY)
+            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
+
+            harness.engine.start(index = 0)
+            harness.engine.range(index = 0, start = 0, end = 5)
+            assertEquals(
+                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+
+            harness.engine.range(index = 0, start = 0, end = 0)
+
+            assertEquals(
+                emptyList<TtsVisibleTextSpan>(),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+        }
+
+    @Test
     fun aPersistedSilentVerdictStillRunsTheEstimate() =
         runTest {
             val harness = LaneHarness(this)
