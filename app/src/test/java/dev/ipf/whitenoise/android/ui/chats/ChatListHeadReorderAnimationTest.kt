@@ -531,6 +531,7 @@ class ChatListHeadReorderAnimationTest {
 private fun headDemotionTargetIndex(
     itemIds: List<String>,
     pinnedCount: Int?,
+    leadingItemCount: Int,
     demotion: ChatListHeadDemotion?,
     applied: Boolean,
 ): Int? =
@@ -542,7 +543,7 @@ private fun headDemotionTargetIndex(
             chatListHeadDemotionTargetIndex(
                 rowIndex = rowIndex,
                 pinnedBoundaryIndex = pinnedCount,
-                leadingItemCount = 0,
+                leadingItemCount = leadingItemCount,
             )
         }
 
@@ -567,7 +568,13 @@ internal fun ChatListHeadReorderMotionHarness(
     val viewportGeneration = rememberChatListUserGestureGeneration(listState)
     val pinnedOrder = pinnedCount?.let(itemIds::take).orEmpty()
     val userHeadDemotionTargetIndex =
-        headDemotionTargetIndex(itemIds, pinnedCount, userHeadDemotion, userHeadDemotionSettled)
+        headDemotionTargetIndex(
+            itemIds = itemIds,
+            pinnedCount = pinnedCount,
+            leadingItemCount = leadingItemCount,
+            demotion = userHeadDemotion,
+            applied = userHeadDemotionSettled,
+        )
     ChatListActiveHeadScrollEffect(
         listState = listState,
         activeHeadId = itemIds.firstOrNull(),
