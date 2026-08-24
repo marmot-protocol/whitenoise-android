@@ -2518,7 +2518,7 @@ class WhiteNoiseAppState private constructor(
             draftWriter
                 .loadIfCurrent(accountRef, groupIdHex, generation)
                 ?.onSuccess { draft ->
-                    draftWriter.runIfCurrent(accountRef, groupIdHex, generation) {
+                    draftWriter.runHydrationIfCurrent(accountRef, groupIdHex, generation) {
                         draftStore.replaceFromAuthoritative(
                             accountRef,
                             groupIdHex,
@@ -2550,7 +2550,7 @@ class WhiteNoiseAppState private constructor(
      * text entered after the send gesture.
      */
     private fun hideDraftForPendingSend(token: DraftSendClearToken): Boolean =
-        draftWriter.runIfCurrent(token.accountRef, token.groupIdHex, token.generation) {
+        draftWriter.beginPendingSendPresentation(token.accountRef, token.groupIdHex, token.generation) {
             draftStore.set(token.accountRef, token.groupIdHex, TextFieldValue(""))
         }
 

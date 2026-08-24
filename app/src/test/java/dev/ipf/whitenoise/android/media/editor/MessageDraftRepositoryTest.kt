@@ -127,6 +127,56 @@ class MessageDraftRepositoryTest {
         }
 
     @Test
+    fun optimisticSendBlocksAuthoritativeHydrationWithoutDeletingRecoveryDraft() =
+        runTest {
+            val gateway = FakeDraftGateway(draft(content = "sending"))
+            val writer = writer(gateway)
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+            var lifecycleProjectionHidden = false
+
+            val claimed =
+                writer.beginPendingSendPresentation(
+                    accountRef = ACCOUNT,
+                    groupIdHex = GROUP,
+                    sentGeneration = sentGeneration,
+                    onClaimed = { lifecycleProjectionHidden = true },
+                )
+            val reentryHydration = writer.loadIfCurrent(ACCOUNT, GROUP, sentGeneration)
+
+            assertTrue(claimed)
+            assertTrue(lifecycleProjectionHidden)
+            assertNull("pending text must not rehydrate on conversation re-entry", reentryHydration)
+            assertEquals("sending", gateway.current?.content)
+            assertEquals("blocked re-entry must not cross the MDK boundary", 0, gateway.readCalls)
+        }
+
+    @Test
+    fun optimisticSendPreventsInFlightHydrationFromCommittingLifecycleProjection() =
+        runTest {
+            val gateway = FakeDraftGateway(draft(content = "sending"))
+            val writer = writer(gateway)
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+            var pendingPresentationClaimed = false
+            gateway.onRead = {
+                pendingPresentationClaimed =
+                    writer.beginPendingSendPresentation(ACCOUNT, GROUP, sentGeneration)
+            }
+
+            val inFlightHydration = writer.loadIfCurrent(ACCOUNT, GROUP, sentGeneration)
+            var lifecycleProjectionCommitted = false
+            inFlightHydration?.onSuccess {
+                writer.runHydrationIfCurrent(ACCOUNT, GROUP, sentGeneration) {
+                    lifecycleProjectionCommitted = true
+                }
+            }
+
+            assertTrue(pendingPresentationClaimed)
+            assertFalse(lifecycleProjectionCommitted)
+            assertEquals("sending", gateway.current?.content)
+            assertEquals(1, gateway.readCalls)
+        }
+
+    @Test
     fun successfulSendCleanupPreventsTheSentGenerationFromCommittingAProjection() =
         runTest {
             val writer = writer(FakeDraftGateway(draft(content = "sent")))
@@ -788,6 +838,7 @@ class MessageDraftRepositoryTest {
 private class FakeDraftGateway(
     var current: MessageDraftFfi?,
 ) : MessageDraftGateway {
+    var readCalls = 0
     var saveCalls = 0
     var readFailure: Throwable? = null
     var throwBeforeNextSave = false
@@ -802,6 +853,7 @@ private class FakeDraftGateway(
         accountRef: String,
         groupIdHex: String,
     ): MessageDraftFfi? {
+        readCalls += 1
         readFailure?.let { throw it }
         val callback = onRead
         onRead = {}

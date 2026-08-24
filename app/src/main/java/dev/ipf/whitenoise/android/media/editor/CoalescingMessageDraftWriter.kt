@@ -78,6 +78,28 @@ internal class CoalescingMessageDraftWriter(
     ): Boolean = drafts.coordinated.isCurrent(accountRef, groupIdHex, generation)
 
     /**
+     * Claims the lifecycle presentation of an optimistic send without deleting
+     * its durable MDK recovery draft. Re-entry hydration for the captured
+     * generation stays blocked until durable cleanup or a newer mutation wins.
+     */
+    fun beginPendingSendPresentation(
+        accountRef: String,
+        groupIdHex: String,
+        sentGeneration: MessageDraftGeneration,
+        onClaimed: () -> Unit = {},
+    ): Boolean {
+        val key = Key(accountRef, groupIdHex)
+        return synchronized(lock) {
+            if (!drafts.coordinated.isCurrent(accountRef, groupIdHex, sentGeneration)) {
+                return@synchronized false
+            }
+            hydrationBlockedGenerations[key] = sentGeneration
+            onClaimed()
+            true
+        }
+    }
+
+    /**
      * Claims successful-send cleanup as a new generation before Android clears
      * its lifecycle projection. Any MDK hydration that started against the
      * sent generation then fails its post-read currency check and cannot put
@@ -113,6 +135,22 @@ internal class CoalescingMessageDraftWriter(
             block()
             true
         }
+
+    /** Commit a completed authoritative read only while its generation remains visible. */
+    fun runHydrationIfCurrent(
+        accountRef: String,
+        groupIdHex: String,
+        generation: MessageDraftGeneration,
+        block: () -> Unit,
+    ): Boolean {
+        val key = Key(accountRef, groupIdHex)
+        return synchronized(lock) {
+            if (hydrationBlockedGenerations[key] == generation) return@synchronized false
+            if (!drafts.coordinated.isCurrent(accountRef, groupIdHex, generation)) return@synchronized false
+            block()
+            true
+        }
+    }
 
     suspend fun flush() {
         while (true) {
