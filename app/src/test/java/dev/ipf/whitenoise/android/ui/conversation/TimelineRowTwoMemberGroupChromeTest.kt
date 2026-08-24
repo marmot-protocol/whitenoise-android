@@ -83,7 +83,12 @@ class TimelineRowTwoMemberGroupChromeTest {
                 groupRosterReader = { _, _ ->
                     when (rosterRead++) {
                         0 -> roster(member(ACCOUNT_ID, local = true, isSelf = true), member(SENDER_ID))
-                        else -> roster(member(ACCOUNT_ID, local = true, isSelf = true), member(SENDER_ID), member(THIRD_ID))
+                        else ->
+                            roster(
+                                member(ACCOUNT_ID, local = true, isSelf = true),
+                                member(SENDER_ID),
+                                member(THIRD_ID),
+                            )
                     }
                 },
             )

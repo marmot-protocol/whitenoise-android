@@ -1646,6 +1646,7 @@ internal fun MainShell(
                                     openChat.group.groupIdHex,
                                 ),
                         initialChatListRow = openChat.projection,
+                        initialIsDm = openChat.isDm(),
                         initialTimelinePreview = openChat.projection?.lastMessage,
                         accountRefOverride = conversationAccountRef?.takeIf { it != appState.activeAccountRef },
                         startOnConstruction = true,

@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 
 /**
@@ -18,7 +17,7 @@ val ConversationController.usesDirectTranscriptChrome: Boolean
                 initialMemberSnapshot?.memberCount
             }
         return GroupProjector.usesDirectTranscriptChrome(
-            isDirectConversation = latestChatListRow?.conversationKind == ChatConversationKindFfi.DIRECT,
+            isDirectConversation = isDm,
             memberCount = stableMemberCount ?: 0,
             memberCountStable = stableMemberCount != null,
         )

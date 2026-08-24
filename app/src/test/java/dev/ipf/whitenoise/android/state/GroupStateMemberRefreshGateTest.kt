@@ -25,7 +25,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class GroupStateMemberRefreshGateTest {
     @Test
-    fun restoredTwoMemberSnapshotPreservesTranscriptChromeAndDoesNotLeakToReplacementController() =
+    fun restoredTwoMemberGroupSnapshotPreservesTranscriptChromeAcrossRefresh() =
         runBlocking {
             val restoredSnapshot =
                 GroupMemberSnapshot(
@@ -54,33 +54,42 @@ class GroupStateMemberRefreshGateTest {
             assertTrue(firstController.usesDirectTranscriptChrome)
             firstController.retryMembers()
             assertTrue(firstController.usesDirectTranscriptChrome)
+        }
 
-            val restoredDirectController =
-                ConversationController(
-                    appState = appState(),
-                    initialGroup = group(name = ""),
-                    initialMemberSnapshot = restoredSnapshot,
-                    initialChatListRow = chatListRow(ChatConversationKindFfi.DIRECT),
-                )
-            assertFalse(restoredDirectController.membersVerified)
-            assertTrue(restoredDirectController.isDm)
-            assertTrue(restoredDirectController.usesDirectTranscriptChrome)
+    @Test
+    fun directTranscriptChromeSurvivesRestoredAndUnprojectedOpenings() {
+        val restoredSnapshot = twoMemberSnapshot()
 
-            val unprojectedUnnamedController =
-                ConversationController(
-                    appState = appState(),
-                    initialGroup = group(name = ""),
-                    initialMemberSnapshot = restoredSnapshot,
-                )
-            assertTrue(unprojectedUnnamedController.isDm)
-            assertFalse(unprojectedUnnamedController.membersVerified)
-            assertTrue(unprojectedUnnamedController.usesDirectTranscriptChrome)
+        val restoredDirectController =
+            ConversationController(
+                appState = appState(),
+                initialGroup = group(name = ""),
+                initialMemberSnapshot = restoredSnapshot,
+                initialChatListRow = chatListRow(ChatConversationKindFfi.DIRECT),
+            )
+        assertFalse(restoredDirectController.membersVerified)
+        assertTrue(restoredDirectController.isDm)
+        assertTrue(restoredDirectController.usesDirectTranscriptChrome)
 
+        val unprojectedUnnamedController =
+            ConversationController(
+                appState = appState(),
+                initialGroup = group(name = ""),
+                initialMemberSnapshot = restoredSnapshot,
+            )
+        assertTrue(unprojectedUnnamedController.isDm)
+        assertFalse(unprojectedUnnamedController.membersVerified)
+        assertTrue(unprojectedUnnamedController.usesDirectTranscriptChrome)
+    }
+
+    @Test
+    fun failedRefreshKeepsLastKnownTwoMemberChromeAndDoesNotLeakToReplacementController() =
+        runBlocking {
             val refreshFailureController =
                 ConversationController(
                     appState = appState(),
                     initialGroup = group(),
-                    initialMemberSnapshot = restoredSnapshot,
+                    initialMemberSnapshot = twoMemberSnapshot(),
                     initialChatListRow = chatListRow(ChatConversationKindFfi.GROUP),
                     groupRosterReader = { _, _ -> error("refresh failed") },
                 )
@@ -96,7 +105,55 @@ class GroupStateMemberRefreshGateTest {
             val replacementController = ConversationController(appState = appState(), initialGroup = group())
             assertFalse(replacementController.membersVerified)
             assertFalse(replacementController.usesDirectTranscriptChrome)
-            assertTrue(firstController.usesDirectTranscriptChrome)
+            assertTrue(refreshFailureController.usesDirectTranscriptChrome)
+        }
+
+    @Test
+    fun directOpeningHintPreservesChromeWithoutRowOrRosterUntilAuthoritativeStateArrives() =
+        runBlocking {
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(name = ""),
+                    initialIsDm = true,
+                    groupRosterReader = { _, _ -> error("refresh failed") },
+                )
+
+            assertFalse(controller.membersVerified)
+            assertTrue(controller.isDm)
+            assertTrue(controller.usesDirectTranscriptChrome)
+
+            controller.retryMembers()
+
+            assertEquals(GroupRosterLoadState.FAILED, controller.memberRosterState)
+            assertFalse(controller.membersVerified)
+            assertTrue(controller.isDm)
+            assertTrue(controller.usesDirectTranscriptChrome)
+        }
+
+    @Test
+    fun verifiedThreeMemberRosterSupersedesDirectOpeningHint() =
+        runBlocking {
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(name = ""),
+                    initialIsDm = true,
+                    groupRosterReader = { _, _ ->
+                        roster(
+                            member("alice", isAdmin = true, isSelf = true, local = true),
+                            member("bob", isAdmin = false),
+                            member("carol", isAdmin = false),
+                        )
+                    },
+                )
+            assertTrue(controller.usesDirectTranscriptChrome)
+
+            controller.retryMembers()
+
+            assertTrue(controller.membersVerified)
+            assertFalse(controller.isDm)
+            assertFalse(controller.usesDirectTranscriptChrome)
         }
 
     @Test
@@ -294,6 +351,14 @@ class GroupStateMemberRefreshGateTest {
                     ),
                 ),
             activeAccountRef = "alice",
+        )
+
+    private fun twoMemberSnapshot() =
+        GroupMemberSnapshot(
+            listOf(
+                cachedMember("alice", local = true),
+                cachedMember("bob"),
+            ),
         )
 
     private fun roster(

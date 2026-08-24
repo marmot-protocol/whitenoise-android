@@ -6838,6 +6838,7 @@ class ConversationController(
     initialGroup: AppGroupRecordFfi,
     internal val initialMemberSnapshot: GroupMemberSnapshot? = null,
     initialChatListRow: ChatListRowFfi? = null,
+    internal val initialIsDm: Boolean = false,
     initialTimelinePreview: ChatListMessagePreviewFfi? = null,
     // Pins the conversation to a specific account instead of the account active
     // at construction. Set only by notification routing when the target opens
@@ -7365,16 +7366,15 @@ class ConversationController(
 
     // Deduped case-insensitively, mirroring the projector's classification —
     // a hex-casing-drifted duplicate must not inflate the visible headcount.
-    val memberCount: Int
-        get() = GroupProjector.uniqueMemberCount(members)
-
-    // Classified the same way the chat list does: the engine's projected
-    // conversation kind first (folded from the live chat-list row while this
-    // conversation is open), the nameless-two-member heuristic only for
-    // UNKNOWN and unprojected rows. The header title is already the
-    // counterparty's name, so the "2 members" subtitle is redundant noise here.
+    val memberCount: Int get() = GroupProjector.uniqueMemberCount(members)
     val isDm: Boolean
-        get() = GroupProjector.isDm(latestChatListRow?.conversationKind, memberCount, group.name)
+        get() =
+            GroupProjector.isDm(latestChatListRow?.conversationKind, memberCount, group.name) ||
+                (
+                    initialIsDm &&
+                        !membersVerified &&
+                        latestChatListRow?.conversationKind != ChatConversationKindFfi.GROUP
+                )
 
     val subtitle: String
         get() = subtitle(justYou = "Just you", oneMember = "1 member", membersFormat = "%1\$d members")

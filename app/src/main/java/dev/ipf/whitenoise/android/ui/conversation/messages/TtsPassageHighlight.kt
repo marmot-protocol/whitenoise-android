@@ -202,18 +202,25 @@ private fun renderedListMarkerHighlight(
     renderedText: String,
     activeListItemPaths: Set<String>,
 ): TtsLeafHighlight? {
-    val itemPath = renderedLeafId.listMarkerItemPath() ?: return null
-    if (itemPath !in activeListItemPaths || renderedText.isEmpty()) return null
-    return TtsLeafHighlight(sentenceRanges = listOf(renderedText.indices), word = null)
+    val markerIsActive = renderedLeafId.listMarkerItemPath() in activeListItemPaths && renderedText.isNotEmpty()
+    return if (markerIsActive) {
+        TtsLeafHighlight(sentenceRanges = listOf(renderedText.indices), word = null)
+    } else {
+        null
+    }
 }
 
 private fun String.listMarkerItemPath(): String? {
     val separator = lastIndexOf('/')
-    if (separator <= 0 || separator == lastIndex) return null
-    val segment = substring(separator + 1)
-    val itemIndex = segment.takeIf { it.length > 1 && it[0] == 'm' }?.substring(1) ?: return null
-    if (itemIndex.any { !it.isDigit() }) return null
-    return substring(0, separator) + "/i" + itemIndex
+    return if (separator in 1 until lastIndex) {
+        val segment = substring(separator + 1)
+        val itemIndex = segment.drop(1)
+        itemIndex
+            .takeIf { segment.firstOrNull() == 'm' && it.isNotEmpty() && it.all(Char::isDigit) }
+            ?.let { substring(0, separator) + "/i" + it }
+    } else {
+        null
+    }
 }
 
 private fun String.innermostListItemPath(): String? {
