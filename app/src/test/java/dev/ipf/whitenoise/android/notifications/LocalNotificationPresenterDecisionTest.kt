@@ -96,6 +96,16 @@ class LocalNotificationPresenterDecisionTest {
     }
 
     @Test
+    fun removalUsesPlainEventStyleOnTheMembershipChannel() {
+        val decision = decision(update(trigger = NotificationTriggerFfi.REMOVED_FROM_GROUP))
+
+        assertSame(NotificationStyleChoice.Plain, decision?.style)
+        assertEquals(NotificationChannelSpec.GROUP_MEMBERSHIP.id, decision?.channelId)
+        assertEquals(NotificationCompat.CATEGORY_EVENT, decision?.category)
+        assertEquals(emptyList<NotificationActionKind>(), decision?.actions)
+    }
+
+    @Test
     fun historyCapCarriesOnlyPreviousMessagesThatFitBesideTheNewOne() {
         val decision = decision(update(trigger = NotificationTriggerFfi.NEW_MESSAGE)) ?: error("missing decision")
         val oldHistory = (1..30).toList()
@@ -188,6 +198,8 @@ class LocalNotificationPresenterDecisionTest {
                     NotificationChannelSpec.REACTIONS,
                 update(trigger = NotificationTriggerFfi.GROUP_INVITE) to
                     NotificationChannelSpec.INVITES,
+                update(trigger = NotificationTriggerFfi.REMOVED_FROM_GROUP) to
+                    NotificationChannelSpec.GROUP_MEMBERSHIP,
             )
 
         updatesWithExpectedChannels.forEach { (update, expectedSpec) ->
@@ -207,6 +219,10 @@ class LocalNotificationPresenterDecisionTest {
         assertEquals(
             NotificationCompat.CATEGORY_EVENT,
             decision(update(trigger = NotificationTriggerFfi.GROUP_INVITE))?.category,
+        )
+        assertEquals(
+            NotificationCompat.CATEGORY_EVENT,
+            decision(update(trigger = NotificationTriggerFfi.REMOVED_FROM_GROUP))?.category,
         )
     }
 

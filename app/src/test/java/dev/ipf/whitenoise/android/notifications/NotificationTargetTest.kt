@@ -149,9 +149,21 @@ class NotificationTargetTest {
     }
 
     @Test
-    fun fromUpdate_membershipTriggersRemainUnroutableUntilTheirPresentationLands() {
+    fun fromUpdate_removalRoutesToChatListAndDropsMessageId() {
+        val target =
+            NotificationNavigation.fromUpdate(
+                update(trigger = NotificationTriggerFfi.REMOVED_FROM_GROUP, messageId = "m1"),
+            )
+
+        assertEquals(
+            NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.CHAT_LIST),
+            target,
+        )
+    }
+
+    @Test
+    fun fromUpdate_adminTriggersRemainUnroutableUntilIssue822Lands() {
         listOf(
-            NotificationTriggerFfi.REMOVED_FROM_GROUP,
             NotificationTriggerFfi.MADE_ADMIN,
             NotificationTriggerFfi.REMOVED_AS_ADMIN,
         ).forEach { trigger ->
@@ -206,6 +218,21 @@ class NotificationTargetTest {
                 "m1",
                 "INVITE",
             )
+        assertNull(target?.messageIdHex)
+    }
+
+    @Test
+    fun parseExtras_chatListTargetIgnoresMessageId() {
+        val target =
+            NotificationNavigation.parseExtras(
+                NotificationNavigation.ACTION_OPEN,
+                "a",
+                "g",
+                "m1",
+                "CHAT_LIST",
+            )
+
+        assertEquals(NotificationTargetKind.CHAT_LIST, target?.kind)
         assertNull(target?.messageIdHex)
     }
 
@@ -859,6 +886,34 @@ class NotificationTargetTest {
                 availableGroupIds = emptySet(),
             )
         assertEquals(NotificationNavStep.AwaitChatList, step)
+    }
+
+    @Test
+    fun nav_removalOnActiveAccountOpensChatListWithoutWaitingForTheDeadGroup() {
+        val step =
+            resolveNotificationNav(
+                target.copy(kind = NotificationTargetKind.CHAT_LIST),
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = false,
+                availableGroupIds = emptySet(),
+            )
+
+        assertEquals(NotificationNavStep.OpenChatList, step)
+    }
+
+    @Test
+    fun nav_removalOnBackgroundAccountSwitchesBeforeOpeningChatList() {
+        val step =
+            resolveNotificationNav(
+                target.copy(kind = NotificationTargetKind.CHAT_LIST),
+                knownAccountRefs = setOf("acct-a", "acct-b"),
+                activeAccountRef = "acct-b",
+                chatListReady = false,
+                availableGroupIds = emptySet(),
+            )
+
+        assertEquals(NotificationNavStep.SwitchAccount("acct-a"), step)
     }
 
     @Test

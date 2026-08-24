@@ -263,6 +263,7 @@ private fun notificationChannelTitle(channel: NotificationChannelSpec): String =
             NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions
             NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions
             NotificationChannelSpec.INVITES -> R.string.notification_channel_invites
+            NotificationChannelSpec.GROUP_MEMBERSHIP -> R.string.notification_channel_group_membership
             NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
         },

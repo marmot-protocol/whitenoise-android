@@ -45,6 +45,15 @@ object LocalNotificationFormatter {
     const val AGENT_ACTIVITY_NOTIFICATION_ID = 3
     private const val AGENT_ACTIVITY_TAG_PREFIX = "agent-activity|"
 
+    const val GROUP_MEMBERSHIP_NOTIFICATION_ID = 4
+    private const val GROUP_MEMBERSHIP_TAG_PREFIX = "group-membership|"
+
+    private enum class ContentKind {
+        MESSAGE,
+        INVITE,
+        REMOVED_FROM_GROUP,
+    }
+
     private val whitespaceRun = Regex("\\s+")
 
     // Invites stamp the account + group they're for into these extras so the
@@ -99,10 +108,23 @@ object LocalNotificationFormatter {
             id = AGENT_ACTIVITY_NOTIFICATION_ID,
         )
 
+    fun groupMembershipDismissalKey(
+        accountRef: String,
+        groupIdHex: String,
+    ): NotificationDismissalKey =
+        NotificationDismissalKey(
+            tag = GROUP_MEMBERSHIP_TAG_PREFIX + conversationDismissalKey(accountRef, groupIdHex).tag,
+            id = GROUP_MEMBERSHIP_NOTIFICATION_ID,
+        )
+
     fun notificationDismissalKey(update: NotificationUpdateFfi): NotificationDismissalKey =
         when {
             update.trigger == NotificationTriggerFfi.GROUP_INVITE ->
                 NotificationDismissalKey(update.notificationKey, MESSAGE_NOTIFICATION_ID)
+            update.trigger == NotificationTriggerFfi.REMOVED_FROM_GROUP ||
+                update.trigger == NotificationTriggerFfi.MADE_ADMIN ||
+                update.trigger == NotificationTriggerFfi.REMOVED_AS_ADMIN ->
+                groupMembershipDismissalKey(update.accountRef, update.groupIdHex)
             isReaction(update) -> reactionDismissalKey(update.accountRef, update.groupIdHex)
             update.isMention -> mentionDismissalKey(update.accountRef, update.groupIdHex)
             update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY ->
@@ -176,29 +198,46 @@ object LocalNotificationFormatter {
         // shortener here keeps this pure formatter from duplicating bech32.
         shortNpub: (String) -> String,
     ): LocalNotificationContent? {
-        val isGroupInvite =
+        val kind =
             if (update.isFromSelf) {
                 null
             } else {
                 when (update.trigger) {
-                    NotificationTriggerFfi.NEW_MESSAGE -> false
-                    NotificationTriggerFfi.GROUP_INVITE -> true
-                    NotificationTriggerFfi.REMOVED_FROM_GROUP,
+                    NotificationTriggerFfi.NEW_MESSAGE -> ContentKind.MESSAGE
+                    NotificationTriggerFfi.GROUP_INVITE -> ContentKind.INVITE
+                    NotificationTriggerFfi.REMOVED_FROM_GROUP -> ContentKind.REMOVED_FROM_GROUP
                     NotificationTriggerFfi.MADE_ADMIN,
                     NotificationTriggerFfi.REMOVED_AS_ADMIN,
                     -> null
                 }
             }
-        if (isGroupInvite == null) return null
+        if (kind == null) return null
         val senderName = senderName(update.sender, senderNameOverride, shortNpub)
+        val conversationTitle =
+            if (!update.isDm) {
+                clean(conversationTitleOverride) ?: clean(update.groupName)
+            } else {
+                null
+            }
         val title =
-            if (isGroupInvite) inviteTitle(context) else messageTitle(update, context, senderName)
+            when (kind) {
+                ContentKind.MESSAGE -> messageTitle(update, context, senderName)
+                ContentKind.INVITE -> inviteTitle(context)
+                ContentKind.REMOVED_FROM_GROUP -> removedFromGroupTitle(context, conversationTitle)
+            }
         val body =
             boundedNotificationMessageText(
-                if (isGroupInvite) {
-                    inviteBody(update, context, senderName)
-                } else {
-                    messageBody(update, context, previewTextOverride, reactedToPreviewOverride, mediaKind)
+                when (kind) {
+                    ContentKind.MESSAGE ->
+                        messageBody(update, context, previewTextOverride, reactedToPreviewOverride, mediaKind)
+                    ContentKind.INVITE -> inviteBody(update, context, senderName)
+                    ContentKind.REMOVED_FROM_GROUP ->
+                        clean(previewTextOverride)
+                            ?: text(
+                                context,
+                                R.string.notification_removed_from_group_body,
+                                "You can view your message history, but you can no longer send messages.",
+                            )
                 },
             )
         val dismissalKey = notificationDismissalKey(update)
@@ -217,9 +256,28 @@ object LocalNotificationFormatter {
             selfName = displayName(update.receiver, shortNpub),
             selfKey = update.receiver.accountIdHex,
             isGroupConversation = !update.isDm,
-            conversationTitle = if (!update.isDm) clean(conversationTitleOverride) ?: clean(update.groupName) else null,
+            conversationTitle = conversationTitle,
         )
     }
+
+    private fun removedFromGroupTitle(
+        context: Context?,
+        conversationTitle: String?,
+    ): String =
+        if (conversationTitle == null) {
+            text(
+                context,
+                R.string.notification_removed_from_unnamed_group,
+                "You were removed from a group",
+            )
+        } else {
+            text(
+                context,
+                R.string.notification_removed_from_group,
+                "You were removed from %1\$s",
+                conversationTitle,
+            )
+        }
 
     private fun messageTitle(
         update: NotificationUpdateFfi,

@@ -635,6 +635,10 @@
     <string name="notification_channel_reactions_default_description">Comportamento padrão de alertas do Android para reações em conversas</string>
     <string name="notification_channel_invites_default">Convites · Padrão para todas as conversas</string>
     <string name="notification_channel_invites_default_description">Comportamento padrão de alertas do Android para convites e boas-vindas de grupo</string>
+    <string name="notification_channel_group_membership">Alterações de participação em grupos</string>
+    <string name="notification_channel_group_membership_description">Remoções e alterações de função em grupos</string>
+    <string name="notification_channel_group_membership_default">Alterações de participação em grupos · Padrão para todas as conversas</string>
+    <string name="notification_channel_group_membership_default_description">Comportamento padrão dos alertas do Android para remoções e alterações de função em grupos</string>
     <string name="notification_channel_agent_activity_default">Atividade do agente · Padrão para todas as conversas</string>
     <string name="notification_channel_agent_activity_default_description">Comportamento padrão de alertas do Android para atividade do agente em conversas</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (personalizado)</string>
@@ -651,6 +655,9 @@
     <string name="notification_sender_in_group">%1$s em %2$s</string>
     <string name="notification_invite_from_sender">Convite de %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s convidou você para %2$s</string>
+    <string name="notification_removed_from_group">Você foi removido de %1$s</string>
+    <string name="notification_removed_from_unnamed_group">Você foi removido de um grupo</string>
+    <string name="notification_removed_from_group_body">Você pode ver seu histórico de mensagens, mas não pode mais enviar mensagens.</string>
     <string name="background_connection_notification_title">White Noise está conectado</string>
     <string name="background_connection_notification_text">Ouvindo mensagens</string>
     <string name="background_connection_notification_hint">Mantenha esta notificação pressionada para ocultá-la</string>

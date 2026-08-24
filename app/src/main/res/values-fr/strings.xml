@@ -635,6 +635,10 @@
     <string name="notification_channel_reactions_default_description">Comportement d’alerte Android par défaut pour les réactions dans les discussions</string>
     <string name="notification_channel_invites_default">Invitations · Valeur par défaut pour toutes les discussions</string>
     <string name="notification_channel_invites_default_description">Comportement d’alerte Android par défaut pour les invitations et accueils de groupe</string>
+    <string name="notification_channel_group_membership">Modifications d’appartenance aux groupes</string>
+    <string name="notification_channel_group_membership_description">Exclusions et changements de rôle dans les groupes</string>
+    <string name="notification_channel_group_membership_default">Modifications d’appartenance aux groupes · Par défaut pour toutes les discussions</string>
+    <string name="notification_channel_group_membership_default_description">Comportement par défaut des alertes Android pour les exclusions et changements de rôle dans les groupes</string>
     <string name="notification_channel_agent_activity_default">Activité de l’agent · Valeur par défaut pour toutes les discussions</string>
     <string name="notification_channel_agent_activity_default_description">Comportement d’alerte Android par défaut pour l’activité de l’agent dans les discussions</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (personnalisé)</string>
@@ -651,6 +655,9 @@
     <string name="notification_sender_in_group">%1$s dans %2$s</string>
     <string name="notification_invite_from_sender">Invitation de %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s vous a invité à %2$s</string>
+    <string name="notification_removed_from_group">Vous ne faites plus partie de %1$s</string>
+    <string name="notification_removed_from_unnamed_group">Vous ne faites plus partie d’un groupe</string>
+    <string name="notification_removed_from_group_body">Vous pouvez consulter votre historique de messages, mais vous ne pouvez plus envoyer de messages.</string>
     <string name="background_connection_notification_title">White Noise est connecté</string>
     <string name="background_connection_notification_text">Écoute des messages</string>
     <string name="background_connection_notification_hint">Appuyez longuement pour masquer cette notification</string>

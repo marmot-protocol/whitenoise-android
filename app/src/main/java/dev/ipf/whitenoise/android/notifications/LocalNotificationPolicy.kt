@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 
@@ -14,15 +15,30 @@ object LocalNotificationPolicy {
         engineMuted: Boolean = false,
     ): Boolean {
         if (appLockScreenVisible) return false
-        // The engine's durable mute converges across a user's devices, so a
-        // conversation muted elsewhere stays quiet here even before local
-        // preferences learn about it. It is a full mute: the most restrictive
-        // of it and the local notify mode wins (mentions included).
-        if (engineMuted) return false
-        when (conversationNotifyMode(update.accountRef, update.groupIdHex)) {
-            ChatNotifyMode.ALL -> Unit
-            ChatNotifyMode.MENTIONS_ONLY -> if (!update.isMention) return false
-            ChatNotifyMode.NONE -> return false
+        val isGlobalMembershipEvent =
+            when (update.trigger) {
+                NotificationTriggerFfi.REMOVED_FROM_GROUP,
+                NotificationTriggerFfi.MADE_ADMIN,
+                NotificationTriggerFfi.REMOVED_AS_ADMIN,
+                -> true
+                NotificationTriggerFfi.NEW_MESSAGE,
+                NotificationTriggerFfi.GROUP_INVITE,
+                -> false
+            }
+        // Membership events belong to an app-wide OS channel. A conversation
+        // mute controls its content, not the safety-critical fact that this
+        // account can no longer participate in the group.
+        if (!isGlobalMembershipEvent) {
+            // The engine's durable mute converges across a user's devices, so a
+            // conversation muted elsewhere stays quiet here even before local
+            // preferences learn about it. It is a full mute: the most restrictive
+            // of it and the local notify mode wins (mentions included).
+            if (engineMuted) return false
+            when (conversationNotifyMode(update.accountRef, update.groupIdHex)) {
+                ChatNotifyMode.ALL -> Unit
+                ChatNotifyMode.MENTIONS_ONLY -> if (!update.isMention) return false
+                ChatNotifyMode.NONE -> return false
+            }
         }
 
         // Suppress only the conversation the user is actively viewing — and only

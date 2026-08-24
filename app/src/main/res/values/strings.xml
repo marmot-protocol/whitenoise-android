@@ -878,6 +878,10 @@
     <string name="notification_channel_invites_description">Group invites and welcomes</string>
     <string name="notification_channel_invites_default">Invites · Default for all chats</string>
     <string name="notification_channel_invites_default_description">Default Android alert behavior for group invites and welcomes</string>
+    <string name="notification_channel_group_membership">Group membership changes</string>
+    <string name="notification_channel_group_membership_description">Removal and role changes in groups</string>
+    <string name="notification_channel_group_membership_default">Group membership changes · Default for all chats</string>
+    <string name="notification_channel_group_membership_default_description">Default Android alert behavior for removal and role changes in groups</string>
     <string name="notification_channel_agent_activity">Agent activity</string>
     <string name="notification_channel_agent_activity_description">Tool progress and agent status updates</string>
     <string name="notification_channel_agent_activity_default">Agent activity · Default for all chats</string>
@@ -896,6 +900,9 @@
     <string name="notification_sender_in_group">%1$s in %2$s</string>
     <string name="notification_invite_from_sender">Invite from %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s invited you to %2$s</string>
+    <string name="notification_removed_from_group">You were removed from %1$s</string>
+    <string name="notification_removed_from_unnamed_group">You were removed from a group</string>
+    <string name="notification_removed_from_group_body">You can view your message history, but you can no longer send messages.</string>
     <string name="notification_reacted_to_message">reacted %1$s to: \"%2$s\"</string>
     <string name="notification_reacted">reacted %1$s</string>
     <string name="background_connection_notification_title">White Noise is connected</string>

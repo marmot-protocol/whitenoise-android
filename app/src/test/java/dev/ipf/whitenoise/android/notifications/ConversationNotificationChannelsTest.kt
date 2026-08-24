@@ -50,6 +50,10 @@ class ConversationNotificationChannelsTest {
             "App updates · App-wide",
             manager.getNotificationChannel(NotificationChannelSpec.APP_UPDATES.id).name.toString(),
         )
+        assertEquals(
+            "Group membership changes · Default for all chats",
+            manager.getNotificationChannel(NotificationChannelSpec.GROUP_MEMBERSHIP.id).name.toString(),
+        )
         assertEquals("reactions_v2", NotificationChannelSpec.REACTIONS.id)
     }
 

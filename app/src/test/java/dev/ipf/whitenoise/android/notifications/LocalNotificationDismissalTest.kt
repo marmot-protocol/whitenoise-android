@@ -126,6 +126,7 @@ class LocalNotificationDismissalTest {
                 LocalNotificationFormatter.reactionDismissalKey(account, group),
                 LocalNotificationFormatter.mentionDismissalKey(account, group),
                 LocalNotificationFormatter.agentActivityDismissalKey(account, group),
+                LocalNotificationFormatter.groupMembershipDismissalKey(account, group),
             )
         siblingKeys.forEach { key -> manager.notify(key.tag, key.id, notification()) }
         manager.notify(
@@ -252,14 +253,17 @@ class LocalNotificationDismissalTest {
     }
 
     @Test
-    fun siblingDismissalClearsSiblingsAtOrBeforeBaselineButLeavesTheMessageCard() {
+    fun siblingDismissalClearsMessageSiblingsButLeavesMessageAndMembershipCards() {
         val account = "account-a"
         val group = "group-a"
         val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
         val reaction = LocalNotificationFormatter.reactionDismissalKey(account, group)
         val mention = LocalNotificationFormatter.mentionDismissalKey(account, group)
         val agentActivity = LocalNotificationFormatter.agentActivityDismissalKey(account, group)
-        listOf(conversation, reaction, mention, agentActivity).forEach { manager.notify(it.tag, it.id, notification()) }
+        val groupMembership = LocalNotificationFormatter.groupMembershipDismissalKey(account, group)
+        listOf(conversation, reaction, mention, agentActivity, groupMembership).forEach {
+            manager.notify(it.tag, it.id, notification())
+        }
         manager.notify(
             "invite-target",
             41,
@@ -272,7 +276,8 @@ class LocalNotificationDismissalTest {
             ),
         )
         // Baseline at/after every posted card, so each sibling counts as "already
-        // present" and is cleared. The message card is the caller's to cancel.
+        // present" and is cleared. The message card is the caller's to cancel;
+        // the membership alert is a separate event the message action does not own.
         val baseline = manager.activeNotifications.maxOf { it.postTime }
 
         assertTrue(
@@ -280,8 +285,14 @@ class LocalNotificationDismissalTest {
                 .dismissConversationSiblingCardsNotNewerThan(account, group, sinceMs = baseline),
         )
 
-        val remaining = manager.activeNotifications.map { it.tag to it.id }
-        assertEquals(listOf(conversation.tag to conversation.id), remaining)
+        val remaining = manager.activeNotifications.map { it.tag to it.id }.toSet()
+        assertEquals(
+            setOf(
+                conversation.tag to conversation.id,
+                groupMembership.tag to groupMembership.id,
+            ),
+            remaining,
+        )
     }
 
     @Test
@@ -450,6 +461,7 @@ class LocalNotificationDismissalTest {
                 LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex),
                 LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex),
                 LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex),
+                LocalNotificationFormatter.groupMembershipDismissalKey(accountRef, groupIdHex),
             )
         keys.forEach { key -> manager.notify(key.tag, key.id, notification()) }
         manager.notify(

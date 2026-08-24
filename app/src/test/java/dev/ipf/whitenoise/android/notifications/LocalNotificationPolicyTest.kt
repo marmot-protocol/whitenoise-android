@@ -204,6 +204,25 @@ class LocalNotificationPolicyTest {
         )
     }
 
+    @Test
+    fun removalNotificationIgnoresConversationMutes() {
+        assertTrue(
+            LocalNotificationPolicy.shouldPost(
+                update(
+                    groupIdHex = "removed-group",
+                    accountRef = "account-a",
+                    trigger = NotificationTriggerFfi.REMOVED_FROM_GROUP,
+                ),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+                conversationNotifyMode = { _, _ -> ChatNotifyMode.NONE },
+                engineMuted = true,
+            ),
+        )
+    }
+
     // End-to-end lifecycle checks (issue #821): drive the suppression state
     // through the reported sequences and assert the post decision, so the policy
     // and the lifecycle transitions are pinned together.
@@ -257,11 +276,12 @@ class LocalNotificationPolicyTest {
         groupIdHex: String,
         accountRef: String = "account",
         isMention: Boolean = false,
+        trigger: NotificationTriggerFfi = NotificationTriggerFfi.NEW_MESSAGE,
     ) = NotificationUpdateFfi(
         isMention = isMention,
         notificationKey = "message:$accountRef:message",
         conversationKey = "conversation:$accountRef:$groupIdHex",
-        trigger = NotificationTriggerFfi.NEW_MESSAGE,
+        trigger = trigger,
         trafficClass = dev.ipf.marmotkit.NotificationTrafficClassFfi.STANDARD,
         accountRef = accountRef,
         accountIdHex = accountRef,

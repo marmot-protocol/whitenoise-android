@@ -635,6 +635,10 @@
     <string name="notification_channel_reactions_default_description">Standardmäßiges Android-Benachrichtigungsverhalten für Reaktionen in Chats</string>
     <string name="notification_channel_invites_default">Einladungen · Standard für alle Chats</string>
     <string name="notification_channel_invites_default_description">Standardmäßiges Android-Benachrichtigungsverhalten für Gruppeneinladungen und Willkommensnachrichten</string>
+    <string name="notification_channel_group_membership">Änderungen der Gruppenmitgliedschaft</string>
+    <string name="notification_channel_group_membership_description">Entfernungen und Rollenänderungen in Gruppen</string>
+    <string name="notification_channel_group_membership_default">Änderungen der Gruppenmitgliedschaft · Standard für alle Chats</string>
+    <string name="notification_channel_group_membership_default_description">Standardmäßiges Android-Benachrichtigungsverhalten für Entfernungen und Rollenänderungen in Gruppen</string>
     <string name="notification_channel_agent_activity_default">Agentenaktivität · Standard für alle Chats</string>
     <string name="notification_channel_agent_activity_default_description">Standardmäßiges Android-Benachrichtigungsverhalten für Agentenaktivität in Chats</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (benutzerdefiniert)</string>
@@ -651,6 +655,9 @@
     <string name="notification_sender_in_group">%1$s in %2$s</string>
     <string name="notification_invite_from_sender">Einladung von %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s hat dich zu %2$s eingeladen</string>
+    <string name="notification_removed_from_group">Du wurdest aus %1$s entfernt</string>
+    <string name="notification_removed_from_unnamed_group">Du wurdest aus einer Gruppe entfernt</string>
+    <string name="notification_removed_from_group_body">Du kannst deinen Nachrichtenverlauf ansehen, aber keine Nachrichten mehr senden.</string>
     <string name="background_connection_notification_title">White Noise ist verbunden</string>
     <string name="background_connection_notification_text">Wartet auf Nachrichten</string>
     <string name="background_connection_notification_hint">Lange drücken, um diese Benachrichtigung auszublenden</string>
