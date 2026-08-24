@@ -51,6 +51,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDeleteDialog
@@ -82,7 +83,7 @@ internal fun AgentOperationTimelineRow(
     val record = item.record
     val mine = controller.isMessageMine(record)
     val senderName = appState.displayName(record.sender)
-    val showSender = GroupProjector.shouldShowTranscriptSenderAvatar(controller.isDm, mine)
+    val showSender = GroupProjector.shouldShowTranscriptSenderAvatar(controller.usesDirectTranscriptChrome, mine)
     val deleteCapability =
         if (readOnly) {
             MessageDeleteCapability(canDeleteForMe = false, canDeleteForEveryone = false)

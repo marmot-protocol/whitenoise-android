@@ -95,6 +95,7 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
+import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
@@ -741,7 +742,7 @@ internal fun MessageBubble(
     val forwardPayload = (forwardEligibility as? ForwardEligibility.Eligible)?.payload
     val reserveSenderAvatarSlot =
         GroupProjector.shouldShowTranscriptSenderAvatar(
-            isDm = controller.isDm,
+            isDm = controller.usesDirectTranscriptChrome,
             mine = mine,
         )
     val tallies = controller.reactions[record.messageIdHex].orEmpty()

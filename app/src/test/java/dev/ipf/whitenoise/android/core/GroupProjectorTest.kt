@@ -689,16 +689,57 @@ class GroupProjectorTest {
     }
 
     @Test
-    fun transcriptSenderAvatarUsesConversationKindInsteadOfHeadcount() {
+    fun verifiedTwoMemberGroupUsesDirectTranscriptChromeWithoutChangingConversationKind() {
         val namedTwoMemberGroupIsDm =
             GroupProjector.isDm(
                 conversationKind = ChatConversationKindFfi.GROUP,
                 memberCount = 2,
                 name = "Group 2",
             )
+        val unnamedTwoMemberGroupIsDm =
+            GroupProjector.isDm(
+                conversationKind = ChatConversationKindFfi.GROUP,
+                memberCount = 2,
+                name = "",
+            )
 
         assertFalse(namedTwoMemberGroupIsDm)
-        assertTrue(GroupProjector.shouldShowTranscriptSenderAvatar(isDm = namedTwoMemberGroupIsDm, mine = false))
+        assertFalse(unnamedTwoMemberGroupIsDm)
+        assertTrue(
+            GroupProjector.usesDirectTranscriptChrome(
+                isDirectConversation = namedTwoMemberGroupIsDm,
+                memberCount = 2,
+                membersVerified = true,
+            ),
+        )
+        assertFalse(
+            GroupProjector.usesDirectTranscriptChrome(
+                isDirectConversation = namedTwoMemberGroupIsDm,
+                memberCount = 2,
+                membersVerified = false,
+            ),
+        )
+        assertTrue(
+            GroupProjector.usesDirectTranscriptChrome(
+                isDirectConversation = unnamedTwoMemberGroupIsDm,
+                memberCount = 2,
+                membersVerified = true,
+            ),
+        )
+        assertFalse(
+            GroupProjector.usesDirectTranscriptChrome(
+                isDirectConversation = namedTwoMemberGroupIsDm,
+                memberCount = 3,
+                membersVerified = true,
+            ),
+        )
+        assertTrue(
+            GroupProjector.usesDirectTranscriptChrome(
+                isDirectConversation = true,
+                memberCount = 0,
+                membersVerified = false,
+            ),
+        )
         assertFalse(GroupProjector.shouldShowTranscriptSenderAvatar(isDm = true, mine = false))
         assertFalse(GroupProjector.shouldShowTranscriptSenderAvatar(isDm = false, mine = true))
     }

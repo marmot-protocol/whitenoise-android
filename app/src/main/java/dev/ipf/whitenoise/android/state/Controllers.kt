@@ -6837,9 +6837,8 @@ class ConversationController(
     private val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
     initialMemberSnapshot: GroupMemberSnapshot? = null,
+    initialChatListRow: ChatListRowFfi? = null,
     initialTimelinePreview: ChatListMessagePreviewFfi? = null,
-    initialLastReadMessageId: String? = null,
-    initialLastReadTimelineAt: ULong? = null,
     // Pins the conversation to a specific account instead of the account active
     // at construction. Set only by notification routing when the target opens
     // before its account switch lands (#586); every MDK read/write below is
@@ -6884,7 +6883,7 @@ class ConversationController(
      * off-screen). Read for row-scoped state a conversation surface needs
      * fresh, like the engine's durable mute.
      */
-    var latestChatListRow by mutableStateOf<ChatListRowFfi?>(null)
+    var latestChatListRow by mutableStateOf(initialChatListRow)
         private set
 
     /**
@@ -7298,12 +7297,13 @@ class ConversationController(
     // doesn't issue redundant FFI hops. Compose-observable so UI (the
     // jump-to-mention chip) can derive unread state off the engine read
     // watermark rather than the scroll position.
-    var lastReadMessageId: String? by mutableStateOf(initialLastReadMessageId?.takeIf { it.isNotBlank() })
+    var lastReadMessageId: String? by
+        mutableStateOf(initialChatListRow?.lastReadMessageIdHex?.takeIf { it.isNotBlank() })
         private set
 
     // Persisted read watermark from the chat-list projection / mark-read FFI.
     // Drives read-anchored disappearing-message deferral (#797).
-    private var persistedLastReadTimelineAt: ULong? = initialLastReadTimelineAt
+    private var persistedLastReadTimelineAt: ULong? = initialChatListRow?.lastReadTimelineAt
 
     // Session read/display anchors keyed by message id. Maps to the local
     // second the row became visible/read; TTL is anchored there until the

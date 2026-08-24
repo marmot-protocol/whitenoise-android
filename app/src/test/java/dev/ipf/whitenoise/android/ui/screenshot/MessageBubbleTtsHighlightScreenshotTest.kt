@@ -26,6 +26,8 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownListItemFfi
+import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
@@ -97,6 +99,18 @@ class MessageBubbleTtsHighlightScreenshotTest {
     fun editedMarkdownIncomingWordHighlightLight() {
         renderEditedMarkdown(mine = false, darkTheme = false, amoled = false)
         capture("message_bubble_tts_edited_markdown_incoming_word_light")
+    }
+
+    @Test
+    fun nestedListIncomingWordHighlightLight() {
+        renderNestedList(mine = false, darkTheme = false, amoled = false, largeFont = false)
+        capture("message_bubble_tts_nested_list_incoming_word_light")
+    }
+
+    @Test
+    fun nestedListOutgoingWordHighlightAmoledLargeFont() {
+        renderNestedList(mine = true, darkTheme = true, amoled = true, largeFont = true)
+        capture("message_bubble_tts_nested_list_outgoing_word_amoled_large_font")
     }
 
     private fun capture(name: String) {
@@ -259,6 +273,74 @@ class MessageBubbleTtsHighlightScreenshotTest {
                         document,
                         ttsLeafHighlightResolver = resolver,
                     )
+                }
+            }
+        }
+    }
+
+    private fun renderNestedList(
+        mine: Boolean,
+        darkTheme: Boolean,
+        amoled: Boolean,
+        largeFont: Boolean,
+    ) {
+        fun paragraph(vararg inlines: MarkdownInlineFfi) = MarkdownBlockFfi.Paragraph(inlines.toList())
+
+        fun item(vararg blocks: MarkdownBlockFfi) =
+            MarkdownListItemFfi(
+                blocks = blocks.toList(),
+                checked = null,
+                blankLinesBefore = byteArrayOf(),
+            )
+        val nestedList =
+            MarkdownBlockFfi.ListBlock(
+                kind = MarkdownListKindFfi.Bullet("-"),
+                tight = true,
+                items =
+                    listOf(
+                        item(
+                            paragraph(
+                                MarkdownInlineFfi.Text("Nested "),
+                                MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("word"))),
+                                MarkdownInlineFfi.Text(" active"),
+                            ),
+                        ),
+                    ),
+            )
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.ListBlock(
+                            kind = MarkdownListKindFfi.Bullet("-"),
+                            tight = true,
+                            items =
+                                listOf(
+                                    item(paragraph(MarkdownInlineFfi.Text("Outer row")), nestedList),
+                                    item(paragraph(MarkdownInlineFfi.Text("Sibling row"))),
+                                ),
+                        ),
+                    ),
+            )
+        val projection = markdownDocumentToSpeakableProjection(document)
+        val passage =
+            TtsPassage(
+                messageIdHex = "m1",
+                sentenceIndex = 1,
+                projectionId = projection.projectionId,
+                visibleWord = listOf(TtsVisibleTextSpan("b0/i0/b1/i0/b0/n1/n0", 0, 4)),
+            )
+        val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
+        composeRule.setContent {
+            WhiteNoiseTheme(
+                darkTheme = darkTheme,
+                amoled = amoled,
+                fontScale = if (largeFont) 1.3f else 1f,
+            ) {
+                BubbleFixture(mine = mine, tag = TAG) {
+                    MarkdownMessageBody(document, ttsLeafHighlightResolver = resolver)
                 }
             }
         }

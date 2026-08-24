@@ -140,6 +140,20 @@ object GroupProjector {
         mine: Boolean,
     ): Boolean = !mine && !isDm
 
+    /**
+     * Whether the transcript should use the compact two-party presentation.
+     *
+     * This is deliberately separate from [isDm]: an MLS group remains a group
+     * for titles, permissions, settings, notifications, and lifecycle even
+     * when its latest authoritative roster contains only two people. Cached or
+     * still-hydrating rosters cannot switch a semantic group into this mode.
+     */
+    fun usesDirectTranscriptChrome(
+        isDirectConversation: Boolean,
+        memberCount: Int,
+        membersVerified: Boolean,
+    ): Boolean = isDirectConversation || (membersVerified && memberCount == 2)
+
     fun transcriptSenderDecoration(
         isDm: Boolean,
         mine: Boolean,
