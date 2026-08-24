@@ -12,6 +12,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -105,6 +106,28 @@ class TtsPlaybackForegroundServiceTest {
                 .orEmpty()
         assertTrue("generic title expected, got '$text'", text.isNotBlank())
         assertFalse("notification must not leak message content", text.contains("One"))
+        controller.destroy()
+    }
+
+    @Test
+    fun wordProgressDoesNotRepostTheNotification() {
+        val harness = installHost()
+        harness.speak("One two three four.")
+
+        val controller = Robolectric.buildService(TtsPlaybackForegroundService::class.java).create()
+        val service = controller.get()
+        service.onStartCommand(Intent(RuntimeEnvironment.getApplication(), service::class.java), 0, 1)
+        shadowOf(Looper.getMainLooper()).idle()
+        val posted = shadowOf(service as Service).lastForegroundNotification
+        assertNotNull(posted)
+
+        harness.engine.range(index = 0, start = 0, end = 3)
+        harness.engine.range(index = 0, start = 4, end = 7)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // Word progress changes the controller state but nothing this surface
+        // shows, so the posted notification must be the same instance.
+        assertSame(posted, shadowOf(service as Service).lastForegroundNotification)
         controller.destroy()
     }
 
@@ -295,6 +318,7 @@ class TtsPlaybackForegroundServiceTest {
 
     private class FakeServiceEngine : TtsSpeechEngine {
         private var doneCallback: ((String?) -> Unit)? = null
+        private var rangeCallback: ((String?, Int, Int, Int) -> Unit)? = null
         private val spoken = mutableListOf<String>()
 
         override fun setLanguage(locale: Locale): Int = TextToSpeech.LANG_AVAILABLE
@@ -308,10 +332,21 @@ class TtsPlaybackForegroundServiceTest {
             onStop: (String?, Boolean) -> Unit,
         ) {
             doneCallback = onDone
+            rangeCallback = onRangeStart
         }
 
         override fun clearCallbacks() {
             doneCallback = null
+            rangeCallback = null
+        }
+
+        /** Reports a spoken word range for the utterance at [index], as an engine does. */
+        fun range(
+            index: Int,
+            start: Int,
+            end: Int,
+        ) {
+            rangeCallback?.invoke(spoken[index], start, end, 0)
         }
 
         override fun speak(

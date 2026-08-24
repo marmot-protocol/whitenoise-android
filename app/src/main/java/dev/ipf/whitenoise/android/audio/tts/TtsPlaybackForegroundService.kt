@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -177,6 +178,14 @@ class TtsPlaybackForegroundService : Service() {
             serviceScope.launch {
                 host.controller.state
                     .map(TtsPlaybackSessionModel::from)
+                    // Speaking is republished for every word: the progress
+                    // fraction and the highlighted passage both change. The
+                    // surface here shows none of that, only play/pause, so
+                    // without this the notification is rebuilt and re-posted
+                    // several times a second on the main thread, each rebuild
+                    // allocating four actions, five PendingIntents and four
+                    // Icons for an identical result.
+                    .distinctUntilChanged()
                     .collect { model ->
                         if (!model.isActive) {
                             // Terminal: completion, explicit stop, or error —
