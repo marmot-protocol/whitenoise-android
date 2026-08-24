@@ -5,13 +5,14 @@ root=${1:?candidate root is required}
 : "${PR_NUMBER:?PR_NUMBER is required}"
 : "${HEAD_SHA:?HEAD_SHA is required}"
 : "${BUILD_RUN_NUMBER:?BUILD_RUN_NUMBER is required}"
+: "${EXPECTED_VERSION_CODE:?EXPECTED_VERSION_CODE is required}"
+[[ "$EXPECTED_VERSION_CODE" =~ ^[1-9][0-9]*$ ]]
 
-expected_version=2000000000
 expected_sha=${HEAD_SHA:0:7}
 max_apk_bytes=67108848
 max_expanded_bytes=536870912
 
-for channel in stable isolated; do
+for channel in regular; do
   dir="$root/$channel"
   test -d "$dir"
   (cd "$dir" && sha256sum --check SHA256SUMS)
@@ -35,17 +36,13 @@ for channel in stable isolated; do
   expanded_bytes=$(zipinfo -l "${apks[0]}" | awk '$1 ~ /^[-dl]/ { total += $4 } END { print total + 0 }')
   [[ "$expanded_bytes" -le "$max_expanded_bytes" ]]
 
-  if [[ "$channel" == stable ]]; then
-    expected_package=dev.ipf.whitenoise.android.preview
-  else
-    expected_package="dev.ipf.whitenoise.android.preview.pr${PR_NUMBER}"
-  fi
+  expected_package=dev.ipf.whitenoise.android.staging
 
   actual_package=$(apkanalyzer manifest application-id "${apks[0]}")
   actual_version=$(apkanalyzer manifest version-code "${apks[0]}")
   actual_version_name=$(apkanalyzer manifest version-name "${apks[0]}")
   [[ "$actual_package" == "$expected_package" ]]
-  [[ "$actual_version" == "$expected_version" ]]
+  [[ "$actual_version" == "$EXPECTED_VERSION_CODE" ]]
   [[ "$actual_version_name" == *"preview-pr${PR_NUMBER}-${expected_sha}"* ]]
   mapfile -t native_abis < <(zipinfo -1 "${apks[0]}" | sed -nE 's#^lib/([^/]+)/.+#\1#p' | sort -u)
   (( ${#native_abis[@]} == 1 ))

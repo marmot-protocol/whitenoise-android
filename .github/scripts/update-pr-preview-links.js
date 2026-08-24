@@ -3,16 +3,14 @@ const END = '<!-- pr-apk-preview:end -->'
 const LEGACY_COMMENT_MARKER = '<!-- pr-apk-preview -->'
 const APK_MIME = 'application/vnd.android.package-archive'
 
-function renderSection({ prNumber, headSha, stableUrl, isolatedUrl }) {
+function renderSection({ prNumber, headSha, regularUrl }) {
   return [
     START,
-    '## Preview APK',
+    '## PR test APK',
     '',
-    `**[Install/update White Noise PR](${stableUrl})** — stable app identity; keeps app data when switching PRs.`,
+    `**[Update regular White Noise](${regularUrl})** — installs in place and keeps app data.`,
     '',
-    `Built from PR #${prNumber} at \`${headSha.slice(0, 12)}\`. This replaces the installed White Noise PR app and retains its accounts and history.`,
-    '',
-    `[Isolated PR #${prNumber}](${isolatedUrl}) — use for storage/auth changes or side-by-side testing.`,
+    `Built from PR #${prNumber} at \`${headSha.slice(0, 12)}\`. This updates the regular White Noise staging app and retains its accounts and history.`,
     '',
     'Updates automatically on every push to this PR.',
     END,
@@ -74,10 +72,9 @@ async function removeLegacyPreviewComment(github, context, prNumber, core) {
 async function run({ github, context, core }) {
   const prNumber = Number(process.env.PR_NUMBER)
   const headSha = process.env.HEAD_SHA
-  const stableUrl = process.env.STABLE_URL
-  const isolatedUrl = process.env.ISOLATED_URL
-  if (!prNumber || !headSha || !stableUrl || !isolatedUrl) {
-    throw new Error('PR_NUMBER, HEAD_SHA, STABLE_URL, and ISOLATED_URL are required')
+  const regularUrl = process.env.REGULAR_URL
+  if (!prNumber || !headSha || !regularUrl) {
+    throw new Error('PR_NUMBER, HEAD_SHA, and REGULAR_URL are required')
   }
 
   const { data: pr } = await github.rest.pulls.get({
@@ -89,7 +86,7 @@ async function run({ github, context, core }) {
     core.info(`Skipping preview links for superseded PR head ${headSha}.`)
     return
   }
-  const section = renderSection({ prNumber, headSha, stableUrl, isolatedUrl })
+  const section = renderSection({ prNumber, headSha, regularUrl })
   await github.rest.pulls.update({
     owner: context.repo.owner,
     repo: context.repo.repo,

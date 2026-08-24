@@ -1,9 +1,9 @@
 name: Android PR APK
 
 # This pull_request workflow is intentionally unprivileged. It compiles the PR
-# code and hands unsigned preview candidates to android-pr-preview-publish.yml;
+# code and hands one unsigned regular-app candidate to android-pr-preview-publish.yml;
 # it never receives signing or upload credentials. workflow_dispatch lets a
-# current internal PR head be rebuilt after merge to restore missing preview links.
+# current internal PR head be rebuilt after merge to restore a missing regular-app link.
 on:
   pull_request:
     paths-ignore:
@@ -26,19 +26,16 @@ permissions:
 
 jobs:
   build:
-    name: Build untrusted preview candidates
-    # Preview signing is intentionally limited to branches in this repository.
+    name: Build untrusted regular-app PR candidate
+    # Staging signing is intentionally limited to branches in this repository.
     # Skip fork PRs cleanly instead of failing inside the internal-PR resolver.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      matrix:
-        channel: [stable, isolated]
     env:
-      PR_PREVIEW_CHANNEL: ${{ matrix.channel }}
+      PR_PREVIEW_CHANNEL: regular
       GITHUB_RUN_NUMBER: ${{ github.run_number }}
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
 
@@ -114,6 +111,14 @@ jobs:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
+      - name: Resolve regular app version contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t version_codes < <(sed -nE 's/^[[:space:]]*versionCode = ([1-9][0-9]*)$/\1/p' app/build.gradle.kts)
+          (( ${#version_codes[@]} == 1 ))
+          printf 'EXPECTED_VERSION_CODE=%s\n' "${version_codes[0]}" >> "$GITHUB_ENV"
+
       - name: Test preview workflow contract
         run: |
           .github/scripts/test-pr-preview-contract.sh
@@ -143,7 +148,7 @@ jobs:
       - name: Upload untrusted candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: pr-preview-${{ matrix.channel }}
+          name: pr-preview-regular
           path: preview-candidate/
           if-no-files-found: error
           retention-days: 1

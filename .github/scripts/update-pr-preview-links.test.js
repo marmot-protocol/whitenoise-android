@@ -12,17 +12,16 @@ const {
 const links = {
   prNumber: 2143,
   headSha: 'ba3a01bd3fd43c9c438ec53d4eb203da446fe419',
-  stableUrl: 'https://nostr.download/abc123.apk',
-  isolatedUrl: 'https://nostr.download/def456.apk',
+  regularUrl: 'https://nostr.download/abc123.apk',
 }
 
 test('renders preview links with start/end markers', () => {
   const section = renderSection(links)
   assert.match(section, /^<!-- pr-apk-preview:start -->/)
   assert.match(section, /<!-- pr-apk-preview:end -->$/)
-  assert.match(section, /Install\/update White Noise PR/)
+  assert.match(section, /Update regular White Noise/)
   assert.match(section, /Built from PR #2143 at `ba3a01bd3fd4`/)
-  assert.match(section, /Isolated PR #2143/)
+  assert.doesNotMatch(section, /Isolated/)
 })
 
 test('appends preview section when description has no prior block', () => {
@@ -98,14 +97,12 @@ test('does not update links or delete the fallback comment for a superseded head
   const previousEnv = {
     PR_NUMBER: process.env.PR_NUMBER,
     HEAD_SHA: process.env.HEAD_SHA,
-    STABLE_URL: process.env.STABLE_URL,
-    ISOLATED_URL: process.env.ISOLATED_URL,
+    REGULAR_URL: process.env.REGULAR_URL,
   }
   Object.assign(process.env, {
     PR_NUMBER: String(links.prNumber),
     HEAD_SHA: links.headSha,
-    STABLE_URL: links.stableUrl,
-    ISOLATED_URL: links.isolatedUrl,
+    REGULAR_URL: links.regularUrl,
   })
 
   try {
@@ -156,14 +153,12 @@ test('a head advance at the write boundary cannot leave stale links as the final
   const previousEnv = {
     PR_NUMBER: process.env.PR_NUMBER,
     HEAD_SHA: process.env.HEAD_SHA,
-    STABLE_URL: process.env.STABLE_URL,
-    ISOLATED_URL: process.env.ISOLATED_URL,
+    REGULAR_URL: process.env.REGULAR_URL,
   }
   Object.assign(process.env, {
     PR_NUMBER: String(links.prNumber),
     HEAD_SHA: links.headSha,
-    STABLE_URL: links.stableUrl,
-    ISOLATED_URL: links.isolatedUrl,
+    REGULAR_URL: links.regularUrl,
   })
 
   try {

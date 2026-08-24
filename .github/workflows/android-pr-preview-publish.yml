@@ -34,9 +34,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p candidates/stable candidates/isolated
-          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-stable --dir candidates/stable
-          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-isolated --dir candidates/isolated
+          mkdir -p candidates/regular
+          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-regular --dir candidates/regular
 
       # Resolve the validated PR number before the publisher starts so job-level
       # concurrency cannot couple distinct PRs that happen to share a branch.
@@ -56,25 +55,20 @@ jobs:
             [[ $(grep -c "^${key}=" "$file") -eq 1 ]]
             printf '%s' "$value"
           }
-          stable=candidates/stable/provenance.env
-          isolated=candidates/isolated/provenance.env
-          stable_pr=$(provenance_value "$stable" pr_number)
-          isolated_pr=$(provenance_value "$isolated" pr_number)
-          stable_sha=$(provenance_value "$stable" head_sha)
-          isolated_sha=$(provenance_value "$isolated" head_sha)
-          stable_run=$(provenance_value "$stable" run_number)
-          isolated_run=$(provenance_value "$isolated" run_number)
-          [[ "$stable_pr" == "$isolated_pr" && "$stable_sha" == "$isolated_sha" && "$stable_run" == "$isolated_run" ]]
-          [[ "$stable_pr" =~ ^[1-9][0-9]*$ && "$stable_sha" =~ ^[0-9a-f]{40}$ && "$stable_run" =~ ^[1-9][0-9]*$ ]]
-          [[ "$stable_run" == "$BUILD_RUN_NUMBER" ]]
+          regular=candidates/regular/provenance.env
+          regular_pr=$(provenance_value "$regular" pr_number)
+          regular_sha=$(provenance_value "$regular" head_sha)
+          regular_run=$(provenance_value "$regular" run_number)
+          [[ "$regular_pr" =~ ^[1-9][0-9]*$ && "$regular_sha" =~ ^[0-9a-f]{40}$ && "$regular_run" =~ ^[1-9][0-9]*$ ]]
+          [[ "$regular_run" == "$BUILD_RUN_NUMBER" ]]
           if [[ "$WORKFLOW_EVENT" == pull_request ]]; then
-            [[ "$stable_sha" == "$WORKFLOW_HEAD_SHA" ]]
+            [[ "$regular_sha" == "$WORKFLOW_HEAD_SHA" ]]
           fi
-          current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${stable_pr}" \
+          current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${regular_pr}" \
             --jq '[.state, .head.sha, .head.repo.full_name] | @tsv')
-          expected=$(printf 'open\t%s\t%s' "$stable_sha" "$GITHUB_REPOSITORY")
+          expected=$(printf 'open\t%s\t%s' "$regular_sha" "$GITHUB_REPOSITORY")
           [[ "$current" == "$expected" ]]
-          printf 'pr_number=%s\nhead_sha=%s\n' "$stable_pr" "$stable_sha" >> "$GITHUB_OUTPUT"
+          printf 'pr_number=%s\nhead_sha=%s\n' "$regular_pr" "$regular_sha" >> "$GITHUB_OUTPUT"
 
   publish:
     needs: prepare
@@ -114,9 +108,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p candidates/stable candidates/isolated
-          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-stable --dir candidates/stable
-          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-isolated --dir candidates/isolated
+          mkdir -p candidates/regular
+          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-regular --dir candidates/regular
 
       # Recheck the freshly downloaded untrusted artifacts against the values
       # that selected this PR's concurrency group before exposing any secret.
@@ -135,25 +128,20 @@ jobs:
             [[ $(grep -c "^${key}=" "$file") -eq 1 ]]
             printf '%s' "$value"
           }
-          stable=candidates/stable/provenance.env
-          isolated=candidates/isolated/provenance.env
-          stable_pr=$(provenance_value "$stable" pr_number)
-          isolated_pr=$(provenance_value "$isolated" pr_number)
-          stable_sha=$(provenance_value "$stable" head_sha)
-          isolated_sha=$(provenance_value "$isolated" head_sha)
-          stable_run=$(provenance_value "$stable" run_number)
-          isolated_run=$(provenance_value "$isolated" run_number)
-          [[ "$stable_pr" == "$isolated_pr" && "$stable_sha" == "$isolated_sha" && "$stable_run" == "$isolated_run" ]]
-          [[ "$stable_pr" =~ ^[1-9][0-9]*$ && "$stable_sha" =~ ^[0-9a-f]{40}$ && "$stable_run" =~ ^[1-9][0-9]*$ ]]
-          [[ "$stable_run" == "$BUILD_RUN_NUMBER" ]]
+          regular=candidates/regular/provenance.env
+          regular_pr=$(provenance_value "$regular" pr_number)
+          regular_sha=$(provenance_value "$regular" head_sha)
+          regular_run=$(provenance_value "$regular" run_number)
+          [[ "$regular_pr" =~ ^[1-9][0-9]*$ && "$regular_sha" =~ ^[0-9a-f]{40}$ && "$regular_run" =~ ^[1-9][0-9]*$ ]]
+          [[ "$regular_run" == "$BUILD_RUN_NUMBER" ]]
           if [[ "$WORKFLOW_EVENT" == pull_request ]]; then
-            [[ "$stable_sha" == "$WORKFLOW_HEAD_SHA" ]]
+            [[ "$regular_sha" == "$WORKFLOW_HEAD_SHA" ]]
           fi
-          current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${stable_pr}" \
+          current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${regular_pr}" \
             --jq '[.state, .head.sha, .head.repo.full_name] | @tsv')
-          expected=$(printf 'open\t%s\t%s' "$stable_sha" "$GITHUB_REPOSITORY")
+          expected=$(printf 'open\t%s\t%s' "$regular_sha" "$GITHUB_REPOSITORY")
           [[ "$current" == "$expected" ]]
-          [[ "$stable_pr" == "$PR_NUMBER" && "$stable_sha" == "$HEAD_SHA" ]]
+          [[ "$regular_pr" == "$PR_NUMBER" && "$regular_sha" == "$HEAD_SHA" ]]
 
       - name: Verify current PR head
         env:
@@ -179,28 +167,35 @@ jobs:
       - name: Set up Android SDK tools
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
 
+      - name: Resolve trusted regular app version contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t version_codes < <(sed -nE 's/^[[:space:]]*versionCode = ([1-9][0-9]*)$/\1/p' app/build.gradle.kts)
+          (( ${#version_codes[@]} == 1 ))
+          printf 'EXPECTED_VERSION_CODE=%s\n' "${version_codes[0]}" >> "$GITHUB_ENV"
+
       - name: Verify untrusted candidates
         shell: bash
         run: .github/scripts/verify-pr-preview-candidates.sh candidates
 
-      - name: Decode isolated preview signing key
+      - name: Decode regular staging signing key
         env:
-          PR_PREVIEW_KEYSTORE_BASE64: ${{ secrets.PR_PREVIEW_KEYSTORE_BASE64 }}
+          WHITENOISE_STAGING_KEYSTORE_BASE64: ${{ secrets.WHITENOISE_STAGING_KEYSTORE_BASE64 }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$PR_PREVIEW_KEYSTORE_BASE64"
-          printf '%s' "$PR_PREVIEW_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/pr-preview.p12"
-          chmod 600 "$RUNNER_TEMP/pr-preview.p12"
+          test -n "$WHITENOISE_STAGING_KEYSTORE_BASE64"
+          printf '%s' "$WHITENOISE_STAGING_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/whitenoise-staging.p12"
+          chmod 600 "$RUNNER_TEMP/whitenoise-staging.p12"
 
       - name: Sign and verify previews
         env:
-          PR_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.PR_PREVIEW_KEYSTORE_PASSWORD }}
-          PR_PREVIEW_KEY_ALIAS: ${{ secrets.PR_PREVIEW_KEY_ALIAS }}
-          PR_PREVIEW_KEY_PASSWORD: ${{ secrets.PR_PREVIEW_KEY_PASSWORD }}
-          PR_PREVIEW_CERT_SHA256: ${{ secrets.PR_PREVIEW_CERT_SHA256 }}
+          WHITENOISE_STAGING_KEYSTORE_PASSWORD: ${{ secrets.WHITENOISE_STAGING_KEYSTORE_PASSWORD }}
+          WHITENOISE_STAGING_KEY_ALIAS: ${{ secrets.WHITENOISE_STAGING_KEY_ALIAS }}
+          WHITENOISE_STAGING_KEY_PASSWORD: ${{ secrets.WHITENOISE_STAGING_KEY_PASSWORD }}
         shell: bash
-        run: .github/scripts/sign-pr-preview-candidates.sh candidates signed "$RUNNER_TEMP/pr-preview.p12"
+        run: .github/scripts/sign-pr-preview-candidates.sh candidates signed "$RUNNER_TEMP/whitenoise-staging.p12"
 
       - name: Verify signed previews
         shell: bash
@@ -232,7 +227,7 @@ jobs:
         run: |
           set -euo pipefail
           go install github.com/fiatjaf/nak@62fa610a063b708743456e49f9befaef4a441a37
-          for channel in stable isolated; do
+          for channel in regular; do
             apk=$(find "signed/$channel" -type f -name '*.apk' -print -quit)
             url=$(APK_PATH="$apk" .github/scripts/upload-pr-apk-to-blossom.sh)
             remote_sha=$(curl --fail --location --retry 3 --retry-all-errors --max-time 240 "$url" | sha256sum | awk '{print $1}')
@@ -260,13 +255,12 @@ jobs:
             exit 1
           }
 
-      - name: Update PR description with preview links
+      - name: Update PR description with regular-app link
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v8
         env:
           PR_NUMBER: ${{ env.PR_NUMBER }}
           HEAD_SHA: ${{ env.HEAD_SHA }}
-          STABLE_URL: ${{ steps.publish.outputs.stable_url }}
-          ISOLATED_URL: ${{ steps.publish.outputs.isolated_url }}
+          REGULAR_URL: ${{ steps.publish.outputs.regular_url }}
         with:
           script: |
             const updater = require('./.github/scripts/update-pr-preview-links.js')

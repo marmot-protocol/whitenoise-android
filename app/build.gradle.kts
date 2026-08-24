@@ -210,17 +210,12 @@ val allowUnsignedRelease =
     runtimeConfigProperty("WHITENOISE_ALLOW_UNSIGNED_RELEASE", "false")
         .equals("true", ignoreCase = true)
 
-// PR preview inputs. The default "stable" channel deliberately keeps one
-// applicationId so every PR preview updates the same app and retains its data.
-// The "isolated" channel remains available when a reviewer needs side-by-side
-// installs or a clean data directory. Both are signed later by a privileged,
-// base-branch-only workflow; Gradle never receives the preview signing key.
+// PR test inputs. Every PR APK deliberately uses the regular staging app
+// identity so it updates the tester's installed White Noise app and retains
+// accounts/history. Signing happens later in a privileged base-branch-only
+// workflow; Gradle never receives the staging signing key.
 val prNumber: String? = System.getenv("PR_NUMBER")?.takeIf { it.isNotBlank() }
 val prPreviewChannel: String? = System.getenv("PR_PREVIEW_CHANNEL")?.takeIf { it.isNotBlank() }
-// Android accepts an update whose versionCode equals the installed version.
-// A fixed preview-only code therefore lets a tester move between any two PR
-// builds without uninstalling and losing the preview app's data.
-val prPreviewVersionCode = 2_000_000_000
 val defaultAppName = "White Noise"
 val buildShortSha =
     System.getenv("PREVIEW_HEAD_SHA")?.take(7)
@@ -331,7 +326,7 @@ android {
         create("preview") {
             dimension = "environment"
             val previewIdentity = prNumber ?: "local"
-            val previewChannel = prPreviewChannel ?: "stable"
+            val previewChannel = prPreviewChannel ?: "regular"
             manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher_preview"
             manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_preview"
             manifestPlaceholders["deepLinkScheme"] = "whitenoise-preview"
@@ -344,26 +339,13 @@ android {
             buildConfigField("String", "WHITENOISE_TELEMETRY_TENANT", "whitenoise-android-preview".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_PUSH_SERVER_PUBKEY_HEX", "".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_PUSH_RELAY_HINT", "".asBuildConfigString())
-            versionCode = prPreviewVersionCode
             when (previewChannel) {
-                "stable" -> {
-                    applicationIdSuffix = ".preview"
+                "regular" -> {
+                    applicationId = "dev.ipf.whitenoise.android.staging"
                     versionNameSuffix = "-preview-pr$previewIdentity-$buildShortSha"
                     manifestPlaceholders["appName"] = "White Noise PR"
                 }
-                "isolated" -> {
-                    applicationIdSuffix = ".preview.pr$previewIdentity"
-                    versionNameSuffix = "-preview-pr$previewIdentity-$buildShortSha-isolated"
-                    manifestPlaceholders["appName"] = "PR $previewIdentity Isolated"
-                    val isolatedDeepLinkScheme = "whitenoise-preview-pr$previewIdentity"
-                    manifestPlaceholders["deepLinkScheme"] = isolatedDeepLinkScheme
-                    buildConfigField(
-                        "String",
-                        "WHITENOISE_DEEP_LINK_SCHEME",
-                        isolatedDeepLinkScheme.asBuildConfigString(),
-                    )
-                }
-                else -> error("PR_PREVIEW_CHANNEL must be 'stable' or 'isolated'")
+                else -> error("PR_PREVIEW_CHANNEL must be 'regular'")
             }
         }
 

@@ -21,13 +21,11 @@ case "$command" in
   application-id)
     if [[ "${FAKE_BAD_PACKAGE:-}" == "$channel" ]]; then
       printf 'invalid.preview.package\n'
-    elif [[ "$channel" == stable ]]; then
-      printf 'dev.ipf.whitenoise.android.preview\n'
     else
-      printf 'dev.ipf.whitenoise.android.preview.pr%s\n' "$PR_NUMBER"
+      printf 'dev.ipf.whitenoise.android.staging\n'
     fi
     ;;
-  version-code) printf '%s\n' "${FAKE_VERSION_CODE:-2000000000}" ;;
+  version-code) printf '%s\n' "${FAKE_VERSION_CODE:-9}" ;;
   version-name) printf '%s\n' "${FAKE_VERSION_NAME:-2026.8.6-preview-pr${PR_NUMBER}-${HEAD_SHA:0:7}}" ;;
   *) exit 64 ;;
 esac
@@ -54,11 +52,12 @@ chmod +x "$fake_bin/apkanalyzer" "$fake_bin/zipinfo"
 export PR_NUMBER=2468
 export HEAD_SHA=abcdef0123456789abcdef0123456789abcdef01
 export BUILD_RUN_NUMBER=73
+export EXPECTED_VERSION_CODE=9
 
 make_candidates() {
   local root=$1
   rm -rf "$root"
-  for channel in stable isolated; do
+  for channel in regular; do
     mkdir -p "$root/$channel"
     printf 'valid candidate %s\n' "$channel" > "$root/$channel/preview.apk"
     (cd "$root/$channel" && sha256sum preview.apk > SHA256SUMS)
@@ -83,20 +82,21 @@ candidates="$tmp/candidates"
 make_candidates "$candidates"
 PATH="$fake_bin:$PATH" "$verifier" "$candidates" >/dev/null
 
-expect_rejection 'wrong package' env PATH="$fake_bin:$PATH" FAKE_BAD_PACKAGE=stable "$verifier" "$candidates"
-expect_rejection 'wrong version code' env PATH="$fake_bin:$PATH" FAKE_VERSION_CODE=7 "$verifier" "$candidates"
+expect_rejection 'wrong package' env PATH="$fake_bin:$PATH" FAKE_BAD_PACKAGE=regular "$verifier" "$candidates"
+expect_rejection 'lower version code' env PATH="$fake_bin:$PATH" FAKE_VERSION_CODE=8 "$verifier" "$candidates"
+expect_rejection 'higher version code' env PATH="$fake_bin:$PATH" FAKE_VERSION_CODE=2000000000 "$verifier" "$candidates"
 expect_rejection 'wrong PR/SHA version name' env PATH="$fake_bin:$PATH" FAKE_VERSION_NAME=wrong "$verifier" "$candidates"
 expect_rejection 'wrong ABI' env PATH="$fake_bin:$PATH" FAKE_ABI=x86_64 "$verifier" "$candidates"
 expect_rejection 'invalid ZIP' env PATH="$fake_bin:$PATH" FAKE_INVALID_ZIP=true "$verifier" "$candidates"
 
-printf 'head_sha=wrong\n' >> "$candidates/stable/provenance.env"
+printf 'head_sha=wrong\n' >> "$candidates/regular/provenance.env"
 expect_rejection 'tampered provenance' env PATH="$fake_bin:$PATH" "$verifier" "$candidates"
 make_candidates "$candidates"
-cp "$candidates/stable/preview.apk" "$candidates/stable/extra.apk"
+cp "$candidates/regular/preview.apk" "$candidates/regular/extra.apk"
 expect_rejection 'multiple APKs' env PATH="$fake_bin:$PATH" "$verifier" "$candidates"
 make_candidates "$candidates"
-truncate -s 67108849 "$candidates/stable/preview.apk"
-(cd "$candidates/stable" && sha256sum preview.apk > SHA256SUMS)
+truncate -s 67108849 "$candidates/regular/preview.apk"
+(cd "$candidates/regular" && sha256sum preview.apk > SHA256SUMS)
 expect_rejection 'oversized APK' env PATH="$fake_bin:$PATH" "$verifier" "$candidates"
 make_candidates "$candidates"
 expect_rejection 'oversized expanded APK' env PATH="$fake_bin:$PATH" FAKE_EXPANDED_BYTES=536870913 "$verifier" "$candidates"
@@ -117,14 +117,14 @@ case "$1" in
     cp "$input" "$output"
     ;;
   verify)
-    cert_digest=${FAKE_CERT_DIGEST:-aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd}
+    cert_digest=${FAKE_CERT_DIGEST:-6bd133d7b8f9feb99e06daec0f22aae597bbcf1bb6af5dee73ec21df94634dd2}
     if [[ "${FAKE_LEGACY_CERT_OUTPUT:-false}" == true ]]; then
       printf 'Signer #1 certificate SHA-256 digest: %s\n' "$cert_digest"
     else
       printf 'V3.0 Signer: certificate SHA-256 digest: %s\n' "$cert_digest"
     fi
     if [[ "${FAKE_SECOND_SIGNER:-false}" == true ]]; then
-      printf 'Signer #2 certificate SHA-256 digest: aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd\n'
+      printf 'Signer #2 certificate SHA-256 digest: 6bd133d7b8f9feb99e06daec0f22aae597bbcf1bb6af5dee73ec21df94634dd2\n'
     fi
     ;;
   *) exit 64 ;;
@@ -134,14 +134,13 @@ chmod +x "$android_home/build-tools/1/apksigner"
 
 make_candidates "$candidates"
 export ANDROID_HOME="$android_home"
-export PR_PREVIEW_KEYSTORE_PASSWORD=test
-export PR_PREVIEW_KEY_ALIAS=test
-export PR_PREVIEW_KEY_PASSWORD=test
-expected_cert_digest=aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd
-export PR_PREVIEW_CERT_SHA256=$expected_cert_digest
+export WHITENOISE_STAGING_KEYSTORE_PASSWORD=test
+export WHITENOISE_STAGING_KEY_ALIAS=test
+export WHITENOISE_STAGING_KEY_PASSWORD=test
+expected_cert_digest=6bd133d7b8f9feb99e06daec0f22aae597bbcf1bb6af5dee73ec21df94634dd2
 "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
 "$stager" "$tmp/signed" "$candidates" "$tmp/signed-check"
-for channel in stable isolated; do
+for channel in regular; do
   checksum_path=$(awk '{print $2}' "$tmp/signed-check/$channel/SHA256SUMS")
   [[ "$checksum_path" == "whitenoise-pr-${PR_NUMBER}-${channel}.apk" ]]
 done
@@ -152,18 +151,10 @@ rm -rf "$tmp/signed"
 FAKE_LEGACY_CERT_OUTPUT=true "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
 rm -rf "$tmp/signed"
 
-keytool_fingerprint=$(printf '%s' "$expected_cert_digest" |
-  sed -E 's/(..)/\1:/g; s/:$//; y/abcdef/ABCDEF/')
-export PR_PREVIEW_CERT_SHA256="SHA256: $keytool_fingerprint"
-"$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
-rm -rf "$tmp/signed"
-
-export PR_PREVIEW_CERT_SHA256=$expected_cert_digest
 wrong_cert_digest=deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef
 expect_rejection 'wrong signing certificate' env FAKE_CERT_DIGEST="$wrong_cert_digest" "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
 rm -rf "$tmp/signed"
 expect_rejection 'multiple signing certificates' env FAKE_SECOND_SIGNER=true "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
 rm -rf "$tmp/signed"
-expect_rejection 'malformed expected fingerprint' env PR_PREVIEW_CERT_SHA256=not-a-fingerprint "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
 
 printf 'preview validation fixtures: passed\n'
