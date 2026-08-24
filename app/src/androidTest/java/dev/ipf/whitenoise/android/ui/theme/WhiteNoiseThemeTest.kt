@@ -19,6 +19,9 @@ import org.junit.Rule
 import org.junit.Test
 
 private const val OPAQUE_ARGB_MASK = 0xFFFFFFFFL
+private val AmoledPrimary = Color(0xFFFFC400)
+private val AmoledPrimaryContainer = Color(0xFF493800)
+private val BlueFreeWhiteAccent = Color(0xFFFFFF00)
 
 class WhiteNoiseThemeTest {
     @get:Rule
@@ -137,7 +140,7 @@ class WhiteNoiseThemeTest {
     }
 
     @Test
-    fun customAccentKeepsAmoledSurfaceTintTransparent() {
+    fun customAccentKeepsAmoledSurfaceTintTransparentAndDropsBlueChannel() {
         var scheme: ColorScheme? = null
 
         composeRule.setContent {
@@ -153,19 +156,25 @@ class WhiteNoiseThemeTest {
 
         composeRule.runOnIdle {
             val s = requireNotNull(scheme)
-            assertEquals(Color(0xFFFFC107), s.primary)
+            assertEquals(Color(0xFFFFC100), s.primary)
             assertEquals(Color.Transparent, s.surfaceTint)
         }
     }
 
     @Test
     fun blackAccentKeepsInversePrimaryReadableAcrossThemes() {
-        assertInversePrimaryContrast(Color.Black)
+        assertInversePrimaryContrast(
+            accent = Color.Black,
+            expectedAmoledAccent = AmoledPrimary,
+        )
     }
 
     @Test
     fun whiteAccentKeepsInversePrimaryReadableAcrossThemes() {
-        assertInversePrimaryContrast(Color.White)
+        assertInversePrimaryContrast(
+            accent = Color.White,
+            expectedAmoledAccent = BlueFreeWhiteAccent,
+        )
     }
 
     /**
@@ -208,15 +217,15 @@ class WhiteNoiseThemeTest {
             // text/action content.
             assertEquals(Color.Black, s.inverseSurface)
             assertEquals(s.onSurface, s.inverseOnSurface)
-            assertEquals(Highlight, s.inversePrimary)
+            assertEquals(AmoledPrimary, s.inversePrimary)
             // Tonal-elevation overlay must be a no-op on AMOLED.
             assertEquals(Color.Transparent, s.surfaceTint)
         }
     }
 
-    /** The locked brand primary stays cyan even on the AMOLED variant (#446). */
+    /** AMOLED replaces the cyan brand primary with a readable blue-free accent. */
     @Test
-    fun amoledThemeKeepsBrandPrimaryCyan() {
+    fun amoledThemeUsesBlueFreePrimary() {
         var primary: Color? = null
         var primaryContainer: Color? = null
 
@@ -231,20 +240,26 @@ class WhiteNoiseThemeTest {
         }
 
         composeRule.runOnIdle {
-            val expected = Color(0xFF06B6D4)
-            assertEquals(expected, primary)
-            assertEquals(expected, primaryContainer)
+            assertEquals(AmoledPrimary, primary)
+            assertEquals(AmoledPrimaryContainer, primaryContainer)
         }
     }
 
-    private fun assertInversePrimaryContrast(accent: Color) {
+    private fun assertInversePrimaryContrast(
+        accent: Color,
+        expectedAmoledAccent: Color,
+    ) {
         val captured = CapturedSchemes()
         composeRule.setContent { CaptureAccentSchemes(accent, captured) }
 
         composeRule.runOnIdle {
-            listOf(captured.light, captured.dark, captured.amoled).forEach { capturedScheme ->
+            listOf(
+                captured.light to accent,
+                captured.dark to accent,
+                captured.amoled to expectedAmoledAccent,
+            ).forEach { (capturedScheme, expectedPrimary) ->
                 val scheme = requireNotNull(capturedScheme)
-                assertEquals(accent, scheme.primary)
+                assertEquals(expectedPrimary, scheme.primary)
                 val ratio =
                     contrastRatio(
                         scheme.inversePrimary.toOpaqueArgb(),
