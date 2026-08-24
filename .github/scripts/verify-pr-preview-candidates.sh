@@ -9,7 +9,7 @@ root=${1:?candidate root is required}
 [[ "$EXPECTED_VERSION_CODE" =~ ^[1-9][0-9]*$ ]]
 
 expected_sha=${HEAD_SHA:0:7}
-max_apk_bytes=67108848
+max_apk_bytes=67108847
 max_expanded_bytes=536870912
 
 for channel in regular; do

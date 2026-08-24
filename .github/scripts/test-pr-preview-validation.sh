@@ -95,7 +95,7 @@ make_candidates "$candidates"
 cp "$candidates/regular/preview.apk" "$candidates/regular/extra.apk"
 expect_rejection 'multiple APKs' env PATH="$fake_bin:$PATH" "$verifier" "$candidates"
 make_candidates "$candidates"
-truncate -s 67108849 "$candidates/regular/preview.apk"
+truncate -s 67108848 "$candidates/regular/preview.apk"
 (cd "$candidates/regular" && sha256sum preview.apk > SHA256SUMS)
 expect_rejection 'oversized APK' env PATH="$fake_bin:$PATH" "$verifier" "$candidates"
 make_candidates "$candidates"
