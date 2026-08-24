@@ -1240,17 +1240,12 @@ internal fun ConversationScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
-    val currentOnBack by rememberUpdatedState(onBack)
-    val exitCoordinator = remember(chat.id) { ConversationExitCoordinator() }
-
-    fun exitConversation() {
-        exitCoordinator.requestExit(
+    val exitConversation =
+        rememberConversationExitHandler(
+            identity = chat.id,
             imeIsOpen = imeIsOpen,
-            hideIme = { keyboardController?.hide() },
-            clearComposerFocus = { focusManager.clearFocus(force = true) },
-            navigate = { currentOnBack() },
+            routeToChatList = onBack,
         )
-    }
 
     val eventCardResolver =
         remember(controller, appState, conversationAccountRef, appState.runtimeGeneration) {
@@ -2150,14 +2145,7 @@ internal fun ConversationScreen(
     // A voice/dictation handoff never sets composerDismissInProgress, so its
     // temporary inset collapse continues to preserve focus and selection.
     LaunchedEffect(imeIsOpen, composerDismissInProgress) {
-        if (!imeIsOpen && exitCoordinator.awaitingImeDismiss) {
-            composerDismissInProgress = false
-            exitCoordinator.onImeVisibilityChanged(
-                imeIsOpen = false,
-                clearComposerFocus = { focusManager.clearFocus(force = true) },
-                navigate = { currentOnBack() },
-            )
-        } else if (!imeIsOpen && composerDismissInProgress) {
+        if (!imeIsOpen && composerDismissInProgress) {
             focusManager.clearFocus(force = true)
             composerDismissInProgress = false
         }
@@ -2678,7 +2666,7 @@ internal fun ConversationScreen(
                 openTransferOnDetails = false
                 openAddMemberOnDetails = false
             },
-            onLeft = ::exitConversation,
+            onLeft = exitConversation,
             onJumpToMessage = { messageId ->
                 showDetails = false
                 openTransferOnDetails = false
@@ -2899,7 +2887,7 @@ internal fun ConversationScreen(
                 openedAsDmHint = openedAsDmHint,
                 openDetailsDescription = openDetailsDescription,
                 onOpenDetails = { showDetails = true },
-                onBack = ::exitConversation,
+                onBack = exitConversation,
                 menuOpen = menuOpen,
                 onMenuOpenChange = { menuOpen = it },
                 onOpenSearch = {
@@ -3048,7 +3036,7 @@ internal fun ConversationScreen(
                 controller = controller,
                 appState = appState,
                 messageTextCopy = messageTextCopy,
-                onBack = ::exitConversation,
+                onBack = exitConversation,
                 initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
                 onDraftChange = { appState.setDraft(draftAccountRef, controller.group.groupIdHex, it) },
                 composerTextState = composerTextState,
@@ -3372,7 +3360,7 @@ internal fun ConversationScreen(
                                     onQuickReactionsReset = { resetQuickReactionEmojis() },
                                     onReplyPreviewClick = { navigateToReplyTarget(it) },
                                     composerGate = composerGate,
-                                    onBack = ::exitConversation,
+                                    onBack = exitConversation,
                                     mentionCandidates = mentionPicker.candidates,
                                     mentionPickerEnabled = mentionPicker.enabled,
                                     collapseLongMessages = collapseLongMessages,

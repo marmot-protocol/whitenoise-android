@@ -18,12 +18,6 @@ class ConversationExitCoordinatorTest {
             clearComposerFocus = { events += "clear-focus" },
             navigate = { events += "navigate" },
         )
-        coordinator.requestExit(
-            imeIsOpen = true,
-            hideIme = { events += "hide-ime-again" },
-            clearComposerFocus = { events += "clear-focus-again" },
-            navigate = { events += "navigate-again" },
-        )
 
         assertEquals(listOf("hide-ime"), events)
         assertTrue(coordinator.awaitingImeDismiss)
@@ -35,6 +29,31 @@ class ConversationExitCoordinatorTest {
         )
 
         assertEquals(listOf("hide-ime", "clear-focus", "navigate"), events)
+        assertFalse(coordinator.awaitingImeDismiss)
+    }
+
+    @Test
+    fun repeatedExitRecoversWhenImeDismissEdgeNeverArrives() {
+        val events = mutableListOf<String>()
+        val coordinator = ConversationExitCoordinator()
+
+        coordinator.requestExit(
+            imeIsOpen = true,
+            hideIme = { events += "hide-ime" },
+            clearComposerFocus = { events += "clear-focus" },
+            navigate = { events += "navigate" },
+        )
+        coordinator.requestExit(
+            imeIsOpen = true,
+            hideIme = { events += "hide-ime-retry" },
+            clearComposerFocus = { events += "clear-focus" },
+            navigate = { events += "navigate" },
+        )
+
+        assertEquals(
+            listOf("hide-ime", "hide-ime-retry", "clear-focus", "navigate"),
+            events,
+        )
         assertFalse(coordinator.awaitingImeDismiss)
     }
 
@@ -84,11 +103,12 @@ class ConversationExitCoordinatorTest {
     fun conversationScreenRoutesEveryListExitThroughTheCoordinator() {
         val screen = sourceFile("ConversationScreen.kt").readText()
 
-        assertTrue(screen.contains("fun exitConversation()"))
+        assertTrue(screen.contains("val exitConversation ="))
+        assertTrue(screen.contains("rememberConversationExitHandler("))
         assertTrue(screen.contains("ConversationTopBar("))
-        assertTrue(screen.contains("onBack = ::exitConversation"))
+        assertTrue(screen.contains("onBack = exitConversation"))
         assertTrue(screen.contains("ConversationBackAction.NAVIGATE_UP -> exitConversation()"))
-        assertTrue(screen.contains("onLeft = ::exitConversation"))
+        assertTrue(screen.contains("onLeft = exitConversation"))
         listOf(
             "ConversationBackAction.NAVIGATE_UP -> onBack()",
             "onLeft = onBack",

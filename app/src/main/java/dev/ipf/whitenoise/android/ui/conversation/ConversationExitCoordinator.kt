@@ -1,5 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+
 /**
  * Serializes the transition from a mounted conversation to the chat list.
  *
@@ -19,7 +26,14 @@ internal class ConversationExitCoordinator {
         clearComposerFocus: () -> Unit,
         navigate: () -> Unit,
     ) {
-        if (completing || awaitingImeDismiss) return
+        if (completing) return
+
+        if (awaitingImeDismiss) {
+            awaitingImeDismiss = false
+            hideIme()
+            complete(clearComposerFocus, navigate)
+            return
+        }
 
         hideIme()
         if (imeIsOpen) {
@@ -50,6 +64,41 @@ internal class ConversationExitCoordinator {
             navigate()
         } finally {
             completing = false
+        }
+    }
+}
+
+@Composable
+internal fun rememberConversationExitHandler(
+    identity: Any? = Unit,
+    imeIsOpen: Boolean,
+    routeToChatList: () -> Unit,
+): () -> Unit {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val currentImeIsOpen = rememberUpdatedState(imeIsOpen)
+    val currentKeyboardController = rememberUpdatedState(keyboardController)
+    val currentRouteToChatList = rememberUpdatedState(routeToChatList)
+    val coordinator = remember(identity) { ConversationExitCoordinator() }
+
+    LaunchedEffect(coordinator, imeIsOpen, focusManager) {
+        if (!imeIsOpen && coordinator.awaitingImeDismiss) {
+            coordinator.onImeVisibilityChanged(
+                imeIsOpen = false,
+                clearComposerFocus = { focusManager.clearFocus(force = true) },
+                navigate = { currentRouteToChatList.value() },
+            )
+        }
+    }
+
+    return remember(coordinator, focusManager) {
+        {
+            coordinator.requestExit(
+                imeIsOpen = currentImeIsOpen.value,
+                hideIme = { currentKeyboardController.value?.hide() },
+                clearComposerFocus = { focusManager.clearFocus(force = true) },
+                navigate = { currentRouteToChatList.value() },
+            )
         }
     }
 }
