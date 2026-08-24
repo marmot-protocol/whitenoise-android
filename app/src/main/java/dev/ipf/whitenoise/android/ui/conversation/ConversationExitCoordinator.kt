@@ -5,7 +5,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import dev.ipf.whitenoise.android.ui.common.activity
 
 /**
  * Serializes the transition from a mounted conversation to the chat list.
@@ -13,6 +16,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
  * When the IME still owns an inset, navigation waits for the zero-inset edge.
  * This preserves the final inset dispatch before focus is detached and prevents
  * the chat list from inheriting the conversation's keyboard-sized viewport.
+ * Repeated requests retry dismissal but remain coalesced until the inset closes.
  */
 internal class ConversationExitCoordinator {
     var awaitingImeDismiss: Boolean = false
@@ -29,9 +33,11 @@ internal class ConversationExitCoordinator {
         if (completing) return
 
         if (awaitingImeDismiss) {
-            awaitingImeDismiss = false
             hideIme()
-            complete(clearComposerFocus, navigate)
+            if (!imeIsOpen) {
+                awaitingImeDismiss = false
+                complete(clearComposerFocus, navigate)
+            }
             return
         }
 
@@ -75,9 +81,13 @@ internal fun rememberConversationExitHandler(
     routeToChatList: () -> Unit,
 ): () -> Unit {
     val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
+    val view = LocalView.current
+    val imeController =
+        remember(view) {
+            val activity = requireNotNull(view.context.activity())
+            WindowCompat.getInsetsController(activity.window, view)
+        }
     val currentImeIsOpen = rememberUpdatedState(imeIsOpen)
-    val currentKeyboardController = rememberUpdatedState(keyboardController)
     val currentRouteToChatList = rememberUpdatedState(routeToChatList)
     val coordinator = remember(identity) { ConversationExitCoordinator() }
 
@@ -95,7 +105,7 @@ internal fun rememberConversationExitHandler(
         {
             coordinator.requestExit(
                 imeIsOpen = currentImeIsOpen.value,
-                hideIme = { currentKeyboardController.value?.hide() },
+                hideIme = { imeController.hide(WindowInsetsCompat.Type.ime()) },
                 clearComposerFocus = { focusManager.clearFocus(force = true) },
                 navigate = { currentRouteToChatList.value() },
             )

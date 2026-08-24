@@ -33,7 +33,32 @@ class ConversationExitCoordinatorTest {
     }
 
     @Test
-    fun repeatedExitRecoversWhenImeDismissEdgeNeverArrives() {
+    fun repeatedExitWithClosedImeRecoversWhenObserverMissesDismissEdge() {
+        val events = mutableListOf<String>()
+        val coordinator = ConversationExitCoordinator()
+
+        coordinator.requestExit(
+            imeIsOpen = true,
+            hideIme = { events += "hide-ime" },
+            clearComposerFocus = { events += "clear-focus" },
+            navigate = { events += "navigate" },
+        )
+        coordinator.requestExit(
+            imeIsOpen = false,
+            hideIme = { events += "hide-ime-retry" },
+            clearComposerFocus = { events += "clear-focus" },
+            navigate = { events += "navigate" },
+        )
+
+        assertEquals(
+            listOf("hide-ime", "hide-ime-retry", "clear-focus", "navigate"),
+            events,
+        )
+        assertFalse(coordinator.awaitingImeDismiss)
+    }
+
+    @Test
+    fun rapidRepeatedExitWhileImeIsOpenRetriesHideWithoutNavigating() {
         val events = mutableListOf<String>()
         val coordinator = ConversationExitCoordinator()
 
@@ -50,11 +75,8 @@ class ConversationExitCoordinatorTest {
             navigate = { events += "navigate" },
         )
 
-        assertEquals(
-            listOf("hide-ime", "hide-ime-retry", "clear-focus", "navigate"),
-            events,
-        )
-        assertFalse(coordinator.awaitingImeDismiss)
+        assertEquals(listOf("hide-ime", "hide-ime-retry"), events)
+        assertTrue(coordinator.awaitingImeDismiss)
     }
 
     @Test
