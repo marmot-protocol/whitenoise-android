@@ -64,6 +64,18 @@ class MessageBubbleTtsHighlightScreenshotTest {
     }
 
     @Test
+    fun plainIncomingOmittedUrlSentenceBandLight() {
+        renderOmittedUrl(mine = false, darkTheme = false, amoled = false)
+        capture("message_bubble_tts_omitted_url_incoming_light")
+    }
+
+    @Test
+    fun plainOutgoingOmittedUrlSentenceBandAmoled() {
+        renderOmittedUrl(mine = true, darkTheme = true, amoled = true)
+        capture("message_bubble_tts_omitted_url_outgoing_amoled")
+    }
+
+    @Test
     fun markdownIncomingSentenceFallbackAmoled() {
         renderMarkdown(mine = false, darkTheme = true, amoled = true, sentenceFallback = true)
         capture("message_bubble_tts_markdown_incoming_sentence_amoled")
@@ -103,6 +115,33 @@ class MessageBubbleTtsHighlightScreenshotTest {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 BubbleFixture(mine = mine, tag = TAG) {
                     HighlightedPlainLeaf(text = "Hello bright world.", resolver = resolver)
+                }
+            }
+        }
+    }
+
+    // The URL is rendered but never spoken, so the sentence band covers the
+    // two rendered pieces around it and leaves the link itself unpainted.
+    private fun renderOmittedUrl(
+        mine: Boolean,
+        darkTheme: Boolean,
+        amoled: Boolean,
+    ) {
+        val text = "Check https://example.com/page now."
+        val wordStart = text.indexOf("now")
+        val projection = legacyTextToSpeakableProjection(text)
+        val passage =
+            TtsPassage(
+                messageIdHex = "m1",
+                sentenceIndex = 0,
+                projectionId = projection.projectionId,
+                visibleWord = listOf(TtsVisibleTextSpan("plain", wordStart, wordStart + 3)),
+            )
+        val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
+                BubbleFixture(mine = mine, tag = TAG) {
+                    HighlightedPlainLeaf(text = text, resolver = resolver)
                 }
             }
         }

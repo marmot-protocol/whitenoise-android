@@ -359,10 +359,27 @@ private data class MarkdownBodyContext(
 internal typealias SelectableTextLayoutReporter =
     (key: Any, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates?) -> Unit
 
+/**
+ * The active read-aloud passage resolved inside one rendered text leaf: every
+ * rendered range the spoken sentence covers, plus the spoken word painted on
+ * top of them.
+ *
+ * The sentence is a *list* of ranges because a spoken sentence maps to disjoint
+ * rendered pieces whenever the renderer shows text the projection does not
+ * speak - an omitted URL, a list marker, collapsed punctuation. Demanding one
+ * contiguous span dropped the sentence band entirely in those messages.
+ */
 internal data class TtsLeafHighlight(
-    val sentence: IntRange?,
+    val sentenceRanges: List<IntRange>,
     val word: IntRange?,
 ) {
+    /** Outer bounds of the sentence in this leaf: what accessibility reports. */
+    val sentence: IntRange?
+        get() =
+            sentenceRanges
+                .takeIf(List<IntRange>::isNotEmpty)
+                ?.let { ranges -> ranges.minOf(IntRange::first)..ranges.maxOf(IntRange::last) }
+
     val primaryRange: IntRange?
         get() = word ?: sentence
 }

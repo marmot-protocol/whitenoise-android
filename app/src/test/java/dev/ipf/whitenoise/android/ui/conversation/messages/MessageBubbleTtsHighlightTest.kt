@@ -81,6 +81,52 @@ class MessageBubbleTtsHighlightTest {
     }
 
     @Test
+    fun omittedUrlBubbleDrawsSentenceBandAndWordAccent() {
+        val rendered = "Check https://example.com/page now."
+        val wordStart = rendered.indexOf("now")
+        val projection = legacyTextToSpeakableProjection(rendered)
+        val passage =
+            TtsPassage(
+                messageIdHex = "m1",
+                sentenceIndex = 0,
+                projectionId = projection.projectionId,
+                visibleWord = listOf(TtsVisibleTextSpan("plain", wordStart, wordStart + 3)),
+            )
+        val resolver =
+            buildTtsLeafHighlightResolver(
+                passage = passage,
+                messageIdHex = "m1",
+                projection = projection,
+                locale = Locale.US,
+            ) as TtsLeafHighlightResolver
+        var captured: TtsLeafHighlight? = null
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                val highlight = resolver("plain", rendered)
+                captured = highlight
+                HighlightedPlainText(
+                    text = rendered,
+                    highlightRange = highlight,
+                    testTag = "url-highlighted-text",
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(2, captured?.sentenceRanges?.size)
+        assertEquals(wordStart until wordStart + 3, captured?.word)
+        val semantics = composeRule.onNodeWithTag("url-highlighted-text").fetchSemanticsNode().config
+        assertEquals(
+            wordStart until wordStart + 3,
+            semantics.getOrNull(TtsReadAloudHighlightRangeKey),
+        )
+        assertEquals(
+            0 until rendered.length,
+            semantics.getOrNull(TtsReadAloudSentenceHighlightRangeKey),
+        )
+    }
+
+    @Test
     fun visibleWordUpdatesRecomposeHighlightWithoutRelayout() {
         val projection = legacyTextToSpeakableProjection("Hello bright world.")
         var passage by mutableStateOf(
