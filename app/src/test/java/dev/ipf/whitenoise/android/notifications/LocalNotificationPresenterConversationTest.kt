@@ -1020,6 +1020,26 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
+    fun plainReactionStoresItsGenerationForEnrichment() {
+        presenter.ensureChannels()
+        val reaction =
+            update(
+                isMention = false,
+                messageIdHex = "reaction-current",
+                reactionEmoji = "👍",
+            )
+
+        runBlocking { presenter.show(reaction, shortNpub = { "npub1test" }) }
+
+        val notification = manager.activeNotifications.single().notification
+        assertEquals(
+            "reaction-current",
+            notification.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX),
+        )
+        assertTrue(presenter.isNotificationUpdateCurrentForEnrichment(reaction))
+    }
+
+    @Test
     fun reusedPresenterRestampsPublicVersionOnEachPost() {
         var clockMs = 1_000_000L
         val clockPresenter =

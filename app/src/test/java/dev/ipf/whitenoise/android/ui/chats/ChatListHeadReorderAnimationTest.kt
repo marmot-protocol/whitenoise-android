@@ -490,6 +490,36 @@ class ChatListHeadReorderAnimationTest {
         composeRule.runOnIdle { assertEquals(emptyList<String>(), openedIds) }
     }
 
+    @Test
+    fun leadingInlineItemShiftDisablesRowActionsUntilPlacementSettles() {
+        var leadingItemCount by mutableStateOf(0)
+        val openedIds = mutableListOf<String>()
+        composeRule.setContent {
+            ChatListHeadReorderMotionHarness(
+                itemIds = listOf("A", "B"),
+                listState = rememberLazyListState(),
+                rowHeight = rowHeight,
+                leadingItemCount = leadingItemCount,
+                onOpen = openedIds::add,
+            )
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+
+        composeRule.runOnUiThread { leadingItemCount = 1 }
+        composeRule.runOnIdle { }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle { }
+
+        composeRule.onNodeWithTag(chatListHeadReorderRowTag("A")).performClick()
+        composeRule.runOnIdle { assertEquals(emptyList<String>(), openedIds) }
+
+        composeRule.mainClock.advanceTimeBy(CHAT_LIST_ROW_PLACEMENT_MILLIS.toLong() + 1L)
+        composeRule.runOnIdle { }
+        composeRule.onNodeWithTag(chatListHeadReorderRowTag("A")).performClick()
+        composeRule.runOnIdle { assertEquals(listOf("A"), openedIds) }
+    }
+
     private fun rowTop(id: String): Float =
         composeRule
             .onNodeWithTag(chatListHeadReorderRowTag(id))
@@ -525,6 +555,7 @@ internal fun ChatListHeadReorderMotionHarness(
     datasetKey: ChatListDatasetKey = ChatListDatasetKey(false, null, ""),
     contentRevision: Int = 0,
     pinnedCount: Int? = null,
+    leadingItemCount: Int = 0,
     userHeadDemotion: ChatListHeadDemotion? = null,
     userHeadDemotionSettled: Boolean = false,
     onUserHeadDemotionConsumed: (ChatListHeadDemotion) -> Unit = {},
@@ -564,6 +595,7 @@ internal fun ChatListHeadReorderMotionHarness(
         rememberChatListRowPlacementGate(
             orderedRowIds = itemIds,
             pinnedBoundaryIndex = pinnedCount,
+            leadingItemCount = leadingItemCount,
         )
     val interactionsEnabled = !headReorderInProgress && !rowPlacementInProgress
     SideEffect {
@@ -573,6 +605,11 @@ internal fun ChatListHeadReorderMotionHarness(
         modifier = Modifier.testTag(CHAT_LIST_HEAD_REORDER_LIST_TAG),
         state = listState,
     ) {
+        repeat(leadingItemCount) { leadingIndex ->
+            item(key = "leading-$leadingIndex") {
+                Box(Modifier.fillMaxWidth().height(rowHeight))
+            }
+        }
         itemIds.forEachIndexed { targetIndex, id ->
             if (targetIndex == pinnedCount) {
                 item(key = CHAT_LIST_PINNED_BOUNDARY_KEY) {

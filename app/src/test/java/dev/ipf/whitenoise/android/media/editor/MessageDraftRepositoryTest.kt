@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -115,10 +116,14 @@ class MessageDraftRepositoryTest {
                     groupIdHex = GROUP,
                     generation = requireNotNull(cleanupGeneration),
                 )
+            val clearedHydration =
+                writer.loadIfCurrent(ACCOUNT, GROUP, requireNotNull(cleanupGeneration))
 
             assertNull("a read captured before acceptance must not resurrect sent text", staleHydration)
             assertTrue(deletion is MessageDraftConditionalDeleteResult.Applied)
             assertNull(gateway.current)
+            assertNotNull(clearedHydration)
+            assertNull(clearedHydration?.getOrThrow())
         }
 
     @Test
@@ -161,6 +166,34 @@ class MessageDraftRepositoryTest {
 
             assertEquals(MessageDraftConditionalDeleteResult.Superseded, deletion)
             assertEquals("next draft", gateway.current?.content)
+        }
+
+    @Test
+    fun failedSuccessfulSendDeletionBlocksHydrationUntilNewTextIsAccepted() =
+        runTest {
+            val gateway =
+                FakeDraftGateway(draft(content = "sent")).apply {
+                    throwBeforeNextDelete = true
+                }
+            val writer = writer(gateway)
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+            val cleanupGeneration =
+                requireNotNull(writer.beginSuccessfulSendCleanup(ACCOUNT, GROUP, sentGeneration))
+
+            val deletion = writer.deleteIfCurrent(ACCOUNT, GROUP, cleanupGeneration)
+            val blockedHydration = writer.loadIfCurrent(ACCOUNT, GROUP, writer.generation(ACCOUNT, GROUP))
+
+            assertTrue(deletion is MessageDraftConditionalDeleteResult.Applied)
+            val deletionResult = (deletion as MessageDraftConditionalDeleteResult.Applied).result
+            assertTrue(deletionResult is MessageDraftMutationResult.Failure)
+            assertNull("failed cleanup must not restore accepted text", blockedHydration)
+            assertEquals("sent", gateway.current?.content)
+
+            writer.submit(ACCOUNT, GROUP, "next draft")
+            writer.flush()
+            val nextHydration = writer.loadIfCurrent(ACCOUNT, GROUP, writer.generation(ACCOUNT, GROUP))
+
+            assertEquals("next draft", nextHydration?.getOrThrow()?.content)
         }
 
     @Test
@@ -759,6 +792,7 @@ private class FakeDraftGateway(
     var readFailure: Throwable? = null
     var throwBeforeNextSave = false
     var throwAfterNextSave = false
+    var throwBeforeNextDelete = false
     var throwAfterNextDelete = false
     var onSave: (String) -> Unit = {}
     var onRead: () -> Unit = {}
@@ -809,6 +843,10 @@ private class FakeDraftGateway(
         accountRef: String,
         groupIdHex: String,
     ) {
+        if (throwBeforeNextDelete) {
+            throwBeforeNextDelete = false
+            error("delete failed before commit")
+        }
         current = null
         val callback = onDelete
         onDelete = {}

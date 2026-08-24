@@ -26,6 +26,7 @@ internal class CoalescingMessageDraftWriter(
     private val pending = mutableMapOf<Key, Pending>()
     private val activeMerges = mutableMapOf<Key, ActiveMerge>()
     private val mergeLocks = mutableMapOf<Key, Mutex>()
+    private val hydrationBlockedGenerations = mutableMapOf<Key, MessageDraftGeneration>()
 
     fun submit(
         accountRef: String,
@@ -35,6 +36,7 @@ internal class CoalescingMessageDraftWriter(
         val key = Key(accountRef, groupIdHex)
         return synchronized(lock) {
             val generation = drafts.coordinated.acceptMutation(accountRef, groupIdHex)
+            hydrationBlockedGenerations.remove(key)
             enqueueAccepted(key, content, generation)
             generation
         }
@@ -58,6 +60,7 @@ internal class CoalescingMessageDraftWriter(
             val generation =
                 drafts.coordinated.acceptMutationIfCurrent(accountRef, groupIdHex, expected)
                     ?: return@synchronized null
+            hydrationBlockedGenerations.remove(key)
             enqueueAccepted(key, content, generation)
             generation
         }
@@ -78,19 +81,26 @@ internal class CoalescingMessageDraftWriter(
      * Claims successful-send cleanup as a new generation before Android clears
      * its lifecycle projection. Any MDK hydration that started against the
      * sent generation then fails its post-read currency check and cannot put
-     * the accepted text back into the composer or chat row (#2225).
+     * the accepted text back into the composer or chat row. The cleanup
+     * generation remains hydration-blocked until deletion succeeds or a newer
+     * mutation supersedes it (#2225).
      */
     fun beginSuccessfulSendCleanup(
         accountRef: String,
         groupIdHex: String,
         sentGeneration: MessageDraftGeneration,
         onClaimed: () -> Unit = {},
-    ): MessageDraftGeneration? =
-        synchronized(lock) {
-            drafts.coordinated
-                .acceptMutationIfCurrent(accountRef, groupIdHex, sentGeneration)
-                ?.also { onClaimed() }
+    ): MessageDraftGeneration? {
+        val key = Key(accountRef, groupIdHex)
+        return synchronized(lock) {
+            val cleanupGeneration =
+                drafts.coordinated.acceptMutationIfCurrent(accountRef, groupIdHex, sentGeneration)
+                    ?: return@synchronized null
+            hydrationBlockedGenerations[key] = cleanupGeneration
+            onClaimed()
+            cleanupGeneration
         }
+    }
 
     fun runIfCurrent(
         accountRef: String,
@@ -118,7 +128,9 @@ internal class CoalescingMessageDraftWriter(
         generation: MessageDraftGeneration,
     ): Result<MessageDraftFfi?>? {
         val key = Key(accountRef, groupIdHex)
+        if (isHydrationBlocked(key, generation)) return null
         flush(key)
+        if (isHydrationBlocked(key, generation)) return null
         return drafts.coordinated.draftIf(accountRef, groupIdHex, generation)
     }
 
@@ -129,7 +141,15 @@ internal class CoalescingMessageDraftWriter(
     ): MessageDraftConditionalDeleteResult {
         val key = Key(accountRef, groupIdHex)
         flush(key)
-        return drafts.coordinated.deleteIf(accountRef, groupIdHex, generation)
+        val deletion = drafts.coordinated.deleteIf(accountRef, groupIdHex, generation)
+        if (deletion is MessageDraftConditionalDeleteResult.Applied &&
+            deletion.result is MessageDraftMutationResult.Success
+        ) {
+            synchronized(lock) {
+                hydrationBlockedGenerations.remove(key, generation)
+            }
+        }
+        return deletion
     }
 
     suspend fun mergeText(
@@ -146,7 +166,10 @@ internal class CoalescingMessageDraftWriter(
             )
         }
         val key = Key(accountRef, groupIdHex)
-        drafts.coordinated.acceptMutation(accountRef, groupIdHex)
+        synchronized(lock) {
+            drafts.coordinated.acceptMutation(accountRef, groupIdHex)
+            hydrationBlockedGenerations.remove(key)
+        }
         val mergeLock = synchronized(lock) { mergeLocks.getOrPut(key) { Mutex() } }
         return mergeLock.withLock {
             val activeMerge = ActiveMerge(trimmedIncoming)
@@ -247,6 +270,11 @@ internal class CoalescingMessageDraftWriter(
         state.generation = generation.value
         if (state.job == null) state.job = scope.launch { drain(key, state) }
     }
+
+    private fun isHydrationBlocked(
+        key: Key,
+        generation: MessageDraftGeneration,
+    ): Boolean = synchronized(lock) { hydrationBlockedGenerations[key] == generation }
 
     private data class Key(
         val accountRef: String,

@@ -443,6 +443,8 @@ internal fun ChatsScreen(
         }
     val visibleChatIds = remember(visibleItems) { visibleItems.map { it.id }.toSet() }
     val orderedVisibleChatIds = remember(visibleItems) { visibleItems.map { it.id } }
+    val leadingChatListItemCount =
+        if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
     val visiblePinnedOrder = remember(visibleItems) { visibleItems.filter { it.pinned() }.map { it.id } }
     val pinnedBoundary =
         remember(visibleItems, showArchived) {
@@ -473,12 +475,10 @@ internal fun ChatsScreen(
         pendingHeadDemotionTarget
             ?.let { visibleItems.indexOf(it) }
             ?.let { rowIndex ->
-                val inlineErrorItems =
-                    if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
                 chatListHeadDemotionTargetIndex(
                     rowIndex = rowIndex,
                     pinnedBoundaryIndex = pinnedBoundary,
-                    leadingItemCount = inlineErrorItems,
+                    leadingItemCount = leadingChatListItemCount,
                 )
             }
 
@@ -821,6 +821,7 @@ internal fun ChatsScreen(
         rememberChatListRowPlacementGate(
             orderedRowIds = orderedVisibleChatIds,
             pinnedBoundaryIndex = pinnedBoundary,
+            leadingItemCount = leadingChatListItemCount,
         )
     val archivedUnreadCount =
         remember(controller.archivedItems) {

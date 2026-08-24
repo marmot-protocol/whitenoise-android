@@ -21,9 +21,13 @@ import kotlinx.coroutines.delay
 internal fun rememberChatListRowPlacementGate(
     orderedRowIds: List<String>,
     pinnedBoundaryIndex: Int?,
+    leadingItemCount: Int,
 ): Boolean {
     var firstLayoutPublished by remember { mutableStateOf(false) }
-    val layoutKey = remember(orderedRowIds, pinnedBoundaryIndex) { orderedRowIds to pinnedBoundaryIndex }
+    val layoutKey =
+        remember(orderedRowIds, pinnedBoundaryIndex, leadingItemCount) {
+            Triple(orderedRowIds, pinnedBoundaryIndex, leadingItemCount)
+        }
     var placementInProgress by
         remember(layoutKey) {
             mutableStateOf(firstLayoutPublished && orderedRowIds.isNotEmpty())
