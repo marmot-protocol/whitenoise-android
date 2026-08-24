@@ -160,7 +160,7 @@ internal fun OtherAccountAvatarsRow(
     val unreadLabel = stringResource(R.string.account_unread_indicator)
     val actionLabels =
         shown.map { account ->
-            val title = appState.displayName(account.accountIdHex)
+            val title = appState.accountDisplayNameCached(account.accountIdHex)
             buildString {
                 append(switchAccountLabel)
                 append(": ")
@@ -229,7 +229,7 @@ internal fun OtherAccountAvatarsRow(
         shown.forEach { account ->
             OtherAccountAvatar(
                 accountLabel = account.label,
-                title = appState.displayName(account.accountIdHex),
+                title = appState.accountDisplayNameCached(account.accountIdHex),
                 seed = account.accountIdHex,
                 pictureUrl = appState.avatarUrl(account.accountIdHex),
                 showUnreadDot = appState.accountShowsUnreadDot(account.label),

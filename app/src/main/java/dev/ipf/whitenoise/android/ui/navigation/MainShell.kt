@@ -61,8 +61,9 @@ import dev.ipf.whitenoise.android.notifications.runInactiveNotificationRouteStag
 import dev.ipf.whitenoise.android.notifications.shouldDeferNotificationChatListBind
 import dev.ipf.whitenoise.android.notifications.shouldRetryNotificationMessageLoadAfterActivation
 import dev.ipf.whitenoise.android.notifications.stateFor
-import dev.ipf.whitenoise.android.share.EncryptedPendingShareRequestStore
+import dev.ipf.whitenoise.android.share.PendingShareRequestStore
 import dev.ipf.whitenoise.android.share.ShareRequest
+import dev.ipf.whitenoise.android.share.createPendingShareRequestStore
 import dev.ipf.whitenoise.android.share.resolveShareDirectGroupId
 import dev.ipf.whitenoise.android.share.shouldPresentInboundShare
 import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
@@ -538,7 +539,10 @@ internal fun MainShell(
     val currentInboundNotificationTarget by rememberUpdatedState(inboundNotificationTarget)
     val currentInboundNotificationRequestId by rememberUpdatedState(inboundNotificationRequestId)
     val currentRuntimeGeneration by rememberUpdatedState(appState.runtimeGeneration)
-    val pendingShareRequestStore = remember(context) { EncryptedPendingShareRequestStore.create(context) }
+    var pendingShareRequestStore by remember(context) { mutableStateOf<PendingShareRequestStore?>(null) }
+    LaunchedEffect(context) {
+        pendingShareRequestStore = createPendingShareRequestStore(context)
+    }
     var sharePickerRequest by remember { mutableStateOf<ShareRequest?>(null) }
     var savedSharePickerRequestId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingStagedShareOpen by remember { mutableStateOf<PendingStagedShareOpen?>(null) }
@@ -547,8 +551,10 @@ internal fun MainShell(
         sharePickerRequest = null
         savedSharePickerRequestId = null
         requestId?.let { pendingRequestId ->
-            appState.launchMutation {
-                withContext(Dispatchers.IO) { pendingShareRequestStore.remove(pendingRequestId) }
+            pendingShareRequestStore?.let { store ->
+                appState.launchMutation {
+                    withContext(Dispatchers.IO) { store.remove(pendingRequestId) }
+                }
             }
         }
     }
@@ -581,9 +587,10 @@ internal fun MainShell(
     }
 
     LaunchedEffect(pendingShareRequestStore, savedSharePickerRequestId) {
+        val store = pendingShareRequestStore ?: return@LaunchedEffect
         val requestId = savedSharePickerRequestId ?: return@LaunchedEffect
         if (sharePickerRequest?.requestId == requestId) return@LaunchedEffect
-        val restored = withContext(Dispatchers.IO) { pendingShareRequestStore.load(requestId) }
+        val restored = withContext(Dispatchers.IO) { store.load(requestId) }
         if (savedSharePickerRequestId != requestId) return@LaunchedEffect
         if (restored == null) {
             savedSharePickerRequestId = null
@@ -598,12 +605,13 @@ internal fun MainShell(
         inboundShareRequest,
         sharePickerRequest,
     ) {
+        val store = pendingShareRequestStore ?: return@LaunchedEffect
         if (
             savedSharePickerRequestId == null &&
             inboundShareRequest == null &&
             sharePickerRequest == null
         ) {
-            withContext(Dispatchers.IO) { pendingShareRequestStore.clear() }
+            withContext(Dispatchers.IO) { store.clear() }
         }
     }
 
@@ -1269,6 +1277,7 @@ internal fun MainShell(
     }
 
     LaunchedEffect(
+        pendingShareRequestStore,
         inboundShareRequest,
         appState.phase,
         appState.appLockScreenVisible,
@@ -1296,7 +1305,8 @@ internal fun MainShell(
             onShareRequestHandled(request)
             stageShareToChats(request, accountRef, listOf(directGroupId))
         } else {
-            val persisted = withContext(Dispatchers.IO) { pendingShareRequestStore.save(request) }
+            val store = pendingShareRequestStore ?: return@LaunchedEffect
+            val persisted = withContext(Dispatchers.IO) { store.save(request) }
             onShareRequestHandled(request)
             sharePickerRequest = request
             savedSharePickerRequestId = request.requestId.takeIf { persisted }

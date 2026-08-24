@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.DiskByteCache
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -74,6 +76,12 @@ internal class EncryptedPendingShareRequestStore(
         }
     }
 }
+
+/** Resolves no-backup storage and constructs the encrypted cache away from Main. */
+internal suspend fun createPendingShareRequestStore(
+    context: Context,
+    factory: (Context) -> PendingShareRequestStore = { EncryptedPendingShareRequestStore.create(it) },
+): PendingShareRequestStore = withContext(Dispatchers.IO) { factory(context) }
 
 private const val PENDING_SHARE_REQUEST_VERSION = 1
 internal const val MAX_PENDING_SHARE_REQUEST_BYTES = 4 * 1024 * 1024

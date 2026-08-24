@@ -7,13 +7,17 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
+import java.io.OutputStream
 import java.lang.reflect.Proxy
 import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.Socket
+import java.net.SocketAddress
 import java.net.URL
+import java.nio.channels.SocketChannel
 import javax.net.ssl.HandshakeCompletedListener
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SNIHostName
@@ -503,32 +507,99 @@ class SafeHttpsGetTest {
     }
 
     @Test
-    fun pinnedSocketDelegatesRepresentativeTlsSurfaceIncludingSession() {
+    fun pinnedSocketDelegatesEveryTlsAndConnectedSocketOperation() {
         val session = fakeSslSession()
-        val fake = FakeSslSocket(session)
-        val wrapper = SniPinnedSslSocket(fake, "cdn.example.com")
+        val delegate = RecordingSslSocket(session)
+        val wrapper = SniPinnedSslSocket(delegate, "cdn.example.com")
+        val endpoint = java.net.InetSocketAddress(InetAddress.getLoopbackAddress(), 443)
+        val listener = HandshakeCompletedListener { }
+        val cases = tlsDelegationCases(wrapper, session, listener) + socketDelegationCases(wrapper, endpoint)
 
-        wrapper.enabledCipherSuites = arrayOf("TLS_TEST_CIPHER")
-        wrapper.enabledProtocols = arrayOf("TLSv1.3")
-        wrapper.useClientMode = false
-        wrapper.needClientAuth = true
-        wrapper.enableSessionCreation = false
-
-        val delegatedValues =
-            listOf(
-                "session" to (wrapper.session === session),
-                "enabledCipherSuites" to (wrapper.enabledCipherSuites.toList() == listOf("TLS_TEST_CIPHER")),
-                "enabledProtocols" to (wrapper.enabledProtocols.toList() == listOf("TLSv1.3")),
-                "useClientMode" to !wrapper.useClientMode,
-                "needClientAuth" to wrapper.needClientAuth,
-                "enableSessionCreation" to !wrapper.enableSessionCreation,
-            )
-
-        delegatedValues.forEach { (property, delegated) ->
-            assertTrue("$property must delegate to the connected TLS socket", delegated)
+        assertEquals(63, cases.size)
+        cases.forEach { (expectedCall, invoke) ->
+            delegate.calls.clear()
+            invoke()
+            assertEquals("$expectedCall must reach the connected TLS delegate", listOf(expectedCall), delegate.calls)
         }
-        assertSame(session, fake.session)
     }
+
+    private fun tlsDelegationCases(
+        wrapper: SniPinnedSslSocket,
+        session: SSLSession,
+        listener: HandshakeCompletedListener,
+    ): List<Pair<String, () -> Any?>> =
+        listOf(
+            "getSSLParameters" to { wrapper.sslParameters },
+            "getSupportedCipherSuites" to { wrapper.supportedCipherSuites },
+            "getEnabledCipherSuites" to { wrapper.enabledCipherSuites },
+            "setEnabledCipherSuites" to { wrapper.enabledCipherSuites = arrayOf("TLS_TEST_CIPHER") },
+            "getSupportedProtocols" to { wrapper.supportedProtocols },
+            "getEnabledProtocols" to { wrapper.enabledProtocols },
+            "setEnabledProtocols" to { wrapper.enabledProtocols = arrayOf("TLSv1.3") },
+            "getSession" to { assertSame(session, wrapper.session) },
+            "getHandshakeSession" to { wrapper.handshakeSession },
+            "addHandshakeCompletedListener" to { wrapper.addHandshakeCompletedListener(listener) },
+            "removeHandshakeCompletedListener" to { wrapper.removeHandshakeCompletedListener(listener) },
+            "startHandshake" to { wrapper.startHandshake() },
+            "setUseClientMode" to { wrapper.useClientMode = false },
+            "getUseClientMode" to { wrapper.useClientMode },
+            "setNeedClientAuth" to { wrapper.needClientAuth = true },
+            "getNeedClientAuth" to { wrapper.needClientAuth },
+            "setWantClientAuth" to { wrapper.wantClientAuth = true },
+            "getWantClientAuth" to { wrapper.wantClientAuth },
+            "setEnableSessionCreation" to { wrapper.enableSessionCreation = false },
+            "getEnableSessionCreation" to { wrapper.enableSessionCreation },
+            "getApplicationProtocol" to { wrapper.applicationProtocol },
+            "getHandshakeApplicationProtocol" to { wrapper.handshakeApplicationProtocol },
+        )
+
+    private fun socketDelegationCases(
+        wrapper: SniPinnedSslSocket,
+        endpoint: SocketAddress,
+    ): List<Pair<String, () -> Any?>> =
+        listOf(
+            "connect" to { wrapper.connect(endpoint) },
+            "connectWithTimeout" to { wrapper.connect(endpoint, 250) },
+            "bind" to { wrapper.bind(endpoint) },
+            "getInetAddress" to { wrapper.inetAddress },
+            "getLocalAddress" to { wrapper.localAddress },
+            "getPort" to { wrapper.port },
+            "getLocalPort" to { wrapper.localPort },
+            "getRemoteSocketAddress" to { wrapper.remoteSocketAddress },
+            "getLocalSocketAddress" to { wrapper.localSocketAddress },
+            "getChannel" to { wrapper.channel },
+            "getInputStream" to { wrapper.inputStream },
+            "getOutputStream" to { wrapper.outputStream },
+            "setTcpNoDelay" to { wrapper.tcpNoDelay = true },
+            "getTcpNoDelay" to { wrapper.tcpNoDelay },
+            "setSoLinger" to { wrapper.setSoLinger(true, 1) },
+            "getSoLinger" to { wrapper.soLinger },
+            "sendUrgentData" to { wrapper.sendUrgentData(1) },
+            "setOOBInline" to { wrapper.oobInline = true },
+            "getOOBInline" to { wrapper.oobInline },
+            "setSoTimeout" to { wrapper.soTimeout = 250 },
+            "getSoTimeout" to { wrapper.soTimeout },
+            "setSendBufferSize" to { wrapper.sendBufferSize = 1_024 },
+            "getSendBufferSize" to { wrapper.sendBufferSize },
+            "setReceiveBufferSize" to { wrapper.receiveBufferSize = 2_048 },
+            "getReceiveBufferSize" to { wrapper.receiveBufferSize },
+            "setKeepAlive" to { wrapper.keepAlive = true },
+            "getKeepAlive" to { wrapper.keepAlive },
+            "setTrafficClass" to { wrapper.trafficClass = 4 },
+            "getTrafficClass" to { wrapper.trafficClass },
+            "setReuseAddress" to { wrapper.reuseAddress = true },
+            "getReuseAddress" to { wrapper.reuseAddress },
+            "close" to { wrapper.close() },
+            "shutdownInput" to { wrapper.shutdownInput() },
+            "shutdownOutput" to { wrapper.shutdownOutput() },
+            "isConnected" to { wrapper.isConnected },
+            "isBound" to { wrapper.isBound },
+            "isClosed" to { wrapper.isClosed },
+            "isInputShutdown" to { wrapper.isInputShutdown },
+            "isOutputShutdown" to { wrapper.isOutputShutdown },
+            "setPerformancePreferences" to { wrapper.setPerformancePreferences(1, 2, 3) },
+            "toString" to { wrapper.toString() },
+        )
 
     private fun dependencies(
         resolve: (String) -> Array<InetAddress>? = { PUBLIC_ADDRESSES },
@@ -709,6 +780,174 @@ class SafeHttpsGetTest {
         }
 
         override fun getEnableSessionCreation(): Boolean = sessionCreation
+    }
+
+    private class RecordingSslSocket(
+        private val sessionValue: SSLSession,
+    ) : SSLSocket() {
+        val calls = mutableListOf<String>()
+
+        private fun record(name: String) {
+            calls += name
+        }
+
+        override fun getSSLParameters(): SSLParameters = SSLParameters().also { record("getSSLParameters") }
+
+        override fun getSupportedCipherSuites(): Array<String> {
+            record("getSupportedCipherSuites")
+            return emptyArray()
+        }
+
+        override fun getEnabledCipherSuites(): Array<String> {
+            record("getEnabledCipherSuites")
+            return emptyArray()
+        }
+
+        override fun setEnabledCipherSuites(suites: Array<String>?) = record("setEnabledCipherSuites")
+
+        override fun getSupportedProtocols(): Array<String> {
+            record("getSupportedProtocols")
+            return emptyArray()
+        }
+
+        override fun getEnabledProtocols(): Array<String> = emptyArray<String>().also { record("getEnabledProtocols") }
+
+        override fun setEnabledProtocols(protocols: Array<String>?) = record("setEnabledProtocols")
+
+        override fun getSession(): SSLSession = sessionValue.also { record("getSession") }
+
+        override fun getHandshakeSession(): SSLSession? = sessionValue.also { record("getHandshakeSession") }
+
+        override fun addHandshakeCompletedListener(listener: HandshakeCompletedListener?) {
+            record("addHandshakeCompletedListener")
+        }
+
+        override fun removeHandshakeCompletedListener(listener: HandshakeCompletedListener?) {
+            record("removeHandshakeCompletedListener")
+        }
+
+        override fun startHandshake() = record("startHandshake")
+
+        override fun setUseClientMode(mode: Boolean) = record("setUseClientMode")
+
+        override fun getUseClientMode(): Boolean = false.also { record("getUseClientMode") }
+
+        override fun setNeedClientAuth(need: Boolean) = record("setNeedClientAuth")
+
+        override fun getNeedClientAuth(): Boolean = false.also { record("getNeedClientAuth") }
+
+        override fun setWantClientAuth(want: Boolean) = record("setWantClientAuth")
+
+        override fun getWantClientAuth(): Boolean = false.also { record("getWantClientAuth") }
+
+        override fun setEnableSessionCreation(flag: Boolean) = record("setEnableSessionCreation")
+
+        override fun getEnableSessionCreation(): Boolean = false.also { record("getEnableSessionCreation") }
+
+        override fun getApplicationProtocol(): String? = "h2".also { record("getApplicationProtocol") }
+
+        override fun getHandshakeApplicationProtocol(): String? {
+            record("getHandshakeApplicationProtocol")
+            return "h2"
+        }
+
+        override fun connect(endpoint: SocketAddress?) = record("connect")
+
+        override fun connect(
+            endpoint: SocketAddress?,
+            timeout: Int,
+        ) = record("connectWithTimeout")
+
+        override fun bind(bindpoint: SocketAddress?) = record("bind")
+
+        override fun getInetAddress(): InetAddress? = InetAddress.getLoopbackAddress().also { record("getInetAddress") }
+
+        override fun getLocalAddress(): InetAddress {
+            record("getLocalAddress")
+            return InetAddress.getLoopbackAddress()
+        }
+
+        override fun getPort(): Int = 443.also { record("getPort") }
+
+        override fun getLocalPort(): Int = 12_345.also { record("getLocalPort") }
+
+        override fun getRemoteSocketAddress(): SocketAddress? = null.also { record("getRemoteSocketAddress") }
+
+        override fun getLocalSocketAddress(): SocketAddress? = null.also { record("getLocalSocketAddress") }
+
+        override fun getChannel(): SocketChannel? = null.also { record("getChannel") }
+
+        override fun getInputStream(): InputStream {
+            record("getInputStream")
+            return ByteArrayInputStream(byteArrayOf())
+        }
+
+        override fun getOutputStream(): OutputStream = ByteArrayOutputStream().also { record("getOutputStream") }
+
+        override fun setTcpNoDelay(on: Boolean) = record("setTcpNoDelay")
+
+        override fun getTcpNoDelay(): Boolean = false.also { record("getTcpNoDelay") }
+
+        override fun setSoLinger(
+            on: Boolean,
+            linger: Int,
+        ) = record("setSoLinger")
+
+        override fun getSoLinger(): Int = 0.also { record("getSoLinger") }
+
+        override fun sendUrgentData(data: Int) = record("sendUrgentData")
+
+        override fun setOOBInline(on: Boolean) = record("setOOBInline")
+
+        override fun getOOBInline(): Boolean = false.also { record("getOOBInline") }
+
+        override fun setSoTimeout(timeout: Int) = record("setSoTimeout")
+
+        override fun getSoTimeout(): Int = 0.also { record("getSoTimeout") }
+
+        override fun setSendBufferSize(size: Int) = record("setSendBufferSize")
+
+        override fun getSendBufferSize(): Int = 1_024.also { record("getSendBufferSize") }
+
+        override fun setReceiveBufferSize(size: Int) = record("setReceiveBufferSize")
+
+        override fun getReceiveBufferSize(): Int = 2_048.also { record("getReceiveBufferSize") }
+
+        override fun setKeepAlive(on: Boolean) = record("setKeepAlive")
+
+        override fun getKeepAlive(): Boolean = false.also { record("getKeepAlive") }
+
+        override fun setTrafficClass(tc: Int) = record("setTrafficClass")
+
+        override fun getTrafficClass(): Int = 0.also { record("getTrafficClass") }
+
+        override fun setReuseAddress(on: Boolean) = record("setReuseAddress")
+
+        override fun getReuseAddress(): Boolean = false.also { record("getReuseAddress") }
+
+        override fun close() = record("close")
+
+        override fun shutdownInput() = record("shutdownInput")
+
+        override fun shutdownOutput() = record("shutdownOutput")
+
+        override fun isConnected(): Boolean = true.also { record("isConnected") }
+
+        override fun isBound(): Boolean = true.also { record("isBound") }
+
+        override fun isClosed(): Boolean = false.also { record("isClosed") }
+
+        override fun isInputShutdown(): Boolean = false.also { record("isInputShutdown") }
+
+        override fun isOutputShutdown(): Boolean = false.also { record("isOutputShutdown") }
+
+        override fun setPerformancePreferences(
+            connectionTime: Int,
+            latency: Int,
+            bandwidth: Int,
+        ) = record("setPerformancePreferences")
+
+        override fun toString(): String = "recording-ssl-socket".also { record("toString") }
     }
 
     private companion object {

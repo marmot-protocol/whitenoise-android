@@ -341,6 +341,33 @@ class AccountSwitcherUnreadDotLayoutTest {
             .assertIsDisplayed()
     }
 
+    @Test
+    fun coldIdentityAccountLabelsDoNotAccessMarmotDuringTopBarComposition() {
+        var marmotAccesses = 0
+        val activeId = "aa".repeat(32)
+        val otherId = "bb".repeat(32)
+        val appState =
+            WhiteNoiseAppState(
+                context = context,
+                draftStore = DraftStore(InMemoryDraftPersistence()),
+                accountIdHexResolver = { activeId },
+                accounts =
+                    listOf(
+                        accountSummary(label = activeId, accountIdHex = activeId),
+                        accountSummary(label = otherId, accountIdHex = otherId),
+                    ),
+                activeAccountRef = activeId,
+                profileReader = { null },
+                profileDisplayNameReader = { null },
+                profileRefreshRequest = {},
+                marmotAccessObserver = { marmotAccesses += 1 },
+            )
+
+        renderTopBar(appState)
+
+        assertEquals(0, marmotAccesses)
+    }
+
     private fun renderTopBar(
         appState: WhiteNoiseAppState,
         rtl: Boolean = false,
@@ -448,6 +475,19 @@ class AccountSwitcherUnreadDotLayoutTest {
                     )
                 },
             activeAccountRef = activeAccountRef,
+        )
+
+    private fun accountSummary(
+        label: String,
+        accountIdHex: String,
+    ): AccountSummaryFfi =
+        AccountSummaryFfi(
+            label = label,
+            accountIdHex = accountIdHex,
+            localSigning = true,
+            externalSigning = false,
+            signedOut = false,
+            running = true,
         )
 
     private class InMemoryDraftPersistence : DraftPersistence {

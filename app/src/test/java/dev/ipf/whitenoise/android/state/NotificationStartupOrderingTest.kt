@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.Manifest
 import android.app.Application
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -14,6 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -31,6 +33,29 @@ class NotificationStartupOrderingTest {
 
                 assertTrue(fixture.receiverWasAttachedAtPostStartEmission)
                 assertTrue(fixture.appState.phase is AppPhase.Onboarding)
+            } finally {
+                fixture.close()
+            }
+        }
+
+    @Test
+    fun coldIdentityFallbackPostsWithoutCanonicalNpubFfiWork() =
+        runBlocking {
+            shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    notificationUsersHaveDisplayNames = false,
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitNotificationPosted()
+
+                assertEquals(
+                    "the first complete card must use cached or deterministic identity text",
+                    0,
+                    fixture.npubCalls.get(),
+                )
             } finally {
                 fixture.close()
             }

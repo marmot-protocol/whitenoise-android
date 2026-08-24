@@ -41,6 +41,7 @@ internal class NotificationBootstrapTestFixture(
     initiallyBlockSubscriptionsSynchronously: Boolean = false,
     delayFirstNotificationDispatchAfterRuntimeStart: Boolean = false,
     receiverTimeoutMillis: Long = 100L,
+    notificationUsersHaveDisplayNames: Boolean = true,
     private val markReadRow: ChatListRowFfi? = null,
 ) {
     private val appContext = context.applicationContext
@@ -65,6 +66,7 @@ internal class NotificationBootstrapTestFixture(
     val runtimeStartCalls = AtomicInteger(0)
     val subscriptionCalls = AtomicInteger(0)
     val markReadCalls = AtomicInteger(0)
+    val npubCalls = AtomicInteger(0)
 
     @Volatile
     var receiverWasAttachedAtPostStartEmission = false
@@ -90,13 +92,13 @@ internal class NotificationBootstrapTestFixture(
             sender =
                 NotificationUserFfi(
                     accountIdHex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                    displayName = "Alice",
+                    displayName = "Alice".takeIf { notificationUsersHaveDisplayNames },
                     pictureUrl = null,
                 ),
             receiver =
                 NotificationUserFfi(
                     accountIdHex = "self",
-                    displayName = "Me",
+                    displayName = "Me".takeIf { notificationUsersHaveDisplayNames },
                     pictureUrl = null,
                 ),
             previewText = "Delivered while bootstrap is still running",
@@ -150,6 +152,10 @@ internal class NotificationBootstrapTestFixture(
                     markReadCalls.incrementAndGet()
                     markReadRow
                 }
+                "npub" -> {
+                    npubCalls.incrementAndGet()
+                    "npub1coldidentityfallback"
+                }
                 "listAccounts", "chatList" -> emptyList<Any>()
                 "displayName" -> "Alice"
                 "toString" -> "NotificationBootstrapMarmotFake"
@@ -190,6 +196,16 @@ internal class NotificationBootstrapTestFixture(
     suspend fun awaitUpdateConsumed() {
         withTimeout(5_000L) {
             while (consumedUpdates.get() == 0) delay(10L)
+        }
+    }
+
+    suspend fun awaitNotificationPosted() {
+        val manager = appContext.getSystemService(NotificationManager::class.java)
+        withTimeout(5_000L) {
+            while (manager.activeNotifications.none { it.tag == "account-a|group-a" }) {
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                delay(1L)
+            }
         }
     }
 

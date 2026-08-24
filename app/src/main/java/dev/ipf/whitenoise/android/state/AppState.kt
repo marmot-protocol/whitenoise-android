@@ -8443,6 +8443,17 @@ class WhiteNoiseAppState private constructor(
         return cachedName ?: shortNpub(accountIdHex)
     }
 
+    /**
+     * Presentation-only account title for composition. Unlike [displayName],
+     * this never performs a synchronous Marmot fallback when the npub cache is
+     * cold; callers can request profile hydration from a side effect.
+     */
+    internal fun accountDisplayNameCached(accountIdHex: String): String {
+        chatMemberNameCached(accountIdHex)?.let { return it }
+        val accountLabel = accounts.firstOrNull { it.accountIdHex == accountIdHex }?.label
+        return networkDisplayNameFallback(accountLabel, accountIdHex, ::cachedShortNpubOrUnknown)
+    }
+
     internal fun contactDisplayNameCached(
         accountRef: String?,
         accountIdHex: String,
@@ -8459,6 +8470,19 @@ class WhiteNoiseAppState private constructor(
         if (npub.isEmpty()) return ""
         return IdentityFormatter.short(npub, prefix = 10, suffix = 8)
     }
+
+    /**
+     * Main-thread presentation fallbacks may consult only the in-memory
+     * encoding cache. A cold cache must not synchronously cross the
+     * Marmot/UniFFI boundary; notification enrichment and UI side effects can
+     * resolve the canonical identity later.
+     */
+    private fun cachedShortNpubOrUnknown(accountIdHex: String): String =
+        npubs
+            .get(accountIdHex)
+            ?.takeIf(String::isNotBlank)
+            ?.let { IdentityFormatter.short(it, prefix = 10, suffix = 8) }
+            ?: appContext.getString(R.string.unknown)
 
     /** Returns a canonical npub for presentation, or empty rather than exposing raw hex. */
     fun npubForDisplay(accountIdHex: String): String {
@@ -9656,7 +9680,7 @@ class WhiteNoiseAppState private constructor(
                 update = update,
                 redactContent = redactContent,
                 directShareEligible = !redactContent && update.accountRef == activeAccountRef,
-                shortNpub = ::shortNpub,
+                shortNpub = ::cachedShortNpubOrUnknown,
                 isPostStillAllowed = {
                     isNotificationGenerationPostAllowed(
                         update = update,
@@ -9675,7 +9699,7 @@ class WhiteNoiseAppState private constructor(
                 localNotificationPresenter.show(
                     update = update,
                     redactContent = true,
-                    shortNpub = ::shortNpub,
+                    shortNpub = ::cachedShortNpubOrUnknown,
                     isPostStillAllowed = {
                         isNotificationGenerationPostAllowed(
                             update = update,
