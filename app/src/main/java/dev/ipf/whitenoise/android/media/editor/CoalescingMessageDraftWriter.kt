@@ -128,10 +128,13 @@ internal class CoalescingMessageDraftWriter(
         generation: MessageDraftGeneration,
     ): Result<MessageDraftFfi?>? {
         val key = Key(accountRef, groupIdHex)
-        if (isHydrationBlocked(key, generation)) return null
-        flush(key)
-        if (isHydrationBlocked(key, generation)) return null
-        return drafts.coordinated.draftIf(accountRef, groupIdHex, generation)
+        val blockedBeforeFlush = isHydrationBlocked(key, generation)
+        if (!blockedBeforeFlush) flush(key)
+        return if (blockedBeforeFlush || isHydrationBlocked(key, generation)) {
+            null
+        } else {
+            drafts.coordinated.draftIf(accountRef, groupIdHex, generation)
+        }
     }
 
     suspend fun deleteIfCurrent(
