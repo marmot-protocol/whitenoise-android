@@ -233,6 +233,7 @@ object LocalNotificationFormatter {
                     ContentKind.INVITE -> inviteBody(update, context, senderName)
                     ContentKind.REMOVED_FROM_GROUP ->
                         clean(previewTextOverride)
+                            ?: clean(update.previewText)
                             ?: text(
                                 context,
                                 R.string.notification_removed_from_group_body,
