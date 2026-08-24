@@ -296,15 +296,13 @@ class TtsController internal constructor(
     private fun acquireAudioFocus(): Boolean =
         audioFocus.acquire(
             onFocusLoss = ::pause,
-            onOwnerSurrender = ::surrender,
+            // Permanent focus loss (another app took over playback, a voice
+            // note started) pauses too: interruptions must not silently
+            // discard the session's position (#1484). The retained session
+            // stays resumable until explicit dismissal, natural completion, or
+            // a security boundary ends it.
+            onOwnerSurrender = ::pause,
         )
-
-    @Synchronized
-    private fun surrender() {
-        if (state.value is TtsState.Speaking || state.value is TtsState.Paused) {
-            queue.stop()
-        }
-    }
 
     @Synchronized
     private fun onStart(utteranceId: String?) {

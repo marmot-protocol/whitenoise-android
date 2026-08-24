@@ -75,6 +75,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionSnapshot
 import dev.ipf.whitenoise.android.audio.tts.TtsHistoryPager
 import dev.ipf.whitenoise.android.audio.tts.TtsHistorySession
+import dev.ipf.whitenoise.android.audio.tts.TtsPlaybackForegroundService
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
@@ -1682,6 +1683,15 @@ class WhiteNoiseAppState private constructor(
             ttsSpeechAccountRef = activeAccountRef
             ttsAutoReadSessionKey = null
             ttsHistorySession.onSessionCleared()
+            // The session now exists, so the mediaPlayback service must too:
+            // it mirrors the controller, keeps playback alive across app
+            // switches, and stops itself when the controller goes terminal.
+            if (!TtsPlaybackForegroundService.start(appContext)) {
+                // A rejected foreground-service start must not leave private
+                // read-aloud running without its user-visible stop surface.
+                stopSpeaking()
+                return false
+            }
         }
         return started
     }
@@ -1967,6 +1977,8 @@ class WhiteNoiseAppState private constructor(
 
     var appLockScreenVisible by mutableStateOf(false)
         private set
+
+    private var appLockTtsBoundaryJob: Job? = null
 
     val notificationActionsAllowed: Boolean
         get() = notificationActionsAllowed(appLockScreenVisible)
@@ -5841,9 +5853,14 @@ class WhiteNoiseAppState private constructor(
     fun requestAppUnlock() {
         refreshAppLockCredentialAvailability()
         if (!requireAppUnlock || !appLockCredentialAvailable) return
-        appLockScreenVisible = true
+        showAppLockScreen()
         appUnlockError = null
         appUnlockPromptRequestId += 1
+    }
+
+    private fun showAppLockScreen() {
+        appLockScreenVisible = true
+        stopSpeaking()
     }
 
     fun markAppUnlockSucceeded(
@@ -5897,7 +5914,7 @@ class WhiteNoiseAppState private constructor(
     private fun deferAppLockDecisionUntilTimestampLoads(nowMillis: Long) {
         if (appUnlockEvaluationPending) return
         appUnlockEvaluationPending = true
-        appLockScreenVisible = true
+        showAppLockScreen()
         mutationsScope.launch {
             val loaded = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
             if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = loaded
@@ -7085,6 +7102,8 @@ class WhiteNoiseAppState private constructor(
         updateNotificationSuppression(if (foreground) suppression.onForeground() else suppression.onBackground())
         AppUpdateForegroundState.isForeground = foreground
         if (foreground) {
+            appLockTtsBoundaryJob?.cancel()
+            appLockTtsBoundaryJob = null
             maybeShowAppLockForForeground()
             if (dismissRetainedVisibleConversation) {
                 dismissVisibleConversationNotifications()
@@ -7093,9 +7112,7 @@ class WhiteNoiseAppState private constructor(
             recordAppLockBackgrounded()
             conversationDictation.onAppBackgrounded()
             mutationsScope.launch { draftWriter.flush() }
-            // Read-aloud is foreground-only in v1 (no mediaPlayback FGS):
-            // spoken private messages must not continue after an app switch.
-            stopSpeaking()
+            scheduleTtsStopAtAppLockBoundary()
         }
         if (foreground) {
             refreshLocalNotificationPermission()
@@ -7106,6 +7123,24 @@ class WhiteNoiseAppState private constructor(
         if (!foreground) notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = true) }
         if (foreground) notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
         if (foreground) refreshAppSelfUpdateInstallPermission()
+    }
+
+    private fun scheduleTtsStopAtAppLockBoundary() {
+        appLockTtsBoundaryJob?.cancel()
+        appLockTtsBoundaryJob = null
+        if (!requireAppUnlock || !appLockCredentialAvailable) return
+        val delayMillis = appLockDelay.delayMillis
+        if (delayMillis == 0L) {
+            stopSpeaking()
+            return
+        }
+        appLockTtsBoundaryJob =
+            mutationsScope.launch {
+                delay(delayMillis)
+                if (!appInForeground && requireAppUnlock && appLockCredentialAvailable) {
+                    stopSpeaking()
+                }
+            }
     }
 
     private fun dismissVisibleConversationNotifications() {
@@ -7136,6 +7171,9 @@ class WhiteNoiseAppState private constructor(
     fun onTaskRemoved() {
         updateNotificationSuppression(suppression.onTaskRemoved())
         conversationDictation.cancel()
+        // The app-state lifecycle is authoritative even if the TTS foreground
+        // service has not started yet or its start was rejected.
+        stopSpeaking()
         mutationsScope.launch { draftWriter.flush() }
     }
 

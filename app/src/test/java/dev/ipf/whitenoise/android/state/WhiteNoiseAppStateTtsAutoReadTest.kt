@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
@@ -14,13 +15,19 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadow.api.Shadow
+import org.robolectric.shadows.ShadowBiometricManager
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class WhiteNoiseAppStateTtsAutoReadTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
+    private val appPreferences =
+        context.getSharedPreferences("WhiteNoiseAppStateTtsAutoReadTest", Context.MODE_PRIVATE)
     private val accountRef = "account-a"
     private val groupA = "group-a"
     private val groupB = "group-b"
@@ -32,6 +39,7 @@ class WhiteNoiseAppStateTtsAutoReadTest {
             .edit()
             .clear()
             .commit()
+        appPreferences.edit().clear().commit()
     }
 
     @Test
@@ -107,6 +115,84 @@ class WhiteNoiseAppStateTtsAutoReadTest {
 
         appState.setConversationAutoReadOverride(groupA, TtsAutoReadOverride.OFF)
         assertTrue(appState.ttsController.state.value is TtsState.Speaking)
+    }
+
+    @Test
+    fun taskRemovalStopsManualSpeech() {
+        val appState = testAppState()
+        appState.ttsController.attachEngine(FakeSessionEngine())
+        assertTrue(
+            appState.speakAloud(
+                listOf(TtsSpeakableEntry("s", "Sender", "Private playback.")),
+                Locale.US,
+            ),
+        )
+
+        appState.onTaskRemoved()
+
+        assertTrue(appState.ttsController.state.value is TtsState.Idle)
+    }
+
+    @Test
+    fun immediateAppLockBoundaryStopsBackgroundSpeech() {
+        enableDeviceCredential()
+        val appState = testAppState()
+        appState.updateRequireAppUnlock(true)
+        appState.markAppUnlockSucceeded()
+        appState.ttsController.attachEngine(FakeSessionEngine())
+        assertTrue(
+            appState.speakAloud(
+                listOf(TtsSpeakableEntry("s", "Sender", "Private playback.")),
+                Locale.US,
+            ),
+        )
+
+        appState.setAppInForeground(false)
+
+        assertTrue(appState.ttsController.state.value is TtsState.Idle)
+    }
+
+    @Test
+    fun delayedAppLockBoundaryStopsSpeechOnlyWhenTheDelayExpires() {
+        enableDeviceCredential()
+        val appState = testAppState()
+        appState.updateAppLockDelay(AppLockDelay.OneMinute)
+        appState.updateRequireAppUnlock(true)
+        appState.markAppUnlockSucceeded()
+        appState.ttsController.attachEngine(FakeSessionEngine())
+        assertTrue(
+            appState.speakAloud(
+                listOf(TtsSpeakableEntry("s", "Sender", "Private playback.")),
+                Locale.US,
+            ),
+        )
+
+        appState.setAppInForeground(false)
+        shadowOf(Looper.getMainLooper()).idleFor(59, TimeUnit.SECONDS)
+        assertTrue(appState.ttsController.state.value is TtsState.Speaking)
+
+        shadowOf(Looper.getMainLooper()).idleFor(1, TimeUnit.SECONDS)
+        assertTrue(appState.ttsController.state.value is TtsState.Idle)
+    }
+
+    @Test
+    fun showingTheAppLockStopsActiveSpeech() {
+        enableDeviceCredential()
+        val appState = testAppState()
+        appState.updateRequireAppUnlock(true)
+        appState.markAppUnlockSucceeded()
+        appState.ttsController.attachEngine(FakeSessionEngine())
+        assertTrue(
+            appState.speakAloud(
+                listOf(TtsSpeakableEntry("s", "Sender", "Private playback.")),
+                Locale.US,
+            ),
+        )
+
+        appState.requestAppUnlock()
+
+        assertTrue(appState.appLockScreenVisible)
+        assertTrue(appState.ttsController.state.value is TtsState.Idle)
     }
 
     @Test
@@ -328,7 +414,15 @@ class WhiteNoiseAppStateTtsAutoReadTest {
                     ),
                 ),
             activeAccountRef = accountRef,
+            preferences = appPreferences,
         )
+
+    private fun enableDeviceCredential() {
+        Shadow
+            .extract<ShadowBiometricManager>(
+                context.getSystemService(android.hardware.biometrics.BiometricManager::class.java),
+            ).setCanAuthenticate(true)
+    }
 
     private fun testAppStateWithTwoAccounts(activeAccountRef: String): WhiteNoiseAppState =
         WhiteNoiseAppState(
@@ -355,6 +449,7 @@ class WhiteNoiseAppStateTtsAutoReadTest {
                     ),
                 ),
             activeAccountRef = activeAccountRef,
+            preferences = appPreferences,
         )
 
     private object DiscardedDrafts : DraftPersistence {

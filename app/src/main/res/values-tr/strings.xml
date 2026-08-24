@@ -656,6 +656,15 @@
     <string name="background_connection_notification_hint">Bu bildirimi gizlemek için uzun basın</string>
     <string name="notification_channel_background_connection">Arka plan bağlantısı</string>
     <string name="notification_channel_background_connection_description">Yerel bildirimler için White Noise’yi bağlı tutar</string>
+    <string name="notification_channel_read_aloud">Sesli okuma</string>
+    <string name="notification_channel_read_aloud_description">Mesajlar sesli okunurken oynatma denetimleri</string>
+    <string name="tts_playback_notification_title">Sesli okunuyor</string>
+    <string name="tts_playback_notification_text">White Noise mesajları sesli okuyor</string>
+    <string name="tts_playback_action_play">Oynat</string>
+    <string name="tts_playback_action_pause">Duraklat</string>
+    <string name="tts_playback_action_stop">Durdur</string>
+    <string name="tts_playback_action_previous_message">Önceki mesaj</string>
+    <string name="tts_playback_action_next_message">Sonraki mesaj</string>
     <string name="toast_restarting">Yeniden başlatılıyor</string>
     <string name="toast_identity_created">Kimlik oluşturuldu</string>
     <string name="toast_couldnt_create_identity">Kimlik oluşturulamadı</string>

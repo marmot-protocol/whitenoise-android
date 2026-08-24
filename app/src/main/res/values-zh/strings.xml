@@ -645,6 +645,15 @@
     <string name="background_connection_notification_hint">长按以隐藏此通知</string>
     <string name="notification_channel_background_connection">后台连接</string>
     <string name="notification_channel_background_connection_description">保持 White Noise 连接以获取本地通知</string>
+    <string name="notification_channel_read_aloud">朗读</string>
+    <string name="notification_channel_read_aloud_description">朗读消息时的播放控制</string>
+    <string name="tts_playback_notification_title">正在朗读</string>
+    <string name="tts_playback_notification_text">White Noise 正在朗读消息</string>
+    <string name="tts_playback_action_play">播放</string>
+    <string name="tts_playback_action_pause">暂停</string>
+    <string name="tts_playback_action_stop">停止</string>
+    <string name="tts_playback_action_previous_message">上一条消息</string>
+    <string name="tts_playback_action_next_message">下一条消息</string>
     <string name="toast_restarting">正在重启</string>
     <string name="toast_identity_created">身份已创建</string>
     <string name="toast_couldnt_create_identity">无法创建身份</string>

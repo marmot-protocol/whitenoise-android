@@ -688,6 +688,15 @@
     <string name="background_connection_notification_hint">Нажмите и удерживайте, чтобы скрыть это уведомление</string>
     <string name="notification_channel_background_connection">Фоновое подключение</string>
     <string name="notification_channel_background_connection_description">Поддерживает White Noise на связи для локальных уведомлений.</string>
+    <string name="notification_channel_read_aloud">Чтение вслух</string>
+    <string name="notification_channel_read_aloud_description">Управление воспроизведением при чтении сообщений вслух</string>
+    <string name="tts_playback_notification_title">Чтение вслух</string>
+    <string name="tts_playback_notification_text">White Noise читает сообщения вслух</string>
+    <string name="tts_playback_action_play">Воспроизвести</string>
+    <string name="tts_playback_action_pause">Пауза</string>
+    <string name="tts_playback_action_stop">Остановить</string>
+    <string name="tts_playback_action_previous_message">Предыдущее сообщение</string>
+    <string name="tts_playback_action_next_message">Следующее сообщение</string>
     <string name="toast_restarting">Перезапуск</string>
     <string name="toast_identity_created">Идентичность создана</string>
     <string name="toast_couldnt_create_identity">Не удалось создать идентификатор</string>

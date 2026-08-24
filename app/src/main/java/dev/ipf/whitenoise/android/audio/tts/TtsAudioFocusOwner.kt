@@ -7,10 +7,13 @@ import android.media.AudioManager
 
 /**
  * Audio-focus ownership for read-aloud. Spoken messages are long-form
- * content, so this requests full GAIN (not transient): a transient loss —
- * a notification chime, a voice note starting — pauses the queue for the
- * user to resume; a permanent loss (another app takes over playback) ends
- * the session outright rather than parking a stale paused bar forever.
+ * content, so this requests full GAIN (not transient). Both loss kinds are
+ * survivable: a transient loss — a notification chime, a voice note starting —
+ * and a permanent loss (another app takes over playback) pause the queue at
+ * its retained position rather than destroying the session; the paused
+ * session stays resumable until it is explicitly dismissed (#1484). The two
+ * callbacks stay separate so the permanent path can also drop the spent
+ * focus request, which a later resume() re-acquires from scratch.
  */
 internal class TtsAudioFocusOwner(
     context: Context,
