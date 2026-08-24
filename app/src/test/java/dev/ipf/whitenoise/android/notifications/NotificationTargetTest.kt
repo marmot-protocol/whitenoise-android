@@ -149,6 +149,17 @@ class NotificationTargetTest {
     }
 
     @Test
+    fun fromUpdate_membershipTriggersRemainUnroutableUntilTheirPresentationLands() {
+        listOf(
+            NotificationTriggerFfi.REMOVED_FROM_GROUP,
+            NotificationTriggerFfi.MADE_ADMIN,
+            NotificationTriggerFfi.REMOVED_AS_ADMIN,
+        ).forEach { trigger ->
+            assertNull(NotificationNavigation.fromUpdate(update(trigger = trigger)))
+        }
+    }
+
+    @Test
     fun fromUpdate_blankAccountOrGroup_returnsNull() {
         assertNull(NotificationNavigation.fromUpdate(update(accountRef = "")))
         assertNull(NotificationNavigation.fromUpdate(update(groupIdHex = "")))

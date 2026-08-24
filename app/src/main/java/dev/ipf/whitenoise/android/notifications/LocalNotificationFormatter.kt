@@ -176,19 +176,29 @@ object LocalNotificationFormatter {
         // shortener here keeps this pure formatter from duplicating bech32.
         shortNpub: (String) -> String,
     ): LocalNotificationContent? {
-        if (update.isFromSelf) return null
+        val isGroupInvite =
+            if (update.isFromSelf) {
+                null
+            } else {
+                when (update.trigger) {
+                    NotificationTriggerFfi.NEW_MESSAGE -> false
+                    NotificationTriggerFfi.GROUP_INVITE -> true
+                    NotificationTriggerFfi.REMOVED_FROM_GROUP,
+                    NotificationTriggerFfi.MADE_ADMIN,
+                    NotificationTriggerFfi.REMOVED_AS_ADMIN,
+                    -> null
+                }
+            }
+        if (isGroupInvite == null) return null
         val senderName = senderName(update.sender, senderNameOverride, shortNpub)
         val title =
-            when (update.trigger) {
-                NotificationTriggerFfi.NEW_MESSAGE -> messageTitle(update, context, senderName)
-                NotificationTriggerFfi.GROUP_INVITE -> inviteTitle(context)
-            }
+            if (isGroupInvite) inviteTitle(context) else messageTitle(update, context, senderName)
         val body =
             boundedNotificationMessageText(
-                when (update.trigger) {
-                    NotificationTriggerFfi.NEW_MESSAGE ->
-                        messageBody(update, context, previewTextOverride, reactedToPreviewOverride, mediaKind)
-                    NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context, senderName)
+                if (isGroupInvite) {
+                    inviteBody(update, context, senderName)
+                } else {
+                    messageBody(update, context, previewTextOverride, reactedToPreviewOverride, mediaKind)
                 },
             )
         val dismissalKey = notificationDismissalKey(update)
