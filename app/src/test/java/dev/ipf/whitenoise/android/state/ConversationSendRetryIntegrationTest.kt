@@ -213,7 +213,7 @@ class ConversationSendRetryIntegrationTest {
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
-                        assertEquals("queued safely", appState.draftFor(GROUP_ID))
+                        assertEquals(null, appState.draftFor(GROUP_ID))
                         SendSummaryFfi(
                             published = 0u,
                             messageIds = listOf(CONFIRMED_MESSAGE_ID),

@@ -1,5 +1,12 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -14,10 +21,14 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -26,8 +37,58 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class PendingSendDraftPresentationTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
     @Test
-    fun pendingSendHidesItsCapturedRecoveryDraftFromTheChatRow() =
+    fun pendingSendDoesNotReturnToComposerAfterLeavingAndReopeningConversation() =
+        runTest {
+            val appState = appState()
+            val publishStarted = CompletableDeferred<Unit>()
+            val finishPublish = CompletableDeferred<Unit>()
+            val controller = controller(appState, publishStarted, finishPublish)
+            var conversationOpen by mutableStateOf(true)
+
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    if (conversationOpen) {
+                        ComposerBar(
+                            replyingTo = null,
+                            messageTextCopy = MessageTextCopy.Default,
+                            onCancelReply = {},
+                            onSend = { _, _ -> },
+                            initialDraft =
+                                appState
+                                    .draftSnapshotFor(ACCOUNT_REF, GROUP_ID)
+                                    ?.textFieldValue
+                                    ?: TextFieldValue(""),
+                            onDraftChange = { appState.setDraft(it) },
+                            draftKey = GROUP_ID,
+                        )
+                    }
+                }
+            }
+
+            composeRule.onNode(hasSetTextAction()).performTextInput("sending now")
+            composeRule.waitForIdle()
+            val send =
+                async {
+                    appState.sendConversationText(controller, "sending now")
+                }
+            publishStarted.await()
+
+            composeRule.runOnIdle { conversationOpen = false }
+            composeRule.runOnIdle { conversationOpen = true }
+
+            composeRule.onNode(hasSetTextAction()).assertTextEquals("")
+
+            finishPublish.complete(Unit)
+            send.await()
+            assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+        }
+
+    @Test
+    fun pendingSendHidesItsCapturedRecoveryDraftFromComposerAndChatRow() =
         runTest {
             val appState = appState()
             appState.setDraft(TextFieldValue("sending now"))
@@ -38,11 +99,8 @@ class PendingSendDraftPresentationTest {
             val send = async { appState.sendConversationText(controller, "sending now") }
             publishStarted.await()
 
-            assertEquals("sending now", appState.draftFor(ACCOUNT_REF, GROUP_ID))
-            assertEquals(
-                null,
-                appState.chatRowDraftFor(ACCOUNT_REF, GROUP_ID, OutgoingMessageIndicator.Sending),
-            )
+            assertEquals(null, appState.draftFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(null, appState.chatRowDraftFor(ACCOUNT_REF, GROUP_ID))
             assertEquals(MessageStatus.Pending, controller.timeline.single().status)
 
             finishPublish.complete(Unit)
@@ -71,7 +129,7 @@ class PendingSendDraftPresentationTest {
             assertEquals(MessageStatus.Failed, controller.timeline.single().status)
             assertEquals(
                 "try again",
-                appState.chatRowDraftFor(ACCOUNT_REF, GROUP_ID, OutgoingMessageIndicator.Failed),
+                appState.chatRowDraftFor(ACCOUNT_REF, GROUP_ID),
             )
         }
 
@@ -90,7 +148,7 @@ class PendingSendDraftPresentationTest {
 
             assertEquals(
                 "next message",
-                appState.chatRowDraftFor(ACCOUNT_REF, GROUP_ID, OutgoingMessageIndicator.Sending),
+                appState.chatRowDraftFor(ACCOUNT_REF, GROUP_ID),
             )
 
             finishPublish.complete(Unit)
@@ -114,7 +172,7 @@ class PendingSendDraftPresentationTest {
 
             assertEquals(
                 "same words",
-                appState.chatRowDraftFor(ACCOUNT_REF, GROUP_ID, OutgoingMessageIndicator.Sending),
+                appState.chatRowDraftFor(ACCOUNT_REF, GROUP_ID),
             )
 
             finishPublish.complete(Unit)

@@ -315,7 +315,7 @@ internal fun ChatRow(
                 val deliveryIndicator = item.projectedDeliveryIndicator()
                 val draft =
                     appState
-                        .chatRowDraftFor(accountRef, item.group.groupIdHex, deliveryIndicator)
+                        .chatRowDraftFor(accountRef, item.group.groupIdHex)
                         ?.takeIf { it.isNotBlank() }
                 // Tokens only ever describe the last message's body, so they're
                 // ignored whenever the line shows something else (invite copy,
