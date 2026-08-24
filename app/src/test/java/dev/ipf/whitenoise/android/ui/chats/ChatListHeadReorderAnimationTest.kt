@@ -19,8 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -426,6 +428,99 @@ class ChatListHeadReorderAnimationTest {
         }
     }
 
+    @Test
+    fun sameHeadMembershipMotionCannotRetargetPointerOrAccessibilityActions() {
+        var itemIds by mutableStateOf(listOf("A", "B", "C"))
+        val openedIds = mutableListOf<String>()
+
+        composeRule.setContent {
+            ChatListHeadReorderMotionHarness(
+                itemIds = itemIds,
+                listState = rememberLazyListState(),
+                rowHeight = rowHeight,
+                onOpen = openedIds::add,
+            )
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+
+        composeRule.runOnUiThread { itemIds = listOf("A", "C", "B") }
+        composeRule.runOnIdle { }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle { }
+
+        composeRule.onNodeWithTag(chatListHeadReorderRowTag("C")).performTouchInput {
+            down(center)
+            up()
+        }
+        composeRule.onNodeWithTag(chatListHeadReorderRowTag("B")).assertIsNotEnabled()
+        composeRule.runOnIdle {
+            assertEquals("moving rows must expose no stale pointer or semantic action", emptyList<String>(), openedIds)
+        }
+
+        composeRule.mainClock.advanceTimeBy(CHAT_LIST_ROW_PLACEMENT_MILLIS.toLong() + 1L)
+        composeRule.runOnIdle { }
+        composeRule.onNodeWithTag(chatListHeadReorderRowTag("C")).performClick()
+        composeRule.runOnIdle {
+            assertEquals(listOf("C"), openedIds)
+        }
+    }
+
+    @Test
+    fun removedRowExposesNoStaleSemanticsWhileItsOldSlotIsReused() {
+        var itemIds by mutableStateOf(listOf("A", "B", "C"))
+        val openedIds = mutableListOf<String>()
+        composeRule.setContent {
+            ChatListHeadReorderMotionHarness(
+                itemIds = itemIds,
+                listState = rememberLazyListState(),
+                rowHeight = rowHeight,
+                onOpen = openedIds::add,
+            )
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+
+        composeRule.runOnUiThread { itemIds = listOf("A", "C") }
+        composeRule.runOnIdle { }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle { }
+
+        composeRule.onNodeWithTag(chatListHeadReorderRowTag("B")).assertDoesNotExist()
+        composeRule.onNodeWithTag(chatListHeadReorderRowTag("C")).assertIsNotEnabled()
+        composeRule.runOnIdle { assertEquals(emptyList<String>(), openedIds) }
+    }
+
+    @Test
+    fun leadingInlineItemShiftDisablesRowActionsUntilPlacementSettles() {
+        var leadingItemCount by mutableStateOf(0)
+        val openedIds = mutableListOf<String>()
+        composeRule.setContent {
+            ChatListHeadReorderMotionHarness(
+                itemIds = listOf("A", "B"),
+                listState = rememberLazyListState(),
+                rowHeight = rowHeight,
+                leadingItemCount = leadingItemCount,
+                onOpen = openedIds::add,
+            )
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+
+        composeRule.runOnUiThread { leadingItemCount = 1 }
+        composeRule.runOnIdle { }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle { }
+
+        composeRule.onNodeWithTag(chatListHeadReorderRowTag("A")).assertIsNotEnabled()
+        composeRule.runOnIdle { assertEquals(emptyList<String>(), openedIds) }
+
+        composeRule.mainClock.advanceTimeBy(CHAT_LIST_ROW_PLACEMENT_MILLIS.toLong() + 1L)
+        composeRule.runOnIdle { }
+        composeRule.onNodeWithTag(chatListHeadReorderRowTag("A")).performClick()
+        composeRule.runOnIdle { assertEquals(listOf("A"), openedIds) }
+    }
+
     private fun rowTop(id: String): Float =
         composeRule
             .onNodeWithTag(chatListHeadReorderRowTag(id))
@@ -437,6 +532,7 @@ class ChatListHeadReorderAnimationTest {
 private fun headDemotionTargetIndex(
     itemIds: List<String>,
     pinnedCount: Int?,
+    leadingItemCount: Int,
     demotion: ChatListHeadDemotion?,
     applied: Boolean,
 ): Int? =
@@ -448,11 +544,12 @@ private fun headDemotionTargetIndex(
             chatListHeadDemotionTargetIndex(
                 rowIndex = rowIndex,
                 pinnedBoundaryIndex = pinnedCount,
-                leadingItemCount = 0,
+                leadingItemCount = leadingItemCount,
             )
         }
 
 @Composable
+@Suppress("LongMethod") // Production-equivalent motion, gate, boundary, and click wiring belong in one harness.
 internal fun ChatListHeadReorderMotionHarness(
     itemIds: List<String>,
     listState: LazyListState,
@@ -460,6 +557,7 @@ internal fun ChatListHeadReorderMotionHarness(
     datasetKey: ChatListDatasetKey = ChatListDatasetKey(false, null, ""),
     contentRevision: Int = 0,
     pinnedCount: Int? = null,
+    leadingItemCount: Int = 0,
     userHeadDemotion: ChatListHeadDemotion? = null,
     userHeadDemotionSettled: Boolean = false,
     onUserHeadDemotionConsumed: (ChatListHeadDemotion) -> Unit = {},
@@ -471,7 +569,13 @@ internal fun ChatListHeadReorderMotionHarness(
     val viewportGeneration = rememberChatListUserGestureGeneration(listState)
     val pinnedOrder = pinnedCount?.let(itemIds::take).orEmpty()
     val userHeadDemotionTargetIndex =
-        headDemotionTargetIndex(itemIds, pinnedCount, userHeadDemotion, userHeadDemotionSettled)
+        headDemotionTargetIndex(
+            itemIds = itemIds,
+            pinnedCount = pinnedCount,
+            leadingItemCount = leadingItemCount,
+            demotion = userHeadDemotion,
+            applied = userHeadDemotionSettled,
+        )
     ChatListActiveHeadScrollEffect(
         listState = listState,
         activeHeadId = itemIds.firstOrNull(),
@@ -495,7 +599,13 @@ internal fun ChatListHeadReorderMotionHarness(
             isActiveList = true,
             scrollCorrectionInProgress = scrollCorrectionInProgress,
         )
-    val interactionsEnabled = !headReorderInProgress
+    val rowPlacementInProgress =
+        rememberChatListRowPlacementGate(
+            orderedRowIds = itemIds,
+            pinnedBoundaryIndex = pinnedCount,
+            leadingItemCount = leadingItemCount,
+        )
+    val interactionsEnabled = !headReorderInProgress && !rowPlacementInProgress
     SideEffect {
         onRowsComposed(itemIds, interactionsEnabled)
     }
@@ -503,6 +613,11 @@ internal fun ChatListHeadReorderMotionHarness(
         modifier = Modifier.testTag(CHAT_LIST_HEAD_REORDER_LIST_TAG),
         state = listState,
     ) {
+        repeat(leadingItemCount) { leadingIndex ->
+            item(key = "leading-$leadingIndex") {
+                Box(Modifier.fillMaxWidth().height(rowHeight))
+            }
+        }
         itemIds.forEachIndexed { targetIndex, id ->
             if (targetIndex == pinnedCount) {
                 item(key = CHAT_LIST_PINNED_BOUNDARY_KEY) {

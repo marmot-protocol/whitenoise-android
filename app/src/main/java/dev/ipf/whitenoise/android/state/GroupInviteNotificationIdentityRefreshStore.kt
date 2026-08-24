@@ -1,8 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.NotificationTriggerFfi
-import dev.ipf.marmotkit.NotificationUpdateFfi
-
 /**
  * Bounded process-local record of posted invite cards whose sender name was
  * incomplete. Invite cards use a plain notification style that does not render
@@ -14,12 +11,12 @@ internal class GroupInviteNotificationIdentityRefreshStore(
     private val maxEntries: Int = 64,
 ) {
     internal data class RefreshCandidate(
-        val update: NotificationUpdateFfi,
+        val identity: GroupInviteNotificationIdentity,
         val resolvedName: String?,
     )
 
     private data class Entry(
-        val update: NotificationUpdateFfi,
+        val identity: GroupInviteNotificationIdentity,
         val displayedName: String?,
         val desiredName: String?,
     )
@@ -29,21 +26,15 @@ internal class GroupInviteNotificationIdentityRefreshStore(
     private val refreshesInFlight = mutableSetOf<String>()
 
     fun rememberPosted(
-        update: NotificationUpdateFfi,
+        identity: GroupInviteNotificationIdentity,
         displayedName: String?,
     ) {
-        if (
-            update.trigger != NotificationTriggerFfi.GROUP_INVITE ||
-            update.notificationKey.isBlank() ||
-            update.sender.accountIdHex.isBlank()
-        ) {
-            return
-        }
+        if (identity.notificationKey.isBlank() || identity.senderAccountIdHex.isBlank()) return
         synchronized(lock) {
-            entriesByNotificationKey.remove(update.notificationKey)
-            entriesByNotificationKey[update.notificationKey] =
+            entriesByNotificationKey.remove(identity.notificationKey)
+            entriesByNotificationKey[identity.notificationKey] =
                 Entry(
-                    update = update,
+                    identity = identity,
                     displayedName = displayedName,
                     desiredName = displayedName,
                 )
@@ -63,7 +54,7 @@ internal class GroupInviteNotificationIdentityRefreshStore(
         return synchronized(lock) {
             val candidates = mutableListOf<RefreshCandidate>()
             entriesByNotificationKey.entries.forEach { (notificationKey, entry) ->
-                if (!entry.update.sender.accountIdHex
+                if (!entry.identity.senderAccountIdHex
                         .equals(senderAccountIdHex, ignoreCase = true)
                 ) {
                     return@forEach
@@ -80,20 +71,20 @@ internal class GroupInviteNotificationIdentityRefreshStore(
     }
 
     fun completeRefresh(
-        update: NotificationUpdateFfi,
+        notificationKey: String,
         displayedName: String?,
         contentRedacted: Boolean,
     ): RefreshCandidate? =
         synchronized(lock) {
-            refreshesInFlight.remove(update.notificationKey)
-            val current = entriesByNotificationKey[update.notificationKey] ?: return@synchronized null
+            refreshesInFlight.remove(notificationKey)
+            val current = entriesByNotificationKey[notificationKey] ?: return@synchronized null
             if (contentRedacted) return@synchronized null
             val refreshedEntry =
                 current.copy(
                     displayedName = displayedName,
                 )
-            entriesByNotificationKey[update.notificationKey] = refreshedEntry
-            claimIfPending(update.notificationKey, refreshedEntry)
+            entriesByNotificationKey[notificationKey] = refreshedEntry
+            claimIfPending(notificationKey, refreshedEntry)
         }
 
     fun claimPendingRefreshes(): List<RefreshCandidate> =
@@ -142,7 +133,7 @@ internal class GroupInviteNotificationIdentityRefreshStore(
         }
         refreshesInFlight += notificationKey
         return RefreshCandidate(
-            update = entry.update,
+            identity = entry.identity,
             resolvedName = entry.desiredName,
         )
     }

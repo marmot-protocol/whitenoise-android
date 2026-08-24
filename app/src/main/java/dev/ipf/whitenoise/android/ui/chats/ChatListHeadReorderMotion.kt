@@ -27,14 +27,16 @@ import kotlinx.coroutines.withContext
  *
  * The target list order is also the paint order: rows moving toward an earlier
  * slot stay above later rows while paths cross. Short membership fades keep
- * inserted/removed rows from flashing through shared rows; disappearing lazy
- * items are drawn below retained items by Compose.
+ * inserted rows from flashing through shared rows. Removed rows do not fade:
+ * keeping an exiting item composed would also keep its stale pointer and
+ * semantics nodes alive while another row moves into that slot (#1828).
  */
 internal fun LazyItemScope.chatListRowMotion(targetIndex: Int): Modifier =
     Modifier
         .animateItem(
             fadeInSpec = tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS),
-            fadeOutSpec = tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS),
+            placementSpec = tween(CHAT_LIST_ROW_PLACEMENT_MILLIS),
+            fadeOutSpec = null,
         ).zIndex(chatListTargetZIndex(targetIndex))
 
 internal fun chatListTargetZIndex(targetIndex: Int): Float = -targetIndex.toFloat()
@@ -173,8 +175,7 @@ private suspend fun LazyListState.animateHeadScrollCorrection() {
     try {
         animateScrollToItem(0)
     } finally {
-        // Placement uses Compose's spring animation and can outlive the scroll
-        // correction. Preserve the minimum input gate even if a newer scroll
+        // Preserve the minimum head-reorder input gate even if a newer scroll
         // mutation cancels this animation.
         withContext(NonCancellable) {
             val elapsedMs = SystemClock.uptimeMillis() - gateStartedAtMs
@@ -296,4 +297,5 @@ internal fun ChatListActiveHeadScrollEffect(
 }
 
 private const val CHAT_LIST_MEMBERSHIP_FADE_MILLIS = 120
+internal const val CHAT_LIST_ROW_PLACEMENT_MILLIS = 240
 internal const val CHAT_LIST_HEAD_INPUT_GATE_MILLIS = 500L

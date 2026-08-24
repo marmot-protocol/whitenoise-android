@@ -21,7 +21,13 @@ class PostedGroupInviteIdentityTest {
                 displayedName = "Alice",
             )
 
-        assertEquals(update, identity?.update)
+        assertEquals(update.notificationKey, identity?.identity?.notificationKey)
+        assertEquals(update.accountRef, identity?.identity?.accountRef)
+        assertEquals(update.groupIdHex, identity?.identity?.groupIdHex)
+        assertEquals(update.groupName, identity?.identity?.groupName)
+        assertEquals(update.sender.accountIdHex, identity?.identity?.senderAccountIdHex)
+        assertEquals(update.receiver.accountIdHex, identity?.identity?.receiverAccountIdHex)
+        assertEquals(update.receiver.displayName, identity?.identity?.receiverDisplayName)
         assertNull(identity?.displayedName)
     }
 

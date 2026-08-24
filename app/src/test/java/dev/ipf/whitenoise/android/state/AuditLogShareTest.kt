@@ -58,6 +58,25 @@ class AuditLogShareTest {
     }
 
     @Test
+    fun prepareAuditLogShareFilesAcceptsTheConfiguredRootThroughItsFilesystemAlias() {
+        val realRoot = temporaryFolder.newFolder("real-allowed")
+        val source = File(realRoot, "audit.jsonl").apply { writeText("entry") }
+        val rootAlias = File(temporaryFolder.root, "allowed-alias")
+        Files.createSymbolicLink(rootAlias.toPath(), realRoot.toPath())
+        val cache = temporaryFolder.newFolder("alias-cache")
+
+        val shared =
+            prepareAuditLogShareFiles(
+                cache,
+                rootAlias,
+                listOf(File(rootAlias, source.name).absolutePath),
+            )
+
+        assertEquals(listOf("audit.jsonl"), shared.map(File::getName))
+        assertEquals(listOf("entry"), shared.map(File::readText))
+    }
+
+    @Test
     fun prepareAuditLogShareFilesRejectsSymlinksAndMissingFiles() {
         val source = temporaryFolder.newFile("source.jsonl").apply { writeText("private") }
         val link = File(temporaryFolder.root, "link.jsonl")

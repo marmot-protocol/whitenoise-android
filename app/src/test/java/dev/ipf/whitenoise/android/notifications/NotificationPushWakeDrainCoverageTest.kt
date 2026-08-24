@@ -1,6 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
-import dev.ipf.whitenoise.android.state.postAfterNotificationAvatarPreWarm
+import dev.ipf.whitenoise.android.state.postBeforeNotificationEnrichment
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -80,7 +80,7 @@ class NotificationPushWakeDrainCoverageTest {
     fun appStateDrainWaiterStartsBeforeRuntimeBootstrap() {
         val appState = appStateSource().readText()
         val wait = appStateFunctionBody("ensureNotificationRuntimeStartedAndAwaitPushDrain")
-        val postUpdate = appStateFunctionBody("postNotificationUpdate")
+        val postMaintenance = appStateFunctionBody("schedulePostNotificationMaintenance")
 
         assertTrue(
             "drain waiter must be active before ensureNotificationRuntimeStarted can process a fast update",
@@ -90,37 +90,62 @@ class NotificationPushWakeDrainCoverageTest {
         )
         assertTrue(
             "notification update processing must signal push-wake drain completion",
-            "signalNotificationDrain()" in postUpdate &&
+            "signalNotificationDrain()" in postMaintenance &&
                 "notificationDrainSignals.tryEmit(notificationDrainSequence.incrementAndGet())" in appState,
         )
     }
 
     @Test
-    fun coldPushWakePreWarmsAvatarsBeforePostingTheFirstNotification() =
+    fun firstNotificationPostsBeforeBlockedOptionalEnrichmentIsScheduled() =
         runBlocking {
             val calls = mutableListOf<String>()
+            var pendingResolver: (suspend () -> Unit)? = null
             val listener = appStateFunctionBody("runNotificationListenerLoop")
             val updateProcessing = appStateFunctionBody("processNotificationUpdate")
 
-            postAfterNotificationAvatarPreWarm(
-                preWarm = {
-                    calls += "pre-warm"
-                    "resolved-avatar-urls"
-                },
-                post = { resolved -> calls += "post:$resolved" },
-            )
+            val posted =
+                postBeforeNotificationEnrichment(
+                    post = {
+                        calls += "post"
+                        true
+                    },
+                    scheduleEnrichment = {
+                        calls += "schedule-enrichment"
+                        pendingResolver = { calls += "resolver-finished" }
+                    },
+                )
 
-            assertEquals(listOf("pre-warm", "post:resolved-avatar-urls"), calls)
+            assertTrue(posted)
+            assertEquals(listOf("post", "schedule-enrichment"), calls)
+            checkNotNull(pendingResolver).invoke()
+            assertEquals(listOf("post", "schedule-enrichment", "resolver-finished"), calls)
             assertTrue(
-                "the UI-independent notification subscription must use the tested pre-warm/post sequence",
+                "the subscription must post fallback content before scheduling optional resolver work",
                 "processNotificationUpdate(update)" in listener &&
-                    "postAfterNotificationAvatarPreWarm(" in updateProcessing &&
+                    "postBeforeNotificationEnrichment(" in updateProcessing &&
                     "val postEpoch = notificationPostEpoch.capture()" in updateProcessing &&
                     "val engineMuted = engineNotificationMuted(update)" in updateProcessing &&
-                    "preWarm = { preWarmNotificationAvatars(update, engineMuted) }" in updateProcessing &&
-                    "post = { avatars -> postNotificationUpdate(update, avatars, postEpoch, engineMuted) }" in
+                    "post = { postInitialNotificationUpdate(update, postEpoch, engineMuted) }" in updateProcessing &&
+                    "scheduleNotificationEnrichment(update, postEpoch, engineMuted, receivedAtElapsedMs)" in
                     updateProcessing,
             )
+        }
+
+    @Test
+    fun rejectedInitialPostDoesNotScheduleEnrichment() =
+        runBlocking {
+            var scheduled = false
+
+            val posted =
+                postBeforeNotificationEnrichment(
+                    post = { false },
+                    scheduleEnrichment = {
+                        scheduled = true
+                    },
+                )
+
+            assertEquals(false, posted)
+            assertEquals(false, scheduled)
         }
 
     @Test

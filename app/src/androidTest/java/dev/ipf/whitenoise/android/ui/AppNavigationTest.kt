@@ -60,10 +60,10 @@ class AppNavigationTest {
         }
 
         composeRule.onNodeWithContentDescription("Open navigation").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Open settings").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Open settings", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("AL").assertIsDisplayed()
 
-        composeRule.onNodeWithContentDescription("Open settings").performClick()
+        composeRule.onNodeWithContentDescription("Open settings", substring = true).performClick()
         composeRule.runOnIdle { assertEquals(1, settingsClicks) }
     }
 
@@ -82,7 +82,7 @@ class AppNavigationTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Open settings").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Open settings", substring = true).assertIsDisplayed()
         composeRule
             .onNodeWithContentDescription("This account has unread messages", substring = true)
             .assertDoesNotExist()
@@ -223,7 +223,7 @@ class AppNavigationTest {
         composeRule.runOnIdle {
             appState.presentTransient(AppText.Plain(GLOBAL_NOTICE_TEXT))
         }
-        composeRule.onNodeWithContentDescription("Open settings").performClick()
+        composeRule.onNodeWithContentDescription("Open settings", substring = true).performClick()
 
         composeRule.onNodeWithText("Settings").assertIsDisplayed()
         val selector =

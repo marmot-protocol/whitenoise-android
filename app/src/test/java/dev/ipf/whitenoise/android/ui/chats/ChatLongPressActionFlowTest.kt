@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -8,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
@@ -185,6 +188,58 @@ class ChatLongPressActionFlowTest {
     }
 
     @Test
+    fun productionRowsCancelHeldPointerAndActionsAcrossPlacementMotion() {
+        var itemIds by mutableStateOf(listOf("A", "B"))
+        val items =
+            mapOf(
+                "A" to chatItem(groupIdByte = "0a", name = "Gesture A"),
+                "B" to chatItem(groupIdByte = "0b", name = "Gesture B"),
+            )
+        val openedIds = mutableListOf<String>()
+        val actionIds = mutableListOf<String>()
+        val state = appState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProductionChatListPlacementHarness(
+                    itemIds = itemIds,
+                    items = items,
+                    appState = state,
+                    onOpen = openedIds::add,
+                    onOpenActions = actionIds::add,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+
+        composeRule.onNodeWithTag(productionChatRowTag("A")).performTouchInput { down(center) }
+        composeRule.runOnUiThread { itemIds = listOf("B", "A") }
+        composeRule.runOnIdle { }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(CHAT_LIST_ROW_PLACEMENT_MILLIS.toLong() + 1L)
+        composeRule.onAllNodes(isRoot())[0].performTouchInput {
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 1L)
+            up()
+        }
+
+        composeRule.runOnIdle {
+            assertEquals(emptyList<String>(), openedIds)
+            assertEquals(emptyList<String>(), actionIds)
+        }
+        composeRule.onNodeWithText("Gesture A").assertIsEnabled()
+        composeRule.onNodeWithText("Gesture B").assertIsEnabled()
+
+        composeRule.runOnIdle { }
+        composeRule.onNode(hasText("Gesture A") and hasClickAction()).performClick()
+        composeRule.onNodeWithTag(productionChatRowTag("B")).performTouchInput { longClick() }
+
+        composeRule.runOnIdle {
+            assertEquals(listOf("A"), openedIds)
+            assertEquals(listOf("B"), actionIds)
+        }
+    }
+
+    @Test
     fun longPressDragDismissesThresholdActionAndEntersRange() {
         var rangeActive by mutableStateOf(false)
         var sheetOpen by mutableStateOf(false)
@@ -329,57 +384,59 @@ class ChatLongPressActionFlowTest {
             activeAccountRef = "personal",
         )
 
-    private fun chatItem() =
-        ChatListItem(
-            group =
-                AppGroupRecordFfi(
-                    groupIdHex = "02".repeat(32),
-                    protocolProfile = AppProtocolProfileFfi.LEGACY,
-                    endpoint = "wss://relay.example",
-                    profilePresent = true,
-                    name = GROUP_NAME,
-                    description = "",
-                    admins = emptyList(),
-                    relays = emptyList(),
-                    nostrGroupIdHex = "03".repeat(32),
-                    avatarUrl = null,
-                    avatarDim = null,
-                    avatarThumbhash = null,
-                    imageHashHex = null,
-                    encryptedMedia =
-                        AppGroupEncryptedMediaComponentFfi(
-                            componentId = 0x8008u,
-                            component = "marmot.group.encrypted-media.v1",
-                            required = true,
-                            version = EncryptedMediaVersionFfi.V1,
-                            mediaFormat = "encrypted-media-v1",
-                            allowedLocatorKinds = listOf("blossom-v1"),
-                            defaultBlobEndpoints =
-                                listOf(
-                                    AppBlobEndpointFfi(
-                                        locatorKind = "blossom-v1",
-                                        baseUrl = "https://blossom.example",
-                                    ),
+    private fun chatItem(
+        groupIdByte: String = "02",
+        name: String = GROUP_NAME,
+    ) = ChatListItem(
+        group =
+            AppGroupRecordFfi(
+                groupIdHex = groupIdByte.repeat(32),
+                protocolProfile = AppProtocolProfileFfi.LEGACY,
+                endpoint = "wss://relay.example",
+                profilePresent = true,
+                name = name,
+                description = "",
+                admins = emptyList(),
+                relays = emptyList(),
+                nostrGroupIdHex = "03".repeat(32),
+                avatarUrl = null,
+                avatarDim = null,
+                avatarThumbhash = null,
+                imageHashHex = null,
+                encryptedMedia =
+                    AppGroupEncryptedMediaComponentFfi(
+                        componentId = 0x8008u,
+                        component = "marmot.group.encrypted-media.v1",
+                        required = true,
+                        version = EncryptedMediaVersionFfi.V1,
+                        mediaFormat = "encrypted-media-v1",
+                        allowedLocatorKinds = listOf("blossom-v1"),
+                        defaultBlobEndpoints =
+                            listOf(
+                                AppBlobEndpointFfi(
+                                    locatorKind = "blossom-v1",
+                                    baseUrl = "https://blossom.example",
                                 ),
-                        ),
-                    disappearingMessageSecs = 0uL,
-                    archived = false,
-                    pendingConfirmation = false,
-                    unrecoverable = false,
-                    selfMembership = SelfMembershipFfi.MEMBER,
-                    leaveRequestPending = false,
-                    leaveRequestedAtMs = null,
-                    disbanding = false,
-                    disbandRequest = null,
-                    disbanded = false,
-                    welcomerAccountIdHex = null,
-                    viaWelcomeMessageIdHex = null,
-                ),
-            latest = null,
-            otherMemberAccount = null,
-            memberCount = 3,
-            memberSnapshot = null,
-        )
+                            ),
+                    ),
+                disappearingMessageSecs = 0uL,
+                archived = false,
+                pendingConfirmation = false,
+                unrecoverable = false,
+                selfMembership = SelfMembershipFfi.MEMBER,
+                leaveRequestPending = false,
+                leaveRequestedAtMs = null,
+                disbanding = false,
+                disbandRequest = null,
+                disbanded = false,
+                welcomerAccountIdHex = null,
+                viaWelcomeMessageIdHex = null,
+            ),
+        latest = null,
+        otherMemberAccount = null,
+        memberCount = 3,
+        memberSnapshot = null,
+    )
 
     private class InMemoryDraftPersistence : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()
@@ -396,3 +453,48 @@ class ChatLongPressActionFlowTest {
         const val CHAT_HOLD_HOST_TAG = "chat-hold-host"
     }
 }
+
+@Composable
+private fun ProductionChatListPlacementHarness(
+    itemIds: List<String>,
+    items: Map<String, ChatListItem>,
+    appState: WhiteNoiseAppState,
+    onOpen: (String) -> Unit,
+    onOpenActions: (String) -> Unit,
+) {
+    val placementInProgress =
+        rememberChatListRowPlacementGate(
+            orderedRowIds = itemIds,
+            pinnedBoundaryIndex = null,
+            leadingItemCount = 0,
+        )
+    LazyColumn(
+        modifier = Modifier.cancelPointersAcrossChatListMotion(interactionsEnabled = !placementInProgress),
+    ) {
+        itemIds.forEachIndexed { targetIndex, id ->
+            item(key = id) {
+                Box(modifier = chatListRowMotion(targetIndex).testTag(productionChatRowTag(id))) {
+                    ChatListRow(
+                        item = items.getValue(id),
+                        appState = appState,
+                        isMuted = false,
+                        interactionsEnabled = !placementInProgress,
+                        selectionMode = false,
+                        selected = false,
+                        onOpen = { onOpen(id) },
+                        onOpenProfile = {},
+                        onOpenActions = { onOpenActions(id) },
+                        onDragSelectionStart = {},
+                        onDragSelection = { false },
+                        onDragSelectionEnd = {},
+                        onDragSelectionCancel = {},
+                        rangeDragActive = false,
+                        onToggleSelection = {},
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun productionChatRowTag(id: String): String = "production-chat-row-$id"

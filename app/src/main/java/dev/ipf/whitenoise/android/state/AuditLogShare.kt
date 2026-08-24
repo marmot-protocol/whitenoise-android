@@ -34,10 +34,16 @@ internal fun prepareAuditLogShareFiles(
     val shareDirectory = File(shareRoot, UUID.randomUUID().toString())
     check(shareDirectory.mkdir()) { "Unable to prepare audit log export" }
 
-    val allowedRoot = allowedSourceRoot.toPath().toRealPath()
+    val allowedLexicalRoot = allowedSourceRoot.toPath().toAbsolutePath().normalize()
+    val allowedRealRoot = allowedLexicalRoot.toRealPath()
     val usedNames = mutableSetOf<String>()
     return sourcePaths.mapNotNull { sourcePath ->
-        val source = confinedRegularAuditFile(File(sourcePath), allowedRoot) ?: return@mapNotNull null
+        val source =
+            confinedRegularAuditFile(
+                candidate = File(sourcePath),
+                allowedLexicalRoot = allowedLexicalRoot,
+                allowedRealRoot = allowedRealRoot,
+            ) ?: return@mapNotNull null
 
         val safeBaseName =
             source.name
@@ -55,19 +61,28 @@ internal fun prepareAuditLogShareFiles(
 @Suppress("ReturnCount") // Every path/symlink/confinement guard fails closed before copying.
 private fun confinedRegularAuditFile(
     candidate: File,
-    allowedRoot: Path,
+    allowedLexicalRoot: Path,
+    allowedRealRoot: Path,
 ): File? {
     val lexical = candidate.toPath().toAbsolutePath().normalize()
-    if (!lexical.startsWith(allowedRoot)) return null
+    val containmentRoot =
+        when {
+            lexical.startsWith(allowedLexicalRoot) -> allowedLexicalRoot
+            lexical.startsWith(allowedRealRoot) -> allowedRealRoot
+            else -> return null
+        }
 
-    var current = allowedRoot
-    for (component in allowedRoot.relativize(lexical)) {
+    var current = containmentRoot
+    for (component in containmentRoot.relativize(lexical)) {
         current = current.resolve(component)
         if (Files.isSymbolicLink(current)) return null
     }
 
-    val real = runCatching { lexical.toRealPath(LinkOption.NOFOLLOW_LINKS) }.getOrNull() ?: return null
-    if (!real.startsWith(allowedRoot) || !Files.isRegularFile(real, LinkOption.NOFOLLOW_LINKS)) return null
+    // Every descendant component, including the file itself, was checked above.
+    // Resolve only now so an allowed-root alias such as macOS /var -> /private/var
+    // is compared in the same namespace as [allowedRealRoot].
+    val real = runCatching { lexical.toRealPath() }.getOrNull() ?: return null
+    if (!real.startsWith(allowedRealRoot) || !Files.isRegularFile(real, LinkOption.NOFOLLOW_LINKS)) return null
     return real.toFile()
 }
 

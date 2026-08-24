@@ -14,7 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
-class WhiteNoiseApplication : Application() {
+open class WhiteNoiseApplication : Application() {
     val appState: WhiteNoiseAppState by lazy {
         WhiteNoiseAppState(this)
     }

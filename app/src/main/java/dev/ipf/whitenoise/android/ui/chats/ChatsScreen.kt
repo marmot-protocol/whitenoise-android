@@ -443,6 +443,8 @@ internal fun ChatsScreen(
         }
     val visibleChatIds = remember(visibleItems) { visibleItems.map { it.id }.toSet() }
     val orderedVisibleChatIds = remember(visibleItems) { visibleItems.map { it.id } }
+    val leadingChatListItemCount =
+        if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
     val visiblePinnedOrder = remember(visibleItems) { visibleItems.filter { it.pinned() }.map { it.id } }
     val pinnedBoundary =
         remember(visibleItems, showArchived) {
@@ -473,12 +475,10 @@ internal fun ChatsScreen(
         pendingHeadDemotionTarget
             ?.let { visibleItems.indexOf(it) }
             ?.let { rowIndex ->
-                val inlineErrorItems =
-                    if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
                 chatListHeadDemotionTargetIndex(
                     rowIndex = rowIndex,
                     pinnedBoundaryIndex = pinnedBoundary,
-                    leadingItemCount = inlineErrorItems,
+                    leadingItemCount = leadingChatListItemCount,
                 )
             }
 
@@ -817,6 +817,13 @@ internal fun ChatsScreen(
             isActiveList = !showArchived,
             scrollCorrectionInProgress = headScrollCorrectionInProgress,
         )
+    val rowPlacementInProgress =
+        rememberChatListRowPlacementGate(
+            orderedRowIds = orderedVisibleChatIds,
+            pinnedBoundaryIndex = pinnedBoundary,
+            leadingItemCount = leadingChatListItemCount,
+        )
+    val chatListInteractionsEnabled = !headReorderInProgress && !rowPlacementInProgress
     val archivedUnreadCount =
         remember(controller.archivedItems) {
             controller.archivedItems.count { it.hasUnread }
@@ -1170,6 +1177,7 @@ internal fun ChatsScreen(
                                 Modifier
                                     .fillMaxSize()
                                     .clipToBounds()
+                                    .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
                                     .onGloballyPositioned { coordinates ->
                                         chatListWindowTop = coordinates.positionInWindow().y
                                         chatListHeightPx = coordinates.size.height.toFloat()
@@ -1233,7 +1241,7 @@ internal fun ChatsScreen(
                                             accountRef = controller.boundAccountRef,
                                             isMuted =
                                                 item.engineMuted(),
-                                            interactionsEnabled = !headReorderInProgress,
+                                            interactionsEnabled = chatListInteractionsEnabled,
                                             selectionMode = selectionMode,
                                             selected = item.id in selectedChatIds,
                                             bodyMatch = bodyMatch,

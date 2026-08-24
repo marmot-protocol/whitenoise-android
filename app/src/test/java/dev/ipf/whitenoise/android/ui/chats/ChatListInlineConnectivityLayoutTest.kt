@@ -108,7 +108,7 @@ class ChatListInlineConnectivityLayoutTest {
 
         val activeAccountAvatar =
             composeRule
-                .onNodeWithContentDescription(context.getString(R.string.open_settings))
+                .onNodeWithContentDescription(context.getString(R.string.open_settings), substring = true)
                 .fetchSemanticsNode()
                 .boundsInRoot
 

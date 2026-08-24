@@ -83,7 +83,7 @@ class ChatListHeadDemotionTest {
 
     @Test
     @Suppress("LongMethod")
-    fun unpinVisibleHeadPreservesAnchorWithoutHeadScrollCorrection() {
+    fun unpinVisibleHeadWithLeadingItemPreservesAnchorWithoutHeadScrollCorrection() {
         val tail = (0 until 20).map { "E$it" }
         var itemIds by mutableStateOf(listOf("A", "B", "C") + tail)
         var pinnedCount by mutableIntStateOf(2)
@@ -102,6 +102,7 @@ class ChatListHeadDemotionTest {
                 listState = listState,
                 rowHeight = rowHeight,
                 pinnedCount = pinnedCount,
+                leadingItemCount = 1,
                 userHeadDemotion = demotion,
                 userHeadDemotionSettled = demotionApplied,
                 onUserHeadDemotionConsumed = {
@@ -114,7 +115,7 @@ class ChatListHeadDemotionTest {
         }
 
         composeRule.waitForIdle()
-        composeRule.runOnIdle { listStateHolder[0]!!.requestScrollToItem(0, 12) }
+        composeRule.runOnIdle { listStateHolder[0]!!.requestScrollToItem(1, 12) }
         composeRule.waitForIdle()
         val anchoredTop = rowTop("A")
         assertEquals(0f, anchoredTop, 0.5f)

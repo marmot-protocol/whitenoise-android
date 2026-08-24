@@ -56,6 +56,35 @@ class ChatListFolderTransitionScreenshotTest {
         captureFolderTransition(darkTheme = true, amoled = true, themeName = "amoled")
     }
 
+    @Test
+    fun sameHeadPlacementCrossingDark() {
+        var itemIds by mutableStateOf(listOf("A", "B", "C"))
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = false) {
+                Surface(
+                    modifier =
+                        Modifier
+                            .width(SCREENSHOT_WIDTH)
+                            .height(SCREENSHOT_HEIGHT)
+                            .testTag(SCREENSHOT_TAG),
+                    color = MaterialTheme.colorScheme.surface,
+                ) {
+                    FolderTransitionHarness(itemIds)
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnUiThread { itemIds = listOf("A", "C", "B") }
+        composeRule.runOnIdle { }
+        composeRule.mainClock.advanceTimeBy(CHAT_LIST_ROW_PLACEMENT_MILLIS / 2L)
+        composeRule.runOnIdle { }
+
+        composeRule
+            .onNodeWithTag(SCREENSHOT_TAG)
+            .captureRoboImage("src/test/snapshots/chat_list_same_head_crossing_dark.png")
+    }
+
     private fun captureFolderTransition(
         darkTheme: Boolean,
         amoled: Boolean,

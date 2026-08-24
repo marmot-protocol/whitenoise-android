@@ -12,11 +12,14 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("LargeClass") // One fixture exercises the repository's serialized mutation and generation race matrix.
 class MessageDraftRepositoryTest {
     @Test
     fun coalescedWriterPersistsOnlyLatestTextFromKeystrokeBurst() =
@@ -88,6 +91,159 @@ class MessageDraftRepositoryTest {
 
             assertEquals(MessageDraftConditionalDeleteResult.Superseded, result)
             assertEquals("next draft", gateway.current?.content)
+        }
+
+    @Test
+    fun successfulSendCleanupInvalidatesAuthoritativeHydrationAlreadyInFlight() =
+        runTest {
+            val gateway = FakeDraftGateway(draft(content = "sent"))
+            val writer = writer(gateway)
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+            var cleanupGeneration: MessageDraftGeneration? = null
+            gateway.onRead = {
+                cleanupGeneration =
+                    writer.beginSuccessfulSendCleanup(
+                        accountRef = ACCOUNT,
+                        groupIdHex = GROUP,
+                        sentGeneration = sentGeneration,
+                    )
+            }
+
+            val staleHydration = writer.loadIfCurrent(ACCOUNT, GROUP, sentGeneration)
+            val deletion =
+                writer.deleteIfCurrent(
+                    accountRef = ACCOUNT,
+                    groupIdHex = GROUP,
+                    generation = requireNotNull(cleanupGeneration),
+                )
+            val clearedHydration =
+                writer.loadIfCurrent(ACCOUNT, GROUP, requireNotNull(cleanupGeneration))
+
+            assertNull("a read captured before acceptance must not resurrect sent text", staleHydration)
+            assertTrue(deletion is MessageDraftConditionalDeleteResult.Applied)
+            assertNull(gateway.current)
+            assertNotNull(clearedHydration)
+            assertNull(clearedHydration?.getOrThrow())
+        }
+
+    @Test
+    fun optimisticSendBlocksAuthoritativeHydrationWithoutDeletingRecoveryDraft() =
+        runTest {
+            val gateway = FakeDraftGateway(draft(content = "sending"))
+            val writer = writer(gateway)
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+            var lifecycleProjectionHidden = false
+
+            val claimed =
+                writer.beginPendingSendPresentation(
+                    accountRef = ACCOUNT,
+                    groupIdHex = GROUP,
+                    sentGeneration = sentGeneration,
+                    onClaimed = { lifecycleProjectionHidden = true },
+                )
+            val reentryHydration = writer.loadIfCurrent(ACCOUNT, GROUP, sentGeneration)
+
+            assertTrue(claimed)
+            assertTrue(lifecycleProjectionHidden)
+            assertNull("pending text must not rehydrate on conversation re-entry", reentryHydration)
+            assertEquals("sending", gateway.current?.content)
+            assertEquals("blocked re-entry must not cross the MDK boundary", 0, gateway.readCalls)
+        }
+
+    @Test
+    fun optimisticSendPreventsInFlightHydrationFromCommittingLifecycleProjection() =
+        runTest {
+            val gateway = FakeDraftGateway(draft(content = "sending"))
+            val writer = writer(gateway)
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+            var pendingPresentationClaimed = false
+            gateway.onRead = {
+                pendingPresentationClaimed =
+                    writer.beginPendingSendPresentation(ACCOUNT, GROUP, sentGeneration)
+            }
+
+            val inFlightHydration = writer.loadIfCurrent(ACCOUNT, GROUP, sentGeneration)
+            var lifecycleProjectionCommitted = false
+            inFlightHydration?.onSuccess {
+                writer.runHydrationIfCurrent(ACCOUNT, GROUP, sentGeneration) {
+                    lifecycleProjectionCommitted = true
+                }
+            }
+
+            assertTrue(pendingPresentationClaimed)
+            assertFalse(lifecycleProjectionCommitted)
+            assertEquals("sending", gateway.current?.content)
+            assertEquals(1, gateway.readCalls)
+        }
+
+    @Test
+    fun successfulSendCleanupPreventsTheSentGenerationFromCommittingAProjection() =
+        runTest {
+            val writer = writer(FakeDraftGateway(draft(content = "sent")))
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+            val cleanupGeneration =
+                requireNotNull(writer.beginSuccessfulSendCleanup(ACCOUNT, GROUP, sentGeneration))
+            var staleProjectionCommitted = false
+            var cleanupProjectionCommitted = false
+
+            val staleWasCurrent =
+                writer.runIfCurrent(ACCOUNT, GROUP, sentGeneration) {
+                    staleProjectionCommitted = true
+                }
+            val cleanupWasCurrent =
+                writer.runIfCurrent(ACCOUNT, GROUP, cleanupGeneration) {
+                    cleanupProjectionCommitted = true
+                }
+
+            assertFalse(staleWasCurrent)
+            assertFalse(staleProjectionCommitted)
+            assertTrue(cleanupWasCurrent)
+            assertTrue(cleanupProjectionCommitted)
+        }
+
+    @Test
+    fun newerDraftSupersedesClaimedSuccessfulSendCleanup() =
+        runTest {
+            val gateway = FakeDraftGateway(draft(content = "sent"))
+            val writer = writer(gateway)
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+            val cleanupGeneration =
+                requireNotNull(writer.beginSuccessfulSendCleanup(ACCOUNT, GROUP, sentGeneration))
+
+            writer.submit(ACCOUNT, GROUP, "next draft")
+            val deletion = writer.deleteIfCurrent(ACCOUNT, GROUP, cleanupGeneration)
+            writer.flush()
+
+            assertEquals(MessageDraftConditionalDeleteResult.Superseded, deletion)
+            assertEquals("next draft", gateway.current?.content)
+        }
+
+    @Test
+    fun failedSuccessfulSendDeletionBlocksHydrationUntilNewTextIsAccepted() =
+        runTest {
+            val gateway =
+                FakeDraftGateway(draft(content = "sent")).apply {
+                    throwBeforeNextDelete = true
+                }
+            val writer = writer(gateway)
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+            val cleanupGeneration =
+                requireNotNull(writer.beginSuccessfulSendCleanup(ACCOUNT, GROUP, sentGeneration))
+
+            val deletion = writer.deleteIfCurrent(ACCOUNT, GROUP, cleanupGeneration)
+            val blockedHydration = writer.loadIfCurrent(ACCOUNT, GROUP, writer.generation(ACCOUNT, GROUP))
+
+            assertTrue(deletion is MessageDraftConditionalDeleteResult.Applied)
+            val deletionResult = (deletion as MessageDraftConditionalDeleteResult.Applied).result
+            assertTrue(deletionResult is MessageDraftMutationResult.Failure)
+            assertNull("failed cleanup must not restore accepted text", blockedHydration)
+            assertEquals("sent", gateway.current?.content)
+
+            writer.submit(ACCOUNT, GROUP, "next draft")
+            writer.flush()
+            val nextHydration = writer.loadIfCurrent(ACCOUNT, GROUP, writer.generation(ACCOUNT, GROUP))
+
+            assertEquals("next draft", nextHydration?.getOrThrow()?.content)
         }
 
     @Test
@@ -682,10 +838,12 @@ class MessageDraftRepositoryTest {
 private class FakeDraftGateway(
     var current: MessageDraftFfi?,
 ) : MessageDraftGateway {
+    var readCalls = 0
     var saveCalls = 0
     var readFailure: Throwable? = null
     var throwBeforeNextSave = false
     var throwAfterNextSave = false
+    var throwBeforeNextDelete = false
     var throwAfterNextDelete = false
     var onSave: (String) -> Unit = {}
     var onRead: () -> Unit = {}
@@ -695,6 +853,7 @@ private class FakeDraftGateway(
         accountRef: String,
         groupIdHex: String,
     ): MessageDraftFfi? {
+        readCalls += 1
         readFailure?.let { throw it }
         val callback = onRead
         onRead = {}
@@ -736,6 +895,10 @@ private class FakeDraftGateway(
         accountRef: String,
         groupIdHex: String,
     ) {
+        if (throwBeforeNextDelete) {
+            throwBeforeNextDelete = false
+            error("delete failed before commit")
+        }
         current = null
         val callback = onDelete
         onDelete = {}

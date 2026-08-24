@@ -99,6 +99,17 @@ object LocalNotificationFormatter {
             id = AGENT_ACTIVITY_NOTIFICATION_ID,
         )
 
+    fun notificationDismissalKey(update: NotificationUpdateFfi): NotificationDismissalKey =
+        when {
+            update.trigger == NotificationTriggerFfi.GROUP_INVITE ->
+                NotificationDismissalKey(update.notificationKey, MESSAGE_NOTIFICATION_ID)
+            isReaction(update) -> reactionDismissalKey(update.accountRef, update.groupIdHex)
+            update.isMention -> mentionDismissalKey(update.accountRef, update.groupIdHex)
+            update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY ->
+                agentActivityDismissalKey(update.accountRef, update.groupIdHex)
+            else -> conversationDismissalKey(update.accountRef, update.groupIdHex)
+        }
+
     /**
      * True when this update is a kind:7 reaction (a NEW_MESSAGE carrying an
      * emoji that survives sanitization). The emoji is tested through [clean],
@@ -180,31 +191,15 @@ object LocalNotificationFormatter {
                     NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context, senderName)
                 },
             )
+        val dismissalKey = notificationDismissalKey(update)
         return LocalNotificationContent(
             // Messages from one conversation share a per-account, per-group tag
             // so they accumulate into a single MessagingStyle card instead of N
             // independent alerts. Reactions and mentions in that same conversation
             // get their own prefixed identities so their channel-specific cards
             // stay independent of the ordinary message card. Invites stay individual.
-            notificationTag =
-                when {
-                    update.trigger == NotificationTriggerFfi.GROUP_INVITE -> update.notificationKey
-                    isReaction(update) ->
-                        REACTION_TAG_PREFIX + conversationDismissalKey(update.accountRef, update.groupIdHex).tag
-                    update.isMention ->
-                        MENTION_TAG_PREFIX + conversationDismissalKey(update.accountRef, update.groupIdHex).tag
-                    update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY ->
-                        AGENT_ACTIVITY_TAG_PREFIX + conversationDismissalKey(update.accountRef, update.groupIdHex).tag
-                    else -> conversationDismissalKey(update.accountRef, update.groupIdHex).tag
-                },
-            notificationId =
-                when {
-                    update.trigger == NotificationTriggerFfi.GROUP_INVITE -> 0
-                    isReaction(update) -> REACTION_NOTIFICATION_ID
-                    update.isMention -> MENTION_NOTIFICATION_ID
-                    update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY -> AGENT_ACTIVITY_NOTIFICATION_ID
-                    else -> MESSAGE_NOTIFICATION_ID
-                },
+            notificationTag = dismissalKey.tag,
+            notificationId = dismissalKey.id,
             title = title,
             body = body,
             senderName = senderName,

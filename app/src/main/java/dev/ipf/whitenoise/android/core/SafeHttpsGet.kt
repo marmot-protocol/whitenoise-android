@@ -22,6 +22,20 @@ import javax.net.ssl.SSLSession
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 
+internal class SafeHttpsPinnedRequest(
+    val parsed: URL,
+    val addresses: Array<InetAddress>,
+    val requestDeadlineNanos: Long,
+    val connectTimeoutMillis: Int,
+    val readTimeoutMillis: Int,
+    val requestHeaders: Map<String, String>,
+)
+
+internal class SafeHttpsGetDependencies(
+    val resolve: (String) -> Array<InetAddress>?,
+    val openPinnedConnection: (SafeHttpsPinnedRequest) -> HttpURLConnection?,
+)
+
 /**
  * SSRF-hardened HTTPS GET for Android-owned directory and user-initiated
  * fetches such as NIP-05, Lightning-address resolution, and image search.
@@ -65,6 +79,21 @@ object SafeHttpsGet {
             "proxy-authorization",
         )
 
+    private val defaultDependencies =
+        SafeHttpsGetDependencies(
+            resolve = { host -> InetAddress.getAllByName(host) },
+            openPinnedConnection = { request ->
+                openPinnedConnection(
+                    parsed = request.parsed,
+                    addresses = request.addresses,
+                    requestDeadlineNanos = request.requestDeadlineNanos,
+                    connectTimeoutMillis = request.connectTimeoutMillis,
+                    readTimeoutMillis = request.readTimeoutMillis,
+                    requestHeaders = request.requestHeaders,
+                )
+            },
+        )
+
     internal fun requestDeadlineMillis(
         connectTimeoutMillis: Int,
         readTimeoutMillis: Int,
@@ -82,6 +111,32 @@ object SafeHttpsGet {
         requestHeaders: Map<String, String> = emptyMap(),
         maxRedirectHops: Int = DEFAULT_MAX_REDIRECT_HOPS,
         hostAllowed: (URL) -> Boolean = { true },
+    ): ByteArray? =
+        get(
+            url = url,
+            maxBodyBytes = maxBodyBytes,
+            connectTimeoutMillis = connectTimeoutMillis,
+            readTimeoutMillis = readTimeoutMillis,
+            requestHeaders = requestHeaders,
+            maxRedirectHops = maxRedirectHops,
+            hostAllowed = hostAllowed,
+            dependencies = defaultDependencies,
+        )
+
+    /**
+     * Test seam around DNS and the already-connected pinned transport.
+     * Each policy rejection is intentionally explicit and fail-closed.
+     */
+    @Suppress("CyclomaticComplexMethod", "ReturnCount")
+    internal fun get(
+        url: String,
+        maxBodyBytes: Int,
+        connectTimeoutMillis: Int,
+        readTimeoutMillis: Int,
+        requestHeaders: Map<String, String> = emptyMap(),
+        maxRedirectHops: Int = DEFAULT_MAX_REDIRECT_HOPS,
+        hostAllowed: (URL) -> Boolean = { true },
+        dependencies: SafeHttpsGetDependencies,
     ): ByteArray? {
         val original = runCatching { URL(url) }.getOrNull() ?: return null
         val requestDeadlineNanos =
@@ -98,19 +153,21 @@ object SafeHttpsGet {
             if (parsed.port != -1 && parsed.port != 443) return null
             if (HostSafety.isPrivateOrLoopbackHost(host)) return null
             if (!hostAllowed(parsed)) return null
-            val resolved = runCatching { InetAddress.getAllByName(host) }.getOrNull()
+            val resolved = runCatching { dependencies.resolve(host) }.getOrNull()
             if (resolved.isNullOrEmpty() || resolved.any { HostSafety.isPrivateOrLoopbackAddress(it) }) {
                 return null
             }
 
             val connection =
-                openPinnedConnection(
-                    parsed = parsed,
-                    addresses = resolved,
-                    requestDeadlineNanos = requestDeadlineNanos,
-                    connectTimeoutMillis = connectTimeoutMillis,
-                    readTimeoutMillis = readTimeoutMillis,
-                    requestHeaders = headersForHop(requestHeaders, original = original, current = parsed),
+                dependencies.openPinnedConnection(
+                    SafeHttpsPinnedRequest(
+                        parsed = parsed,
+                        addresses = resolved,
+                        requestDeadlineNanos = requestDeadlineNanos,
+                        connectTimeoutMillis = connectTimeoutMillis,
+                        readTimeoutMillis = readTimeoutMillis,
+                        requestHeaders = headersForHop(requestHeaders, original = original, current = parsed),
+                    ),
                 ) ?: return null
             try {
                 connection.readTimeout =

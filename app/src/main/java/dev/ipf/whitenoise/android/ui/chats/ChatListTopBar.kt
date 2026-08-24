@@ -34,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -84,6 +85,9 @@ internal fun ChatListTopBar(
     onSwitchAccount: (String) -> Unit,
     connectivityState: ConnectivityBannerState = ConnectivityBannerState.Hidden,
 ) {
+    LaunchedEffect(appState.accounts, appState.runtimeGeneration) {
+        appState.requestProfiles(appState.accounts.map { it.accountIdHex })
+    }
     TopAppBar(
         title = {
             when {
@@ -156,7 +160,9 @@ internal fun ChatListTopBar(
                 else -> {
                     val active = appState.activeAccount
                     AccountAvatarButton(
-                        title = active?.let { appState.displayName(it.accountIdHex) } ?: stringResource(R.string.app_name),
+                        title =
+                            active?.let { appState.accountDisplayNameCached(it.accountIdHex) }
+                                ?: stringResource(R.string.app_name),
                         seed = active?.accountIdHex ?: "whitenoise",
                         pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
                         size = 44.dp,

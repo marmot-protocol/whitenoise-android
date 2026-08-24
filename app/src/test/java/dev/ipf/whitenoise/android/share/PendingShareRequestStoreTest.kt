@@ -1,12 +1,17 @@
 package dev.ipf.whitenoise.android.share
 
+import android.content.Context
 import android.net.Uri
+import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -81,6 +86,26 @@ class PendingShareRequestStoreTest {
         assertFalse(store.save(request))
         assertNull(store.load(request.requestId))
     }
+
+    @Test
+    fun contextBackedStoreCreationRunsOffTheCallingThread() =
+        runTest {
+            val callerThread = Thread.currentThread()
+            val expected = store()
+            lateinit var factoryThread: Thread
+
+            val actual =
+                createPendingShareRequestStore(
+                    context = ApplicationProvider.getApplicationContext<Context>(),
+                    factory = {
+                        factoryThread = Thread.currentThread()
+                        expected
+                    },
+                )
+
+            assertSame(expected, actual)
+            assertNotSame(callerThread, factoryThread)
+        }
 
     private fun store(): EncryptedPendingShareRequestStore =
         EncryptedPendingShareRequestStore(

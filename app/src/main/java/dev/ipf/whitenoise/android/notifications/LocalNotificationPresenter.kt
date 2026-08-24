@@ -305,6 +305,7 @@ class LocalNotificationPresenter(
         conversationAvatarUrl: String? = null,
         senderAvatarUrl: String? = null,
         silentUpdate: Boolean = false,
+        replaceCurrentMessage: Boolean = false,
         isPostStillAllowed: () -> Boolean = { true },
         shortNpub: (String) -> String,
     ): Boolean {
@@ -405,6 +406,12 @@ class LocalNotificationPresenter(
                     .setSilent(silentUpdate)
             // Name the recipient identity in the header when multi-account (#836).
             if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
+            if (
+                decision.style == NotificationStyleChoice.Plain ||
+                decision.style == NotificationStyleChoice.Messaging
+            ) {
+                stampConversationCardMessageId(builder, update.messageIdHex)
+            }
 
             var messagingPost: MessagingPostContext? = null
             when (val style = decision.style) {
@@ -412,11 +419,12 @@ class LocalNotificationPresenter(
                 // reactions channel, see LocalNotificationFormatter) so they're muted
                 // independently of messages. They aren't repliable, so no
                 // MessagingStyle / reply / mark-read — just a plain expandable card.
-                NotificationStyleChoice.Plain ->
+                NotificationStyleChoice.Plain -> {
                     builder
                         .setContentTitle(notificationContent.title)
                         .setContentText(notificationContent.body)
                         .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
+                }
 
                 // Messages stack into one per-conversation card; invites are
                 // one-off events, so keep them as a plain expandable notification.
@@ -446,13 +454,6 @@ class LocalNotificationPresenter(
                             .setShortcutId(messagingShortcutId)
                             .setLocusId(locusId)
                             .addPerson(sender)
-                    }
-                    update.messageIdHex?.takeIf { it.isNotBlank() }?.let { messageIdHex ->
-                        builder.addExtras(
-                            Bundle().apply {
-                                putString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX, messageIdHex)
-                            },
-                        )
                     }
                     if (redactContent) {
                         builder.addExtras(Bundle().apply { putBoolean(EXTRA_CONTENT_REDACTED, true) })
@@ -508,16 +509,6 @@ class LocalNotificationPresenter(
                 }
             }
 
-            messagingPost?.let { messaging ->
-                withContext(Dispatchers.Default) {
-                    publishInitialConversationShortcut(
-                        update = update,
-                        content = notificationContent,
-                        messaging = messaging,
-                        directShareEligible = directShareEligible,
-                    )
-                }
-            }
             val notificationManager = NotificationManagerCompat.from(context)
             val posted =
                 withContext(Dispatchers.Default) {
@@ -541,6 +532,10 @@ class LocalNotificationPresenter(
                                     existingConversationMessages(
                                         notificationContent.notificationTag,
                                         notificationContent.notificationId,
+                                        replacingMessageIdHex =
+                                            update.messageIdHex
+                                                ?.takeIf(String::isNotBlank)
+                                                ?.takeIf { replaceCurrentMessage },
                                     )
                                 }
                             ConversationCardPostSynchronizer.awaitTestBarrier(
@@ -676,28 +671,6 @@ class LocalNotificationPresenter(
             }
             true
         }
-    }
-
-    private fun publishInitialConversationShortcut(
-        update: NotificationUpdateFfi,
-        content: LocalNotificationContent,
-        messaging: MessagingPostContext,
-        directShareEligible: Boolean,
-    ) {
-        val shortcutId = messaging.shortcutId ?: return
-        if (shortcutSnapshots.containsKey(shortcutId)) return
-        publishConversationShortcut(
-            update = update,
-            content = content,
-            shortcutId = shortcutId,
-            locusId = LocusIdCompat(shortcutId),
-            conversationAvatarUrl = messaging.conversationAvatarUrl,
-            conversationAvatarBitmap = messaging.conversationAvatarBitmap,
-            senderAvatarUrl = messaging.senderAvatarUrl,
-            senderAvatarBitmap = messaging.senderAvatarBitmap,
-            sender = messaging.sender,
-            directShareEligible = directShareEligible,
-        )
     }
 
     private suspend fun dispatchMessagingEnrichment(
@@ -977,6 +950,30 @@ class LocalNotificationPresenter(
             )
     }
 
+    internal fun isNotificationUpdateCurrentForEnrichment(update: NotificationUpdateFfi): Boolean {
+        val expectedMessageIdHex = update.messageIdHex?.takeIf(String::isNotBlank)
+        return when {
+            update.trigger == NotificationTriggerFfi.GROUP_INVITE -> isGroupInviteNotificationActive(update)
+            expectedMessageIdHex == null -> false
+            else -> {
+                val key = LocalNotificationFormatter.notificationDismissalKey(update)
+                conversationCardMessageIdHex(key.tag, key.id) == expectedMessageIdHex
+            }
+        }
+    }
+
+    private fun stampConversationCardMessageId(
+        builder: NotificationCompat.Builder,
+        messageIdHex: String?,
+    ) {
+        val generationId = messageIdHex?.takeIf(String::isNotBlank) ?: return
+        builder.addExtras(
+            Bundle().apply {
+                putString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX, generationId)
+            },
+        )
+    }
+
     private fun ChannelImportance.toCompatPriority(): Int =
         when (this) {
             ChannelImportance.HIGH -> NotificationCompat.PRIORITY_HIGH
@@ -1222,15 +1219,26 @@ class LocalNotificationPresenter(
     private fun existingConversationMessages(
         tag: String,
         id: Int,
-    ): List<NotificationCompat.MessagingStyle.Message>? =
-        activeConversationCard(tag, id)
-            ?.takeUnless { it.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true }
-            ?.let { existing ->
-                NotificationCompat.MessagingStyle
-                    .extractMessagingStyleFromNotification(existing)
-                    ?.messages
-                    ?: expandedSingleMessage(existing.extras)
-            }
+        replacingMessageIdHex: String? = null,
+    ): List<NotificationCompat.MessagingStyle.Message>? {
+        val existing =
+            activeConversationCard(tag, id)
+                ?.takeUnless { it.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true }
+                ?: return null
+        val messages =
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(existing)
+                ?.messages
+                ?: expandedSingleMessage(existing.extras)
+        return if (
+            replacingMessageIdHex != null &&
+            conversationCardMessageIdHex(existing) == replacingMessageIdHex
+        ) {
+            messages?.dropLast(1)
+        } else {
+            messages
+        }
+    }
 
     private fun expandedSingleMessage(extras: Bundle?): List<NotificationCompat.MessagingStyle.Message>? =
         extras?.let { bundle ->
