@@ -879,9 +879,9 @@
     <string name="notification_channel_invites_default">Invites · Default for all chats</string>
     <string name="notification_channel_invites_default_description">Default Android alert behavior for group invites and welcomes</string>
     <string name="notification_channel_group_membership">Group membership changes</string>
-    <string name="notification_channel_group_membership_description">Removal and role changes in groups</string>
+    <string name="notification_channel_group_membership_description">When you are removed from groups</string>
     <string name="notification_channel_group_membership_default">Group membership changes · Default for all chats</string>
-    <string name="notification_channel_group_membership_default_description">Default Android alert behavior for removal and role changes in groups</string>
+    <string name="notification_channel_group_membership_default_description">Default Android alert behavior when you are removed from groups</string>
     <string name="notification_channel_agent_activity">Agent activity</string>
     <string name="notification_channel_agent_activity_description">Tool progress and agent status updates</string>
     <string name="notification_channel_agent_activity_default">Agent activity · Default for all chats</string>

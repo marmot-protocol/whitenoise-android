@@ -635,10 +635,10 @@
     <string name="notification_channel_reactions_default_description">Comportamiento predeterminado de alertas de Android para reacciones en chats</string>
     <string name="notification_channel_invites_default">Invitaciones · Predeterminado para todos los chats</string>
     <string name="notification_channel_invites_default_description">Comportamiento predeterminado de alertas de Android para invitaciones y bienvenidas de grupo</string>
-    <string name="notification_channel_group_membership">Cambios de pertenencia a grupos</string>
-    <string name="notification_channel_group_membership_description">Expulsiones y cambios de rol en grupos</string>
-    <string name="notification_channel_group_membership_default">Cambios de pertenencia a grupos · Predeterminado para todos los chats</string>
-    <string name="notification_channel_group_membership_default_description">Comportamiento predeterminado de las alertas de Android para expulsiones y cambios de rol en grupos</string>
+    <string name="notification_channel_group_membership">Cambios en la membresía de grupos</string>
+    <string name="notification_channel_group_membership_description">Cuando te eliminan de grupos</string>
+    <string name="notification_channel_group_membership_default">Cambios en la membresía de grupos · Predeterminado para todos los chats</string>
+    <string name="notification_channel_group_membership_default_description">Comportamiento predeterminado de las alertas de Android cuando te eliminan de grupos</string>
     <string name="notification_channel_agent_activity_default">Actividad del agente · Predeterminado para todos los chats</string>
     <string name="notification_channel_agent_activity_default_description">Comportamiento predeterminado de alertas de Android para la actividad del agente en chats</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (personalizado)</string>

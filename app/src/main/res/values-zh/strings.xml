@@ -625,9 +625,9 @@
     <string name="notification_channel_invites_default">邀请 · 所有聊天的默认设置</string>
     <string name="notification_channel_invites_default_description">群组邀请和欢迎的默认 Android 提醒方式</string>
     <string name="notification_channel_group_membership">群组成员变更</string>
-    <string name="notification_channel_group_membership_description">群组中的移除和角色变更</string>
+    <string name="notification_channel_group_membership_description">当你被移出群组时</string>
     <string name="notification_channel_group_membership_default">群组成员变更 · 所有聊天的默认设置</string>
-    <string name="notification_channel_group_membership_default_description">群组移除和角色变更的默认 Android 提醒方式</string>
+    <string name="notification_channel_group_membership_default_description">当你被移出群组时的默认 Android 提醒方式</string>
     <string name="notification_channel_agent_activity_default">代理活动 · 所有聊天的默认设置</string>
     <string name="notification_channel_agent_activity_default_description">聊天中代理活动的默认 Android 提醒方式</string>
     <string name="notification_channel_custom_name">%1$s · %2$s（自定义）</string>

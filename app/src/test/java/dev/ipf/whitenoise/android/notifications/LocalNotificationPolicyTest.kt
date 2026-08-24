@@ -223,6 +223,29 @@ class LocalNotificationPolicyTest {
         )
     }
 
+    @Test
+    fun unsupportedAdminRoleNotificationsFailClosed() {
+        listOf(
+            NotificationTriggerFfi.MADE_ADMIN,
+            NotificationTriggerFfi.REMOVED_AS_ADMIN,
+        ).forEach { trigger ->
+            assertFalse(
+                LocalNotificationPolicy.shouldPost(
+                    update(
+                        groupIdHex = "admin-role-group",
+                        accountRef = "account-a",
+                        trigger = trigger,
+                    ),
+                    appInForeground = false,
+                    activeConversationGroupIdHex = null,
+                    activeConversationAccountRef = null,
+                    appLockScreenVisible = false,
+                    conversationNotifyMode = { _, _ -> ChatNotifyMode.ALL },
+                ),
+            )
+        }
+    }
+
     // End-to-end lifecycle checks (issue #821): drive the suppression state
     // through the reported sequences and assert the post decision, so the policy
     // and the lifecycle transitions are pinned together.

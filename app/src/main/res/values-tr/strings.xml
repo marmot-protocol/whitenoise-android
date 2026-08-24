@@ -636,9 +636,9 @@
     <string name="notification_channel_invites_default">Davetler · Tüm sohbetler için varsayılan</string>
     <string name="notification_channel_invites_default_description">Grup davetleri ve karşılamalar için varsayılan Android uyarı davranışı</string>
     <string name="notification_channel_group_membership">Grup üyeliği değişiklikleri</string>
-    <string name="notification_channel_group_membership_description">Gruplardaki çıkarma ve rol değişiklikleri</string>
+    <string name="notification_channel_group_membership_description">Gruplardan çıkarıldığınızda</string>
     <string name="notification_channel_group_membership_default">Grup üyeliği değişiklikleri · Tüm sohbetler için varsayılan</string>
-    <string name="notification_channel_group_membership_default_description">Gruplardaki çıkarma ve rol değişiklikleri için varsayılan Android uyarı davranışı</string>
+    <string name="notification_channel_group_membership_default_description">Gruplardan çıkarıldığınızda varsayılan Android uyarı davranışı</string>
     <string name="notification_channel_agent_activity_default">Ajan etkinliği · Tüm sohbetler için varsayılan</string>
     <string name="notification_channel_agent_activity_default_description">Sohbetlerdeki ajan etkinliği için varsayılan Android uyarı davranışı</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (özel)</string>

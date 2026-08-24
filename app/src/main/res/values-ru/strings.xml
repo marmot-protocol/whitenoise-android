@@ -667,10 +667,10 @@
     <string name="notification_channel_reactions_default_description">Стандартные уведомления Android для реакций в чатах</string>
     <string name="notification_channel_invites_default">Приглашения · По умолчанию для всех чатов</string>
     <string name="notification_channel_invites_default_description">Стандартные уведомления Android для приглашений и приветствий в группах</string>
-    <string name="notification_channel_group_membership">Изменения участия в группах</string>
-    <string name="notification_channel_group_membership_description">Исключения и изменения ролей в группах</string>
-    <string name="notification_channel_group_membership_default">Изменения участия в группах · По умолчанию для всех чатов</string>
-    <string name="notification_channel_group_membership_default_description">Стандартные настройки уведомлений Android об исключениях и изменениях ролей в группах</string>
+    <string name="notification_channel_group_membership">Изменения членства в группах</string>
+    <string name="notification_channel_group_membership_description">Когда вас удаляют из групп</string>
+    <string name="notification_channel_group_membership_default">Изменения членства в группах · По умолчанию для всех чатов</string>
+    <string name="notification_channel_group_membership_default_description">Стандартные настройки уведомлений Android, когда вас удаляют из групп</string>
     <string name="notification_channel_agent_activity_default">Активность агента · По умолчанию для всех чатов</string>
     <string name="notification_channel_agent_activity_default_description">Стандартные уведомления Android об активности агента в чатах</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (настроено)</string>

@@ -15,16 +15,16 @@ object LocalNotificationPolicy {
         engineMuted: Boolean = false,
     ): Boolean {
         if (appLockScreenVisible) return false
-        val isGlobalMembershipEvent =
-            when (update.trigger) {
-                NotificationTriggerFfi.REMOVED_FROM_GROUP,
-                NotificationTriggerFfi.MADE_ADMIN,
-                NotificationTriggerFfi.REMOVED_AS_ADMIN,
-                -> true
-                NotificationTriggerFfi.NEW_MESSAGE,
-                NotificationTriggerFfi.GROUP_INVITE,
-                -> false
-            }
+        // MDK exposes these triggers, but #822 has not defined their Android
+        // presentation yet. Reject them at the eligibility boundary instead of
+        // relying on the formatter's later null-content guard.
+        if (
+            update.trigger == NotificationTriggerFfi.MADE_ADMIN ||
+            update.trigger == NotificationTriggerFfi.REMOVED_AS_ADMIN
+        ) {
+            return false
+        }
+        val isGlobalMembershipEvent = update.trigger == NotificationTriggerFfi.REMOVED_FROM_GROUP
         // Membership events belong to an app-wide OS channel. A conversation
         // mute controls its content, not the safety-critical fact that this
         // account can no longer participate in the group.
