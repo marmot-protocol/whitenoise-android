@@ -64,6 +64,12 @@ class MessageBubbleTtsHighlightScreenshotTest {
     }
 
     @Test
+    fun rangeSilentEstimatedWordHighlightLight() {
+        renderEstimatedWord()
+        capture("message_bubble_tts_range_silent_estimated_word_light")
+    }
+
+    @Test
     fun plainIncomingOmittedUrlSentenceBandLight() {
         renderOmittedUrl(mine = false, darkTheme = false, amoled = false)
         capture("message_bubble_tts_omitted_url_incoming_light")
@@ -115,6 +121,28 @@ class MessageBubbleTtsHighlightScreenshotTest {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 BubbleFixture(mine = mine, tag = TAG) {
                     HighlightedPlainLeaf(text = "Hello bright world.", resolver = resolver)
+                }
+            }
+        }
+    }
+
+    /** Visual contract for the passage emitted by the range-silent timing lane. */
+    private fun renderEstimatedWord() {
+        val text = "Estimated timing follows speech."
+        val wordStart = text.indexOf("timing")
+        val projection = legacyTextToSpeakableProjection(text)
+        val passage =
+            TtsPassage(
+                messageIdHex = "m1",
+                sentenceIndex = 0,
+                projectionId = projection.projectionId,
+                visibleWord = listOf(TtsVisibleTextSpan("plain", wordStart, wordStart + "timing".length)),
+            )
+        val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false, amoled = false) {
+                BubbleFixture(mine = false, tag = TAG) {
+                    HighlightedPlainLeaf(text = text, resolver = resolver)
                 }
             }
         }

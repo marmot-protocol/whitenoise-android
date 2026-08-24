@@ -514,6 +514,19 @@ internal class TtsPlaybackQueue(
         }
     }
 
+    /**
+     * The exact engine payload of the utterance the queue is currently
+     * speaking, or null when [utteranceId] is stale, out of generation, or not
+     * the active chunk. This is the validation gate the estimated word-timing
+     * lane shares with real engine callbacks: an utterance that fails it must
+     * neither arm a schedule nor contribute a calibration sample.
+     */
+    fun submittedChunk(utteranceId: String?): TtsChunk? {
+        val index = parseCurrentGenerationIndex(utteranceId) ?: return null
+        val active = _state.value is TtsState.Speaking && index == currentIndex
+        return if (active) rangeTracker.submitted(index) else null
+    }
+
     fun onDone(utteranceId: String?) {
         val completedIndex = parseCurrentGenerationIndex(utteranceId) ?: return
         if (_state.value !is TtsState.Speaking || completedIndex != currentIndex) return
@@ -597,6 +610,12 @@ internal class TtsPlaybackQueue(
         }
     }
 
+    enum class RangeApplication {
+        Stale,
+        FallbackOnly,
+        VisibleWord,
+    }
+
     /** Publishes range progress only for the active generation and chunk. */
     @Suppress("ReturnCount")
     fun onRangeStart(
@@ -604,10 +623,13 @@ internal class TtsPlaybackQueue(
         start: Int,
         end: Int,
         @Suppress("UNUSED_PARAMETER") frame: Int = 0,
-    ) {
-        val callbackIndex = parseCurrentGenerationIndex(utteranceId) ?: return
-        val speaking = _state.value as? TtsState.Speaking ?: return
-        if (callbackIndex != currentIndex) return
+        retainVisibleWordOnFallback: Boolean = false,
+    ): RangeApplication {
+        val callbackIndex = parseCurrentGenerationIndex(utteranceId) ?: return RangeApplication.Stale
+        val speaking = _state.value as? TtsState.Speaking ?: return RangeApplication.Stale
+        if (callbackIndex != currentIndex) return RangeApplication.Stale
+        val chunk = chunks[callbackIndex]
+        val passage = rangeTracker.passageForRange(chunk, start, end)
         val messageIndex = projection.messageIndexForChunk(callbackIndex)
         progress.applyRangeStart(
             chunkIndex = callbackIndex,
@@ -620,8 +642,20 @@ internal class TtsPlaybackQueue(
         _state.value =
             speaking.copy(
                 messageProgressFraction = progress.fraction,
-                passage = rangeTracker.passageForRange(chunks[callbackIndex], start, end),
+                passage =
+                    if (passage?.visibleWord?.isNotEmpty() == true) {
+                        passage
+                    } else if (retainVisibleWordOnFallback) {
+                        speaking.passage
+                    } else {
+                        passage
+                    },
             )
+        return if (passage?.visibleWord?.isNotEmpty() == true) {
+            RangeApplication.VisibleWord
+        } else {
+            RangeApplication.FallbackOnly
+        }
     }
 
     private fun isNavigable(): Boolean = _state.value is TtsState.Speaking || _state.value is TtsState.Paused

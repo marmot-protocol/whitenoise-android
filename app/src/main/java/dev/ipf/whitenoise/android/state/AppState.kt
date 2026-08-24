@@ -68,8 +68,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
-import dev.ipf.whitenoise.android.audio.tts.TtsAudioFocusOwner
-import dev.ipf.whitenoise.android.audio.tts.TtsController
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineChoice
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
@@ -1645,11 +1643,7 @@ class WhiteNoiseAppState private constructor(
 
     // Process-wide read-aloud playback: survives navigation between chats and
     // back to the chat list, matching VoicePlaybackController's lifetime.
-    val ttsController: TtsController =
-        TtsController(
-            audioFocus = TtsAudioFocusOwner(appContext),
-            speechRate = { ttsRatePreferences.resolvedRate() },
-        )
+    val ttsController = createAppTtsController(appContext, ttsRatePreferences)
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set
 
@@ -1855,7 +1849,10 @@ class WhiteNoiseAppState private constructor(
         if (handle === attachedTtsHandle) return
         attachedTtsHandle = handle
         if (handle != null) {
-            ttsController.attachEngine(AndroidTtsSpeechEngine(handle.textToSpeech))
+            ttsController.attachEngine(
+                AndroidTtsSpeechEngine(handle.textToSpeech),
+                engineKey = handle.enginePackage,
+            )
         } else {
             ttsController.detachEngine()
         }

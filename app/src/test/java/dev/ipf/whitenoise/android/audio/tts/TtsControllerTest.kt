@@ -711,6 +711,7 @@ class TtsControllerTest {
         var stopCalls = 0
             private set
         var locale: Locale? = null
+        var startCallback: ((String?) -> Unit)? = null
         var completionCallback: ((String?) -> Unit)? = null
         var errorCallback: ((String?, Int) -> Unit)? = null
         var rangeCallback: ((String?, Int, Int, Int) -> Unit)? = null
@@ -728,11 +729,13 @@ class TtsControllerTest {
         }
 
         override fun setCallbacks(
+            onStart: (String?) -> Unit,
             onDone: (String?) -> Unit,
             onError: (String?, Int) -> Unit,
             onRangeStart: (String?, Int, Int, Int) -> Unit,
             onStop: (String?, Boolean) -> Unit,
         ) {
+            startCallback = onStart
             completionCallback = onDone
             errorCallback = onError
             rangeCallback = onRangeStart
@@ -740,6 +743,7 @@ class TtsControllerTest {
         }
 
         override fun clearCallbacks() {
+            startCallback = null
             completionCallback = null
             errorCallback = null
             rangeCallback = null
@@ -756,6 +760,10 @@ class TtsControllerTest {
 
         override fun stop() {
             stopCalls += 1
+        }
+
+        fun start(index: Int) {
+            startCallback?.invoke(spoken[index].utteranceId)
         }
 
         fun complete(index: Int) {

@@ -15,13 +15,14 @@ internal class AndroidTtsSpeechEngine(
     }
 
     override fun setCallbacks(
+        onStart: (String?) -> Unit,
         onDone: (String?) -> Unit,
         onError: (String?, Int) -> Unit,
         onRangeStart: (String?, Int, Int, Int) -> Unit,
         onStop: (String?, Boolean) -> Unit,
     ) {
         textToSpeech.setOnUtteranceProgressListener(
-            androidTtsProgressListener(onDone, onError, onRangeStart, onStop),
+            androidTtsProgressListener(onStart, onDone, onError, onRangeStart, onStop),
         )
     }
 
@@ -46,13 +47,16 @@ internal class AndroidTtsSpeechEngine(
 }
 
 internal fun androidTtsProgressListener(
+    onStart: (String?) -> Unit,
     onDone: (String?) -> Unit,
     onError: (String?, Int) -> Unit,
     onRangeStart: (String?, Int, Int, Int) -> Unit,
     onStop: (String?, Boolean) -> Unit,
 ): UtteranceProgressListener =
     object : UtteranceProgressListener() {
-        override fun onStart(utteranceId: String?) = Unit
+        override fun onStart(utteranceId: String?) {
+            onStart(utteranceId)
+        }
 
         override fun onDone(utteranceId: String?) {
             onDone(utteranceId)

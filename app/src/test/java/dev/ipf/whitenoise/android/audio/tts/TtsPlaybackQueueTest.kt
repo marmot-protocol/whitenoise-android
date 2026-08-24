@@ -95,6 +95,8 @@ class TtsPlaybackQueueTest {
         queue.onRangeStart("malformed", 0, 1, 0)
         assertEquals(hello, queue.state.value.passage)
 
+        val sentenceFallback = TtsPassage("m1", 0)
+
         listOf(
             -1 to 2,
             0 to 100,
@@ -104,7 +106,7 @@ class TtsPlaybackQueueTest {
             13 to 14,
         ).forEach { (start, end) ->
             queue.onRangeStart(staleId, start, end, 0)
-            assertEquals(TtsPassage("m1", 0), queue.state.value.passage)
+            assertEquals(sentenceFallback, queue.state.value.passage)
         }
 
         queue.pause()
