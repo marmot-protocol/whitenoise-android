@@ -63,15 +63,18 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
     }
 
     @Test
-    fun locallySeededOtherAccountNamesAndAvatarsOwnFirstFrame() =
+    fun locallySeededActiveAndOtherAccountProfilesOwnFirstFrame() =
         runTest {
-            val appState = appState()
-            appState.warmProfilePresentationsBlocking(listOf(STUDIO_ID, WORK_ID))
+            val appState = appState(includeActiveProfile = true)
+            appState.warmProfilePresentationsBlocking(listOf(ACTIVE_ID, STUDIO_ID, WORK_ID))
+            AvatarImageLoader.putCached(ACTIVE_AVATAR, AvatarScreenshotFixtures.distinctAvatarBitmap(Color.GREEN))
             AvatarImageLoader.putCached(STUDIO_AVATAR, AvatarScreenshotFixtures.distinctAvatarBitmap(Color.RED))
             AvatarImageLoader.putCached(WORK_AVATAR, AvatarScreenshotFixtures.distinctAvatarBitmap(Color.BLUE))
 
+            assertEquals(ACTIVE_NAME, appState.displayName(ACTIVE_ID))
             assertEquals(STUDIO_NAME, appState.displayName(STUDIO_ID))
             assertEquals(WORK_NAME, appState.displayName(WORK_ID))
+            assertEquals(ACTIVE_AVATAR, appState.avatarUrl(ACTIVE_ID))
             assertEquals(STUDIO_AVATAR, appState.avatarUrl(STUDIO_ID))
             assertEquals(WORK_AVATAR, appState.avatarUrl(WORK_ID))
 
@@ -103,6 +106,7 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
             composeRule
                 .onNodeWithTag(otherAccountAvatarTag(WORK_REF), useUnmergedTree = true)
                 .assertIsDisplayed()
+            composeRule.onNodeWithContentDescription(ACTIVE_NAME, substring = true).assertIsDisplayed()
             composeRule.onNodeWithContentDescription(STUDIO_NAME, substring = true).assertIsDisplayed()
             composeRule.onNodeWithContentDescription(WORK_NAME, substring = true).assertIsDisplayed()
             composeRule
@@ -171,6 +175,7 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
                 account(STUDIO_REF, STUDIO_ID),
                 account(WORK_REF, WORK_ID),
             ),
+        includeActiveProfile: Boolean = false,
     ) = WhiteNoiseAppState(
         context = context,
         draftStore = DraftStore(EmptyDraftPersistence),
@@ -178,8 +183,8 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
         accounts =
             listOf(account(ACTIVE_REF, ACTIVE_ID)) + otherAccounts,
         activeAccountRef = ACTIVE_REF,
-        profileReader = { accountId -> profile(accountId) },
-        profileDisplayNameReader = { accountId -> profileName(accountId) },
+        profileReader = { accountId -> profile(accountId, includeActiveProfile) },
+        profileDisplayNameReader = { accountId -> profileName(accountId, includeActiveProfile) },
         profileRefreshRequest = {},
     )
 
@@ -195,19 +200,25 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
         running = true,
     )
 
-    private fun profile(accountIdHex: String) =
-        when (accountIdHex) {
-            STUDIO_ID -> userProfile(STUDIO_NAME, STUDIO_AVATAR)
-            WORK_ID -> userProfile(WORK_NAME, WORK_AVATAR)
-            else -> null
-        }
+    private fun profile(
+        accountIdHex: String,
+        includeActiveProfile: Boolean,
+    ) = when (accountIdHex) {
+        ACTIVE_ID -> userProfile(ACTIVE_NAME, ACTIVE_AVATAR).takeIf { includeActiveProfile }
+        STUDIO_ID -> userProfile(STUDIO_NAME, STUDIO_AVATAR)
+        WORK_ID -> userProfile(WORK_NAME, WORK_AVATAR)
+        else -> null
+    }
 
-    private fun profileName(accountIdHex: String) =
-        when (accountIdHex) {
-            STUDIO_ID -> STUDIO_NAME
-            WORK_ID -> WORK_NAME
-            else -> null
-        }
+    private fun profileName(
+        accountIdHex: String,
+        includeActiveProfile: Boolean,
+    ) = when (accountIdHex) {
+        ACTIVE_ID -> ACTIVE_NAME.takeIf { includeActiveProfile }
+        STUDIO_ID -> STUDIO_NAME
+        WORK_ID -> WORK_NAME
+        else -> null
+    }
 
     private fun userProfile(
         displayName: String,
@@ -235,8 +246,10 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
         const val ACTIVE_REF = "personal"
         const val STUDIO_REF = "studio"
         const val WORK_REF = "work"
+        const val ACTIVE_NAME = "Personal profile"
         const val STUDIO_NAME = "Studio profile"
         const val WORK_NAME = "Work profile"
+        const val ACTIVE_AVATAR = "https://profiles.example/personal.png"
         const val STUDIO_AVATAR = "https://profiles.example/studio.png"
         const val WORK_AVATAR = "https://profiles.example/work.png"
         val ACTIVE_ID = "11".repeat(32)

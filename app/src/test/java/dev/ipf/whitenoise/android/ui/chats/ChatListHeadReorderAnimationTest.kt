@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -452,7 +453,7 @@ class ChatListHeadReorderAnimationTest {
             down(center)
             up()
         }
-        composeRule.onNodeWithTag(chatListHeadReorderRowTag("B")).performClick()
+        composeRule.onNodeWithTag(chatListHeadReorderRowTag("B")).assertIsNotEnabled()
         composeRule.runOnIdle {
             assertEquals("moving rows must expose no stale pointer or semantic action", emptyList<String>(), openedIds)
         }
@@ -486,7 +487,7 @@ class ChatListHeadReorderAnimationTest {
         composeRule.runOnIdle { }
 
         composeRule.onNodeWithTag(chatListHeadReorderRowTag("B")).assertDoesNotExist()
-        composeRule.onNodeWithTag(chatListHeadReorderRowTag("C")).performClick()
+        composeRule.onNodeWithTag(chatListHeadReorderRowTag("C")).assertIsNotEnabled()
         composeRule.runOnIdle { assertEquals(emptyList<String>(), openedIds) }
     }
 
@@ -511,7 +512,7 @@ class ChatListHeadReorderAnimationTest {
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.runOnIdle { }
 
-        composeRule.onNodeWithTag(chatListHeadReorderRowTag("A")).performClick()
+        composeRule.onNodeWithTag(chatListHeadReorderRowTag("A")).assertIsNotEnabled()
         composeRule.runOnIdle { assertEquals(emptyList<String>(), openedIds) }
 
         composeRule.mainClock.advanceTimeBy(CHAT_LIST_ROW_PLACEMENT_MILLIS.toLong() + 1L)

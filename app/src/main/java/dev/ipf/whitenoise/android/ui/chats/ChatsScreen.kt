@@ -823,6 +823,7 @@ internal fun ChatsScreen(
             pinnedBoundaryIndex = pinnedBoundary,
             leadingItemCount = leadingChatListItemCount,
         )
+    val chatListInteractionsEnabled = !headReorderInProgress && !rowPlacementInProgress
     val archivedUnreadCount =
         remember(controller.archivedItems) {
             controller.archivedItems.count { it.hasUnread }
@@ -1176,6 +1177,7 @@ internal fun ChatsScreen(
                                 Modifier
                                     .fillMaxSize()
                                     .clipToBounds()
+                                    .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
                                     .onGloballyPositioned { coordinates ->
                                         chatListWindowTop = coordinates.positionInWindow().y
                                         chatListHeightPx = coordinates.size.height.toFloat()
@@ -1239,7 +1241,7 @@ internal fun ChatsScreen(
                                             accountRef = controller.boundAccountRef,
                                             isMuted =
                                                 item.engineMuted(),
-                                            interactionsEnabled = !headReorderInProgress && !rowPlacementInProgress,
+                                            interactionsEnabled = chatListInteractionsEnabled,
                                             selectionMode = selectionMode,
                                             selected = item.id in selectedChatIds,
                                             bodyMatch = bodyMatch,

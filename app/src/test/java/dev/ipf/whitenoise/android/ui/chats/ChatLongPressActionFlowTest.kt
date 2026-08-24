@@ -9,11 +9,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
@@ -219,18 +216,19 @@ class ChatLongPressActionFlowTest {
         composeRule.runOnUiThread { itemIds = listOf("B", "A") }
         composeRule.runOnIdle { }
         composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onAllNodes(isRoot())[0].performTouchInput { up() }
+        composeRule.mainClock.advanceTimeBy(CHAT_LIST_ROW_PLACEMENT_MILLIS.toLong() + 1L)
+        composeRule.onAllNodes(isRoot())[0].performTouchInput {
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 1L)
+            up()
+        }
 
         composeRule.runOnIdle {
             assertEquals(emptyList<String>(), openedIds)
             assertEquals(emptyList<String>(), actionIds)
         }
-        composeRule.onNodeWithText("Gesture A").assertIsNotEnabled()
-        composeRule
-            .onNodeWithText("Gesture B")
-            .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick).not())
+        composeRule.onNodeWithText("Gesture A").assertIsEnabled()
+        composeRule.onNodeWithText("Gesture B").assertIsEnabled()
 
-        composeRule.mainClock.advanceTimeBy(CHAT_LIST_ROW_PLACEMENT_MILLIS.toLong() + 1L)
         composeRule.runOnIdle { }
         composeRule.onNode(hasText("Gesture A") and hasClickAction()).performClick()
         composeRule.onNodeWithTag(productionChatRowTag("B")).performTouchInput { longClick() }
@@ -470,7 +468,9 @@ private fun ProductionChatListPlacementHarness(
             pinnedBoundaryIndex = null,
             leadingItemCount = 0,
         )
-    LazyColumn {
+    LazyColumn(
+        modifier = Modifier.cancelPointersAcrossChatListMotion(interactionsEnabled = !placementInProgress),
+    ) {
         itemIds.forEachIndexed { targetIndex, id ->
             item(key = id) {
                 Box(modifier = chatListRowMotion(targetIndex).testTag(productionChatRowTag(id))) {

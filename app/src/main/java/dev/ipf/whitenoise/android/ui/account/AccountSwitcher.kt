@@ -63,9 +63,9 @@ fun AccountAvatarButton(
     val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
     val avatarContentDescription =
         if (showUnreadDot) {
-            "$openSettingsDescription, $accountUnreadDescription"
+            "$openSettingsDescription, $title, $accountUnreadDescription"
         } else {
-            openSettingsDescription
+            "$openSettingsDescription, $title"
         }
     IconButton(
         onClick = onClick,

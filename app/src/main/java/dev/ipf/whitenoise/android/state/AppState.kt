@@ -9479,7 +9479,7 @@ class WhiteNoiseAppState private constructor(
             displayedName = notificationDisplayNameHint(update.sender.displayName),
         )?.let { identity ->
             inviteNotificationIdentityRefreshStore.rememberPosted(
-                update = identity.update,
+                identity = identity.identity,
                 displayedName = identity.displayedName,
             )
         }
@@ -9626,7 +9626,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     private fun launchInviteNotificationIdentityRefresh(initialCandidate: GroupInviteNotificationIdentityRefreshStore.RefreshCandidate) {
-        val update = initialCandidate.update
+        val update = initialCandidate.identity.asNotificationUpdate()
         profileScope.launch {
             var candidate: GroupInviteNotificationIdentityRefreshStore.RefreshCandidate? = initialCandidate
             while (candidate != null) {
@@ -9656,7 +9656,7 @@ class WhiteNoiseAppState private constructor(
                     if (refreshResult.posted) {
                         followUp =
                             inviteNotificationIdentityRefreshStore.completeRefresh(
-                                update = update,
+                                notificationKey = update.notificationKey,
                                 displayedName = refreshResult.displayedName,
                                 contentRedacted = refreshResult.contentRedacted,
                             )

@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.state
 
 import androidx.annotation.StringRes
+import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
+import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGeneration
@@ -160,8 +162,47 @@ internal data class InviteNotificationIdentityRefreshResult(
     val contentRedacted: Boolean,
 )
 
+/** Minimal data needed to re-render one active invite after profile resolution. */
+internal data class GroupInviteNotificationIdentity(
+    val notificationKey: String,
+    val accountRef: String,
+    val groupIdHex: String,
+    val groupName: String?,
+    val senderAccountIdHex: String,
+    val receiverAccountIdHex: String,
+    val receiverDisplayName: String?,
+) {
+    /** Build an ephemeral formatter input; the process store never retains the protocol update. */
+    fun asNotificationUpdate(): NotificationUpdateFfi =
+        NotificationUpdateFfi(
+            notificationKey = notificationKey,
+            conversationKey = "",
+            trigger = NotificationTriggerFfi.GROUP_INVITE,
+            trafficClass = NotificationTrafficClassFfi.STANDARD,
+            accountRef = accountRef,
+            accountIdHex = receiverAccountIdHex,
+            groupIdHex = groupIdHex,
+            groupName = groupName,
+            isDm = false,
+            isMention = false,
+            messageIdHex = null,
+            sender = NotificationUserFfi(senderAccountIdHex, displayName = null, pictureUrl = null),
+            receiver =
+                NotificationUserFfi(
+                    receiverAccountIdHex,
+                    displayName = receiverDisplayName,
+                    pictureUrl = null,
+                ),
+            previewText = null,
+            reactionEmoji = null,
+            reactedToPreview = null,
+            timestampMs = 0L,
+            isFromSelf = false,
+        )
+}
+
 internal data class PostedGroupInviteIdentity(
-    val update: NotificationUpdateFfi,
+    val identity: GroupInviteNotificationIdentity,
     val displayedName: String?,
 )
 
@@ -171,14 +212,32 @@ internal fun postedGroupInviteIdentity(
     redactContent: Boolean,
     displayedName: String?,
 ): PostedGroupInviteIdentity? =
-    if (posted && update.trigger == NotificationTriggerFfi.GROUP_INVITE) {
+    if (postedGroupInviteCanRefresh(update, posted)) {
         PostedGroupInviteIdentity(
-            update = update,
+            identity =
+                GroupInviteNotificationIdentity(
+                    notificationKey = update.notificationKey,
+                    accountRef = update.accountRef,
+                    groupIdHex = update.groupIdHex,
+                    groupName = update.groupName,
+                    senderAccountIdHex = update.sender.accountIdHex,
+                    receiverAccountIdHex = update.receiver.accountIdHex,
+                    receiverDisplayName = update.receiver.displayName,
+                ),
             displayedName = displayedName.takeUnless { redactContent },
         )
     } else {
         null
     }
+
+private fun postedGroupInviteCanRefresh(
+    update: NotificationUpdateFfi,
+    posted: Boolean,
+): Boolean {
+    val isPostedInvite = posted && update.trigger == NotificationTriggerFfi.GROUP_INVITE
+    val hasRefreshIdentity = update.notificationKey.isNotBlank() && update.sender.accountIdHex.isNotBlank()
+    return isPostedInvite && hasRefreshIdentity
+}
 
 internal data class NotificationAvatarPreWarmTarget(
     val senderAccountIdHex: String?,
