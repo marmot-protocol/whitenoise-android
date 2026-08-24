@@ -383,6 +383,10 @@ object NotificationNavigation {
             when (update.trigger) {
                 NotificationTriggerFfi.NEW_MESSAGE -> NotificationTargetKind.MESSAGE
                 NotificationTriggerFfi.GROUP_INVITE -> NotificationTargetKind.INVITE
+                NotificationTriggerFfi.REMOVED_FROM_GROUP,
+                NotificationTriggerFfi.MADE_ADMIN,
+                NotificationTriggerFfi.REMOVED_AS_ADMIN,
+                -> return null
             }
         // messageId is only meaningful for message notifications.
         val messageIdHex =

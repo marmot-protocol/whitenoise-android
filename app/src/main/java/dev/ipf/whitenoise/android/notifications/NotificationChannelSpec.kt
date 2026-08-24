@@ -103,6 +103,14 @@ enum class NotificationChannelSpec(
         fun forUpdate(update: NotificationUpdateFfi): NotificationChannelSpec =
             when (update.trigger) {
                 NotificationTriggerFfi.GROUP_INVITE -> INVITES
+                // The snapshot exposes these triggers before Android owns their
+                // presentation. The formatter drops them until #822/#824 land;
+                // keep an explicit inert route so future enum additions still
+                // break compilation instead of silently inheriting a channel.
+                NotificationTriggerFfi.REMOVED_FROM_GROUP,
+                NotificationTriggerFfi.MADE_ADMIN,
+                NotificationTriggerFfi.REMOVED_AS_ADMIN,
+                -> INVITES
                 NotificationTriggerFfi.NEW_MESSAGE ->
                     when {
                         // Route off the same sanitized-emoji predicate the
