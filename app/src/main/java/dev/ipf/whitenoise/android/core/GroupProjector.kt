@@ -145,14 +145,15 @@ object GroupProjector {
      *
      * This is deliberately separate from [isDm]: an MLS group remains a group
      * for titles, permissions, settings, notifications, and lifecycle even
-     * when its latest authoritative roster contains only two people. Cached or
-     * still-hydrating rosters cannot switch a semantic group into this mode.
+     * when its latest stable roster contains only two people. A restored
+     * last-known roster may preserve this presentation through hydration, but
+     * an unresolved roster with no stable member count cannot enable it.
      */
     fun usesDirectTranscriptChrome(
         isDirectConversation: Boolean,
         memberCount: Int,
-        membersVerified: Boolean,
-    ): Boolean = isDirectConversation || (membersVerified && memberCount == 2)
+        memberCountStable: Boolean,
+    ): Boolean = isDirectConversation || (memberCountStable && memberCount == 2)
 
     fun transcriptSenderDecoration(
         isDm: Boolean,

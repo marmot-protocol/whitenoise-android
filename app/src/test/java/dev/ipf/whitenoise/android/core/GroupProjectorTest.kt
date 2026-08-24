@@ -709,35 +709,35 @@ class GroupProjectorTest {
             GroupProjector.usesDirectTranscriptChrome(
                 isDirectConversation = namedTwoMemberGroupIsDm,
                 memberCount = 2,
-                membersVerified = true,
+                memberCountStable = true,
             ),
         )
         assertFalse(
             GroupProjector.usesDirectTranscriptChrome(
                 isDirectConversation = namedTwoMemberGroupIsDm,
                 memberCount = 2,
-                membersVerified = false,
+                memberCountStable = false,
             ),
         )
         assertTrue(
             GroupProjector.usesDirectTranscriptChrome(
                 isDirectConversation = unnamedTwoMemberGroupIsDm,
                 memberCount = 2,
-                membersVerified = true,
+                memberCountStable = true,
             ),
         )
         assertFalse(
             GroupProjector.usesDirectTranscriptChrome(
                 isDirectConversation = namedTwoMemberGroupIsDm,
                 memberCount = 3,
-                membersVerified = true,
+                memberCountStable = true,
             ),
         )
         assertTrue(
             GroupProjector.usesDirectTranscriptChrome(
                 isDirectConversation = true,
                 memberCount = 0,
-                membersVerified = false,
+                memberCountStable = false,
             ),
         )
         assertFalse(GroupProjector.shouldShowTranscriptSenderAvatar(isDm = true, mine = false))

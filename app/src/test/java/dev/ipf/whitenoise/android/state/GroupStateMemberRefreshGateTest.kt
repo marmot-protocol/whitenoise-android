@@ -25,7 +25,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class GroupStateMemberRefreshGateTest {
     @Test
-    fun restoredTwoMemberSnapshotWaitsForAuthoritativeRosterAndDoesNotLeakToReplacementController() =
+    fun restoredTwoMemberSnapshotPreservesTranscriptChromeAndDoesNotLeakToReplacementController() =
         runBlocking {
             val restoredSnapshot =
                 GroupMemberSnapshot(
@@ -51,7 +51,7 @@ class GroupStateMemberRefreshGateTest {
             assertEquals(2, firstController.memberCount)
             assertFalse(firstController.isDm)
             assertFalse(firstController.membersVerified)
-            assertFalse(firstController.usesDirectTranscriptChrome)
+            assertTrue(firstController.usesDirectTranscriptChrome)
             firstController.retryMembers()
             assertTrue(firstController.usesDirectTranscriptChrome)
 
@@ -74,10 +74,24 @@ class GroupStateMemberRefreshGateTest {
                 )
             assertTrue(unprojectedUnnamedController.isDm)
             assertFalse(unprojectedUnnamedController.membersVerified)
-            assertFalse(unprojectedUnnamedController.usesDirectTranscriptChrome)
+            assertTrue(unprojectedUnnamedController.usesDirectTranscriptChrome)
+
+            val refreshFailureController =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = restoredSnapshot,
+                    initialChatListRow = chatListRow(ChatConversationKindFfi.GROUP),
+                    groupRosterReader = { _, _ -> error("refresh failed") },
+                )
+            assertTrue(refreshFailureController.usesDirectTranscriptChrome)
+            refreshFailureController.retryMembers()
+            assertFalse(refreshFailureController.membersVerified)
+            assertEquals(GroupRosterLoadState.FAILED, refreshFailureController.memberRosterState)
+            assertTrue(refreshFailureController.usesDirectTranscriptChrome)
 
             // Account and conversation switches replace the controller. The
-            // replacement derives presentation from its own unverified roster
+            // replacement derives presentation from its own opening snapshot
             // instead of inheriting the previous conversation's two-party mode.
             val replacementController = ConversationController(appState = appState(), initialGroup = group())
             assertFalse(replacementController.membersVerified)

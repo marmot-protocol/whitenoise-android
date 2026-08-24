@@ -21,6 +21,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
@@ -36,6 +37,7 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -64,13 +66,20 @@ class TimelineRowTwoMemberGroupChromeTest {
     private val composerTextState = ComposerTextState(TextFieldValue())
 
     @Test
-    fun mountedNamedGroupRemovesAndRestoresSenderChromeWithVerifiedRoster() {
+    fun mountedNamedGroupPreservesTwoMemberChromeAcrossInitialRefresh() {
         var rosterRead = 0
         val appState = appState()
         val controller =
             ConversationController(
                 appState = appState,
                 initialGroup = group(),
+                initialMemberSnapshot =
+                    GroupMemberSnapshot(
+                        listOf(
+                            cachedMember(ACCOUNT_ID, local = true),
+                            cachedMember(SENDER_ID),
+                        ),
+                    ),
                 groupRosterReader = { _, _ ->
                     when (rosterRead++) {
                         0 -> roster(member(ACCOUNT_ID, local = true, isSelf = true), member(SENDER_ID))
@@ -90,9 +99,9 @@ class TimelineRowTwoMemberGroupChromeTest {
             }
         }
 
-        composeRule.onNodeWithText(senderName, useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithText(senderInitials, useUnmergedTree = true).assertExists()
-        val groupTextLeft = messageTextLeft()
+        composeRule.onNodeWithText(senderName, useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText(senderInitials, useUnmergedTree = true).assertDoesNotExist()
+        val initialTextLeft = messageTextLeft()
 
         composeRule.runOnIdle { runBlocking { controller.retryMembers() } }
         composeRule.waitForIdle()
@@ -100,14 +109,14 @@ class TimelineRowTwoMemberGroupChromeTest {
         composeRule.onNodeWithText(senderName, useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText(senderInitials, useUnmergedTree = true).assertDoesNotExist()
         val directTextLeft = messageTextLeft()
-        assertTrue("direct transcript must remove the sender-avatar gutter", directTextLeft < groupTextLeft)
+        assertEquals("refresh must not shift the two-member transcript", initialTextLeft, directTextLeft, 0.5f)
 
         composeRule.runOnIdle { runBlocking { controller.retryMembers() } }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText(senderName, useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText(senderInitials, useUnmergedTree = true).assertExists()
-        assertEquals(groupTextLeft, messageTextLeft(), 0.5f)
+        assertTrue("three-member transcript must restore the sender-avatar gutter", messageTextLeft() > directTextLeft)
     }
 
     @Test
@@ -302,6 +311,15 @@ class TimelineRowTwoMemberGroupChromeTest {
         isSelf = isSelf,
         npub = "npub-$id",
         displayName = null,
+    )
+
+    private fun cachedMember(
+        id: String,
+        local: Boolean = false,
+    ) = AppGroupMemberRecordFfi(
+        memberIdHex = id,
+        account = ACCOUNT_REF.takeIf { local },
+        local = local,
     )
 
     private fun group() =

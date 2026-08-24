@@ -6836,7 +6836,7 @@ internal typealias MediaPublisher =
 class ConversationController(
     private val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
-    initialMemberSnapshot: GroupMemberSnapshot? = null,
+    internal val initialMemberSnapshot: GroupMemberSnapshot? = null,
     initialChatListRow: ChatListRowFfi? = null,
     initialTimelinePreview: ChatListMessagePreviewFfi? = null,
     // Pins the conversation to a specific account instead of the account active
