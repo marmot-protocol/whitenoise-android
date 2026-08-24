@@ -683,8 +683,9 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
-    fun groupMessageOffersReplyAndTheFirstTwoCustomizedQuickReactions() {
-        RecentEmojiPreferences.saveQuickReactions(context, listOf("🥳", "🔥", "😂", "👍"))
+    fun groupMessageOffersReplyReactAndMarkReadWithAllSixConfiguredChoices() {
+        val choices = listOf("🥳", "🔥", "😂", "👍", "😮", "😢")
+        RecentEmojiPreferences.saveQuickReactions(context, choices)
         try {
             presenter.ensureChannels()
 
@@ -693,11 +694,27 @@ class LocalNotificationPresenterConversationTest {
             }
 
             assertEquals(
-                listOf(context.getString(R.string.reply), "🥳", "🔥"),
+                listOf(
+                    context.getString(R.string.reply),
+                    context.getString(R.string.message_react),
+                    context.getString(R.string.chat_row_action_mark_read),
+                ),
                 manager.activeNotifications
                     .single()
                     .notification.actions
                     .map { it.title.toString() },
+            )
+            val react =
+                manager.activeNotifications
+                    .single()
+                    .notification.actions
+                    .single { it.title.toString() == context.getString(R.string.message_react) }
+            assertEquals(
+                choices,
+                react.remoteInputs
+                    .single()
+                    .choices
+                    ?.map(CharSequence::toString),
             )
         } finally {
             RecentEmojiPreferences.resetQuickReactions(context)

@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.notifications
 import android.content.Intent
 import android.net.Uri
 import dev.ipf.marmotkit.NotificationUpdateFfi
-import java.security.MessageDigest
 
 enum class NotificationActionKind { REPLY, REACT, MARK_READ }
 
@@ -18,7 +17,6 @@ data class NotificationAction(
     val target: NotificationTarget,
     val notificationTag: String,
     val notificationId: Int,
-    val reaction: String? = null,
 )
 
 object NotificationActions {
@@ -26,10 +24,11 @@ object NotificationActions {
     const val ACTION_REACT = "dev.ipf.whitenoise.android.action.REACT_NOTIFICATION"
     const val ACTION_MARK_READ = "dev.ipf.whitenoise.android.action.MARK_NOTIFICATION_READ"
     const val KEY_TEXT_REPLY = "dev.ipf.whitenoise.android.extra.TEXT_REPLY"
+    const val KEY_REACTION_CHOICE = "dev.ipf.whitenoise.android.extra.REACTION_CHOICE"
 
     private const val EXTRA_NOTIFICATION_TAG = "dev.ipf.whitenoise.android.extra.NOTIFICATION_TAG"
     private const val EXTRA_NOTIFICATION_ID = "dev.ipf.whitenoise.android.extra.NOTIFICATION_ID"
-    private const val EXTRA_REACTION = "dev.ipf.whitenoise.android.extra.REACTION"
+    private const val LEGACY_EXTRA_REACTION = "dev.ipf.whitenoise.android.extra.REACTION"
     private const val URI_SCHEME = "whitenoise-notify"
 
     fun targetFromUpdate(
@@ -47,36 +46,23 @@ object NotificationActions {
     fun actionUriString(
         kind: NotificationActionKind,
         notificationTag: String,
-        reaction: String? = null,
-    ): String =
-        buildString {
-            append("$URI_SCHEME://action/${kind.name.lowercase()}/")
-            append(notificationTag.ifBlank { "unknown" })
-            reaction?.let {
-                append("?reaction_id=")
-                append(reactionDiscriminator(it))
-            }
-        }
+    ): String = "$URI_SCHEME://action/${kind.name.lowercase()}/${notificationTag.ifBlank { "unknown" }}"
 
     fun requestCode(
         kind: NotificationActionKind,
         notificationTag: String,
-        reaction: String? = null,
-    ): Int = 31 * (31 * notificationTag.hashCode() + kind.name.hashCode()) + reaction.orEmpty().hashCode()
+    ): Int = 31 * notificationTag.hashCode() + kind.name.hashCode()
 
     fun applyToIntent(
         intent: Intent,
         kind: NotificationActionKind,
         actionTarget: NotificationActionTarget,
-        reaction: String? = null,
     ) {
-        val normalizedReaction = reaction?.let(::normalizeNotificationReaction)
         intent.action = actionName(kind)
-        intent.data = Uri.parse(actionUriString(kind, actionTarget.notificationTag, normalizedReaction))
+        intent.data = Uri.parse(actionUriString(kind, actionTarget.notificationTag))
         NotificationNavigation.applyTargetExtras(intent, actionTarget.target)
         intent.putExtra(EXTRA_NOTIFICATION_TAG, actionTarget.notificationTag)
         intent.putExtra(EXTRA_NOTIFICATION_ID, actionTarget.notificationId)
-        normalizedReaction?.let { intent.putExtra(EXTRA_REACTION, it) }
     }
 
     fun parse(intent: Intent?): NotificationAction? {
@@ -93,10 +79,16 @@ object NotificationActions {
                 } else {
                     null
                 },
-            reaction = intent.getStringExtra(EXTRA_REACTION),
-            requireReaction = true,
         )
     }
+
+    // Notifications posted by the previous app version carried a direct emoji
+    // action. Keep those cards functional across an in-place app update while
+    // still subjecting the value to the current allowlist in the receiver.
+    internal fun legacyReaction(intent: Intent): String? =
+        normalizeNotificationReaction(
+            intent.getStringExtra(LEGACY_EXTRA_REACTION),
+        )
 
     fun parseRawFields(
         action: String?,
@@ -106,11 +98,10 @@ object NotificationActions {
         targetKindName: String?,
         notificationTag: String?,
         notificationId: Int?,
-        reaction: String? = null,
     ): NotificationAction? {
         val actionKind = kindForAction(action) ?: return null
         val target = NotificationNavigation.parseTargetExtras(accountRef, groupIdHex, messageIdHex, targetKindName) ?: return null
-        return parseFields(actionKind, target, notificationTag, notificationId, reaction, requireReaction = false)
+        return parseFields(actionKind, target, notificationTag, notificationId)
     }
 
     private fun parseFields(
@@ -118,21 +109,12 @@ object NotificationActions {
         target: NotificationTarget,
         notificationTag: String?,
         notificationId: Int?,
-        reaction: String?,
-        requireReaction: Boolean,
     ): NotificationAction? {
         if (target.kind != NotificationTargetKind.MESSAGE) return null
         if (target.messageIdHex.isNullOrBlank()) return null
         val tag = notificationTag?.takeIf { it.isNotBlank() } ?: return null
         val id = notificationId ?: return null
-        val normalizedReaction =
-            if (actionKind == NotificationActionKind.REACT) {
-                normalizeNotificationReaction(reaction)
-            } else {
-                null
-            }
-        if (actionKind == NotificationActionKind.REACT && requireReaction && normalizedReaction == null) return null
-        return NotificationAction(actionKind, target, tag, id, normalizedReaction)
+        return NotificationAction(actionKind, target, tag, id)
     }
 
     private fun actionName(kind: NotificationActionKind): String =
@@ -149,11 +131,6 @@ object NotificationActions {
             ACTION_MARK_READ -> NotificationActionKind.MARK_READ
             else -> null
         }
-
-    private fun reactionDiscriminator(reaction: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(reaction.toByteArray())
-        return digest.toLowercaseHexString()
-    }
 }
 
 internal fun ByteArray.toLowercaseHexString(): String =

@@ -51,6 +51,7 @@ private sealed interface NotificationReactionInput {
     data class Ready(
         val action: NotificationAction,
         val reaction: String,
+        val actionStartedAtMs: Long,
     ) : NotificationReactionInput
 
     data class CryptoFailure(
@@ -109,7 +110,6 @@ class NotificationReactionWorker(
         retryStore: NotificationActionRetryStore,
         retryKey: String,
     ): Result {
-        val dismissBaselineMs = System.currentTimeMillis()
         val runtimeFailure =
             runCatching {
                 withContext(Dispatchers.Main.immediate) {
@@ -143,7 +143,7 @@ class NotificationReactionWorker(
             is NotificationReactionSendAttempt.Completed ->
                 when (sendAttempt.outcome) {
                     NotificationReactionSendOutcome.Sent ->
-                        completedReactionResult(application, input, retryStore, retryKey, dismissBaselineMs)
+                        completedReactionResult(application, input, retryStore, retryKey)
                     NotificationReactionSendOutcome.RetryableFailure ->
                         retryableReactionFailureResult(retryStore, retryKey)
                     NotificationReactionSendOutcome.NonRetryableFailure ->
@@ -157,7 +157,6 @@ class NotificationReactionWorker(
         input: NotificationReactionInput.Ready,
         retryStore: NotificationActionRetryStore,
         retryKey: String,
-        dismissBaselineMs: Long,
     ): Result =
         withContext(NonCancellable) {
             runCatching {
@@ -177,13 +176,15 @@ class NotificationReactionWorker(
                 }
             }.onFailure { Log.w(TAG, "reaction sent but mark-read failed", it) }
             runCatching {
-                LocalNotificationPresenter(applicationContext).dismissActionNotificationAndOlderSiblings(
-                    notificationTag = input.action.notificationTag,
-                    notificationId = input.action.notificationId,
-                    actedMessageIdHex = input.action.target.messageIdHex,
-                    accountRef = input.action.target.accountRef,
-                    groupIdHex = input.action.target.groupIdHex,
-                    sinceMs = dismissBaselineMs,
+                // Receiver cleanup normally removes the card immediately. This
+                // is a process-death fallback. It clears API 34+'s RemoteInput
+                // lifetime extension generation-safely and deliberately reuses
+                // the tap baseline so delayed work cannot clear newer siblings.
+                dismissReactedNotification(
+                    presenter = LocalNotificationPresenter(applicationContext),
+                    action = input.action,
+                    reaction = input.reaction,
+                    dismissalBaselineMs = input.actionStartedAtMs,
                 )
             }.onFailure { Log.w(TAG, "reaction sent but notification cleanup failed", it) }
             retryStore.clear(retryKey)
@@ -239,12 +240,13 @@ class NotificationReactionWorker(
                 ?.takeIf { it.kind == NotificationActionKind.REACT }
         val encryptedReaction = reactionFromInput(data)
         if (action == null || encryptedReaction == null) return NotificationReactionInput.Malformed
+        val actionStartedAtMs = reactionActionStartedAtMs(data) ?: System.currentTimeMillis()
         return runCatching {
             NotificationReplyCipher.create().decrypt(encryptedReaction, id, action)
         }.fold(
             onSuccess = { reaction ->
                 normalizeNotificationReaction(reaction)
-                    ?.let { NotificationReactionInput.Ready(action, it) }
+                    ?.let { NotificationReactionInput.Ready(action, it, actionStartedAtMs) }
                     ?: NotificationReactionInput.Malformed
             },
             onFailure = NotificationReactionInput::CryptoFailure,
@@ -255,6 +257,7 @@ class NotificationReactionWorker(
         private const val TAG = "DMReactionWorker"
         private const val KEY_REACTION_IV = "reaction_iv"
         private const val KEY_REACTION_CIPHERTEXT = "reaction_ciphertext"
+        private const val KEY_ACTION_STARTED_AT_MS = "action_started_at_ms"
         private const val MAX_SEND_ATTEMPTS = 3
         private const val BACKOFF_DELAY_SECONDS = 30L
 
@@ -262,20 +265,20 @@ class NotificationReactionWorker(
             context: Context,
             action: NotificationAction,
             reaction: String,
+            actionStartedAtMs: Long,
         ): Boolean {
             val enqueueResult =
                 runCatching {
                     val requestId = UUID.randomUUID()
-                    val routingAction = action.copy(reaction = null)
                     val normalizedReaction = requireNotNull(normalizeNotificationReaction(reaction))
-                    val encrypted =
-                        NotificationReplyCipher.create().encrypt(normalizedReaction, requestId, routingAction)
+                    require(actionStartedAtMs > 0L)
+                    val encrypted = NotificationReplyCipher.create().encrypt(normalizedReaction, requestId, action)
                     WorkManager
                         .getInstance(context.applicationContext)
                         .enqueueUniqueWork(
-                            notificationReactionWorkName(routingAction, normalizedReaction),
+                            notificationReactionWorkName(action),
                             ExistingWorkPolicy.KEEP,
-                            notificationReactionRequest(routingAction, requestId, encrypted),
+                            notificationReactionRequest(action, requestId, encrypted, actionStartedAtMs),
                         ).await()
                 }
             val failure = enqueueResult.exceptionOrNull()
@@ -286,16 +289,12 @@ class NotificationReactionWorker(
 
         internal fun shouldRetryAfterFailure(operationAttempt: Int): Boolean = operationAttempt < MAX_SEND_ATTEMPTS - 1
 
-        internal fun notificationReactionWorkName(
-            action: NotificationAction,
-            reaction: String,
-        ): String {
+        internal fun notificationReactionWorkName(action: NotificationAction): String {
             val canonical =
                 listOf(
                     action.target.accountRef,
                     action.target.groupIdHex,
                     action.target.messageIdHex.orEmpty(),
-                    reaction,
                 ).joinToString("\u0000")
             val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray())
             return "notification_reaction_" + digest.toLowercaseHexString()
@@ -305,6 +304,7 @@ class NotificationReactionWorker(
             action: NotificationAction,
             requestId: UUID,
             encryptedReaction: EncryptedNotificationReply,
+            actionStartedAtMs: Long,
         ) = OneTimeWorkRequestBuilder<NotificationReactionWorker>()
             .setId(requestId)
             .setConstraints(
@@ -312,7 +312,7 @@ class NotificationReactionWorker(
                     .Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build(),
-            ).setInputData(reactionInputData(action, encryptedReaction))
+            ).setInputData(reactionInputData(action, encryptedReaction, actionStartedAtMs))
             .setBackoffCriteria(
                 BackoffPolicy.EXPONENTIAL,
                 BACKOFF_DELAY_SECONDS,
@@ -322,12 +322,14 @@ class NotificationReactionWorker(
         internal fun reactionInputData(
             action: NotificationAction,
             encryptedReaction: EncryptedNotificationReply,
+            actionStartedAtMs: Long,
         ): Data =
             Data
                 .Builder()
-                .putAll(NotificationActionWorkData.encode(action.copy(reaction = null)))
+                .putAll(NotificationActionWorkData.encode(action))
                 .putByteArray(KEY_REACTION_IV, encryptedReaction.initializationVector)
                 .putByteArray(KEY_REACTION_CIPHERTEXT, encryptedReaction.ciphertext)
+                .putLong(KEY_ACTION_STARTED_AT_MS, actionStartedAtMs)
                 .build()
 
         internal fun reactionFromInput(data: Data): EncryptedNotificationReply? {
@@ -335,5 +337,10 @@ class NotificationReactionWorker(
             val ciphertext = data.getByteArray(KEY_REACTION_CIPHERTEXT)
             return if (iv != null && ciphertext != null) EncryptedNotificationReply(iv, ciphertext) else null
         }
+
+        internal fun reactionActionStartedAtMs(data: Data): Long? =
+            data
+                .getLong(KEY_ACTION_STARTED_AT_MS, Long.MIN_VALUE)
+                .takeIf { it > 0L }
     }
 }

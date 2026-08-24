@@ -93,6 +93,7 @@ class LocalNotificationPresenter(
     private val enrichmentLauncher: (suspend () -> Unit) -> Unit = { block ->
         notificationEnrichmentScope.launch { block() }
     },
+    private val quickReactionChoices: () -> List<String> = { notificationQuickReactionChoices(context) },
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
     },
@@ -462,7 +463,9 @@ class LocalNotificationPresenter(
                     if (!redactContent) {
                         val quickReactions =
                             if (decision.actions.contains(NotificationActionKind.REACT)) {
-                                withContext(Dispatchers.Default) { notificationQuickReactionChoices(context) }
+                                withContext(Dispatchers.Default) {
+                                    notificationQuickReactionChoices(quickReactionChoices())
+                                }
                             } else {
                                 emptyList()
                             }
@@ -473,9 +476,8 @@ class LocalNotificationPresenter(
                                     when (action) {
                                         NotificationActionKind.REPLY -> builder.addAction(replyNotificationAction(actionTarget))
                                         NotificationActionKind.REACT ->
-                                            quickReactions.forEach { reaction ->
-                                                builder.addAction(reactionNotificationAction(actionTarget, reaction))
-                                            }
+                                            reactionNotificationAction(actionTarget, quickReactions)
+                                                ?.let(builder::addAction)
                                         NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
                                     }
                                 }
@@ -1081,6 +1083,27 @@ class LocalNotificationPresenter(
         notificationTag: String,
         notificationId: Int,
         replyText: String,
+    ): Boolean = markRemoteInputHandled(notificationTag, notificationId, expectedMessageIdHex = null, replyText)
+
+    /**
+     * Clear a reaction chip's direct-reply lifetime extension only while the
+     * live card still represents the message that offered the chip. A newer
+     * message reuses the same notification key and must not inherit the old
+     * reaction as RemoteInput history.
+     */
+    internal fun markReactionHandledIfSameGeneration(
+        notificationTag: String,
+        notificationId: Int,
+        reactedMessageIdHex: String?,
+        reaction: String,
+    ): Boolean = markRemoteInputHandled(notificationTag, notificationId, reactedMessageIdHex, reaction)
+
+    @SuppressLint("MissingPermission")
+    private fun markRemoteInputHandled(
+        notificationTag: String,
+        notificationId: Int,
+        expectedMessageIdHex: String?,
+        handledText: String,
     ): Boolean =
         ConversationCardPostSynchronizer.withLock(
             notificationTag,
@@ -1094,6 +1117,15 @@ class LocalNotificationPresenter(
                         ?.activeNotifications
                         ?.firstOrNull { it.tag == notificationTag && it.id == notificationId }
                 }.getOrNull() ?: return@withLock false
+            if (
+                expectedMessageIdHex != null &&
+                !shouldCancelRepliedConversationCard(
+                    expectedMessageIdHex,
+                    conversationCardMessageIdHex(active.notification),
+                )
+            ) {
+                return@withLock false
+            }
             ConversationCardPostSynchronizer.awaitTestBarrier(
                 ConversationCardOp.MARK_REPLY_HANDLED,
                 ConversationCardBarrier.AFTER_READ,
@@ -1104,12 +1136,12 @@ class LocalNotificationPresenter(
                 val resolved =
                     NotificationCompat
                         .Builder(context, active.notification)
-                        .setRemoteInputHistory(arrayOf(replyText))
+                        .setRemoteInputHistory(arrayOf(handledText))
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
                         .build()
                 NotificationManagerCompat.from(context).notify(notificationTag, notificationId, resolved)
-                notificationDebug { "reply-handled re-post tag=${notificationTag.take(16)} id=$notificationId" }
+                notificationDebug { "remote-input-handled re-post tag=${notificationTag.take(16)} id=$notificationId" }
                 true
             }.getOrDefault(false)
         }
@@ -1418,35 +1450,47 @@ class LocalNotificationPresenter(
 
     private fun reactionNotificationAction(
         actionTarget: NotificationActionTarget,
-        reaction: String,
-    ): NotificationCompat.Action =
-        NotificationCompat
+        choices: List<String>,
+    ): NotificationCompat.Action? {
+        if (choices.isEmpty()) return null
+        val remoteInput =
+            RemoteInput
+                .Builder(NotificationActions.KEY_REACTION_CHOICE)
+                .setLabel(context.getString(R.string.message_react))
+                .setChoices(choices.toTypedArray())
+                .setAllowFreeFormInput(false)
+                .setEditChoicesBeforeSending(RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED)
+                .build()
+        return NotificationCompat
             .Action
             .Builder(
                 R.drawable.ic_stat_whitenoise,
-                reaction,
-                actionPendingIntent(actionTarget, NotificationActionKind.REACT, reaction),
-            ).setShowsUserInterface(false)
+                context.getString(R.string.message_react),
+                actionPendingIntent(actionTarget, NotificationActionKind.REACT),
+            ).addRemoteInput(remoteInput)
+            .setAllowGeneratedReplies(false)
+            .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_THUMBS_UP)
+            .setShowsUserInterface(false)
             .build()
+    }
 
     private fun actionPendingIntent(
         actionTarget: NotificationActionTarget,
         kind: NotificationActionKind,
-        reaction: String? = null,
     ): PendingIntent {
         val actionIntent =
             Intent(context, NotificationActionReceiver::class.java).apply {
-                NotificationActions.applyToIntent(this, kind, actionTarget, reaction)
+                NotificationActions.applyToIntent(this, kind, actionTarget)
             }
         val mutableFlag =
-            if (kind == NotificationActionKind.REPLY) {
+            if (kind == NotificationActionKind.REPLY || kind == NotificationActionKind.REACT) {
                 PendingIntent.FLAG_MUTABLE
             } else {
                 PendingIntent.FLAG_IMMUTABLE
             }
         return PendingIntent.getBroadcast(
             context,
-            NotificationActions.requestCode(kind, actionTarget.notificationTag, reaction),
+            NotificationActions.requestCode(kind, actionTarget.notificationTag),
             actionIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or mutableFlag,
         )
