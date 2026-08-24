@@ -149,6 +149,27 @@ class TtsPlaybackForegroundServiceTest {
     }
 
     @Test
+    fun terminalControllerStateStopsObservingBeforeDestruction() {
+        val harness = installHost()
+        harness.speak()
+
+        val controller = Robolectric.buildService(TtsPlaybackForegroundService::class.java).create()
+        val service = controller.get()
+        service.onStartCommand(Intent(RuntimeEnvironment.getApplication(), service::class.java), 0, 1)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        harness.controller.stop()
+        shadowOf(Looper.getMainLooper()).idle()
+        val terminalNotification = shadowOf(service as Service).lastForegroundNotification
+
+        harness.speak("A replacement session.")
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertSame(terminalNotification, shadowOf(service as Service).lastForegroundNotification)
+        controller.destroy()
+    }
+
+    @Test
     fun startingWithNoActiveSessionStopsImmediately() {
         installHost()
 
@@ -267,6 +288,23 @@ class TtsPlaybackForegroundServiceTest {
         assertEquals(1, harness.stops)
         assertTrue(harness.controller.state.value is TtsState.Idle)
         controller.destroy()
+        assertEquals(1, harness.stops)
+    }
+
+    @Test
+    fun activeServiceDestructionStopsTheSession() {
+        val harness = installHost()
+        harness.speak()
+
+        val controller = Robolectric.buildService(TtsPlaybackForegroundService::class.java).create()
+        val service = controller.get()
+        service.onStartCommand(Intent(RuntimeEnvironment.getApplication(), service::class.java), 0, 1)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        controller.destroy()
+
+        assertEquals(1, harness.stops)
+        assertTrue(harness.controller.state.value is TtsState.Idle)
     }
 
     @Test
@@ -326,6 +364,7 @@ class TtsPlaybackForegroundServiceTest {
         override fun setSpeechRate(rate: Float) = Unit
 
         override fun setCallbacks(
+            onStart: (String?) -> Unit,
             onDone: (String?) -> Unit,
             onError: (String?, Int) -> Unit,
             onRangeStart: (String?, Int, Int, Int) -> Unit,

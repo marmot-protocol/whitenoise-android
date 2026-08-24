@@ -1978,6 +1978,8 @@ class WhiteNoiseAppState private constructor(
     var appLockScreenVisible by mutableStateOf(false)
         private set
 
+    private var appLockTtsBoundaryJob: Job? = null
+
     val notificationActionsAllowed: Boolean
         get() = notificationActionsAllowed(appLockScreenVisible)
 
@@ -5851,9 +5853,14 @@ class WhiteNoiseAppState private constructor(
     fun requestAppUnlock() {
         refreshAppLockCredentialAvailability()
         if (!requireAppUnlock || !appLockCredentialAvailable) return
-        appLockScreenVisible = true
+        showAppLockScreen()
         appUnlockError = null
         appUnlockPromptRequestId += 1
+    }
+
+    private fun showAppLockScreen() {
+        appLockScreenVisible = true
+        stopSpeaking()
     }
 
     fun markAppUnlockSucceeded(
@@ -5907,7 +5914,7 @@ class WhiteNoiseAppState private constructor(
     private fun deferAppLockDecisionUntilTimestampLoads(nowMillis: Long) {
         if (appUnlockEvaluationPending) return
         appUnlockEvaluationPending = true
-        appLockScreenVisible = true
+        showAppLockScreen()
         mutationsScope.launch {
             val loaded = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
             if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = loaded
@@ -7095,6 +7102,8 @@ class WhiteNoiseAppState private constructor(
         updateNotificationSuppression(if (foreground) suppression.onForeground() else suppression.onBackground())
         AppUpdateForegroundState.isForeground = foreground
         if (foreground) {
+            appLockTtsBoundaryJob?.cancel()
+            appLockTtsBoundaryJob = null
             maybeShowAppLockForForeground()
             if (dismissRetainedVisibleConversation) {
                 dismissVisibleConversationNotifications()
@@ -7103,10 +7112,7 @@ class WhiteNoiseAppState private constructor(
             recordAppLockBackgrounded()
             conversationDictation.onAppBackgrounded()
             mutationsScope.launch { draftWriter.flush() }
-            // Read-aloud continues in the background: the mediaPlayback
-            // foreground service owns the session's lifecycle, its generic
-            // notification exposes the controls, and explicit dismissal (or
-            // task removal) is what ends it (#1484).
+            scheduleTtsStopAtAppLockBoundary()
         }
         if (foreground) {
             refreshLocalNotificationPermission()
@@ -7117,6 +7123,24 @@ class WhiteNoiseAppState private constructor(
         if (!foreground) notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = true) }
         if (foreground) notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
         if (foreground) refreshAppSelfUpdateInstallPermission()
+    }
+
+    private fun scheduleTtsStopAtAppLockBoundary() {
+        appLockTtsBoundaryJob?.cancel()
+        appLockTtsBoundaryJob = null
+        if (!requireAppUnlock || !appLockCredentialAvailable) return
+        val delayMillis = appLockDelay.delayMillis
+        if (delayMillis == 0L) {
+            stopSpeaking()
+            return
+        }
+        appLockTtsBoundaryJob =
+            mutationsScope.launch {
+                delay(delayMillis)
+                if (!appInForeground && requireAppUnlock && appLockCredentialAvailable) {
+                    stopSpeaking()
+                }
+            }
     }
 
     private fun dismissVisibleConversationNotifications() {

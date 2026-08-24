@@ -22,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 
 /**
@@ -112,6 +113,9 @@ class TtsPlaybackForegroundService : Service() {
     override fun onDestroy() {
         observeJob?.cancel()
         serviceScope.cancel()
+        hostResolver(this)
+            ?.takeIf { TtsPlaybackSessionModel.from(it.controller.state.value).isActive }
+            ?.stopSession()
         mediaSession?.release()
         mediaSession = null
         super.onDestroy()
@@ -186,15 +190,17 @@ class TtsPlaybackForegroundService : Service() {
                     // allocating four actions, five PendingIntents and four
                     // Icons for an identical result.
                     .distinctUntilChanged()
-                    .collect { model ->
+                    .takeWhile { model ->
                         if (!model.isActive) {
                             // Terminal: completion, explicit stop, or error —
                             // the queue is already cleared, so tear everything
-                            // down exactly once.
+                            // down exactly once and unsubscribe. A replacement
+                            // session must enter through a new service start.
                             stopForeground(STOP_FOREGROUND_REMOVE)
                             stopSelf()
-                            return@collect
                         }
+                        model.isActive
+                    }.collect { model ->
                         publishPlaybackState(model)
                         startForeground(NOTIFICATION_ID, buildNotification(model))
                     }
