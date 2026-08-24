@@ -181,6 +181,7 @@ jobs:
       # intentional UI change with `./gradlew :app:recordRoborazziDevZapstoreDebug`
       # or `:app:recordRoborazziDevPlayDebug` (see README "Screenshot tests").
       - name: Screenshot tests (Roborazzi)
+        if: ${{ !cancelled() }}
         # Roborazzi's verify tasks depend on the variant unit-test tasks. Keep
         # this filtered invocation after Kover has consumed the unfiltered test
         # outputs; otherwise it invalidates those outputs and makes the coverage
