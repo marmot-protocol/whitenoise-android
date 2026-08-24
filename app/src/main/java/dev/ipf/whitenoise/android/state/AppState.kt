@@ -432,6 +432,11 @@ internal data class DraftSendClearToken(
     val generation: MessageDraftGeneration,
 )
 
+private data class PendingSendDraftKey(
+    val accountRef: String,
+    val groupIdHex: String,
+)
+
 internal class StartProfileChatNoActiveAccountException : IllegalStateException("No active account")
 
 internal fun profileGroupInviteToast(outcome: ProfileGroupInviteOutcome): ProfileGroupInviteToast? {
@@ -2249,6 +2254,13 @@ class WhiteNoiseAppState private constructor(
             maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
             observable = true,
         )
+    private val pendingSendDraftGenerations =
+        ScopedCache<PendingSendDraftKey, MessageDraftGeneration>(
+            registry = accountScopedCaches,
+            name = "pending-send-draft-generations",
+            maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
+            observable = true,
+        )
 
     /**
      * Per-account media auto-download matrix (issue #407). Reloaded whenever
@@ -2658,6 +2670,28 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): String? = draftSnapshotFor(accountRef, groupIdHex)?.textFieldValue?.text
 
+    /**
+     * Draft subtitle for a chat-list row. The exact recovery draft captured by
+     * an optimistic send stays durable until MDK accepts it, but it must not
+     * replace that send's pending preview with `Draft: ...`. A newer draft has
+     * a different generation (even when its text is identical) and remains
+     * visible while the older send is pending.
+     */
+    internal fun chatRowDraftFor(
+        accountRef: String?,
+        groupIdHex: String,
+        deliveryIndicator: OutgoingMessageIndicator?,
+    ): String? {
+        val draft = draftFor(accountRef, groupIdHex)
+        val generation = accountRef?.let { pendingSendDraftGenerations[PendingSendDraftKey(it, groupIdHex)] }
+        val shouldHide =
+            accountRef != null &&
+                deliveryIndicator == OutgoingMessageIndicator.Sending &&
+                generation != null &&
+                draftWriter.isCurrent(accountRef, groupIdHex, generation)
+        return draft?.takeUnless { shouldHide }
+    }
+
     /** Return [accountRef]'s restored composer draft for [groupIdHex]. */
     fun draftSnapshotFor(
         accountRef: String?,
@@ -2681,6 +2715,7 @@ class WhiteNoiseAppState private constructor(
     ) {
         draftStore.set(accountRef, groupIdHex, value)
         draftWriter.submit(accountRef, groupIdHex, value.text)
+        pendingSendDraftGenerations.remove(PendingSendDraftKey(accountRef, groupIdHex))
     }
 
     private fun conversationDictationDraftSnapshot(
@@ -2716,6 +2751,7 @@ class WhiteNoiseAppState private constructor(
             content = value.text,
         ) ?: return false
         draftStore.set(accountRef, groupIdHex, value)
+        pendingSendDraftGenerations.remove(PendingSendDraftKey(accountRef, groupIdHex))
         return true
     }
 
@@ -2766,7 +2802,8 @@ class WhiteNoiseAppState private constructor(
                 // cannot be cleared after it becomes current.
                 draftStore.set(accountRef, groupIdHex, TextFieldValue(""))
             }
-                ?: return
+        releasePendingSendDraft(pendingClear)
+        cleanupGeneration ?: return
         // Generation ownership is advanced first. Clearing the lifecycle
         // projection afterward is therefore one-way: a read captured before
         // durable acceptance can no longer rehydrate this sent text (#2225).
@@ -2797,11 +2834,29 @@ class WhiteNoiseAppState private constructor(
         val pendingClear = captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         controller.send(
             text = text,
-            onAccepted = onAccepted,
+            onAccepted = {
+                pendingClear?.let(::markPendingSendDraft)
+                onAccepted()
+            },
             onDurablyAccepted = {
                 pendingClear?.let(::clearDraftAfterSuccessfulSend)
             },
         )
+    }
+
+    private fun markPendingSendDraft(token: DraftSendClearToken) {
+        if (!draftWriter.isCurrent(token.accountRef, token.groupIdHex, token.generation)) return
+        pendingSendDraftGenerations.put(
+            PendingSendDraftKey(token.accountRef, token.groupIdHex),
+            token.generation,
+        )
+    }
+
+    private fun releasePendingSendDraft(token: DraftSendClearToken) {
+        val key = PendingSendDraftKey(token.accountRef, token.groupIdHex)
+        if (pendingSendDraftGenerations[key] == token.generation) {
+            pendingSendDraftGenerations.remove(key)
+        }
     }
 
     internal suspend fun deleteDraftBeforeGroupRemoval(
