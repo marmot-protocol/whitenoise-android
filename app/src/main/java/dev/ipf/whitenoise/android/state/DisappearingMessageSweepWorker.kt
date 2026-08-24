@@ -32,15 +32,34 @@ import java.util.concurrent.TimeUnit
  * expiry decision; Android only needs to nudge it periodically. WorkManager's
  * own minimum periodic interval (15 minutes) further guards against a hot loop.
  */
-class DisappearingMessageSweepWorker(
-    appContext: Context,
-    params: WorkerParameters,
-) : CoroutineWorker(appContext, params) {
+internal typealias PerformDisappearingMessageSweep = suspend (WhiteNoiseApplication) -> Unit
+
+class DisappearingMessageSweepWorker : CoroutineWorker {
+    private val sweepOverride: PerformDisappearingMessageSweep?
+
+    constructor(
+        appContext: Context,
+        params: WorkerParameters,
+    ) : this(appContext, params, null)
+
+    internal constructor(
+        appContext: Context,
+        params: WorkerParameters,
+        sweepOverride: PerformDisappearingMessageSweep?,
+    ) : super(appContext, params) {
+        this.sweepOverride = sweepOverride
+    }
+
     override suspend fun doWork(): Result {
         val app = applicationContext as? WhiteNoiseApplication ?: return Result.success()
         return runCatching {
             withContext(Dispatchers.Main.immediate) {
-                app.appState.sweepExpiredDisappearingMessages()
+                val override = sweepOverride
+                if (override != null) {
+                    override(app)
+                } else {
+                    app.appState.sweepExpiredDisappearingMessages()
+                }
             }
             Result.success()
         }.getOrElse { error ->

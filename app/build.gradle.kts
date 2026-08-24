@@ -1,4 +1,6 @@
 import com.android.build.api.attributes.ProductFlavorAttr
+import kotlinx.kover.gradle.plugin.dsl.AggregationType
+import kotlinx.kover.gradle.plugin.dsl.CoverageUnit
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.testing.Test
 import java.time.LocalDate
@@ -755,6 +757,11 @@ tasks
     }
 
 kover {
+    currentProject {
+        createVariant("statePackageFloor") {
+            add("devZapstoreDebug")
+        }
+    }
     reports {
         filters {
             excludes {
@@ -769,9 +776,39 @@ kover {
             }
         }
         verify {
-            // Coverage ratchet: raise this floor as coverage improves; never lower it silently.
-            rule {
-                minBound(34)
+            // Baseline from origin/master @ ccc33f46169f01ee206d9365c13087cce19a9c8a via
+            // `./gradlew :app:koverXmlReportDevZapstoreDebug` (aggregate LINE 68.2958%,
+            // BRANCH 53.3771%; state-package LINE 63.3282%). Floors use the measured
+            // integer percent with a small safety margin; raise only after a fresh
+            // report on the same task.
+            rule("aggregate line floor") {
+                minBound(68, CoverageUnit.LINE, AggregationType.COVERED_PERCENTAGE)
+            }
+            rule("aggregate branch floor") {
+                bound {
+                    minValue = 53
+                    coverageUnits = CoverageUnit.BRANCH
+                    aggregationForGroup = AggregationType.COVERED_PERCENTAGE
+                }
+            }
+        }
+        variant("statePackageFloor") {
+            filters {
+                excludes {
+                    classes(
+                        "dev.ipf.marmotkit.*",
+                        "io.crates.keyring.*",
+                        "*.BuildConfig",
+                    )
+                }
+                includes {
+                    packages("dev.ipf.whitenoise.android.state")
+                }
+            }
+            verify {
+                rule("dev.ipf.whitenoise.android.state line floor") {
+                    minBound(63, CoverageUnit.LINE, AggregationType.COVERED_PERCENTAGE)
+                }
             }
         }
     }
@@ -883,6 +920,7 @@ dependencies {
     testImplementation(libs.org.json)
     // Roborazzi Compose screenshot tests run on the JVM via Robolectric, so the
     // Compose tooling + Roborazzi artifacts live on the unit-test classpath.
+    testImplementation(libs.androidx.work.testing)
     testImplementation(libs.robolectric)
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
@@ -928,5 +966,11 @@ afterEvaluate {
             includeTestsMatching("dev.ipf.whitenoise.android.core.RecipientReferenceTest")
             includeTestsMatching("dev.ipf.whitenoise.android.amber.Nip55SignerParsingTest")
         }
+    }
+}
+
+tasks.configureEach {
+    if (name == "koverVerifyDevZapstoreDebug") {
+        dependsOn("koverVerifyStatePackageFloor")
     }
 }

@@ -24,17 +24,29 @@ internal object AppLockPreferences {
     private var cachedStore: KeystoreSecureStore? = null
     private val cacheLock = Any()
 
-    fun readLastUnlockedAtMillis(context: Context): Long {
+    fun readLastUnlockedAtMillis(context: Context): Long = readLastUnlockedAtMillis(context, secureStore = null)
+
+    internal fun readLastUnlockedAtMillis(
+        context: Context,
+        secureStore: KeystoreSecureStore?,
+        legacyReader: (Context, String) -> Map<String, String>? = LegacySecurePreferences::read,
+    ): Long {
         // One immediate retry after invalidating the cache: a Keystore entry
         // invalidated mid-process recreates through the corruption-recovery
         // path right away instead of failing every call until the next one.
         repeat(2) {
             runCatching {
-                return store(context.applicationContext)
+                return resolvedStore(context.applicationContext, secureStore, legacyReader)
                     .readAll()[LAST_UNLOCKED_AT_KEY]
                     ?.toLongOrNull()
                     ?: 0L
-            }.onFailure { recover() }
+            }.onFailure {
+                if (secureStore != null) {
+                    runCatching { secureStore.clear() }
+                } else {
+                    recover()
+                }
+            }
         }
         return 0L
     }
@@ -42,21 +54,49 @@ internal object AppLockPreferences {
     fun writeLastUnlockedAtMillis(
         context: Context,
         value: Long,
+    ) = writeLastUnlockedAtMillis(context, value, secureStore = null)
+
+    internal fun writeLastUnlockedAtMillis(
+        context: Context,
+        value: Long,
+        secureStore: KeystoreSecureStore?,
+        legacyReader: (Context, String) -> Map<String, String>? = LegacySecurePreferences::read,
     ) {
         repeat(2) {
             runCatching {
-                store(context.applicationContext)
+                resolvedStore(context.applicationContext, secureStore, legacyReader)
                     .write(LAST_UNLOCKED_AT_KEY, value.coerceAtLeast(0L).toString())
                 return
-            }.onFailure { recover() }
+            }.onFailure {
+                if (secureStore != null) {
+                    runCatching { secureStore.clear() }
+                } else {
+                    recover()
+                }
+            }
         }
     }
 
-    private fun store(context: Context): KeystoreSecureStore {
+    private fun resolvedStore(
+        context: Context,
+        secureStore: KeystoreSecureStore?,
+        legacyReader: (Context, String) -> Map<String, String>?,
+    ): KeystoreSecureStore {
+        if (secureStore != null) {
+            importLegacyStore(context, secureStore, legacyReader)
+            return secureStore
+        }
+        return store(context, legacyReader)
+    }
+
+    private fun store(
+        context: Context,
+        legacyReader: (Context, String) -> Map<String, String>? = LegacySecurePreferences::read,
+    ): KeystoreSecureStore {
         cachedStore?.let { return it }
         return synchronized(cacheLock) {
             cachedStore ?: create(context).also {
-                importLegacyStore(context, it)
+                importLegacyStore(context, it, legacyReader)
                 cachedStore = it
             }
         }
@@ -86,9 +126,28 @@ internal object AppLockPreferences {
     private fun importLegacyStore(
         context: Context,
         target: KeystoreSecureStore,
+        legacyReader: (Context, String) -> Map<String, String>?,
     ) {
-        val imported = readLegacyTimestamp(context)?.get(LAST_UNLOCKED_AT_KEY)
-        val stored = if (imported == null) null else readStored(target)
+        val imported =
+            try {
+                legacyReader(context, LEGACY_SECURE_FILE)?.get(LAST_UNLOCKED_AT_KEY)
+            } catch (error: GeneralSecurityException) {
+                context.deleteSharedPreferences(LEGACY_SECURE_FILE)
+                null
+            } catch (error: IOException) {
+                context.deleteSharedPreferences(LEGACY_SECURE_FILE)
+                null
+            }
+        val stored =
+            if (imported == null) {
+                null
+            } else {
+                try {
+                    target.readAll()
+                } catch (error: GeneralSecurityException) {
+                    null
+                }
+            }
         when {
             imported == null -> Unit
             // Unreadable new store: retry on a later open rather than dropping
@@ -98,31 +157,13 @@ internal object AppLockPreferences {
             // unlock with the stale legacy one on every recovery.
             stored.containsKey(LAST_UNLOCKED_AT_KEY) ->
                 context.deleteSharedPreferences(LEGACY_SECURE_FILE)
-            persist(target, imported) ->
+            persistImported(target, imported) ->
                 context.deleteSharedPreferences(LEGACY_SECURE_FILE)
             else -> Unit
         }
     }
 
-    private fun readLegacyTimestamp(context: Context): Map<String, String>? =
-        try {
-            LegacySecurePreferences.read(context, LEGACY_SECURE_FILE)
-        } catch (error: GeneralSecurityException) {
-            context.deleteSharedPreferences(LEGACY_SECURE_FILE)
-            null
-        } catch (error: IOException) {
-            context.deleteSharedPreferences(LEGACY_SECURE_FILE)
-            null
-        }
-
-    private fun readStored(target: KeystoreSecureStore): Map<String, String>? =
-        try {
-            target.readAll()
-        } catch (error: GeneralSecurityException) {
-            null
-        }
-
-    private fun persist(
+    private fun persistImported(
         target: KeystoreSecureStore,
         value: String,
     ): Boolean =

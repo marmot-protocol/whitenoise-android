@@ -1,0 +1,52 @@
+package dev.ipf.whitenoise.android.state
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+
+/**
+ * Growth ceiling for the two largest state sources. The ceilings exist because
+ * [Controllers.kt] (13,031 lines) and [AppState.kt] (10,185 lines) are already
+ * hard to navigate; new work should land in smaller units unless a Kover report
+ * justifies a deliberate, reviewed raise of these limits. Lowering a ceiling
+ * after a refactor is routine; raising one requires an intentional edit here
+ * backed by coverage measurements from
+ * `./gradlew :app:koverXmlReportDevZapstoreDebug`.
+ */
+class StateSourceSizeCeilingTest {
+    @Test
+    fun controllersAndAppStateStayWithinGrowthCeiling() {
+        assertTrue(
+            "Controllers.kt exceeds ${CONTROLLERS_MAX_LINES} lines",
+            sourceLineCount("Controllers.kt") <= CONTROLLERS_MAX_LINES,
+        )
+        assertTrue(
+            "AppState.kt exceeds ${APP_STATE_MAX_LINES} lines",
+            sourceLineCount("AppState.kt") <= APP_STATE_MAX_LINES,
+        )
+    }
+
+    @Test
+    fun lineCountHelperCountsPhysicalLinesLikeWc() {
+        val temp = File.createTempFile("state-source-ceiling", ".kt")
+        temp.writeText("first\nsecond\nthird\n")
+        assertEquals(3, sourceLineCount(temp))
+    }
+
+    private fun sourceLineCount(name: String): Int = sourceLineCount(sourceFile(name))
+
+    internal companion object {
+        const val CONTROLLERS_MAX_LINES = 13031
+        const val APP_STATE_MAX_LINES = 10185
+
+        internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }
+
+        private fun sourceFile(name: String): File =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/state/$name"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/state/$name"),
+            ).firstOrNull(File::exists)
+                ?: error("Missing $name source file")
+    }
+}
