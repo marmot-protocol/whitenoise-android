@@ -9,15 +9,22 @@ class MainActivityRecentsSecureFlagCoverageTest {
     fun persistedRecentsPrivacyAppliesBeforeFirstComposeFrame() {
         val source = mainActivitySource().readText()
         val onCreate = source.functionBody("onCreate")
+        val installComposeContent = source.functionBody("installComposeContent")
+        val composeInstallCall = onCreate.indexOf("installComposeContent()")
+
+        assertTrue(
+            "MainActivity must install Compose content from onCreate",
+            composeInstallCall >= 0 && "setContent" in installComposeContent,
+        )
 
         assertTrue(
             "MainActivity must read the persisted recents privacy preference before setContent",
             onCreate.indexOf("ChatScreenshotPreferences.readAllowChatScreenshots(this)") in
-                0 until onCreate.indexOf("setContent"),
+                0 until composeInstallCall,
         )
         assertTrue(
             "MainActivity must apply the persisted recents privacy preference before setContent",
-            onCreate.indexOf("applyRecentsPreferenceSecureFlag") in 0 until onCreate.indexOf("setContent"),
+            onCreate.indexOf("applyRecentsPreferenceSecureFlag") in 0 until composeInstallCall,
         )
     }
 
