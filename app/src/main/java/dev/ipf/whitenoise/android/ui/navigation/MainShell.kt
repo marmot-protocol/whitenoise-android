@@ -1080,6 +1080,13 @@ internal fun MainShell(
                 }
             }
             NotificationNavStep.AwaitChatList -> Unit // invite route re-fires when list state settles
+            NotificationNavStep.OpenChatList -> {
+                releaseNotificationFirstFrameGate(routingRequestId)
+                routingNotification = false
+                fallBackToChatList()
+                onNotificationTargetHandled(target, routingRequestId)
+                NotificationRouteTrace.finishRequest(routingRequestId)
+            }
             NotificationNavStep.AwaitInviteRow -> {
                 routingNotification = true
                 var authoritativeItem: ChatListItem? = null

@@ -74,6 +74,14 @@ enum class NotificationChannelSpec(
         launcherBadgeByDefault = false,
     ),
 
+    /** Removal and role changes that affect the local user's group membership. */
+    GROUP_MEMBERSHIP(
+        "group_membership_v1",
+        ChannelImportance.HIGH,
+        ConversationChannelPolicy.GLOBAL_ONLY,
+        launcherBadgeByDefault = false,
+    ),
+
     /** Agent tool progress and status updates. Visible but silent by default. */
     AGENT_ACTIVITY(
         "agent_activity_v1",
@@ -96,6 +104,7 @@ enum class NotificationChannelSpec(
          * Map a notification to its channel using only the signals the FFI
          * payload actually carries:
          *  - GROUP_INVITE                       -> invites
+         *  - membership/admin state change      -> group membership
          *  - NEW_MESSAGE with a reaction emoji  -> reactions
          *  - NEW_MESSAGE, DM                    -> direct messages
          *  - NEW_MESSAGE, group                 -> group messages
@@ -103,14 +112,10 @@ enum class NotificationChannelSpec(
         fun forUpdate(update: NotificationUpdateFfi): NotificationChannelSpec =
             when (update.trigger) {
                 NotificationTriggerFfi.GROUP_INVITE -> INVITES
-                // The snapshot exposes these triggers before Android owns their
-                // presentation. The formatter drops them until #822/#824 land;
-                // keep an explicit inert route so future enum additions still
-                // break compilation instead of silently inheriting a channel.
                 NotificationTriggerFfi.REMOVED_FROM_GROUP,
                 NotificationTriggerFfi.MADE_ADMIN,
                 NotificationTriggerFfi.REMOVED_AS_ADMIN,
-                -> INVITES
+                -> GROUP_MEMBERSHIP
                 NotificationTriggerFfi.NEW_MESSAGE ->
                     when {
                         // Route off the same sanitized-emoji predicate the

@@ -635,6 +635,10 @@
     <string name="notification_channel_reactions_default_description">Comportamento predefinito degli avvisi Android per le reazioni nelle chat</string>
     <string name="notification_channel_invites_default">Inviti · Predefinito per tutte le chat</string>
     <string name="notification_channel_invites_default_description">Comportamento predefinito degli avvisi Android per inviti e messaggi di benvenuto</string>
+    <string name="notification_channel_group_membership">Modifiche all’appartenenza ai gruppi</string>
+    <string name="notification_channel_group_membership_description">Quando vieni rimosso dai gruppi</string>
+    <string name="notification_channel_group_membership_default">Modifiche all’appartenenza ai gruppi · Predefinito per tutte le chat</string>
+    <string name="notification_channel_group_membership_default_description">Comportamento predefinito degli avvisi Android quando vieni rimosso dai gruppi</string>
     <string name="notification_channel_agent_activity_default">Attività dell’agente · Predefinito per tutte le chat</string>
     <string name="notification_channel_agent_activity_default_description">Comportamento predefinito degli avvisi Android per l’attività dell’agente nelle chat</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (personalizzato)</string>
@@ -651,6 +655,9 @@
     <string name="notification_sender_in_group">%1$s in %2$s</string>
     <string name="notification_invite_from_sender">Invito da %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s ti ha invitato a %2$s</string>
+    <string name="notification_removed_from_group">Ti hanno rimosso da %1$s</string>
+    <string name="notification_removed_from_unnamed_group">Ti hanno rimosso da un gruppo</string>
+    <string name="notification_removed_from_group_body">Puoi vedere la cronologia dei messaggi, ma non puoi più inviare messaggi.</string>
     <string name="background_connection_notification_title">White Noise è connesso</string>
     <string name="background_connection_notification_text">In ascolto per messaggi</string>
     <string name="background_connection_notification_hint">Tieni premuta questa notifica per nasconderla</string>

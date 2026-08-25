@@ -624,6 +624,10 @@
     <string name="notification_channel_reactions_default_description">聊天中回應的預設 Android 提醒方式</string>
     <string name="notification_channel_invites_default">邀請 · 所有聊天的預設設定</string>
     <string name="notification_channel_invites_default_description">群組邀請和歡迎的預設 Android 提醒方式</string>
+    <string name="notification_channel_group_membership">群組成員變更</string>
+    <string name="notification_channel_group_membership_description">當你被移出群組時</string>
+    <string name="notification_channel_group_membership_default">群組成員變更 · 所有聊天的預設設定</string>
+    <string name="notification_channel_group_membership_default_description">當你被移出群組時的預設 Android 提醒方式</string>
     <string name="notification_channel_agent_activity_default">代理活動 · 所有聊天的預設設定</string>
     <string name="notification_channel_agent_activity_default_description">聊天中代理活動的預設 Android 提醒方式</string>
     <string name="notification_channel_custom_name">%1$s · %2$s（自訂）</string>
@@ -640,6 +644,9 @@
     <string name="notification_sender_in_group">%1$s 在 %2$s 中</string>
     <string name="notification_invite_from_sender">來自 %1$s 的邀請</string>
     <string name="notification_sender_invited_you_to_group">%1$s 邀請你加入 %2$s</string>
+    <string name="notification_removed_from_group">你已被移出「%1$s」</string>
+    <string name="notification_removed_from_unnamed_group">你已被移出群組</string>
+    <string name="notification_removed_from_group_body">你可以查看訊息記錄，但無法再傳送訊息。</string>
     <string name="background_connection_notification_title">White Noise 已連線</string>
     <string name="background_connection_notification_text">正在監聽訊息</string>
     <string name="background_connection_notification_hint">長按以隱藏此通知</string>

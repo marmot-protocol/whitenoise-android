@@ -118,6 +118,16 @@ class NotificationChannelSpecTest {
     }
 
     @Test
+    fun removalRoutesToTheDedicatedGroupMembershipChannel() {
+        assertEquals(
+            NotificationChannelSpec.GROUP_MEMBERSHIP,
+            NotificationChannelSpec.forUpdate(
+                update(trigger = NotificationTriggerFfi.REMOVED_FROM_GROUP),
+            ),
+        )
+    }
+
+    @Test
     fun agentActivityRoutesToTheLowImportanceAgentChannel() {
         val spec =
             NotificationChannelSpec.forUpdate(
@@ -155,6 +165,7 @@ class NotificationChannelSpecTest {
         assertEquals("mentions", NotificationChannelSpec.MENTIONS.id)
         assertEquals("reactions_v2", NotificationChannelSpec.REACTIONS.id)
         assertEquals("invites_v2", NotificationChannelSpec.INVITES.id)
+        assertEquals("group_membership_v1", NotificationChannelSpec.GROUP_MEMBERSHIP.id)
         assertEquals("agent_activity_v1", NotificationChannelSpec.AGENT_ACTIVITY.id)
         assertEquals("app_updates_v1", NotificationChannelSpec.APP_UPDATES.id)
     }

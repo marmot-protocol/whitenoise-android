@@ -11,7 +11,7 @@ import kotlinx.coroutines.delay
 import kotlin.coroutines.cancellation.CancellationException
 
 /** What a tapped notification should open. */
-enum class NotificationTargetKind { MESSAGE, INVITE }
+enum class NotificationTargetKind { MESSAGE, INVITE, CHAT_LIST }
 
 /**
  * Navigation target carried by a notification's content intent. Built from a
@@ -51,6 +51,9 @@ sealed interface NotificationNavStep {
     /** Right account is active but its chat list hasn't loaded yet — wait for an invite row. */
     data object AwaitChatList : NotificationNavStep
 
+    /** Membership-removal target: land on Chats without opening the dead group. */
+    data object OpenChatList : NotificationNavStep
+
     /**
      * Invite target: initial chat-list snapshot is ready but the pending invite
      * row has not materialized yet — wait for the live row or an authoritative
@@ -80,6 +83,7 @@ sealed interface NotificationNavStep {
  *    already active)
  *  - active account, chat list not ready + message → [NotificationNavStep.LoadMessageDirectly]
  *  - active account, chat list not ready + invite → [NotificationNavStep.AwaitChatList]
+ *  - active account + chat-list target → [NotificationNavStep.OpenChatList]
  *  - ready + group present → [NotificationNavStep.OpenConversation], carrying the
  *    notified message id (already non-blank and MESSAGE-only by construction) so
  *    the persisted read cursor can advance before composition
@@ -119,6 +123,7 @@ fun resolveNotificationNav(
         }
         return NotificationNavStep.SwitchAccount(target.accountRef)
     }
+    if (target.kind == NotificationTargetKind.CHAT_LIST) return NotificationNavStep.OpenChatList
     if (!chatListReady) {
         return if (target.kind == NotificationTargetKind.MESSAGE) {
             NotificationNavStep.LoadMessageDirectly
@@ -383,7 +388,7 @@ object NotificationNavigation {
             when (update.trigger) {
                 NotificationTriggerFfi.NEW_MESSAGE -> NotificationTargetKind.MESSAGE
                 NotificationTriggerFfi.GROUP_INVITE -> NotificationTargetKind.INVITE
-                NotificationTriggerFfi.REMOVED_FROM_GROUP,
+                NotificationTriggerFfi.REMOVED_FROM_GROUP -> NotificationTargetKind.CHAT_LIST
                 NotificationTriggerFfi.MADE_ADMIN,
                 NotificationTriggerFfi.REMOVED_AS_ADMIN,
                 -> return null

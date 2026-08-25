@@ -635,6 +635,10 @@
     <string name="notification_channel_reactions_default_description">Sohbetlerdeki tepkiler için varsayılan Android uyarı davranışı</string>
     <string name="notification_channel_invites_default">Davetler · Tüm sohbetler için varsayılan</string>
     <string name="notification_channel_invites_default_description">Grup davetleri ve karşılamalar için varsayılan Android uyarı davranışı</string>
+    <string name="notification_channel_group_membership">Grup üyeliği değişiklikleri</string>
+    <string name="notification_channel_group_membership_description">Gruplardan çıkarıldığınızda</string>
+    <string name="notification_channel_group_membership_default">Grup üyeliği değişiklikleri · Tüm sohbetler için varsayılan</string>
+    <string name="notification_channel_group_membership_default_description">Gruplardan çıkarıldığınızda varsayılan Android uyarı davranışı</string>
     <string name="notification_channel_agent_activity_default">Ajan etkinliği · Tüm sohbetler için varsayılan</string>
     <string name="notification_channel_agent_activity_default_description">Sohbetlerdeki ajan etkinliği için varsayılan Android uyarı davranışı</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (özel)</string>
@@ -651,6 +655,9 @@
     <string name="notification_sender_in_group">%1$s, %2$s içinde</string>
     <string name="notification_invite_from_sender">%1$s tarafından davet</string>
     <string name="notification_sender_invited_you_to_group">%1$s sizi %2$s grubuna davet etti</string>
+    <string name="notification_removed_from_group">%1$s grubundan çıkarıldınız</string>
+    <string name="notification_removed_from_unnamed_group">Bir gruptan çıkarıldınız</string>
+    <string name="notification_removed_from_group_body">Mesaj geçmişinizi görebilirsiniz ancak artık mesaj gönderemezsiniz.</string>
     <string name="background_connection_notification_title">White Noise bağlı</string>
     <string name="background_connection_notification_text">Mesajlar dinleniyor</string>
     <string name="background_connection_notification_hint">Bu bildirimi gizlemek için uzun basın</string>

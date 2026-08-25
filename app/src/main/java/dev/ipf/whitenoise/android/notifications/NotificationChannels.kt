@@ -71,6 +71,7 @@ object NotificationChannels {
 
                 NotificationChannelSpec.REACTIONS,
                 NotificationChannelSpec.INVITES,
+                NotificationChannelSpec.GROUP_MEMBERSHIP,
                 NotificationChannelSpec.AGENT_ACTIVITY,
                 NotificationChannelSpec.APP_UPDATES,
                 -> Unit
@@ -89,6 +90,7 @@ object NotificationChannels {
             NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions
             NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions
             NotificationChannelSpec.INVITES -> R.string.notification_channel_invites
+            NotificationChannelSpec.GROUP_MEMBERSHIP -> R.string.notification_channel_group_membership
             NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
         }
@@ -100,6 +102,7 @@ object NotificationChannels {
             NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions_default
             NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions_default
             NotificationChannelSpec.INVITES -> R.string.notification_channel_invites_default
+            NotificationChannelSpec.GROUP_MEMBERSHIP -> R.string.notification_channel_group_membership_default
             NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity_default
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates_global
         }
@@ -111,6 +114,8 @@ object NotificationChannels {
             NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions_default_description
             NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions_default_description
             NotificationChannelSpec.INVITES -> R.string.notification_channel_invites_default_description
+            NotificationChannelSpec.GROUP_MEMBERSHIP ->
+                R.string.notification_channel_group_membership_default_description
             NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity_default_description
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates_global_description
         }
