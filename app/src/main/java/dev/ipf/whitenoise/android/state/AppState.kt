@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.StringRes
+import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -2898,6 +2899,16 @@ class WhiteNoiseAppState private constructor(
     fun detachConversationController(controller: ConversationController) {
         synchronized(conversationControllerLock) { conversationControllers.remove(controller) }
     }
+
+    @VisibleForTesting
+    internal var conversationLiveSubscriptionsOverride: ConversationLiveSubscriptions? = null
+
+    internal fun conversationLiveSubscriptions(): ConversationLiveSubscriptions =
+        conversationLiveSubscriptionsOverride ?: ConversationLiveSubscriptions.bind(this)
+
+    @VisibleForTesting
+    internal fun attachedConversationControllersForTest(): List<ConversationController> =
+        synchronized(conversationControllerLock) { conversationControllers.toList() }
 
     internal fun deliverConfirmedMediaHandoff(
         accountRef: String?,
