@@ -325,8 +325,10 @@ private fun HighlightedPlainText(
     testTag: String? = null,
 ) {
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    val color = ttsReadAloudHighlightColor()
-    Surface(color = MaterialTheme.colorScheme.primaryContainer) {
+    val background = MaterialTheme.colorScheme.primaryContainer
+    val content = MaterialTheme.colorScheme.onPrimaryContainer
+    val style = rememberTtsReadAloudHighlightStyle(background, content)
+    Surface(color = background, contentColor = content) {
         Text(
             text = text,
             modifier =
@@ -334,7 +336,7 @@ private fun HighlightedPlainText(
                     .width(280.dp)
                     .padding(12.dp)
                     .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
-                    .ttsReadAloudHighlight(layout, highlightRange, color),
+                    .ttsReadAloudHighlight(layout, highlightRange, style),
             onTextLayout = { layout = it },
         )
     }

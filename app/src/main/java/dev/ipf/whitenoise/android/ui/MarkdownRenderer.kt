@@ -82,8 +82,8 @@ import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlight
-import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlightColor
 import java.net.IDN
 import java.net.URI
 import java.util.Locale
@@ -147,6 +147,7 @@ internal fun MarkdownMessageBody(
     // Accessibility actions invoke the same copy path without a pointer event.
     onCopyLink: ((String) -> Unit)? = null,
     ttsLeafHighlightResolver: TtsLeafHighlightResolver? = null,
+    ttsReadAloudHighlightStyle: TtsReadAloudHighlightStyle? = null,
     ttsSentenceLayoutReporter: TtsSentenceLayoutReporter? = null,
 ) {
     val context = LocalContext.current
@@ -179,11 +180,17 @@ internal fun MarkdownMessageBody(
         remember(linkListener, mentionDisplayName, isGroupMember, useDecorativeBackgrounds) {
             MarkdownBodyContext(linkListener, mentionDisplayName, isGroupMember, useDecorativeBackgrounds)
         }
+    val ttsHighlightContext =
+        remember(ttsLeafHighlightResolver, ttsReadAloudHighlightStyle) {
+            ttsLeafHighlightResolver?.let { resolver ->
+                MarkdownTtsHighlightContext(resolver, ttsReadAloudHighlightStyle)
+            }
+        }
     CompositionLocalProvider(
         LocalSelectableTextLayoutReporter provides onSelectableTextLayoutChanged,
         LocalMarkdownLinkTextLayoutReporter provides onLinkTextLayoutChanged,
         LocalMarkdownLinkCopyHandler provides onCopyLink,
-        LocalTtsLeafHighlightResolver provides ttsLeafHighlightResolver,
+        LocalTtsHighlightContext provides ttsHighlightContext,
         LocalTtsSentenceLayoutReporter provides ttsSentenceLayoutReporter,
     ) {
         MarkdownBlockList(
@@ -404,8 +411,13 @@ internal data class MarkdownLinkTextLayout(
 private val LocalSelectableTextLayoutReporter =
     staticCompositionLocalOf<SelectableTextLayoutReporter?> { null }
 
-private val LocalTtsLeafHighlightResolver =
-    compositionLocalOf<TtsLeafHighlightResolver?> { null }
+private data class MarkdownTtsHighlightContext(
+    val resolver: TtsLeafHighlightResolver,
+    val style: TtsReadAloudHighlightStyle?,
+)
+
+private val LocalTtsHighlightContext =
+    compositionLocalOf<MarkdownTtsHighlightContext?> { null }
 
 private val LocalTtsSentenceLayoutReporter =
     compositionLocalOf<TtsSentenceLayoutReporter?> { null }
@@ -432,7 +444,8 @@ private fun MarkdownBodyText(
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     val reporter = LocalSelectableTextLayoutReporter.current
-    val highlightResolver = LocalTtsLeafHighlightResolver.current
+    val highlightContext = LocalTtsHighlightContext.current
+    val highlightResolver = highlightContext?.resolver
     val sentenceLayoutReporter = LocalTtsSentenceLayoutReporter.current
     val linkReporter = LocalMarkdownLinkTextLayoutReporter.current
     val onCopyLink = LocalMarkdownLinkCopyHandler.current
@@ -440,7 +453,6 @@ private fun MarkdownBodyText(
     val linkDestinations = remember(text) { markdownLinkDestinations(text) }
     val reportsLinks = remember(text) { text.getLinkAnnotations(0, text.length).isNotEmpty() }
     val tracker = remember(leafId, text) { MarkdownTextLayoutTracker() }
-    val highlightColor = ttsReadAloudHighlightColor()
     var layoutResult by remember(leafId, text) { mutableStateOf<TextLayoutResult?>(null) }
     val highlight =
         remember(highlightResolver, leafId, text.text) {
@@ -488,7 +500,7 @@ private fun MarkdownBodyText(
         modifier =
             modifier
                 .then(accessibilityModifier)
-                .ttsReadAloudHighlight(layoutResult, highlight, highlightColor)
+                .ttsReadAloudHighlight(layoutResult, highlight, highlightContext?.style)
                 .onGloballyPositioned { coordinates ->
                     tracker.coordinates = coordinates
                     reportIfReady()
