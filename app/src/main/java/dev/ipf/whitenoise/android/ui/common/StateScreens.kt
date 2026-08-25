@@ -99,6 +99,15 @@ fun StartupLoadingScreen() {
 
 internal const val FULL_SCREEN_LOADING_TEST_TAG = "full-screen-loading"
 internal const val STARTUP_LOADING_TEST_TAG = "startup-loading"
+internal const val WARM_RESUME_USEFUL_SURFACE_TEST_TAG = "warm-resume-useful-surface"
+
+/** Marks a rendered, interactive destination rather than the shell's possibly blank root. */
+@Composable
+internal fun WarmResumeUsefulSurface(content: @Composable () -> Unit) {
+    Box(Modifier.fillMaxSize().testTag(WARM_RESUME_USEFUL_SURFACE_TEST_TAG)) {
+        content()
+    }
+}
 
 @Composable
 internal fun InlineConfirmationNotice(

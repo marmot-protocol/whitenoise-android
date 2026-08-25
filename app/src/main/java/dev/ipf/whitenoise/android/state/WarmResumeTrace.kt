@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.os.Process
 import android.util.Log
 import androidx.tracing.Trace
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.ui.navigation.WarmResumeFirstUsefulSurface
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -90,6 +91,7 @@ internal object WarmResumeTrace {
         event: String,
         fields: String = "",
     ) {
+        if (!BuildConfig.DEBUG && !BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) return
         val suffix = fields.takeIf(String::isNotEmpty)?.let { " $it" }.orEmpty()
         Log.i(TAG, "activity=$activityToken event=$event$suffix")
     }

@@ -1865,7 +1865,10 @@ internal fun MainShell(
         routeTransition.AnimatedContent(
             transitionSpec = {
                 when {
-                    routingNotification || routingShare || routingAppUpdate || pendingTtsDestinationNavigation != null ->
+                    routingNotification ||
+                        routingShare ||
+                        routingAppUpdate ||
+                        pendingTtsDestinationNavigation != null ->
                         EnterTransition.None togetherWith ExitTransition.None
                     targetState != null ->
                         slideInHorizontally(

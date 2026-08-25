@@ -99,6 +99,10 @@ class MainActivity : AppCompatActivity() {
         consumeIntent(intent)
         enableEdgeToEdge()
         applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
+        installComposeContent()
+    }
+
+    private fun installComposeContent() {
         setContent {
             val state = remember { appState }
             val systemDarkTheme = isSystemInDarkTheme()

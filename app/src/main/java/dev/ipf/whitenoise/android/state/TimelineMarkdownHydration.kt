@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
  * FFI call, so it rides [WhiteNoiseAppState.marmotIo]'s IO hop. Any failure
  * degrades to an empty document, which renders as plain text.
  */
+@Suppress("TooGenericExceptionCaught") // The FFI boundary can raise unchecked failures; cancellation is rethrown first.
 internal suspend fun WhiteNoiseAppState.parseMarkdownOrEmpty(text: String): MarkdownDocumentFfi =
     try {
         marmotIo { parseMarkdown(text) }
@@ -23,7 +24,7 @@ internal suspend fun WhiteNoiseAppState.parseMarkdownOrEmpty(text: String): Mark
 
 /** Re-parse only ordinary, visible text rows whose projected Markdown is absent. */
 internal fun needsTimelineMarkdownHydration(record: TimelineMessageRecordFfi): Boolean =
-    record.kind == 9uL &&
+    record.kind == CHAT_MESSAGE_KIND &&
         !record.deleted &&
         record.plaintext.isNotBlank() &&
         record.contentTokens.blocks.isEmpty()
@@ -43,3 +44,5 @@ internal fun publishTimelineBeforeMarkdownHydration(
     if (pending.isEmpty()) return null
     return scope.launch { applyHydrated(hydrate(pending)) }
 }
+
+private const val CHAT_MESSAGE_KIND = 9uL

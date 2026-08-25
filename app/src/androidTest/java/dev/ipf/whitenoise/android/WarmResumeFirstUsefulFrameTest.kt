@@ -8,6 +8,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.whitenoise.android.ui.common.FULL_SCREEN_LOADING_TEST_TAG
 import dev.ipf.whitenoise.android.ui.common.STARTUP_LOADING_TEST_TAG
+import dev.ipf.whitenoise.android.ui.common.WARM_RESUME_USEFUL_SURFACE_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_INITIAL_LOADING_TEST_TAG
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import org.junit.Assert.assertSame
@@ -54,6 +55,7 @@ class WarmResumeFirstUsefulFrameTest {
 
     private fun assertUsefulSurfaceWithoutFullScreenLoading() {
         composeRule.onRoot().assertExists()
+        composeRule.onNodeWithTag(WARM_RESUME_USEFUL_SURFACE_TEST_TAG).assertExists()
         composeRule.onNodeWithTag(FULL_SCREEN_LOADING_TEST_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(STARTUP_LOADING_TEST_TAG).assertDoesNotExist()
     }

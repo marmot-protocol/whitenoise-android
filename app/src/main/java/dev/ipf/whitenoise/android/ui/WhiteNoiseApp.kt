@@ -55,6 +55,7 @@ import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
+import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
@@ -140,6 +141,11 @@ internal fun ShellTransientNoticeLayout(
 }
 
 @Composable
+@Suppress(
+    "CyclomaticComplexMethod",
+    "FunctionNaming",
+    "LongMethod",
+) // App-level Compose orchestration keeps lifecycle effects and privacy routing in one owner.
 internal fun WhiteNoiseApp(
     appState: WhiteNoiseAppState,
     mainShellStateHolder: MainShellStateHolder,
@@ -361,15 +367,17 @@ internal fun WhiteNoiseApp(
                                 firstUsefulFrameRecorded = true
                             }
                         }
-                        AppLockScreen(
-                            error = appState.appUnlockError,
-                            onRetry = { appState.requestAppUnlock() },
-                        )
+                        WarmResumeUsefulSurface {
+                            AppLockScreen(
+                                error = appState.appUnlockError,
+                                onRetry = { appState.requestAppUnlock() },
+                            )
+                        }
                     } else {
                         AppSelfUpdateDialog(appState = appState)
                         when (val phase = appState.phase) {
                             AppPhase.Bootstrapping -> StartupLoadingScreen()
-                            AppPhase.Onboarding -> OnboardingScreen(appState)
+                            AppPhase.Onboarding -> WarmResumeUsefulSurface { OnboardingScreen(appState) }
                             AppPhase.Ready -> {
                                 val firstUsefulSurface =
                                     warmResumeFirstUsefulSurface(
@@ -384,9 +392,10 @@ internal fun WhiteNoiseApp(
                                             ),
                                     )
                                 LaunchedEffect(firstUsefulSurface, warmResumeTraceToken, warmResumeEpoch) {
+                                    val foregroundCanRecord =
+                                        !firstUsefulFrameRecorded && warmResumeEpoch > 0
                                     if (
-                                        !firstUsefulFrameRecorded &&
-                                        warmResumeEpoch > 0 &&
+                                        foregroundCanRecord &&
                                         !inboundRoutePending &&
                                         firstUsefulSurface != WarmResumeFirstUsefulSurface.Startup
                                     ) {
@@ -413,31 +422,35 @@ internal fun WhiteNoiseApp(
                                     PrepareMainShellFirstFrame(appState, mainShellStateHolder)
                                     StartupLoadingScreen()
                                 } else {
-                                    ShellTransientNoticeLayout(
-                                        notice = transientNotice,
-                                        persistentTopContent = { ForwardOperationStatusHost(appState) },
-                                        persistentTopContentConsumesStatusBars = forwardOperationVisible,
-                                    ) {
-                                        MainShell(
-                                            appState = appState,
-                                            stateHolder = mainShellStateHolder,
-                                            inboundNotificationTarget = inboundNotificationTarget,
-                                            inboundNotificationRequestId = inboundNotificationRequestId,
-                                            onNotificationTargetHandled = onNotificationTargetHandled,
-                                            inboundShareRequest = inboundShareRequest,
-                                            onShareRequestHandled = onShareRequestHandled,
-                                            inboundAppUpdateTap = inboundAppUpdateTap,
-                                            onAppUpdateTapHandled = onAppUpdateTapHandled,
-                                        )
+                                    WarmResumeUsefulSurface {
+                                        ShellTransientNoticeLayout(
+                                            notice = transientNotice,
+                                            persistentTopContent = { ForwardOperationStatusHost(appState) },
+                                            persistentTopContentConsumesStatusBars = forwardOperationVisible,
+                                        ) {
+                                            MainShell(
+                                                appState = appState,
+                                                stateHolder = mainShellStateHolder,
+                                                inboundNotificationTarget = inboundNotificationTarget,
+                                                inboundNotificationRequestId = inboundNotificationRequestId,
+                                                onNotificationTargetHandled = onNotificationTargetHandled,
+                                                inboundShareRequest = inboundShareRequest,
+                                                onShareRequestHandled = onShareRequestHandled,
+                                                inboundAppUpdateTap = inboundAppUpdateTap,
+                                                onAppUpdateTapHandled = onAppUpdateTapHandled,
+                                            )
+                                        }
                                     }
                                 }
                             }
                             is AppPhase.Failed ->
-                                ErrorContent(
-                                    title = stringResource(R.string.white_noise_couldnt_start),
-                                    error = phase.error,
-                                    onRetry = { scope.launch { appState.bootstrap() } },
-                                )
+                                WarmResumeUsefulSurface {
+                                    ErrorContent(
+                                        title = stringResource(R.string.white_noise_couldnt_start),
+                                        error = phase.error,
+                                        onRetry = { scope.launch { appState.bootstrap() } },
+                                    )
+                                }
                         }
                         // Sign Out & Wipe chrome (#350) lives above the phase
                         // router but below the lock privacy boundary.

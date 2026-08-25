@@ -77,22 +77,26 @@ internal class MainShellStateHolder(
         controller: ChatsController,
         activeAccountRef: String?,
     ) {
-        if (!savedRouteResolutionPending || selectedChat.value != null) return
         val groupIdHex = savedGroupIdHex ?: return
-        if (activeAccountRef == null) return
-        if (controller.boundAccountRef != activeAccountRef || !controller.hasLoadedLocalSnapshot) return
+        val canResolve =
+            savedRouteResolutionPending &&
+                selectedChat.value == null &&
+                activeAccountRef != null &&
+                controller.boundAccountRef == activeAccountRef &&
+                controller.hasLoadedLocalSnapshot
+        if (!canResolve) return
         if (savedAccountRef == null || savedAccountRef != activeAccountRef) {
             clearSavedConversationRoute()
-            return
+        } else {
+            selectedChat.value =
+                (controller.items + controller.archivedItems)
+                    .firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+            selectedChatOpenContext.value = ConversationOpenContext()
+            selectedChatJustCreated.value = false
+            selectedChatOpenedAsDmHint.value = false
+            savedRouteResolutionPending = false
+            if (selectedChat.value == null) clearSavedConversationRoute()
         }
-        selectedChat.value =
-            (controller.items + controller.archivedItems)
-                .firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
-        selectedChatOpenContext.value = ConversationOpenContext()
-        selectedChatJustCreated.value = false
-        selectedChatOpenedAsDmHint.value = false
-        savedRouteResolutionPending = false
-        if (selectedChat.value == null) clearSavedConversationRoute()
     }
 
     /** Keep only lightweight keys in Android saved state; the live item remains Activity-scoped. */
@@ -144,11 +148,13 @@ internal class MainShellStateHolder(
         activeAccountRef: String?,
         runtimeGeneration: Int,
         appLockScreenVisible: Boolean,
-    ): Boolean {
-        if (appLockScreenVisible) return true
-        if (phase != AppPhase.Ready) return phase != AppPhase.Bootstrapping
-        return localProjectionAvailable(activeAccountRef, runtimeGeneration)
-    }
+    ): Boolean =
+        when {
+            appLockScreenVisible -> true
+            phase == AppPhase.Bootstrapping -> false
+            phase != AppPhase.Ready -> true
+            else -> localProjectionAvailable(activeAccountRef, runtimeGeneration)
+        }
 
     fun localProjectionAvailable(
         activeAccountRef: String?,
@@ -250,6 +256,7 @@ internal fun shouldComposeProtectedMainShell(surface: WarmResumeFirstUsefulSurfa
 
 /** Load only the retained local projection while no protected shell content is composed. */
 @Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 internal fun PrepareMainShellFirstFrame(
     appState: WhiteNoiseAppState,
     stateHolder: MainShellStateHolder,
