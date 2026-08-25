@@ -2168,7 +2168,7 @@ internal fun messageBubbleColumnMaxWidth(
     selectionGutterWidth: Dp,
     senderAvatarSlotWidth: Dp,
 ): Dp =
-    (containerWidth - MessageBubbleOppositeGutter - selectionGutterWidth - senderAvatarSlotWidth)
+    (containerWidth - maxOf(MessageBubbleOppositeGutter, selectionGutterWidth) - senderAvatarSlotWidth)
         .coerceAtLeast(0.dp)
 
 internal fun messageBubbleColumnTestTag(messageIdHex: String): String = "message-bubble-column:$messageIdHex"

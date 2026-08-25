@@ -146,14 +146,14 @@ class MessageBubbleFileAttachmentScreenshotTest {
         val selectedRow = composeRule.onNodeWithContentDescription(selectedRowDescription)
         selectedRow.assertIsSelected()
         val selectedRowBounds = selectedRow.getUnclippedBoundsInRoot()
-        assertEquals(300f, (selectedRowBounds.right - selectedRowBounds.left).value, 1f)
-        // 300 dp host - 48 dp opposite gutter - 40 dp selection gutter -
-        // 40 dp incoming group-avatar slot.
+        assertEquals(360f, (selectedRowBounds.right - selectedRowBounds.left).value, 1f)
+        // The 40 dp selection control fits within the existing 48 dp row
+        // reserve, so selection does not shrink this captioned file.
         assertEquals(
-            172.dp,
-            messageBubbleColumnMaxWidth(300.dp, messageBubbleSelectionGutterWidth, 40.dp),
+            272.dp,
+            messageBubbleColumnMaxWidth(360.dp, messageBubbleSelectionGutterWidth, 40.dp),
         )
-        assertFileCardAndBubbleWidth(gallery.selectedConstrained, expectedWidth = 172f)
+        assertFileCardAndBubbleWidth(gallery.selectedCaptioned, expectedWidth = 272f)
         assertFileCardAndBubbleWidth(gallery.rtl, expectedWidth = 240f)
     }
 
@@ -173,13 +173,11 @@ class MessageBubbleFileAttachmentScreenshotTest {
             FileMessage(gallery.multiple)
             FileMessage(gallery.pending)
             FileMessage(gallery.persistedFailure)
-            Column(Modifier.width(300.dp)) {
-                FileMessage(
-                    gallery.selectedConstrained,
-                    selectionMode = true,
-                    selected = true,
-                )
-            }
+            FileMessage(
+                gallery.selectedCaptioned,
+                selectionMode = true,
+                selected = true,
+            )
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 FileMessage(gallery.rtl)
             }
@@ -224,10 +222,10 @@ class MessageBubbleFileAttachmentScreenshotTest {
                     fileName = PERSISTED_FAILURE_FILE,
                     invalidationStatus = PERSISTED_FAILURE_STATUS,
                 ),
-            selectedConstrained =
+            selectedCaptioned =
                 fileTimelineMessage(
                     index = 9,
-                    fileName = SELECTED_CONSTRAINED_FILE,
+                    fileName = SELECTED_FILE,
                     caption = SELECTED_CAPTION,
                 ),
             rtl = fileTimelineMessage(index = 10, fileName = RTL_FILE),
@@ -243,7 +241,7 @@ class MessageBubbleFileAttachmentScreenshotTest {
         val multiple: TimelineMessage,
         val pending: TimelineMessage,
         val persistedFailure: TimelineMessage,
-        val selectedConstrained: TimelineMessage,
+        val selectedCaptioned: TimelineMessage,
         val rtl: TimelineMessage,
     )
 
@@ -601,7 +599,7 @@ class MessageBubbleFileAttachmentScreenshotTest {
         const val PENDING_GENERIC_FILE = "pending-generic-archive.zip"
         const val PERSISTED_FAILURE_FILE = "persisted-failure.pdf"
         const val PERSISTED_FAILURE_STATUS = "FutureEngineFailure"
-        const val SELECTED_CONSTRAINED_FILE = "selected-constrained.pdf"
+        const val SELECTED_FILE = "selected-captioned.pdf"
         const val SELECTED_CAPTION = "Selected constrained attachment"
         const val RTL_FILE = "rtl-layout-document.pdf"
         val FILE_CARD_CONTENT_PADDING = 10.dp

@@ -28,6 +28,22 @@ class MessageBubbleLayoutTest {
                 senderAvatarSlotWidth = 40.dp,
             ),
         )
+        assertEquals(
+            312.dp,
+            messageBubbleColumnMaxWidth(
+                containerWidth = 400.dp,
+                selectionGutterWidth = 40.dp,
+                senderAvatarSlotWidth = 40.dp,
+            ),
+        )
+        assertEquals(
+            212.dp,
+            messageBubbleColumnMaxWidth(
+                containerWidth = 300.dp,
+                selectionGutterWidth = 40.dp,
+                senderAvatarSlotWidth = 40.dp,
+            ),
+        )
     }
 
     @Test
