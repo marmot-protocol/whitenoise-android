@@ -3,7 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -39,12 +39,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
-internal val FileBubbleWidth = 240.dp
-internal val CaptionedFileBubblePreferredWidth = 320.dp
-
-internal fun fileBubblePreferredWidth(attachedToCaption: Boolean) = if (attachedToCaption) CaptionedFileBubblePreferredWidth else FileBubbleWidth
-
-internal fun Modifier.fileBubbleWidth(attachedToCaption: Boolean = false): Modifier = width(fileBubblePreferredWidth(attachedToCaption))
+internal fun Modifier.fileBubbleWidth(): Modifier = fillMaxWidth()
 
 internal fun fileAttachmentCardTestTag(
     messageIdHex: String,
@@ -256,7 +251,7 @@ internal fun MediaFileBubble(
         border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
         modifier =
             Modifier
-                .fileBubbleWidth(attachedToCaption)
+                .fileBubbleWidth()
                 .testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
                 .combinedClickable(
                     enabled =
@@ -402,7 +397,7 @@ internal fun PendingFilePill(
         border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
         modifier =
             Modifier
-                .fileBubbleWidth(attachedToCaption)
+                .fileBubbleWidth()
                 .then(
                     if (failed && onRetry != null) {
                         Modifier.clickable(onClick = onRetry)

@@ -12,6 +12,7 @@ internal enum class AttachmentOpenIntentClaim {
  * Persists Android-owned scheduling intent only. MDK remains the authority for
  * attachment references, cryptographic material, transfer state, and bytes.
  */
+@Suppress("TooManyFunctions") // Cohesive persistence boundary for one attachment-intent record type.
 internal class AttachmentDownloadIntentStore(
     private val preferences: SharedPreferences,
 ) {

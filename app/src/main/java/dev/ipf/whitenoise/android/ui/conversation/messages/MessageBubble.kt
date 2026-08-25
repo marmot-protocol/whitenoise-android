@@ -62,7 +62,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
@@ -117,7 +116,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNo
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
-import dev.ipf.whitenoise.android.ui.conversation.media.fileBubblePreferredWidth
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
@@ -1065,7 +1063,6 @@ internal fun MessageBubble(
         val bubbleColumnMinWidth =
             messageBubbleColumnMinWidth(
                 hasGeneralFileCard = hasGeneralFileCard,
-                attachedToCaption = mediaCaption != null,
                 maxWidth = bubbleColumnMaxWidth,
             )
         val longPressBlockedBySelection = selectionMode && !rangeDragActive
@@ -2159,30 +2156,3 @@ internal fun MessageBubble(
 // A body longer than this many rendered lines collapses to a Read More that
 // opens the full-screen view rather than spilling down the transcript (#325).
 internal const val MESSAGE_COLLAPSE_LINE_LIMIT = 52
-
-private val MessageBubbleOppositeGutter = 48.dp
-private val MessageBubbleSenderAvatarSlotWidth = 40.dp
-
-internal fun messageBubbleColumnMaxWidth(
-    containerWidth: Dp,
-    selectionGutterWidth: Dp,
-    senderAvatarSlotWidth: Dp,
-): Dp =
-    (containerWidth - maxOf(MessageBubbleOppositeGutter, selectionGutterWidth) - senderAvatarSlotWidth)
-        .coerceAtLeast(0.dp)
-
-internal fun messageBubbleColumnTestTag(messageIdHex: String): String = "message-bubble-column:$messageIdHex"
-
-internal fun messageBubbleColumnMinWidth(
-    hasGeneralFileCard: Boolean,
-    attachedToCaption: Boolean,
-    maxWidth: Dp,
-): Dp =
-    if (hasGeneralFileCard) {
-        // Standalone files retain their compact readable card, while a file
-        // plus caption becomes one wider surface. The
-        // row maximum still owns narrow screens, avatars, and selection gutters.
-        minOf(fileBubblePreferredWidth(attachedToCaption), maxWidth.coerceAtLeast(0.dp))
-    } else {
-        Dp.Unspecified
-    }

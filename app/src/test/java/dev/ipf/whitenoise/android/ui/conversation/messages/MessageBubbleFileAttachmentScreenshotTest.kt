@@ -126,19 +126,19 @@ class MessageBubbleFileAttachmentScreenshotTest {
     }
 
     private fun assertFileGalleryStates(gallery: GalleryFixtures) {
-        assertFileCardAndBubbleWidth(gallery.incoming, expectedWidth = 240f)
-        assertFileCardAndBubbleWidth(gallery.downloadedApk, expectedWidth = 240f)
-        assertFileCardAndBubbleWidth(gallery.outgoing, expectedWidth = 240f)
-        // Captioned incoming group messages prefer 320 dp, then clamp to the
-        // 272 dp left after the opposite gutter and sender-avatar slot.
+        assertFileCardAndBubbleWidth(gallery.incoming, expectedWidth = 272f)
+        assertFileCardAndBubbleWidth(gallery.downloadedApk, expectedWidth = 272f)
+        assertFileCardAndBubbleWidth(gallery.outgoing, expectedWidth = 312f)
+        // Incoming group messages use the 272 dp left after the opposite gutter
+        // and sender-avatar slot, regardless of whether they carry a caption.
         assertFileCardAndBubbleWidth(gallery.captionedReply, expectedWidth = 272f)
         composeRule.onNodeWithText("Updated release notes").assertExists()
-        assertFileCardAndBubbleWidth(gallery.largeFont, expectedWidth = 240f)
+        assertFileCardAndBubbleWidth(gallery.largeFont, expectedWidth = 272f)
         // 300 dp host - 48 dp opposite gutter - 40 dp incoming avatar slot.
         assertFileCardAndBubbleWidth(gallery.constrained, expectedWidth = 212f)
-        assertFileCardAndBubbleWidth(gallery.multiple, attachmentIndex = 0, expectedWidth = 240f)
-        assertFileCardAndBubbleWidth(gallery.multiple, attachmentIndex = 1, expectedWidth = 240f)
-        assertPendingFileCard(gallery.pending, PENDING_GENERIC_FILE, "Uploading…", 240f)
+        assertFileCardAndBubbleWidth(gallery.multiple, attachmentIndex = 0, expectedWidth = 272f)
+        assertFileCardAndBubbleWidth(gallery.multiple, attachmentIndex = 1, expectedWidth = 272f)
+        assertPendingFileCard(gallery.pending, PENDING_GENERIC_FILE, "Uploading…", 312f)
         composeRule.onNodeWithText("4 B").assertExists()
         composeRule.onNodeWithText(PERSISTED_FAILURE_FILE).assertDoesNotExist()
         composeRule.onNodeWithText("This message didn't reach the group").assertExists()
@@ -154,7 +154,7 @@ class MessageBubbleFileAttachmentScreenshotTest {
             messageBubbleColumnMaxWidth(360.dp, messageBubbleSelectionGutterWidth, 40.dp),
         )
         assertFileCardAndBubbleWidth(gallery.selectedCaptioned, expectedWidth = 272f)
-        assertFileCardAndBubbleWidth(gallery.rtl, expectedWidth = 240f)
+        assertFileCardAndBubbleWidth(gallery.rtl, expectedWidth = 272f)
     }
 
     @Composable
@@ -269,19 +269,12 @@ class MessageBubbleFileAttachmentScreenshotTest {
         transferStateDescription: String,
         expectedWidth: Float,
     ) {
-        val controlBounds =
-            composeRule
-                .onNodeWithContentDescription(transferStateDescription)
-                .getUnclippedBoundsInRoot()
-        val fileNameBounds = composeRule.onNodeWithText(fileName).getUnclippedBoundsInRoot()
-        val cardWidth =
-            (fileNameBounds.right + FILE_CARD_CONTENT_PADDING) -
-                (controlBounds.left - FILE_CARD_CONTENT_PADDING)
+        composeRule.onNodeWithContentDescription(transferStateDescription).assertExists()
+        composeRule.onNodeWithText(fileName).assertExists()
         val bubbleBounds =
             composeRule
                 .onNodeWithTag(messageBubbleColumnTestTag(item.record.messageIdHex), useUnmergedTree = true)
                 .getUnclippedBoundsInRoot()
-        assertEquals(expectedWidth, cardWidth.value, 1f)
         assertEquals(expectedWidth, (bubbleBounds.right - bubbleBounds.left).value, 1f)
     }
 
@@ -602,7 +595,6 @@ class MessageBubbleFileAttachmentScreenshotTest {
         const val SELECTED_FILE = "selected-captioned.pdf"
         const val SELECTED_CAPTION = "Selected constrained attachment"
         const val RTL_FILE = "rtl-layout-document.pdf"
-        val FILE_CARD_CONTENT_PADDING = 10.dp
         const val SNAPSHOT_PATH = "src/test/snapshots/message_bubble_file_attachment_width.png"
     }
 }

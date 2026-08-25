@@ -129,26 +129,29 @@ internal suspend fun openAttachmentWithPersistedInstallerPermission(
     persistence: InstallerPermissionPersistence,
 ): OpenAttachmentResult {
     val initial = open(source, mediaType, fileName)
-    if (initial != OpenAttachmentResult.InstallPermissionRequired) return initial
-    if (persistence.claim == AttachmentOpenIntentClaim.InstallPermissionRecovery) {
-        return OpenAttachmentResult.InstallPermissionDenied
-    }
-    check(persistence.begin()) { "installer permission handoff could not be persisted" }
-
-    AttachmentPlaintextCache.protectPublicationFile(source)
-    var permissionRequestActive = true
-    return try {
-        val permissionFailure = requestInstallerPermissionFailure(requestInstallPermission)
-        check(persistence.finish()) { "installer permission handoff could not be completed" }
-        permissionRequestActive = false
-        permissionFailure ?: open(source, mediaType, fileName)
-    } catch (cancellation: CancellationException) {
-        persistence.abandon()
-        permissionRequestActive = false
-        throw cancellation
-    } finally {
-        if (permissionRequestActive) persistence.abandon()
-        AttachmentPlaintextCache.unprotectPublicationFile(source)
+    return when {
+        initial != OpenAttachmentResult.InstallPermissionRequired -> initial
+        persistence.claim == AttachmentOpenIntentClaim.InstallPermissionRecovery -> {
+            OpenAttachmentResult.InstallPermissionDenied
+        }
+        else -> {
+            check(persistence.begin()) { "installer permission handoff could not be persisted" }
+            AttachmentPlaintextCache.protectPublicationFile(source)
+            var permissionRequestActive = true
+            try {
+                val permissionFailure = requestInstallerPermissionFailure(requestInstallPermission)
+                check(persistence.finish()) { "installer permission handoff could not be completed" }
+                permissionRequestActive = false
+                permissionFailure ?: open(source, mediaType, fileName)
+            } catch (cancellation: CancellationException) {
+                persistence.abandon()
+                permissionRequestActive = false
+                throw cancellation
+            } finally {
+                if (permissionRequestActive) persistence.abandon()
+                AttachmentPlaintextCache.unprotectPublicationFile(source)
+            }
+        }
     }
 }
 

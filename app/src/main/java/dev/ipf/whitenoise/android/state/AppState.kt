@@ -3965,6 +3965,7 @@ class WhiteNoiseAppState private constructor(
         attachmentOpenIntentRevision += 1
     }
 
+    @Suppress("MaxLineLength") // Keep this single delegation in ktlint's required expression-body form.
     internal fun hasAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean = attachmentDownloadIntents.hasDispatchableOpenIntent(request)
 
     internal suspend fun claimAttachmentOpenIntent(request: AttachmentTransferRequest): AttachmentOpenIntentClaim? =
