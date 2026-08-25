@@ -476,7 +476,8 @@ class LocalNotificationPresenter(
                                     when (action) {
                                         NotificationActionKind.REPLY ->
                                             builder.addAction(replyNotificationAction(actionTarget, quickReactions))
-                                        // Reaction choices ride on Reply's RemoteInput so SystemUI can render them inline.
+                                        // Reaction choices ride on Reply's RemoteInput so SystemUI
+                                        // can render them inline.
                                         NotificationActionKind.REACT -> Unit
                                         NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
                                     }
