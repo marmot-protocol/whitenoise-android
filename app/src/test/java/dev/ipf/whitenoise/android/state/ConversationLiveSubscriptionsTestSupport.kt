@@ -24,6 +24,7 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.Channel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.robolectric.Shadows.shadowOf
@@ -33,9 +34,10 @@ import java.util.concurrent.atomic.AtomicInteger
 
 internal class ScriptedConversationTimelineSubscription(
     private val snapshotPage: TimelinePageFfi,
+    private val backwardsPage: TimelinePageFfi = emptyTimelinePage(),
 ) : ConversationTimelineSubscriptionHandle {
     private val lifecycleEvents = CopyOnWriteArrayList<String>()
-    private val updatesEnded = CompletableDeferred<Unit>()
+    private val updates = Channel<TimelineSubscriptionUpdateFfi>(Channel.UNLIMITED)
 
     val lifecycleEventOrder: List<String>
         get() = lifecycleEvents.toList()
@@ -56,21 +58,24 @@ internal class ScriptedConversationTimelineSubscription(
 
     override suspend fun nextUpdate(): TimelineSubscriptionUpdateFfi? {
         lifecycleEvents += "nextUpdate"
-        updatesEnded.await()
-        return null
+        return updates.receiveCatching().getOrNull()
     }
 
     fun endUpdates() {
-        updatesEnded.complete(Unit)
+        updates.close()
     }
 
-    override suspend fun paginateBackwards(count: UInt): TimelinePageFfi = emptyTimelinePage()
+    fun emitUpdate(update: TimelineSubscriptionUpdateFfi) {
+        check(updates.trySend(update).isSuccess) { "timeline update channel is closed" }
+    }
+
+    override suspend fun paginateBackwards(count: UInt): TimelinePageFfi = backwardsPage
 
     override suspend fun paginateForwards(count: UInt): TimelinePageFfi = emptyTimelinePage()
 
     override fun close() {
         lifecycleEvents += "close"
-        updatesEnded.complete(Unit)
+        updates.close()
     }
 }
 

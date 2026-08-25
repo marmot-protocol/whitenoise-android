@@ -7708,6 +7708,11 @@ class ConversationController(
             publishAuthoritativeEmptyInitialTimeline()
             emptyList()
         } else {
+            // A newly opened subscription owns a fresh head-anchored window.
+            // Pagination state from the previous handle cannot change how this
+            // handle's later authoritative Page refreshes are reconciled.
+            hasLoadedOlderPages = false
+            protectedTimelineMessageIds.clear()
             val streamIds =
                 applyTimelinePage(
                     snapshot,
