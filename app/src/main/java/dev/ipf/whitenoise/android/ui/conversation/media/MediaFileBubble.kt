@@ -158,7 +158,6 @@ internal fun MediaFileBubble(
     LaunchedEffect(
         controller,
         pillKey,
-        attachmentOpenRequest,
         reference.sourceEpoch,
         appState.attachmentOpenIntentRevision,
         lifecycleOwner,
