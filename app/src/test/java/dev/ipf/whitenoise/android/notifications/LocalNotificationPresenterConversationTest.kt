@@ -683,8 +683,9 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
-    fun groupMessageOffersReplyAndTheFirstTwoCustomizedQuickReactions() {
-        RecentEmojiPreferences.saveQuickReactions(context, listOf("🥳", "🔥", "😂", "👍"))
+    fun groupMessageOffersReplyAndMarkReadWithAllSixConfiguredReactionChoices() {
+        val choices = listOf("🥳", "🔥", "😂", "👍", "😮", "😢")
+        RecentEmojiPreferences.saveQuickReactions(context, choices)
         try {
             presenter.ensureChannels()
 
@@ -693,11 +694,26 @@ class LocalNotificationPresenterConversationTest {
             }
 
             assertEquals(
-                listOf(context.getString(R.string.reply), "🥳", "🔥"),
+                listOf(
+                    context.getString(R.string.reply),
+                    context.getString(R.string.chat_row_action_mark_read),
+                ),
                 manager.activeNotifications
                     .single()
                     .notification.actions
                     .map { it.title.toString() },
+            )
+            val reply =
+                manager.activeNotifications
+                    .single()
+                    .notification.actions
+                    .single { it.title.toString() == context.getString(R.string.reply) }
+            assertEquals(
+                choices,
+                reply.remoteInputs
+                    .single()
+                    .choices
+                    ?.map(CharSequence::toString),
             )
         } finally {
             RecentEmojiPreferences.resetQuickReactions(context)
@@ -931,7 +947,7 @@ class LocalNotificationPresenterConversationTest {
         val notification = manager.activeNotifications.single().notification
         assertEquals(body, notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString())
         assertNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification))
-        assertEquals(3, notification.actions.size)
+        assertEquals(2, notification.actions.size)
         assertEquals(
             context.getString(R.string.reply),
             notification.actions

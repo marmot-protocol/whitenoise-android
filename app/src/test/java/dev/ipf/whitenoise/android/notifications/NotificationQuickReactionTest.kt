@@ -1,9 +1,14 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.Intent
+import android.os.Bundle
+import androidx.core.app.RemoteInput
 import androidx.work.BackoffPolicy
 import androidx.work.NetworkType
+import androidx.work.WorkManager
+import androidx.work.testing.WorkManagerTestInitHelper
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -31,18 +36,25 @@ class NotificationQuickReactionTest {
     }
 
     @Test
-    fun notificationUsesTheFirstTwoCustomizedQuickReactions() {
+    fun notificationUsesAllSixCustomizedQuickReactions() {
         RecentEmojiPreferences.saveQuickReactions(context, listOf("🥳", "🔥", "😂", "👍"))
 
-        assertEquals(listOf("🥳", "🔥"), notificationQuickReactionChoices(context))
+        assertEquals(listOf("🥳", "🔥", "😂", "👍", "❤️", "👎"), notificationQuickReactionChoices(context))
     }
 
     @Test
-    fun reactionIntentRoundTripsTheExactMessageAndReaction() {
+    fun quickReactionChoicesDropBlankOversizedAndDuplicateFavourites() {
+        val stored = listOf("🥳", "   ", "😀".repeat(33), "🔥", "🥳")
+
+        assertEquals(listOf("🥳", "🔥"), notificationQuickReactionChoices(stored))
+    }
+
+    @Test
+    fun reactIntentRoundTripsTheTargetAndNeverCarriesAnEmoji() {
         val actionTarget = actionTarget()
         val intent = Intent()
 
-        NotificationActions.applyToIntent(intent, NotificationActionKind.REACT, actionTarget, " 🔥 ")
+        NotificationActions.applyToIntent(intent, NotificationActionKind.REACT, actionTarget)
 
         assertEquals(
             NotificationAction(
@@ -50,41 +62,85 @@ class NotificationQuickReactionTest {
                 target = actionTarget.target,
                 notificationTag = actionTarget.notificationTag,
                 notificationId = actionTarget.notificationId,
-                reaction = "🔥",
             ),
             NotificationActions.parse(intent),
         )
+        assertNull(notificationReactionChoice(intent, allowedChoices = listOf("🔥")))
     }
 
     @Test
-    fun reactionIntentRejectsMissingOrOversizedReactions() {
-        val missing =
-            Intent().also {
-                NotificationActions.applyToIntent(it, NotificationActionKind.REACT, actionTarget())
-            }
-        val oversized = "😀".repeat(33)
-        val tooLong =
-            Intent().also {
-                NotificationActions.applyToIntent(it, NotificationActionKind.REACT, actionTarget(), oversized)
+    fun reactionChoiceAcceptsOnlyAnAllowlistedRemoteInputResult() {
+        val remoteInput = RemoteInput.Builder(NotificationActions.KEY_REACTION_CHOICE).build()
+
+        fun delivered(value: String) =
+            Intent().also { intent ->
+                RemoteInput.addResultsToIntent(
+                    arrayOf(remoteInput),
+                    intent,
+                    Bundle().apply { putCharSequence(NotificationActions.KEY_REACTION_CHOICE, value) },
+                )
             }
 
-        assertNull(NotificationActions.parse(missing))
-        assertNull(NotificationActions.parse(tooLong))
+        assertEquals("🔥", notificationReactionChoice(delivered(" 🔥 "), listOf("🥳", "🔥")))
+        assertNull(notificationReactionChoice(delivered("👾"), listOf("🥳", "🔥")))
+        assertNull(notificationReactionChoice(delivered("😀".repeat(33)), listOf("🥳", "🔥")))
     }
 
     @Test
-    fun eachQuickReactionHasADistinctPendingIntentIdentity() {
+    fun replyActionChoiceRoutesToReactionWhileFreeFormStillRoutesToReply() {
+        val remoteInput = RemoteInput.Builder(NotificationActions.KEY_TEXT_REPLY).build()
+
+        fun delivered(
+            value: String,
+            source: Int,
+        ) = Intent().also { intent ->
+            NotificationActions.applyToIntent(
+                intent,
+                NotificationActionKind.REPLY,
+                actionTarget(),
+                acceptsInlineReactionChoices = true,
+            )
+            RemoteInput.addResultsToIntent(
+                arrayOf(remoteInput),
+                intent,
+                Bundle().apply { putCharSequence(NotificationActions.KEY_TEXT_REPLY, value) },
+            )
+            RemoteInput.setResultsSource(intent, source)
+        }
+
+        val choice = delivered("🔥", RemoteInput.SOURCE_CHOICE)
+        val freeForm = delivered("🔥", RemoteInput.SOURCE_FREE_FORM_INPUT)
+
+        assertEquals(NotificationActionKind.REACT, NotificationActions.parse(choice)?.kind)
+        assertEquals("🔥", notificationReactionChoice(choice, listOf("🥳", "🔥")))
+        assertEquals(NotificationActionKind.REPLY, NotificationActions.parse(freeForm)?.kind)
+        assertNull(notificationReactionChoice(freeForm, listOf("🥳", "🔥")))
+    }
+
+    @Test
+    fun directReactionFromANotificationPostedBeforeUpgradeStillUsesTheCurrentAllowlist() {
+        val legacy =
+            Intent().putExtra(
+                "dev.ipf.whitenoise.android.extra.REACTION",
+                "🔥",
+            )
+
+        assertEquals("🔥", notificationReactionChoice(legacy, listOf("🥳", "🔥")))
+        assertNull(notificationReactionChoice(legacy, listOf("🥳")))
+    }
+
+    @Test
+    fun reactKeepsAPendingIntentIdentityOfItsOwn() {
         val tag = "account-a|group-a"
 
         assertNotEquals(
-            NotificationActions.requestCode(NotificationActionKind.REACT, tag, "❤️"),
-            NotificationActions.requestCode(NotificationActionKind.REACT, tag, "👍"),
+            NotificationActions.requestCode(NotificationActionKind.REACT, tag),
+            NotificationActions.requestCode(NotificationActionKind.REPLY, tag),
         )
         assertNotEquals(
-            NotificationActions.actionUriString(NotificationActionKind.REACT, tag, "❤️"),
-            NotificationActions.actionUriString(NotificationActionKind.REACT, tag, "👍"),
+            NotificationActions.actionUriString(NotificationActionKind.REACT, tag),
+            NotificationActions.actionUriString(NotificationActionKind.REPLY, tag),
         )
-        assertFalse(NotificationActions.actionUriString(NotificationActionKind.REACT, tag, "❤️").contains("❤️"))
     }
 
     @Test
@@ -93,16 +149,150 @@ class NotificationQuickReactionTest {
     }
 
     @Test
-    fun appLockTransitionAfterPreflightBlocksReactionSend() =
+    fun lockedChipTapCannotEnqueueOrDismissAReaction() =
         runTest {
-            var actionsAllowed = true
+            var enqueueCount = 0
+            var dismissCount = 0
+
+            val outcome =
+                submitNotificationReaction(
+                    action = reactAction(),
+                    reaction = "🔥",
+                    notificationActionsAllowed = { false },
+                    enqueueReaction = { _, _, _ ->
+                        enqueueCount += 1
+                        true
+                    },
+                    dismissNotification = { _, _, _ -> dismissCount += 1 },
+                )
+
+            assertEquals(NotificationReactionSubmissionOutcome.BlockedByAppLock, outcome)
+            assertEquals(0, enqueueCount)
+            assertEquals(0, dismissCount)
+        }
+
+    @Test
+    fun chipTapPersistsOneReactionBeforeDismissing() =
+        runTest {
+            val events = mutableListOf<String>()
+
+            val outcome =
+                submitNotificationReaction(
+                    action = reactAction(),
+                    reaction = " 🔥 ",
+                    actionStartedAtMs = 123L,
+                    notificationActionsAllowed = { true },
+                    enqueueReaction = { _, reaction, startedAtMs ->
+                        assertEquals("🔥", reaction)
+                        assertEquals(123L, startedAtMs)
+                        events += "persisted"
+                        true
+                    },
+                    dismissNotification = { _, _, _ -> events += "dismissed" },
+                )
+
+            assertEquals(NotificationReactionSubmissionOutcome.Submitted, outcome)
+            assertEquals(listOf("persisted", "dismissed"), events)
+        }
+
+    @Test
+    fun failedPersistenceLeavesTheNotificationAvailable() =
+        runTest {
+            var dismissed = false
+
+            val outcome =
+                submitNotificationReaction(
+                    action = reactAction(),
+                    reaction = "🔥",
+                    notificationActionsAllowed = { true },
+                    enqueueReaction = { _, _, _ -> false },
+                    dismissNotification = { _, _, _ -> dismissed = true },
+                )
+
+            assertEquals(NotificationReactionSubmissionOutcome.PersistenceFailed, outcome)
+            assertFalse(dismissed)
+        }
+
+    @Test
+    fun pendingReactionRejectsALaterChoiceWithoutDismissing() =
+        runTest {
+            WorkManagerTestInitHelper.initializeTestWorkManager(context)
+            val action = reactAction()
+            val workManager = WorkManager.getInstance(context)
+            val firstRequestId = UUID.randomUUID()
+            val secondRequestId = UUID.randomUUID()
+            val firstCipher = testCipher()
+
+            assertTrue(
+                NotificationReactionWorker.enqueue(
+                    context = context,
+                    action = action,
+                    reaction = "🔥",
+                    actionStartedAtMs = 123L,
+                    requestId = firstRequestId,
+                    cipherFactory = { firstCipher },
+                ),
+            )
+            var dismissed = false
+
+            val outcome =
+                submitNotificationReaction(
+                    action = action,
+                    reaction = "🥳",
+                    actionStartedAtMs = 456L,
+                    notificationActionsAllowed = { true },
+                    enqueueReaction = { queuedAction, queuedReaction, startedAtMs ->
+                        NotificationReactionWorker.enqueue(
+                            context = context,
+                            action = queuedAction,
+                            reaction = queuedReaction,
+                            actionStartedAtMs = startedAtMs,
+                            requestId = secondRequestId,
+                            cipherFactory = ::testCipher,
+                        )
+                    },
+                    dismissNotification = { _, _, _ -> dismissed = true },
+                )
+
+            val retainedWork =
+                workManager
+                    .getWorkInfosForUniqueWork(NotificationReactionWorker.notificationReactionWorkName(action))
+                    .get()
+            assertEquals(NotificationReactionSubmissionOutcome.PersistenceFailed, outcome)
+            assertFalse(dismissed)
+            assertEquals(listOf(firstRequestId), retainedWork.map { it.id })
+        }
+
+    @Test
+    fun cancellationWhilePersistingPropagatesAndLeavesTheNotificationAvailable() =
+        runTest {
+            var dismissed = false
+
+            var propagated = false
+            try {
+                submitNotificationReaction(
+                    action = reactAction(),
+                    reaction = "🔥",
+                    notificationActionsAllowed = { true },
+                    enqueueReaction = { _, _, _ -> throw CancellationException("receiver timed out") },
+                    dismissNotification = { _, _, _ -> dismissed = true },
+                )
+            } catch (_: CancellationException) {
+                propagated = true
+            }
+
+            assertTrue(propagated)
+            assertFalse(dismissed)
+        }
+
+    @Test
+    fun workerRechecksAppLockBeforeSending() =
+        runTest {
             var sendCount = 0
 
-            assertTrue(actionsAllowed)
-            actionsAllowed = false
             val attempt =
                 attemptNotificationReactionSend(
-                    notificationActionsAllowed = { actionsAllowed },
+                    notificationActionsAllowed = { false },
                     sendReaction = {
                         sendCount += 1
                         NotificationReactionSendOutcome.Sent
@@ -127,7 +317,14 @@ class NotificationQuickReactionTest {
         val cipher = testCipher()
         val encrypted = cipher.encrypt(reaction, requestId, routingAction)
 
-        val request = NotificationReactionWorker.notificationReactionRequest(routingAction, requestId, encrypted)
+        val actionStartedAtMs = 123_456L
+        val request =
+            NotificationReactionWorker.notificationReactionRequest(
+                routingAction,
+                requestId,
+                encrypted,
+                actionStartedAtMs,
+            )
         val input = request.workSpec.input
         val restored = NotificationReactionWorker.reactionFromInput(input)!!
 
@@ -141,10 +338,10 @@ class NotificationQuickReactionTest {
         val plaintextBytes = reaction.toByteArray(Charsets.UTF_8).asList()
         assertFalse(serializedInput.windowed(plaintextBytes.size).any { it == plaintextBytes })
         assertEquals(reaction, cipher.decrypt(restored, requestId, routingAction))
-        val workName = NotificationReactionWorker.notificationReactionWorkName(routingAction, reaction)
+        assertEquals(actionStartedAtMs, NotificationReactionWorker.reactionActionStartedAtMs(input))
+        val workName = NotificationReactionWorker.notificationReactionWorkName(routingAction)
         assertFalse(workName.contains(reaction))
-        assertEquals(workName, NotificationReactionWorker.notificationReactionWorkName(routingAction, reaction))
-        assertNotEquals(workName, NotificationReactionWorker.notificationReactionWorkName(routingAction, "👍"))
+        assertEquals(workName, NotificationReactionWorker.notificationReactionWorkName(routingAction))
         assertTrue(NotificationReactionWorker.shouldRetryAfterFailure(0))
         assertTrue(NotificationReactionWorker.shouldRetryAfterFailure(1))
         assertFalse(NotificationReactionWorker.shouldRetryAfterFailure(2))
@@ -155,6 +352,14 @@ class NotificationQuickReactionTest {
             target = NotificationTarget("account-a", "group-a", "message-a", NotificationTargetKind.MESSAGE),
             notificationTag = "account-a|group-a",
             notificationId = 17,
+        )
+
+    private fun reactAction() =
+        NotificationAction(
+            kind = NotificationActionKind.REACT,
+            target = actionTarget().target,
+            notificationTag = actionTarget().notificationTag,
+            notificationId = actionTarget().notificationId,
         )
 
     private fun testCipher() = NotificationReplyCipher(SecretKeySpec(ByteArray(32) { it.toByte() }, "AES"))
