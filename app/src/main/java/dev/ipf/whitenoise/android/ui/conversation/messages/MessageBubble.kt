@@ -391,7 +391,7 @@ internal fun MessageBubble(
     val context = LocalContext.current
     // Freeze both the touch point and the selected message's window bounds when
     // the menu opens. The point seeds partial text selection; the bounds keep
-    // the action surface visually attached to the bubble like Signal/Telegram.
+    // the action surface visually attached to the selected bubble.
     var longPressWindowPosition by remember(record.messageIdHex) { mutableStateOf<Offset?>(null) }
     var selectionSeedVisibleOffset by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
@@ -1626,8 +1626,8 @@ internal fun MessageBubble(
                         null
                     }
                 if (hasMedia) {
-                    // Signal and Telegram treat media plus caption as one message
-                    // surface. The media owns no internal corners or border when
+                    // Media plus caption renders as one message surface. The
+                    // media owns no internal corners or border when
                     // a caption is present; the shared frame owns the continuous
                     // outer shape, color, border, and single footer.
                     Column(
@@ -2179,8 +2179,8 @@ internal fun messageBubbleColumnMinWidth(
     maxWidth: Dp,
 ): Dp =
     if (hasGeneralFileCard) {
-        // Standalone files retain their compact readable card. Like Signal's
-        // captioned media, a file plus caption becomes one wider surface. The
+        // Standalone files retain their compact readable card, while a file
+        // plus caption becomes one wider surface. The
         // row maximum still owns narrow screens, avatars, and selection gutters.
         minOf(fileBubblePreferredWidth(attachedToCaption), maxWidth.coerceAtLeast(0.dp))
     } else {
