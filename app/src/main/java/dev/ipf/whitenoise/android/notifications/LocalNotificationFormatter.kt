@@ -52,6 +52,8 @@ object LocalNotificationFormatter {
         MESSAGE,
         INVITE,
         REMOVED_FROM_GROUP,
+        MADE_ADMIN,
+        REMOVED_AS_ADMIN,
     }
 
     private val whitespaceRun = Regex("\\s+")
@@ -198,20 +200,7 @@ object LocalNotificationFormatter {
         // shortener here keeps this pure formatter from duplicating bech32.
         shortNpub: (String) -> String,
     ): LocalNotificationContent? {
-        val kind =
-            if (update.isFromSelf) {
-                null
-            } else {
-                when (update.trigger) {
-                    NotificationTriggerFfi.NEW_MESSAGE -> ContentKind.MESSAGE
-                    NotificationTriggerFfi.GROUP_INVITE -> ContentKind.INVITE
-                    NotificationTriggerFfi.REMOVED_FROM_GROUP -> ContentKind.REMOVED_FROM_GROUP
-                    NotificationTriggerFfi.MADE_ADMIN,
-                    NotificationTriggerFfi.REMOVED_AS_ADMIN,
-                    -> null
-                }
-            }
-        if (kind == null) return null
+        val kind = contentKind(update) ?: return null
         val senderName = senderName(update.sender, senderNameOverride, shortNpub)
         val conversationTitle =
             if (!update.isDm) {
@@ -224,22 +213,18 @@ object LocalNotificationFormatter {
                 ContentKind.MESSAGE -> messageTitle(update, context, senderName)
                 ContentKind.INVITE -> inviteTitle(context)
                 ContentKind.REMOVED_FROM_GROUP -> removedFromGroupTitle(context, conversationTitle)
+                ContentKind.MADE_ADMIN -> adminRoleTitle(context, conversationTitle, madeAdmin = true)
+                ContentKind.REMOVED_AS_ADMIN -> adminRoleTitle(context, conversationTitle, madeAdmin = false)
             }
         val body =
-            boundedNotificationMessageText(
-                when (kind) {
-                    ContentKind.MESSAGE ->
-                        messageBody(update, context, previewTextOverride, reactedToPreviewOverride, mediaKind)
-                    ContentKind.INVITE -> inviteBody(update, context, senderName)
-                    ContentKind.REMOVED_FROM_GROUP ->
-                        clean(previewTextOverride)
-                            ?: clean(update.previewText)
-                            ?: text(
-                                context,
-                                R.string.notification_removed_from_group_body,
-                                "You can view your message history, but you can no longer send messages.",
-                            )
-                },
+            notificationBody(
+                kind,
+                update,
+                context,
+                senderName,
+                previewTextOverride,
+                reactedToPreviewOverride,
+                mediaKind,
             )
         val dismissalKey = notificationDismissalKey(update)
         return LocalNotificationContent(
@@ -261,6 +246,65 @@ object LocalNotificationFormatter {
         )
     }
 
+    private fun contentKind(update: NotificationUpdateFfi): ContentKind? =
+        when {
+            update.isFromSelf -> null
+            update.isDm &&
+                (
+                    update.trigger == NotificationTriggerFfi.MADE_ADMIN ||
+                        update.trigger == NotificationTriggerFfi.REMOVED_AS_ADMIN
+                ) -> null
+            else ->
+                when (update.trigger) {
+                    NotificationTriggerFfi.NEW_MESSAGE -> ContentKind.MESSAGE
+                    NotificationTriggerFfi.GROUP_INVITE -> ContentKind.INVITE
+                    NotificationTriggerFfi.REMOVED_FROM_GROUP -> ContentKind.REMOVED_FROM_GROUP
+                    NotificationTriggerFfi.MADE_ADMIN -> ContentKind.MADE_ADMIN
+                    NotificationTriggerFfi.REMOVED_AS_ADMIN -> ContentKind.REMOVED_AS_ADMIN
+                }
+        }
+
+    private fun notificationBody(
+        kind: ContentKind,
+        update: NotificationUpdateFfi,
+        context: Context?,
+        senderName: String,
+        previewTextOverride: String?,
+        reactedToPreviewOverride: String?,
+        mediaKind: ReplyMediaKind,
+    ): String =
+        boundedNotificationMessageText(
+            when (kind) {
+                ContentKind.MESSAGE ->
+                    messageBody(update, context, previewTextOverride, reactedToPreviewOverride, mediaKind)
+                ContentKind.INVITE -> inviteBody(update, context, senderName)
+                ContentKind.REMOVED_FROM_GROUP ->
+                    clean(previewTextOverride)
+                        ?: clean(update.previewText)
+                        ?: text(
+                            context,
+                            R.string.notification_removed_from_group_body,
+                            "You can view your message history, but you can no longer send messages.",
+                        )
+                ContentKind.MADE_ADMIN ->
+                    clean(previewTextOverride)
+                        ?: clean(update.previewText)
+                        ?: text(
+                            context,
+                            R.string.group_system_admin_added_you_passive,
+                            "You are now an admin",
+                        )
+                ContentKind.REMOVED_AS_ADMIN ->
+                    clean(previewTextOverride)
+                        ?: clean(update.previewText)
+                        ?: text(
+                            context,
+                            R.string.group_system_admin_removed_you_passive,
+                            "You are no longer an admin",
+                        )
+            },
+        )
+
     private fun removedFromGroupTitle(
         context: Context?,
         conversationTitle: String?,
@@ -278,6 +322,40 @@ object LocalNotificationFormatter {
                 "You were removed from %1\$s",
                 conversationTitle,
             )
+        }
+
+    private fun adminRoleTitle(
+        context: Context?,
+        conversationTitle: String?,
+        madeAdmin: Boolean,
+    ): String =
+        when {
+            madeAdmin && conversationTitle == null ->
+                text(
+                    context,
+                    R.string.notification_made_admin_of_unnamed_group,
+                    "You are now an admin of a group",
+                )
+            madeAdmin ->
+                text(
+                    context,
+                    R.string.notification_made_admin_of_group,
+                    "You are now an admin of %1\$s",
+                    requireNotNull(conversationTitle),
+                )
+            conversationTitle == null ->
+                text(
+                    context,
+                    R.string.notification_removed_as_admin_of_unnamed_group,
+                    "You are no longer an admin of a group",
+                )
+            else ->
+                text(
+                    context,
+                    R.string.notification_removed_as_admin_of_group,
+                    "You are no longer an admin of %1\$s",
+                    conversationTitle,
+                )
         }
 
     private fun messageTitle(

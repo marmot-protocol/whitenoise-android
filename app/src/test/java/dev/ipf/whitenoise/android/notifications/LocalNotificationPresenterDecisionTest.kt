@@ -112,6 +112,21 @@ class LocalNotificationPresenterDecisionTest {
     }
 
     @Test
+    fun adminRoleChangesUsePlainEventStyleOnTheMembershipChannel() {
+        listOf(
+            NotificationTriggerFfi.MADE_ADMIN,
+            NotificationTriggerFfi.REMOVED_AS_ADMIN,
+        ).forEach { trigger ->
+            val decision = decision(update(trigger = trigger))
+
+            assertSame(NotificationStyleChoice.Plain, decision?.style)
+            assertEquals(NotificationChannelSpec.GROUP_MEMBERSHIP.id, decision?.channelId)
+            assertEquals(NotificationCompat.CATEGORY_EVENT, decision?.category)
+            assertEquals(emptyList<NotificationActionKind>(), decision?.actions)
+        }
+    }
+
+    @Test
     fun historyCapCarriesOnlyPreviousMessagesThatFitBesideTheNewOne() {
         val decision = decision(update(trigger = NotificationTriggerFfi.NEW_MESSAGE)) ?: error("missing decision")
         val oldHistory = (1..30).toList()
@@ -206,6 +221,10 @@ class LocalNotificationPresenterDecisionTest {
                     NotificationChannelSpec.INVITES,
                 update(trigger = NotificationTriggerFfi.REMOVED_FROM_GROUP) to
                     NotificationChannelSpec.GROUP_MEMBERSHIP,
+                update(trigger = NotificationTriggerFfi.MADE_ADMIN) to
+                    NotificationChannelSpec.GROUP_MEMBERSHIP,
+                update(trigger = NotificationTriggerFfi.REMOVED_AS_ADMIN) to
+                    NotificationChannelSpec.GROUP_MEMBERSHIP,
             )
 
         updatesWithExpectedChannels.forEach { (update, expectedSpec) ->
@@ -229,6 +248,14 @@ class LocalNotificationPresenterDecisionTest {
         assertEquals(
             NotificationCompat.CATEGORY_EVENT,
             decision(update(trigger = NotificationTriggerFfi.REMOVED_FROM_GROUP))?.category,
+        )
+        assertEquals(
+            NotificationCompat.CATEGORY_EVENT,
+            decision(update(trigger = NotificationTriggerFfi.MADE_ADMIN))?.category,
+        )
+        assertEquals(
+            NotificationCompat.CATEGORY_EVENT,
+            decision(update(trigger = NotificationTriggerFfi.REMOVED_AS_ADMIN))?.category,
         )
     }
 

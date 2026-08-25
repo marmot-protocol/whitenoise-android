@@ -67,16 +67,6 @@ class LocalNotificationRemovalFormatterTest {
     }
 
     @Test
-    fun adminTriggersRemainFailClosedUntilIssue822Lands() {
-        listOf(
-            NotificationTriggerFfi.MADE_ADMIN,
-            NotificationTriggerFfi.REMOVED_AS_ADMIN,
-        ).forEach { trigger ->
-            assertNull(content(update(trigger = trigger)))
-        }
-    }
-
-    @Test
     fun selfAuthoredRemovalNotificationIsSuppressed() {
         assertNull(content(update(isFromSelf = true)))
     }

@@ -224,7 +224,30 @@ class LocalNotificationPolicyTest {
     }
 
     @Test
-    fun unsupportedAdminRoleNotificationsFailClosed() {
+    fun adminRoleNotificationsPostWhenTheConversationAllowsNotifications() {
+        listOf(
+            NotificationTriggerFfi.MADE_ADMIN,
+            NotificationTriggerFfi.REMOVED_AS_ADMIN,
+        ).forEach { trigger ->
+            assertTrue(
+                LocalNotificationPolicy.shouldPost(
+                    update(
+                        groupIdHex = "admin-role-group",
+                        accountRef = "account-a",
+                        trigger = trigger,
+                    ),
+                    appInForeground = false,
+                    activeConversationGroupIdHex = null,
+                    activeConversationAccountRef = null,
+                    appLockScreenVisible = false,
+                    conversationNotifyMode = { _, _ -> ChatNotifyMode.ALL },
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun adminRoleNotificationsRespectConversationMutes() {
         listOf(
             NotificationTriggerFfi.MADE_ADMIN,
             NotificationTriggerFfi.REMOVED_AS_ADMIN,
@@ -240,7 +263,30 @@ class LocalNotificationPolicyTest {
                     activeConversationGroupIdHex = null,
                     activeConversationAccountRef = null,
                     appLockScreenVisible = false,
-                    conversationNotifyMode = { _, _ -> ChatNotifyMode.ALL },
+                    conversationNotifyMode = { _, _ -> ChatNotifyMode.NONE },
+                    engineMuted = true,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun adminRoleNotificationsNeverPostForDirectMessages() {
+        listOf(
+            NotificationTriggerFfi.MADE_ADMIN,
+            NotificationTriggerFfi.REMOVED_AS_ADMIN,
+        ).forEach { trigger ->
+            assertFalse(
+                LocalNotificationPolicy.shouldPost(
+                    update(
+                        groupIdHex = "direct-message",
+                        trigger = trigger,
+                        isDm = true,
+                    ),
+                    appInForeground = false,
+                    activeConversationGroupIdHex = null,
+                    activeConversationAccountRef = null,
+                    appLockScreenVisible = false,
                 ),
             )
         }
@@ -300,6 +346,7 @@ class LocalNotificationPolicyTest {
         accountRef: String = "account",
         isMention: Boolean = false,
         trigger: NotificationTriggerFfi = NotificationTriggerFfi.NEW_MESSAGE,
+        isDm: Boolean = false,
     ) = NotificationUpdateFfi(
         isMention = isMention,
         notificationKey = "message:$accountRef:message",
@@ -310,7 +357,7 @@ class LocalNotificationPolicyTest {
         accountIdHex = accountRef,
         groupIdHex = groupIdHex,
         groupName = "General",
-        isDm = false,
+        isDm = isDm,
         messageIdHex = "message",
         sender = user(),
         receiver = user(accountIdHex = accountRef, displayName = "Me"),

@@ -658,6 +658,10 @@
     <string name="notification_removed_from_group">Te eliminaron de %1$s</string>
     <string name="notification_removed_from_unnamed_group">Te eliminaron de un grupo</string>
     <string name="notification_removed_from_group_body">Puedes ver tu historial de mensajes, pero ya no puedes enviar mensajes.</string>
+    <string name="notification_made_admin_of_group">Ahora eres administrador de %1$s</string>
+    <string name="notification_made_admin_of_unnamed_group">Ahora eres administrador de un grupo</string>
+    <string name="notification_removed_as_admin_of_group">Ya no eres administrador de %1$s</string>
+    <string name="notification_removed_as_admin_of_unnamed_group">Ya no eres administrador de un grupo</string>
     <string name="background_connection_notification_title">White Noise está conectado</string>
     <string name="background_connection_notification_text">Escuchando mensajes</string>
     <string name="background_connection_notification_hint">Mantén pulsada esta notificación para ocultarla</string>
