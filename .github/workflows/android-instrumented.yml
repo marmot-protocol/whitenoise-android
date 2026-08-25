@@ -18,6 +18,8 @@ on:
       - 'app/build.gradle.kts'
       - 'app/src/main/marmotkit/**'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/core/ForwardMediaReferenceFfiIntegrationTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaReferenceSupportFuzzIntegrationTest.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/MediaReferenceSupport.kt'
       - 'scripts/prepare_marmotkit_artifact.py'
       - 'scripts/test_prepare_marmotkit_artifact.py'
       - 'scripts/run-android-instrumented-tests.sh'

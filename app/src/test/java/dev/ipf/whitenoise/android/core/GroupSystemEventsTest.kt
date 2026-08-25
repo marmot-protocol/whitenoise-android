@@ -211,6 +211,68 @@ class GroupSystemEventsTest {
     }
 
     @Test
+    fun rawUnicodeAndNestedPayloadParsingIsDeterministicAndNeutral() {
+        val plaintext =
+            """{"system_type":"future_\u2603","text":"Alice removed you",""" +
+                """"data":{"actor":"$actorHex","subject":"${"b2".repeat(32)}","extra":[[{"value":"👩🏽‍💻"}]]}}"""
+
+        val first = GroupSystemEvents.parse(plaintext)!!
+        val second = GroupSystemEvents.parse(plaintext)
+
+        assertEquals(first, second)
+        assertNull(first.actor)
+        assertNull(first.subject)
+        assertEquals(GroupSystemCopy.Default.fallback, GroupSystemEvents.summary(first, "Mallory", "me"))
+    }
+
+    @Test
+    fun rawPayloadsBeyondJsonResourceBoundsAreRejected() {
+        val tooDeep =
+            """{"system_type":"group_avatar_changed","data":""" +
+                "[".repeat(GroupSystemEventJson.MAX_JSON_DEPTH) +
+                "[0]" +
+                "]".repeat(GroupSystemEventJson.MAX_JSON_DEPTH) +
+                "}"
+        val tooManyMembers =
+            (0..GroupSystemEventJson.MAX_COLLECTION_ELEMENTS)
+                .joinToString(
+                    prefix = "{\"system_type\":\"group_avatar_changed\",\"data\":{",
+                    postfix = "}}",
+                ) { index -> "\"field$index\":$index" }
+        val tooManyLenientMembers =
+            (0..GroupSystemEventJson.MAX_COLLECTION_ELEMENTS)
+                .joinToString(
+                    separator = ";",
+                    prefix = "{\"system_type\":\"group_avatar_changed\",\"data\":{",
+                    postfix = "}}",
+                ) { index -> "\"field$index\":$index" }
+
+        assertNull(GroupSystemEvents.parse(tooDeep))
+        assertNull(GroupSystemEvents.parse(tooManyMembers))
+        assertNull(GroupSystemEvents.parse(tooManyLenientMembers))
+        assertNull(GroupSystemEvents.parse("x".repeat(GroupSystemEventJson.MAX_INPUT_BYTES + 1)))
+    }
+
+    @Test
+    fun rawPayloadsAtJsonResourceBoundsAreAccepted() {
+        val atMaxDepth =
+            """{"system_type":"group_avatar_changed","data":""" +
+                "[".repeat(GroupSystemEventJson.MAX_JSON_DEPTH - 1) +
+                "0" +
+                "]".repeat(GroupSystemEventJson.MAX_JSON_DEPTH - 1) +
+                "}"
+        val atMaxMembers =
+            (0 until GroupSystemEventJson.MAX_COLLECTION_ELEMENTS)
+                .joinToString(
+                    prefix = "{\"system_type\":\"group_avatar_changed\",\"data\":{",
+                    postfix = "}}",
+                ) { index -> "\"field$index\":$index" }
+
+        assertEquals("group_avatar_changed", GroupSystemEvents.parse(atMaxDepth)?.systemType)
+        assertEquals("group_avatar_changed", GroupSystemEvents.parse(atMaxMembers)?.systemType)
+    }
+
+    @Test
     fun summaryPrefersStructuredFieldsOverEmbeddedText() {
         val event =
             GroupSystemEvents.resolve(

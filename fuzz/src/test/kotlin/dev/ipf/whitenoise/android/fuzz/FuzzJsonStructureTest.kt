@@ -61,6 +61,15 @@ class FuzzJsonStructureTest {
     }
 
     @Test
+    fun withinBounds_rejectsLenientObjectOverLimit() {
+        val members =
+            (1..FuzzBounds.MAX_COLLECTION_ELEMENTS + 1)
+                .joinToString(";") { index -> "\"field$index\":$index" }
+
+        assertFalse(FuzzJsonStructure.withinBounds("{$members}"))
+    }
+
+    @Test
     fun withinBounds_acceptsCollectionAtLimit() {
         val elements = (1..FuzzBounds.MAX_COLLECTION_ELEMENTS).joinToString(",")
         assertTrue(FuzzJsonStructure.withinBounds("[$elements]"))

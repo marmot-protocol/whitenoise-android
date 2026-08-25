@@ -8,6 +8,7 @@ cd "$ROOT"
 TARGETS=(
   fuzzZapstoreProtocol
   fuzzIdentityReference
+  fuzzGroupSystemEvent
   fuzzNip55SignerProtocol
 )
 
@@ -40,7 +41,7 @@ Environment:
   FUZZ_WORKERS_APPLIED libFuzzer -workers value (default -workers=2)
 
 Each target runs one standalone Jazzer JavaExec with jobs/workers applied by libFuzzer.
-Phase-1 targets run sequentially. Full engine output is written to fuzz/build/fuzz-campaign-logs/.
+Fuzz targets run sequentially. Full engine output is written to fuzz/build/fuzz-campaign-logs/.
 On target failure, deterministic crash artifacts are triaged before the campaign exits non-zero.
 EOF
 }
