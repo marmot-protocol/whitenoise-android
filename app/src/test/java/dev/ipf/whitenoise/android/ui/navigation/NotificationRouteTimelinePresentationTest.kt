@@ -347,6 +347,22 @@ class NotificationRouteTimelinePresentationTest {
         }
     }
 
+    @Suppress("UNCHECKED_CAST")
+    private fun WhiteNoiseAppState.attachedConversationControllersForTest(): List<ConversationController> {
+        val lock =
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("conversationControllerLock")
+                .apply { isAccessible = true }
+                .get(this)
+                .let(::requireNotNull)
+        val controllers =
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("conversationControllers")
+                .apply { isAccessible = true }
+                .get(this) as Set<ConversationController>
+        return synchronized(lock) { controllers.toList() }
+    }
+
     private companion object {
         const val TARGET_ACCOUNT = "bob"
         val TARGET_ACCOUNT_ID = "ee".repeat(32)

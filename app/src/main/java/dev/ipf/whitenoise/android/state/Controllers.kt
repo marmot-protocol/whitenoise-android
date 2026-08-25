@@ -6847,8 +6847,7 @@ class ConversationController(
         appState.marmotIo { sendMediaAttachments(account, groupIdHex, references, caption) }
     },
 ) {
-    private val liveSubscriptions: ConversationLiveSubscriptions =
-        appState.conversationLiveSubscriptions()
+    private val liveSubscriptions = appState.conversationLiveSubscriptions()
 
     var group by mutableStateOf(initialGroup)
         private set
@@ -7708,9 +7707,6 @@ class ConversationController(
             publishAuthoritativeEmptyInitialTimeline()
             emptyList()
         } else {
-            // A newly opened subscription owns a fresh head-anchored window.
-            // Pagination state from the previous handle cannot change how this
-            // handle's later authoritative Page refreshes are reconciled.
             hasLoadedOlderPages = false
             protectedTimelineMessageIds.clear()
             val streamIds =
