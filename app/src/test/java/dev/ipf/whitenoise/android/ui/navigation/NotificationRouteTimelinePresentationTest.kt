@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate
 import dev.ipf.whitenoise.android.state.awaitConversationCondition
+import dev.ipf.whitenoise.android.state.awaitOpenedTimelineSubscriptionsClosed
 import dev.ipf.whitenoise.android.state.conversationTimelineReconnectFixtures
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.notificationChatListRow
@@ -74,27 +75,37 @@ class NotificationRouteTimelinePresentationTest {
         val handled = AtomicBoolean(false)
         val inboundRequestId = mutableStateOf(routed.notificationRequestId)
 
-        mountNotificationRoute(appState, routed, handled, inboundRequestId)
-        val mountedController =
-            awaitMountedNotificationConversation(routeGate, handled, appState)
+        var mountedController: ConversationController? = null
+        try {
+            mountNotificationRoute(appState, routed, handled, inboundRequestId)
+            mountedController = awaitMountedNotificationConversation(routeGate, handled, appState)
 
-        reconnectWhileBackground(
-            appState = appState,
-            firstSubscription = fixtures.firstSubscription,
-            mountedController = mountedController,
-        )
-        resumeAfterForeground(
-            appState = appState,
-            inboundRequestId = inboundRequestId,
-            mountedController = mountedController,
-        )
+            reconnectWhileBackground(
+                appState = appState,
+                firstSubscription = fixtures.firstSubscription,
+                mountedController = mountedController,
+            )
+            resumeAfterForeground(
+                appState = appState,
+                inboundRequestId = inboundRequestId,
+                mountedController = mountedController,
+            )
 
-        assertNotificationReconnectPresentation(
-            mountedController = mountedController,
-            appState = appState,
-            scriptedSubscriptions = fixtures.scriptedSubscriptions,
-            replacementSubscription = fixtures.replacementSubscription,
-        )
+            assertNotificationReconnectPresentation(
+                mountedController = mountedController,
+                appState = appState,
+                scriptedSubscriptions = fixtures.scriptedSubscriptions,
+                replacementSubscription = fixtures.replacementSubscription,
+            )
+        } finally {
+            routeGate.releasePreload.countDown()
+            routeGate.releaseActivation.countDown()
+            mountedController?.let { controller ->
+                appState.detachConversationController(controller)
+                controller.onCleared()
+            }
+            awaitOpenedTimelineSubscriptionsClosed(fixtures.scriptedSubscriptions)
+        }
     }
 
     private fun mountNotificationRoute(

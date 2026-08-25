@@ -29,24 +29,28 @@ class ConversationTimelineReconnectIntegrationTest {
                     groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
                     startOnConstruction = true,
                 )
+            try {
+                awaitConversationCondition {
+                    fixtures.firstSubscription.snapshotCallCount == 1 &&
+                        ConversationTimelineTestIds.MESSAGE_A in timelineMessageIds(controller)
+                }
+                assertEquals(1, fixtures.scriptedSubscriptions.timelineSubscriptionOpenCount)
+                assertFalse(ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(controller))
 
-            awaitConversationCondition {
-                fixtures.firstSubscription.snapshotCallCount == 1 &&
-                    ConversationTimelineTestIds.MESSAGE_A in timelineMessageIds(controller)
+                awaitConversationCondition { fixtures.firstSubscription.nextUpdateCallCount == 1 }
+                assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate(fixtures.firstSubscription)
+
+                controller.retryLoadFailure()
+
+                awaitConversationCondition {
+                    fixtures.scriptedSubscriptions.timelineSubscriptionOpenCount == 2 &&
+                        ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(controller)
+                }
+                awaitConversationCondition { fixtures.replacementSubscription.nextUpdateCallCount >= 1 }
+                assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate(fixtures.replacementSubscription)
+            } finally {
+                controller.onCleared()
+                awaitOpenedTimelineSubscriptionsClosed(fixtures.scriptedSubscriptions)
             }
-            assertEquals(1, fixtures.scriptedSubscriptions.timelineSubscriptionOpenCount)
-            assertFalse(ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(controller))
-
-            awaitConversationCondition { fixtures.firstSubscription.nextUpdateCallCount == 1 }
-            assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate(fixtures.firstSubscription)
-
-            controller.retryLoadFailure()
-
-            awaitConversationCondition {
-                fixtures.scriptedSubscriptions.timelineSubscriptionOpenCount == 2 &&
-                    ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(controller)
-            }
-            awaitConversationCondition { fixtures.replacementSubscription.nextUpdateCallCount >= 1 }
-            assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate(fixtures.replacementSubscription)
         }
 }

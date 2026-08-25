@@ -26,13 +26,14 @@ import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.robolectric.Shadows.shadowOf
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 internal class ScriptedConversationTimelineSubscription(
     private val snapshotPage: TimelinePageFfi,
 ) : ConversationTimelineSubscriptionHandle {
-    private val lifecycleEvents = mutableListOf<String>()
+    private val lifecycleEvents = CopyOnWriteArrayList<String>()
 
     val lifecycleEventOrder: List<String>
         get() = lifecycleEvents.toList()
@@ -42,6 +43,9 @@ internal class ScriptedConversationTimelineSubscription(
 
     val nextUpdateCallCount: Int
         get() = lifecycleEvents.count { it == "nextUpdate" }
+
+    val closeCallCount: Int
+        get() = lifecycleEvents.count { it == "close" }
 
     override fun snapshot(): TimelinePageFfi? {
         lifecycleEvents += "snapshot"
@@ -304,6 +308,14 @@ internal fun awaitConversationCondition(
         Thread.sleep(10)
     }
     throw AssertionError("Condition not met within ${timeoutMs}ms")
+}
+
+internal fun awaitOpenedTimelineSubscriptionsClosed(subscriptions: ScriptedConversationLiveSubscriptions) {
+    awaitConversationCondition {
+        subscriptions.timelineScripts
+            .take(subscriptions.timelineSubscriptionOpenCount)
+            .all { it.closeCallCount >= 1 }
+    }
 }
 
 private fun emptyMarkdown(): MarkdownDocumentFfi =
