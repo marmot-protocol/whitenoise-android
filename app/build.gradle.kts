@@ -238,8 +238,8 @@ android {
         applicationId = "dev.ipf.whitenoise.android"
         minSdk = 30
         targetSdk = 36
-        versionCode = 9
-        versionName = "2026.8.13"
+        versionCode = 10
+        versionName = "2026.8.25"
         manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
         manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_round"
 
