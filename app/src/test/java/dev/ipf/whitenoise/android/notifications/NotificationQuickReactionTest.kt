@@ -5,6 +5,8 @@ import android.os.Bundle
 import androidx.core.app.RemoteInput
 import androidx.work.BackoffPolicy
 import androidx.work.NetworkType
+import androidx.work.WorkManager
+import androidx.work.testing.WorkManagerTestInitHelper
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
@@ -209,6 +211,56 @@ class NotificationQuickReactionTest {
 
             assertEquals(NotificationReactionSubmissionOutcome.PersistenceFailed, outcome)
             assertFalse(dismissed)
+        }
+
+    @Test
+    fun pendingReactionRejectsALaterChoiceWithoutDismissing() =
+        runTest {
+            WorkManagerTestInitHelper.initializeTestWorkManager(context)
+            val action = reactAction()
+            val workManager = WorkManager.getInstance(context)
+            val firstRequestId = UUID.randomUUID()
+            val secondRequestId = UUID.randomUUID()
+            val firstCipher = testCipher()
+
+            assertTrue(
+                NotificationReactionWorker.enqueue(
+                    context = context,
+                    action = action,
+                    reaction = "🔥",
+                    actionStartedAtMs = 123L,
+                    requestId = firstRequestId,
+                    cipherFactory = { firstCipher },
+                ),
+            )
+            var dismissed = false
+
+            val outcome =
+                submitNotificationReaction(
+                    action = action,
+                    reaction = "🥳",
+                    actionStartedAtMs = 456L,
+                    notificationActionsAllowed = { true },
+                    enqueueReaction = { queuedAction, queuedReaction, startedAtMs ->
+                        NotificationReactionWorker.enqueue(
+                            context = context,
+                            action = queuedAction,
+                            reaction = queuedReaction,
+                            actionStartedAtMs = startedAtMs,
+                            requestId = secondRequestId,
+                            cipherFactory = ::testCipher,
+                        )
+                    },
+                    dismissNotification = { _, _, _ -> dismissed = true },
+                )
+
+            val retainedWork =
+                workManager
+                    .getWorkInfosForUniqueWork(NotificationReactionWorker.notificationReactionWorkName(action))
+                    .get()
+            assertEquals(NotificationReactionSubmissionOutcome.PersistenceFailed, outcome)
+            assertFalse(dismissed)
+            assertEquals(listOf(firstRequestId), retainedWork.map { it.id })
         }
 
     @Test

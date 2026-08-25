@@ -9,6 +9,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -18,6 +19,7 @@ import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.util.UUID
@@ -266,25 +268,51 @@ class NotificationReactionWorker(
             action: NotificationAction,
             reaction: String,
             actionStartedAtMs: Long,
+        ): Boolean =
+            enqueue(
+                context = context,
+                action = action,
+                reaction = reaction,
+                actionStartedAtMs = actionStartedAtMs,
+                requestId = UUID.randomUUID(),
+                cipherFactory = NotificationReplyCipher::create,
+            )
+
+        internal suspend fun enqueue(
+            context: Context,
+            action: NotificationAction,
+            reaction: String,
+            actionStartedAtMs: Long,
+            requestId: UUID,
+            cipherFactory: () -> NotificationReplyCipher,
         ): Boolean {
             val enqueueResult =
                 runCatching {
-                    val requestId = UUID.randomUUID()
                     val normalizedReaction = requireNotNull(normalizeNotificationReaction(reaction))
                     require(actionStartedAtMs > 0L)
-                    val encrypted = NotificationReplyCipher.create().encrypt(normalizedReaction, requestId, action)
-                    WorkManager
-                        .getInstance(context.applicationContext)
-                        .enqueueUniqueWork(
-                            notificationReactionWorkName(action),
-                            ExistingWorkPolicy.KEEP,
-                            notificationReactionRequest(action, requestId, encrypted, actionStartedAtMs),
-                        ).await()
+                    val encrypted = cipherFactory().encrypt(normalizedReaction, requestId, action)
+                    enqueueUniqueReactionWork(
+                        workManager = WorkManager.getInstance(context.applicationContext),
+                        workName = notificationReactionWorkName(action),
+                        request = notificationReactionRequest(action, requestId, encrypted, actionStartedAtMs),
+                    )
                 }
             val failure = enqueueResult.exceptionOrNull()
             if (failure is CancellationException) throw failure
             if (failure != null) Log.w(TAG, "failed to encrypt or enqueue notification reaction", failure)
-            return enqueueResult.isSuccess
+            return enqueueResult.getOrDefault(false)
+        }
+
+        internal suspend fun enqueueUniqueReactionWork(
+            workManager: WorkManager,
+            workName: String,
+            request: OneTimeWorkRequest,
+        ): Boolean {
+            workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.KEEP, request).await()
+            return workManager
+                .getWorkInfosForUniqueWorkFlow(workName)
+                .first()
+                .any { it.id == request.id }
         }
 
         internal fun shouldRetryAfterFailure(operationAttempt: Int): Boolean = operationAttempt < MAX_SEND_ATTEMPTS - 1
