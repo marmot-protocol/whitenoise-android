@@ -1033,6 +1033,7 @@ private fun FileLibraryRow(
                                     fetchFile(),
                                     row.reference.mediaType,
                                     row.reference.fileName,
+                                    null,
                                 )
                             }.getOrElse { error ->
                                 appState.presentFailure(

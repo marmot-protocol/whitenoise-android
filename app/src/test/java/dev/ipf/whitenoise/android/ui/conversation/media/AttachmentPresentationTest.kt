@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.ActivityNotFoundException
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
+import dev.ipf.whitenoise.android.state.AttachmentOpenIntentClaim
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.AutomaticBacklogStoppedException
 import kotlinx.coroutines.CancellationException
@@ -344,6 +345,106 @@ class AttachmentPresentationTest {
             } finally {
                 directory.deleteRecursively()
             }
+        }
+
+    @Test
+    fun persistedInstallerPermissionHandoffCompletesBeforeRetryingTheExactAttachment() =
+        runTest {
+            val source = File("agent-build.apk")
+            val events = mutableListOf<String>()
+            var opens = 0
+
+            val result =
+                openAttachmentWithPersistedInstallerPermission(
+                    source = source,
+                    mediaType = ANDROID_PACKAGE_MIME,
+                    fileName = "agent-build.apk",
+                    open = { requestedSource, requestedMediaType, requestedFileName ->
+                        assertSame(source, requestedSource)
+                        assertEquals(ANDROID_PACKAGE_MIME, requestedMediaType)
+                        assertEquals("agent-build.apk", requestedFileName)
+                        opens += 1
+                        events += "open-$opens"
+                        if (opens == 1) {
+                            OpenAttachmentResult.InstallPermissionRequired
+                        } else {
+                            OpenAttachmentResult.Opened
+                        }
+                    },
+                    requestInstallPermission = {
+                        events += "settings"
+                        true
+                    },
+                    persistence =
+                        InstallerPermissionPersistence(
+                            claim = AttachmentOpenIntentClaim.Fresh,
+                            begin = {
+                                events += "begin"
+                                true
+                            },
+                            finish = {
+                                events += "finish"
+                                true
+                            },
+                            abandon = { events += "abandon" },
+                        ),
+                )
+
+            assertEquals(OpenAttachmentResult.Opened, result)
+            assertEquals(listOf("open-1", "begin", "settings", "finish", "open-2"), events)
+        }
+
+    @Test
+    fun recoveredDeniedInstallerPermissionDoesNotReopenSettings() =
+        runTest {
+            var permissionRequests = 0
+            val result =
+                openAttachmentWithPersistedInstallerPermission(
+                    source = File("agent-build.apk"),
+                    mediaType = ANDROID_PACKAGE_MIME,
+                    fileName = "agent-build.apk",
+                    open = { _, _, _ -> OpenAttachmentResult.InstallPermissionRequired },
+                    requestInstallPermission = {
+                        permissionRequests += 1
+                        false
+                    },
+                    persistence =
+                        InstallerPermissionPersistence(
+                            claim = AttachmentOpenIntentClaim.InstallPermissionRecovery,
+                            begin = { error("recovery must not begin another Settings handoff") },
+                            finish = { error("recovery claim was already consumed") },
+                            abandon = { error("no Settings request should be active") },
+                        ),
+                )
+
+            assertEquals(OpenAttachmentResult.InstallPermissionDenied, result)
+            assertEquals(0, permissionRequests)
+        }
+
+    @Test
+    fun cancelledInstallerSettingsKeepsDurableHandoffForAnotherOwner() =
+        runTest {
+            var abandoned = false
+            val failure =
+                runCatching {
+                    openAttachmentWithPersistedInstallerPermission(
+                        source = File("agent-build.apk"),
+                        mediaType = ANDROID_PACKAGE_MIME,
+                        fileName = "agent-build.apk",
+                        open = { _, _, _ -> OpenAttachmentResult.InstallPermissionRequired },
+                        requestInstallPermission = { throw CancellationException("composition replaced") },
+                        persistence =
+                            InstallerPermissionPersistence(
+                                claim = AttachmentOpenIntentClaim.Fresh,
+                                begin = { true },
+                                finish = { error("cancelled request must not finish") },
+                                abandon = { abandoned = true },
+                            ),
+                    )
+                }.exceptionOrNull()
+
+            assertTrue(failure is CancellationException)
+            assertTrue(abandoned)
         }
 
     @Test

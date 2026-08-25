@@ -3965,19 +3965,33 @@ class WhiteNoiseAppState private constructor(
         attachmentOpenIntentRevision += 1
     }
 
-    internal fun hasAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean {
-        val intents = attachmentDownloadIntents
-        return intents.hasOpenIntent(request)
-    }
+    internal fun hasAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean = attachmentDownloadIntents.hasDispatchableOpenIntent(request)
+
+    internal suspend fun claimAttachmentOpenIntent(request: AttachmentTransferRequest): AttachmentOpenIntentClaim? =
+        withContext(Dispatchers.IO) { attachmentDownloadIntents.claimOpenIntent(request) }
 
     internal suspend fun consumeAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean {
         val intents = attachmentDownloadIntents
         return withContext(Dispatchers.IO) { intents.consumeOpenIntent(request) }
     }
 
+    internal suspend fun beginAttachmentInstallPermissionRequest(request: AttachmentTransferRequest): Boolean =
+        withContext(Dispatchers.IO) { attachmentDownloadIntents.beginInstallPermissionRequest(request) }
+
+    internal suspend fun finishAttachmentInstallPermissionRequest(request: AttachmentTransferRequest): Boolean =
+        withContext(Dispatchers.IO) { attachmentDownloadIntents.finishInstallPermissionRequest(request) }
+
+    internal fun abandonAttachmentInstallPermissionRequest(request: AttachmentTransferRequest) {
+        attachmentDownloadIntents.abandonInstallPermissionRequest(request)
+        // A replacement composition may have checked while the former owner
+        // was still active. Re-run its effect after releasing that volatile
+        // owner so the durable recovery cannot remain asleep.
+        attachmentOpenIntentRevision += 1
+    }
+
     /** Restores a failed dispatch without immediately looping the active effect. */
     internal fun restoreAttachmentOpenIntent(request: AttachmentTransferRequest) {
-        attachmentDownloadIntents.markOpenIntent(request)
+        attachmentDownloadIntents.restoreOpenIntent(request)
     }
 
     fun automaticAttachmentDownloadsPaused(): Boolean {

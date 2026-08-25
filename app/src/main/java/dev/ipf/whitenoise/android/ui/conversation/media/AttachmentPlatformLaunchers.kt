@@ -16,6 +16,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.state.AttachmentOpenIntentClaim
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -26,8 +27,17 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 internal typealias DocumentSaveFallback = suspend (source: File, fileName: String, mediaType: String) -> Unit
-internal typealias AttachmentOpener = suspend (File, String, String) -> OpenAttachmentResult
+private typealias ExternalAttachmentOpen = suspend (File, String, String) -> OpenAttachmentResult
+internal typealias AttachmentOpener =
+    suspend (File, String, String, InstallerPermissionPersistence?) -> OpenAttachmentResult
 private typealias InstallPermissionRequester = suspend () -> Boolean
+
+internal data class InstallerPermissionPersistence(
+    val claim: AttachmentOpenIntentClaim,
+    val begin: suspend () -> Boolean,
+    val finish: suspend () -> Boolean,
+    val abandon: () -> Unit,
+)
 
 /** User dismissed the destination picker; unlike parent cancellation, a batch may continue. */
 internal class DocumentDestinationCancelledException : CancellationException("document destination cancelled")
@@ -44,18 +54,31 @@ internal fun rememberAttachmentOpener(): AttachmentOpener {
             runCatching { context.packageManager.canRequestPackageInstalls() }.getOrDefault(false)
         }
     return remember(context, requestInstallPermission) {
-        { source, mediaType, fileName ->
-            openAttachmentWithInstallerPermission(
-                source = source,
-                mediaType = mediaType,
-                fileName = fileName,
-                open = { requestedSource, requestedMediaType, requestedFileName ->
-                    openAttachmentExternally(context, requestedSource, requestedMediaType, requestedFileName)
-                },
-                requestInstallPermission = {
-                    requestInstallPermission(androidPackageInstallPermissionIntent(context))
-                },
-            )
+        { source, mediaType, fileName, persistence ->
+            val open: ExternalAttachmentOpen = { requestedSource, requestedMediaType, requestedFileName ->
+                openAttachmentExternally(context, requestedSource, requestedMediaType, requestedFileName)
+            }
+            val requestPermission: InstallPermissionRequester = {
+                requestInstallPermission(androidPackageInstallPermissionIntent(context))
+            }
+            if (persistence == null) {
+                openAttachmentWithInstallerPermission(
+                    source = source,
+                    mediaType = mediaType,
+                    fileName = fileName,
+                    open = open,
+                    requestInstallPermission = requestPermission,
+                )
+            } else {
+                openAttachmentWithPersistedInstallerPermission(
+                    source = source,
+                    mediaType = mediaType,
+                    fileName = fileName,
+                    open = open,
+                    requestInstallPermission = requestPermission,
+                    persistence = persistence,
+                )
+            }
         }
     }
 }
@@ -79,7 +102,7 @@ private suspend fun openAfterInstallerPermission(
     source: File,
     mediaType: String,
     fileName: String,
-    open: AttachmentOpener,
+    open: ExternalAttachmentOpen,
     requestInstallPermission: InstallPermissionRequester,
 ): OpenAttachmentResult {
     AttachmentPlaintextCache.protectPublicationFile(source)
@@ -87,6 +110,44 @@ private suspend fun openAfterInstallerPermission(
         requestInstallerPermissionFailure(requestInstallPermission)
             ?: open(source, mediaType, fileName)
     } finally {
+        AttachmentPlaintextCache.unprotectPublicationFile(source)
+    }
+}
+
+/**
+ * Permission-aware opener for a persisted conversation tap. A fresh claim is
+ * moved to a durable Settings handoff before White Noise leaves the foreground.
+ * A claim recovered after process recreation only rechecks permission: denial
+ * is reported instead of reopening Settings in a loop.
+ */
+internal suspend fun openAttachmentWithPersistedInstallerPermission(
+    source: File,
+    mediaType: String,
+    fileName: String,
+    open: ExternalAttachmentOpen,
+    requestInstallPermission: suspend () -> Boolean,
+    persistence: InstallerPermissionPersistence,
+): OpenAttachmentResult {
+    val initial = open(source, mediaType, fileName)
+    if (initial != OpenAttachmentResult.InstallPermissionRequired) return initial
+    if (persistence.claim == AttachmentOpenIntentClaim.InstallPermissionRecovery) {
+        return OpenAttachmentResult.InstallPermissionDenied
+    }
+    check(persistence.begin()) { "installer permission handoff could not be persisted" }
+
+    AttachmentPlaintextCache.protectPublicationFile(source)
+    var permissionRequestActive = true
+    return try {
+        val permissionFailure = requestInstallerPermissionFailure(requestInstallPermission)
+        check(persistence.finish()) { "installer permission handoff could not be completed" }
+        permissionRequestActive = false
+        permissionFailure ?: open(source, mediaType, fileName)
+    } catch (cancellation: CancellationException) {
+        persistence.abandon()
+        permissionRequestActive = false
+        throw cancellation
+    } finally {
+        if (permissionRequestActive) persistence.abandon()
         AttachmentPlaintextCache.unprotectPublicationFile(source)
     }
 }

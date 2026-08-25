@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
@@ -115,8 +116,8 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
-import dev.ipf.whitenoise.android.ui.conversation.media.FileBubbleWidth
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
+import dev.ipf.whitenoise.android.ui.conversation.media.fileBubblePreferredWidth
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
@@ -1006,6 +1007,11 @@ internal fun MessageBubble(
 
     val pendingAttachmentsForRecord = controller.pendingAttachmentsList(record.messageIdHex)
     val bubbleMedia = rememberBubbleMedia(mediaReferences, pendingAttachmentsForRecord)
+    val mediaCaption =
+        MessageProjector.mediaCaption(
+            message = record,
+            body = editState?.latestText ?: record.plaintext,
+        )
     val mediaPendingName =
         remember(record.tags) {
             record.tags
@@ -1059,6 +1065,7 @@ internal fun MessageBubble(
         val bubbleColumnMinWidth =
             messageBubbleColumnMinWidth(
                 hasGeneralFileCard = hasGeneralFileCard,
+                attachedToCaption = mediaCaption != null,
                 maxWidth = bubbleColumnMaxWidth,
             )
         val longPressBlockedBySelection = selectionMode && !rangeDragActive
@@ -1280,6 +1287,7 @@ internal fun MessageBubble(
                 modifier =
                     Modifier
                         .widthIn(min = bubbleColumnMinWidth, max = bubbleColumnMaxWidth)
+                        .testTag(messageBubbleColumnTestTag(record.messageIdHex))
                         .then(
                             if (reserveSenderAvatarSlot && reactionHostPresent) {
                                 Modifier.alignBy(MessageBubbleBottomAlignmentLine)
@@ -1344,11 +1352,6 @@ internal fun MessageBubble(
                         }
                     }
                 }
-                val mediaCaption =
-                    MessageProjector.mediaCaption(
-                        message = record,
-                        body = editState?.latestText ?: record.plaintext,
-                    )
                 // An uncaptioned visual message carries the footer over the
                 // bottom-right media tile. For an album that is the last visible
                 // image/video; a caption (if any) owns the footer instead.
@@ -2168,15 +2171,18 @@ internal fun messageBubbleColumnMaxWidth(
     (containerWidth - MessageBubbleOppositeGutter - selectionGutterWidth - senderAvatarSlotWidth)
         .coerceAtLeast(0.dp)
 
+internal fun messageBubbleColumnTestTag(messageIdHex: String): String = "message-bubble-column:$messageIdHex"
+
 internal fun messageBubbleColumnMinWidth(
     hasGeneralFileCard: Boolean,
+    attachedToCaption: Boolean,
     maxWidth: Dp,
 ): Dp =
     if (hasGeneralFileCard) {
-        // Establish the file-card invariant at the parent measurement boundary.
-        // The leaf still owns its preferred width, while small screens and row
-        // gutters remain authoritative through the already-computed maximum.
-        minOf(FileBubbleWidth, maxWidth.coerceAtLeast(0.dp))
+        // Standalone files retain their compact readable card. Like Signal's
+        // captioned media, a file plus caption becomes one wider surface. The
+        // row maximum still owns narrow screens, avatars, and selection gutters.
+        minOf(fileBubblePreferredWidth(attachedToCaption), maxWidth.coerceAtLeast(0.dp))
     } else {
         Dp.Unspecified
     }

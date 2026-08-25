@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.input.TextFieldValue
@@ -50,8 +51,11 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.mediaCacheKey
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.conversation.media.ANDROID_PACKAGE_MIME
+import dev.ipf.whitenoise.android.ui.conversation.media.fileAttachmentCardTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
@@ -104,23 +108,37 @@ class MessageBubbleFileAttachmentScreenshotTest {
                 FileGallery(gallery)
             }
         }
-        assertFileGalleryStates()
+        composeRule.runOnIdle {
+            appState.cacheMediaPlaintext(
+                mediaCacheKey(
+                    ACCOUNT_REF,
+                    GROUP_ID,
+                    gallery.downloadedApk.record.messageIdHex,
+                    0,
+                ),
+                byteArrayOf(1, 2, 3),
+            )
+        }
+        assertFileGalleryStates(gallery)
         // Capture the fixed-size root rather than a cropped semantics node. Cropped native-graphics
         // capture can fail in Skia's PNG stream encoder on Linux even after all layout assertions pass.
         composeRule.onRoot().captureRoboImage(SNAPSHOT_PATH)
     }
 
-    private fun assertFileGalleryStates() {
-        assertFileCardWidth(INCOMING_FILE, 240f)
-        assertFileCardWidth(OUTGOING_FILE, 240f)
-        assertFileCardWidth(CAPTIONED_REPLY_FILE, 240f)
+    private fun assertFileGalleryStates(gallery: GalleryFixtures) {
+        assertFileCardAndBubbleWidth(gallery.incoming, expectedWidth = 240f)
+        assertFileCardAndBubbleWidth(gallery.downloadedApk, expectedWidth = 240f)
+        assertFileCardAndBubbleWidth(gallery.outgoing, expectedWidth = 240f)
+        // Captioned incoming group messages prefer 320 dp, then clamp to the
+        // 272 dp left after the opposite gutter and sender-avatar slot.
+        assertFileCardAndBubbleWidth(gallery.captionedReply, expectedWidth = 272f)
         composeRule.onNodeWithText("Updated release notes").assertExists()
-        assertFileCardWidth(LARGE_FONT_FILE, 240f)
+        assertFileCardAndBubbleWidth(gallery.largeFont, expectedWidth = 240f)
         // 300 dp host - 48 dp opposite gutter - 40 dp incoming avatar slot.
-        assertFileCardWidth(CONSTRAINED_FILE, 212f)
-        assertFileCardWidth(MULTI_FIRST_FILE, 240f)
-        assertFileCardWidth(MULTI_SECOND_FILE, 240f)
-        assertPendingFileCardWidth(PENDING_GENERIC_FILE, "Uploading…", 240f)
+        assertFileCardAndBubbleWidth(gallery.constrained, expectedWidth = 212f)
+        assertFileCardAndBubbleWidth(gallery.multiple, attachmentIndex = 0, expectedWidth = 240f)
+        assertFileCardAndBubbleWidth(gallery.multiple, attachmentIndex = 1, expectedWidth = 240f)
+        assertPendingFileCard(gallery.pending, PENDING_GENERIC_FILE, "Uploading…", 240f)
         composeRule.onNodeWithText("4 B").assertExists()
         composeRule.onNodeWithText(PERSISTED_FAILURE_FILE).assertDoesNotExist()
         composeRule.onNodeWithText("This message didn't reach the group").assertExists()
@@ -129,15 +147,21 @@ class MessageBubbleFileAttachmentScreenshotTest {
         selectedRow.assertIsSelected()
         val selectedRowBounds = selectedRow.getUnclippedBoundsInRoot()
         assertEquals(300f, (selectedRowBounds.right - selectedRowBounds.left).value, 1f)
-        // 300 dp host - 48 dp opposite gutter - 40 dp selection gutter.
-        assertEquals(212.dp, messageBubbleColumnMaxWidth(300.dp, messageBubbleSelectionGutterWidth, 0.dp))
-        assertFileCardWidth(RTL_FILE, 240f)
+        // 300 dp host - 48 dp opposite gutter - 40 dp selection gutter -
+        // 40 dp incoming group-avatar slot.
+        assertEquals(
+            172.dp,
+            messageBubbleColumnMaxWidth(300.dp, messageBubbleSelectionGutterWidth, 40.dp),
+        )
+        assertFileCardAndBubbleWidth(gallery.selectedConstrained, expectedWidth = 172f)
+        assertFileCardAndBubbleWidth(gallery.rtl, expectedWidth = 240f)
     }
 
     @Composable
     private fun FileGallery(gallery: GalleryFixtures) {
         Column(Modifier.width(360.dp)) {
             FileMessage(gallery.incoming)
+            FileMessage(gallery.downloadedApk)
             FileMessage(gallery.outgoing)
             FileMessage(gallery.captionedReply)
             CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = 1.6f)) {
@@ -164,7 +188,18 @@ class MessageBubbleFileAttachmentScreenshotTest {
 
     private fun fileGallery() =
         GalleryFixtures(
-            incoming = fileTimelineMessage(index = 1, fileName = INCOMING_FILE),
+            incoming =
+                fileTimelineMessage(
+                    index = 1,
+                    fileName = INCOMING_FILE,
+                    mediaType = ANDROID_PACKAGE_MIME,
+                ),
+            downloadedApk =
+                fileTimelineMessage(
+                    index = 11,
+                    fileName = DOWNLOADED_APK_FILE,
+                    mediaType = ANDROID_PACKAGE_MIME,
+                ),
             outgoing = fileTimelineMessage(index = 2, fileName = OUTGOING_FILE, mine = true),
             captionedReply =
                 fileTimelineMessage(
@@ -172,6 +207,7 @@ class MessageBubbleFileAttachmentScreenshotTest {
                     fileName = CAPTIONED_REPLY_FILE,
                     caption = "Updated release notes",
                     hasReply = true,
+                    mediaType = ANDROID_PACKAGE_MIME,
                 ),
             largeFont = fileTimelineMessage(index = 4, fileName = LARGE_FONT_FILE),
             constrained = fileTimelineMessage(index = 5, fileName = CONSTRAINED_FILE),
@@ -199,6 +235,7 @@ class MessageBubbleFileAttachmentScreenshotTest {
 
     private data class GalleryFixtures(
         val incoming: TimelineMessage,
+        val downloadedApk: TimelineMessage,
         val outgoing: TimelineMessage,
         val captionedReply: TimelineMessage,
         val largeFont: TimelineMessage,
@@ -210,15 +247,26 @@ class MessageBubbleFileAttachmentScreenshotTest {
         val rtl: TimelineMessage,
     )
 
-    private fun assertFileCardWidth(
-        fileName: String,
+    private fun assertFileCardAndBubbleWidth(
+        item: TimelineMessage,
+        attachmentIndex: Int = 0,
         expectedWidth: Float,
     ) {
-        val bounds = composeRule.onNodeWithText(fileName).getUnclippedBoundsInRoot()
-        assertEquals(expectedWidth, (bounds.right - bounds.left).value, 1f)
+        val messageIdHex = item.record.messageIdHex
+        val cardBounds =
+            composeRule
+                .onNodeWithTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex), useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+        val bubbleBounds =
+            composeRule
+                .onNodeWithTag(messageBubbleColumnTestTag(messageIdHex), useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+        assertEquals(expectedWidth, (cardBounds.right - cardBounds.left).value, 1f)
+        assertEquals(expectedWidth, (bubbleBounds.right - bubbleBounds.left).value, 1f)
     }
 
-    private fun assertPendingFileCardWidth(
+    private fun assertPendingFileCard(
+        item: TimelineMessage,
         fileName: String,
         transferStateDescription: String,
         expectedWidth: Float,
@@ -228,13 +276,15 @@ class MessageBubbleFileAttachmentScreenshotTest {
                 .onNodeWithContentDescription(transferStateDescription)
                 .getUnclippedBoundsInRoot()
         val fileNameBounds = composeRule.onNodeWithText(fileName).getUnclippedBoundsInRoot()
-        // The pending Surface is intentionally non-clickable, so it does not merge descendants into
-        // one semantics node. Its outer edges are the fixed 10 dp content padding around the transfer
-        // control and the constrained filename column.
-        val pendingCardWidth =
+        val cardWidth =
             (fileNameBounds.right + FILE_CARD_CONTENT_PADDING) -
                 (controlBounds.left - FILE_CARD_CONTENT_PADDING)
-        assertEquals(expectedWidth, pendingCardWidth.value, 1f)
+        val bubbleBounds =
+            composeRule
+                .onNodeWithTag(messageBubbleColumnTestTag(item.record.messageIdHex), useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+        assertEquals(expectedWidth, cardWidth.value, 1f)
+        assertEquals(expectedWidth, (bubbleBounds.right - bubbleBounds.left).value, 1f)
     }
 
     @Composable
@@ -308,6 +358,7 @@ class MessageBubbleFileAttachmentScreenshotTest {
         caption: String = "",
         hasReply: Boolean = false,
         fileNames: List<String> = listOf(fileName),
+        mediaType: String = "application/pdf",
         invalidationStatus: String? = null,
     ): TimelineMessage {
         val messageId = index.toString(16).padStart(2, '0') + "00".repeat(31)
@@ -315,7 +366,7 @@ class MessageBubbleFileAttachmentScreenshotTest {
         val direction = if (mine) "sent" else "received"
         val mediaTags =
             fileNames.map { name ->
-                MessageTagFfi(listOf("imeta", "m application/pdf", "filename $name"))
+                MessageTagFfi(listOf("imeta", "m $mediaType", "filename $name"))
             }
         val record =
             AppMessageRecordFfi(
@@ -349,7 +400,7 @@ class MessageBubbleFileAttachmentScreenshotTest {
                 replyToMessageIdHex = PARENT_MESSAGE_ID.takeIf { hasReply },
                 replyPreview = replyPreview().takeIf { hasReply },
                 mediaJson = null,
-                media = fileNames.map(::fileReference),
+                media = fileNames.map { name -> fileReference(name, mediaType) },
                 agentTextStreamJson = null,
                 groupSystem = null,
                 reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
@@ -398,19 +449,21 @@ class MessageBubbleFileAttachmentScreenshotTest {
             )
         }
 
-    private fun fileReference(fileName: String) =
-        MediaAttachmentReferenceFfi(
-            locators = listOf(MediaLocatorFfi("blossom-v1", "https://media.example/$fileName")),
-            ciphertextSha256 = "a".repeat(64),
-            plaintextSha256 = "b".repeat(64),
-            nonceHex = "c".repeat(24),
-            fileName = fileName,
-            mediaType = "application/pdf",
-            version = EncryptedMediaVersionFfi.V1,
-            sourceEpoch = 1uL,
-            dim = null,
-            thumbhash = null,
-        )
+    private fun fileReference(
+        fileName: String,
+        mediaType: String,
+    ) = MediaAttachmentReferenceFfi(
+        locators = listOf(MediaLocatorFfi("blossom-v1", "https://media.example/$fileName")),
+        ciphertextSha256 = "a".repeat(64),
+        plaintextSha256 = "b".repeat(64),
+        nonceHex = "c".repeat(24),
+        fileName = fileName,
+        mediaType = mediaType,
+        version = EncryptedMediaVersionFfi.V1,
+        sourceEpoch = 1uL,
+        dim = null,
+        thumbhash = null,
+    )
 
     private fun replyPreview() =
         TimelineReplyPreviewFfi(
@@ -537,9 +590,10 @@ class MessageBubbleFileAttachmentScreenshotTest {
         val SENDER_ID = "02" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
         val PARENT_MESSAGE_ID = "06" + "00".repeat(31)
-        const val INCOMING_FILE = "incoming-release-notes.pdf"
+        const val INCOMING_FILE = "incoming-release.apk"
+        const val DOWNLOADED_APK_FILE = "downloaded-master-build.apk"
         const val OUTGOING_FILE = "outgoing-build.pdf"
-        const val CAPTIONED_REPLY_FILE = "captioned-reply.pdf"
+        const val CAPTIONED_REPLY_FILE = "captioned-reply.apk"
         const val LARGE_FONT_FILE = "large-font-accessibility-report.pdf"
         const val CONSTRAINED_FILE = "constrained-width-file.pdf"
         const val MULTI_FIRST_FILE = "multiple-first.pdf"

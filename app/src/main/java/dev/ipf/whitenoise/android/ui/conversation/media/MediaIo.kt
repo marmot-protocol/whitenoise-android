@@ -191,9 +191,9 @@ private fun documentAttachmentExtension(
 }
 
 /**
- * Fire `ACTION_VIEW` for an already materialized [source] via the app's
- * FileProvider so an external app (PDF reader, package installer, etc.) can
- * open it. The stable source is also reused by Save and later taps.
+ * Dispatch an already materialized [source] via the app's FileProvider.
+ * Verified APKs use the dedicated package-install action; general files keep
+ * the platform view action. The stable source is reused by Save and later taps.
  *
  * Distinguishes "no app claims this MIME" ([OpenAttachmentResult.NoHandler])
  * from "we couldn't even try" ([OpenAttachmentResult.Error]) so the caller
@@ -265,7 +265,7 @@ private suspend fun openReadyAttachment(
         else ->
             try {
                 val uri = withContext(Dispatchers.IO) { fileProviderUri(context.applicationContext, source) }
-                launchAttachmentViewIntent(context, uri, mediaType)
+                launchAttachmentIntent(context, uri, mediaType)
             } catch (error: CancellationException) {
                 throw error
             } catch (_: SecurityException) {
@@ -277,12 +277,12 @@ private suspend fun openReadyAttachment(
             }
     }
 
-private fun launchAttachmentViewIntent(
+private fun launchAttachmentIntent(
     context: Context,
     uri: Uri,
     mediaType: String,
 ): OpenAttachmentResult {
-    val intent = attachmentViewIntent(uri, mediaType)
+    val intent = attachmentOpenIntent(uri, mediaType)
     return try {
         context.startActivity(intent)
         OpenAttachmentResult.Opened
@@ -306,11 +306,17 @@ private fun launchAttachmentViewIntent(
     }
 }
 
-internal fun attachmentViewIntent(
+internal fun attachmentOpenIntent(
     uri: Uri,
     mediaType: String,
 ): Intent =
-    Intent(Intent.ACTION_VIEW).apply {
+    Intent(
+        if (mediaType == ANDROID_PACKAGE_MIME) {
+            Intent.ACTION_INSTALL_PACKAGE
+        } else {
+            Intent.ACTION_VIEW
+        },
+    ).apply {
         setDataAndType(uri, mediaType)
         clipData = ClipData.newRawUri("attachment", uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

@@ -21,6 +21,10 @@ class AttachmentDownloadIntentStoreTest {
 
     @Before
     fun reset() {
+        AttachmentDownloadIntentStore(preferences).apply {
+            abandonInstallPermissionRequest(REQUEST_A)
+            abandonInstallPermissionRequest(REQUEST_B)
+        }
         preferences.edit().clear().commit()
     }
 
@@ -61,6 +65,42 @@ class AttachmentDownloadIntentStoreTest {
         assertTrue(recreated.consumeOpenIntent(REQUEST_A))
         assertFalse(recreated.consumeOpenIntent(REQUEST_A))
         assertFalse(AttachmentDownloadIntentStore(preferences).hasOpenIntent(REQUEST_A))
+    }
+
+    @Test
+    fun installPermissionHandoffRecoversOnlyAfterItsProcessOwnerIsGone() {
+        val store = AttachmentDownloadIntentStore(preferences)
+        store.markOpenIntent(REQUEST_A)
+
+        assertTrue(store.claimOpenIntent(REQUEST_A) == AttachmentOpenIntentClaim.Fresh)
+        assertTrue(store.beginInstallPermissionRequest(REQUEST_A))
+        assertFalse(store.hasDispatchableOpenIntent(REQUEST_A))
+        assertFalse(AttachmentDownloadIntentStore(preferences).hasDispatchableOpenIntent(REQUEST_A))
+
+        store.abandonInstallPermissionRequest(REQUEST_A)
+        val recreated = AttachmentDownloadIntentStore(preferences)
+        assertTrue(recreated.hasDispatchableOpenIntent(REQUEST_A))
+        assertTrue(
+            recreated.claimOpenIntent(REQUEST_A) == AttachmentOpenIntentClaim.InstallPermissionRecovery,
+        )
+        assertFalse(recreated.hasDispatchableOpenIntent(REQUEST_A))
+    }
+
+    @Test
+    fun failedFinalLaunchRestoresFreshIntentWithoutDuplicatingPermissionHandoff() {
+        val store = AttachmentDownloadIntentStore(preferences)
+        store.markOpenIntent(REQUEST_A)
+        assertTrue(store.claimOpenIntent(REQUEST_A) == AttachmentOpenIntentClaim.Fresh)
+        assertTrue(store.beginInstallPermissionRequest(REQUEST_A))
+
+        store.markOpenIntent(REQUEST_A)
+        store.restoreOpenIntent(REQUEST_A)
+        assertFalse(store.hasOpenIntent(REQUEST_A))
+
+        assertTrue(store.finishInstallPermissionRequest(REQUEST_A))
+        store.restoreOpenIntent(REQUEST_A)
+        assertTrue(store.hasOpenIntent(REQUEST_A))
+        assertTrue(store.hasDispatchableOpenIntent(REQUEST_A))
     }
 
     @Test

@@ -165,7 +165,7 @@ class ReceivedFileTimestampScreenshotTest {
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant,
             shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fileBubbleWidth(),
+            modifier = Modifier.fileBubbleWidth(attachedToCaption = true),
         ) {
             Column {
                 MediaFileBubbleContent(
