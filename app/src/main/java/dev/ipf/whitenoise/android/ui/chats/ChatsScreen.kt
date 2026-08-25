@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -72,23 +73,27 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
-import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.Nip05Resolver
-import dev.ipf.whitenoise.android.core.applyChatListSearchAndFilter
+import dev.ipf.whitenoise.android.core.canonicalChatListBodyMatches
+import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.core.localeInvariantFold
+import dev.ipf.whitenoise.android.core.projectChatListSearchSections
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -198,13 +203,10 @@ internal fun ChatsScreen(
             interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
             selectionMode = selectionMode,
         )
-    // Async message-body search results (issue #290), keyed by group id. The
-    // title/preview match in `applyChatListSearchAndFilter` is synchronous;
-    // body matching has to query each conversation's local timeline via the
-    // `timelineMessages` FFI, so it lands here a debounce later. A row uses
-    // its entry (if any) to render the highlighted snippet line and to scroll
-    // to the matched message on tap-through.
-    var bodyMatches by remember { mutableStateOf<Map<String, MessageBodyMatch>>(emptyMap()) }
+    // Async message-body results retain their exact query/account/list key.
+    // A superseding key therefore hides stale matches synchronously, before
+    // the replacement effect gets its first post-composition frame (#2202).
+    var bodySearchResult by remember { mutableStateOf<ChatListBodySearchResult?>(null) }
     // Resolution state for a pasted Nostr identifier in the search field (#344).
     // An npub resolves synchronously; a NIP-05 address resolves over the network
     // (loading → resolved/failed). Plain-text queries stay [None] and the list
@@ -362,7 +364,7 @@ internal fun ChatsScreen(
     val loadFailurePlacement = loadFailurePlacement(controller.error != null, sourceList.isNotEmpty())
     // Subscribing read of the profile-cache revision so the filter
     // re-runs when a DM peer's display name resolves — the title
-    // projection inside `applyChatListSearchAndFilter` reads
+    // projection inside `projectChatListSearchSections` reads
     // `appState.chatMemberTitle(...)`, but that read happens from a
     // `remember` block where Compose's snapshot system doesn't track
     // state. Keying on `profileRev` re-fires the filter when the
@@ -373,15 +375,40 @@ internal fun ChatsScreen(
     // unrelated chat-list republishes or row reordering must not restart a
     // full-corpus body search while the user is typing (#1201).
     val trimmedQuery = searchQuery.trim()
-    val ciSearchNeedle = remember(trimmedQuery) { trimmedQuery.lowercase(Locale.ROOT) }
-    val bodySearchGroupIds = remember(sourceList) { sourceList.map { it.id }.sorted() }
-    LaunchedEffect(trimmedQuery, showArchived, bodySearchGroupIds) {
-        if (trimmedQuery.isEmpty()) {
-            bodyMatches = emptyMap()
+    val normalizedSearchQuery = remember(trimmedQuery) { localeInvariantFold(trimmedQuery) }
+    val searchActive = trimmedQuery.isNotEmpty()
+    val bodySearchGroupIds =
+        remember(sourceList) {
+            sourceList.map { canonicalChatListGroupId(it.id) }.distinct().sorted()
+        }
+    val bodySearchKey =
+        remember(normalizedSearchQuery, controller.boundAccountRef, showArchived, bodySearchGroupIds) {
+            ChatListBodySearchKey(
+                query = normalizedSearchQuery,
+                accountRef = controller.boundAccountRef,
+                showArchived = showArchived,
+                canonicalGroupIds = bodySearchGroupIds,
+            )
+        }
+    // Use a request identity as well as the structural cache key. If a user
+    // types A → B → A, the second A owns a fresh token, so the first A's
+    // result cannot flash for one frame before this query's effect starts.
+    val bodySearchRequest = remember(bodySearchKey) { ChatListBodySearchRequest() }
+    val bodyMatches =
+        bodySearchResult
+            ?.takeIf { it.request === bodySearchRequest }
+            ?.matches
+            .orEmpty()
+    LaunchedEffect(bodySearchRequest) {
+        if (!searchActive) {
             return@LaunchedEffect
         }
         delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
-        bodyMatches = controller.searchMessageBodies(sourceList, trimmedQuery)
+        bodySearchResult =
+            ChatListBodySearchResult(
+                request = bodySearchRequest,
+                matches = canonicalChatListBodyMatches(controller.searchMessageBodies(sourceList, trimmedQuery)),
+            )
     }
     // Resolve a pasted Nostr identifier in the search field (#344). An npub is
     // validated (and normalized) via the FFI key parser — no network. A NIP-05
@@ -428,31 +455,54 @@ internal fun ChatsScreen(
     val userGestureGeneration = rememberChatListUserGestureGeneration(chatListState)
     var programmaticViewportGeneration by remember(chatListState) { mutableLongStateOf(0L) }
     val viewportGeneration = userGestureGeneration + programmaticViewportGeneration
-    val visibleItems =
-        // Keyed on the trimmed query: leading/trailing-space edits change
+    val searchSections =
+        // Keyed on the normalized query: whitespace and case-only edits change
         // nothing the filter can see, so they must not re-run the O(n) pass.
-        remember(sourceList, trimmedQuery, selectedFolderChatIds, groupTitleCopy, profileRev, bodyMatches) {
-            applyChatListSearchAndFilter(
-                sourceList,
-                trimmedQuery,
-                appState,
-                groupTitleCopy,
+        remember(sourceList, normalizedSearchQuery, selectedFolderChatIds, groupTitleCopy, profileRev, bodyMatches) {
+            projectChatListSearchSections(
+                source = sourceList,
+                rawQuery = trimmedQuery,
+                appState = appState,
+                titleCopy = groupTitleCopy,
                 bodyMatchGroupIds = bodyMatches.keys,
                 folderChatIds = selectedFolderChatIds,
             )
         }
-    val visibleChatIds = remember(visibleItems) { visibleItems.map { it.id }.toSet() }
-    val orderedVisibleChatIds = remember(visibleItems) { visibleItems.map { it.id } }
+    val visibleItems = remember(searchSections) { searchSections.orderedItems() }
+
+    fun visibleRowId(item: ChatListItem): String =
+        if (searchActive) {
+            canonicalChatListGroupId(item.id)
+        } else {
+            item.id
+        }
+
+    val visibleChatIds =
+        remember(visibleItems, searchActive) {
+            visibleItems.mapTo(mutableSetOf(), ::visibleRowId)
+        }
+    val orderedVisibleChatIds =
+        remember(visibleItems, searchActive) {
+            visibleItems.map(::visibleRowId)
+        }
     val leadingChatListItemCount =
         if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
-    val visiblePinnedOrder = remember(visibleItems) { visibleItems.filter { it.pinned() }.map { it.id } }
-    val pinnedBoundary =
-        remember(visibleItems, showArchived) {
-            pinnedBoundaryIndex(
-                pinnedStates = visibleItems.map(ChatListItem::pinned),
-                showArchived = showArchived,
-            )
+    val visiblePinnedOrder =
+        remember(visibleItems, searchActive) {
+            if (searchActive) emptyList() else visibleItems.filter { it.pinned() }.map { it.id }
         }
+    val pinnedBoundary =
+        remember(visibleItems, showArchived, searchActive) {
+            if (searchActive) {
+                null
+            } else {
+                pinnedBoundaryIndex(
+                    pinnedStates = visibleItems.map(ChatListItem::pinned),
+                    showArchived = showArchived,
+                )
+            }
+        }
+    val ordinaryActiveList = !showArchived && !searchActive
     var nextHeadDemotionTransactionId by remember { mutableLongStateOf(0L) }
     var pendingHeadDemotion by
         remember(
@@ -504,8 +554,8 @@ internal fun ChatsScreen(
         if (actionSheetChatId != null && actionSheetChatId !in visibleChatIds) actionSheetChatId = null
     }
     val selectedVisibleItems =
-        remember(visibleItems, selectedChatIds.size) {
-            visibleItems.filter { it.id in selectedChatIds }
+        remember(visibleItems, searchActive, selectedChatIds.size) {
+            visibleItems.filter { visibleRowId(it) in selectedChatIds }
         }
     val bulkArchiveAction =
         remember(selectedVisibleItems) {
@@ -594,7 +644,7 @@ internal fun ChatsScreen(
         if (item.group.archived) return
         val nextPinned = !item.pinned()
         val headDemotion =
-            if (!nextPinned && !showArchived && visibleItems.firstOrNull()?.id == item.id) {
+            if (!nextPinned && ordinaryActiveList && visibleItems.firstOrNull()?.id == item.id) {
                 nextHeadDemotionTransactionId += 1L
                 ChatListHeadDemotion(
                     chatId = item.id,
@@ -644,10 +694,16 @@ internal fun ChatsScreen(
         ChatListDatasetKey(
             showArchived = showArchived,
             folderId = selectedFolderId,
-            query = trimmedQuery,
+            query = normalizedSearchQuery,
             accountRef = appState.activeAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
         )
+    ChatListSearchTopResetEffect(
+        listState = chatListState,
+        datasetKey = chatListDatasetKey,
+        searchActive = searchActive,
+        onScrollRequested = { programmaticViewportGeneration += 1L },
+    )
     var headScrollCorrectionInProgress by remember(chatListDatasetKey) { mutableStateOf(false) }
     val density = LocalDensity.current
     val dragEdgeThresholdPx = with(density) { 56.dp.toPx() }
@@ -769,22 +825,22 @@ internal fun ChatsScreen(
     //     or interrupt active scrolling (#541 / #1651).
     // Keyed on `showArchived` so the tracked head resets alongside
     // `chatListState` on a view swap.
-    val activeHeadId = if (showArchived) null else visibleItems.firstOrNull()?.id
-    LaunchedEffect(conversationReturnHeadId, activeHeadId, showArchived) {
+    val activeHeadId = visibleItems.firstOrNull()?.id.takeIf { ordinaryActiveList }
+    LaunchedEffect(conversationReturnHeadId, activeHeadId, ordinaryActiveList) {
         val headAtConversationOpen = conversationReturnHeadId ?: return@LaunchedEffect
         snapshotFlow {
             canDecideConversationReturnHeadSnap(
                 headIdAtConversationOpen = headAtConversationOpen,
                 currentHeadId = activeHeadId,
                 isScrollInProgress = chatListState.isScrollInProgress,
-                isActiveList = !showArchived,
+                isActiveList = ordinaryActiveList,
             )
         }.first { it }
         if (
             shouldSnapChatListOnConversationReturn(
                 headIdAtConversationOpen = headAtConversationOpen,
                 currentHeadId = activeHeadId,
-                isActiveList = !showArchived,
+                isActiveList = ordinaryActiveList,
             )
         ) {
             programmaticViewportGeneration += 1L
@@ -797,7 +853,7 @@ internal fun ChatsScreen(
         activeHeadId = activeHeadId,
         pinnedOrder = visiblePinnedOrder,
         datasetKey = chatListDatasetKey,
-        isActiveList = !showArchived,
+        isActiveList = ordinaryActiveList,
         userHeadDemotion = pendingHeadDemotion,
         userHeadDemotionSettled = pendingHeadDemotionSettled,
         userHeadDemotionTargetIndex = pendingHeadDemotionTargetIndex,
@@ -814,14 +870,14 @@ internal fun ChatsScreen(
         rememberChatListHeadReorderGate(
             activeHeadId = activeHeadId,
             datasetKey = chatListDatasetKey,
-            isActiveList = !showArchived,
+            isActiveList = ordinaryActiveList,
             scrollCorrectionInProgress = headScrollCorrectionInProgress,
         )
     val rowPlacementInProgress =
         rememberChatListRowPlacementGate(
-            orderedRowIds = orderedVisibleChatIds,
-            pinnedBoundaryIndex = pinnedBoundary,
-            leadingItemCount = leadingChatListItemCount,
+            orderedRowIds = if (searchActive) emptyList() else orderedVisibleChatIds,
+            pinnedBoundaryIndex = pinnedBoundary.takeUnless { searchActive },
+            leadingItemCount = leadingChatListItemCount.takeUnless { searchActive } ?: 0,
         )
     val chatListInteractionsEnabled = !headReorderInProgress && !rowPlacementInProgress
     val archivedUnreadCount =
@@ -918,6 +974,48 @@ internal fun ChatsScreen(
         )
         return
     }
+
+    val chatRowContent: @Composable LazyItemScope.(ChatListItem, Int, MessageBodyMatch?) -> Unit =
+        { item, targetIndex, bodyMatch ->
+            val rowId = visibleRowId(item)
+            Box(modifier = if (searchActive) Modifier else chatListRowMotion(targetIndex)) {
+                ChatListRow(
+                    item = item,
+                    appState = appState,
+                    accountRef = controller.boundAccountRef,
+                    isMuted = item.engineMuted(),
+                    interactionsEnabled = chatListInteractionsEnabled,
+                    selectionMode = selectionMode,
+                    selected = rowId in selectedChatIds,
+                    bodyMatch = bodyMatch,
+                    onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
+                    onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
+                    onOpenActions = {
+                        actionSheetChatId = rowId
+                    },
+                    onDragSelectionStart = { pointerWindowY ->
+                        actionSheetChatId = null
+                        dragAnchorChatId = rowId
+                        dragPointerWindowY = pointerWindowY
+                    },
+                    onDragSelection = { pointerWindowY ->
+                        dragPointerWindowY = pointerWindowY
+                        updateChatDragSelection(pointerWindowY)
+                    },
+                    onDragSelectionEnd = { finishChatDrag(clearSelection = false) },
+                    onDragSelectionCancel = {
+                        actionSheetChatId = null
+                        finishChatDrag(clearSelection = true)
+                    },
+                    rangeDragActive = dragAnchorChatId == rowId,
+                    onToggleSelection = {
+                        val updated = toggleChatListSelection(selectedChatIds, rowId)
+                        selectedChatIds.clear()
+                        selectedChatIds.addAll(updated)
+                    },
+                )
+            }
+        }
 
     Scaffold(
         topBar = {
@@ -1195,82 +1293,59 @@ internal fun ChatsScreen(
                                         )
                                     }
                                 }
-                            visibleItems.forEachIndexed { targetIndex, item ->
-                                if (targetIndex == pinnedBoundary) {
-                                    this.item(
-                                        key = CHAT_LIST_PINNED_BOUNDARY_KEY,
-                                        contentType = CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE,
+                            if (searchActive) {
+                                if (searchSections.groups.isNotEmpty()) {
+                                    item(
+                                        key = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY,
+                                        contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
                                     ) {
-                                        ChatListPinnedBoundary()
+                                        ChatListSearchSectionHeader(
+                                            title = stringResource(R.string.chat_list_filter_groups),
+                                            testTag = CHAT_LIST_SEARCH_GROUPS_HEADER_TAG,
+                                        )
                                     }
                                 }
-                                this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
-                                    // Body-match snippet + tap-to-message focus are
-                                    // for rows that matched ONLY on an older message
-                                    // body. A row that also matches its title or
-                                    // current preview keeps the normal single-line
-                                    // layout and a normal conversation open, so drop
-                                    // its body match here (issue #290 contract). The
-                                    // title/preview test mirrors the synchronous
-                                    // match in applyChatListSearchAndFilter so the
-                                    // classification can't drift from the filter.
-                                    val rawBodyMatch = bodyMatches[item.id]
-                                    val bodyMatch =
-                                        remember(
-                                            item,
-                                            appState,
-                                            groupTitleCopy,
-                                            ciSearchNeedle,
-                                            profileRev,
-                                            rawBodyMatch,
-                                        ) {
-                                            rawBodyMatch?.takeUnless {
-                                                ChatListMessageSearch.titleOrPreviewMatches(
-                                                    displayTitle =
-                                                        chatListItemDisplayTitle(item, appState, groupTitleCopy),
-                                                    previewText = item.projectedPreviewText(),
-                                                    ciNeedle = ciSearchNeedle,
-                                                    description = item.group.description,
-                                                )
-                                            }
-                                        }
-                                    Box(modifier = chatListRowMotion(targetIndex)) {
-                                        ChatListRow(
-                                            item = item,
-                                            appState = appState,
-                                            accountRef = controller.boundAccountRef,
-                                            isMuted =
-                                                item.engineMuted(),
-                                            interactionsEnabled = chatListInteractionsEnabled,
-                                            selectionMode = selectionMode,
-                                            selected = item.id in selectedChatIds,
-                                            bodyMatch = bodyMatch,
-                                            onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
-                                            onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
-                                            onOpenActions = {
-                                                actionSheetChatId = item.id
-                                            },
-                                            onDragSelectionStart = { pointerWindowY ->
-                                                actionSheetChatId = null
-                                                dragAnchorChatId = item.id
-                                                dragPointerWindowY = pointerWindowY
-                                            },
-                                            onDragSelection = { pointerWindowY ->
-                                                dragPointerWindowY = pointerWindowY
-                                                updateChatDragSelection(pointerWindowY)
-                                            },
-                                            onDragSelectionEnd = { finishChatDrag(clearSelection = false) },
-                                            onDragSelectionCancel = {
-                                                actionSheetChatId = null
-                                                finishChatDrag(clearSelection = true)
-                                            },
-                                            rangeDragActive = dragAnchorChatId == item.id,
-                                            onToggleSelection = {
-                                                val updated = toggleChatListSelection(selectedChatIds, item.id)
-                                                selectedChatIds.clear()
-                                                selectedChatIds.addAll(updated)
-                                            },
+                                searchSections.groups.forEachIndexed { targetIndex, item ->
+                                    this.item(
+                                        key = visibleRowId(item),
+                                        contentType = CHAT_LIST_ROW_CONTENT_TYPE,
+                                    ) {
+                                        chatRowContent(item, targetIndex, null)
+                                    }
+                                }
+                                if (searchSections.messages.isNotEmpty()) {
+                                    item(
+                                        key = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY,
+                                        contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
+                                    ) {
+                                        ChatListSearchSectionHeader(
+                                            title = stringResource(R.string.notification_channel_messages),
+                                            testTag = CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG,
                                         )
+                                    }
+                                }
+                                searchSections.messages.forEachIndexed { messageIndex, item ->
+                                    val canonicalId = visibleRowId(item)
+                                    this.item(
+                                        key = canonicalId,
+                                        contentType = CHAT_LIST_ROW_CONTENT_TYPE,
+                                    ) {
+                                        val bodyMatch = bodyMatches[canonicalId]
+                                        chatRowContent(item, searchSections.groups.size + messageIndex, bodyMatch)
+                                    }
+                                }
+                            } else {
+                                visibleItems.forEachIndexed { targetIndex, item ->
+                                    if (targetIndex == pinnedBoundary) {
+                                        this.item(
+                                            key = CHAT_LIST_PINNED_BOUNDARY_KEY,
+                                            contentType = CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE,
+                                        ) {
+                                            ChatListPinnedBoundary()
+                                        }
+                                    }
+                                    this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
+                                        chatRowContent(item, targetIndex, null)
                                     }
                                 }
                             }
@@ -1346,7 +1421,7 @@ internal fun ChatsScreen(
     }
 
     actionSheetChatId
-        ?.let { id -> visibleItems.firstOrNull { it.id == id } }
+        ?.let { id -> visibleItems.firstOrNull { visibleRowId(it) == id } }
         ?.let { item ->
             val hasUnread = item.effectiveHasUnread(appState.activeAccount?.accountIdHex)
             val muted = item.engineMuted()
@@ -1369,7 +1444,7 @@ internal fun ChatsScreen(
                 onMovePinned = { delta -> movePinnedChat(item, delta) },
                 onSelect = {
                     selectedChatIds.clear()
-                    selectedChatIds.addAll(enterChatListSelection(item.id))
+                    selectedChatIds.addAll(enterChatListSelection(visibleRowId(item)))
                 },
                 onDelete = { pendingBulkDelete = listOf(item) },
                 onDismiss = { actionSheetChatId = null },
@@ -1578,10 +1653,57 @@ private const val CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE = "pinned-boundary"
 
 private const val CHAT_LIST_ROW_CONTENT_TYPE = "chat-row"
 
+private const val CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE = "search-section-header"
+
+internal const val CHAT_LIST_SEARCH_GROUPS_HEADER_KEY = "chat-list-search-groups-header"
+internal const val CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY = "chat-list-search-messages-header"
+internal const val CHAT_LIST_SEARCH_GROUPS_HEADER_TAG = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY
+internal const val CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY
+
+private data class ChatListBodySearchKey(
+    val query: String,
+    val accountRef: String?,
+    val showArchived: Boolean,
+    val canonicalGroupIds: List<String>,
+)
+
+private class ChatListBodySearchRequest
+
+private data class ChatListBodySearchResult(
+    val request: ChatListBodySearchRequest,
+    val matches: Map<String, MessageBodyMatch>,
+)
+
 // Debounce before the chat-list message-body search fires its per-chat FFI
 // queries (issue #290). Sits inside the existing 250–300 ms chat-list input
 // debounce band so a fast typist doesn't trigger a query per keystroke.
 internal const val CHAT_LIST_SEARCH_DEBOUNCE_MS: Long = 275L
+
+@Composable
+@Suppress("FunctionNaming")
+internal fun ChatListSearchSectionHeader(
+    title: String,
+    testTag: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Text(
+            text = title,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .semantics { heading() }
+                    .testTag(testTag)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
 
 @Composable
 private fun AppUpdateBanner(

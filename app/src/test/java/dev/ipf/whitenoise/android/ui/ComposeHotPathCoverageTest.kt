@@ -97,6 +97,9 @@ class ComposeHotPathCoverageTest {
     @Test
     fun chatListScrollAndRowSearchWorkAreIsolatedFromScreenComposition() {
         val source = source("chats/ChatsScreen.kt").readText()
+        val searchProjectionRemember =
+            "remember\\(sourceList, normalizedSearchQuery, selectedFolderChatIds, " +
+                "groupTitleCopy, profileRev, bodyMatches\\)"
 
         assertTrue(
             "scroll index must be observed from snapshotFlow",
@@ -108,13 +111,12 @@ class ComposeHotPathCoverageTest {
         )
         assertTrue(
             "the normalized search needle must be remembered once per query",
-            "val ciSearchNeedle = remember(trimmedQuery) { trimmedQuery.lowercase(Locale.ROOT) }" in source,
+            "val normalizedSearchQuery = remember(trimmedQuery) { localeInvariantFold(trimmedQuery) }" in source,
         )
         assertTrue(
-            "per-row title and preview classification must be memoized",
-            Regex(
-                """remember\(\s*item,\s*appState,\s*groupTitleCopy,\s*ciSearchNeedle,\s*profileRev,\s*rawBodyMatch,""",
-            ).containsMatchIn(source),
+            "title, metadata, and body classification must be projected once per result dataset",
+            Regex(searchProjectionRemember).containsMatchIn(source) &&
+                "projectChatListSearchSections(" in source,
         )
     }
 
