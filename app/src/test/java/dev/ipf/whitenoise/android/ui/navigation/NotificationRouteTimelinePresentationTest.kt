@@ -7,7 +7,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
@@ -192,6 +194,7 @@ class NotificationRouteTimelinePresentationTest {
         assertEquals(2, scriptedSubscriptions.timelineSubscriptionOpenCount)
         awaitConversationCondition { replacementSubscription.nextUpdateCallCount >= 1 }
         assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate(replacementSubscription)
+        composeRule.onNodeWithText("notified body").assertIsDisplayed()
         assertFalse(attachedControllers.any { it !== mountedController })
     }
 
