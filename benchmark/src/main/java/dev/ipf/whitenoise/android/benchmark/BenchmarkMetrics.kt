@@ -13,6 +13,7 @@ internal const val SCROLL_CONVERSATION_TRACE = "benchmark:scroll-conversation"
 internal const val SECONDARY_ACCOUNT_NOTIFICATION_TRACE = "benchmark:secondary-account-notification"
 internal const val OPEN_CONVERSATION_VISIBLE_TRACE = "benchmark:open-conversation-visible"
 internal const val OPEN_CONVERSATION_SETTLED_TRACE = "benchmark:open-conversation-settled"
+internal const val WARM_RESUME_FIRST_USEFUL_FRAME_TRACE = "WhiteNoise.warmResume.firstUsefulFrame"
 
 private val notificationRoutePhaseSections =
     listOf(
@@ -64,6 +65,18 @@ internal fun openConversationMetrics(): List<Metric> =
             mode = TraceSectionMetric.Mode.First,
             label = "routeSettledMs",
             targetPackageOnly = false,
+        ),
+    )
+
+@OptIn(ExperimentalMetricApi::class)
+internal fun warmResumeMetrics(): List<Metric> =
+    listOf(
+        FrameTimingMetric(),
+        TraceSectionMetric(
+            sectionName = WARM_RESUME_FIRST_USEFUL_FRAME_TRACE,
+            mode = TraceSectionMetric.Mode.First,
+            label = "firstUsefulFrameMs",
+            targetPackageOnly = true,
         ),
     )
 

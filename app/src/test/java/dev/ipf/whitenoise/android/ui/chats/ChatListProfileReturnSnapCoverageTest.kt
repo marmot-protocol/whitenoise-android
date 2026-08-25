@@ -116,6 +116,7 @@ class ChatListProfileReturnSnapCoverageTest {
     @Test
     fun nonListConversationOpensDoNotConsumeStaleReturnHead() {
         val mainShell = mainShellSource().readText()
+        val stateHolder = mainShellStateHolderSource().readText()
 
         val notificationCommitBlock =
             mainShell.requiredSection(
@@ -137,14 +138,18 @@ class ChatListProfileReturnSnapCoverageTest {
             Regex("""commitNotificationConversationOpen\(""").containsMatchIn(notificationOpenBlock),
         )
 
-        val restoreBlock =
-            mainShell.requiredSection(
-                start = "if (savedGroupId != null && selectedChat == null) {",
-                end = "\n        }\n        hasRestoredSelectedChat = true",
-            )
         assertTrue(
-            "process-restore opens must reset armed return-head provenance",
-            Regex("""resetChatListReturnHeadSnap\(""").containsMatchIn(restoreBlock),
+            "return-head provenance must remain composition-local and start unarmed",
+            "var chatListReturnHeadSnap by remember" in mainShell &&
+                "ChatListReturnHeadSnapState.Unarmed" in mainShell,
+        )
+        assertFalse(
+            "process-restored conversation routes must not retain stale return-head provenance",
+            "chatListReturnHeadSnap" in stateHolder,
+        )
+        assertTrue(
+            "process-restored conversation routes must be resolved by the retained shell state holder",
+            "restoreConversationIfReady" in stateHolder,
         )
     }
 
@@ -230,6 +235,13 @@ class ChatListProfileReturnSnapCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing MainShell.kt source file")
+
+    private fun mainShellStateHolderSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellStateHolder.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellStateHolder.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing MainShellStateHolder.kt source file")
 
     private fun String.requiredSection(
         start: String,

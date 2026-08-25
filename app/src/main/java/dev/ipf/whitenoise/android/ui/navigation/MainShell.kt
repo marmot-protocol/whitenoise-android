@@ -23,7 +23,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -37,6 +36,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.LayoutDirection.Ltr
 import androidx.compose.ui.unit.LayoutDirection.Rtl
 import androidx.compose.ui.window.SecureFlagPolicy
+import androidx.lifecycle.SavedStateHandle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.notifications.NotificationInviteAuthoritativeOutcome
@@ -70,7 +70,6 @@ import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
-import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
@@ -86,7 +85,6 @@ import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
-import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
@@ -337,6 +335,7 @@ internal fun resolveMainShellContentRoute(
 @Composable
 internal fun MainShell(
     appState: WhiteNoiseAppState,
+    stateHolder: MainShellStateHolder? = null,
     inboundNotificationTarget: NotificationTarget? = null,
     inboundNotificationRequestId: Long = 0L,
     onNotificationTargetHandled: (NotificationTarget, Long) -> Unit = { _, _ -> },
@@ -345,9 +344,24 @@ internal fun MainShell(
     inboundAppUpdateTap: Int = 0,
     onAppUpdateTapHandled: (Int) -> Unit = {},
 ) {
+    val shellStateHolder =
+        remember(appState, stateHolder) {
+            stateHolder ?: MainShellStateHolder(appState, SavedStateHandle())
+        }
+    DisposableEffect(shellStateHolder, stateHolder) {
+        onDispose {
+            if (stateHolder == null) shellStateHolder.release()
+        }
+    }
+    val chatsController =
+        shellStateHolder.chatsController(
+            accountRef = appState.activeAccountRef,
+            runtimeGeneration = appState.runtimeGeneration,
+        )
+    shellStateHolder.restoreConversationIfReady(chatsController, appState.activeAccountRef)
     var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
     var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedChat by remember { mutableStateOf<ChatListItem?>(null) }
+    var selectedChat by shellStateHolder.selectedChat
     // Retain the complete outgoing route for the short back-slide. Account pin,
     // controller and decrypted seed are one ownership unit; retaining only the
     // chat would rebuild it against the active account during an early Back.
@@ -359,38 +373,24 @@ internal fun MainShell(
     // math instead of painting an empty destination and filling it afterward.
     var pendingConversationOpen by remember { mutableStateOf<PendingConversationOpen?>(null) }
     var nextPendingConversationOpenRequestId by remember { mutableLongStateOf(0L) }
-    // The open conversation must survive Activity recreation / process death
-    // (issue #386): the in-app camera foregrounds an external activity that can
-    // get the host process killed on low-memory devices, and on return a null
-    // selection drops the user on the chat list and discards the staged capture
-    // owned by ConversationScreen. Per AGENTS.md we must NOT serialize the
-    // ChatListItem (it wraps FFI records) into the saved bundle — only the
-    // lightweight group id hex is persisted, and selectedChat is re-resolved
-    // from the live ChatsController once its list loads.
-    var savedSelectedGroupIdHex by rememberSaveable { mutableStateOf<String?>(null) }
-    // Reset on each new composition (plain remember, not Saveable): a fresh
-    // composition after process death must be allowed exactly one restore
-    // attempt. Once that attempt runs — or the user explicitly navigates —
-    // the sync effect below owns the saved id and this stays true.
-    var hasRestoredSelectedChat by remember { mutableStateOf(false) }
     // Open-time conversation state. Search hits carry a focus id; every
     // notification tap advances the request id so an already-mounted
     // ConversationScreen re-runs its first-unread anchor.
-    var selectedChatOpenContext by remember { mutableStateOf(ConversationOpenContext()) }
+    var selectedChatOpenContext by shellStateHolder.selectedChatOpenContext
     // True only when `selectedChat` was opened straight off a just-completed
     // New Chat / Create Group flow (issue #321), so ConversationScreen raises
     // the composer + keyboard once on entry. Plain `remember` (not
     // rememberSaveable) so it never survives process death. Reset on every
     // other open path and on back.
-    var selectedChatJustCreated by remember { mutableStateOf(false) }
+    var selectedChatJustCreated by shellStateHolder.selectedChatJustCreated
     // True only for the route that has just created a 1:1 DM and is opening it
     // before the live roster has necessarily settled. Suppresses the group-style
     // member-count subtitle during that transient 0/1-member window (#998).
-    var selectedChatOpenedAsDmHint by remember { mutableStateOf(false) }
+    var selectedChatOpenedAsDmHint by shellStateHolder.selectedChatOpenedAsDmHint
     // Per-conversation scroll anchors for back-to-list re-entry (issue #1107).
     // Keyed by account + group id; dropped when the reader leaves near-bottom so
     // the normal unread/newest anchor still runs for chats left at the tail.
-    val conversationScrollSnapshots = remember { mutableStateMapOf<String, ConversationScrollSnapshot>() }
+    val conversationScrollSnapshots = shellStateHolder.conversationScrollSnapshots
     // Visible active-list head provenance while a conversation opened from
     // ChatsScreen is foregrounded. Published back to the list only after
     // setChatListVisible(true) flushes pending recompute (issue #1313).
@@ -411,7 +411,15 @@ internal fun MainShell(
     // (switching account / awaiting its chat list). Holds a single stable loading
     // state over the multi-step route so the chat list never paints as an
     // intermediate stop between the account switch and the opened conversation.
-    var routingNotification by remember { mutableStateOf(false) }
+    var routingNotification by remember(inboundNotificationRequestId) {
+        mutableStateOf(inboundNotificationTarget != null)
+    }
+    var routingShare by remember(inboundShareRequest?.requestId) {
+        mutableStateOf(inboundShareRequest != null)
+    }
+    var routingAppUpdate by remember(inboundAppUpdateTap) {
+        mutableStateOf(inboundAppUpdateTap != 0)
+    }
     // Tracks whether an in-flight group-create completion may still open its
     // conversation. Explicit shell navigation advances [navigationGeneration]
     // and invalidates a captured pending generation (issue #1953).
@@ -558,19 +566,10 @@ internal fun MainShell(
             }
         }
     }
-    val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
     val deferNotificationChatListBind =
         shouldDeferNotificationChatListBind(notificationFirstFrameGate, appState.activeAccountRef)
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
-
-    DisposableEffect(chatsController) {
-        appState.attachChatsController(chatsController)
-        onDispose {
-            appState.attachChatsController(null)
-            chatsController.onCleared()
-        }
-    }
 
     LaunchedEffect(
         chatsController,
@@ -582,7 +581,7 @@ internal fun MainShell(
         if (deferNotificationChatListBind) return@LaunchedEffect
         chatsController.bind(
             accountRef = appState.activeAccountRef,
-            preserveLoadedContent = chatsController.retryGeneration > 0L,
+            preserveLoadedContent = chatsController.retryGeneration > 0L || chatsController.hasLoadedLocalSnapshot,
         )
     }
 
@@ -1163,6 +1162,7 @@ internal fun MainShell(
         selectedChatOpenContext = ConversationOpenContext()
         selectedChatJustCreated = false
         routingNotification = false
+        routingAppUpdate = false
         appState.showAppUpdateBannerFromNotification()
         onAppUpdateTapHandled(tap)
     }
@@ -1280,6 +1280,7 @@ internal fun MainShell(
         if (appState.appLockScreenVisible) {
             supersedePendingTtsDestinationNavigation()
             clearSharePickerRequest()
+            routingShare = false
         }
     }
 
@@ -1295,7 +1296,12 @@ internal fun MainShell(
         chatsController.isLoading,
         chatsController.items,
     ) {
-        val request = inboundShareRequest ?: return@LaunchedEffect
+        val request =
+            inboundShareRequest ?: run {
+                routingShare = false
+                return@LaunchedEffect
+            }
+        routingShare = true
         supersedePendingTtsDestinationNavigation()
         if (!shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) return@LaunchedEffect
         if (appState.accounts.isEmpty()) return@LaunchedEffect
@@ -1311,54 +1317,14 @@ internal fun MainShell(
             clearSharePickerRequest()
             onShareRequestHandled(request)
             stageShareToChats(request, accountRef, listOf(directGroupId))
+            routingShare = false
         } else {
             val store = pendingShareRequestStore ?: return@LaunchedEffect
             val persisted = withContext(Dispatchers.IO) { store.save(request) }
-            onShareRequestHandled(request)
             sharePickerRequest = request
             savedSharePickerRequestId = request.requestId.takeIf { persisted }
-        }
-    }
-
-    // One-shot restore after process death: once the chat list for the active
-    // account is loaded, re-resolve the saved group id back to a live
-    // ChatListItem (issue #386). Runs before the sync effect can clobber the
-    // saved id, and closes the restore window (hasRestoredSelectedChat) as soon
-    // as the list is ready — whether or not a saved selection was present — so
-    // it never overrides a later explicit user navigation.
-    LaunchedEffect(
-        chatsController,
-        chatsController.boundAccountRef,
-        chatsController.isLoading,
-        chatsController.items,
-    ) {
-        if (hasRestoredSelectedChat) return@LaunchedEffect
-        val chatListReady =
-            chatsController.boundAccountRef == appState.activeAccountRef &&
-                !chatsController.isLoading
-        if (!chatListReady) return@LaunchedEffect
-        val savedGroupId = savedSelectedGroupIdHex
-        if (savedGroupId != null && selectedChat == null) {
-            (chatsController.items + chatsController.archivedItems)
-                .firstOrNull { it.group.groupIdHex == savedGroupId }
-                ?.let {
-                    chatListReturnHeadSnap = resetChatListReturnHeadSnap()
-                    selectedChatOpenContext = ConversationOpenContext()
-                    selectedChatOpenedAsDmHint = false
-                    selectedChat = it
-                }
-        }
-        hasRestoredSelectedChat = true
-    }
-
-    // Keep the saved (Saveable) group id in step with the live selection so a
-    // recreation always restores the right conversation — and so returning to
-    // the chat list (selectedChat == null) clears it, preventing a stale
-    // restore. Gated until the one-shot restore window has closed so it can't
-    // null out the saved id before restore reads it. See issue #386.
-    LaunchedEffect(selectedChat?.group?.groupIdHex, hasRestoredSelectedChat) {
-        if (hasRestoredSelectedChat) {
-            savedSelectedGroupIdHex = selectedChat?.group?.groupIdHex
+            routingShare = false
+            onShareRequestHandled(request)
         }
     }
 
@@ -1633,34 +1599,49 @@ internal fun MainShell(
     val navAccountStable =
         mainShellAccountContentOwned(previousActiveAccountRef, appState.activeAccountRef) ||
             earlyOpenLandsPinnedAccount
+    // Activity recreation reads the live selection synchronously from the
+    // holder. Process restoration keeps only lightweight route keys. Persist
+    // only after account ownership is stable so an account-switch frame cannot
+    // save the previous account's group under the destination account.
+    LaunchedEffect(
+        selectedChat?.group?.groupIdHex,
+        conversationAccountRef,
+        navAccountStable,
+    ) {
+        if (selectedChat == null || navAccountStable) {
+            shellStateHolder.persistConversationRoute(conversationAccountRef)
+        }
+    }
     val controllerChat =
         selectedChat?.takeIf { navAccountStable && conversationAccountRef != null }
             ?: accountOwnedPendingConversationOpen?.item
     val selectedOrPendingConversationController =
         controllerChat?.let { openChat ->
-            remember(openChat.id, conversationAccountRef, appState.runtimeGeneration) {
-                // startOnConstruction begins the subscription before this
-                // composition commits — the guard clears it if the commit
-                // never happens, since DisposableEffect can't run then.
-                RememberAbandonmentGuard(
+            conversationAccountRef?.let { accountRef ->
+                shellStateHolder.conversationController(
+                    chatId = openChat.id,
+                    accountRef = accountRef,
+                    runtimeGeneration = appState.runtimeGeneration,
+                    presentationKey = conversationControllerCopy.hashCode(),
+                ) {
                     ConversationController(
                         appState = appState,
                         initialGroup = openChat.group,
                         initialMemberSnapshot =
                             openChat.memberSnapshot
                                 ?: appState.cachedGroupMemberSnapshot(
-                                    conversationAccountRef,
+                                    accountRef,
                                     openChat.group.groupIdHex,
                                 ),
                         initialChatListRow = openChat.projection,
                         initialIsDm = openChat.isDm(),
                         initialTimelinePreview = openChat.projection?.lastMessage,
-                        accountRefOverride = conversationAccountRef?.takeIf { it != appState.activeAccountRef },
+                        accountRefOverride = accountRef.takeIf { it != appState.activeAccountRef },
                         startOnConstruction = true,
                         copy = conversationControllerCopy,
-                    ),
-                ) { it.onCleared() }
-            }.value
+                    )
+                }
+            }
         }
     val conversationController =
         selectedOrPendingConversationController
@@ -1706,13 +1687,15 @@ internal fun MainShell(
                 appState.attachConversationController(ownedController)
                 onDispose {
                     appState.detachConversationController(ownedController)
-                    ownedController.onCleared()
                 }
             }
             LaunchedEffect(ownedController, ownedController.retryGeneration) {
                 ownedController.start()
             }
         }
+    }
+    LaunchedEffect(ownedConversationControllers) {
+        shellStateHolder.retainConversationControllers(ownedConversationControllers)
     }
     LaunchedEffect(
         conversationController,
@@ -1786,12 +1769,16 @@ internal fun MainShell(
         section,
         appState.pendingProfileNpub,
         routingNotification,
+        routingShare,
+        routingAppUpdate,
     ) {
         val supersededByOtherNavigation =
             selectedChat != null ||
                 section != MainSection.Chats ||
                 appState.pendingProfileNpub != null ||
-                routingNotification
+                routingNotification ||
+                routingShare ||
+                routingAppUpdate
         if (pendingConversationOpen != null && supersededByOtherNavigation) {
             pendingConversationOpen = null
         }
@@ -1878,7 +1865,10 @@ internal fun MainShell(
         routeTransition.AnimatedContent(
             transitionSpec = {
                 when {
-                    routingNotification || pendingTtsDestinationNavigation != null ->
+                    routingNotification ||
+                        routingShare ||
+                        routingAppUpdate ||
+                        pendingTtsDestinationNavigation != null ->
                         EnterTransition.None togetherWith ExitTransition.None
                     targetState != null ->
                         slideInHorizontally(
@@ -1905,7 +1895,7 @@ internal fun MainShell(
             when (
                 resolveMainShellContentRoute(
                     conversationOpen = animatedConversation != null,
-                    routingNotification = routingNotification,
+                    routingNotification = routingNotification || routingShare || routingAppUpdate,
                     routingTtsReturn = pendingTtsDestinationNavigation != null,
                 )
             ) {
