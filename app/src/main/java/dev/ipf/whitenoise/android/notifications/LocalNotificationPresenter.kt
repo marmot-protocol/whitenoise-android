@@ -161,7 +161,8 @@ class LocalNotificationPresenter(
         val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
         val mention = LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex)
         val agentActivity = LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex)
-        listOf(message, reaction, mention, agentActivity).forEach { key ->
+        val groupMembership = LocalNotificationFormatter.groupMembershipDismissalKey(accountRef, groupIdHex)
+        listOf(message, reaction, mention, agentActivity, groupMembership).forEach { key ->
             cancelSynchronized(manager, key.tag, key.id)
         }
         dismissInvitesForGroup(accountRef, groupIdHex)
