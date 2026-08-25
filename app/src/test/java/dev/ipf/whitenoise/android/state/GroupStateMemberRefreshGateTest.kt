@@ -4,7 +4,10 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupRosterFfi
@@ -21,6 +24,192 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class GroupStateMemberRefreshGateTest {
+    @Test
+    fun restoredTwoMemberGroupSnapshotPreservesTranscriptChromeAcrossRefresh() =
+        runBlocking {
+            val restoredSnapshot =
+                GroupMemberSnapshot(
+                    listOf(
+                        cachedMember("alice", local = true),
+                        cachedMember("bob"),
+                    ),
+                )
+            val firstController =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(name = ""),
+                    initialMemberSnapshot = restoredSnapshot,
+                    initialChatListRow = chatListRow(ChatConversationKindFfi.GROUP),
+                    groupRosterReader = { _, _ ->
+                        roster(
+                            member("alice", isAdmin = true, isSelf = true, local = true),
+                            member("bob", isAdmin = false),
+                        )
+                    },
+                )
+
+            assertEquals(2, firstController.memberCount)
+            assertFalse(firstController.isDm)
+            assertFalse(firstController.membersVerified)
+            assertTrue(firstController.usesDirectTranscriptChrome)
+            firstController.retryMembers()
+            assertTrue(firstController.usesDirectTranscriptChrome)
+        }
+
+    @Test
+    fun directTranscriptChromeSurvivesRestoredAndUnprojectedOpenings() {
+        val restoredSnapshot = twoMemberSnapshot()
+
+        val restoredDirectController =
+            ConversationController(
+                appState = appState(),
+                initialGroup = group(name = ""),
+                initialMemberSnapshot = restoredSnapshot,
+                initialChatListRow = chatListRow(ChatConversationKindFfi.DIRECT),
+            )
+        assertFalse(restoredDirectController.membersVerified)
+        assertTrue(restoredDirectController.isDm)
+        assertTrue(restoredDirectController.usesDirectTranscriptChrome)
+
+        val unprojectedUnnamedController =
+            ConversationController(
+                appState = appState(),
+                initialGroup = group(name = ""),
+                initialMemberSnapshot = restoredSnapshot,
+            )
+        assertTrue(unprojectedUnnamedController.isDm)
+        assertFalse(unprojectedUnnamedController.membersVerified)
+        assertTrue(unprojectedUnnamedController.usesDirectTranscriptChrome)
+    }
+
+    @Test
+    fun failedRefreshKeepsLastKnownTwoMemberChromeAndDoesNotLeakToReplacementController() =
+        runBlocking {
+            val refreshFailureController =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = twoMemberSnapshot(),
+                    initialChatListRow = chatListRow(ChatConversationKindFfi.GROUP),
+                    groupRosterReader = { _, _ -> error("refresh failed") },
+                )
+            assertTrue(refreshFailureController.usesDirectTranscriptChrome)
+            refreshFailureController.retryMembers()
+            assertFalse(refreshFailureController.membersVerified)
+            assertEquals(GroupRosterLoadState.FAILED, refreshFailureController.memberRosterState)
+            assertTrue(refreshFailureController.usesDirectTranscriptChrome)
+
+            // Account and conversation switches replace the controller. The
+            // replacement derives presentation from its own opening snapshot
+            // instead of inheriting the previous conversation's two-party mode.
+            val replacementController = ConversationController(appState = appState(), initialGroup = group())
+            assertFalse(replacementController.membersVerified)
+            assertFalse(replacementController.usesDirectTranscriptChrome)
+            assertTrue(refreshFailureController.usesDirectTranscriptChrome)
+        }
+
+    @Test
+    fun directOpeningHintPreservesChromeWithoutRowOrRosterUntilAuthoritativeStateArrives() =
+        runBlocking {
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(name = ""),
+                    initialIsDm = true,
+                    groupRosterReader = { _, _ -> error("refresh failed") },
+                )
+
+            assertFalse(controller.membersVerified)
+            assertTrue(controller.isDm)
+            assertTrue(controller.usesDirectTranscriptChrome)
+
+            controller.retryMembers()
+
+            assertEquals(GroupRosterLoadState.FAILED, controller.memberRosterState)
+            assertFalse(controller.membersVerified)
+            assertTrue(controller.isDm)
+            assertTrue(controller.usesDirectTranscriptChrome)
+        }
+
+    @Test
+    fun verifiedThreeMemberRosterSupersedesDirectOpeningHint() =
+        runBlocking {
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(name = ""),
+                    initialIsDm = true,
+                    groupRosterReader = { _, _ ->
+                        roster(
+                            member("alice", isAdmin = true, isSelf = true, local = true),
+                            member("bob", isAdmin = false),
+                            member("carol", isAdmin = false),
+                        )
+                    },
+                )
+            assertTrue(controller.usesDirectTranscriptChrome)
+
+            controller.retryMembers()
+
+            assertTrue(controller.membersVerified)
+            assertFalse(controller.isDm)
+            assertFalse(controller.usesDirectTranscriptChrome)
+        }
+
+    @Test
+    fun verifiedRosterDrivesTwoToThreeToTwoTranscriptChromeWithoutFailureFlicker() =
+        runBlocking {
+            var rosterRead = 0
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    groupRosterReader = { _, _ ->
+                        when (rosterRead++) {
+                            0 ->
+                                roster(
+                                    member("alice", isAdmin = true, isSelf = true, local = true),
+                                    member("bob", isAdmin = false),
+                                )
+                            1 ->
+                                roster(
+                                    member("alice", isAdmin = true, isSelf = true, local = true),
+                                    member("bob", isAdmin = false),
+                                    member("carol", isAdmin = false),
+                                )
+                            2 ->
+                                roster(
+                                    member("alice", isAdmin = true, isSelf = true, local = true),
+                                    member("ALICE", isAdmin = true, isSelf = true, local = true),
+                                    member("bob", isAdmin = false),
+                                    memberCount = 2u,
+                                )
+                            else -> error("refresh failed")
+                        }
+                    },
+                )
+
+            assertFalse(controller.membersVerified)
+            assertFalse(controller.usesDirectTranscriptChrome)
+
+            controller.retryMembers()
+            assertFalse(controller.isDm)
+            assertEquals(2, controller.memberCount)
+            assertTrue(controller.usesDirectTranscriptChrome)
+
+            controller.retryMembers()
+            assertEquals(3, controller.memberCount)
+            assertFalse(controller.usesDirectTranscriptChrome)
+
+            controller.retryMembers()
+            assertEquals(2, controller.memberCount)
+            assertTrue(controller.usesDirectTranscriptChrome)
+
+            controller.retryMembers()
+            assertEquals(GroupRosterLoadState.READY, controller.memberRosterState)
+            assertTrue(controller.usesDirectTranscriptChrome)
+        }
+
     @Test
     fun refreshUsesOneAuthoritativeRosterRead() =
         runBlocking {
@@ -164,6 +353,14 @@ class GroupStateMemberRefreshGateTest {
             activeAccountRef = "alice",
         )
 
+    private fun twoMemberSnapshot() =
+        GroupMemberSnapshot(
+            listOf(
+                cachedMember("alice", local = true),
+                cachedMember("bob"),
+            ),
+        )
+
     private fun roster(
         vararg members: GroupMemberDetailsFfi,
         groupIdHex: String = "group",
@@ -195,50 +392,95 @@ class GroupStateMemberRefreshGateTest {
         displayName = null,
     )
 
-    private fun group(selfMembership: SelfMembershipFfi = SelfMembershipFfi.MEMBER) =
-        AppGroupRecordFfi(
-            selfMembership = selfMembership,
+    private fun cachedMember(
+        memberId: String,
+        local: Boolean = false,
+    ) = AppGroupMemberRecordFfi(
+        memberIdHex = memberId,
+        account = memberId.takeIf { local },
+        local = local,
+    )
+
+    private fun chatListRow(conversationKind: ChatConversationKindFfi) =
+        ChatListRowFfi(
+            selfMembership = SelfMembershipFfi.MEMBER,
+            unreadMentionCount = 0uL,
+            unreadMention = false,
             groupIdHex = "group",
-            protocolProfile = dev.ipf.marmotkit.AppProtocolProfileFfi.LEGACY,
-            profilePresent = false,
-            endpoint = "endpoint",
-            name = "Group",
-            description = "A group",
-            admins = listOf("alice"),
-            relays = listOf("wss://relay.example"),
-            nostrGroupIdHex = "nostr",
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            imageHashHex = null,
-            encryptedMedia =
-                AppGroupEncryptedMediaComponentFfi(
-                    componentId = 0x8008u,
-                    component = "marmot.group.encrypted-media.v1",
-                    required = true,
-                    version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
-                    mediaFormat = "encrypted-media-v1",
-                    allowedLocatorKinds = listOf("blossom-v1"),
-                    defaultBlobEndpoints =
-                        listOf(
-                            AppBlobEndpointFfi(
-                                locatorKind = "blossom-v1",
-                                baseUrl = "https://blossom.primal.net",
-                            ),
-                        ),
-                ),
             archived = false,
             pendingConfirmation = false,
-            unrecoverable = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-            disappearingMessageSecs = 0uL,
+            title = "Group",
+            groupName = "Group",
+            avatarUrl = null,
+            avatar = null,
+            lastMessage = null,
+            unreadCount = 0uL,
+            hasUnread = false,
+            firstUnreadMessageIdHex = null,
+            lastReadMessageIdHex = null,
+            lastReadTimelineAt = null,
+            conversationCreatedAt = 0uL,
+            activitySortAt = 0uL,
+            updatedAt = 0uL,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            manuallyMarkedUnread = false,
+            conversationKind = conversationKind,
+            muted = false,
+            mutedUntilMs = null,
+            pinned = false,
+            pinnedPosition = null,
+            lifecycleState = GroupLifecycleStateFfi.STABLE,
             disbanding = false,
-            disbanded = false,
             disbandRequest = null,
         )
+
+    private fun group(
+        selfMembership: SelfMembershipFfi = SelfMembershipFfi.MEMBER,
+        name: String = "Group",
+    ) = AppGroupRecordFfi(
+        selfMembership = selfMembership,
+        groupIdHex = "group",
+        protocolProfile = dev.ipf.marmotkit.AppProtocolProfileFfi.LEGACY,
+        profilePresent = false,
+        endpoint = "endpoint",
+        name = name,
+        description = "A group",
+        admins = listOf("alice"),
+        relays = listOf("wss://relay.example"),
+        nostrGroupIdHex = "nostr",
+        avatarUrl = null,
+        avatarDim = null,
+        avatarThumbhash = null,
+        imageHashHex = null,
+        encryptedMedia =
+            AppGroupEncryptedMediaComponentFfi(
+                componentId = 0x8008u,
+                component = "marmot.group.encrypted-media.v1",
+                required = true,
+                version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
+                mediaFormat = "encrypted-media-v1",
+                allowedLocatorKinds = listOf("blossom-v1"),
+                defaultBlobEndpoints =
+                    listOf(
+                        AppBlobEndpointFfi(
+                            locatorKind = "blossom-v1",
+                            baseUrl = "https://blossom.primal.net",
+                        ),
+                    ),
+            ),
+        archived = false,
+        pendingConfirmation = false,
+        unrecoverable = false,
+        welcomerAccountIdHex = null,
+        viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        disbanding = false,
+        disbanded = false,
+        disbandRequest = null,
+    )
 }
 
 private class RosterDraftPersistence : DraftPersistence {

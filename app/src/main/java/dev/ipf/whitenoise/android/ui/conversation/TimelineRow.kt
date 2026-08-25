@@ -18,6 +18,7 @@ import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
@@ -181,7 +182,7 @@ internal fun TimelineRow(
                 } == true
             val senderDecoration =
                 GroupProjector.transcriptSenderDecoration(
-                    isDm = controller.isDm,
+                    isDm = controller.usesDirectTranscriptChrome,
                     mine = controller.isMessageMine(item.record),
                     sameSenderAsOlderBubble = sameSenderAsOlderBubble,
                     sameSenderAsNewerBubble = sameSenderAsNewerBubble,

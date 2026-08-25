@@ -365,9 +365,11 @@ internal typealias SelectableTextLayoutReporter =
  * top of them.
  *
  * The sentence is a *list* of ranges because a spoken sentence maps to disjoint
- * rendered pieces whenever the renderer shows text the projection does not
- * speak - an omitted URL, a list marker, collapsed punctuation. Demanding one
- * contiguous span dropped the sentence band entirely in those messages.
+ * rendered pieces whenever the renderer shows inline text the projection does
+ * not speak, such as an omitted URL or collapsed punctuation. List markers are
+ * associated with their active item separately so the whole bullet row reads
+ * as the highlighted sentence. Demanding one contiguous span dropped the
+ * sentence band entirely in those messages.
  */
 internal data class TtsLeafHighlight(
     val sentenceRanges: List<IntRange>,

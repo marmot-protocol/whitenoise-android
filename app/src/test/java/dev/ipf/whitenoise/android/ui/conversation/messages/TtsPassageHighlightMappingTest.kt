@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownListItemFfi
+import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
@@ -14,6 +16,87 @@ import org.junit.Test
 import java.util.Locale
 
 class TtsPassageHighlightMappingTest {
+    @Test
+    fun activeMixedMarkdownListRowHighlightsItsMarkerAndWordButNotSiblingMarker() {
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.ListBlock(
+                            kind = MarkdownListKindFfi.Bullet("-"),
+                            tight = true,
+                            items =
+                                listOf(
+                                    listItem(MarkdownInlineFfi.Text("First row")),
+                                    listItem(
+                                        MarkdownInlineFfi.Text("Read "),
+                                        MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("aloud"))),
+                                        MarkdownInlineFfi.Text(" now"),
+                                    ),
+                                ),
+                        ),
+                    ),
+            )
+        val projection = markdownDocumentToSpeakableProjection(document)
+        val passage =
+            TtsPassage(
+                messageIdHex = "m1",
+                sentenceIndex = 1,
+                projectionId = projection.projectionId,
+                visibleWord = listOf(TtsVisibleTextSpan("b0/i1/b0/n1/n0", 0, 5)),
+            )
+        val resolver = createTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
+
+        assertNull(resolver("b0/m0", "•"))
+        assertEquals(listOf(0 until 1), resolver("b0/m1", "•")?.sentenceRanges)
+        assertEquals(5 until 10, resolver("b0/i1/b0", "Read aloud now")?.word)
+    }
+
+    @Test
+    fun nestedListSentenceHighlightsOnlyItsOwnMarker() {
+        val nestedList =
+            MarkdownBlockFfi.ListBlock(
+                kind = MarkdownListKindFfi.Bullet("-"),
+                tight = true,
+                items = listOf(listItem(MarkdownInlineFfi.Text("Nested row"))),
+            )
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.ListBlock(
+                            kind = MarkdownListKindFfi.Bullet("-"),
+                            tight = true,
+                            items =
+                                listOf(
+                                    MarkdownListItemFfi(
+                                        blocks =
+                                            listOf(
+                                                MarkdownBlockFfi.Paragraph(
+                                                    listOf(MarkdownInlineFfi.Text("Outer row")),
+                                                ),
+                                                nestedList,
+                                            ),
+                                        checked = null,
+                                        blankLinesBefore = byteArrayOf(),
+                                    ),
+                                ),
+                        ),
+                    ),
+            )
+        val projection = markdownDocumentToSpeakableProjection(document)
+        val passage = TtsPassage("m1", sentenceIndex = 1, projectionId = projection.projectionId)
+        val resolver = createTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
+
+        assertNull(resolver("b0/m0", "•"))
+        assertEquals(listOf(0 until 1), resolver("b0/i0/b1/m0", "•")?.sentenceRanges)
+        assertEquals(listOf(0 until 10), resolver("b0/i0/b1/i0/b0", "Nested row")?.sentenceRanges)
+    }
+
     @Test
     fun multiBlockDetailsContentResolvesAgainstSiblingBlockLeafId() {
         val document =
@@ -275,4 +358,11 @@ class TtsPassageHighlightMappingTest {
         }
         return MarkdownBlockFfi.Paragraph(inlines)
     }
+
+    private fun listItem(vararg inlines: MarkdownInlineFfi) =
+        MarkdownListItemFfi(
+            blocks = listOf(MarkdownBlockFfi.Paragraph(inlines.toList())),
+            checked = null,
+            blankLinesBefore = byteArrayOf(),
+        )
 }
