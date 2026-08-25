@@ -74,7 +74,7 @@ class ReceivedApkAttachmentOpenIntegrationTest {
 
                 assertEquals(OpenAttachmentResult.Opened, result)
                 val intent = requireNotNull(context.startedIntent)
-                assertEquals(Intent.ACTION_VIEW, intent.action)
+                assertEquals(Intent.ACTION_INSTALL_PACKAGE, intent.action)
                 assertEquals(ANDROID_PACKAGE_MIME, intent.type)
                 assertTrue(intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
                 assertTrue(intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
@@ -255,14 +255,17 @@ class ReceivedApkAttachmentOpenIntegrationTest {
             projectFile("app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt")
                 .readText()
         val normalizedLibrary = library.replace(Regex("\\s+"), " ")
+        val normalizedBubble = bubble.replace(Regex("\\s+"), " ")
 
         assertTrue(
-            Regex("openAttachment\\(file, reference\\.mediaType, reference\\.fileName\\)")
-                .containsMatchIn(bubble),
+            normalizedBubble.contains(
+                "openAttachment( file, reference.mediaType, reference.fileName, " +
+                    "InstallerPermissionPersistence(",
+            ),
         )
         assertTrue(
             normalizedLibrary.contains(
-                "openAttachment( fetchFile(), row.reference.mediaType, row.reference.fileName, )",
+                "openAttachment( fetchFile(), row.reference.mediaType, row.reference.fileName, null, )",
             ),
         )
     }

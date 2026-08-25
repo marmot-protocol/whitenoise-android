@@ -127,10 +127,21 @@ internal suspend fun consumeAndDispatchAttachmentOpen(
     restore: suspend () -> Unit,
     dispatch: suspend () -> Unit,
 ): Boolean =
+    claimAndDispatchAttachmentOpen(
+        claim = { Unit.takeIf { consume() } },
+        restore = restore,
+        dispatch = { dispatch() },
+    )
+
+/** Claims a typed persisted phase and restores it when final platform dispatch fails. */
+internal suspend fun <Claim : Any> claimAndDispatchAttachmentOpen(
+    claim: suspend () -> Claim?,
+    restore: suspend () -> Unit,
+    dispatch: suspend (Claim) -> Unit,
+): Boolean =
     withContext(NonCancellable) {
-        val consumed = consume()
-        if (!consumed) return@withContext false
-        val failure = runCatching { dispatch() }.exceptionOrNull() ?: return@withContext true
+        val claimed = claim() ?: return@withContext false
+        val failure = runCatching { dispatch(claimed) }.exceptionOrNull() ?: return@withContext true
         runCatching { restore() }
             .exceptionOrNull()
             ?.let(failure::addSuppressed)
@@ -147,6 +158,23 @@ internal suspend fun consumeAndDispatchAttachmentOpenReportingFailure(
 ): Boolean =
     try {
         consumeAndDispatchAttachmentOpen(consume, restore, dispatch)
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (failure: Throwable) {
+        onFailure(failure)
+        false
+    }
+
+/** Typed variant used when an installer-permission recovery is claimed. */
+@Suppress("TooGenericExceptionCaught")
+internal suspend fun <Claim : Any> claimAndDispatchAttachmentOpenReportingFailure(
+    claim: suspend () -> Claim?,
+    restore: suspend () -> Unit,
+    dispatch: suspend (Claim) -> Unit,
+    onFailure: (Throwable) -> Unit,
+): Boolean =
+    try {
+        claimAndDispatchAttachmentOpen(claim, restore, dispatch)
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (failure: Throwable) {

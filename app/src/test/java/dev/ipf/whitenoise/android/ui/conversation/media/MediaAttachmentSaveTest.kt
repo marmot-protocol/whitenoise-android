@@ -120,15 +120,24 @@ class MediaAttachmentSaveTest {
     }
 
     @Test
-    fun attachmentViewIntentGrantsTheInstallerReadAccessThroughClipData() {
+    fun attachmentOpenIntentTargetsInstallerAndGrantsReadAccessThroughClipData() {
         val uri = Uri.parse("content://${context().packageName}.files/agent-build.apk")
-        val intent = attachmentViewIntent(uri, ANDROID_PACKAGE_MIME)
+        val intent = attachmentOpenIntent(uri, ANDROID_PACKAGE_MIME)
 
-        assertEquals(Intent.ACTION_VIEW, intent.action)
+        assertEquals(Intent.ACTION_INSTALL_PACKAGE, intent.action)
         assertEquals(uri, intent.data)
         assertEquals(ANDROID_PACKAGE_MIME, intent.type)
         assertTrue(intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         assertEquals(uri, intent.clipData?.getItemAt(0)?.uri)
+    }
+
+    @Test
+    fun attachmentOpenIntentKeepsGeneralDocumentsOnActionView() {
+        val uri = Uri.parse("content://${context().packageName}.files/release-notes.pdf")
+        val intent = attachmentOpenIntent(uri, "application/pdf")
+
+        assertEquals(Intent.ACTION_VIEW, intent.action)
+        assertEquals("application/pdf", intent.type)
     }
 
     @Test

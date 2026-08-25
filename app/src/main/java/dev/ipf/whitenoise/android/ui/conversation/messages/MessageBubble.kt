@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
@@ -61,7 +62,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
@@ -115,7 +115,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
-import dev.ipf.whitenoise.android.ui.conversation.media.FileBubbleWidth
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
@@ -390,7 +389,7 @@ internal fun MessageBubble(
     val context = LocalContext.current
     // Freeze both the touch point and the selected message's window bounds when
     // the menu opens. The point seeds partial text selection; the bounds keep
-    // the action surface visually attached to the bubble like Signal/Telegram.
+    // the action surface visually attached to the selected bubble.
     var longPressWindowPosition by remember(record.messageIdHex) { mutableStateOf<Offset?>(null) }
     var selectionSeedVisibleOffset by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
@@ -1006,6 +1005,11 @@ internal fun MessageBubble(
 
     val pendingAttachmentsForRecord = controller.pendingAttachmentsList(record.messageIdHex)
     val bubbleMedia = rememberBubbleMedia(mediaReferences, pendingAttachmentsForRecord)
+    val mediaCaption =
+        MessageProjector.mediaCaption(
+            message = record,
+            body = editState?.latestText ?: record.plaintext,
+        )
     val mediaPendingName =
         remember(record.tags) {
             record.tags
@@ -1280,6 +1284,7 @@ internal fun MessageBubble(
                 modifier =
                     Modifier
                         .widthIn(min = bubbleColumnMinWidth, max = bubbleColumnMaxWidth)
+                        .testTag(messageBubbleColumnTestTag(record.messageIdHex))
                         .then(
                             if (reserveSenderAvatarSlot && reactionHostPresent) {
                                 Modifier.alignBy(MessageBubbleBottomAlignmentLine)
@@ -1344,11 +1349,6 @@ internal fun MessageBubble(
                         }
                     }
                 }
-                val mediaCaption =
-                    MessageProjector.mediaCaption(
-                        message = record,
-                        body = editState?.latestText ?: record.plaintext,
-                    )
                 // An uncaptioned visual message carries the footer over the
                 // bottom-right media tile. For an album that is the last visible
                 // image/video; a caption (if any) owns the footer instead.
@@ -1623,8 +1623,8 @@ internal fun MessageBubble(
                         null
                     }
                 if (hasMedia) {
-                    // Signal and Telegram treat media plus caption as one message
-                    // surface. The media owns no internal corners or border when
+                    // Media plus caption renders as one message surface. The
+                    // media owns no internal corners or border when
                     // a caption is present; the shared frame owns the continuous
                     // outer shape, color, border, and single footer.
                     Column(
@@ -2156,27 +2156,3 @@ internal fun MessageBubble(
 // A body longer than this many rendered lines collapses to a Read More that
 // opens the full-screen view rather than spilling down the transcript (#325).
 internal const val MESSAGE_COLLAPSE_LINE_LIMIT = 52
-
-private val MessageBubbleOppositeGutter = 48.dp
-private val MessageBubbleSenderAvatarSlotWidth = 40.dp
-
-internal fun messageBubbleColumnMaxWidth(
-    containerWidth: Dp,
-    selectionGutterWidth: Dp,
-    senderAvatarSlotWidth: Dp,
-): Dp =
-    (containerWidth - MessageBubbleOppositeGutter - selectionGutterWidth - senderAvatarSlotWidth)
-        .coerceAtLeast(0.dp)
-
-internal fun messageBubbleColumnMinWidth(
-    hasGeneralFileCard: Boolean,
-    maxWidth: Dp,
-): Dp =
-    if (hasGeneralFileCard) {
-        // Establish the file-card invariant at the parent measurement boundary.
-        // The leaf still owns its preferred width, while small screens and row
-        // gutters remain authoritative through the already-computed maximum.
-        minOf(FileBubbleWidth, maxWidth.coerceAtLeast(0.dp))
-    } else {
-        Dp.Unspecified
-    }

@@ -3,7 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -27,6 +28,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
+import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -37,9 +39,12 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
-internal val FileBubbleWidth = 240.dp
+internal fun Modifier.fileBubbleWidth(): Modifier = fillMaxWidth()
 
-internal fun Modifier.fileBubbleWidth(): Modifier = width(FileBubbleWidth)
+internal fun fileAttachmentCardTestTag(
+    messageIdHex: String,
+    attachmentIndex: Int,
+): String = "file-attachment-card:$messageIdHex#$attachmentIndex"
 
 /**
  * Confirmed bubble for any attachment whose MIME isn't an image. Renders
@@ -70,6 +75,10 @@ internal fun MediaFileBubble(
     val openAttachment = rememberAttachmentOpener()
     val lifecycleOwner = LocalLifecycleOwner.current
     val pillKey = "$messageIdHex#$attachmentIndex"
+    val attachmentOpenRequest =
+        controller.boundAccountRef?.let { accountRef ->
+            AttachmentTransferRequest(accountRef, controller.group.groupIdHex, messageIdHex, attachmentIndex)
+        }
     var openRequested by remember(pillKey) { mutableStateOf(false) }
     var readerOpen by rememberSaveable(pillKey) { mutableStateOf(false) }
     val transferStateFlow =
@@ -148,7 +157,8 @@ internal fun MediaFileBubble(
         appState.attachmentOpenIntentRevision,
         lifecycleOwner,
     ) {
-        if (!controller.hasAttachmentOpenIntent(messageIdHex, attachmentIndex)) return@LaunchedEffect
+        val request = attachmentOpenRequest ?: return@LaunchedEffect
+        if (!appState.hasAttachmentOpenIntent(request)) return@LaunchedEffect
         openRequested = true
         try {
             val file =
@@ -178,11 +188,22 @@ internal fun MediaFileBubble(
             if (!lifecycleOwner.lifecycle.awaitResumedOrDestroyed()) return@LaunchedEffect
             var openResult: OpenAttachmentResult? = null
             val dispatched =
-                consumeAndDispatchAttachmentOpenReportingFailure(
-                    consume = { controller.consumeAttachmentOpenIntent(messageIdHex, attachmentIndex) },
-                    restore = { controller.restoreAttachmentOpenIntent(messageIdHex, attachmentIndex) },
-                    dispatch = {
-                        openResult = openAttachment(file, reference.mediaType, reference.fileName)
+                claimAndDispatchAttachmentOpenReportingFailure(
+                    claim = { appState.claimAttachmentOpenIntent(request) },
+                    restore = { appState.restoreAttachmentOpenIntent(request) },
+                    dispatch = { claim ->
+                        openResult =
+                            openAttachment(
+                                file,
+                                reference.mediaType,
+                                reference.fileName,
+                                InstallerPermissionPersistence(
+                                    claim = claim,
+                                    begin = { appState.beginAttachmentInstallPermissionRequest(request) },
+                                    finish = { appState.finishAttachmentInstallPermissionRequest(request) },
+                                    abandon = { appState.abandonAttachmentInstallPermissionRequest(request) },
+                                ),
+                            )
                     },
                     onFailure = { failure ->
                         Log.w(
@@ -194,7 +215,15 @@ internal fun MediaFileBubble(
                     },
                 )
             if (!dispatched) return@LaunchedEffect
-            when (checkNotNull(openResult)) {
+            val resolvedOpenResult = checkNotNull(openResult)
+            if (resolvedOpenResult != OpenAttachmentResult.Opened) {
+                Log.w(
+                    MEDIA_FILE_BUBBLE_TAG,
+                    "attachment open outcome=${resolvedOpenResult.name} " +
+                        "msg=${messageIdHex.take(8)}#$attachmentIndex",
+                )
+            }
+            when (resolvedOpenResult) {
                 OpenAttachmentResult.Opened -> Unit
                 OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
                 OpenAttachmentResult.NoInstaller -> appState.present(noInstallerMessage)
@@ -223,6 +252,7 @@ internal fun MediaFileBubble(
         modifier =
             Modifier
                 .fileBubbleWidth()
+                .testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
                 .combinedClickable(
                     enabled =
                         !openRequested &&
