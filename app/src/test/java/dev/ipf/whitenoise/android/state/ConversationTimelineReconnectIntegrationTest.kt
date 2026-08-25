@@ -40,6 +40,8 @@ class ConversationTimelineReconnectIntegrationTest {
                 awaitConversationCondition { fixtures.firstSubscription.nextUpdateCallCount == 1 }
                 assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate(fixtures.firstSubscription)
 
+                fixtures.firstSubscription.endUpdates()
+                awaitConversationCondition { fixtures.firstSubscription.closeCallCount == 1 }
                 controller.retryLoadFailure()
 
                 awaitConversationCondition {

@@ -157,6 +157,8 @@ class NotificationRouteTimelinePresentationTest {
         assertFalse(ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(mountedController))
         appState.setAppInForeground(false)
         awaitCondition { firstSubscription.nextUpdateCallCount == 1 }
+        firstSubscription.endUpdates()
+        awaitCondition { firstSubscription.closeCallCount == 1 }
         runBlocking { mountedController.retryLoadFailure() }
         awaitCondition {
             ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(mountedController)

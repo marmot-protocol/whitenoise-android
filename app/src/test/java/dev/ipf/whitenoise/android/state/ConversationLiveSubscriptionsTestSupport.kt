@@ -23,6 +23,7 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.robolectric.Shadows.shadowOf
@@ -34,6 +35,7 @@ internal class ScriptedConversationTimelineSubscription(
     private val snapshotPage: TimelinePageFfi,
 ) : ConversationTimelineSubscriptionHandle {
     private val lifecycleEvents = CopyOnWriteArrayList<String>()
+    private val updatesEnded = CompletableDeferred<Unit>()
 
     val lifecycleEventOrder: List<String>
         get() = lifecycleEvents.toList()
@@ -54,7 +56,12 @@ internal class ScriptedConversationTimelineSubscription(
 
     override suspend fun nextUpdate(): TimelineSubscriptionUpdateFfi? {
         lifecycleEvents += "nextUpdate"
+        updatesEnded.await()
         return null
+    }
+
+    fun endUpdates() {
+        updatesEnded.complete(Unit)
     }
 
     override suspend fun paginateBackwards(count: UInt): TimelinePageFfi = emptyTimelinePage()
@@ -63,17 +70,25 @@ internal class ScriptedConversationTimelineSubscription(
 
     override fun close() {
         lifecycleEvents += "close"
+        updatesEnded.complete(Unit)
     }
 }
 
 internal class ScriptedConversationGroupStateSubscription(
     private val group: AppGroupRecordFfi,
 ) : ConversationGroupStateSubscriptionHandle {
+    private val closed = CompletableDeferred<Unit>()
+
     override fun snapshot(): AppGroupRecordFfi = group
 
-    override suspend fun next(): AppGroupRecordFfi? = null
+    override suspend fun next(): AppGroupRecordFfi? {
+        closed.await()
+        return null
+    }
 
-    override fun close() = Unit
+    override fun close() {
+        closed.complete(Unit)
+    }
 }
 
 internal class ScriptedConversationLiveSubscriptions(
