@@ -74,6 +74,143 @@ internal const val GROUP_ID_SEARCH_MIN_LENGTH = 8
 internal fun looksLikeGroupIdNeedle(ciNeedle: String): Boolean =
     ciNeedle.length >= GROUP_ID_SEARCH_MIN_LENGTH && ciNeedle.all { it in '0'..'9' || it in 'a'..'f' }
 
+internal fun canonicalChatListGroupId(groupIdHex: String): String = localeInvariantFold(groupIdHex.trim())
+
+internal data class ChatListSearchCandidate<T>(
+    val value: T,
+    val groupIdHex: String,
+    val nostrGroupIdHex: String,
+    val displayTitle: String,
+    val previewText: String,
+    val description: String,
+)
+
+internal data class ChatListSearchSections<T>(
+    val groups: List<T>,
+    val messages: List<T>,
+) {
+    fun orderedItems(): List<T> = groups + messages
+}
+
+private enum class ChatListSynchronousSearchMatch {
+    TITLE,
+    METADATA,
+    MESSAGE,
+    NONE,
+}
+
+private val ChatListSynchronousSearchMatch.priority: Int
+    get() =
+        when (this) {
+            ChatListSynchronousSearchMatch.TITLE -> 3
+            ChatListSynchronousSearchMatch.METADATA -> 2
+            ChatListSynchronousSearchMatch.MESSAGE -> 1
+            ChatListSynchronousSearchMatch.NONE -> 0
+        }
+
+@Suppress("ReturnCount") // Ordered guard clauses avoid computing lower-priority matches after a hit.
+private fun <T> ChatListSearchCandidate<T>.synchronousMatch(ciNeedle: String): ChatListSynchronousSearchMatch {
+    if (localeInvariantFold(displayTitle).contains(ciNeedle)) return ChatListSynchronousSearchMatch.TITLE
+    if (localeInvariantFold(previewText).contains(ciNeedle)) return ChatListSynchronousSearchMatch.METADATA
+    if (localeInvariantFold(description).contains(ciNeedle)) return ChatListSynchronousSearchMatch.METADATA
+    if (
+        looksLikeGroupIdNeedle(ciNeedle) &&
+        (
+            canonicalChatListGroupId(groupIdHex).contains(ciNeedle) ||
+                canonicalChatListGroupId(nostrGroupIdHex).contains(ciNeedle)
+        )
+    ) {
+        return ChatListSynchronousSearchMatch.METADATA
+    }
+    return ChatListSynchronousSearchMatch.NONE
+}
+
+internal fun <T> projectChatListSearchCandidates(
+    candidates: List<ChatListSearchCandidate<T>>,
+    rawQuery: String,
+    bodyMatchGroupIds: Set<String> = emptySet(),
+    folderChatIds: Set<String>? = null,
+): ChatListSearchSections<T> {
+    val ciNeedle = localeInvariantFold(rawQuery.trim())
+    val canonicalFolderIds = folderChatIds?.mapTo(mutableSetOf(), ::canonicalChatListGroupId)
+    val canonicalBodyIds = bodyMatchGroupIds.mapTo(mutableSetOf(), ::canonicalChatListGroupId)
+    val classifiedById = linkedMapOf<String, Pair<T, ChatListSynchronousSearchMatch>>()
+
+    candidates.forEach { candidate ->
+        val canonicalId = canonicalChatListGroupId(candidate.groupIdHex)
+        if (canonicalFolderIds != null && canonicalId !in canonicalFolderIds) return@forEach
+        val synchronousMatch =
+            if (ciNeedle.isEmpty()) ChatListSynchronousSearchMatch.METADATA else candidate.synchronousMatch(ciNeedle)
+        val match =
+            if (synchronousMatch == ChatListSynchronousSearchMatch.NONE && canonicalId in canonicalBodyIds) {
+                ChatListSynchronousSearchMatch.MESSAGE
+            } else {
+                synchronousMatch
+            }
+        val previous = classifiedById[canonicalId]
+        if (previous == null || match.priority > previous.second.priority) {
+            classifiedById[canonicalId] = candidate.value to match
+        }
+    }
+    return ChatListSearchSections(
+        groups =
+            classifiedById.values
+                .filter { it.second == ChatListSynchronousSearchMatch.TITLE }
+                .map(Pair<T, ChatListSynchronousSearchMatch>::first) +
+                classifiedById.values
+                    .filter { it.second == ChatListSynchronousSearchMatch.METADATA }
+                    .map(Pair<T, ChatListSynchronousSearchMatch>::first),
+        messages =
+            classifiedById.values
+                .filter { it.second == ChatListSynchronousSearchMatch.MESSAGE }
+                .map(Pair<T, ChatListSynchronousSearchMatch>::first),
+    )
+}
+
+internal fun projectChatListSearchSections(
+    source: List<ChatListItem>,
+    rawQuery: String,
+    appState: WhiteNoiseAppState,
+    titleCopy: GroupTitleCopy,
+    bodyMatchGroupIds: Set<String> = emptySet(),
+    folderChatIds: Set<String>? = null,
+): ChatListSearchSections<ChatListItem> {
+    if (rawQuery.trim().isEmpty()) {
+        val canonicalFolderIds = folderChatIds?.mapTo(mutableSetOf(), ::canonicalChatListGroupId)
+        val folderItems =
+            if (canonicalFolderIds == null) {
+                source
+            } else {
+                source.filter { canonicalChatListGroupId(it.group.groupIdHex) in canonicalFolderIds }
+            }
+        return ChatListSearchSections(groups = folderItems, messages = emptyList())
+    }
+
+    return projectChatListSearchCandidates(
+        candidates =
+            source.map { item ->
+                ChatListSearchCandidate(
+                    value = item,
+                    groupIdHex = item.group.groupIdHex,
+                    nostrGroupIdHex = item.group.nostrGroupIdHex,
+                    displayTitle = chatListItemDisplayTitle(item, appState, titleCopy),
+                    previewText = item.projectedPreviewText(),
+                    description = item.group.description,
+                )
+            },
+        rawQuery = rawQuery,
+        bodyMatchGroupIds = bodyMatchGroupIds,
+        folderChatIds = folderChatIds,
+    )
+}
+
+internal fun canonicalChatListBodyMatches(matches: Map<String, MessageBodyMatch>): Map<String, MessageBodyMatch> =
+    buildMap {
+        matches.forEach { (groupId, match) ->
+            putIfAbsent(canonicalChatListGroupId(groupId), match)
+        }
+    }
+
 internal fun applyChatListSearchAndFilter(
     source: List<ChatListItem>,
     rawQuery: String,
@@ -84,57 +221,15 @@ internal fun applyChatListSearchAndFilter(
     // (lowercased, manual plus rule matches) that folder contains. Every
     // folder — seeded defaults included — filters through this one path.
     folderChatIds: Set<String>? = null,
-): List<ChatListItem> {
-    val byFolder =
-        if (folderChatIds == null) {
-            source
-        } else {
-            source.filter { it.group.groupIdHex.lowercase() in folderChatIds }
-        }
-    val needle = rawQuery.trim()
-    if (needle.isEmpty()) return byFolder
-    val ciNeedle = localeInvariantFold(needle)
-    return byFolder.filter { item ->
-        // Match against the SAME title the user sees in the row, not the
-        // raw group.name. For DMs and other unnamed chats, group.name is
-        // blank and the visible title is projected from the other
-        // member's profile — without this projection the search misses
-        // direct messages by their displayed name.
-        val title = localeInvariantFold(chatListItemDisplayTitle(item, appState, titleCopy))
-        if (title.contains(ciNeedle)) return@filter true
-        val preview = localeInvariantFold(item.projectedPreviewText())
-        if (preview.contains(ciNeedle)) return@filter true
-        // Group description matches (issue #388): descriptions hold the
-        // context users put there to find a group later ("research workgroup",
-        // "family planning"), so they should surface the row even when the
-        // title and preview don't mention the needle. Same lowercase +
-        // substring containment as title/preview.
-        val description = localeInvariantFold(item.group.description)
-        if (description.isNotEmpty() && description.contains(ciNeedle)) return@filter true
-        // Group-id matches (issue #1509): both ids are shown as copyable
-        // values on the group details screen, so pasting one back into search
-        // must surface the group. Only a hex-shaped needle of plausible
-        // length is compared against the ids — ordinary words must not
-        // surface unrelated groups through their 64-char hex ids.
-        if (looksLikeGroupIdNeedle(ciNeedle) &&
-            (
-                localeInvariantFold(item.group.groupIdHex).contains(ciNeedle) ||
-                    localeInvariantFold(item.group.nostrGroupIdHex).contains(ciNeedle)
-            )
-        ) {
-            return@filter true
-        }
-        // Message-body matches (issue #290): the async per-chat search
-        // (ChatsController.searchMessageBodies) found the needle inside this
-        // conversation's local timeline even though it isn't in the title or
-        // preview line. The matched message id + highlighted snippet ride a
-        // separate map keyed by group id; here we only need to know the chat
-        // qualifies so it joins the result set. Body matches still pass
-        // through the folder filter above, so a selected folder narrows
-        // them the same way it narrows title/preview hits.
-        item.group.groupIdHex in bodyMatchGroupIds
-    }
-}
+): List<ChatListItem> =
+    projectChatListSearchSections(
+        source = source,
+        rawQuery = rawQuery,
+        appState = appState,
+        titleCopy = titleCopy,
+        bodyMatchGroupIds = bodyMatchGroupIds,
+        folderChatIds = folderChatIds,
+    ).orderedItems()
 
 /**
  * Display title shown for a chat-list row. Shared between `ChatRow` (the
