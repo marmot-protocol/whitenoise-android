@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.content.Intent
 import android.net.Uri
+import androidx.core.app.RemoteInput
 import dev.ipf.marmotkit.NotificationUpdateFfi
 
 enum class NotificationActionKind { REPLY, REACT, MARK_READ }
@@ -28,6 +29,7 @@ object NotificationActions {
 
     private const val EXTRA_NOTIFICATION_TAG = "dev.ipf.whitenoise.android.extra.NOTIFICATION_TAG"
     private const val EXTRA_NOTIFICATION_ID = "dev.ipf.whitenoise.android.extra.NOTIFICATION_ID"
+    private const val EXTRA_INLINE_REACTION_CHOICES = "dev.ipf.whitenoise.android.extra.INLINE_REACTION_CHOICES"
     private const val LEGACY_EXTRA_REACTION = "dev.ipf.whitenoise.android.extra.REACTION"
     private const val URI_SCHEME = "whitenoise-notify"
 
@@ -57,17 +59,25 @@ object NotificationActions {
         intent: Intent,
         kind: NotificationActionKind,
         actionTarget: NotificationActionTarget,
+        acceptsInlineReactionChoices: Boolean = false,
     ) {
         intent.action = actionName(kind)
         intent.data = Uri.parse(actionUriString(kind, actionTarget.notificationTag))
         NotificationNavigation.applyTargetExtras(intent, actionTarget.target)
         intent.putExtra(EXTRA_NOTIFICATION_TAG, actionTarget.notificationTag)
         intent.putExtra(EXTRA_NOTIFICATION_ID, actionTarget.notificationId)
+        if (acceptsInlineReactionChoices) intent.putExtra(EXTRA_INLINE_REACTION_CHOICES, true)
     }
 
     fun parse(intent: Intent?): NotificationAction? {
         intent ?: return null
-        val actionKind = kindForAction(intent.action) ?: return null
+        val parsedKind = kindForAction(intent.action) ?: return null
+        val actionKind =
+            if (parsedKind == NotificationActionKind.REPLY && isInlineReactionChoice(intent)) {
+                NotificationActionKind.REACT
+            } else {
+                parsedKind
+            }
         val target = NotificationNavigation.parseTarget(intent) ?: return null
         return parseFields(
             actionKind = actionKind,
@@ -89,6 +99,10 @@ object NotificationActions {
         normalizeNotificationReaction(
             intent.getStringExtra(LEGACY_EXTRA_REACTION),
         )
+
+    internal fun isInlineReactionChoice(intent: Intent): Boolean =
+        intent.getBooleanExtra(EXTRA_INLINE_REACTION_CHOICES, false) &&
+            RemoteInput.getResultsSource(intent) == RemoteInput.SOURCE_CHOICE
 
     fun parseRawFields(
         action: String?,

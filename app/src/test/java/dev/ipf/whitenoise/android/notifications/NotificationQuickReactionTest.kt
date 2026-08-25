@@ -85,6 +85,37 @@ class NotificationQuickReactionTest {
     }
 
     @Test
+    fun replyActionChoiceRoutesToReactionWhileFreeFormStillRoutesToReply() {
+        val remoteInput = RemoteInput.Builder(NotificationActions.KEY_TEXT_REPLY).build()
+
+        fun delivered(
+            value: String,
+            source: Int,
+        ) = Intent().also { intent ->
+            NotificationActions.applyToIntent(
+                intent,
+                NotificationActionKind.REPLY,
+                actionTarget(),
+                acceptsInlineReactionChoices = true,
+            )
+            RemoteInput.addResultsToIntent(
+                arrayOf(remoteInput),
+                intent,
+                Bundle().apply { putCharSequence(NotificationActions.KEY_TEXT_REPLY, value) },
+            )
+            RemoteInput.setResultsSource(intent, source)
+        }
+
+        val choice = delivered("🔥", RemoteInput.SOURCE_CHOICE)
+        val freeForm = delivered("🔥", RemoteInput.SOURCE_FREE_FORM_INPUT)
+
+        assertEquals(NotificationActionKind.REACT, NotificationActions.parse(choice)?.kind)
+        assertEquals("🔥", notificationReactionChoice(choice, listOf("🥳", "🔥")))
+        assertEquals(NotificationActionKind.REPLY, NotificationActions.parse(freeForm)?.kind)
+        assertNull(notificationReactionChoice(freeForm, listOf("🥳", "🔥")))
+    }
+
+    @Test
     fun directReactionFromANotificationPostedBeforeUpgradeStillUsesTheCurrentAllowlist() {
         val legacy =
             Intent().putExtra(

@@ -170,12 +170,15 @@ internal fun notificationReactionChoice(
     intent: Intent,
     allowedChoices: List<String>,
 ): String? {
+    val results = RemoteInput.getResultsFromIntent(intent)
     val reaction =
         normalizeNotificationReaction(
-            RemoteInput
-                .getResultsFromIntent(intent)
-                ?.getCharSequence(NotificationActions.KEY_REACTION_CHOICE)
-                ?.toString(),
+            (
+                results?.getCharSequence(NotificationActions.KEY_REACTION_CHOICE)
+                    ?: results
+                        ?.getCharSequence(NotificationActions.KEY_TEXT_REPLY)
+                        ?.takeIf { NotificationActions.isInlineReactionChoice(intent) }
+            )?.toString(),
         ) ?: NotificationActions.legacyReaction(intent)
     return reaction?.takeIf { it in allowedChoices }
 }

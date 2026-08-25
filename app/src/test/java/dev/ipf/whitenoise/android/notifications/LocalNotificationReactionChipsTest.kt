@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
+import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
@@ -47,36 +49,44 @@ class LocalNotificationReactionChipsTest {
     }
 
     @Test
-    fun reactOffersSixChoicesWithoutFreeFormInput() {
+    fun replyOffersSixReactionChoicesAndStillAllowsFreeFormInput() {
         val choices = listOf("🥳", "🔥", "😂", "👍", "😮", "😢")
         postConversationCard(presenter(choices))
 
-        val remoteInput = checkNotNull(reactAction().remoteInputs).single()
+        val remoteInput = checkNotNull(replyAction().remoteInputs).single()
 
-        assertEquals(NotificationActions.KEY_REACTION_CHOICE, remoteInput.resultKey)
+        assertEquals(NotificationActions.KEY_TEXT_REPLY, remoteInput.resultKey)
         assertEquals(choices, remoteInput.choices?.map(CharSequence::toString))
-        assertFalse(remoteInput.allowFreeFormInput)
+        assertTrue(remoteInput.allowFreeFormInput)
         assertEquals(RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED, remoteInput.editChoicesBeforeSending)
     }
 
     @Test
-    fun rowStaysReplyReactAndMarkReadAndReactUsesAMutableBroadcast() {
+    fun rowKeepsReplyAndMarkReadWhileReplyUsesAMutableBroadcast() {
         postConversationCard(presenter(defaultChoices()))
 
         assertEquals(
             listOf(
                 context.getString(R.string.reply),
-                context.getString(R.string.message_react),
                 context.getString(R.string.chat_row_action_mark_read),
             ),
             actions().map { it.title.toString() },
         )
-        val react = reactAction()
-        val pendingIntent = shadowOf(react.actionIntent)
+        val reply = replyAction()
+        val pendingIntent = shadowOf(reply.actionIntent)
         assertTrue(pendingIntent.isBroadcast)
         assertFalse(pendingIntent.isImmutable)
-        assertFalse(react.showsUserInterface)
-        assertEquals(NotificationCompat.Action.SEMANTIC_ACTION_THUMBS_UP, react.semanticAction)
+        assertFalse(reply.showsUserInterface)
+        assertEquals(NotificationCompat.Action.SEMANTIC_ACTION_REPLY, reply.semanticAction)
+
+        val selectedChoice = Intent(pendingIntent.savedIntent)
+        RemoteInput.addResultsToIntent(
+            checkNotNull(reply.remoteInputs),
+            selectedChoice,
+            Bundle().apply { putCharSequence(NotificationActions.KEY_TEXT_REPLY, defaultChoices().first()) },
+        )
+        RemoteInput.setResultsSource(selectedChoice, RemoteInput.SOURCE_CHOICE)
+        assertEquals(NotificationActionKind.REACT, NotificationActions.parse(selectedChoice)?.kind)
     }
 
     @Test
@@ -129,7 +139,7 @@ class LocalNotificationReactionChipsTest {
         }
     }
 
-    private fun reactAction() = actions().single { it.title.toString() == context.getString(R.string.message_react) }
+    private fun replyAction() = actions().single { it.title.toString() == context.getString(R.string.reply) }
 
     private fun defaultChoices() = listOf("❤️", "👍", "👎", "😂", "😮", "😢")
 

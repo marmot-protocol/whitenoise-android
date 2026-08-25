@@ -462,7 +462,7 @@ class LocalNotificationPresenter(
                     }
                     if (!redactContent) {
                         val quickReactions =
-                            if (decision.actions.contains(NotificationActionKind.REACT)) {
+                            if (decision.actions.contains(NotificationActionKind.REPLY)) {
                                 withContext(Dispatchers.Default) {
                                     notificationQuickReactionChoices(quickReactionChoices())
                                 }
@@ -474,10 +474,10 @@ class LocalNotificationPresenter(
                             ?.let { actionTarget ->
                                 decision.actions.forEach { action ->
                                     when (action) {
-                                        NotificationActionKind.REPLY -> builder.addAction(replyNotificationAction(actionTarget))
-                                        NotificationActionKind.REACT ->
-                                            reactionNotificationAction(actionTarget, quickReactions)
-                                                ?.let(builder::addAction)
+                                        NotificationActionKind.REPLY ->
+                                            builder.addAction(replyNotificationAction(actionTarget, quickReactions))
+                                        // Reaction choices ride on Reply's RemoteInput so SystemUI can render them inline.
+                                        NotificationActionKind.REACT -> Unit
                                         NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
                                     }
                                 }
@@ -1418,20 +1418,30 @@ class LocalNotificationPresenter(
         }
     }
 
-    private fun replyNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action {
+    private fun replyNotificationAction(
+        actionTarget: NotificationActionTarget,
+        reactionChoices: List<String>,
+    ): NotificationCompat.Action {
         val remoteInput =
             RemoteInput
                 .Builder(NotificationActions.KEY_TEXT_REPLY)
                 .setLabel(context.getString(R.string.message))
+                .setChoices(reactionChoices.toTypedArray())
+                .setAllowFreeFormInput(true)
+                .setEditChoicesBeforeSending(RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED)
                 .build()
         return NotificationCompat
             .Action
             .Builder(
                 R.drawable.ic_stat_whitenoise,
                 context.getString(R.string.reply),
-                actionPendingIntent(actionTarget, NotificationActionKind.REPLY),
+                actionPendingIntent(
+                    actionTarget,
+                    NotificationActionKind.REPLY,
+                    acceptsInlineReactionChoices = reactionChoices.isNotEmpty(),
+                ),
             ).addRemoteInput(remoteInput)
-            .setAllowGeneratedReplies(true)
+            .setAllowGeneratedReplies(false)
             .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
             .setShowsUserInterface(false)
             .build()
@@ -1448,39 +1458,19 @@ class LocalNotificationPresenter(
             .setShowsUserInterface(false)
             .build()
 
-    private fun reactionNotificationAction(
-        actionTarget: NotificationActionTarget,
-        choices: List<String>,
-    ): NotificationCompat.Action? {
-        if (choices.isEmpty()) return null
-        val remoteInput =
-            RemoteInput
-                .Builder(NotificationActions.KEY_REACTION_CHOICE)
-                .setLabel(context.getString(R.string.message_react))
-                .setChoices(choices.toTypedArray())
-                .setAllowFreeFormInput(false)
-                .setEditChoicesBeforeSending(RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED)
-                .build()
-        return NotificationCompat
-            .Action
-            .Builder(
-                R.drawable.ic_stat_whitenoise,
-                context.getString(R.string.message_react),
-                actionPendingIntent(actionTarget, NotificationActionKind.REACT),
-            ).addRemoteInput(remoteInput)
-            .setAllowGeneratedReplies(false)
-            .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_THUMBS_UP)
-            .setShowsUserInterface(false)
-            .build()
-    }
-
     private fun actionPendingIntent(
         actionTarget: NotificationActionTarget,
         kind: NotificationActionKind,
+        acceptsInlineReactionChoices: Boolean = false,
     ): PendingIntent {
         val actionIntent =
             Intent(context, NotificationActionReceiver::class.java).apply {
-                NotificationActions.applyToIntent(this, kind, actionTarget)
+                NotificationActions.applyToIntent(
+                    this,
+                    kind,
+                    actionTarget,
+                    acceptsInlineReactionChoices,
+                )
             }
         val mutableFlag =
             if (kind == NotificationActionKind.REPLY || kind == NotificationActionKind.REACT) {
