@@ -6,7 +6,7 @@ set -euo pipefail
 event_name="${1:-}"
 if [[ "$event_name" == "pull_request" ]]; then
   exec ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
-    -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.ProfileImageDialSafetyIntegrationTest,dev.ipf.whitenoise.android.core.ForwardMediaReferenceFfiIntegrationTest \
+    -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.ProfileImageDialSafetyIntegrationTest,dev.ipf.whitenoise.android.core.ForwardMediaReferenceFfiIntegrationTest,dev.ipf.whitenoise.android.media.MediaReferenceSupportFuzzIntegrationTest \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --no-daemon --stacktrace
 fi

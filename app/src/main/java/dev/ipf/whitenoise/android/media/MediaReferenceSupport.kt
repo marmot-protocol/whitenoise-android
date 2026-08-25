@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.parseMediaImetaTag
@@ -24,12 +25,30 @@ object MediaReferenceSupport {
         tags: List<MessageTagFfi>,
         sourceEpoch: ULong,
     ): List<MediaAttachmentReferenceFfi> =
+        try {
+            parseAllImetaTags(tags, sourceEpoch, ::parseMediaImetaTag)
+        } catch (_: LinkageError) {
+            // Local JVM callers have no Android ABI library. The instrumented
+            // fuzz test invokes the native parser directly before this wrapper,
+            // so this compatibility fallback cannot create false native coverage.
+            emptyList()
+        }
+
+    internal fun parseAllImetaTags(
+        tags: List<MessageTagFfi>,
+        sourceEpoch: ULong,
+        parser: (MessageTagFfi, ULong) -> MediaAttachmentReferenceFfi,
+    ): List<MediaAttachmentReferenceFfi> =
         tags.mapNotNull { tag ->
             if (tag.values.firstOrNull() != TAG_NAME) return@mapNotNull null
-            // Invalid tags are intentionally omitted. This also keeps local JVM
-            // tests deterministic: they do not load Android's ABI-specific
-            // native library, while runtime builds package it normally.
-            runCatching { parseMediaImetaTag(tag, sourceEpoch) }.getOrNull()
+            // Only typed parser rejection is omission. Linkage/programming
+            // failures must escape so a test cannot claim native coverage when
+            // MarmotKit was never loaded.
+            try {
+                parser(tag, sourceEpoch)
+            } catch (_: MarmotKitException) {
+                null
+            }
         }
 
     fun parseImetaTag(

@@ -964,6 +964,8 @@ afterEvaluate {
             includeTestsMatching("dev.ipf.whitenoise.android.updates.ZapstoreReleaseClientTest")
             includeTestsMatching("dev.ipf.whitenoise.android.core.ProfileLinkTest")
             includeTestsMatching("dev.ipf.whitenoise.android.core.RecipientReferenceTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.core.GroupSystemEventsTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.media.MediaReferenceSupportTest")
             includeTestsMatching("dev.ipf.whitenoise.android.amber.Nip55SignerParsingTest")
         }
     }

@@ -42,6 +42,15 @@ enum class Nip55Subtarget {
     }
 }
 
+enum class GroupSystemSubtarget {
+    Json,
+    ;
+
+    companion object {
+        val COUNT: Int = entries.size
+    }
+}
+
 /**
  * Consumes one selector byte mapped onto `0..count-1`.
  *

@@ -3,41 +3,6 @@ package dev.ipf.whitenoise.android.core
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
-import org.json.JSONObject
-
-/**
- * Parsed content of a kind-1210 group system row (schema v1). These rows are
- * synthesized from MLS-authenticated group state and must never render as
- * chat bubbles; see spec/foundation/application-messages.md.
- */
-data class GroupSystemEvent(
-    val systemType: String,
-    val text: String,
-    // Attribution fields: only ever non-null when the event came from Marmot's
-    // authenticated state-change projection. The JSON parse fallback leaves
-    // both null — a raw payload's actor/subject are peer claims (#985).
-    val actor: String?,
-    val subject: String?,
-    val name: String?,
-    // Rename changes (kind:1210 `group_renamed`): the previous group name, when
-    // the payload carries it (`data.old_name`). null = absent, in which case the
-    // row falls back to the new-name-only form rather than faking an "Unknown →"
-    // diff. Peer-supplied, so it is sanitized at render time like `name`.
-    val oldName: String? = null,
-    // True when the previous-name source explicitly says what the old name was,
-    // even if that value was blank (first-ever name set). This distinguishes
-    // "old name unknown" from "known unnamed group" without rendering a fake
-    // diff.
-    val oldNameKnown: Boolean = oldName != null,
-    // Disappearing-timer changes (kind:1210 `disappearing_timer_changed`): the
-    // previous and new per-group retention in seconds. 0 = off; null = absent.
-    val oldRetentionSeconds: ULong? = null,
-    val newRetentionSeconds: ULong? = null,
-    // True only for engine-synthesized timeline rows (`direction == "system"`
-    // and no source message). A non-null GroupSystemEventFfi alone is not proof:
-    // Marmot also schema-parses member-authored kind-1210 messages (#1318).
-    val fromAuthenticatedStateProjection: Boolean,
-)
 
 data class GroupRenameDiffNames(
     val oldName: String,
@@ -177,32 +142,7 @@ object GroupSystemEvents {
      * to backfill an older authenticated projection; fallback-only events render
      * as neutral [GroupSystemCopy.fallback]. See #985 and #1318.
      */
-    fun parse(plaintext: String): GroupSystemEvent? =
-        runCatching {
-            val json = JSONObject(plaintext)
-            val systemType = json.optString("system_type").takeIf { it.isNotBlank() } ?: return null
-            val data = json.optJSONObject("data")
-            val hasOldName = data?.has("old_name") == true
-            GroupSystemEvent(
-                systemType = systemType,
-                text = json.optString("text"),
-                // Never trusted from a raw payload; see the KDoc above.
-                actor = null,
-                subject = null,
-                name = data?.optString("name")?.takeIf { it.isNotBlank() },
-                // Previous group name for a rename diff, when the peer includes
-                // it. Absent stays null so the row falls back to the new-name
-                // form rather than rendering a fake "Unknown → New" diff.
-                oldName = data?.optString("old_name")?.takeIf { it.isNotBlank() },
-                oldNameKnown = hasOldName,
-                // Only accept a real non-negative number; absent or malformed
-                // (non-numeric) stays null so it falls back rather than rendering
-                // as an authoritative "turned off" (which is only secs == 0).
-                oldRetentionSeconds = data?.optLong("old_retention_seconds", -1L)?.takeIf { it >= 0L }?.toULong(),
-                newRetentionSeconds = data?.optLong("new_retention_seconds", -1L)?.takeIf { it >= 0L }?.toULong(),
-                fromAuthenticatedStateProjection = false,
-            )
-        }.getOrNull()
+    fun parse(plaintext: String): GroupSystemEvent? = GroupSystemEventJson.parse(plaintext)
 
     private fun fromFfi(ffi: GroupSystemEventFfi): GroupSystemEvent =
         GroupSystemEvent(

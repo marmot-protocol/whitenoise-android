@@ -90,7 +90,7 @@ object FuzzJsonStructure {
                         depth--
                     }
                 }
-                ',' -> {
+                ',', ';' -> {
                     if (depth > 0) {
                         membersByDepth[depth]++
                         maxMembersSeen = maxOf(maxMembersSeen, membersByDepth[depth])

@@ -30,6 +30,8 @@ class FuzzSeedSubtargetTest {
         provider: ByteArrayFuzzedDataProvider,
     ) {
         when {
+            seedName in GROUP_SYSTEM_SEEDS ->
+                assertTrue(provider.consumeParserInput().trimStart().startsWith("{"), "$seedName must replay JSON")
             seedName.startsWith("nostr_event_") ->
                 assertTrue(provider.consumeParserInput().trimStart().startsWith("{"), "$seedName must replay JSON")
             seedName.startsWith("relay_envelope_") -> {
@@ -73,6 +75,13 @@ class FuzzSeedSubtargetTest {
     companion object {
         private val resourcesRoot =
             Path.of("src/test/resources/dev/ipf/whitenoise/android/fuzz")
+        private val GROUP_SYSTEM_SEEDS =
+            setOf(
+                "accepted_rename.input",
+                "spoofed_attribution.input",
+                "truncated_nested.input",
+                "unicode_unknown.input",
+            )
 
         private val SEED_EXPECTATIONS: List<SeedExpectation> =
             Files.walk(resourcesRoot).use { paths ->
@@ -85,6 +94,13 @@ class FuzzSeedSubtargetTest {
         private fun expectationFor(seedPath: Path): SeedExpectation {
             val name = seedPath.name
             return when {
+                name in GROUP_SYSTEM_SEEDS ->
+                    seedExpectation(
+                        seedPath,
+                        GroupSystemSubtarget.COUNT,
+                        GroupSystemSubtarget.Json.ordinal,
+                        GroupSystemSubtarget.Json.name,
+                    )
                 name.startsWith("nostr_event_") ->
                     seedExpectation(
                         seedPath,

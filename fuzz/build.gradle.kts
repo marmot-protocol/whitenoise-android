@@ -31,6 +31,7 @@ val fuzzProductionIncludes =
         "dev/ipf/whitenoise/android/core/nostr/NostrRelayFrames.kt",
         "dev/ipf/whitenoise/android/core/ProfileLink.kt",
         "dev/ipf/whitenoise/android/core/RecipientReference.kt",
+        "dev/ipf/whitenoise/android/core/GroupSystemEventJson.kt",
         "dev/ipf/whitenoise/android/amber/Nip55SignerPure.kt",
     )
 
@@ -94,6 +95,14 @@ val fuzzCampaignTargets =
             seedCorpusPath =
                 "src/test/resources/dev/ipf/whitenoise/android/fuzz/" +
                     "IdentityReferenceFuzzTestInputs/fuzzIdentityReference",
+        ),
+        FuzzCampaignTarget(
+            taskName = "fuzzGroupSystemEvent",
+            testClass = "dev.ipf.whitenoise.android.fuzz.GroupSystemEventFuzzTest",
+            methodName = "fuzzGroupSystemEvent",
+            seedCorpusPath =
+                "src/test/resources/dev/ipf/whitenoise/android/fuzz/" +
+                    "GroupSystemEventFuzzTestInputs/fuzzGroupSystemEvent",
         ),
         FuzzCampaignTarget(
             taskName = "fuzzNip55SignerProtocol",
