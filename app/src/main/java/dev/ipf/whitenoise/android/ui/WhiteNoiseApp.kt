@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -43,11 +44,13 @@ import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.TransientNotice
+import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineConfirmationNotice
+import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
@@ -57,10 +60,17 @@ import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
+import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
+import dev.ipf.whitenoise.android.ui.navigation.PrepareMainShellFirstFrame
+import dev.ipf.whitenoise.android.ui.navigation.WarmResumeFirstUsefulSurface
+import dev.ipf.whitenoise.android.ui.navigation.shouldComposeProtectedMainShell
+import dev.ipf.whitenoise.android.ui.navigation.warmResumeFirstUsefulSurface
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingScreen
 import dev.ipf.whitenoise.android.ui.settings.WipeOutcomeSheet
 import dev.ipf.whitenoise.android.ui.settings.WipeProgressSheet
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -130,8 +140,11 @@ internal fun ShellTransientNoticeLayout(
 }
 
 @Composable
-fun WhiteNoiseApp(
+internal fun WhiteNoiseApp(
     appState: WhiteNoiseAppState,
+    mainShellStateHolder: MainShellStateHolder,
+    warmResumeTraceToken: Int,
+    warmResumeEpoch: Int,
     inboundProfilePayload: String? = null,
     onProfilePayloadHandled: (String) -> Unit = {},
     inboundNotificationTarget: NotificationTarget? = null,
@@ -164,8 +177,25 @@ fun WhiteNoiseApp(
     val dictationPermissionRequestId = dictation.permissionRequestId
     val dictationProviderActivityRequestId = dictation.providerActivityRequestId
     val density = LocalDensity.current
+    var firstUsefulFrameRecorded by remember(warmResumeTraceToken, warmResumeEpoch) { mutableStateOf(false) }
+    val inboundRoutePending =
+        inboundNotificationTarget != null ||
+            inboundProfilePayload != null ||
+            inboundShareRequest != null ||
+            inboundAppUpdateTap != 0
     val dictationImeVisible =
         WindowInsets.ime.getBottom(density) > WindowInsets.navigationBars.getBottom(density)
+    val localProjectionAvailable =
+        mainShellStateHolder.localProjectionAvailable(
+            activeAccountRef = appState.activeAccountRef,
+            runtimeGeneration = appState.runtimeGeneration,
+        )
+    val lockDecision =
+        when {
+            appState.appUnlockEvaluationPending -> "pending"
+            appState.appLockScreenVisible -> "locked"
+            else -> "unlocked"
+        }
     val dictationPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             val permanentlyDenied =
@@ -206,6 +236,22 @@ fun WhiteNoiseApp(
         withContext(Dispatchers.IO) {
             sweepStaleSharedMedia(context, SHARED_MEDIA_MAX_AGE_MS)
         }
+    }
+    LaunchedEffect(
+        appState.phase,
+        appState.runtimeGeneration,
+        lockDecision,
+        mainShellStateHolder.hasSavedConversationRoute,
+        localProjectionAvailable,
+    ) {
+        WarmResumeTrace.restorationState(
+            activityToken = warmResumeTraceToken,
+            runtimeGeneration = appState.runtimeGeneration,
+            bootstrapLocalReady = appState.phase == AppPhase.Ready,
+            lockDecision = lockDecision,
+            savedRouteAvailable = mainShellStateHolder.hasSavedConversationRoute,
+            localProjectionAvailable = localProjectionAvailable,
+        )
     }
     LaunchedEffect(
         appState.phase,
@@ -288,62 +334,122 @@ fun WhiteNoiseApp(
             LocalSnackbarContentInset provides snackbarContentInset,
         ) {
             Scaffold(
-                modifier = Modifier.exposePerformanceTestTags(),
+                modifier =
+                    Modifier
+                        .performanceTestTag("${PerformanceTestTags.ACTIVITY_INSTANCE_PREFIX}$warmResumeTraceToken")
+                        .exposePerformanceTestTags(),
                 contentWindowInsets = WindowInsets(0.dp),
                 snackbarHost = { WhiteNoiseSnackbarHost(snackbarHostState) },
             ) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding)) {
-                    // Not while the app-lock screen is up — as a Dialog it would
-                    // float above the lock and expose update actions before unlock.
-                    if (!appState.appLockScreenVisible) {
-                        AppSelfUpdateDialog(appState = appState)
-                    }
-                    when (val phase = appState.phase) {
-                        AppPhase.Bootstrapping -> StartupLoadingScreen()
-                        AppPhase.Onboarding -> OnboardingScreen(appState)
-                        AppPhase.Ready ->
-                            ShellTransientNoticeLayout(
-                                notice = transientNotice,
-                                persistentTopContent = { ForwardOperationStatusHost(appState) },
-                                persistentTopContentConsumesStatusBars = forwardOperationVisible,
-                            ) {
-                                MainShell(
-                                    appState = appState,
-                                    inboundNotificationTarget = inboundNotificationTarget,
-                                    inboundNotificationRequestId = inboundNotificationRequestId,
-                                    onNotificationTargetHandled = onNotificationTargetHandled,
-                                    inboundShareRequest = inboundShareRequest,
-                                    onShareRequestHandled = onShareRequestHandled,
-                                    inboundAppUpdateTap = inboundAppUpdateTap,
-                                    onAppUpdateTapHandled = onAppUpdateTapHandled,
-                                )
-                            }
-                        is AppPhase.Failed ->
-                            ErrorContent(
-                                title = stringResource(R.string.white_noise_couldnt_start),
-                                error = phase.error,
-                                onRetry = { scope.launch { appState.bootstrap() } },
-                            )
-                    }
                     if (appState.appLockScreenVisible) {
+                        // Privacy boundary: the protected shell is not composed
+                        // underneath the lock. Its Activity-scoped controllers
+                        // remain alive and may refresh the local projection only.
+                        if (appState.phase == AppPhase.Ready) {
+                            PrepareMainShellFirstFrame(appState, mainShellStateHolder)
+                        }
+                        LaunchedEffect(warmResumeTraceToken, warmResumeEpoch) {
+                            if (!firstUsefulFrameRecorded && warmResumeEpoch > 0) {
+                                withFrameNanos { }
+                                WarmResumeTrace.firstUsefulFrame(
+                                    activityToken = warmResumeTraceToken,
+                                    foregroundEpoch = warmResumeEpoch,
+                                    surface = WarmResumeFirstUsefulSurface.AppLock,
+                                    localSnapshotReady = false,
+                                )
+                                firstUsefulFrameRecorded = true
+                            }
+                        }
                         AppLockScreen(
                             error = appState.appUnlockError,
                             onRetry = { appState.requestAppUnlock() },
                         )
-                    }
-                    // Sign Out & Wipe chrome (#350) is hosted here, above the
-                    // phase router: the wipe flips the active account (or drops
-                    // to Onboarding) mid-flight, popping whatever screen
-                    // started it, so neither the progress sheet nor the
-                    // partial-failure outcome sheet can live in that screen.
-                    if (appState.wipeInProgress) {
-                        WipeProgressSheet()
-                    }
-                    appState.pendingWipeReport?.let { report ->
-                        WipeOutcomeSheet(
-                            report = report,
-                            onDismiss = { appState.pendingWipeReport = null },
-                        )
+                    } else {
+                        AppSelfUpdateDialog(appState = appState)
+                        when (val phase = appState.phase) {
+                            AppPhase.Bootstrapping -> StartupLoadingScreen()
+                            AppPhase.Onboarding -> OnboardingScreen(appState)
+                            AppPhase.Ready -> {
+                                val firstUsefulSurface =
+                                    warmResumeFirstUsefulSurface(
+                                        appLockScreenVisible = false,
+                                        inboundRoutePending = inboundRoutePending,
+                                        shellReady =
+                                            mainShellStateHolder.firstUsefulFrameReady(
+                                                phase = phase,
+                                                activeAccountRef = appState.activeAccountRef,
+                                                runtimeGeneration = appState.runtimeGeneration,
+                                                appLockScreenVisible = false,
+                                            ),
+                                    )
+                                LaunchedEffect(firstUsefulSurface, warmResumeTraceToken, warmResumeEpoch) {
+                                    if (
+                                        !firstUsefulFrameRecorded &&
+                                        warmResumeEpoch > 0 &&
+                                        !inboundRoutePending &&
+                                        firstUsefulSurface != WarmResumeFirstUsefulSurface.Startup
+                                    ) {
+                                        withFrameNanos { }
+                                        WarmResumeTrace.firstUsefulFrame(
+                                            activityToken = warmResumeTraceToken,
+                                            foregroundEpoch = warmResumeEpoch,
+                                            surface = firstUsefulSurface,
+                                            localSnapshotReady =
+                                                mainShellStateHolder.firstUsefulFrameReady(
+                                                    phase = phase,
+                                                    activeAccountRef = appState.activeAccountRef,
+                                                    runtimeGeneration = appState.runtimeGeneration,
+                                                    appLockScreenVisible = false,
+                                                ),
+                                        )
+                                        firstUsefulFrameRecorded = true
+                                    }
+                                }
+                                if (inboundProfilePayload != null) {
+                                    PrepareMainShellFirstFrame(appState, mainShellStateHolder)
+                                    LoadingScreen()
+                                } else if (!shouldComposeProtectedMainShell(firstUsefulSurface)) {
+                                    PrepareMainShellFirstFrame(appState, mainShellStateHolder)
+                                    StartupLoadingScreen()
+                                } else {
+                                    ShellTransientNoticeLayout(
+                                        notice = transientNotice,
+                                        persistentTopContent = { ForwardOperationStatusHost(appState) },
+                                        persistentTopContentConsumesStatusBars = forwardOperationVisible,
+                                    ) {
+                                        MainShell(
+                                            appState = appState,
+                                            stateHolder = mainShellStateHolder,
+                                            inboundNotificationTarget = inboundNotificationTarget,
+                                            inboundNotificationRequestId = inboundNotificationRequestId,
+                                            onNotificationTargetHandled = onNotificationTargetHandled,
+                                            inboundShareRequest = inboundShareRequest,
+                                            onShareRequestHandled = onShareRequestHandled,
+                                            inboundAppUpdateTap = inboundAppUpdateTap,
+                                            onAppUpdateTapHandled = onAppUpdateTapHandled,
+                                        )
+                                    }
+                                }
+                            }
+                            is AppPhase.Failed ->
+                                ErrorContent(
+                                    title = stringResource(R.string.white_noise_couldnt_start),
+                                    error = phase.error,
+                                    onRetry = { scope.launch { appState.bootstrap() } },
+                                )
+                        }
+                        // Sign Out & Wipe chrome (#350) lives above the phase
+                        // router but below the lock privacy boundary.
+                        if (appState.wipeInProgress) {
+                            WipeProgressSheet()
+                        }
+                        appState.pendingWipeReport?.let { report ->
+                            WipeOutcomeSheet(
+                                report = report,
+                                onDismiss = { appState.pendingWipeReport = null },
+                            )
+                        }
                     }
                 }
             }

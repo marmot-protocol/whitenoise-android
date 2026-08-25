@@ -3467,6 +3467,14 @@ class ChatsController private constructor(
 
     var isLoading by mutableStateOf(initialLocalSnapshot == null)
         private set
+
+    /**
+     * True once the bound account's local projection has returned, including
+     * an authoritative empty result. Unlike `items.isNotEmpty()`, this remains
+     * a valid warm-resume seed for accounts with no conversations.
+     */
+    var hasLoadedLocalSnapshot by mutableStateOf(initialLocalSnapshot != null)
+        private set
     var error by mutableStateOf<ErrorPresentation?>(null)
         private set
 
@@ -3975,9 +3983,17 @@ class ChatsController private constructor(
         val seededLocalSnapshot =
             pendingInitialLocalSnapshot?.takeIf { snapshot -> snapshot.accountRef == accountRef }
         pendingInitialLocalSnapshot = null
-        val keepLoadedContent = seededLocalSnapshot != null || (preserveLoadedContent && chatRows.isNotEmpty())
+        val keepLoadedContent =
+            shouldPreserveChatListProjection(
+                hasSeededLocalSnapshot = seededLocalSnapshot != null,
+                preserveLoadedContent = preserveLoadedContent,
+                hasLoadedLocalSnapshot = hasLoadedLocalSnapshot,
+            )
         isLoading = accountRef != null && !keepLoadedContent
-        if (!keepLoadedContent) resetBackingState()
+        if (!keepLoadedContent) {
+            hasLoadedLocalSnapshot = accountRef == null
+            resetBackingState()
+        }
         bindEpoch += 1L
         recompute(scheduleBackgroundEnrichment = seededLocalSnapshot == null)
         error = null
@@ -4045,6 +4061,7 @@ class ChatsController private constructor(
                         "snapshot account=${accountRef.take(8)} rows=${chatRows.size} groups=${groupRecordsById.size} " +
                             "${chatRows.map { it.debugSummary() }}"
                     }
+                    hasLoadedLocalSnapshot = true
                     isLoading = false
                     error = null
                     recompute()
@@ -6022,6 +6039,7 @@ class ChatsController private constructor(
         resetBackingState()
         items = emptyList()
         archivedItems = emptyList()
+        hasLoadedLocalSnapshot = false
         isLoading = false
         error = null
         pendingRecompute = false
@@ -6448,6 +6466,7 @@ class ChatsController private constructor(
             activeAccountIdHex = snapshot.activeAccountIdHex,
             requestProfileRefresh = false,
         )
+        hasLoadedLocalSnapshot = true
         isLoading = false
         error = null
         recompute(scheduleBackgroundEnrichment = false)
@@ -6458,59 +6477,16 @@ class ChatsController private constructor(
     }
 }
 
+internal fun shouldPreserveChatListProjection(
+    hasSeededLocalSnapshot: Boolean,
+    preserveLoadedContent: Boolean,
+    hasLoadedLocalSnapshot: Boolean,
+): Boolean = hasSeededLocalSnapshot || (preserveLoadedContent && hasLoadedLocalSnapshot)
+
 internal fun isEligibleForwardTarget(
     item: ChatListItem,
     activeAccountIdHex: String?,
 ): Boolean = !item.group.pendingConfirmation && !item.removedFromGroup(activeAccountIdHex)
-
-/**
- * Parse [text] into the same Markdown AST the Rust core attaches to projected
- * records, for the state Android synthesizes locally (optimistic sends,
- * finished agent streams, chat-list previews). `parseMarkdown` is a blocking
- * FFI call, so it rides [WhiteNoiseAppState.marmotIo]'s `Dispatchers.IO` hop
- * instead of the main thread. Any failure degrades to an empty document —
- * empty docs render as plain text, so a parser error can never lose a
- * message body.
- */
-internal suspend fun WhiteNoiseAppState.parseMarkdownOrEmpty(text: String): MarkdownDocumentFfi =
-    try {
-        marmotIo { parseMarkdown(text) }
-    } catch (throwable: Throwable) {
-        rethrowIfCancellation(throwable)
-        MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0))
-    }
-
-/**
- * Some legacy/projected rows can arrive without the Markdown document that the
- * bubble needs for links and formatting. Re-parse only ordinary, visible text
- * messages; reactions/system events and tombstones intentionally use derived
- * presentation text instead of their raw payload.
- */
-internal fun needsTimelineMarkdownHydration(record: TimelineMessageRecordFfi): Boolean =
-    record.kind == 9uL &&
-        !record.deleted &&
-        record.plaintext.isNotBlank() &&
-        record.contentTokens.blocks.isEmpty()
-
-internal fun TimelineMessageRecordFfi.withMarkdownTokens(document: MarkdownDocumentFfi) = copy(contentTokens = document)
-
-/**
- * Publish locally available timeline rows before enriching them. The returned
- * job is lifecycle-bound to [scope], so leaving the conversation cancels both
- * parsing and the eventual apply without holding the first visible frame.
- */
-internal fun publishTimelineBeforeMarkdownHydration(
-    scope: CoroutineScope,
-    records: List<TimelineMessageRecordFfi>,
-    publish: () -> Unit,
-    hydrate: suspend (List<TimelineMessageRecordFfi>) -> List<TimelineMessageRecordFfi>,
-    applyHydrated: (List<TimelineMessageRecordFfi>) -> Unit,
-): Job? {
-    publish()
-    val pending = records.filter(::needsTimelineMarkdownHydration)
-    if (pending.isEmpty()) return null
-    return scope.launch { applyHydrated(hydrate(pending)) }
-}
 
 private fun AppGroupRecordFfi.debugSummary(): String =
     "id=${groupIdHex.take(8)} archived=$archived pending=$pendingConfirmation " +

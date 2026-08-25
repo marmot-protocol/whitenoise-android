@@ -20,6 +20,11 @@ internal data class NotificationRouteSample(
         get() = transcriptVisible && expectedConversationVisible
 }
 
+internal enum class BenchmarkUsefulSurface {
+    ChatList,
+    Conversation,
+}
+
 internal class WhiteNoiseJourneys {
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
@@ -64,6 +69,53 @@ internal class WhiteNoiseJourneys {
             returnToChatList()
         }
         device.waitForIdle()
+    }
+
+    /** Resumes without changing the user's useful route and returns its type. */
+    fun MacrobenchmarkScope.resumeToUsefulSurface(): BenchmarkUsefulSurface {
+        startActivityAndWait()
+        checkNotNull(findTagWithPrefix(PerformanceTags.ACTIVITY_INSTANCE_PREFIX)) {
+            "Timed out waiting for the White Noise root surface."
+        }
+        return waitForUsefulSurface().also { device.waitForIdle() }
+    }
+
+    /** Recreates only MainActivity while retaining the target process and its ViewModels. */
+    fun MacrobenchmarkScope.recreateActivityAndWait(expectedSurface: BenchmarkUsefulSurface) {
+        val previousActivityMarker =
+            checkNotNull(findTagWithPrefix(PerformanceTags.ACTIVITY_INSTANCE_PREFIX)) {
+                "Missing Activity-instance marker before benchmark recreation."
+            }.resourceName
+        val component = "${BenchmarkConfig.TARGET_PACKAGE}/dev.ipf.whitenoise.android.MainActivity"
+        val output =
+            device.executeShellCommand(
+                "am start -W -n $component --ez $BENCHMARK_RECREATE_ACTIVITY_EXTRA true",
+            )
+        check(output.lineSequence().any { it.trim() == "Status: ok" }) {
+            "Benchmark Activity recreation request failed: $output"
+        }
+        checkNotNull(
+            device.onElementOrNull(timeoutMs = STARTUP_TIMEOUT_MS) {
+                matchesPerformanceTagPrefix(PerformanceTags.ACTIVITY_INSTANCE_PREFIX) &&
+                    viewIdResourceName != previousActivityMarker
+            },
+        ) {
+            "Timed out waiting for the recreated Activity to replace $previousActivityMarker."
+        }
+        waitForUsefulSurface(expectedSurface)
+    }
+
+    /** Brings back the existing task after `killProcess` without force-stopping or clearing it. */
+    fun MacrobenchmarkScope.launchRestoredTaskAndWait(expectedSurface: BenchmarkUsefulSurface) {
+        val component = "${BenchmarkConfig.TARGET_PACKAGE}/dev.ipf.whitenoise.android.MainActivity"
+        val output = device.executeShellCommand("am start -W -n $component")
+        check(output.lineSequence().any { it.trim() == "Status: ok" }) {
+            "Benchmark process-restoration launch failed: $output"
+        }
+        checkNotNull(findTagWithPrefix(PerformanceTags.ACTIVITY_INSTANCE_PREFIX)) {
+            "Timed out waiting for the restored White Noise root surface."
+        }
+        waitForUsefulSurface(expectedSurface)
     }
 
     fun openGroup(groupName: String) {
@@ -216,6 +268,43 @@ internal class WhiteNoiseJourneys {
             matchesPerformanceTag(tag) && isVisibleOnDisplay()
         }
 
+    private fun findTagWithPrefix(prefix: String): UiObject2? =
+        device.onElementOrNull(timeoutMs = DEFAULT_TIMEOUT_MS) {
+            matchesPerformanceTagPrefix(prefix)
+        }
+
+    fun waitForUsefulSurface(expected: BenchmarkUsefulSurface? = null): BenchmarkUsefulSurface {
+        val resolved =
+            expected ?: run {
+                val deadline = SystemClock.uptimeMillis() + STARTUP_TIMEOUT_MS
+                var detected: BenchmarkUsefulSurface? = null
+                while (detected == null && SystemClock.uptimeMillis() < deadline) {
+                    detected =
+                        when {
+                            findVisibleTag(PerformanceTags.CONVERSATION_TRANSCRIPT_VISIBLE) != null ->
+                                BenchmarkUsefulSurface.Conversation
+                            findVisibleTag(PerformanceTags.NEW_MESSAGE) != null ->
+                                BenchmarkUsefulSurface.ChatList
+                            else -> null
+                        }
+                    if (detected == null) SystemClock.sleep(SELECTOR_POLL_INTERVAL_MS)
+                }
+                checkNotNull(detected) {
+                    "Timed out waiting for a useful chat-list or conversation surface. " +
+                        "Available performance tags: ${availablePerformanceTags()}."
+                }
+            }
+        when (resolved) {
+            BenchmarkUsefulSurface.ChatList -> {
+                waitForVisibleTag(PerformanceTags.NEW_MESSAGE, STARTUP_TIMEOUT_MS)
+            }
+            BenchmarkUsefulSurface.Conversation -> {
+                waitForVisibleTag(PerformanceTags.CONVERSATION_TRANSCRIPT_VISIBLE, STARTUP_TIMEOUT_MS)
+            }
+        }
+        return resolved
+    }
+
     private fun waitForTag(
         tag: String,
         timeoutMs: Long = DEFAULT_TIMEOUT_MS,
@@ -350,6 +439,11 @@ internal class WhiteNoiseJourneys {
             contentDescription?.toString() == tag ||
             extras.getCharSequence(COMPOSE_TEST_TAG_KEY)?.toString() == tag
 
+    private fun AccessibilityNodeInfo.matchesPerformanceTagPrefix(prefix: String): Boolean =
+        viewIdResourceName?.startsWith(prefix) == true ||
+            contentDescription?.toString()?.startsWith(prefix) == true ||
+            extras.getCharSequence(COMPOSE_TEST_TAG_KEY)?.toString()?.startsWith(prefix) == true
+
     private fun AccessibilityNodeInfo.isVisibleOnDisplay(): Boolean {
         if (!isVisibleToUser) return false
         val nodeBounds = Rect()
@@ -361,6 +455,8 @@ internal class WhiteNoiseJourneys {
 
     private companion object {
         const val COMPOSE_TEST_TAG_KEY = "androidx.compose.ui.semantics.testTag"
+        const val BENCHMARK_RECREATE_ACTIVITY_EXTRA =
+            "dev.ipf.whitenoise.android.extra.BENCHMARK_RECREATE_ACTIVITY"
         const val PERFORMANCE_TAG_PREFIX = "performance."
         const val EDIT_TEXT_CLASS = "android.widget.EditText"
         const val DEFAULT_TIMEOUT_MS = 15_000L

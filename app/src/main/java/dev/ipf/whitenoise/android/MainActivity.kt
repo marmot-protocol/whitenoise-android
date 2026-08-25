@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -39,10 +40,12 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ChatScreenshotPreferences
+import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
 import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
 import dev.ipf.whitenoise.android.ui.common.retainSecureFlag
+import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.updates.AppUpdateNavigation
 
@@ -62,6 +65,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var notificationTapTokens: NotificationTapTokens
     private lateinit var appState: WhiteNoiseAppState
     private lateinit var amberSignerLauncher: ActivityResultLauncher<Intent>
+    private var warmResumeTraceToken = 0
+    private var warmResumeEpoch by mutableStateOf(0)
+    private val mainShellStateHolder: MainShellStateHolder by viewModels {
+        MainShellStateHolder.Factory(appState)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
@@ -73,6 +81,14 @@ class MainActivity : AppCompatActivity() {
         setTheme(preComposeThemeFor(firstFrameTheme(), initialSystemDarkTheme))
         super.onCreate(savedInstanceState)
         appState = (application as WhiteNoiseApplication).appState
+        warmResumeTraceToken =
+            WarmResumeTrace.activityCreated(
+                recreated = savedInstanceState != null,
+                runtimeGeneration = appState.runtimeGeneration,
+            )
+        // Create the holder before installing the splash predicate so an
+        // Activity recreation can report its retained useful frame immediately.
+        mainShellStateHolder
         holdSplashThroughBootstrap(splashScreen, splashInstalledAtMs)
         appState.onAllowChatScreenshotsChanged = allowChatScreenshotsCallback
         applyRecentsPreferenceSecureFlag(
@@ -110,6 +126,9 @@ class MainActivity : AppCompatActivity() {
             ) {
                 WhiteNoiseApp(
                     appState = state,
+                    mainShellStateHolder = mainShellStateHolder,
+                    warmResumeTraceToken = warmResumeTraceToken,
+                    warmResumeEpoch = warmResumeEpoch,
                     inboundProfilePayload = inboundProfilePayload,
                     onProfilePayloadHandled = { handled ->
                         if (inboundProfilePayload == handled) inboundProfilePayload = null
@@ -175,6 +194,13 @@ class MainActivity : AppCompatActivity() {
                 shouldRetainSystemSplash(
                     phase = appState.phase,
                     elapsedMs = SystemClock.elapsedRealtime() - installedAtMs,
+                    firstUsefulFrameReady =
+                        mainShellStateHolder.firstUsefulFrameReady(
+                            phase = appState.phase,
+                            activeAccountRef = appState.activeAccountRef,
+                            runtimeGeneration = appState.runtimeGeneration,
+                            appLockScreenVisible = appState.appLockScreenVisible,
+                        ),
                 )
             if (!retain) appState.recordStartupSystemSplashHandoff()
             retain
@@ -231,6 +257,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        warmResumeEpoch += 1
+        WarmResumeTrace.foregroundStarted(warmResumeTraceToken, warmResumeEpoch)
         if (::appState.isInitialized) {
             // A stopped Activity receives onStart before onNewIntent when a
             // notification brings its existing task forward. Defer the
@@ -255,6 +283,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        WarmResumeTrace.lifecycle(warmResumeTraceToken, "activity-resumed")
         if (::appState.isInitialized) {
             if (foregroundConversationDismissal.consumeShouldDismissOnResume()) {
                 appState.dismissRetainedVisibleConversationNotifications()
@@ -269,10 +298,12 @@ class MainActivity : AppCompatActivity() {
             retainAppLockBackgroundSecureFlagIfNeeded()
             appState.setAppInForeground(false)
         }
+        WarmResumeTrace.foregroundStopped(warmResumeTraceToken, warmResumeEpoch)
         super.onStop()
     }
 
     override fun onDestroy() {
+        WarmResumeTrace.lifecycle(warmResumeTraceToken, "activity-destroyed")
         if (::amberSignerLauncher.isInitialized) AmberActivityCoordinator.detach(amberSignerLauncher)
         releaseAppLockBackgroundSecureFlag()
         if (::appState.isInitialized && appState.onAllowChatScreenshotsChanged === allowChatScreenshotsCallback) {
@@ -284,6 +315,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (
+            BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS &&
+            intent.getBooleanExtra(BENCHMARK_RECREATE_ACTIVITY_EXTRA, false)
+        ) {
+            setIntent(Intent(this, MainActivity::class.java))
+            recreate()
+            return
+        }
         setIntent(intent)
         consumeIntent(intent)
     }
@@ -453,7 +492,10 @@ internal const val MAX_RETAINED_SYSTEM_SPLASH_MILLIS = 1_500L
 internal fun shouldRetainSystemSplash(
     phase: AppPhase,
     elapsedMs: Long,
-): Boolean = phase == AppPhase.Bootstrapping && elapsedMs < MAX_RETAINED_SYSTEM_SPLASH_MILLIS
+    firstUsefulFrameReady: Boolean = true,
+): Boolean =
+    elapsedMs < MAX_RETAINED_SYSTEM_SPLASH_MILLIS &&
+        (phase == AppPhase.Bootstrapping || (phase == AppPhase.Ready && !firstUsefulFrameReady))
 
 internal fun preComposeThemeFor(
     themeMode: AppThemeMode,
@@ -482,5 +524,7 @@ private val Configuration.isNightModeActive: Boolean
 
 private const val APP_PREFERENCES_NAME = "whitenoise"
 private const val THEME_MODE_KEY = "theme_mode"
+internal const val BENCHMARK_RECREATE_ACTIVITY_EXTRA =
+    "dev.ipf.whitenoise.android.extra.BENCHMARK_RECREATE_ACTIVITY"
 private const val PRE_COMPOSE_BACKGROUND_LIGHT = 0xFFECEEEE.toInt()
 private const val PRE_COMPOSE_BACKGROUND_DARK = 0xFF0F1112.toInt()

@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
@@ -60,14 +61,20 @@ internal fun loadFailurePlacement(
 
 @Composable
 fun LoadingScreen() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.fillMaxSize().testTag(FULL_SCREEN_LOADING_TEST_TAG),
+        contentAlignment = Alignment.Center,
+    ) {
         CircularProgressIndicator()
     }
 }
 
 @Composable
 fun StartupLoadingScreen() {
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.fillMaxSize().padding(24.dp).testTag(STARTUP_LOADING_TEST_TAG),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -89,6 +96,9 @@ fun StartupLoadingScreen() {
         }
     }
 }
+
+internal const val FULL_SCREEN_LOADING_TEST_TAG = "full-screen-loading"
+internal const val STARTUP_LOADING_TEST_TAG = "startup-loading"
 
 @Composable
 internal fun InlineConfirmationNotice(
