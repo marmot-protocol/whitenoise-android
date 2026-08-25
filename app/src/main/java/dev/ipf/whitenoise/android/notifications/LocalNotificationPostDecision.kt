@@ -59,7 +59,6 @@ internal fun decideNotificationPost(
                 NotificationStyleChoice.Messaging ->
                     listOf(
                         NotificationActionKind.REPLY,
-                        NotificationActionKind.REACT,
                         NotificationActionKind.MARK_READ,
                     )
                 else -> emptyList()
@@ -141,4 +140,8 @@ private fun categoryFor(trigger: NotificationTriggerFfi): String =
     when (trigger) {
         NotificationTriggerFfi.NEW_MESSAGE -> NotificationCompat.CATEGORY_MESSAGE
         NotificationTriggerFfi.GROUP_INVITE -> NotificationCompat.CATEGORY_EVENT
+        NotificationTriggerFfi.REMOVED_FROM_GROUP,
+        NotificationTriggerFfi.MADE_ADMIN,
+        NotificationTriggerFfi.REMOVED_AS_ADMIN,
+        -> NotificationCompat.CATEGORY_EVENT
     }

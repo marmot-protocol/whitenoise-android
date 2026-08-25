@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.core.app.RemoteInput
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -94,34 +95,54 @@ class NotificationActionReceiver : BroadcastReceiver() {
         action: NotificationAction,
         intent: Intent,
     ) {
+        val application = appContext as? WhiteNoiseApplication ?: return
+        val actionStartedAtMs = System.currentTimeMillis()
         val reaction =
             notificationReactionChoice(
                 intent = intent,
                 allowedChoices = notificationQuickReactionChoices(appContext),
             ) ?: return
-        val dismissalBaselineMs = System.currentTimeMillis()
-        val queued =
+        val outcome =
             withContext(Dispatchers.IO) {
                 submitNotificationReaction(
                     action = action,
                     reaction = reaction,
-                    enqueueReactionAndMarkRead = { queuedAction, queuedReaction ->
-                        NotificationReactionWorker.enqueueActionBatch(appContext, queuedAction, queuedReaction)
+                    actionStartedAtMs = actionStartedAtMs,
+                    notificationActionsAllowed = {
+                        withContext(Dispatchers.Main.immediate) {
+                            application.appState.notificationActionsAllowed
+                        }
                     },
-                    dismissNotification = { queuedAction, queuedReaction ->
+                    enqueueReaction = { queuedAction, queuedReaction, startedAtMs ->
+                        NotificationReactionWorker.enqueue(
+                            appContext,
+                            queuedAction,
+                            queuedReaction,
+                            startedAtMs,
+                        )
+                    },
+                    dismissNotification = { queuedAction, queuedReaction, startedAtMs ->
                         dismissReactedNotification(
                             presenter = LocalNotificationPresenter(appContext),
                             action = queuedAction,
                             reaction = queuedReaction,
-                            dismissalBaselineMs = dismissalBaselineMs,
+                            dismissalBaselineMs = startedAtMs,
                         )
                     },
                 )
             }
-        if (!queued) {
-            withContext(Dispatchers.Main.immediate) {
-                Toast.makeText(appContext, R.string.toast_reaction_failed, Toast.LENGTH_LONG).show()
-            }
+        when (outcome) {
+            NotificationReactionSubmissionOutcome.PersistenceFailed ->
+                withContext(Dispatchers.Main.immediate) {
+                    Toast.makeText(appContext, R.string.toast_reaction_failed, Toast.LENGTH_LONG).show()
+                }
+            NotificationReactionSubmissionOutcome.BlockedByAppLock ->
+                notificationWarning("DMNotifyAction", "notification reaction blocked by app lock") {
+                    "group=${action.target.groupIdHex.take(LOGGED_GROUP_ID_PREFIX)}"
+                }
+            NotificationReactionSubmissionOutcome.Rejected,
+            NotificationReactionSubmissionOutcome.Submitted,
+            -> Unit
         }
     }
 
@@ -143,28 +164,61 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
 internal fun notificationReplyActionHandled(sent: Boolean): Boolean = sent
 
-// The action PendingIntent must be mutable so SystemUI can attach RemoteInput
-// results. Treat that result as untrusted and accept only a currently configured
-// quick-reaction choice.
+// The reaction PendingIntent is mutable so SystemUI can attach RemoteInput
+// results. Accept only a normalized value from the current configured choices.
 internal fun notificationReactionChoice(
     intent: Intent,
     allowedChoices: List<String>,
 ): String? {
+    val results = RemoteInput.getResultsFromIntent(intent)
     val reaction =
         normalizeNotificationReaction(
-            RemoteInput
-                .getResultsFromIntent(intent)
-                ?.getCharSequence(NotificationActions.KEY_REACTION_CHOICE)
-                ?.toString(),
-        )
+            (
+                results?.getCharSequence(NotificationActions.KEY_REACTION_CHOICE)
+                    ?: results
+                        ?.getCharSequence(NotificationActions.KEY_TEXT_REPLY)
+                        ?.takeIf { NotificationActions.isInlineReactionChoice(intent) }
+            )?.toString(),
+        ) ?: NotificationActions.legacyReaction(intent)
     return reaction?.takeIf { it in allowedChoices }
 }
 
+internal enum class NotificationReactionSubmissionOutcome {
+    Submitted,
+    BlockedByAppLock,
+    Rejected,
+    PersistenceFailed,
+}
+
+/** Persist the encrypted mutation before changing visible notification state. */
+@Suppress("ReturnCount") // Guard outcomes must not mutate or dismiss the card.
+internal suspend fun submitNotificationReaction(
+    action: NotificationAction,
+    reaction: String,
+    actionStartedAtMs: Long = System.currentTimeMillis(),
+    notificationActionsAllowed: suspend () -> Boolean,
+    enqueueReaction: suspend (NotificationAction, String, Long) -> Boolean,
+    dismissNotification: suspend (NotificationAction, String, Long) -> Unit,
+): NotificationReactionSubmissionOutcome {
+    if (action.kind != NotificationActionKind.REACT || actionStartedAtMs <= 0L) {
+        return NotificationReactionSubmissionOutcome.Rejected
+    }
+    val normalizedReaction =
+        normalizeNotificationReaction(reaction)
+            ?: return NotificationReactionSubmissionOutcome.Rejected
+    if (!notificationActionsAllowed()) return NotificationReactionSubmissionOutcome.BlockedByAppLock
+    if (!enqueueReaction(action, normalizedReaction, actionStartedAtMs)) {
+        return NotificationReactionSubmissionOutcome.PersistenceFailed
+    }
+
+    dismissNotification(action, normalizedReaction, actionStartedAtMs)
+    return NotificationReactionSubmissionOutcome.Submitted
+}
+
 /**
- * Clears the reacted card. A chip tap is a RemoteInput send, so the system
- * lifetime-extends the notification and swallows a bare cancel — the extension
- * has to be cleared with the same "handled" re-post the reply path uses (and
- * given a beat to settle) before the cancel will take.
+ * Clear the RemoteInput lifetime extension and then cancel only the card
+ * generation that offered the selected reaction. Sibling cleanup uses the tap
+ * timestamp so work delayed by connectivity can never consume newer events.
  */
 internal suspend fun dismissReactedNotification(
     presenter: LocalNotificationPresenter,
@@ -172,13 +226,21 @@ internal suspend fun dismissReactedNotification(
     reaction: String,
     dismissalBaselineMs: Long,
 ) {
-    val resolved =
+    val handled =
         runCatching {
             retryReplyCardRestore {
-                presenter.markDirectReplyHandled(action.notificationTag, action.notificationId, reaction)
+                presenter.markReactionHandledIfSameGeneration(
+                    notificationTag = action.notificationTag,
+                    notificationId = action.notificationId,
+                    reactedMessageIdHex = action.target.messageIdHex,
+                    reaction = reaction,
+                )
             }
-        }.getOrDefault(false)
-    if (resolved) delay(REPLY_DISMISS_SETTLE_MS)
+        }.getOrElse { failure ->
+            if (failure is CancellationException) throw failure
+            false
+        }
+    if (handled) delay(REPLY_DISMISS_SETTLE_MS)
     runCatching {
         presenter.dismissActionNotificationAndOlderSiblings(
             notificationTag = action.notificationTag,
@@ -188,31 +250,12 @@ internal suspend fun dismissReactedNotification(
             groupIdHex = action.target.groupIdHex,
             sinceMs = dismissalBaselineMs,
         )
-    }.onFailure {
-        notificationWarning("DMNotifyAction", "notification reaction cleanup failed", it) {
+    }.onFailure { failure ->
+        if (failure is CancellationException) throw failure
+        notificationWarning("DMNotifyAction", "notification reaction cleanup failed", failure) {
             "group=${action.target.groupIdHex.take(LOGGED_GROUP_ID_PREFIX)}"
         }
     }
-}
-
-/**
- * Persists the reaction and mark-read jobs atomically before clearing any
- * visible state. The card stays available if the WorkManager transaction fails
- * or is cancelled, so a retry cannot observe only one queued side effect.
- */
-@Suppress("ReturnCount") // Each guard aborts before the notification is dismissed.
-internal suspend fun submitNotificationReaction(
-    action: NotificationAction,
-    reaction: String,
-    enqueueReactionAndMarkRead: suspend (NotificationAction, String) -> Boolean,
-    dismissNotification: suspend (NotificationAction, String) -> Unit,
-): Boolean {
-    if (action.kind != NotificationActionKind.REACT) return false
-    val normalizedReaction = normalizeNotificationReaction(reaction) ?: return false
-    if (!enqueueReactionAndMarkRead(action, normalizedReaction)) return false
-
-    dismissNotification(action, normalizedReaction)
-    return true
 }
 
 /**
@@ -247,9 +290,6 @@ internal fun notificationReplySendPhaseBudgetMs(
     finishMarginMs: Long = GO_ASYNC_FINISH_MARGIN_MS,
 ): Long = (goAsyncBudgetMs - dismissBudgetMs - finishMarginMs).coerceAtLeast(1L)
 
-// Group ids are PII-adjacent, so logs carry only a short correlating prefix.
-private const val LOGGED_GROUP_ID_PREFIX = 8
-
 // The system applies FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY a beat after the
 // reply broadcast fires, so the live notification may not be in the active set
 // on the first look; retry the "reply handled" re-post a few times, then give
@@ -258,6 +298,7 @@ private const val LOGGED_GROUP_ID_PREFIX = 8
 // pending.finish() so a slow/cold send can't get the process killed mid-reply.
 private const val GO_ASYNC_BUDGET_MS = 8_000L
 private const val GO_ASYNC_FINISH_MARGIN_MS = 300L
+private const val LOGGED_GROUP_ID_PREFIX = 8
 internal const val REPLY_DISMISS_RETRIES = 6
 internal const val REPLY_DISMISS_RETRY_DELAY_MS = 100L
 internal const val REPLY_DISMISS_SETTLE_MS = 350L

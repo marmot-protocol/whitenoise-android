@@ -1,13 +1,11 @@
 package dev.ipf.whitenoise.android.notifications
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -20,7 +18,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
-import androidx.core.content.ContextCompat
 import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
@@ -39,7 +36,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -48,7 +44,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.coroutines.coroutineContext
 
 private const val EXTRA_EXPANDED_SINGLE_MESSAGE_BODY =
     "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_BODY"
@@ -109,25 +104,37 @@ class LocalNotificationPresenter(
     private val tapTokens = NotificationTapTokens.create(context)
     private val conversationVibrationPreferences = ConversationVibrationPreferences(context)
 
-    // Conversation channels we've already created in this process, so the hot
-    // post path skips the get-or-create Binder round-trip after the first post.
-    private val ensuredConversationChannels = ConcurrentHashMap.newKeySet<String>()
+    // First used from show()'s Default-dispatcher routing block, so defer the
+    // SharedPreferences-backed construction instead of adding disk-backed work
+    // to AppState's main-thread initialization.
+    private val conversationNotificationRouting by lazy { ConversationNotificationRouting(context) }
 
     fun ensureChannels() {
         NotificationChannels.ensureChannels(context)
     }
 
-    fun clearConversationShortcuts() {
-        clearAllConversationShortcuts(context)
+    fun hideConversationShortcutsFromDirectShare() {
+        hideConversationShortcutsFromDirectShare(context)
         shortcutSnapshots.clear()
         shortcutLastUsed.clear()
     }
 
-    fun canPostNotifications(): Boolean =
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.POST_NOTIFICATIONS,
-        ) == PackageManager.PERMISSION_GRANTED
+    fun clearConversationShortcutsForAccount(
+        accountRef: String,
+        includeUnscopedLegacy: Boolean,
+    ) {
+        clearConversationShortcutsForAccount(context, accountRef, includeUnscopedLegacy)
+        val accountScope = conversationShortcutAccountScope(accountRef) ?: return
+        shortcutSnapshots
+            .filterValues { it.accountScope == accountScope }
+            .keys
+            .forEach { shortcutId ->
+                shortcutSnapshots.remove(shortcutId)
+                shortcutLastUsed.remove(shortcutId)
+            }
+    }
+
+    fun canPostNotifications(): Boolean = notificationPermissionGranted(context)
 
     // Opening / reading a conversation clears every card for it: the
     // accumulating message card, separate typed sibling cards, and any pending
@@ -137,28 +144,36 @@ class LocalNotificationPresenter(
     suspend fun dismissConversationMessages(
         accountRef: String,
         groupIdHex: String,
+    ): Boolean = withContext(Dispatchers.Default) { dismissConversationMessagesImmediately(accountRef, groupIdHex) }
+
+    /**
+     * Bounded cancellation transaction for a conversation that has just become
+     * visible. UI ownership publication uses this directly so a saturated worker
+     * pool cannot leave tray cards behind after the route is already displayed.
+     */
+    fun dismissConversationMessagesImmediately(
+        accountRef: String,
+        groupIdHex: String,
     ): Boolean {
         if (accountRef.isBlank() || groupIdHex.isBlank()) return false
-        return withContext(Dispatchers.Default) {
-            val manager = NotificationManagerCompat.from(context)
-            val message = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
-            val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
-            val mention = LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex)
-            val agentActivity = LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex)
-            listOf(message, reaction, mention, agentActivity).forEach { key ->
-                cancelSynchronized(manager, key.tag, key.id)
-            }
-            dismissInvitesForGroup(accountRef, groupIdHex)
-            notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
-            true
+        val manager = NotificationManagerCompat.from(context)
+        val message = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
+        val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
+        val mention = LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex)
+        val agentActivity = LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex)
+        listOf(message, reaction, mention, agentActivity).forEach { key ->
+            cancelSynchronized(manager, key.tag, key.id)
         }
+        dismissInvitesForGroup(accountRef, groupIdHex)
+        notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
+        return true
     }
 
     // Invite cards carry no per-conversation tag, so match them by the account +
     // group stamped into their extras and cancel each by its own (tag, id). Both
     // must match: the same group can exist in more than one local account, so the
     // group id alone would clear another account's invite for that group.
-    private suspend fun dismissInvitesForGroup(
+    private fun dismissInvitesForGroup(
         accountRef: String,
         groupIdHex: String,
     ) {
@@ -170,7 +185,7 @@ class LocalNotificationPresenter(
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Throwable) {
-                return
+                emptyArray()
             }
         val inviteNotifications =
             active.filter {
@@ -184,7 +199,6 @@ class LocalNotificationPresenter(
             }
         val compat = NotificationManagerCompat.from(context)
         inviteNotifications.forEach {
-            coroutineContext.ensureActive()
             ConversationCardPostSynchronizer.withLock(
                 it.tag.orEmpty(),
                 it.id,
@@ -207,8 +221,8 @@ class LocalNotificationPresenter(
         }
     }
 
-    // Replying, reacting, or marking read owns the acted-on card, so cancel it
-    // before taking the sibling snapshot. All action paths share this operation so their
+    // Replying / marking read owns the acted-on card, so cancel it before taking
+    // the sibling snapshot. Both action paths share this operation so their
     // ordering and newer-sibling preservation cannot drift apart.
     fun dismissActionNotificationAndOlderSiblings(
         notificationTag: String,
@@ -292,6 +306,7 @@ class LocalNotificationPresenter(
         conversationAvatarUrl: String? = null,
         senderAvatarUrl: String? = null,
         silentUpdate: Boolean = false,
+        replaceCurrentMessage: Boolean = false,
         isPostStillAllowed: () -> Boolean = { true },
         shortNpub: (String) -> String,
     ): Boolean {
@@ -349,11 +364,9 @@ class LocalNotificationPresenter(
                 notificationContent.notificationId,
             )
             if (!isPostStillAllowed()) return@withRegisteredShow false
-            // Every non-redacted notification with a conversation target posts on
-            // the child of its typed parent (messages, mentions, reactions,
-            // invites, or agent activity), so that chat's native per-type settings
-            // apply. Messaging cards additionally carry/publish the shortcut used
-            // by Android's People UI; plain cards still use the child channel.
+            // Ordinary messages keep their required People/conversation child.
+            // Other event types inherit the stable global channel until this
+            // chat has an explicit or legacy custom override.
             val channelShortcutId =
                 if (!redactContent) {
                     conversationShortcutId(update.accountRef, update.groupIdHex)
@@ -371,12 +384,14 @@ class LocalNotificationPresenter(
                     ConversationVibrationPattern.SYSTEM_DEFAULT
                 }
             val channelId =
-                if (channelShortcutId != null) {
-                    withContext(Dispatchers.Default) {
-                        ensureConversationChannel(decision.channelId, channelShortcutId, vibrationPattern)
-                    } ?: decision.channelId
-                } else {
-                    decision.channelId
+                withContext(Dispatchers.Default) {
+                    conversationNotificationRouting
+                        .resolveForPost(
+                            channel = NotificationChannelSpec.forUpdate(update),
+                            conversationShortcutId = channelShortcutId,
+                            conversationTitle = conversationTitleOverride,
+                            primaryVibrationPattern = vibrationPattern,
+                        ).channelId
                 }
             val builder =
                 NotificationCompat
@@ -392,6 +407,12 @@ class LocalNotificationPresenter(
                     .setSilent(silentUpdate)
             // Name the recipient identity in the header when multi-account (#836).
             if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
+            if (
+                decision.style == NotificationStyleChoice.Plain ||
+                decision.style == NotificationStyleChoice.Messaging
+            ) {
+                stampConversationCardMessageId(builder, update.messageIdHex)
+            }
 
             var messagingPost: MessagingPostContext? = null
             when (val style = decision.style) {
@@ -399,11 +420,12 @@ class LocalNotificationPresenter(
                 // reactions channel, see LocalNotificationFormatter) so they're muted
                 // independently of messages. They aren't repliable, so no
                 // MessagingStyle / reply / mark-read — just a plain expandable card.
-                NotificationStyleChoice.Plain ->
+                NotificationStyleChoice.Plain -> {
                     builder
                         .setContentTitle(notificationContent.title)
                         .setContentText(notificationContent.body)
                         .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
+                }
 
                 // Messages stack into one per-conversation card; invites are
                 // one-off events, so keep them as a plain expandable notification.
@@ -434,25 +456,27 @@ class LocalNotificationPresenter(
                             .setLocusId(locusId)
                             .addPerson(sender)
                     }
-                    update.messageIdHex?.takeIf { it.isNotBlank() }?.let { messageIdHex ->
-                        builder.addExtras(
-                            Bundle().apply {
-                                putString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX, messageIdHex)
-                            },
-                        )
-                    }
                     if (redactContent) {
                         builder.addExtras(Bundle().apply { putBoolean(EXTRA_CONTENT_REDACTED, true) })
                     }
                     if (!redactContent) {
+                        val quickReactions =
+                            if (decision.actions.contains(NotificationActionKind.REPLY)) {
+                                withContext(Dispatchers.Default) {
+                                    notificationQuickReactionChoices(quickReactionChoices())
+                                }
+                            } else {
+                                emptyList()
+                            }
                         NotificationActions
                             .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                             ?.let { actionTarget ->
                                 decision.actions.forEach { action ->
                                     when (action) {
-                                        NotificationActionKind.REPLY -> builder.addAction(replyNotificationAction(actionTarget))
-                                        NotificationActionKind.REACT ->
-                                            reactionNotificationAction(actionTarget)?.let(builder::addAction)
+                                        NotificationActionKind.REPLY ->
+                                            builder.addAction(replyNotificationAction(actionTarget, quickReactions))
+                                        // Reaction choices ride on Reply's RemoteInput so SystemUI can render them inline.
+                                        NotificationActionKind.REACT -> Unit
                                         NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
                                     }
                                 }
@@ -487,16 +511,6 @@ class LocalNotificationPresenter(
                 }
             }
 
-            messagingPost?.let { messaging ->
-                withContext(Dispatchers.Default) {
-                    publishInitialConversationShortcut(
-                        update = update,
-                        content = notificationContent,
-                        messaging = messaging,
-                        directShareEligible = directShareEligible,
-                    )
-                }
-            }
             val notificationManager = NotificationManagerCompat.from(context)
             val posted =
                 withContext(Dispatchers.Default) {
@@ -520,6 +534,10 @@ class LocalNotificationPresenter(
                                     existingConversationMessages(
                                         notificationContent.notificationTag,
                                         notificationContent.notificationId,
+                                        replacingMessageIdHex =
+                                            update.messageIdHex
+                                                ?.takeIf(String::isNotBlank)
+                                                ?.takeIf { replaceCurrentMessage },
                                     )
                                 }
                             ConversationCardPostSynchronizer.awaitTestBarrier(
@@ -655,28 +673,6 @@ class LocalNotificationPresenter(
             }
             true
         }
-    }
-
-    private fun publishInitialConversationShortcut(
-        update: NotificationUpdateFfi,
-        content: LocalNotificationContent,
-        messaging: MessagingPostContext,
-        directShareEligible: Boolean,
-    ) {
-        val shortcutId = messaging.shortcutId ?: return
-        if (shortcutSnapshots.containsKey(shortcutId)) return
-        publishConversationShortcut(
-            update = update,
-            content = content,
-            shortcutId = shortcutId,
-            locusId = LocusIdCompat(shortcutId),
-            conversationAvatarUrl = messaging.conversationAvatarUrl,
-            conversationAvatarBitmap = messaging.conversationAvatarBitmap,
-            senderAvatarUrl = messaging.senderAvatarUrl,
-            senderAvatarBitmap = messaging.senderAvatarBitmap,
-            sender = messaging.sender,
-            directShareEligible = directShareEligible,
-        )
     }
 
     private suspend fun dispatchMessagingEnrichment(
@@ -956,6 +952,30 @@ class LocalNotificationPresenter(
             )
     }
 
+    internal fun isNotificationUpdateCurrentForEnrichment(update: NotificationUpdateFfi): Boolean {
+        val expectedMessageIdHex = update.messageIdHex?.takeIf(String::isNotBlank)
+        return when {
+            update.trigger == NotificationTriggerFfi.GROUP_INVITE -> isGroupInviteNotificationActive(update)
+            expectedMessageIdHex == null -> false
+            else -> {
+                val key = LocalNotificationFormatter.notificationDismissalKey(update)
+                conversationCardMessageIdHex(key.tag, key.id) == expectedMessageIdHex
+            }
+        }
+    }
+
+    private fun stampConversationCardMessageId(
+        builder: NotificationCompat.Builder,
+        messageIdHex: String?,
+    ) {
+        val generationId = messageIdHex?.takeIf(String::isNotBlank) ?: return
+        builder.addExtras(
+            Bundle().apply {
+                putString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX, generationId)
+            },
+        )
+    }
+
     private fun ChannelImportance.toCompatPriority(): Int =
         when (this) {
             ChannelImportance.HIGH -> NotificationCompat.PRIORITY_HIGH
@@ -976,7 +996,8 @@ class LocalNotificationPresenter(
     // Shown in place of the real card whenever the lockscreen redacts private
     // notifications. The OS can auto-generate one, but that behaviour varies by
     // OEM; supplying our own guarantees no sender, body, or group name ever
-    // reaches the lockscreen — only the app name.
+    // reaches the lockscreen — it carries only the app name and the generic
+    // hidden-content message.
     private fun redactedPublicVersion(
         channelId: String,
         category: String,
@@ -986,6 +1007,10 @@ class LocalNotificationPresenter(
             .Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_whitenoise)
             .setContentTitle(context.getString(R.string.app_name))
+            // A body line even in the redacted variant — without it the shade
+            // shows a bare icon+header shell when the OS hides sensitive
+            // content, which reads as a broken notification.
+            .setContentText(context.getString(R.string.notification_hidden_content))
             .setCategory(category)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setWhen(presentationTimestampMs)
@@ -1039,12 +1064,10 @@ class LocalNotificationPresenter(
     /**
      * Re-post the (tag, id) notification carrying a RemoteInput history entry —
      * the documented "reply handled" signal that clears the system's
-     * FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY. Sending any RemoteInput action —
-     * typed reply text or a tapped reaction chip — lifetime-extends the card
-     * (API 34+) and a bare [cancel] is ignored while that flag is set, so the
-     * caller must do this (and let it settle) before cancelling. [handledText]
-     * is what the card shows in the meantime: the reply, or the reaction.
-     * Returns true once the live notification was found and
+     * FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY. A direct-reply notification is
+     * lifetime-extended by the system (API 34+) and a bare [cancel] is ignored
+     * while that flag is set, so the caller must do this (and let it settle)
+     * before cancelling. Returns true once the live notification was found and
      * re-posted; false if it isn't in the active set yet (caller should retry —
      * the extension is applied a beat after the reply broadcast fires).
      *
@@ -1058,6 +1081,27 @@ class LocalNotificationPresenter(
     fun markDirectReplyHandled(
         notificationTag: String,
         notificationId: Int,
+        replyText: String,
+    ): Boolean = markRemoteInputHandled(notificationTag, notificationId, expectedMessageIdHex = null, replyText)
+
+    /**
+     * Clear a reaction chip's direct-reply lifetime extension only while the
+     * live card still represents the message that offered the chip. A newer
+     * message reuses the same notification key and must not inherit the old
+     * reaction as RemoteInput history.
+     */
+    internal fun markReactionHandledIfSameGeneration(
+        notificationTag: String,
+        notificationId: Int,
+        reactedMessageIdHex: String?,
+        reaction: String,
+    ): Boolean = markRemoteInputHandled(notificationTag, notificationId, reactedMessageIdHex, reaction)
+
+    @SuppressLint("MissingPermission")
+    private fun markRemoteInputHandled(
+        notificationTag: String,
+        notificationId: Int,
+        expectedMessageIdHex: String?,
         handledText: String,
     ): Boolean =
         ConversationCardPostSynchronizer.withLock(
@@ -1072,6 +1116,15 @@ class LocalNotificationPresenter(
                         ?.activeNotifications
                         ?.firstOrNull { it.tag == notificationTag && it.id == notificationId }
                 }.getOrNull() ?: return@withLock false
+            if (
+                expectedMessageIdHex != null &&
+                !shouldCancelRepliedConversationCard(
+                    expectedMessageIdHex,
+                    conversationCardMessageIdHex(active.notification),
+                )
+            ) {
+                return@withLock false
+            }
             ConversationCardPostSynchronizer.awaitTestBarrier(
                 ConversationCardOp.MARK_REPLY_HANDLED,
                 ConversationCardBarrier.AFTER_READ,
@@ -1087,7 +1140,7 @@ class LocalNotificationPresenter(
                         .setOnlyAlertOnce(true)
                         .build()
                 NotificationManagerCompat.from(context).notify(notificationTag, notificationId, resolved)
-                notificationDebug { "reply-handled re-post tag=${notificationTag.take(16)} id=$notificationId" }
+                notificationDebug { "remote-input-handled re-post tag=${notificationTag.take(16)} id=$notificationId" }
                 true
             }.getOrDefault(false)
         }
@@ -1198,15 +1251,26 @@ class LocalNotificationPresenter(
     private fun existingConversationMessages(
         tag: String,
         id: Int,
-    ): List<NotificationCompat.MessagingStyle.Message>? =
-        activeConversationCard(tag, id)
-            ?.takeUnless { it.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true }
-            ?.let { existing ->
-                NotificationCompat.MessagingStyle
-                    .extractMessagingStyleFromNotification(existing)
-                    ?.messages
-                    ?: expandedSingleMessage(existing.extras)
-            }
+        replacingMessageIdHex: String? = null,
+    ): List<NotificationCompat.MessagingStyle.Message>? {
+        val existing =
+            activeConversationCard(tag, id)
+                ?.takeUnless { it.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true }
+                ?: return null
+        val messages =
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(existing)
+                ?.messages
+                ?: expandedSingleMessage(existing.extras)
+        return if (
+            replacingMessageIdHex != null &&
+            conversationCardMessageIdHex(existing) == replacingMessageIdHex
+        ) {
+            messages?.dropLast(1)
+        } else {
+            messages
+        }
+    }
 
     private fun expandedSingleMessage(extras: Bundle?): List<NotificationCompat.MessagingStyle.Message>? =
         extras?.let { bundle ->
@@ -1248,9 +1312,11 @@ class LocalNotificationPresenter(
                         ?.longLabel
                         ?.toString()
             val title = preferredConversationShortcutTitle(candidateTitle, existingTitle)
+            val accountScope = conversationShortcutAccountScope(update.accountRef) ?: return
             val snapshot =
                 ConversationShortcutSnapshot(
                     shortcutId = shortcutId,
+                    accountScope = accountScope,
                     shortLabel = title.take(24).ifBlank { context.getString(R.string.app_name) },
                     longLabel = title,
                     notificationTag = content.notificationTag,
@@ -1322,37 +1388,11 @@ class LocalNotificationPresenter(
                 .setLocusId(locusId)
                 .setPerson(sender)
                 .setLongLived(true)
+                .setExtras(conversationShortcutAccountScopeExtras(snapshot.accountScope))
         if (directShareEligible) {
             builder.setCategories(setOf(CONVERSATION_SHARE_TARGET_CATEGORY))
         }
         return builder.build()
-    }
-
-    private fun ensureConversationChannel(
-        parentChannelId: String,
-        conversationShortcutId: String,
-        vibrationPattern: ConversationVibrationPattern,
-    ): String? {
-        val conversationChannelId =
-            ConversationNotificationChannels.conversationChannelId(
-                parentChannelId,
-                conversationShortcutId,
-                vibrationPattern,
-            )
-        if (conversationChannelId in ensuredConversationChannels) {
-            val manager = context.getSystemService(NotificationManager::class.java)
-            if (manager?.getNotificationChannel(conversationChannelId) != null) return conversationChannelId
-            ensuredConversationChannels.remove(conversationChannelId)
-        }
-        val created =
-            ConversationNotificationChannels.ensureConversationChannel(
-                context = context,
-                parentChannelId = parentChannelId,
-                conversationShortcutId = conversationShortcutId,
-                vibrationPattern = vibrationPattern,
-            )
-        if (created != null) ensuredConversationChannels.add(created)
-        return created
     }
 
     private fun pruneConversationShortcutsBeforePublish(shortcutId: String) {
@@ -1377,20 +1417,30 @@ class LocalNotificationPresenter(
         }
     }
 
-    private fun replyNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action {
+    private fun replyNotificationAction(
+        actionTarget: NotificationActionTarget,
+        reactionChoices: List<String>,
+    ): NotificationCompat.Action {
         val remoteInput =
             RemoteInput
                 .Builder(NotificationActions.KEY_TEXT_REPLY)
                 .setLabel(context.getString(R.string.message))
+                .setChoices(reactionChoices.toTypedArray())
+                .setAllowFreeFormInput(true)
+                .setEditChoicesBeforeSending(RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED)
                 .build()
         return NotificationCompat
             .Action
             .Builder(
                 R.drawable.ic_stat_whitenoise,
                 context.getString(R.string.reply),
-                actionPendingIntent(actionTarget, NotificationActionKind.REPLY),
+                actionPendingIntent(
+                    actionTarget,
+                    NotificationActionKind.REPLY,
+                    acceptsInlineReactionChoices = reactionChoices.isNotEmpty(),
+                ),
             ).addRemoteInput(remoteInput)
-            .setAllowGeneratedReplies(true)
+            .setAllowGeneratedReplies(false)
             .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
             .setShowsUserInterface(false)
             .build()
@@ -1407,59 +1457,31 @@ class LocalNotificationPresenter(
             .setShowsUserInterface(false)
             .build()
 
-    /**
-     * React offers the user's quick reactions as RemoteInput choice chips rather
-     * than emoji action buttons: chips escape the three-action-button cap, expand
-     * inline instead of collapsing the shade, and take one tap instead of two.
-     * Free-form input is off and editing is disabled, so a chip tap sends
-     * straight away. Null when nothing is configured to offer — a React button
-     * with no chips could never produce a reaction.
-     */
-    private fun reactionNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action? {
-        val choices = notificationQuickReactionChoices(quickReactionChoices())
-        if (choices.isEmpty()) return null
-        val remoteInput =
-            RemoteInput
-                .Builder(NotificationActions.KEY_REACTION_CHOICE)
-                .setLabel(context.getString(R.string.message_react))
-                .setChoices(choices.toTypedArray())
-                .setAllowFreeFormInput(false)
-                .setEditChoicesBeforeSending(RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED)
-                .build()
-        return NotificationCompat
-            .Action
-            .Builder(
-                R.drawable.ic_stat_whitenoise,
-                context.getString(R.string.message_react),
-                actionPendingIntent(actionTarget, NotificationActionKind.REACT),
-            ).addRemoteInput(remoteInput)
-            .setAllowGeneratedReplies(false)
-            .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_THUMBS_UP)
-            .setShowsUserInterface(false)
-            .build()
-    }
-
-    // Actions carrying a RemoteInput must be mutable — the system fills the typed
-    // text or chosen chip into the broadcast, and posting an immutable one is
-    // rejected. The receiver is not exported, so only the shade can fire these.
     private fun actionPendingIntent(
         actionTarget: NotificationActionTarget,
         kind: NotificationActionKind,
+        acceptsInlineReactionChoices: Boolean = false,
     ): PendingIntent {
         val actionIntent =
             Intent(context, NotificationActionReceiver::class.java).apply {
-                NotificationActions.applyToIntent(this, kind, actionTarget)
+                NotificationActions.applyToIntent(
+                    this,
+                    kind,
+                    actionTarget,
+                    acceptsInlineReactionChoices,
+                )
             }
-        val mutabilityFlag =
-            when (kind) {
-                NotificationActionKind.REPLY, NotificationActionKind.REACT -> PendingIntent.FLAG_MUTABLE
-                NotificationActionKind.MARK_READ -> PendingIntent.FLAG_IMMUTABLE
+        val mutableFlag =
+            if (kind == NotificationActionKind.REPLY || kind == NotificationActionKind.REACT) {
+                PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_IMMUTABLE
             }
         return PendingIntent.getBroadcast(
             context,
             NotificationActions.requestCode(kind, actionTarget.notificationTag),
             actionIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or mutabilityFlag,
+            PendingIntent.FLAG_UPDATE_CURRENT or mutableFlag,
         )
     }
 
@@ -1503,6 +1525,7 @@ private data class MessagingPostContext(
 
 private data class ConversationShortcutSnapshot(
     val shortcutId: String,
+    val accountScope: String,
     val shortLabel: String,
     val longLabel: String,
     val notificationTag: String,

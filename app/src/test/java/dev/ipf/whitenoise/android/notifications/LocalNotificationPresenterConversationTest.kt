@@ -25,6 +25,7 @@ import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGO
 import dev.ipf.whitenoise.android.share.ShareShortcutTarget
 import dev.ipf.whitenoise.android.share.buildShareShortcut
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -119,6 +120,10 @@ class LocalNotificationPresenterConversationTest {
         val shortcut = checkNotNull(publishedShortcut)
         assertTrue(conversationShortcutIsRich(shortcut))
         assertFalse(shortcut.categories?.contains(CONVERSATION_SHARE_TARGET_CATEGORY) == true)
+        assertEquals(
+            conversationShortcutAccountScope("account-a"),
+            shortcut.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA),
+        )
     }
 
     @Test
@@ -146,6 +151,34 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
+    fun redactedPublicVersionCarriesGenericBodyText() {
+        presenter.ensureChannels()
+        runBlocking {
+            presenter.show(
+                update(isMention = false),
+                previewTextOverride = "hi",
+                directShareEligible = false,
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        // The public variant replaces the card when the OS hides sensitive
+        // content. Without a body line it renders as an icon+header shell
+        // that reads as a broken notification. The private card's
+        // collapsed text is already guaranteed by MessagingStyle extras.
+        val publicVersion =
+            checkNotNull(
+                manager.activeNotifications
+                    .single()
+                    .notification.publicVersion,
+            )
+        assertEquals(
+            context.getString(R.string.notification_hidden_content),
+            publicVersion.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
+        )
+    }
+
+    @Test
     fun clearingAccountShortcutsInvalidatesSnapshotForIdenticalRepublish() {
         presenter.ensureChannels()
         runBlocking {
@@ -156,7 +189,7 @@ class LocalNotificationPresenterConversationTest {
                 shortNpub = { "npub1test" },
             )
         }
-        presenter.clearConversationShortcuts()
+        presenter.hideConversationShortcutsFromDirectShare()
         runBlocking {
             presenter.show(
                 update(isMention = false),
@@ -188,7 +221,6 @@ class LocalNotificationPresenterConversationTest {
                 maxShortcutCount = { 4 },
                 setDynamicShortcuts = { shortcuts -> synced = shortcuts.single() },
                 existingShortcuts = { listOf(rich) },
-                removeLongLivedShortcuts = { },
             )
         publisher.publish(
             accountRef = "account-a",
@@ -270,8 +302,8 @@ class LocalNotificationPresenterConversationTest {
         )
 
         assertUsefulInitialPost(posts)
-        assertTrue(shortcutWasPublishedBeforeFirstPost)
-        assertEquals(1, shortcutPublishCount)
+        assertFalse(shortcutWasPublishedBeforeFirstPost)
+        assertEquals(0, shortcutPublishCount)
 
         runBlocking { checkNotNull(pendingEnrichment).invoke() }
 
@@ -282,7 +314,7 @@ class LocalNotificationPresenterConversationTest {
         assertEquals(0, posts[1].third.defaults)
         assertNull(posts[1].third.sound)
         assertNotNull(publishedShortcut)
-        assertEquals(2, shortcutPublishCount)
+        assertEquals(1, shortcutPublishCount)
         val messages =
             checkNotNull(
                 NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posts[1].third),
@@ -293,7 +325,6 @@ class LocalNotificationPresenterConversationTest {
 
     private fun assertUsefulInitialPost(posts: List<Triple<String, Int, Notification>>) {
         assertEquals(1, posts.size)
-        assertNotNull(publishedShortcut)
         val notification = posts.single().third
         assertEquals(
             "hi",
@@ -548,7 +579,7 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
-    fun mentionChannelRemainsIndependentOfThePrimaryVibrationChoice() {
+    fun inheritedMentionUsesTheGlobalChannelRegardlessOfPrimaryVibration() {
         presenter.ensureChannels()
         ConversationVibrationPreferences(context).setPattern(
             "account-a",
@@ -560,12 +591,8 @@ class LocalNotificationPresenterConversationTest {
             presenter.show(update(isMention = true), previewTextOverride = "hi", shortNpub = { "npub1test" })
         }
 
-        val shortcutId = conversationShortcutId("account-a", "group-a")!!
         assertEquals(
-            ConversationNotificationChannels.conversationChannelId(
-                NotificationChannelSpec.MENTIONS.id,
-                shortcutId,
-            ),
+            NotificationChannelSpec.MENTIONS.id,
             manager.activeNotifications
                 .single()
                 .notification.channelId,
@@ -656,43 +683,57 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
-    fun groupMessageOffersReplyReactAndMarkRead() {
-        presenter.ensureChannels()
+    fun groupMessageOffersReplyAndMarkReadWithAllSixConfiguredReactionChoices() {
+        val choices = listOf("🥳", "🔥", "😂", "👍", "😮", "😢")
+        RecentEmojiPreferences.saveQuickReactions(context, choices)
+        try {
+            presenter.ensureChannels()
 
-        runBlocking {
-            presenter.show(update(isMention = false), previewTextOverride = "hi", shortNpub = { "npub1test" })
+            runBlocking {
+                presenter.show(update(isMention = false), previewTextOverride = "hi", shortNpub = { "npub1test" })
+            }
+
+            assertEquals(
+                listOf(
+                    context.getString(R.string.reply),
+                    context.getString(R.string.chat_row_action_mark_read),
+                ),
+                manager.activeNotifications
+                    .single()
+                    .notification.actions
+                    .map { it.title.toString() },
+            )
+            val reply =
+                manager.activeNotifications
+                    .single()
+                    .notification.actions
+                    .single { it.title.toString() == context.getString(R.string.reply) }
+            assertEquals(
+                choices,
+                reply.remoteInputs
+                    .single()
+                    .choices
+                    ?.map(CharSequence::toString),
+            )
+        } finally {
+            RecentEmojiPreferences.resetQuickReactions(context)
         }
-
-        assertEquals(
-            listOf(
-                context.getString(R.string.reply),
-                context.getString(R.string.message_react),
-                context.getString(R.string.chat_row_action_mark_read),
-            ),
-            manager.activeNotifications
-                .single()
-                .notification.actions
-                .map { it.title.toString() },
-        )
     }
 
     @Test
-    fun mentionPostsOnTheMentionConversationChannelForTheSameConversation() {
+    fun inheritedMentionPostsOnTheGlobalChannelAndKeepsItsConversationShortcut() {
         presenter.ensureChannels()
 
         runBlocking { presenter.show(update(isMention = true), previewTextOverride = "hi", shortNpub = { "npub1test" }) }
 
         val shortcutId = conversationShortcutId("account-a", "group-a")
         val notification = manager.activeNotifications.single().notification
-        assertEquals(
-            ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.MENTIONS.id, shortcutId!!),
-            notification.channelId,
-        )
+        assertEquals(NotificationChannelSpec.MENTIONS.id, notification.channelId)
         assertEquals(shortcutId, notification.shortcutId)
     }
 
     @Test
-    fun reactionPostsOnTheReactionChannelForItsConversation() {
+    fun inheritedReactionPostsOnTheGlobalReactionChannel() {
         presenter.ensureChannels()
 
         runBlocking {
@@ -702,9 +743,8 @@ class LocalNotificationPresenterConversationTest {
             )
         }
 
-        val shortcutId = conversationShortcutId("account-a", "group-a")
         assertEquals(
-            ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.REACTIONS.id, shortcutId!!),
+            NotificationChannelSpec.REACTIONS.id,
             manager.activeNotifications
                 .single()
                 .notification.channelId,
@@ -712,7 +752,42 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
-    fun agentActivityPostsOnTheSilentAgentChannelForItsConversation() {
+    fun explicitReactionOverridePostsOnTheCustomConversationChannel() {
+        presenter.ensureChannels()
+        val shortcutId = conversationShortcutId("account-a", "group-a")!!
+        ConversationNotificationRouting(context)
+            .setScope(
+                conversation =
+                    NotificationConversationDescriptor(
+                        shortcutId = shortcutId,
+                        isDm = false,
+                        title = "General",
+                        primaryVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
+                    ),
+                category = OverridableConversationNotificationCategory.REACTIONS,
+                scope = ConversationNotificationScope.CUSTOM_FOR_THIS_CHAT,
+            ).getOrThrow()
+
+        runBlocking {
+            presenter.show(
+                update(isMention = false, reactionEmoji = "👍"),
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        assertEquals(
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.REACTIONS.id,
+                shortcutId,
+            ),
+            manager.activeNotifications
+                .single()
+                .notification.channelId,
+        )
+    }
+
+    @Test
+    fun inheritedAgentActivityPostsOnTheGlobalSilentAgentChannel() {
         presenter.ensureChannels()
 
         runBlocking {
@@ -725,12 +800,8 @@ class LocalNotificationPresenterConversationTest {
             )
         }
 
-        val shortcutId = conversationShortcutId("account-a", "group-a")
         assertEquals(
-            ConversationNotificationChannels.conversationChannelId(
-                NotificationChannelSpec.AGENT_ACTIVITY.id,
-                shortcutId!!,
-            ),
+            NotificationChannelSpec.AGENT_ACTIVITY.id,
             manager.activeNotifications
                 .single()
                 .notification.channelId,
@@ -876,7 +947,7 @@ class LocalNotificationPresenterConversationTest {
         val notification = manager.activeNotifications.single().notification
         assertEquals(body, notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString())
         assertNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification))
-        assertEquals(3, notification.actions.size)
+        assertEquals(2, notification.actions.size)
         assertEquals(
             context.getString(R.string.reply),
             notification.actions
@@ -913,6 +984,75 @@ class LocalNotificationPresenterConversationTest {
                 ?.messages
                 ?.map { it.text.toString() },
         )
+    }
+
+    @Test
+    fun silentEnrichmentReplacesCurrentMessageWithoutDuplicatingHistory() {
+        presenter.ensureChannels()
+        val incoming = update(isMention = false, messageIdHex = "same-message")
+
+        runBlocking {
+            presenter.show(
+                incoming,
+                shortNpub = { "npub1test" },
+            )
+            presenter.show(
+                incoming,
+                senderNameOverride = "Alice Enriched",
+                previewTextOverride = "enriched preview",
+                silentUpdate = true,
+                replaceCurrentMessage = true,
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        val notification = manager.activeNotifications.single().notification
+        assertEquals(
+            listOf("enriched preview"),
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(notification)
+                ?.messages
+                ?.map { it.text.toString() },
+        )
+        assertTrue(notification.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        assertTrue(presenter.isNotificationUpdateCurrentForEnrichment(incoming))
+    }
+
+    @Test
+    fun staleOrDismissedUpdateCannotBeginEnrichment() {
+        presenter.ensureChannels()
+        val older = update(isMention = false, messageIdHex = "older")
+        val newer = update(isMention = false, messageIdHex = "newer")
+
+        runBlocking {
+            presenter.show(older, shortNpub = { "npub1test" })
+            presenter.show(newer, shortNpub = { "npub1test" })
+        }
+
+        assertFalse(presenter.isNotificationUpdateCurrentForEnrichment(older))
+        assertTrue(presenter.isNotificationUpdateCurrentForEnrichment(newer))
+        manager.cancelAll()
+        assertFalse(presenter.isNotificationUpdateCurrentForEnrichment(newer))
+    }
+
+    @Test
+    fun plainReactionStoresItsGenerationForEnrichment() {
+        presenter.ensureChannels()
+        val reaction =
+            update(
+                isMention = false,
+                messageIdHex = "reaction-current",
+                reactionEmoji = "👍",
+            )
+
+        runBlocking { presenter.show(reaction, shortNpub = { "npub1test" }) }
+
+        val notification = manager.activeNotifications.single().notification
+        assertEquals(
+            "reaction-current",
+            notification.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX),
+        )
+        assertTrue(presenter.isNotificationUpdateCurrentForEnrichment(reaction))
     }
 
     @Test

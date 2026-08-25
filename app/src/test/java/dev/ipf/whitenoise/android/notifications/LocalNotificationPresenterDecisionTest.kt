@@ -60,14 +60,13 @@ class LocalNotificationPresenterDecisionTest {
     }
 
     @Test
-    fun newMessageUsesMessagingStyleWithReplyReactionAndMarkReadActions() {
+    fun newMessageUsesMessagingStyleAndReplyAndMarkReadActions() {
         val decision = decision(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, reactionEmoji = null))
 
         assertSame(NotificationStyleChoice.Messaging, decision?.style)
         assertEquals(
             listOf(
                 NotificationActionKind.REPLY,
-                NotificationActionKind.REACT,
                 NotificationActionKind.MARK_READ,
             ),
             decision?.actions,

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
@@ -12,7 +13,6 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -46,187 +46,89 @@ class LocalNotificationReactionChipsTest {
     @After
     fun tearDown() {
         manager.cancelAll()
-        RecentEmojiPreferences.resetQuickReactions(context)
     }
 
     @Test
-    fun reactOffersEveryConfiguredQuickReactionAsAChipWithoutFreeFormInput() {
-        RecentEmojiPreferences.saveQuickReactions(context, listOf("🥳", "🔥", "😂", "👍", "😮", "😢"))
-        postConversationCard(presenter())
+    fun replyOffersSixReactionChoicesAndStillAllowsFreeFormInput() {
+        val choices = listOf("🥳", "🔥", "😂", "👍", "😮", "😢")
+        postConversationCard(presenter(choices))
 
-        val remoteInput = reactRemoteInput()
+        val remoteInput = checkNotNull(replyAction().remoteInputs).single()
 
-        assertEquals(NotificationActions.KEY_REACTION_CHOICE, remoteInput.resultKey)
-        assertEquals(
-            listOf("🥳", "🔥", "😂", "👍", "😮", "😢"),
-            remoteInput.choices?.map { it.toString() },
-        )
-        assertFalse(remoteInput.allowFreeFormInput)
+        assertEquals(NotificationActions.KEY_TEXT_REPLY, remoteInput.resultKey)
+        assertEquals(choices, remoteInput.choices?.map(CharSequence::toString))
+        assertTrue(remoteInput.allowFreeFormInput)
         assertEquals(RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED, remoteInput.editChoicesBeforeSending)
-        assertEquals(context.getString(R.string.message_react), remoteInput.label.toString())
     }
 
     @Test
-    fun theDefaultRowStaysReplyReactAndMarkRead() {
-        postConversationCard(presenter())
+    fun rowKeepsReplyAndMarkReadWhileReplyUsesAMutableBroadcast() {
+        postConversationCard(presenter(defaultChoices()))
 
         assertEquals(
             listOf(
                 context.getString(R.string.reply),
-                context.getString(R.string.message_react),
                 context.getString(R.string.chat_row_action_mark_read),
             ),
             actions().map { it.title.toString() },
         )
-    }
-
-    @Test
-    fun reactFiresAMutableBroadcastWithoutShowingUserInterface() {
-        postConversationCard(presenter())
-
-        val react = reactAction()
-        val pendingIntent = shadowOf(react.actionIntent)
-
+        val reply = replyAction()
+        val pendingIntent = shadowOf(reply.actionIntent)
         assertTrue(pendingIntent.isBroadcast)
-        // Android rejects posting a RemoteInput action on an immutable intent.
         assertFalse(pendingIntent.isImmutable)
-        assertFalse(react.showsUserInterface)
-        assertEquals(NotificationCompat.Action.SEMANTIC_ACTION_THUMBS_UP, react.semanticAction)
-        val parsed = NotificationActions.parse(pendingIntent.savedIntent)
-        assertEquals(NotificationActionKind.REACT, parsed?.kind)
-        assertEquals("message-a", parsed?.target?.messageIdHex)
+        assertFalse(reply.showsUserInterface)
+        assertEquals(NotificationCompat.Action.SEMANTIC_ACTION_REPLY, reply.semanticAction)
+
+        val selectedChoice = Intent(pendingIntent.savedIntent)
+        RemoteInput.addResultsToIntent(
+            checkNotNull(reply.remoteInputs),
+            selectedChoice,
+            Bundle().apply { putCharSequence(NotificationActions.KEY_TEXT_REPLY, defaultChoices().first()) },
+        )
+        RemoteInput.setResultsSource(selectedChoice, RemoteInput.SOURCE_CHOICE)
+        assertEquals(NotificationActionKind.REACT, NotificationActions.parse(selectedChoice)?.kind)
     }
 
     @Test
-    fun theChipTheShadeSendsBackArrivesThroughTheActionsOwnRemoteInput() {
-        postConversationCard(presenter())
+    fun reactionHandledRepostCannotAnnotateANewerMessageGeneration() {
+        val presenter = presenter(defaultChoices())
+        postConversationCard(presenter, "message-a")
+        postConversationCard(presenter, "message-b")
 
-        val delivered =
-            Intent().also {
-                RemoteInput.addResultsToIntent(
-                    reactAction().remoteInputs!!,
-                    it,
-                    Bundle().apply { putCharSequence(NotificationActions.KEY_REACTION_CHOICE, " 🔥 ") },
-                )
-            }
-
-        assertEquals("🔥", notificationReactionChoice(delivered, allowedChoices = listOf("🥳", "🔥")))
-    }
-
-    @Test
-    fun aTapWithNoChipResultYieldsNothingToSend() {
-        assertNull(notificationReactionChoice(Intent(), allowedChoices = listOf("🔥")))
-    }
-
-    @Test
-    fun aMutablePendingIntentCannotInjectAnUnconfiguredReaction() {
-        postConversationCard(presenter(listOf("🥳", "🔥")))
-        val delivered =
-            Intent().also {
-                RemoteInput.addResultsToIntent(
-                    reactAction().remoteInputs!!,
-                    it,
-                    Bundle().apply { putCharSequence(NotificationActions.KEY_REACTION_CHOICE, "👾") },
-                )
-            }
-
-        assertNull(notificationReactionChoice(delivered, allowedChoices = listOf("🥳", "🔥")))
-    }
-
-    @Test
-    fun fewerConfiguredFavouritesYieldFewerChips() {
-        postConversationCard(presenter(listOf("🥳", "🔥")))
-
-        assertEquals(listOf("🥳", "🔥"), reactRemoteInput().choices?.map { it.toString() })
-    }
-
-    @Test
-    fun chipsAreCappedAtTheQuickReactionLimit() {
-        postConversationCard(presenter(listOf("🥳", "🔥", "😂", "👍", "😮", "😢", "🎉", "🙏")))
-
-        assertEquals(MAX_NOTIFICATION_QUICK_REACTIONS, reactRemoteInput().choices?.size)
-        assertEquals(listOf("🥳", "🔥", "😂", "👍", "😮", "😢"), reactRemoteInput().choices?.map { it.toString() })
-    }
-
-    @Test
-    fun blankAndOversizedFavouritesNeverReachTheShade() {
-        postConversationCard(presenter(listOf("🥳", "   ", "😀".repeat(33), "🔥", "🔥")))
-
-        assertEquals(listOf("🥳", "🔥"), reactRemoteInput().choices?.map { it.toString() })
-    }
-
-    @Test
-    fun reactIsOmittedRatherThanPostedWithNothingToChoose() {
-        postConversationCard(presenter(emptyList()))
-
-        assertEquals(
-            listOf(
-                context.getString(R.string.reply),
-                context.getString(R.string.chat_row_action_mark_read),
+        assertFalse(
+            presenter.markReactionHandledIfSameGeneration(
+                notificationTag = manager.activeNotifications.single().tag,
+                notificationId = manager.activeNotifications.single().id,
+                reactedMessageIdHex = "message-a",
+                reaction = "🔥",
             ),
-            actions().map { it.title.toString() },
         )
-    }
 
-    @Test
-    fun reactingClearsTheDirectReplyLifetimeExtensionBeforeCancellingTheCard() {
-        val presenter = presenter()
-        postConversationCard(presenter)
-        val posted = manager.activeNotifications.single()
-        val target = NotificationTarget("account-a", "group-a", "message-a", NotificationTargetKind.MESSAGE)
-        val ops = mutableListOf<ConversationCardOp>()
-        ConversationCardPostSynchronizer.testHook =
-            object : ConversationCardTestHook {
-                override fun onLockAcquired(
-                    op: ConversationCardOp,
-                    notificationTag: String,
-                    notificationId: Int,
-                ) {
-                    ops += op
-                }
-            }
-
-        try {
-            runBlocking {
-                dismissReactedNotification(
-                    presenter = presenter,
-                    action =
-                        NotificationAction(
-                            kind = NotificationActionKind.REACT,
-                            target = target,
-                            notificationTag = posted.tag.orEmpty(),
-                            notificationId = posted.id,
-                        ),
-                    reaction = "🔥",
-                    dismissalBaselineMs = System.currentTimeMillis(),
-                )
-            }
-        } finally {
-            ConversationCardPostSynchronizer.testHook = null
-        }
-
+        val live = manager.activeNotifications.single().notification
         assertEquals(
-            listOf(ConversationCardOp.MARK_REPLY_HANDLED, ConversationCardOp.CANCEL_IF_SAME_GENERATION),
-            ops.filter {
-                it == ConversationCardOp.MARK_REPLY_HANDLED || it == ConversationCardOp.CANCEL_IF_SAME_GENERATION
-            },
+            "message-b",
+            live.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX),
         )
-        assertTrue(manager.activeNotifications.isEmpty())
+        assertNull(live.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY))
     }
 
-    private fun presenter(choices: List<String>? = null): LocalNotificationPresenter {
-        val presenter =
-            if (choices == null) {
-                LocalNotificationPresenter(context)
-            } else {
-                LocalNotificationPresenter(context, quickReactionChoices = { choices })
-            }
-        presenter.ensureChannels()
-        return presenter
-    }
+    private fun presenter(choices: List<String>) =
+        LocalNotificationPresenter(
+            context,
+            quickReactionChoices = { choices },
+        ).also(LocalNotificationPresenter::ensureChannels)
 
-    private fun postConversationCard(presenter: LocalNotificationPresenter) {
-        runBlocking { presenter.show(update(), previewTextOverride = "hi", shortNpub = { "npub1test" }) }
+    private fun postConversationCard(
+        presenter: LocalNotificationPresenter,
+        messageIdHex: String = "message-a",
+    ) {
+        runBlocking {
+            presenter.show(
+                update(messageIdHex),
+                previewTextOverride = messageIdHex,
+                shortNpub = { "npub1test" },
+            )
+        }
         assertNotNull(manager.activeNotifications.singleOrNull())
     }
 
@@ -237,13 +139,13 @@ class LocalNotificationReactionChipsTest {
         }
     }
 
-    private fun reactAction() = actions().single { it.title.toString() == context.getString(R.string.message_react) }
+    private fun replyAction() = actions().single { it.title.toString() == context.getString(R.string.reply) }
 
-    private fun reactRemoteInput(): RemoteInput = reactAction().remoteInputs!!.single()
+    private fun defaultChoices() = listOf("❤️", "👍", "👎", "😂", "😮", "😢")
 
-    private fun update(messageIdHex: String = "message-a") =
+    private fun update(messageIdHex: String) =
         NotificationUpdateFfi(
-            notificationKey = "key",
+            notificationKey = "key-$messageIdHex",
             conversationKey = "conversation",
             trigger = NotificationTriggerFfi.NEW_MESSAGE,
             trafficClass = NotificationTrafficClassFfi.STANDARD,
@@ -256,7 +158,7 @@ class LocalNotificationReactionChipsTest {
             messageIdHex = messageIdHex,
             sender = user(displayName = "Alice"),
             receiver = user(accountIdHex = "self", displayName = "Me"),
-            previewText = "hi",
+            previewText = messageIdHex,
             reactionEmoji = null,
             reactedToPreview = null,
             timestampMs = 1234,
