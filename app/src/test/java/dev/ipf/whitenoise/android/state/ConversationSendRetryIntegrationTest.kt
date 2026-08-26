@@ -39,6 +39,7 @@ import org.robolectric.annotation.Config
 /** Integration boundary for optimistic send state plus the shared relay retry policy (#2016). */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
+@Suppress("LargeClass") // Send, retry, projection, preview, and durable-draft scenarios share one controller fixture.
 class ConversationSendRetryIntegrationTest {
     @Test
     fun acceptInviteRetriesAClosedRuntimeWorkerWithoutRollingBackOrReportingAnError() =

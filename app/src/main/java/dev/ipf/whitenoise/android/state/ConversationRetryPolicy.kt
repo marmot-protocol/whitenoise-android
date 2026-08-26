@@ -4,12 +4,13 @@ import dev.ipf.marmotkit.MarmotKitException
 
 /** Short retry budget for background operations and base foreground backoff. */
 internal const val SEND_RETRY_ATTEMPTS: Int = 3
-internal val SEND_RETRY_BACKOFF_MS: Long = 700L
-internal val PENDING_SEND_RETRY_MAX_BACKOFF_MS: Long = 60_000L
+internal const val SEND_RETRY_BACKOFF_MS: Long = 700L
+internal const val PENDING_SEND_RETRY_MAX_BACKOFF_MS: Long = 60_000L
+private const val PENDING_SEND_MAX_BACKOFF_DOUBLINGS: Int = 16
 
 /** Bounded retry window for idempotent account-runtime mutations. */
 internal const val IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS: Int = 3
-internal val IDEMPOTENT_RUNTIME_MUTATION_RETRY_BACKOFF_MS: Long = 700L
+internal const val IDEMPOTENT_RUNTIME_MUTATION_RETRY_BACKOFF_MS: Long = 700L
 
 /**
  * True only when a transport failure proves the event was never sent to a
@@ -44,19 +45,22 @@ internal fun isTransientRelaySendError(throwable: Throwable): Boolean {
  */
 internal fun isAmbiguousRelayDeliveryError(throwable: Throwable): Boolean {
     val causes = throwable.causeChain()
-    if (causes.any { it is MarmotKitException.TransportClosed }) return true
+    val transportClosed = causes.any { it is MarmotKitException.TransportClosed }
     val text = causes.joinToString("\n") { it.errorIdentity() }.lowercase()
-    if ("relay rejected event" in text) return false
-    return listOf(
-        "send event failed",
-        "send event timed out",
-        "relay did not acknowledge event",
-        "publish timed out after",
-        "insufficient publish acknowledgements",
-    ).any(text::contains)
+    val explicitRejection = "relay rejected event" in text
+    val ambiguousPublish =
+        listOf(
+            "send event failed",
+            "send event timed out",
+            "relay did not acknowledge event",
+            "publish timed out after",
+            "insufficient publish acknowledgements",
+        ).any(text::contains)
+    return transportClosed || (!explicitRejection && ambiguousPublish)
 }
 
 /** Bounded connect-phase retry used by background send operations. */
+@Suppress("TooGenericExceptionCaught") // Every non-cancellation gateway failure must be classified before retry.
 internal suspend fun <T> retryTransientRelaySend(
     onTransientFailure: suspend (attempt: Int, throwable: Throwable) -> Unit = { _, _ -> },
     sendAttempt: suspend (attempt: Int) -> T,
@@ -80,7 +84,7 @@ internal suspend fun <T> retryTransientRelaySend(
 
 internal fun pendingSendRetryBackoffMs(failedAttempt: Int): Long {
     var backoffMs = SEND_RETRY_BACKOFF_MS
-    repeat((failedAttempt - 1).coerceIn(0, 16)) {
+    repeat((failedAttempt - 1).coerceIn(0, PENDING_SEND_MAX_BACKOFF_DOUBLINGS)) {
         backoffMs = (backoffMs * 2).coerceAtMost(PENDING_SEND_RETRY_MAX_BACKOFF_MS)
     }
     return backoffMs
@@ -90,6 +94,7 @@ internal fun pendingSendRetryBackoffMs(failedAttempt: Int): Long {
  * Keep a foreground send pending across proven pre-publish connectivity
  * failures. Coroutine cancellation is the lifecycle boundary.
  */
+@Suppress("TooGenericExceptionCaught") // Every non-cancellation gateway failure must be classified before retry.
 internal suspend fun <T> retryPendingConversationSend(
     onTransientFailure: suspend (attempt: Int, throwable: Throwable) -> Unit = { _, _ -> },
     sendAttempt: suspend (attempt: Int) -> T,
@@ -117,6 +122,7 @@ internal fun isRetryableIdempotentMutationError(throwable: Throwable): Boolean =
     isTransientRuntimeWorkerError(throwable) || isTransientRelaySendError(throwable)
 
 /** Retry an idempotent mutation across a closed worker or proven connection gap. */
+@Suppress("TooGenericExceptionCaught") // FFI/runtime failures are classified; cancellation is always rethrown.
 internal suspend fun <T> retryIdempotentRuntimeMutation(
     onTransientFailure: suspend (attempt: Int) -> Unit = {},
     mutation: suspend () -> T,
