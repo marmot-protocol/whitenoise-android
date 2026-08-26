@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingContent
+import dev.ipf.whitenoise.android.ui.onboarding.OnboardingSavedAccountUi
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -95,5 +96,41 @@ class OnboardingContentTest {
         }
 
         composeRule.onNodeWithContentDescription("Sign in").assertIsDisplayed()
+    }
+
+    @Test
+    fun retainedAccountOffersOneTapResumeWithoutHidingOtherSignInOptions() {
+        var resumedLabel: String? = null
+        val account =
+            OnboardingSavedAccountUi(
+                label = "amber-account",
+                accountIdHex = "01".repeat(32),
+                displayName = "Amber User",
+                shortIdentity = "npub1amber…user",
+                avatarUrl = null,
+            )
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                OnboardingContent(
+                    identity = "",
+                    creatingIdentity = false,
+                    signingInBusy = false,
+                    onIdentityChange = {},
+                    onCreateIdentity = {},
+                    onImportIdentity = {},
+                    amberSignerAvailable = true,
+                    savedAccounts = listOf(account),
+                    onContinueWithSavedAccount = { resumedLabel = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Continue as Amber User").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("npub1amber…user").assertIsDisplayed()
+        composeRule.onNodeWithText("Sign In").assertIsDisplayed()
+        composeRule.onNodeWithText("Sign Up").assertIsDisplayed()
+        composeRule.onNodeWithText("Sign in with Amber").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals("amber-account", resumedLabel) }
     }
 }

@@ -1400,6 +1400,7 @@
     <string name="recent_chats">Недавние чаты</string>
     <string name="onboarding_login">Войти</string>
     <string name="onboarding_login_with_amber">Войти через Amber</string>
+    <string name="onboarding_continue_as">Продолжить как %1$s</string>
     <string name="onboarding_offline_setup_message">Нет подключения к интернету. Подключитесь по Wi-Fi, через мобильную сеть или другую сеть и повторите попытку.</string>
     <string name="toast_couldnt_login_amber">Не удалось войти через Amber</string>
     <string name="toast_amber_sign_in_cancelled">Вход через Amber отменён</string>

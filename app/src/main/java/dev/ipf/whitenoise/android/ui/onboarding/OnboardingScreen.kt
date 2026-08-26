@@ -125,6 +125,7 @@ internal fun OnboardingScreen(
     // Signer availability can't change while onboarding is on screen, so read it
     // once (the query hits the PackageManager).
     val amberSignerAvailable = remember { appState.isAmberSignerInstalled() }
+    val savedAccounts = onboardingSavedAccounts(appState)
 
     fun applyStep(step: SignInStep) {
         when (step) {
@@ -153,6 +154,7 @@ internal fun OnboardingScreen(
     }
 
     fun startNetworkSetupAction(action: OnboardingAction) {
+        if (appState.retainedAccountReactivationRef != null) return
         dispatchOnboardingAction(
             inFlightAction = inFlightAction,
             hasValidatedInternet = hasValidatedInternet(),
@@ -232,6 +234,9 @@ internal fun OnboardingScreen(
         amberSignInStage = appState.amberSignInStage,
         amberSignerAvailable = amberSignerAvailable,
         onLoginWithAmber = { startNetworkSetupAction(OnboardingAction.AmberLogin) },
+        savedAccounts = savedAccounts,
+        reactivatingAccountLabel = appState.retainedAccountReactivationRef,
+        onContinueWithSavedAccount = appState::reactivateRetainedAccount,
     )
 }
 
@@ -334,9 +339,12 @@ fun OnboardingContent(
     recoveryConsentVisible: Boolean = false,
     onRecoveryConsentConfirm: () -> Unit = {},
     onRecoveryConsentDismiss: () -> Unit = {},
+    savedAccounts: List<OnboardingSavedAccountUi> = emptyList(),
+    reactivatingAccountLabel: String? = null,
+    onContinueWithSavedAccount: (String) -> Unit = {},
 ) {
     var signingIn by remember { mutableStateOf(signingInBusy) }
-    val busy = creatingIdentity || signingInBusy || loggingInWithAmber
+    val busy = creatingIdentity || signingInBusy || loggingInWithAmber || reactivatingAccountLabel != null
     val creatingIdentityDescription = stringResource(R.string.creating_identity)
     val amberLoginDescription = stringResource(R.string.onboarding_login_with_amber)
 
@@ -429,6 +437,12 @@ fun OnboardingContent(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
                 ) {
+                    OnboardingSavedAccountActions(
+                        accounts = savedAccounts,
+                        reactivatingAccountLabel = reactivatingAccountLabel,
+                        enabled = !busy,
+                        onContinue = onContinueWithSavedAccount,
+                    )
                     FilledTonalButton(
                         onClick = {
                             onOfflineErrorDismiss()

@@ -1468,6 +1468,7 @@
     <string name="onboarding_login">Sign In</string>
     <string name="onboarding_sign_up">Sign Up</string>
     <string name="onboarding_login_with_amber">Sign in with Amber</string>
+    <string name="onboarding_continue_as">Continue as %1$s</string>
     <string name="onboarding_offline_setup_message">No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry.</string>
     <string name="toast_couldnt_login_amber">Couldn\'t sign in with Amber</string>
     <string name="toast_amber_sign_in_cancelled">Amber sign-in cancelled</string>

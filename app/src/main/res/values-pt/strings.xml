@@ -1340,6 +1340,7 @@
     <string name="recent_chats">Conversas recentes</string>
     <string name="onboarding_login">Entrar</string>
     <string name="onboarding_login_with_amber">Entrar com Amber</string>
+    <string name="onboarding_continue_as">Continuar como %1$s</string>
     <string name="onboarding_offline_setup_message">Sem conexão com a internet. Conecte-se por Wi-Fi, dados móveis ou outra rede e tente novamente.</string>
     <string name="toast_couldnt_login_amber">Não foi possível entrar com Amber</string>
     <string name="toast_amber_sign_in_cancelled">Entrada com Amber cancelada</string>

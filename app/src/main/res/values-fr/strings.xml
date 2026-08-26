@@ -1340,6 +1340,7 @@
     <string name="recent_chats">Discussions récentes</string>
     <string name="onboarding_login">Connexion</string>
     <string name="onboarding_login_with_amber">Se connecter avec Amber</string>
+    <string name="onboarding_continue_as">Continuer en tant que %1$s</string>
     <string name="onboarding_offline_setup_message">Pas de connexion Internet. Connectez-vous au Wi-Fi, activez les données mobiles ou utilisez un autre réseau, puis réessayez.</string>
     <string name="toast_couldnt_login_amber">Impossible de se connecter avec Amber</string>
     <string name="toast_amber_sign_in_cancelled">Connexion avec Amber annulée</string>

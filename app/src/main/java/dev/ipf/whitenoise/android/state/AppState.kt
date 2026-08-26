@@ -1896,6 +1896,9 @@ class WhiteNoiseAppState private constructor(
     var phase by mutableStateOf<AppPhase>(AppPhase.Bootstrapping)
         private set
 
+    var retainedAccountReactivationRef by mutableStateOf<String?>(null)
+        private set
+
     var accounts by mutableStateOf(initialAccounts)
         private set
 
@@ -5114,6 +5117,31 @@ class WhiteNoiseAppState private constructor(
             configurePrivacyRuntime()
             refreshLocalNotificationSettings()
             syncNativePushRegistrationIfEnabled()
+        }
+    }
+
+    /**
+     * Restores an account retained by non-destructive sign-out and crosses the
+     * onboarding boundary only after [setActiveAccount] reaches local-ready.
+     * This deliberately uses MDK's account reactivation path rather than
+     * repeating identity import or external-signer account setup.
+     */
+    fun reactivateRetainedAccount(label: String) {
+        if (retainedAccountReactivationRef != null) return
+        if (accounts.none { it.label == label }) {
+            present(R.string.toast_notification_account_unavailable)
+            return
+        }
+        retainedAccountReactivationRef = label
+        launchMutation {
+            try {
+                setActiveAccount(
+                    label = label,
+                    onActivated = { phase = AppPhase.Ready },
+                )
+            } finally {
+                retainedAccountReactivationRef = null
+            }
         }
     }
 

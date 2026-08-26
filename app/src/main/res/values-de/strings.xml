@@ -1338,6 +1338,7 @@
     <string name="recent_chats">Letzte Chats</string>
     <string name="onboarding_login">Anmelden</string>
     <string name="onboarding_login_with_amber">Mit Amber anmelden</string>
+    <string name="onboarding_continue_as">Weiter als %1$s</string>
     <string name="onboarding_offline_setup_message">Keine Internetverbindung. Verbinde dich über WLAN, mobile Daten oder ein anderes Netzwerk und versuche es erneut.</string>
     <string name="toast_couldnt_login_amber">Anmeldung mit Amber fehlgeschlagen</string>
     <string name="toast_amber_sign_in_cancelled">Amber-Anmeldung abgebrochen</string>

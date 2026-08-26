@@ -1313,6 +1313,7 @@
     <string name="recent_chats">最近聊天</string>
     <string name="onboarding_login">登录</string>
     <string name="onboarding_login_with_amber">使用 Amber 登录</string>
+    <string name="onboarding_continue_as">以 %1$s 身份继续</string>
     <string name="onboarding_offline_setup_message">无互联网连接。请使用 Wi-Fi、移动数据或其他网络连接，然后重试。</string>
     <string name="toast_couldnt_login_amber">无法使用 Amber 登录</string>
     <string name="toast_amber_sign_in_cancelled">已取消 Amber 登录</string>
