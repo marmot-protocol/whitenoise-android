@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -30,9 +29,29 @@ class TtsPaceCalibratorTest {
     fun shortSamplesAreRejected() {
         val calibrator = TtsPaceCalibrator(initialMsPerUnitAt1x = 17.5)
 
-        assertFalse(calibrator.observe(unitCount = 30, elapsedMs = 3_000, rate = 1.0f))
-        assertFalse(calibrator.observe(unitCount = 100, elapsedMs = 200, rate = 1.0f))
+        assertEquals(
+            TtsPaceObservation.Rejected,
+            calibrator.observe(unitCount = 30, elapsedMs = 3_000, rate = 1.0f),
+        )
+        assertEquals(
+            TtsPaceObservation.Rejected,
+            calibrator.observe(unitCount = 100, elapsedMs = 200, rate = 1.0f),
+        )
         assertEquals(17.5, calibrator.msPerUnitAt1x, 0.0)
+    }
+
+    @Test
+    fun aSampleThatChangesNothingIsStillASample() {
+        // The voice's pace already matches what is held. The estimate does not
+        // move, but the voice HAS been measured, and a caller that can only
+        // learn "did it move" would never record that.
+        val calibrator = TtsPaceCalibrator(initialMsPerUnitAt1x = 30.0)
+
+        assertEquals(
+            TtsPaceObservation.Accepted,
+            calibrator.observe(unitCount = 100, elapsedMs = 3_000, rate = 1.0f),
+        )
+        assertEquals(30.0, calibrator.msPerUnitAt1x, 0.0)
     }
 
     @Test
@@ -40,9 +59,15 @@ class TtsPaceCalibratorTest {
         val calibrator = TtsPaceCalibrator(initialMsPerUnitAt1x = 17.5)
 
         // 100 units in 60 s: something stalled; no plausible voice is that slow.
-        assertFalse(calibrator.observe(unitCount = 100, elapsedMs = 60_000, rate = 1.0f))
+        assertEquals(
+            TtsPaceObservation.Rejected,
+            calibrator.observe(unitCount = 100, elapsedMs = 60_000, rate = 1.0f),
+        )
         // 1000 units in 500 ms: no plausible voice is that fast either.
-        assertFalse(calibrator.observe(unitCount = 1_000, elapsedMs = 500, rate = 1.0f))
+        assertEquals(
+            TtsPaceObservation.Rejected,
+            calibrator.observe(unitCount = 1_000, elapsedMs = 500, rate = 1.0f),
+        )
         assertEquals(17.5, calibrator.msPerUnitAt1x, 0.0)
     }
 
@@ -50,7 +75,10 @@ class TtsPaceCalibratorTest {
     fun singleSampleMovesTheEstimateOnlyPartWay() {
         val calibrator = TtsPaceCalibrator(initialMsPerUnitAt1x = 17.5)
 
-        assertTrue(calibrator.observe(unitCount = 100, elapsedMs = 3_000, rate = 1.0f))
+        assertEquals(
+            TtsPaceObservation.Moved,
+            calibrator.observe(unitCount = 100, elapsedMs = 3_000, rate = 1.0f),
+        )
 
         assertTrue(calibrator.msPerUnitAt1x > 17.5)
         assertTrue(calibrator.msPerUnitAt1x < 30.0)
