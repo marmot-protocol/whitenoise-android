@@ -484,7 +484,7 @@ class TtsController internal constructor(
             utteranceId?.let(utteranceRates::remove)
             closePaceGapOpener(chunk.index)
             if (timing != null) observeBootstrapPace(chunk, timing)
-            if (rangeProbe.onUtteranceDone(chunk.text.length)) {
+            if (rangeProbe.onUtteranceDone(chunk.answerableLength())) {
                 timingStore?.setRangeVerdict(engineKey, false)
             }
         }
@@ -530,11 +530,17 @@ class TtsController internal constructor(
                 // original engine-only behavior and fall back to the sentence.
                 retainVisibleWordOnFallback = rangeProbe.reportsRanges != true,
             )
-        if (
-            application == TtsPlaybackQueue.RangeApplication.VisibleWord &&
-            rangeProbe.reportsRanges != true
-        ) {
-            rangeProbe.onRangeStart()
+        if (application != TtsPlaybackQueue.RangeApplication.VisibleWord) return
+        // Confirm on EVERY usable range, not only the first: a verdict restored
+        // from storage is provisional, and confirmation is what stops it being
+        // obeyed for the life of the process after the engine has stopped
+        // earning it. The snapshot is read before confirming, because
+        // onRangeStart sets reportsRanges itself - a guard evaluated afterwards
+        // would always be false, and a first-proof range would then neither
+        // retire the estimate nor persist what it had just proved.
+        val wasProven = rangeProbe.reportsRanges == true
+        rangeProbe.onRangeStart()
+        if (!wasProven) {
             wordTicker.stop()
             timingStore?.setRangeVerdict(engineKey, true)
         }
@@ -631,6 +637,41 @@ class TtsController internal constructor(
                 )
             }
         }
+
+    /**
+     * How much of a finished payload the engine could have named a visible word
+     * in. This is what the capability probe must count, never the payload's raw
+     * length.
+     *
+     * Only text INSIDE a visible span counts. A range that falls anywhere else
+     * cannot resolve to a word whatever the engine does - [TtsRangeTracker]
+     * needs contiguous span coverage and returns nothing otherwise - so silence
+     * over it is evidence about the surface, not about the engine, and
+     * crediting it lets one surface persist a verdict every other surface then
+     * inherits. That is not hypothetical: the plain speak overload and the text
+     * attachment reader carry no visible spans at all, so reading through them
+     * used to accumulate a full range-silent verdict against the engine
+     * package, which the conversation then read back.
+     *
+     * The sender announcement falls outside every span by construction (the
+     * queue shifts the spans past the prefix when it adds one), so it is
+     * excluded without a special case. Characters with no letter or digit are
+     * excluded too, which is how an emoji-only message stops counting as an
+     * unanswered question.
+     */
+    private fun TtsChunk.answerableLength(): Int {
+        var answerable = 0
+        for (span in visibleSpans) {
+            var offset = span.spoken.start.coerceIn(0, text.length)
+            val end = span.spoken.end.coerceIn(offset, text.length)
+            while (offset < end) {
+                val codePoint = text.codePointAt(offset)
+                if (Character.isLetterOrDigit(codePoint)) answerable++
+                offset += Character.charCount(codePoint)
+            }
+        }
+        return answerable
+    }
 
     private fun senderAnnouncementReserve(displayName: String): Int =
         displayName

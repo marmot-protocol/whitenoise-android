@@ -191,6 +191,96 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
+    fun aPersistedCapableVerdictIsOverturnedWhenTheEngineStopsReportingRanges() =
+        runTest {
+            val harness = LaneHarness(this)
+            harness.store.verdicts[ENGINE_KEY] = true
+            harness.controller.detachEngine()
+            harness.controller.attachEngine(harness.engine, engineKey = ENGINE_KEY)
+            assertTrue(harness.controller.speak(listOf(plainEntry(OVERTURNING_TEXT)), Locale.US))
+
+            harness.engine.start(index = 0)
+            harness.engine.complete(index = 0)
+
+            assertEquals(false, harness.store.verdicts[ENGINE_KEY])
+
+            // ...and the estimate takes over from the next utterance, which is
+            // the whole point of overturning it.
+            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
+            harness.engine.start(index = 1)
+            advanceTimeBy(150)
+            runCurrent()
+
+            assertEquals(
+                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+        }
+
+    @Test
+    fun aPayloadWithNoVisibleMappingIsNotEvidenceAgainstTheEngine() =
+        runTest {
+            val harness = LaneHarness(this)
+            // The plain speak overload carries no visible spans, so no engine
+            // range from it could ever resolve to a word. Its silence says
+            // nothing about the engine and must not be credited against it.
+            assertTrue(harness.controller.speak(OVERTURNING_TEXT, Locale.US))
+            harness.engine.start(index = 0)
+            harness.engine.complete(index = 0)
+
+            assertEquals(null, harness.store.verdicts[ENGINE_KEY])
+
+            // Witness: the same text WITH a visible mapping does conclude, so
+            // the assertion above is about the mapping and not about length.
+            assertTrue(harness.controller.speak(listOf(plainEntry(OVERTURNING_TEXT)), Locale.US))
+            harness.engine.start(index = 1)
+            harness.engine.complete(index = 1)
+
+            assertEquals(false, harness.store.verdicts[ENGINE_KEY])
+        }
+
+    @Test
+    fun textOutsideAVisibleSpanIsNotEvidenceAgainstTheEngine() =
+        runTest {
+            val harness = LaneHarness(this)
+            // Only the opening words are mapped to visible text. A range
+            // anywhere else could never resolve to a word whatever the engine
+            // does, so the engine has not been asked a question there.
+            assertTrue(
+                harness.controller.speak(
+                    listOf(partiallyMappedEntry(OVERTURNING_TEXT, mappedLength = 20)),
+                    Locale.US,
+                ),
+            )
+            harness.engine.start(index = 0)
+            harness.engine.complete(index = 0)
+
+            assertEquals(null, harness.store.verdicts[ENGINE_KEY])
+
+            // Witness: the same text fully mapped does conclude, so this is
+            // about the mapping and not about the length.
+            assertTrue(harness.controller.speak(listOf(plainEntry(OVERTURNING_TEXT)), Locale.US))
+            harness.engine.start(index = 1)
+            harness.engine.complete(index = 1)
+
+            assertEquals(false, harness.store.verdicts[ENGINE_KEY])
+        }
+
+    @Test
+    fun anEmojiOnlyMessageIsNotEvidenceAgainstTheEngine() =
+        runTest {
+            val harness = LaneHarness(this)
+            val emoji = "\uD83D\uDE42".repeat(80)
+            assertTrue(harness.controller.speak(listOf(plainEntry(emoji)), Locale.US))
+
+            harness.engine.start(index = 0)
+            harness.engine.complete(index = 0)
+
+            assertEquals(null, harness.store.verdicts[ENGINE_KEY])
+        }
+
+    @Test
     fun aGapBetweenTwoWarmUtterancesMeasuresAndPersistsThePace() =
         runTest {
             val harness = LaneHarness(this)
@@ -664,6 +754,26 @@ class TtsEstimatedTimingLaneTest {
             )
         }
 
+    private fun partiallyMappedEntry(
+        text: String,
+        mappedLength: Int,
+        messageIdHex: String = "m1",
+    ): TtsSpeakableEntry =
+        TtsSpeakableEntry(
+            senderKey = "",
+            senderDisplayName = "",
+            text = text,
+            messageIdHex = messageIdHex,
+            spokenTextSpans =
+                listOf(
+                    TtsSpokenTextSpan(
+                        TtsTextRange(0, mappedLength),
+                        TtsVisibleTextSpan("b0/n0", 0, mappedLength),
+                    ),
+                ),
+            projectionId = "projection-",
+        )
+
     private fun plainEntry(
         text: String = "Hello world.",
         messageIdHex: String = "m1",
@@ -836,6 +946,16 @@ class TtsEstimatedTimingLaneTest {
 
     private companion object {
         const val ENGINE_KEY = "com.example.tts"
+
+        /**
+         * Long enough to clear the probe's overturn threshold in one utterance,
+         * and free of terminal punctuation so the chunker keeps it whole.
+         */
+        val OVERTURNING_TEXT =
+            (
+                "The capability probe needs a great deal of answerable text before it will " +
+                    "overturn a verdict that storage already claims and that is deliberate "
+            ).repeat(3)
 
         /** A gap that closes a sentence carries the handover and the breath. */
         const val SENTENCE_SEAM_MS = TTS_UTTERANCE_HANDOVER_MS + TTS_SENTENCE_BREATH_MS
