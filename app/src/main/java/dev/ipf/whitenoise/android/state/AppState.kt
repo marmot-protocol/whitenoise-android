@@ -2899,6 +2899,8 @@ class WhiteNoiseAppState private constructor(
         synchronized(conversationControllerLock) { conversationControllers.remove(controller) }
     }
 
+    internal var conversationLiveSubscriptionsOverride: ConversationLiveSubscriptions? = null
+
     internal fun deliverConfirmedMediaHandoff(
         accountRef: String?,
         groupIdHex: String,

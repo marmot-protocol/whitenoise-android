@@ -37,7 +37,6 @@ import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupRosterFfi
-import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -51,7 +50,6 @@ import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
-import dev.ipf.marmotkit.TimelineMessagesSubscription
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
@@ -6849,6 +6847,8 @@ class ConversationController(
         appState.marmotIo { sendMediaAttachments(account, groupIdHex, references, caption) }
     },
 ) {
+    private val liveSubscriptions = appState.conversationLiveSubscriptions()
+
     var group by mutableStateOf(initialGroup)
         private set
 
@@ -7214,7 +7214,7 @@ class ConversationController(
     private val sendTraceByTempId = linkedMapOf<String, SendTraceEntry>()
     private val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val initialTimelineSubscriptionRead =
-        SingleFlightBoundedInitialResourceRead<TimelineMessagesSubscription>(
+        SingleFlightBoundedInitialResourceRead<ConversationTimelineSubscriptionHandle>(
             closeUnclaimed = { lateStream -> runCatching { lateStream.close() } },
         )
     private val initialTimelineSnapshotRead = SingleFlightBoundedInitialSnapshotRead<TimelinePageFfi?>()
@@ -7236,10 +7236,10 @@ class ConversationController(
     // the returned page directly instead of merging against a hand-rolled
     // cursor.
     @Volatile
-    private var timelineSubscription: TimelineMessagesSubscription? = null
+    private var timelineSubscription: ConversationTimelineSubscriptionHandle? = null
     private val liveSubscriptionLock = Any()
     private val timelineSubscriptionActiveCallMutex = Mutex()
-    private var groupStateSubscription: GroupStateSubscription? = null
+    private var groupStateSubscription: ConversationGroupStateSubscriptionHandle? = null
     private var startJob: Job? = null
     private var lastStartedGeneration: Long? = null
     private var conversationScope: CoroutineScope? = null
@@ -7695,17 +7695,20 @@ class ConversationController(
     // hung call would leave the chat-list tap permanently inert because
     // navigation cannot promote until the first page publishes. Bound it, and
     // convert exhaustion into the ordinary load failure whose surface already
-    // promotes navigation and offers retry. A reconnect keeps its records.
+    // promotes navigation and offers retry. Every subscription open, including
+    // reconnects with a retained window, consumes its one-shot snapshot before
+    // waiting for live updates.
     private suspend fun publishInitialTimelineSnapshot(
         account: String,
-        timelineStream: TimelineMessagesSubscription,
+        timelineStream: ConversationTimelineSubscriptionHandle,
     ): List<String> {
-        if (timelineRecords.isNotEmpty()) return emptyList()
         val snapshot = initialTimelineSnapshotRead.await { timelineStream.snapshot() }
         return if (snapshot == null) {
-            publishAuthoritativeEmptyInitialTimeline()
+            if (timelineRecords.isEmpty()) publishAuthoritativeEmptyInitialTimeline()
             emptyList()
         } else {
+            hasLoadedOlderPages = false
+            protectedTimelineMessageIds.clear()
             val streamIds =
                 applyTimelinePage(
                     snapshot,
@@ -7746,14 +7749,12 @@ class ConversationController(
      * can reset).
      */
     private suspend fun runConversationSubscriptionIteration(account: String): Pair<Boolean, Boolean> {
-        var groupSubscription: GroupStateSubscription? = null
-        var timelineStream: TimelineMessagesSubscription? = null
+        var groupSubscription: ConversationGroupStateSubscriptionHandle? = null
+        var timelineStream: ConversationTimelineSubscriptionHandle? = null
         try {
             timelineStream =
                 initialTimelineSubscriptionRead.await {
-                    appState.marmotIo {
-                        subscribeTimelineMessages(account, group.groupIdHex, ConversationTimelinePageLimit)
-                    }
+                    liveSubscriptions.openTimeline(account, group.groupIdHex, ConversationTimelinePageLimit)
                 }
             val stopAfterTimelineOpen =
                 synchronized(liveSubscriptionLock) {
@@ -7770,8 +7771,7 @@ class ConversationController(
             // layer now drives mark-read as the user scrolls so partial-read
             // sessions retain accurate unread counts on the chat list.
 
-            val groupStream =
-                appState.marmotIo { subscribeGroupState(account, group.groupIdHex) }
+            val groupStream = liveSubscriptions.openGroupState(account, group.groupIdHex)
             groupSubscription = groupStream
             val stopAfterGroupOpen =
                 synchronized(liveSubscriptionLock) {
@@ -7877,7 +7877,7 @@ class ConversationController(
         }
     }
 
-    private suspend fun runGroupStateSubscriptionLoop(groupStream: GroupStateSubscription) {
+    private suspend fun runGroupStateSubscriptionLoop(groupStream: ConversationGroupStateSubscriptionHandle) {
         while (coroutineContext.isActive) {
             val update =
                 withContext(Dispatchers.IO) {
@@ -7893,8 +7893,8 @@ class ConversationController(
     }
 
     private suspend fun closeConversationSubscriptionHandles(
-        groupSubscription: GroupStateSubscription?,
-        timelineStream: TimelineMessagesSubscription?,
+        groupSubscription: ConversationGroupStateSubscriptionHandle?,
+        timelineStream: ConversationTimelineSubscriptionHandle?,
     ) {
         synchronized(liveSubscriptionLock) {
             if (groupStateSubscription === groupSubscription) {
@@ -7921,7 +7921,7 @@ class ConversationController(
         closeTimelineSubscriptionSafely(closingSubscription)
     }
 
-    private suspend fun closeTimelineSubscriptionSafely(timelineStream: TimelineMessagesSubscription?) {
+    private suspend fun closeTimelineSubscriptionSafely(timelineStream: ConversationTimelineSubscriptionHandle?) {
         if (timelineStream == null) return
         withContext(NonCancellable) {
             timelineSubscriptionActiveCallMutex.withLock {
@@ -8005,7 +8005,7 @@ class ConversationController(
 
     private suspend fun CoroutineScope.runTimelineSubscriptionPipeline(
         account: String,
-        timelineStream: TimelineMessagesSubscription,
+        timelineStream: ConversationTimelineSubscriptionHandle,
     ) {
         val timelineUpdates = Channel<TimelineSubscriptionUpdateFfi>(capacity = Channel.BUFFERED)
         val pump =
@@ -11044,7 +11044,7 @@ class ConversationController(
         }
     }
 
-    private suspend fun paginateOlderIfSubscriptionActive(subscription: TimelineMessagesSubscription): TimelinePageFfi? =
+    private suspend fun paginateOlderIfSubscriptionActive(subscription: ConversationTimelineSubscriptionHandle): TimelinePageFfi? =
         timelineSubscriptionActiveCallMutex.withLock {
             val stillActive =
                 synchronized(liveSubscriptionLock) {
@@ -11056,7 +11056,7 @@ class ConversationController(
             }
         }
 
-    private suspend fun paginateNewerIfSubscriptionActive(subscription: TimelineMessagesSubscription): TimelinePageFfi? =
+    private suspend fun paginateNewerIfSubscriptionActive(subscription: ConversationTimelineSubscriptionHandle): TimelinePageFfi? =
         timelineSubscriptionActiveCallMutex.withLock {
             val stillActive =
                 synchronized(liveSubscriptionLock) {
