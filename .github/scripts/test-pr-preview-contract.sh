@@ -3,8 +3,10 @@ set -euo pipefail
 
 workflow=.github/workflows/android-pr-preview-publish.yml
 build=.github/workflows/android-pr-apk.yml
+ci=.github/workflows/android-ci.yml
 gradle=app/build.gradle.kts
 uploader=.github/scripts/upload-pr-apk-to-blossom.sh
+fallback_uploader=.github/scripts/upload-pr-apk-with-fallback.sh
 
 reject() {
   local pattern=$1 file=$2
@@ -34,6 +36,8 @@ grep -Fq 'Recheck PR head before description update' "$workflow"
 grep -Fq 'Recheck PR head before upload' "$workflow"
 grep -Fq 'Test trusted publisher contract' "$workflow"
 grep -Fq '.github/scripts/test-pr-preview-validation.sh' "$workflow"
+grep -Fq '.github/scripts/test-upload-pr-apk-with-fallback.sh' "$workflow"
+grep -Fq '.github/scripts/test-upload-pr-apk-with-fallback.sh' "$ci"
 grep -Fq 'pulls/${stable_pr}' "$workflow"
 grep -Fq 'workflow_run.head_repository.full_name' "$workflow"
 grep -Fq 'workflow_dispatch:' "$build"
@@ -84,3 +88,14 @@ grep -Fq -- '--tag "server=$server_host"' "$uploader"
 grep -Fq -- '--header "Content-Type: $expected_mime"' "$uploader"
 grep -Fq -- '--header "X-SHA-256: $apk_sha256"' "$uploader"
 reject 'blossom upload --server' "$uploader"
+
+# A transient outage at one public Blossom origin must not suppress both PR
+# install links. Keep retries bounded so both APKs can reach the fallback
+# before the trusted publisher's 20-minute job timeout.
+grep -Fq 'BLOSSOM_SERVERS: https://nostr.download https://blossom.primal.net' "$workflow"
+grep -Fq 'BLOSSOM_UPLOAD_MAX_ATTEMPTS: 2' "$workflow"
+grep -Fq 'BLOSSOM_UPLOAD_TIMEOUT_SECONDS: 90' "$workflow"
+grep -Fq 'BLOSSOM_UPLOAD_BACKOFF_SECONDS: 5' "$workflow"
+grep -Fq 'url=$(APK_PATH="$apk" .github/scripts/upload-pr-apk-with-fallback.sh)' "$workflow"
+grep -Fq 'BLOSSOM_SERVER="$server" "$uploader"' "$fallback_uploader"
+reject 'eval ' "$fallback_uploader"

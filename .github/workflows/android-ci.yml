@@ -48,7 +48,9 @@ jobs:
         run: bash .github/scripts/test-package-replacement-startup-report.sh
 
       - name: Test PR preview publisher
-        run: bash .github/scripts/test-upload-pr-apk-to-blossom.sh
+        run: |
+          bash .github/scripts/test-upload-pr-apk-to-blossom.sh
+          bash .github/scripts/test-upload-pr-apk-with-fallback.sh
 
       - name: Test MarmotKit artifact preparation
         run: ./scripts/test-prepare-marmotkit-artifact.sh

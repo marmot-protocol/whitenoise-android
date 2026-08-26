@@ -106,6 +106,7 @@ jobs:
           .github/scripts/test-pr-preview-contract.sh
           .github/scripts/test-pr-preview-validation.sh
           .github/scripts/test-upload-pr-apk-to-blossom.sh
+          .github/scripts/test-upload-pr-apk-with-fallback.sh
           node --test .github/scripts/update-pr-preview-links.test.js
 
       - name: Download candidates from completed run
@@ -226,7 +227,10 @@ jobs:
       - name: Publish previews
         id: publish
         env:
-          BLOSSOM_SERVER: https://nostr.download
+          BLOSSOM_SERVERS: https://nostr.download https://blossom.primal.net
+          BLOSSOM_UPLOAD_MAX_ATTEMPTS: 2
+          BLOSSOM_UPLOAD_TIMEOUT_SECONDS: 90
+          BLOSSOM_UPLOAD_BACKOFF_SECONDS: 5
           BLOSSOM_UPLOAD_NSEC: ${{ secrets.BLOSSOM_UPLOAD_NSEC }}
         shell: bash
         run: |
@@ -234,7 +238,7 @@ jobs:
           go install github.com/fiatjaf/nak@62fa610a063b708743456e49f9befaef4a441a37
           for channel in stable isolated; do
             apk=$(find "signed/$channel" -type f -name '*.apk' -print -quit)
-            url=$(APK_PATH="$apk" .github/scripts/upload-pr-apk-to-blossom.sh)
+            url=$(APK_PATH="$apk" .github/scripts/upload-pr-apk-with-fallback.sh)
             remote_sha=$(curl --fail --location --retry 3 --retry-all-errors --max-time 240 "$url" | sha256sum | awk '{print $1}')
             local_sha=$(sha256sum "$apk" | awk '{print $1}')
             [[ "$remote_sha" == "$local_sha" ]] || {
