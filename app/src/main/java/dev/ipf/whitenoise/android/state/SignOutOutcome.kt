@@ -33,3 +33,16 @@ internal fun AccountSummaryFfi.isSignedInSigningAccount(): Boolean =
     !signedOut &&
         label.isNotBlank() &&
         (localSigning || externalSigning)
+
+/** Mirror a completed engine sign-out when its follow-up account refresh fails. */
+internal fun reconcileCachedAccountsAfterSignOut(
+    accounts: List<AccountSummaryFfi>,
+    signedOutRef: String,
+): List<AccountSummaryFfi> =
+    accounts.map { account ->
+        if (account.label == signedOutRef) {
+            account.copy(signedOut = true, running = false)
+        } else {
+            account
+        }
+    }

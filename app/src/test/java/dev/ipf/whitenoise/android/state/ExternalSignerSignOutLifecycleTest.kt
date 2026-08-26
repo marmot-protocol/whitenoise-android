@@ -1,15 +1,20 @@
 package dev.ipf.whitenoise.android.state
 
 import android.app.Application
+import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.LocalCleanupReportFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.SignOutOutcomeFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
+import dev.ipf.whitenoise.android.share.ShareShortcutTarget
+import dev.ipf.whitenoise.android.share.buildShareShortcut
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -42,6 +47,7 @@ class ExternalSignerSignOutLifecycleTest {
             localCleanup = LocalCleanupReportFfi(completed = true, reason = null),
         )
     private var signOutFailure: Throwable? = null
+    private var listAccountsFailure: Throwable? = null
     private var engineSignedOut = false
     private var wipeOutcome =
         WipeOutcomeFfi(
@@ -88,6 +94,7 @@ class ExternalSignerSignOutLifecycleTest {
                 }
                 "listAccounts" -> {
                     listAccountsCalls.incrementAndGet()
+                    listAccountsFailure?.let(::suspendFailure)
                     if (engineWiped) emptyList() else listOf(externalSignerAccount(signedOut = engineSignedOut))
                 }
                 "accountUnreadSummary", "chatList" -> emptyList<Any>()
@@ -102,6 +109,11 @@ class ExternalSignerSignOutLifecycleTest {
                     }
             }
         } as MarmotInterface
+
+    @Before
+    fun setUp() {
+        ShortcutManagerCompat.removeAllDynamicShortcuts(context)
+    }
 
     private fun appState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
@@ -170,8 +182,26 @@ class ExternalSignerSignOutLifecycleTest {
         }
 
     @Test
+    fun successfulSignOutRefreshFailureStillClearsTheActiveSession() =
+        runBlocking {
+            listAccountsFailure = RuntimeException("account refresh unavailable")
+            val appState = appState()
+
+            val completion = appState.signOutActiveAccount(deleteKeyPackages = true)
+
+            assertEquals(SignOutCompletion.Complete, completion)
+            assertEquals(1, signOutCalls.get())
+            assertEquals(1, listAccountsCalls.get())
+            assertTrue(appState.accounts.single().signedOut)
+            assertFalse(appState.accounts.single().running)
+            assertNull(appState.activeAccountRef)
+            assertTrue(appState.phase is AppPhase.Onboarding)
+        }
+
+    @Test
     fun successfulExternalSignerWipeUsesTheNormalRemovalPath() =
         runBlocking {
+            val shortcutId = publishConversationShortcut()
             val appState = appState()
 
             val outcome = appState.signOutAndWipeActiveAccount()
@@ -182,11 +212,13 @@ class ExternalSignerSignOutLifecycleTest {
             assertTrue(appState.accounts.isEmpty())
             assertNull(appState.activeAccountRef)
             assertTrue(appState.phase is AppPhase.Onboarding)
+            assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).none { it.id == shortcutId })
         }
 
     @Test
     fun unfinishedExternalSignerWipeRestoresTheActiveSession() =
         runBlocking {
+            val shortcutId = publishConversationShortcut()
             wipeOutcome =
                 wipeOutcome.copy(
                     localCleanup =
@@ -206,7 +238,20 @@ class ExternalSignerSignOutLifecycleTest {
             assertEquals(listOf(ACCOUNT_REF), appState.accounts.map { it.label })
             assertEquals(ACCOUNT_REF, appState.activeAccountRef)
             assertEquals(phaseBefore, appState.phase)
+            assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).any { it.id == shortcutId })
         }
+
+    private fun publishConversationShortcut(): String {
+        val shortcut =
+            checkNotNull(
+                buildShareShortcut(
+                    context = context,
+                    target = ShareShortcutTarget(ACCOUNT_REF, "group-a", "Test conversation"),
+                ),
+            )
+        ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+        return shortcut.id
+    }
 
     private companion object {
         const val ACCOUNT_REF = "external-account"

@@ -4638,6 +4638,26 @@ class WhiteNoiseAppState private constructor(
         refreshAccountUnreadCounts(refreshedAccounts)
     }
 
+    private suspend fun accountLabelsAfterSignOut(
+        signedOutRef: String,
+        engineCompleted: Boolean,
+    ): List<String> {
+        val latestAccounts =
+            runCatchingCancellable {
+                refreshAccounts()
+                accounts
+            }.onFailure { failure ->
+                appStateDebug(failure) { "post-sign-out account refresh failed; reconciling cached accounts" }
+            }.getOrElse {
+                if (engineCompleted) {
+                    accounts = reconcileCachedAccountsAfterSignOut(accounts, signedOutRef)
+                    accountListRevision += 1L
+                }
+                accounts
+            }
+        return latestAccounts.map(AccountSummaryFfi::label)
+    }
+
     fun unreadCountForAccount(accountRef: String): ULong = accountUnreadCounts[accountRef] ?: 0uL
 
     /**
@@ -5450,8 +5470,8 @@ class WhiteNoiseAppState private constructor(
             includeUnscopedLegacy = accounts.none { it.label != signedOutRef && it.isSignedInSigningAccount() },
         )
         clearContactPrivateDetailsForAccount(signedOutRef)
-        refreshAccounts()
-        val outcome = signOutOutcome(accounts.map { it.label }, signedOutRef)
+        val accountLabels = accountLabelsAfterSignOut(signedOutRef, engineOutcome != null)
+        val outcome = signOutOutcome(accountLabels, signedOutRef)
         val next = outcome.nextActiveRef
         if (next != null) {
             setActiveAccount(next)
@@ -5494,10 +5514,6 @@ class WhiteNoiseAppState private constructor(
         val wipedRef = activeAccountRef ?: return null
         conversationDictation.onAccountUnavailable(wipedRef)
         clearInMemoryMediaCaches()
-        clearConversationShortcutsForAccount(
-            accountRef = wipedRef,
-            includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },
-        )
         try {
             val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
             val wipeResult =
@@ -5534,6 +5550,10 @@ class WhiteNoiseAppState private constructor(
                 restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                 return outcome
             }
+            clearConversationShortcutsForAccount(
+                accountRef = wipedRef,
+                includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },
+            )
             AvatarImageLoader.clear()
             clearCrossAccountCaches()
             stopTtsForRemovedAccount(wipedRef)
