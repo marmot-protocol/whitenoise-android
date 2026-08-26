@@ -102,6 +102,16 @@ internal class MainShellProcessState(
             entry.controller.hasLoadedLocalSnapshot
     }
 
+    /**
+     * A removed Android task is a navigation boundary even when Keep Connected
+     * retains this process. Drop conversation-only state so a later launcher
+     * Activity starts at the warm chat list instead of reopening private content.
+     */
+    fun onTaskRemoved() {
+        clearConversationControllers()
+        clearRetainedRoute()
+    }
+
     fun release() {
         clearConversationControllers()
         clearRetainedRoute()

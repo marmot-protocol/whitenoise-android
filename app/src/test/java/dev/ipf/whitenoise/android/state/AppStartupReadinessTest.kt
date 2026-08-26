@@ -49,8 +49,8 @@ class AppStartupReadinessTest {
         val blockingFold = bootstrap.indexOf("refreshAccountUnreadCounts")
 
         assertTrue(snapshot >= 0)
-        assertTrue(ready > snapshot)
-        assertTrue("Receiver-gated signer work must stay off the local-shell critical path", signer < 0)
+        assertTrue(signer > snapshot)
+        assertTrue("Signer callbacks must be restored before the shell becomes operational", ready > signer)
         assertTrue("Unread roster folds must not return to the bootstrap critical path", blockingFold < 0)
     }
 

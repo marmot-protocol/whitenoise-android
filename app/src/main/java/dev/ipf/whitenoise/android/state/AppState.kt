@@ -4149,6 +4149,11 @@ class WhiteNoiseAppState private constructor(
                 completeReceiverGatedStartup()
                 phase = AppPhase.Onboarding
             } else {
+                // The receiver attempt already owns its process-lifetime job,
+                // but signer callbacks are an account-readiness prerequisite:
+                // once Ready is visible, UI work may require signing even while
+                // receiver convergence continues in the background.
+                traceStartupStage("external-signer-registration") { reregisterExternalSigners() }
                 val target =
                     activeAccountRef?.takeIf { ref -> accounts.any { it.label == ref } }
                         ?: accounts.first().label
@@ -4191,15 +4196,15 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Wait for the process-owned receiver only after a safe local shell (or
-     * onboarding) can render. Notification-sensitive runtime reads and signer
-     * restoration stay behind the same bounded no-replay barrier as before.
+     * The process-owned listener attempt starts with Marmot itself; only its
+     * bounded readiness wait is deferred until a safe local shell (or
+     * onboarding) can render. Notification-sensitive runtime reads remain
+     * behind that barrier, while signer restoration happens before Ready.
      */
     private suspend fun completeReceiverGatedStartup() {
         val receiverReady = awaitNotificationReceiverForStartup()
         appStateDebug { "marmot started; notification receiver active=$receiverReady" }
         traceStartupStage("notification-privacy-setup") { refreshSecurityPrivacySettings() }
-        traceStartupStage("external-signer-registration") { reregisterExternalSigners() }
     }
 
     private suspend fun startBootstrapRuntime(): AppMarmotRuntime {

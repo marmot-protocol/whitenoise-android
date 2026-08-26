@@ -36,8 +36,8 @@ class ProcessRestorationLocalShellBeforeNotificationReceiverTest {
                 AccountSummaryFfi(
                     label = "account-a",
                     accountIdHex = "a".repeat(64),
-                    localSigning = true,
-                    externalSigning = false,
+                    localSigning = false,
+                    externalSigning = true,
                     signedOut = false,
                     running = true,
                 )
@@ -56,6 +56,11 @@ class ProcessRestorationLocalShellBeforeNotificationReceiverTest {
                 }
 
                 assertEquals(account.label, fixture.appState.activeAccountRef)
+                assertEquals(
+                    "the active account signer must be restored before the shell becomes operational",
+                    1,
+                    fixture.signerRegistrationCalls.get(),
+                )
                 assertTrue("receiver convergence should still be pending", bootstrap.isActive)
                 assertRestoredShell(observeRestoredShell(fixture, account.label))
                 assertStartupCriticalPath(fixture)

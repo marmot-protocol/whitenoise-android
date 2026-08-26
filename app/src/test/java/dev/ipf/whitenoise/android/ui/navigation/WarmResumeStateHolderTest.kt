@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -94,6 +95,49 @@ class WarmResumeStateHolderTest {
         assertSame(loadedController, freshActivityHolder.chatsController(ACCOUNT_REF, runtimeGeneration = 4))
         assertSame(firstActivityHolder.selectedChat.value, freshActivityHolder.selectedChat.value)
         freshActivityHolder.release()
+        snapshotController.onCleared()
+    }
+
+    @Test
+    fun taskRemovalDropsConversationStateButKeepsTheWarmChatListProjection() {
+        val state = appState()
+        val processState = MainShellProcessState(state)
+        val holder = MainShellStateHolder(state, SavedStateHandle(), processState)
+        val loadedChats = holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
+        val snapshotController =
+            ChatsController(
+                appState = state,
+                initialAccountRef = ACCOUNT_REF,
+                initialLocalSnapshot = localSnapshot(),
+                memberSnapshotLoader = { _, _ -> emptyList() },
+            )
+        val selected = snapshotController.items.single()
+        holder.selectedChat.value = selected
+        val retainedConversation =
+            holder.conversationController(
+                chatId = GROUP_ID,
+                accountRef = ACCOUNT_REF,
+                runtimeGeneration = 4,
+                presentationKey = 0,
+            ) {
+                ConversationController(appState = state, initialGroup = selected.group)
+            }
+
+        processState.onTaskRemoved()
+
+        assertNull(holder.selectedChat.value)
+        assertSame(loadedChats, holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4))
+        val replacementConversation =
+            holder.conversationController(
+                chatId = GROUP_ID,
+                accountRef = ACCOUNT_REF,
+                runtimeGeneration = 4,
+                presentationKey = 0,
+            ) {
+                ConversationController(appState = state, initialGroup = selected.group)
+            }
+        assertNotSame(retainedConversation, replacementConversation)
+        holder.release()
         snapshotController.onCleared()
     }
 

@@ -24,8 +24,18 @@ open class WhiteNoiseApplication : Application() {
         createRecentEmojiRecentsOwner()
     }
 
-    internal val mainShellProcessState: MainShellProcessState by lazy {
-        MainShellProcessState(appState)
+    private val mainShellProcessStateDelegate =
+        lazy {
+            MainShellProcessState(appState)
+        }
+    internal val mainShellProcessState: MainShellProcessState by mainShellProcessStateDelegate
+
+    /** Reset task-owned UI state without discarding the process-warm chat list. */
+    internal fun onTaskRemoved() {
+        if (mainShellProcessStateDelegate.isInitialized()) {
+            mainShellProcessState.onTaskRemoved()
+        }
+        appState.onTaskRemoved()
     }
 
     /**

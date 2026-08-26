@@ -77,6 +77,7 @@ internal class NotificationBootstrapTestFixture(
     val localSnapshotGroupSubscriptionCalls = AtomicInteger(0)
     val localSnapshotReadCalls = AtomicInteger(0)
     val memberProjectionCalls = AtomicInteger(0)
+    val signerRegistrationCalls = AtomicInteger(0)
     val markReadCalls = AtomicInteger(0)
     val npubCalls = AtomicInteger(0)
 
@@ -184,6 +185,10 @@ internal class NotificationBootstrapTestFixture(
                 }
                 "userProfile" -> null
                 "displayName" -> "Alice"
+                "registerExternalSigner" -> {
+                    signerRegistrationCalls.incrementAndGet()
+                    Unit
+                }
                 "toString" -> "NotificationBootstrapMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()
