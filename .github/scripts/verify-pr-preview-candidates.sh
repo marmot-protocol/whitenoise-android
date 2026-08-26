@@ -44,10 +44,17 @@ for channel in stable isolated; do
   actual_package=$(apkanalyzer manifest application-id "${apks[0]}")
   actual_version=$(apkanalyzer manifest version-code "${apks[0]}")
   actual_version_name=$(apkanalyzer manifest version-name "${apks[0]}")
+  binary_manifest=$(apkanalyzer manifest print "${apks[0]}")
   [[ "$actual_package" == "$expected_package" ]]
   [[ "$actual_version" == "$expected_version" ]]
   [[ "$actual_version_name" == *"preview-pr${PR_NUMBER}-${expected_sha}"* ]]
+  grep -Fq 'android:extractNativeLibs="true"' <<< "$binary_manifest"
   mapfile -t native_abis < <(zipinfo -1 "${apks[0]}" | sed -nE 's#^lib/([^/]+)/.+#\1#p' | sort -u)
   (( ${#native_abis[@]} == 1 ))
   [[ "${native_abis[0]}" == "arm64-v8a" ]]
+  if zipinfo -l "${apks[0]}" |
+    awk '$NF ~ /^lib\/.*\.so$/ && $7 == "stor" { found=1 } END { exit(found ? 0 : 1) }'; then
+    printf 'Preview APK contains an uncompressed native library.\n' >&2
+    exit 1
+  fi
 done
