@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 internal class ScriptedConversationTimelineSubscription(
-    private val snapshotPage: TimelinePageFfi,
+    private val snapshotPage: TimelinePageFfi?,
     private val backwardsPage: TimelinePageFfi = emptyTimelinePage(),
 ) : ConversationTimelineSubscriptionHandle {
     private val lifecycleEvents = CopyOnWriteArrayList<String>()

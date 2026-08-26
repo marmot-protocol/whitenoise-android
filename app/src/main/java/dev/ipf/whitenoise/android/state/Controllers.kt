@@ -7704,7 +7704,7 @@ class ConversationController(
     ): List<String> {
         val snapshot = initialTimelineSnapshotRead.await { timelineStream.snapshot() }
         return if (snapshot == null) {
-            publishAuthoritativeEmptyInitialTimeline()
+            if (timelineRecords.isEmpty()) publishAuthoritativeEmptyInitialTimeline()
             emptyList()
         } else {
             hasLoadedOlderPages = false

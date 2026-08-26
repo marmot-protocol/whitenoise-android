@@ -55,6 +55,52 @@ class ConversationTimelineReconnectIntegrationTest {
         }
 
     @Test
+    fun nullReplacementSnapshotKeepsRetainedTimelineVisible() =
+        runBlocking {
+            val firstSubscription =
+                ScriptedConversationTimelineSubscription(
+                    snapshotPage =
+                        timelinePage(
+                            timelineRecord(
+                                messageId = ConversationTimelineTestIds.MESSAGE_A,
+                                timelineAt = 1uL,
+                            ),
+                        ),
+                )
+            val replacementSubscription =
+                ScriptedConversationTimelineSubscription(snapshotPage = null)
+            val scriptedSubscriptions =
+                ScriptedConversationLiveSubscriptions(
+                    timelineScripts = listOf(firstSubscription, replacementSubscription),
+                    group = conversationTimelineTestGroup(),
+                )
+            val controller = conversationController(scriptedSubscriptions.subscriptions)
+            try {
+                awaitConversationCondition {
+                    ConversationTimelineTestIds.MESSAGE_A in timelineMessageIds(controller)
+                }
+                awaitConversationCondition { firstSubscription.nextUpdateCallCount == 1 }
+
+                firstSubscription.endUpdates()
+                awaitConversationCondition { firstSubscription.closeCallCount == 1 }
+                controller.retryLoadFailure()
+
+                awaitConversationCondition {
+                    scriptedSubscriptions.timelineSubscriptionOpenCount == 2 &&
+                        replacementSubscription.nextUpdateCallCount >= 1
+                }
+                assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate(replacementSubscription)
+                assertEquals(
+                    listOf(ConversationTimelineTestIds.MESSAGE_A),
+                    timelineMessageIds(controller),
+                )
+            } finally {
+                controller.onCleared()
+                awaitOpenedTimelineSubscriptionsClosed(scriptedSubscriptions)
+            }
+        }
+
+    @Test
     fun replacementSnapshotResetsPaginationModeForLaterAuthoritativeRefresh() =
         runBlocking {
             val oldMessage = timelineRecord(MESSAGE_OLD, 0uL)
