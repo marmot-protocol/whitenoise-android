@@ -82,12 +82,16 @@ class PreferenceParserBundleTest {
     }
 
     @Test
-    fun enterKeyBehavior_defaultsToSendMessageForNullOrUnknown() {
-        // SendMessage is the documented default (#404) -- matches most chat
-        // composers; an unknown stored value must not flip the user to NewLine.
-        assertEquals(EnterKeyBehavior.SendMessage, EnterKeyBehavior.fromPreference(null))
-        assertEquals(EnterKeyBehavior.SendMessage, EnterKeyBehavior.fromPreference(""))
-        assertEquals(EnterKeyBehavior.SendMessage, EnterKeyBehavior.fromPreference("garbage"))
-        assertEquals(EnterKeyBehavior.SendMessage, EnterKeyBehavior.fromPreference("SEND"))
+    fun enterKeyBehavior_defaultsToNewLineForNullOrUnknown() {
+        assertEquals(EnterKeyBehavior.NewLine, EnterKeyBehavior.DEFAULT)
+        assertEquals(EnterKeyBehavior.DEFAULT, EnterKeyBehavior.fromPreference(null))
+        assertEquals(EnterKeyBehavior.DEFAULT, EnterKeyBehavior.fromPreference(""))
+        assertEquals(EnterKeyBehavior.DEFAULT, EnterKeyBehavior.fromPreference("garbage"))
+        assertEquals(EnterKeyBehavior.DEFAULT, EnterKeyBehavior.fromPreference("SEND"))
+    }
+
+    @Test
+    fun enterKeyBehavior_preservesExplicitSendPreference() {
+        assertEquals(EnterKeyBehavior.SendMessage, EnterKeyBehavior.fromPreference("send"))
     }
 }
