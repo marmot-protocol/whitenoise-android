@@ -28,6 +28,7 @@ import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -619,6 +620,53 @@ class ConversationSendRetryIntegrationTest {
         }
 
     @Test
+    fun pendingConnectRetryReleasesTheConversationCommitLockDuringBackoff() =
+        runTest {
+            val appState = appState()
+            val firstAttemptStarted = CompletableDeferred<Unit>()
+            val allowRetryToSucceed = CompletableDeferred<Unit>()
+            var attempts = 0
+            lateinit var controller: ConversationController
+            controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        if (attempts == 1) {
+                            firstAttemptStarted.complete(Unit)
+                            throw MarmotKitException.Publish("connect relay failed")
+                        }
+                        allowRetryToSucceed.await()
+                        successfulSendSummary()
+                    },
+                )
+
+            val send = async { controller.send("hello") }
+            firstAttemptStarted.await()
+            val otherCommitCompleted = CompletableDeferred<Unit>()
+            val otherCommit =
+                async {
+                    appState.withGroupCommitLock(ACCOUNT_REF, GROUP_ID) {
+                        otherCommitCompleted.complete(Unit)
+                    }
+                }
+            yield()
+
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+            assertTrue(
+                "an offline send must release the group commit lock before retry backoff",
+                otherCommitCompleted.isCompleted,
+            )
+
+            allowRetryToSucceed.complete(Unit)
+            otherCommit.await()
+            send.await()
+            assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+        }
+
+    @Test
     fun sendRetriesConnectFailureThenCommitsOneSentTimelineRow() =
         runTest {
             var attempts = 0
@@ -664,6 +712,14 @@ class ConversationSendRetryIntegrationTest {
                 },
             )
         }
+
+    private fun successfulSendSummary() =
+        SendSummaryFfi(
+            published = 1u,
+            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+        )
 
     private fun appState() =
         WhiteNoiseAppState(

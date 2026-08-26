@@ -7850,30 +7850,17 @@ class ConversationController(
         // window the issue is about.
         sendTrace(trace, PerformancePhase.OPTIMISTIC_SHOWN, result = PerformanceResult.PENDING)
         try {
-            // Publish with a bounded retry sweep so a *transient* relay-pool gap
+            // Publish with a retry sweep so a *transient* relay-pool gap
             // (socket teardown mid-reconnect, doze wake, network change) doesn't
             // surface as a user-visible "send failed" the instant the pool looks
             // empty (issue #294). A terminal/logic error fails on the first
-            // attempt; only a sustained connectivity outage — every attempt
-            // exhausted — keeps the hard failure. The optimistic bubble stays
-            // Pending across retries, so the user sees "sending", not "failed".
+            // attempt; a sustained proven pre-publish connectivity outage keeps
+            // retrying while this send's coroutine is active. The optimistic
+            // bubble stays Pending, so the user sees "sending", not "failed".
             //
-            // The commit lock serializes commit-producing FFI calls for the same
-            // (account, group): a second back-to-back send BLOCKS here until the
-            // prior send's full MLS-commit → relay round-trip returns. Timing the
-            // lock-acquire separately from the FFI call makes that serialization
-            // visible (issue #913 "back-to-back sends don't pipeline").
-            val lockWaitStartMs = trace?.let { traceNowMs() }
-            val summary =
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    val lockHeldAtMs = trace?.let { traceNowMs() }
-                    sendTrace(
-                        trace,
-                        PerformancePhase.COMMIT_LOCK_ACQUIRED,
-                        durationMs = lockHeldAtMs?.minus(lockWaitStartMs ?: lockHeldAtMs) ?: 0L,
-                    )
-                    publishTextWithRetry(replyTarget, account, trimmed, trace)
-                }
+            // Each FFI attempt owns the conversation commit lock, but retry
+            // backoff does not. Other mutations remain usable while offline.
+            val summary = publishTextWithRetry(replyTarget, account, trimmed, trace)
             completeDurableAcceptance(optimisticKey)
             val reconciliation =
                 reconcileSuccessfulTextSend(
@@ -8004,46 +7991,60 @@ class ConversationController(
         retryPendingConversationSend(
             onTransientFailure = { attempt, _ -> logSendRetry(trace, attempt) },
         ) { attempt ->
-            // Time the FFI hop itself (App → engine `send_message`: MLS commit +
-            // encrypt + publish + relay ack round-trip, all synchronous inside
-            // this call). This is the primary "long pole" candidate the issue
-            // asks to measure — how long the `sendText`/`replyToMessage` call
-            // blocks before returning (issue #913).
-            val ffiStartMs = trace?.let { traceNowMs() }
-            sendTrace(
-                trace,
-                PerformancePhase.FFI_START,
-                result = PerformanceResult.PENDING,
-                layer = PerformanceLayer.FFI,
-                attempt = attempt,
-            )
-            try {
-                val summary = textPublisher(replyTarget, account, group.groupIdHex, trimmed)
+            // Serialize only this commit-producing FFI attempt. Releasing the
+            // lock before retryPendingConversationSend delays prevents an
+            // offline pending message from blocking every other group mutation.
+            val lockWaitStartMs = trace?.let { traceNowMs() }
+            appState.withGroupCommitLock(account, group.groupIdHex) {
+                val lockHeldAtMs = trace?.let { traceNowMs() }
                 sendTrace(
                     trace,
-                    PerformancePhase.FFI_RETURN,
-                    durationMs = ffiStartMs?.let { traceNowMs() - it } ?: 0L,
-                    layer = PerformanceLayer.FFI,
+                    PerformancePhase.COMMIT_LOCK_ACQUIRED,
+                    durationMs = lockHeldAtMs?.minus(lockWaitStartMs ?: lockHeldAtMs) ?: 0L,
                     attempt = attempt,
-                    count = summary.messageIds.size,
                 )
+                // Time the FFI hop itself (App → engine `send_message`: MLS
+                // commit + encrypt + publish + relay ack round-trip, all
+                // synchronous inside this call). This is the primary "long
+                // pole" candidate the issue asks to measure — how long the
+                // `sendText`/`replyToMessage` call blocks before returning
+                // (issue #913).
+                val ffiStartMs = trace?.let { traceNowMs() }
                 sendTrace(
                     trace,
-                    PerformancePhase.TRANSPORT_COMPLETE,
-                    layer = PerformanceLayer.TRANSPORT,
-                    count = summary.messageIds.size,
-                )
-                summary
-            } catch (throwable: Throwable) {
-                sendTrace(
-                    trace,
-                    PerformancePhase.FFI_ERROR,
-                    durationMs = ffiStartMs?.let { traceNowMs() - it } ?: 0L,
-                    result = PerformanceResult.FAILURE,
+                    PerformancePhase.FFI_START,
+                    result = PerformanceResult.PENDING,
                     layer = PerformanceLayer.FFI,
                     attempt = attempt,
                 )
-                throw throwable
+                try {
+                    val summary = textPublisher(replyTarget, account, group.groupIdHex, trimmed)
+                    sendTrace(
+                        trace,
+                        PerformancePhase.FFI_RETURN,
+                        durationMs = ffiStartMs?.let { traceNowMs() - it } ?: 0L,
+                        layer = PerformanceLayer.FFI,
+                        attempt = attempt,
+                        count = summary.messageIds.size,
+                    )
+                    sendTrace(
+                        trace,
+                        PerformancePhase.TRANSPORT_COMPLETE,
+                        layer = PerformanceLayer.TRANSPORT,
+                        count = summary.messageIds.size,
+                    )
+                    summary
+                } catch (throwable: Throwable) {
+                    sendTrace(
+                        trace,
+                        PerformancePhase.FFI_ERROR,
+                        durationMs = ffiStartMs?.let { traceNowMs() - it } ?: 0L,
+                        result = PerformanceResult.FAILURE,
+                        layer = PerformanceLayer.FFI,
+                        attempt = attempt,
+                    )
+                    throw throwable
+                }
             }
         }
 
@@ -9415,17 +9416,14 @@ class ConversationController(
                 publishTimelineFromIndexes()
                 return
             }
-            val summary =
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    val retryTrace = PerformanceDiagnostics.begin(PerformanceOperation.TEXT_SEND)
-                    sendTrace(
-                        retryTrace,
-                        PerformancePhase.MANUAL_RETRY,
-                        elapsedMs = 0L,
-                        result = PerformanceResult.PENDING,
-                    )
-                    publishTextWithRetry(replyTarget, account, text, retryTrace)
-                }
+            val retryTrace = PerformanceDiagnostics.begin(PerformanceOperation.TEXT_SEND)
+            sendTrace(
+                retryTrace,
+                PerformancePhase.MANUAL_RETRY,
+                elapsedMs = 0L,
+                result = PerformanceResult.PENDING,
+            )
+            val summary = publishTextWithRetry(replyTarget, account, text, retryTrace)
             completeDurableAcceptance(key)
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; drop the result entirely.

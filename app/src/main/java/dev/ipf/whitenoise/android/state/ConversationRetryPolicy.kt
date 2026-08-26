@@ -92,7 +92,9 @@ internal fun pendingSendRetryBackoffMs(failedAttempt: Int): Long {
 
 /**
  * Keep a foreground send pending across proven pre-publish connectivity
- * failures. Coroutine cancellation is the lifecycle boundary.
+ * failures. Coroutine cancellation is the lifecycle boundary. [sendAttempt]
+ * must acquire and release any shared commit lock within one invocation; the
+ * retry loop deliberately owns no lock while it waits between attempts.
  */
 @Suppress("TooGenericExceptionCaught") // Every non-cancellation gateway failure must be classified before retry.
 internal suspend fun <T> retryPendingConversationSend(

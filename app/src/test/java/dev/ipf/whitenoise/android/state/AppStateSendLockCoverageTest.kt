@@ -256,14 +256,20 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
-    fun manualFailedSendRetryUsesTheSharedBoundedConnectivityPolicy() {
+    fun manualFailedSendRetryUsesTheSharedConnectivityPolicyWithoutAnOuterCommitLock() {
         val body = controllerFunctionBody("retryFailedSend")
-        val lock = body.indexOf("appState.withGroupCommitLock(account, group.groupIdHex)")
-        val sharedRetry = body.indexOf("publishTextWithRetry(replyTarget, account, text", startIndex = lock)
+        val retryStart = body.indexOf("val retryTrace = SendTrace.nextSequence()")
+        val sharedRetry = body.indexOf("publishTextWithRetry(replyTarget, account, text", startIndex = retryStart)
+        val retryEnd = body.indexOf("completeDurableAcceptance(key)", startIndex = sharedRetry)
+        val retryWindow = body.substring(retryStart, retryEnd)
 
         assertTrue(
-            "manual text/reply retry must reuse the bounded connect-phase policy inside the group commit lock",
-            lock >= 0 && sharedRetry > lock,
+            "manual text/reply retry must reuse the shared connect-phase policy",
+            retryStart >= 0 && sharedRetry > retryStart && retryEnd > sharedRetry,
+        )
+        assertFalse(
+            "manual retry must not hold the group commit lock around the shared retry loop",
+            "withGroupCommitLock" in retryWindow,
         )
         assertFalse(
             "manual text/reply retry must not bypass the shared policy with direct FFI publish calls",
