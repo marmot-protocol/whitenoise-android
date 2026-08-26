@@ -5,6 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.text.BreakIterator
 import java.util.Locale
+import kotlin.math.abs
 
 class TtsWordTimingEstimateTest {
     @Test
@@ -131,6 +132,43 @@ class TtsWordTimingEstimateTest {
         assertTrue(TtsWordTimingEstimate.pauseWeightOf("done.") == 0)
         // A closing quote may trail the punctuation that carries the pause.
         assertTrue(TtsWordTimingEstimate.pauseWeightOf("\"wait,\"") > 0)
+    }
+
+    @Test
+    fun aClausePauseFallsAfterAMultiWordTokenNotInsideIt() {
+        // A token the word iterator splits shares the token's slot among its
+        // pieces. The breath a comma buys belongs AFTER the token, so the
+        // spacing inside the token must be identical with and without it.
+        val withPause = TtsWordTimingEstimate.plan("read/write, ok", Locale.US, rate = 1.0f)
+        val withoutPause = TtsWordTimingEstimate.plan("read/write ok", Locale.US, rate = 1.0f)
+
+        // Premise: the token really does split into two words on this platform.
+        // Without it every assertion below would hold by construction.
+        assertEquals(3, withPause.size)
+        assertEquals(3, withoutPause.size)
+
+        assertEquals(
+            withoutPause[1].startMs - withoutPause[0].startMs,
+            withPause[1].startMs - withPause[0].startMs,
+        )
+    }
+
+    @Test
+    fun aMultiWordTokenStillCarriesItsWholeClausePauseAfterIt() {
+        // The other half of the rule above: moving the pause out of the token's
+        // interior must not lose it. A comma costs the word after it the same
+        // wherever it sits.
+        val splitPause = TtsWordTimingEstimate.plan("read/write, ok", Locale.US, rate = 1.0f)
+        val splitPlain = TtsWordTimingEstimate.plan("read/write ok", Locale.US, rate = 1.0f)
+        val simplePause = TtsWordTimingEstimate.plan("read, ok", Locale.US, rate = 1.0f)
+        val simplePlain = TtsWordTimingEstimate.plan("read ok", Locale.US, rate = 1.0f)
+
+        val afterSplitToken = splitPause[2].startMs - splitPlain[2].startMs
+        val afterSimpleToken = simplePause[1].startMs - simplePlain[1].startMs
+
+        assertTrue(afterSplitToken > 0)
+        // Both are truncated from the same double arithmetic, so allow one ms.
+        assertTrue(abs(afterSplitToken - afterSimpleToken) <= 1)
     }
 
     @Test
