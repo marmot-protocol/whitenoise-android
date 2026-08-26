@@ -73,7 +73,8 @@ internal object TtsWordTimingEstimate {
         var elapsed = 0.0
         var nextIteratorWord = 0
         for (token in tokens) {
-            val tokenMs = (token.speechWeight + token.pauseWeight) * msPerUnit
+            val speechMs = token.speechWeight * msPerUnit
+            val tokenMs = speechMs + token.pauseWeight * msPerUnit
             while (nextIteratorWord < iteratorWords.size && iteratorWords[nextIteratorWord].last < token.start) {
                 nextIteratorWord++
             }
@@ -89,14 +90,18 @@ internal object TtsWordTimingEstimate {
                     words += TtsEstimatedWord(pieces[0].first, pieces[0].last + 1, elapsed.toLong())
 
                 else -> {
-                    // "well-known" splits at the hyphen: share the token's time
-                    // among its iterator words by their own syllable counts.
+                    // "well-known" splits at the hyphen: share the token's SPEECH
+                    // time among its iterator words by their own syllable counts.
+                    // The pause is charged to the token as a whole and must not be
+                    // shared: the breath after "well-known," falls after the comma,
+                    // not between "well" and "known", so spreading it schedules
+                    // every piece after the first late by a fraction of the pause.
                     val syllables = pieces.map { TtsSyllables.inWord(text.substring(it)).coerceAtLeast(1) }
                     val total = syllables.sum().toDouble()
                     var pieceElapsed = elapsed
                     pieces.forEachIndexed { index, piece ->
                         words += TtsEstimatedWord(piece.first, piece.last + 1, pieceElapsed.toLong())
-                        pieceElapsed += tokenMs * (syllables[index] / total)
+                        pieceElapsed += speechMs * (syllables[index] / total)
                     }
                 }
             }
