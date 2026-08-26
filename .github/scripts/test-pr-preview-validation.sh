@@ -29,6 +29,7 @@ case "$command" in
     ;;
   version-code) printf '%s\n' "${FAKE_VERSION_CODE:-2000000000}" ;;
   version-name) printf '%s\n' "${FAKE_VERSION_NAME:-2026.8.6-preview-pr${PR_NUMBER}-${HEAD_SHA:0:7}}" ;;
+  print) printf '<application android:extractNativeLibs="%s" />\n' "${FAKE_EXTRACT_NATIVE_LIBS:-true}" ;;
   *) exit 64 ;;
 esac
 FAKE_ANALYZER
@@ -42,9 +43,10 @@ case "${1:-}" in
     printf 'AndroidManifest.xml\nlib/%s/libmarmot.so\n' "${FAKE_ABI:-arm64-v8a}"
     ;;
   -l)
+    method=${FAKE_NATIVE_COMPRESSION:-defN}
     printf '%s\n' \
       "-rw-r--r--  2.0 unx ${FAKE_EXPANDED_BYTES:-1024} b- 512 defN 80-Jan-01 00:00 AndroidManifest.xml" \
-      "-rw-r--r--  2.0 unx 1024 b- 512 defN 80-Jan-01 00:00 lib/arm64-v8a/libmarmot.so"
+      "-rw-r--r--  2.0 unx 1024 b- 512 $method 80-Jan-01 00:00 lib/arm64-v8a/libmarmot.so"
     ;;
   *) exit 64 ;;
 esac
@@ -87,6 +89,8 @@ expect_rejection 'wrong package' env PATH="$fake_bin:$PATH" FAKE_BAD_PACKAGE=sta
 expect_rejection 'wrong version code' env PATH="$fake_bin:$PATH" FAKE_VERSION_CODE=7 "$verifier" "$candidates"
 expect_rejection 'wrong PR/SHA version name' env PATH="$fake_bin:$PATH" FAKE_VERSION_NAME=wrong "$verifier" "$candidates"
 expect_rejection 'wrong ABI' env PATH="$fake_bin:$PATH" FAKE_ABI=x86_64 "$verifier" "$candidates"
+expect_rejection 'native extraction disabled' env PATH="$fake_bin:$PATH" FAKE_EXTRACT_NATIVE_LIBS=false "$verifier" "$candidates"
+expect_rejection 'uncompressed native library' env PATH="$fake_bin:$PATH" FAKE_NATIVE_COMPRESSION=stor "$verifier" "$candidates"
 expect_rejection 'invalid ZIP' env PATH="$fake_bin:$PATH" FAKE_INVALID_ZIP=true "$verifier" "$candidates"
 
 printf 'head_sha=wrong\n' >> "$candidates/stable/provenance.env"

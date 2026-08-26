@@ -120,10 +120,25 @@ jobs:
           .github/scripts/test-pr-preview-validation.sh
           node --test .github/scripts/update-pr-preview-links.test.js
 
+      # Keep exact-head source intact while changing only generated preview APK
+      # packaging. Compressed JNI libraries require extractNativeLibs=true; AGP
+      # emits that manifest contract when legacy JNI packaging is enabled.
+      - name: Configure transport-safe preview packaging
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/compact-pr-preview.gradle" <<'GRADLE'
+          gradle.beforeProject { project ->
+              project.plugins.withId("com.android.application") {
+                  project.extensions.getByName("android").packaging.jniLibs.useLegacyPackaging = true
+              }
+          }
+          GRADLE
+          printf 'PR_PREVIEW_INIT_SCRIPT=%s\n' "$RUNNER_TEMP/compact-pr-preview.gradle" >> "$GITHUB_ENV"
+
       # The Play distribution deliberately omits Zapstore's production-style
       # self-updater. Preview APKs are replaced only from the PR install link.
       - name: Assemble preview candidate
-        run: ./gradlew :app:assemblePreviewPlayRelease --no-daemon --stacktrace
+        run: ./gradlew :app:assemblePreviewPlayRelease --no-daemon --stacktrace -I "$PR_PREVIEW_INIT_SCRIPT"
 
       - name: Stage candidate and provenance
         shell: bash
