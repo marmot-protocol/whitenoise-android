@@ -137,6 +137,10 @@ class FreshActivitySameProcessFirstUsefulFrameTest {
             initialActivity.close()
         }
 
+        assertFreshActivityRendersChatList()
+    }
+
+    private fun assertFreshActivityRendersChatList() {
         WarmResumeTrace.resetRenderedSurfaceFrames()
         val freshActivity = launchMainActivity()
         try {
@@ -144,9 +148,10 @@ class FreshActivitySameProcessFirstUsefulFrameTest {
                 WarmResumeTrace.renderedSurfaceFrames().isNotEmpty()
             }
             val frames = WarmResumeTrace.renderedSurfaceFrames()
+            val application = ApplicationProvider.getApplicationContext<WhiteNoiseApplication>()
 
             assertEquals(WarmResumeRenderedSurface.ChatList, frames.first().surface)
-            assertNull(processState.selectedChat.value)
+            assertNull(application.mainShellProcessState.selectedChat.value)
             composeRule.onNodeWithTag(WARM_RESUME_USEFUL_SURFACE_TEST_TAG).assertExists()
             composeRule.onNodeWithTag(FULL_SCREEN_LOADING_TEST_TAG).assertDoesNotExist()
             composeRule.onNodeWithTag(STARTUP_LOADING_TEST_TAG).assertDoesNotExist()
