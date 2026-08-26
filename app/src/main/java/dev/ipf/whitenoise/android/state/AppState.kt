@@ -205,18 +205,6 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
 import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 
-sealed interface AppPhase {
-    data object Bootstrapping : AppPhase
-
-    data object Onboarding : AppPhase
-
-    data object Ready : AppPhase
-
-    data class Failed(
-        val error: ErrorPresentation,
-    ) : AppPhase
-}
-
 internal suspend fun resolveNotificationMentionDisplayName(
     bech32: String,
     accountIdHex: suspend (String) -> String?,
@@ -273,11 +261,6 @@ internal suspend fun resolveNotificationPreviewText(
         mentionDisplayName = mentionNames::get,
     ).text.takeIf { it.isNotBlank() }
 }
-
-internal data class SignOutOutcome(
-    val nextActiveRef: String?,
-    val phase: AppPhase,
-)
 
 internal fun accountSummariesWithCreatedIdentity(
     current: List<AccountSummaryFfi>,
@@ -813,33 +796,6 @@ internal class InFlightMediaUploads {
         uploadKey: String,
     ): String = "$conversationKey\u0000$uploadKey"
 }
-
-/**
- * The active-account ref and app phase after signing [activeRef] out. Sign-out
- * is a non-destructive session switch, so if another account remains we switch
- * to it and stay [AppPhase.Ready]; if the signed-out account was the last
- * active one, drop to [AppPhase.Onboarding] rather than leaving a MainShell
- * rendered with no active account.
- */
-internal fun signOutOutcome(
-    accountLabels: List<String>,
-    activeRef: String?,
-): SignOutOutcome {
-    val next = accountLabels.firstOrNull { it != activeRef }
-    return SignOutOutcome(next, if (next == null) AppPhase.Onboarding else AppPhase.Ready)
-}
-
-/**
- * Persisted account entries that can sign through either local key material or
- * an external signer such as Amber. This is identity/signing-method inventory,
- * not a liveness or signer-reachability check: a non-running external signer is
- * still a signed-in signing account for account switchers, background sweeps,
- * and notification/account-count projections.
- */
-internal fun AccountSummaryFfi.isSignedInSigningAccount(): Boolean =
-    !signedOut &&
-        label.isNotBlank() &&
-        (localSigning || externalSigning)
 
 /** Inline account profiles that the chat-list top bar can render at once. */
 internal const val MAX_TOP_BAR_OTHER_ACCOUNTS = 3
