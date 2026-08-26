@@ -8,9 +8,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SignOutOutcomeTest {
+    private fun account(
+        label: String,
+        signedOut: Boolean = false,
+    ): AccountSummaryFfi =
+        AccountSummaryFfi(
+            label = label,
+            accountIdHex = "hex-$label",
+            localSigning = true,
+            externalSigning = false,
+            signedOut = signedOut,
+            running = !signedOut,
+        )
+
     @Test
     fun switchesToARemainingAccountAndStaysReady() {
-        val outcome = signOutOutcome(accountLabels = listOf("alice", "bob"), activeRef = "alice")
+        val outcome = signOutOutcome(accounts = listOf(account("alice"), account("bob")), activeRef = "alice")
         assertEquals("bob", outcome.nextActiveRef)
         assertEquals(AppPhase.Ready, outcome.phase)
     }
@@ -19,16 +32,45 @@ class SignOutOutcomeTest {
     fun signingOutTheLastAccountDropsToOnboarding() {
         // Regression for #11: previously phase stayed Ready with no active
         // account, leaving a broken MainShell.
-        val outcome = signOutOutcome(accountLabels = listOf("alice"), activeRef = "alice")
+        val outcome = signOutOutcome(accounts = listOf(account("alice")), activeRef = "alice")
         assertNull(outcome.nextActiveRef)
         assertEquals(AppPhase.Onboarding, outcome.phase)
     }
 
     @Test
     fun signingOutWithNoAccountsLeftGoesToOnboarding() {
-        val outcome = signOutOutcome(accountLabels = emptyList(), activeRef = "alice")
+        val outcome = signOutOutcome(accounts = emptyList(), activeRef = "alice")
         assertNull(outcome.nextActiveRef)
         assertEquals(AppPhase.Onboarding, outcome.phase)
+    }
+
+    @Test
+    fun retainedSignedOutAccountDoesNotBecomeTheNextActiveSession() {
+        val outcome =
+            signOutOutcome(
+                accounts = listOf(account("alice"), account("bob", signedOut = true)),
+                activeRef = "alice",
+            )
+
+        assertNull(outcome.nextActiveRef)
+        assertEquals(AppPhase.Onboarding, outcome.phase)
+    }
+
+    @Test
+    fun skipsRetainedSignedOutAccountBeforeAUsableAccount() {
+        val outcome =
+            signOutOutcome(
+                accounts =
+                    listOf(
+                        account("alice"),
+                        account("bob", signedOut = true),
+                        account("carol"),
+                    ),
+                activeRef = "alice",
+            )
+
+        assertEquals("carol", outcome.nextActiveRef)
+        assertEquals(AppPhase.Ready, outcome.phase)
     }
 }
 

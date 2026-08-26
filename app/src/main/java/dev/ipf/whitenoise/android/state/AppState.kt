@@ -4638,10 +4638,10 @@ class WhiteNoiseAppState private constructor(
         refreshAccountUnreadCounts(refreshedAccounts)
     }
 
-    private suspend fun accountLabelsAfterSignOut(
+    private suspend fun accountsAfterSignOut(
         signedOutRef: String,
         engineCompleted: Boolean,
-    ): List<String> {
+    ): List<AccountSummaryFfi> {
         val latestAccounts =
             runCatchingCancellable {
                 refreshAccounts()
@@ -4655,7 +4655,7 @@ class WhiteNoiseAppState private constructor(
                 }
                 accounts
             }
-        return latestAccounts.map(AccountSummaryFfi::label)
+        return latestAccounts
     }
 
     fun unreadCountForAccount(accountRef: String): ULong = accountUnreadCounts[accountRef] ?: 0uL
@@ -5470,8 +5470,8 @@ class WhiteNoiseAppState private constructor(
             includeUnscopedLegacy = accounts.none { it.label != signedOutRef && it.isSignedInSigningAccount() },
         )
         clearContactPrivateDetailsForAccount(signedOutRef)
-        val accountLabels = accountLabelsAfterSignOut(signedOutRef, engineOutcome != null)
-        val outcome = signOutOutcome(accountLabels, signedOutRef)
+        val refreshedAccounts = accountsAfterSignOut(signedOutRef, engineOutcome != null)
+        val outcome = signOutOutcome(refreshedAccounts, signedOutRef)
         val next = outcome.nextActiveRef
         if (next != null) {
             setActiveAccount(next)

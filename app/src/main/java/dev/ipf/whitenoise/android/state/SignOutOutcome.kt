@@ -9,16 +9,16 @@ internal data class SignOutOutcome(
 
 /**
  * The active-account ref and app phase after signing [activeRef] out. Sign-out
- * is a non-destructive session switch, so if another account remains we switch
- * to it and stay [AppPhase.Ready]; if the signed-out account was the last
- * active one, drop to [AppPhase.Onboarding] rather than leaving a MainShell
- * rendered with no active account.
+ * is a non-destructive session switch, so if another signed-in signing account
+ * remains we switch to it and stay [AppPhase.Ready]; otherwise, drop to
+ * [AppPhase.Onboarding] rather than leaving a MainShell rendered with no active
+ * account or reactivating a retained signed-out identity.
  */
 internal fun signOutOutcome(
-    accountLabels: List<String>,
+    accounts: List<AccountSummaryFfi>,
     activeRef: String?,
 ): SignOutOutcome {
-    val next = accountLabels.firstOrNull { it != activeRef }
+    val next = accounts.firstOrNull { it.label != activeRef && it.isSignedInSigningAccount() }?.label
     return SignOutOutcome(next, if (next == null) AppPhase.Onboarding else AppPhase.Ready)
 }
 
