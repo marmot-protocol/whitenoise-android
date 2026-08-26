@@ -162,13 +162,40 @@ class NotificationTargetTest {
     }
 
     @Test
-    fun fromUpdate_adminTriggersRemainUnroutableUntilIssue822Lands() {
+    fun fromUpdate_adminTriggersOpenTheAffectedGroupSystemMessage() {
         listOf(
             NotificationTriggerFfi.MADE_ADMIN,
             NotificationTriggerFfi.REMOVED_AS_ADMIN,
         ).forEach { trigger ->
-            assertNull(NotificationNavigation.fromUpdate(update(trigger = trigger)))
+            assertEquals(
+                NotificationTarget("acct-a", "group-1", "m1", NotificationTargetKind.MESSAGE),
+                NotificationNavigation.fromUpdate(update(trigger = trigger, messageId = "m1")),
+            )
         }
+    }
+
+    @Test
+    fun fromUpdate_adminTriggerWithoutMessageIdStillOpensTheAffectedGroup() {
+        assertEquals(
+            NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.MESSAGE),
+            NotificationNavigation.fromUpdate(
+                update(trigger = NotificationTriggerFfi.MADE_ADMIN, messageId = null),
+            ),
+        )
+    }
+
+    @Test
+    fun fromUpdate_adminTriggersRemainUnroutableForDirectMessages() {
+        assertNull(
+            NotificationNavigation.fromUpdate(
+                update(trigger = NotificationTriggerFfi.MADE_ADMIN, isDm = true),
+            ),
+        )
+        assertNull(
+            NotificationNavigation.fromUpdate(
+                update(trigger = NotificationTriggerFfi.REMOVED_AS_ADMIN, isDm = true),
+            ),
+        )
     }
 
     @Test
@@ -1660,6 +1687,7 @@ class NotificationTargetTest {
         groupIdHex: String = "group-1",
         messageId: String? = "m1",
         trigger: NotificationTriggerFfi = NotificationTriggerFfi.NEW_MESSAGE,
+        isDm: Boolean = false,
     ): NotificationUpdateFfi =
         NotificationUpdateFfi(
             isMention = false,
@@ -1671,7 +1699,7 @@ class NotificationTargetTest {
             accountIdHex = "acctid-a",
             groupIdHex = groupIdHex,
             groupName = "Group",
-            isDm = false,
+            isDm = isDm,
             messageIdHex = messageId,
             sender = NotificationUserFfi("sender-hex", "Sender", null),
             receiver = NotificationUserFfi("receiver-hex", "Me", null),

@@ -903,6 +903,10 @@
     <string name="notification_removed_from_group">You were removed from %1$s</string>
     <string name="notification_removed_from_unnamed_group">You were removed from a group</string>
     <string name="notification_removed_from_group_body">You can view your message history, but you can no longer send messages.</string>
+    <string name="notification_made_admin_of_group">You are now an admin of %1$s</string>
+    <string name="notification_made_admin_of_unnamed_group">You are now an admin of a group</string>
+    <string name="notification_removed_as_admin_of_group">You are no longer an admin of %1$s</string>
+    <string name="notification_removed_as_admin_of_unnamed_group">You are no longer an admin of a group</string>
     <string name="notification_reacted_to_message">reacted %1$s to: \"%2$s\"</string>
     <string name="notification_reacted">reacted %1$s</string>
     <string name="background_connection_notification_title">White Noise is connected</string>

@@ -647,6 +647,10 @@
     <string name="notification_removed_from_group">你已被移出“%1$s”</string>
     <string name="notification_removed_from_unnamed_group">你已被移出群组</string>
     <string name="notification_removed_from_group_body">你可以查看消息记录，但无法再发送消息。</string>
+    <string name="notification_made_admin_of_group">你已成为“%1$s”的管理员</string>
+    <string name="notification_made_admin_of_unnamed_group">你已成为群组管理员</string>
+    <string name="notification_removed_as_admin_of_group">你不再是“%1$s”的管理员</string>
+    <string name="notification_removed_as_admin_of_unnamed_group">你不再是群组管理员</string>
     <string name="background_connection_notification_title">White Noise 已连接</string>
     <string name="background_connection_notification_text">正在监听消息</string>
     <string name="background_connection_notification_hint">长按以隐藏此通知</string>

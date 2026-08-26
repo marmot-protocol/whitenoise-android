@@ -15,12 +15,12 @@ object LocalNotificationPolicy {
         engineMuted: Boolean = false,
     ): Boolean {
         if (appLockScreenVisible) return false
-        // MDK exposes these triggers, but #822 has not defined their Android
-        // presentation yet. Reject them at the eligibility boundary instead of
-        // relying on the formatter's later null-content guard.
         if (
-            update.trigger == NotificationTriggerFfi.MADE_ADMIN ||
-            update.trigger == NotificationTriggerFfi.REMOVED_AS_ADMIN
+            update.isDm &&
+            (
+                update.trigger == NotificationTriggerFfi.MADE_ADMIN ||
+                    update.trigger == NotificationTriggerFfi.REMOVED_AS_ADMIN
+            )
         ) {
             return false
         }

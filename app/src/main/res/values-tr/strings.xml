@@ -658,6 +658,10 @@
     <string name="notification_removed_from_group">%1$s grubundan çıkarıldınız</string>
     <string name="notification_removed_from_unnamed_group">Bir gruptan çıkarıldınız</string>
     <string name="notification_removed_from_group_body">Mesaj geçmişinizi görebilirsiniz ancak artık mesaj gönderemezsiniz.</string>
+    <string name="notification_made_admin_of_group">Artık %1$s grubunun yöneticisisiniz</string>
+    <string name="notification_made_admin_of_unnamed_group">Artık bir grubun yöneticisisiniz</string>
+    <string name="notification_removed_as_admin_of_group">Artık %1$s grubunun yöneticisi değilsiniz</string>
+    <string name="notification_removed_as_admin_of_unnamed_group">Artık bir grubun yöneticisi değilsiniz</string>
     <string name="background_connection_notification_title">White Noise bağlı</string>
     <string name="background_connection_notification_text">Mesajlar dinleniyor</string>
     <string name="background_connection_notification_hint">Bu bildirimi gizlemek için uzun basın</string>

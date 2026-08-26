@@ -690,6 +690,10 @@
     <string name="notification_removed_from_group">Вас удалили из группы «%1$s»</string>
     <string name="notification_removed_from_unnamed_group">Вас удалили из группы</string>
     <string name="notification_removed_from_group_body">Вы можете просматривать историю сообщений, но больше не можете отправлять сообщения.</string>
+    <string name="notification_made_admin_of_group">Теперь вы администратор группы «%1$s»</string>
+    <string name="notification_made_admin_of_unnamed_group">Теперь вы администратор группы</string>
+    <string name="notification_removed_as_admin_of_group">Вы больше не администратор группы «%1$s»</string>
+    <string name="notification_removed_as_admin_of_unnamed_group">Вы больше не администратор группы</string>
     <string name="background_connection_notification_title">White Noise подключен</string>
     <string name="background_connection_notification_text">Ожидание сообщений</string>
     <string name="background_connection_notification_hint">Нажмите и удерживайте, чтобы скрыть это уведомление</string>

@@ -384,6 +384,15 @@ object NotificationNavigation {
     fun fromUpdate(update: NotificationUpdateFfi): NotificationTarget? {
         val accountRef = update.accountRef.takeIf { it.isNotBlank() } ?: return null
         val groupIdHex = update.groupIdHex.takeIf { it.isNotBlank() } ?: return null
+        if (
+            update.isDm &&
+            (
+                update.trigger == NotificationTriggerFfi.MADE_ADMIN ||
+                    update.trigger == NotificationTriggerFfi.REMOVED_AS_ADMIN
+            )
+        ) {
+            return null
+        }
         val kind =
             when (update.trigger) {
                 NotificationTriggerFfi.NEW_MESSAGE -> NotificationTargetKind.MESSAGE
@@ -391,7 +400,7 @@ object NotificationNavigation {
                 NotificationTriggerFfi.REMOVED_FROM_GROUP -> NotificationTargetKind.CHAT_LIST
                 NotificationTriggerFfi.MADE_ADMIN,
                 NotificationTriggerFfi.REMOVED_AS_ADMIN,
-                -> return null
+                -> NotificationTargetKind.MESSAGE
             }
         // messageId is only meaningful for message notifications.
         val messageIdHex =
