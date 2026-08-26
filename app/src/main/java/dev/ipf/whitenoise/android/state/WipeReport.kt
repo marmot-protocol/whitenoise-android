@@ -103,9 +103,10 @@ internal fun wipeReport(outcome: WipeOutcomeFfi): WipeReport =
 internal fun shortWipeSubject(hex: String): String = if (hex.length <= 12) hex else "${hex.take(12)}…"
 
 /**
- * How a non-destructive sign-out ended (#349). Local sign-out always
- * completes; this only distinguishes whether the engine's relay-side
- * KeyPackage cleanup finished.
+ * How a non-destructive sign-out ended (#349, #2132). Android follows the
+ * engine's structured local-cleanup verdict: an unfinished teardown keeps the
+ * current session active, while a thrown call still uses the established
+ * fail-open local sign-out fallback.
  */
 enum class SignOutCompletion {
     /** Engine sign-out succeeded with no relay cleanup failures. */
@@ -117,6 +118,9 @@ enum class SignOutCompletion {
      * not retain a remote-deletion retry queue after this call.
      */
     RelayCleanupIncomplete,
+
+    /** MDK did not deactivate the account, so Android kept the session intact. */
+    AccountCleanupIncomplete,
 }
 
 /**
@@ -124,8 +128,9 @@ enum class SignOutCompletion {
  * the completion the UI toasts about.
  */
 internal fun signOutCompletion(engineOutcome: SignOutOutcomeFfi?): SignOutCompletion =
-    if (engineOutcome == null || engineOutcome.keyPackageFailures.isNotEmpty()) {
-        SignOutCompletion.RelayCleanupIncomplete
-    } else {
-        SignOutCompletion.Complete
+    when {
+        engineOutcome?.localCleanup?.completed == false -> SignOutCompletion.AccountCleanupIncomplete
+        engineOutcome == null || engineOutcome.keyPackageFailures.isNotEmpty() ->
+            SignOutCompletion.RelayCleanupIncomplete
+        else -> SignOutCompletion.Complete
     }

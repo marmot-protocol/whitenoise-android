@@ -455,6 +455,10 @@ internal fun AccountKeysScreen(
                             // does not retain a retry queue for the deletions.
                             SignOutCompletion.RelayCleanupIncomplete ->
                                 appState.present(R.string.toast_signed_out_relay_cleanup_incomplete)
+                            // MDK kept the account active, so the screen and
+                            // all account-scoped state remain intact.
+                            SignOutCompletion.AccountCleanupIncomplete ->
+                                appState.present(R.string.toast_couldnt_sign_out)
                             null -> Unit
                         }
                     } finally {
@@ -562,9 +566,10 @@ internal fun AccountKeysScreen(
                                     if (report.clean) {
                                         appState.presentTransient(R.string.toast_signed_out_and_wiped)
                                     } else {
-                                        // Local wipe completed regardless; the
-                                        // app-root sheet lists the best-effort
-                                        // relay/group failures (#350).
+                                        // The app-root sheet lists every
+                                        // incomplete stage. If local cleanup
+                                        // failed, AppState restored the active
+                                        // session instead of tearing it down.
                                         appState.pendingWipeReport = report
                                     }
                                 }
