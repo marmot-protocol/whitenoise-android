@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.applyApplicationLanguageTag
 import dev.ipf.whitenoise.android.state.persistedApplicationLanguageTag
 import dev.ipf.whitenoise.android.ui.createRecentEmojiRecentsOwner
+import dev.ipf.whitenoise.android.ui.navigation.MainShellProcessState
 import dev.ipf.whitenoise.android.updates.AppUpdateWorker
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +22,10 @@ open class WhiteNoiseApplication : Application() {
 
     val recentEmojiRecentsOwner by lazy {
         createRecentEmojiRecentsOwner()
+    }
+
+    internal val mainShellProcessState: MainShellProcessState by lazy {
+        MainShellProcessState(appState)
     }
 
     /**

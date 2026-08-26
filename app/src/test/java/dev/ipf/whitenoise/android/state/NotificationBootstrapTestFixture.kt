@@ -3,11 +3,16 @@ package dev.ipf.whitenoise.android.state
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Looper
+import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AuditDataModeFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatListSubscription
 import dev.ipf.marmotkit.ChatNotificationSettingsFfi
+import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
@@ -42,6 +47,9 @@ internal class NotificationBootstrapTestFixture(
     delayFirstNotificationDispatchAfterRuntimeStart: Boolean = false,
     receiverTimeoutMillis: Long = 100L,
     notificationUsersHaveDisplayNames: Boolean = true,
+    private val accounts: List<AccountSummaryFfi> = emptyList(),
+    private val chatListRows: List<ChatListRowFfi> = emptyList(),
+    private val chatGroups: List<AppGroupRecordFfi> = emptyList(),
     private val markReadRow: ChatListRowFfi? = null,
 ) {
     private val appContext = context.applicationContext
@@ -65,6 +73,10 @@ internal class NotificationBootstrapTestFixture(
 
     val runtimeStartCalls = AtomicInteger(0)
     val subscriptionCalls = AtomicInteger(0)
+    val localSnapshotSubscriptionCalls = AtomicInteger(0)
+    val localSnapshotGroupSubscriptionCalls = AtomicInteger(0)
+    val localSnapshotReadCalls = AtomicInteger(0)
+    val memberProjectionCalls = AtomicInteger(0)
     val markReadCalls = AtomicInteger(0)
     val npubCalls = AtomicInteger(0)
 
@@ -156,7 +168,21 @@ internal class NotificationBootstrapTestFixture(
                     npubCalls.incrementAndGet()
                     "npub1coldidentityfallback"
                 }
-                "listAccounts", "chatList" -> emptyList<Any>()
+                "listAccounts" -> accounts
+                "subscribeChatList" -> {
+                    localSnapshotSubscriptionCalls.incrementAndGet()
+                    emptyChatListSubscription()
+                }
+                "subscribeChats" -> {
+                    localSnapshotGroupSubscriptionCalls.incrementAndGet()
+                    emptyChatsSubscription()
+                }
+                "chatList" -> emptyList<Any>()
+                "groupMemberIdsPage" -> {
+                    memberProjectionCalls.incrementAndGet()
+                    emptyList<Any>()
+                }
+                "userProfile" -> null
                 "displayName" -> "Alice"
                 "toString" -> "NotificationBootstrapMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
@@ -171,12 +197,60 @@ internal class NotificationBootstrapTestFixture(
             draftStore = DraftStore(EmptyDraftPersistence),
             accountIdHexResolver = { null },
             accounts = emptyList(),
-            activeAccountRef = "",
+            activeAccountRef = accounts.firstOrNull()?.label.orEmpty(),
             marmotRuntimeFactory = { AppMarmotRuntime(rootPath = "test", marmot = marmot) },
             notificationSubscriber = { subscribe() },
             notificationDispatcher = notificationDispatchGate ?: Dispatchers.IO,
             notificationReceiverTimeoutMillis = receiverTimeoutMillisState::get,
         )
+
+    private fun emptyChatListSubscription(): ChatListSubscription =
+        allocateWithoutConstructor(EmptyChatListSubscription::class.java).apply {
+            onSnapshot = localSnapshotReadCalls::incrementAndGet
+            rows = chatListRows
+        }
+
+    private fun emptyChatsSubscription(): ChatsSubscription =
+        allocateWithoutConstructor(EmptyChatsSubscription::class.java).apply {
+            onSnapshot = localSnapshotReadCalls::incrementAndGet
+            groups = chatGroups
+        }
+
+    /** UniFFI's no-pointer constructor registers Android's cleaner, which the
+     * Robolectric JVM module boundary cannot access. These inert subclasses
+     * override every exercised method, so bypassing that native-only setup is
+     * the faithful local-projection fake and never allocates a native handle. */
+    @Suppress("UNCHECKED_CAST")
+    private fun <T : Any> allocateWithoutConstructor(type: Class<T>): T {
+        val unsafeClass = Class.forName("sun.misc.Unsafe")
+        val field = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }
+        val unsafe = field.get(null)
+        return unsafeClass.getMethod("allocateInstance", Class::class.java).invoke(unsafe, type) as T
+    }
+
+    private class EmptyChatListSubscription : ChatListSubscription(NoPointer) {
+        lateinit var onSnapshot: () -> Unit
+        lateinit var rows: List<ChatListRowFfi>
+
+        override fun snapshot(): List<ChatListRowFfi> {
+            onSnapshot()
+            return rows
+        }
+
+        override fun close() = Unit
+    }
+
+    private class EmptyChatsSubscription : ChatsSubscription(NoPointer) {
+        lateinit var onSnapshot: () -> Unit
+        lateinit var groups: List<AppGroupRecordFfi>
+
+        override fun snapshot(): List<AppGroupRecordFfi> {
+            onSnapshot()
+            return groups
+        }
+
+        override fun close() = Unit
+    }
 
     fun allowSubscriptions(recoveryTimeoutMillis: Long? = null) {
         recoveryTimeoutMillis?.let(receiverTimeoutMillisState::set)

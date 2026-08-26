@@ -4,6 +4,7 @@ import android.os.Trace
 import androidx.benchmark.macro.ExperimentalMetricApi
 import androidx.benchmark.macro.FrameTimingMetric
 import androidx.benchmark.macro.Metric
+import androidx.benchmark.macro.StartupTimingMetric
 import androidx.benchmark.macro.TraceSectionMetric
 
 internal const val OPEN_MEMBERS_TRACE = "benchmark:open-group-members"
@@ -71,6 +72,7 @@ internal fun openConversationMetrics(): List<Metric> =
 @OptIn(ExperimentalMetricApi::class)
 internal fun warmResumeMetrics(): List<Metric> =
     listOf(
+        StartupTimingMetric(),
         FrameTimingMetric(),
         TraceSectionMetric(
             sectionName = WARM_RESUME_FIRST_USEFUL_FRAME_TRACE,

@@ -10,6 +10,49 @@ import org.junit.Test
 
 class WarmResumeLifecycleRoutingTest {
     @Test
+    fun lifecycleEvidenceDistinguishesEveryRestorationOwner() {
+        assertEquals(
+            WarmResumeLifecycleClass.RetainedViewModelActivity,
+            warmResumeActivityLifecycleClass(
+                holderCreatedForActivity = false,
+                processProjectionAlreadyOwned = true,
+                savedStateAvailable = true,
+            ),
+        )
+        assertEquals(
+            WarmResumeLifecycleClass.FreshActivitySameProcess,
+            warmResumeActivityLifecycleClass(
+                holderCreatedForActivity = true,
+                processProjectionAlreadyOwned = true,
+                savedStateAvailable = true,
+            ),
+        )
+        assertEquals(
+            WarmResumeLifecycleClass.ProcessRestoration,
+            warmResumeActivityLifecycleClass(
+                holderCreatedForActivity = true,
+                processProjectionAlreadyOwned = false,
+                savedStateAvailable = true,
+            ),
+        )
+        assertEquals(
+            WarmResumeLifecycleClass.ColdProcessStart,
+            warmResumeActivityLifecycleClass(
+                holderCreatedForActivity = true,
+                processProjectionAlreadyOwned = false,
+                savedStateAvailable = false,
+            ),
+        )
+        assertEquals(
+            WarmResumeLifecycleClass.SameActivity,
+            warmResumeForegroundLifecycleClass(
+                activityClass = WarmResumeLifecycleClass.ColdProcessStart,
+                foregroundEpoch = 2,
+            ),
+        )
+    }
+
+    @Test
     fun appLockAlwaysOwnsTheFirstUsefulFrame() {
         assertEquals(
             WarmResumeFirstUsefulSurface.AppLock,

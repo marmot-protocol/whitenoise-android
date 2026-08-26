@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
+import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -17,6 +18,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -25,6 +27,98 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class WarmResumeStateHolderTest {
+    @Test
+    fun terminalNonAuthenticatedPhaseDropsTheProcessRetainedShell() {
+        val state = appState()
+        val processState = MainShellProcessState(state)
+        val holder = MainShellStateHolder(state, SavedStateHandle(), processState)
+        holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
+        val snapshotController =
+            ChatsController(
+                appState = state,
+                initialAccountRef = ACCOUNT_REF,
+                initialLocalSnapshot = localSnapshot(),
+                memberSnapshotLoader = { _, _ -> emptyList() },
+            )
+        holder.selectedChat.value = snapshotController.items.single()
+
+        val onboardingFrameReady =
+            holder.prepareFirstUsefulFrame(
+                phase = AppPhase.Onboarding,
+                activeAccountRef = null,
+                runtimeGeneration = 4,
+                appLockScreenVisible = false,
+            )
+
+        assertTrue(onboardingFrameReady)
+        assertNull(holder.selectedChat.value)
+        assertFalse(holder.localProjectionAvailable(ACCOUNT_REF, runtimeGeneration = 4))
+        snapshotController.onCleared()
+    }
+
+    @Test
+    fun appLockDoesNotMaterializeTheProtectedLocalProjection() {
+        val state = appState()
+        val holder = MainShellStateHolder(state, SavedStateHandle())
+
+        val lockFrameReady =
+            holder.prepareFirstUsefulFrame(
+                phase = AppPhase.Ready,
+                activeAccountRef = ACCOUNT_REF,
+                runtimeGeneration = 4,
+                appLockScreenVisible = true,
+            )
+
+        assertTrue(lockFrameReady)
+        assertFalse(holder.localProjectionAvailable(ACCOUNT_REF, runtimeGeneration = 4))
+        holder.release()
+    }
+
+    @Test
+    fun freshActivityInSameProcessReusesLoadedControllerAndConversationRoute() {
+        val state = appState()
+        val processState = MainShellProcessState(state)
+        val firstActivityHolder = MainShellStateHolder(state, SavedStateHandle(), processState)
+        val loadedController = firstActivityHolder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
+        val snapshotController =
+            ChatsController(
+                appState = state,
+                initialAccountRef = ACCOUNT_REF,
+                initialLocalSnapshot = localSnapshot(),
+                memberSnapshotLoader = { _, _ -> emptyList() },
+            )
+        firstActivityHolder.selectedChat.value = snapshotController.items.single()
+
+        val freshActivityHolder = MainShellStateHolder(state, SavedStateHandle(), processState)
+
+        assertSame(loadedController, freshActivityHolder.chatsController(ACCOUNT_REF, runtimeGeneration = 4))
+        assertSame(firstActivityHolder.selectedChat.value, freshActivityHolder.selectedChat.value)
+        freshActivityHolder.release()
+        snapshotController.onCleared()
+    }
+
+    @Test
+    fun replacementRuntimeDropsTheProcessRetainedConversationBeforeControllerPublication() {
+        val state = appState()
+        val processState = MainShellProcessState(state)
+        val holder = MainShellStateHolder(state, SavedStateHandle(), processState)
+        holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
+        val snapshotController =
+            ChatsController(
+                appState = state,
+                initialAccountRef = ACCOUNT_REF,
+                initialLocalSnapshot = localSnapshot(),
+                memberSnapshotLoader = { _, _ -> emptyList() },
+            )
+        holder.selectedChat.value = snapshotController.items.single()
+
+        holder.chatsController(ACCOUNT_REF, runtimeGeneration = 5)
+
+        assertNull(holder.selectedChat.value)
+        holder.release()
+        snapshotController.onCleared()
+    }
+
     @Test
     fun activityRecreationReusesTheSameLocalProjectionController() {
         val holder = MainShellStateHolder(appState(), SavedStateHandle())
