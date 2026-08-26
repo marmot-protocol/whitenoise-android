@@ -1187,6 +1187,7 @@
     <string name="sign_out_delete_key_packages_label">Удалить пакеты ключей с реле</string>
     <string name="sign_out_delete_key_packages_help">Не даёт незнакомцам приглашать вас в новые группы, пока вы вышли из аккаунта.</string>
     <string name="toast_signed_out_relay_cleanup_incomplete">Локальный выход выполнен, но очистка пакетов ключей на реле завершилась не полностью.</string>
+    <string name="toast_couldnt_sign_out">Не удалось выйти. Аккаунт всё ещё активен на этом устройстве.</string>
     <string name="wipe_progress_title">Выход и стирание…</string>
     <string name="wipe_stage_leaving_groups">Выход из групп…</string>
     <string name="wipe_stage_deleting_key_packages">Удаление пакетов ключей…</string>
@@ -1399,6 +1400,7 @@
     <string name="recent_chats">Недавние чаты</string>
     <string name="onboarding_login">Войти</string>
     <string name="onboarding_login_with_amber">Войти через Amber</string>
+    <string name="onboarding_continue_as">Продолжить как %1$s</string>
     <string name="onboarding_offline_setup_message">Нет подключения к интернету. Подключитесь по Wi-Fi, через мобильную сеть или другую сеть и повторите попытку.</string>
     <string name="toast_couldnt_login_amber">Не удалось войти через Amber</string>
     <string name="toast_amber_sign_in_cancelled">Вход через Amber отменён</string>

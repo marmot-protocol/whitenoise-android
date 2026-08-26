@@ -35,12 +35,13 @@ class ConversationShortcutLifecycleCoverageTest {
                 "suspend fun signOutAndWipeActiveAccount",
                 "suspend fun exportEncryptedSecretKeyBackup",
             )
-        val clearIndex = body.indexOf("accountRef = wipedRef")
         val wipeIndex = body.indexOf("signOutAndWipe(wipedRef)")
+        val completedCleanupIndex = body.indexOf("if (!outcome.localCleanup.completed)")
+        val clearIndex = body.indexOf("accountRef = wipedRef")
 
         assertTrue(
-            "destructive wipe must clear only the wiped account's shortcuts before removing it",
-            clearIndex >= 0 && wipeIndex > clearIndex,
+            "destructive wipe must clear only the wiped account's shortcuts after cleanup completes",
+            wipeIndex >= 0 && completedCleanupIndex > wipeIndex && clearIndex > completedCleanupIndex,
         )
     }
 

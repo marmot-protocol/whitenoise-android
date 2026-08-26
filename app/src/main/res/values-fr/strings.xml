@@ -1141,6 +1141,7 @@
     <string name="sign_out_delete_key_packages_label">Supprimer les paquets de clés des relais</string>
     <string name="sign_out_delete_key_packages_help">Empêche des inconnus de vous inviter dans de nouveaux groupes pendant que vous êtes déconnecté.</string>
     <string name="toast_signed_out_relay_cleanup_incomplete">Déconnecté localement, mais le nettoyage des KeyPackages sur les relais n’a pas été entièrement effectué.</string>
+    <string name="toast_couldnt_sign_out">Impossible de se déconnecter. Le compte est toujours actif sur cet appareil.</string>
     <string name="wipe_progress_title">Déconnexion et effacement…</string>
     <string name="wipe_stage_leaving_groups">Sortie des groupes…</string>
     <string name="wipe_stage_deleting_key_packages">Suppression des paquets de clés…</string>
@@ -1339,6 +1340,7 @@
     <string name="recent_chats">Discussions récentes</string>
     <string name="onboarding_login">Connexion</string>
     <string name="onboarding_login_with_amber">Se connecter avec Amber</string>
+    <string name="onboarding_continue_as">Continuer en tant que %1$s</string>
     <string name="onboarding_offline_setup_message">Pas de connexion Internet. Connectez-vous au Wi-Fi, activez les données mobiles ou utilisez un autre réseau, puis réessayez.</string>
     <string name="toast_couldnt_login_amber">Impossible de se connecter avec Amber</string>
     <string name="toast_amber_sign_in_cancelled">Connexion avec Amber annulée</string>

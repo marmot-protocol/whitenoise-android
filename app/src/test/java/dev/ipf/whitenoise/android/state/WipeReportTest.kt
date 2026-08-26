@@ -163,11 +163,12 @@ class SignOutCompletionTest {
     private fun signOutOutcomeFfi(
         keyPackagesDeleted: UInt = 0u,
         keyPackageFailures: List<RelayFailureFfi> = emptyList(),
+        localCompleted: Boolean = true,
     ): SignOutOutcomeFfi =
         SignOutOutcomeFfi(
             keyPackagesDeleted = keyPackagesDeleted,
             keyPackageFailures = keyPackageFailures,
-            localCleanup = LocalCleanupReportFfi(completed = true, reason = null),
+            localCleanup = LocalCleanupReportFfi(completed = localCompleted, reason = null),
         )
 
     @Test
@@ -191,5 +192,12 @@ class SignOutCompletionTest {
                 keyPackageFailures = listOf(RelayFailureFfi(eventIdHex = "ee".repeat(32), reason = "timeout")),
             )
         assertEquals(SignOutCompletion.RelayCleanupIncomplete, signOutCompletion(outcome))
+    }
+
+    @Test
+    fun unfinishedLocalTeardownKeepsTheAccountActive() {
+        val outcome = signOutOutcomeFfi(localCompleted = false)
+
+        assertEquals(SignOutCompletion.AccountCleanupIncomplete, signOutCompletion(outcome))
     }
 }

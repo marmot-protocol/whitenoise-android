@@ -1141,6 +1141,7 @@
     <string name="sign_out_delete_key_packages_label">Elimina i pacchetti di chiavi dai relay</string>
     <string name="sign_out_delete_key_packages_help">Impedisce a sconosciuti di invitarti in nuovi gruppi mentre sei disconnesso.</string>
     <string name="toast_signed_out_relay_cleanup_incomplete">Disconnesso localmente, ma la pulizia dei KeyPackage sui relay non è stata completata.</string>
+    <string name="toast_couldnt_sign_out">Impossibile disconnettersi. L\'account è ancora attivo su questo dispositivo.</string>
     <string name="wipe_progress_title">Disconnessione e cancellazione…</string>
     <string name="wipe_stage_leaving_groups">Uscita dai gruppi…</string>
     <string name="wipe_stage_deleting_key_packages">Eliminazione dei pacchetti di chiavi…</string>
@@ -1339,6 +1340,7 @@
     <string name="recent_chats">Chat recenti</string>
     <string name="onboarding_login">Accedi</string>
     <string name="onboarding_login_with_amber">Accedi con Amber</string>
+    <string name="onboarding_continue_as">Continua come %1$s</string>
     <string name="onboarding_offline_setup_message">Nessuna connessione Internet. Connettiti tramite Wi-Fi, dati mobili o un’altra rete, quindi riprova.</string>
     <string name="toast_couldnt_login_amber">Impossibile accedere con Amber</string>
     <string name="toast_amber_sign_in_cancelled">Accesso con Amber annullato</string>

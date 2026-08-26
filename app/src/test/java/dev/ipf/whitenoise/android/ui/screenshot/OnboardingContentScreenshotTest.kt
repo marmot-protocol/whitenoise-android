@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingContent
+import dev.ipf.whitenoise.android.ui.onboarding.OnboardingSavedAccountUi
 import dev.ipf.whitenoise.android.ui.onboarding.SignInContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -77,6 +78,36 @@ class OnboardingContentScreenshotTest {
             }
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/onboarding_content_offline_light.png")
+    }
+
+    @Test
+    fun onboardingRetainedAccountLight() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    OnboardingContent(
+                        identity = "",
+                        creatingIdentity = false,
+                        signingInBusy = false,
+                        onIdentityChange = {},
+                        onCreateIdentity = {},
+                        onImportIdentity = {},
+                        amberSignerAvailable = true,
+                        savedAccounts =
+                            listOf(
+                                OnboardingSavedAccountUi(
+                                    label = "amber-account",
+                                    accountIdHex = "01".repeat(32),
+                                    displayName = "Amber User",
+                                    shortIdentity = "npub1amber…user",
+                                    avatarUrl = null,
+                                ),
+                            ),
+                    )
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/onboarding_content_saved_account_light.png")
     }
 
     @Test

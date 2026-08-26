@@ -205,18 +205,6 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
 import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 
-sealed interface AppPhase {
-    data object Bootstrapping : AppPhase
-
-    data object Onboarding : AppPhase
-
-    data object Ready : AppPhase
-
-    data class Failed(
-        val error: ErrorPresentation,
-    ) : AppPhase
-}
-
 internal suspend fun resolveNotificationMentionDisplayName(
     bech32: String,
     accountIdHex: suspend (String) -> String?,
@@ -273,11 +261,6 @@ internal suspend fun resolveNotificationPreviewText(
         mentionDisplayName = mentionNames::get,
     ).text.takeIf { it.isNotBlank() }
 }
-
-internal data class SignOutOutcome(
-    val nextActiveRef: String?,
-    val phase: AppPhase,
-)
 
 internal fun accountSummariesWithCreatedIdentity(
     current: List<AccountSummaryFfi>,
@@ -813,33 +796,6 @@ internal class InFlightMediaUploads {
         uploadKey: String,
     ): String = "$conversationKey\u0000$uploadKey"
 }
-
-/**
- * The active-account ref and app phase after signing [activeRef] out. Sign-out
- * is a non-destructive session switch, so if another account remains we switch
- * to it and stay [AppPhase.Ready]; if the signed-out account was the last
- * active one, drop to [AppPhase.Onboarding] rather than leaving a MainShell
- * rendered with no active account.
- */
-internal fun signOutOutcome(
-    accountLabels: List<String>,
-    activeRef: String?,
-): SignOutOutcome {
-    val next = accountLabels.firstOrNull { it != activeRef }
-    return SignOutOutcome(next, if (next == null) AppPhase.Onboarding else AppPhase.Ready)
-}
-
-/**
- * Persisted account entries that can sign through either local key material or
- * an external signer such as Amber. This is identity/signing-method inventory,
- * not a liveness or signer-reachability check: a non-running external signer is
- * still a signed-in signing account for account switchers, background sweeps,
- * and notification/account-count projections.
- */
-internal fun AccountSummaryFfi.isSignedInSigningAccount(): Boolean =
-    !signedOut &&
-        label.isNotBlank() &&
-        (localSigning || externalSigning)
 
 /** Inline account profiles that the chat-list top bar can render at once. */
 internal const val MAX_TOP_BAR_OTHER_ACCOUNTS = 3
@@ -1894,6 +1850,9 @@ class WhiteNoiseAppState private constructor(
     )
 
     var phase by mutableStateOf<AppPhase>(AppPhase.Bootstrapping)
+        private set
+
+    var retainedAccountReactivationRef by mutableStateOf<String?>(null)
         private set
 
     var accounts by mutableStateOf(initialAccounts)
@@ -4679,6 +4638,26 @@ class WhiteNoiseAppState private constructor(
         refreshAccountUnreadCounts(refreshedAccounts)
     }
 
+    private suspend fun accountsAfterSignOut(
+        signedOutRef: String,
+        engineCompleted: Boolean,
+    ): List<AccountSummaryFfi> {
+        val latestAccounts =
+            runCatchingCancellable {
+                refreshAccounts()
+                accounts
+            }.onFailure { failure ->
+                appStateDebug(failure) { "post-sign-out account refresh failed; reconciling cached accounts" }
+            }.getOrElse {
+                if (engineCompleted) {
+                    accounts = reconcileCachedAccountsAfterSignOut(accounts, signedOutRef)
+                    accountListRevision += 1L
+                }
+                accounts
+            }
+        return latestAccounts
+    }
+
     fun unreadCountForAccount(accountRef: String): ULong = accountUnreadCounts[accountRef] ?: 0uL
 
     /**
@@ -5118,6 +5097,31 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
+     * Restores an account retained by non-destructive sign-out and crosses the
+     * onboarding boundary only after [setActiveAccount] reaches local-ready.
+     * This deliberately uses MDK's account reactivation path rather than
+     * repeating identity import or external-signer account setup.
+     */
+    fun reactivateRetainedAccount(label: String) {
+        if (retainedAccountReactivationRef != null) return
+        if (accounts.none { it.label == label }) {
+            present(R.string.toast_notification_account_unavailable)
+            return
+        }
+        retainedAccountReactivationRef = label
+        launchMutation {
+            try {
+                setActiveAccount(
+                    label = label,
+                    onActivated = { phase = AppPhase.Ready },
+                )
+            } finally {
+                retainedAccountReactivationRef = null
+            }
+        }
+    }
+
+    /**
      * Records the local SQLite chat-row boundary independently from roster and
      * profile projection. Logs timing and a small count only—never account ids.
      */
@@ -5421,36 +5425,41 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Non-destructive sign-out of the active account, driven by the engine's
-     * [dev.ipf.marmotkit.Marmot.signOut] (#349). The engine owns the per-step
-     * teardown — account deactivation, push registration teardown, and (when
-     * [deleteKeyPackages]) relay KeyPackage deletion — so this method keeps
-     * only the local UI bookkeeping: media-cache wipe, active-account
-     * switch/navigation, and notification settings refresh.
-     *
-     * An engine failure (relay unreachable, runtime error) must not strand
-     * the user in a session they asked to leave: local sign-out still
-     * completes and the result is [SignOutCompletion.RelayCleanupIncomplete]
-     * so the caller can report that the best-effort relay cleanup did not
-     * fully finish.
-     * Returns null only when no account is active.
+     * Non-destructive MDK sign-out (#349, #2132). A thrown engine call keeps
+     * the established local fail-open behavior; a structured unfinished-local
+     * outcome retains the active session. Returns null when no account is active.
      */
+    @Suppress("ReturnCount") // No account, retained engine session, or completed local sign-out.
     suspend fun signOutActiveAccount(deleteKeyPackages: Boolean = true): SignOutCompletion? {
-        // Sign-out is a non-destructive session switch: the identity stays in
-        // the device keychain and the user can switch back to it. Per-account
-        // state that the user would expect to find on return (drafts, recent
-        // emoji, etc.) MUST persist across this transition. The only correct
-        // place to call DraftStore.clearAllForAccount is a real
-        // identity-delete flow, which doesn't exist yet.
-        //
-        // Decrypted media is the exception: a real sign-out is the end of the
-        // session, so we wipe both in-memory and disk caches. Account switch
-        // (setActiveAccount) is *not* a sign-out — it keeps the L2 disk cache
-        // so re-entry into the same account doesn't re-download every image.
-        //
-        // In-memory plaintext is dropped synchronously here; the on-disk wipe
-        // is awaited in this suspend path so it isn't an orphaned background task.
         val signedOutRef = activeAccountRef ?: return null
+        // MDK 0.9.15 handles local and external signers through the same call.
+        val engineResult =
+            runCatchingCancellable {
+                marmotIo { signOut(signedOutRef, deleteKeyPackages) }
+            }
+        val engineOutcome = engineResult.getOrNull()
+        if (engineOutcome?.localCleanup?.completed == false) {
+            appStateDebug {
+                "signOut kept active account=${signedOutRef.take(8)} because engine cleanup did not complete"
+            }
+            return SignOutCompletion.AccountCleanupIncomplete
+        }
+        engineResult.exceptionOrNull()?.let { failure ->
+            appStateDebug(failure) {
+                "signOut failed account=${signedOutRef.take(8)}: ${failure.readableMessage()}"
+            }
+        }
+        if (engineOutcome != null) {
+            // MDK deactivated push; discard stale retries and registration cache.
+            pushTokenStore.clearPendingDisable(signedOutRef)
+            nativePushSyncMutex.withLock { perAccountSyncedFingerprints.remove(signedOutRef) }
+        } else {
+            // Queue push disable while preserving the local fail-open contract.
+            pushTokenStore.recordPendingDisable(signedOutRef)
+        }
+
+        // Preserve per-account durable state for later account switching, but
+        // synchronously drop plaintext memory and await the decrypted-disk wipe.
         conversationDictation.onAccountUnavailable(signedOutRef)
         stopTtsForRemovedAccount(signedOutRef)
         clearInMemoryMediaCaches()
@@ -5460,30 +5469,9 @@ class WhiteNoiseAppState private constructor(
             accountRef = signedOutRef,
             includeUnscopedLegacy = accounts.none { it.label != signedOutRef && it.isSignedInSigningAccount() },
         )
-        // The account is signed out engine-side once this returns; no code
-        // below may issue further account-scoped FFI calls for signedOutRef.
-        val engineOutcome =
-            runCatchingCancellable {
-                marmotIo { signOut(signedOutRef, deleteKeyPackages) }
-            }.onSuccess {
-                // The engine deactivated the account (including its push
-                // registration), so any disable retry queued by an older
-                // per-step sign-out attempt is moot. Drop the local push
-                // fingerprint too: server-side registration state changed
-                // underneath the cache, and a stale hit would make a later
-                // re-sign-in skip the re-registration it needs.
-                pushTokenStore.clearPendingDisable(signedOutRef)
-                nativePushSyncMutex.withLock { perAccountSyncedFingerprints.remove(signedOutRef) }
-            }.onFailure {
-                appStateDebug(it) { "signOut failed account=${signedOutRef.take(8)}: ${it.readableMessage()}" }
-                // The engine never deactivated the account, so queue a push
-                // disable for the next foreground sync. MDK's relay-side
-                // KeyPackage cleanup is final for this call and is not queued.
-                pushTokenStore.recordPendingDisable(signedOutRef)
-            }.getOrNull()
         clearContactPrivateDetailsForAccount(signedOutRef)
-        refreshAccounts()
-        val outcome = signOutOutcome(accounts.map { it.label }, signedOutRef)
+        val refreshedAccounts = accountsAfterSignOut(signedOutRef, engineOutcome != null)
+        val outcome = signOutOutcome(refreshedAccounts, signedOutRef)
         val next = outcome.nextActiveRef
         if (next != null) {
             setActiveAccount(next)
@@ -5520,27 +5508,25 @@ class WhiteNoiseAppState private constructor(
      * [dev.ipf.marmotkit.Marmot.signOutAndWipe]. Returns the structured
      * outcome so the UI can surface partial failures.
      */
-    @Suppress("LongMethod", "ReturnCount")
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     // One cancellation-safe bracket owns wipe, editor purge, account switch, and recovery.
     suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
         val wipedRef = activeAccountRef ?: return null
         conversationDictation.onAccountUnavailable(wipedRef)
         clearInMemoryMediaCaches()
-        clearConversationShortcutsForAccount(
-            accountRef = wipedRef,
-            includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },
-        )
         try {
             val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
             val wipeResult =
                 nativePushSyncMutex.withSerializedNativePushWipe {
                     runCatching { marmotIo { signOutAndWipe(wipedRef) } }
-                        .onSuccess {
-                            pushTokenStore.clearPendingDisable(wipedRef)
-                            // The wipe invalidates server-side registration state for this account.
-                            // withSerializedNativePushWipe already holds nativePushSyncMutex here.
-                            perAccountSyncedFingerprints.remove(wipedRef)
-                            pushTokenStore.clear()
+                        .onSuccess { outcome ->
+                            if (outcome.localCleanup.completed) {
+                                pushTokenStore.clearPendingDisable(wipedRef)
+                                // The wipe invalidates server-side registration state for this account.
+                                // withSerializedNativePushWipe already holds nativePushSyncMutex here.
+                                perAccountSyncedFingerprints.remove(wipedRef)
+                                pushTokenStore.clear()
+                            }
                         }
                 }
             val failure = wipeResult.exceptionOrNull()
@@ -5557,6 +5543,17 @@ class WhiteNoiseAppState private constructor(
                     restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                     return null
                 }
+            if (!outcome.localCleanup.completed) {
+                appStateDebug {
+                    "signOutAndWipe kept active account=${wipedRef.take(8)} because engine cleanup did not complete"
+                }
+                restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
+                return outcome
+            }
+            clearConversationShortcutsForAccount(
+                accountRef = wipedRef,
+                includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },
+            )
             AvatarImageLoader.clear()
             clearCrossAccountCaches()
             stopTtsForRemovedAccount(wipedRef)
