@@ -66,6 +66,22 @@ class TtsController internal constructor(
     private val utteranceRates = mutableMapOf<String, Float>()
     private var activeTiming: ActiveUtteranceTiming? = null
 
+    // Pace measurement state. Its lifetime is deliberately NOT activeTiming's:
+    // the opener has to survive its own onDone, because the gap it opened is
+    // only closed by the NEXT utterance's onStart. Clearing it alongside
+    // activeTiming would refuse every gap there is.
+    //
+    // engineEpoch counts engine-queue replacements. The queue stops and
+    // re-enqueues the engine on every disruptive path - start, pause, stop,
+    // failure, and every requeue, which is also how a speech-rate change lands
+    // - and it advances its own generation on exactly those paths. So an
+    // opener stamped with the epoch its utterance was submitted under is
+    // rejected by a single equality if anything replaced the queue in between.
+    private var engineEpoch = 0L
+    private var gapOpener: TtsPaceGapOpener? = null
+    private var engineHasSpoken = false
+    private var bootstrapRetired = false
+
     // Locale of the active queue, retained so history pages loaded mid-session
     // chunk with the same sentence iterator the session started with.
     private var queueLocale: Locale = Locale.getDefault()
@@ -75,6 +91,17 @@ class TtsController internal constructor(
                 wordTicker.stop()
                 utteranceRates.clear()
                 activeTiming = null
+                // Whatever is submitted next belongs to a new engine queue, so
+                // no gap may span this point. The opener is deliberately LEFT
+                // in place rather than discarded: refusing it by the epoch it
+                // carries is what makes the refusal reason say what actually
+                // happened, and a trace that reports every pause, skip and rate
+                // change as "there was no opener" is worth less than one that
+                // names the queue replacement. engineHasSpoken and
+                // bootstrapRetired survive too: the voice does not go cold
+                // again because a session ended, and re-colding it here would
+                // refuse the only gap a two-sentence message produces.
+                engineEpoch += 1
                 engine?.stop()
             },
             enqueue = { chunk, utteranceId ->
@@ -110,11 +137,10 @@ class TtsController internal constructor(
         // from whatever the previous engine left behind.
         this.engineKey = engineKey
         rangeProbe.restore(timingStore?.rangeVerdict(engineKey))
-        paceCalibrator.reset(
-            timingStore?.msPerUnitAt1x(engineKey) ?: TtsWordTimingEstimate.DEFAULT_MS_PER_UNIT_AT_1X,
-        )
+        paceCalibrator.reset(storedPace())
         utteranceRates.clear()
         activeTiming = null
+        resetPaceMeasurement()
         engine.setCallbacks(::onStart, ::onDone, ::onError, ::onRangeStart, ::onStop)
     }
 
@@ -128,6 +154,7 @@ class TtsController internal constructor(
         rangeProbe.restore(null)
         utteranceRates.clear()
         activeTiming = null
+        resetPaceMeasurement()
     }
 
     @Synchronized
@@ -289,6 +316,93 @@ class TtsController internal constructor(
         }
     }
 
+    private fun storedPace(): Double {
+        val stored = timingStore?.msPerUnitAt1x(engineKey)
+        return stored ?: TtsWordTimingEstimate.DEFAULT_MS_PER_UNIT_AT_1X
+    }
+
+    private fun resetPaceMeasurement() {
+        engineEpoch += 1
+        gapOpener = null
+        engineHasSpoken = false
+        bootstrapRetired = false
+    }
+
+    /**
+     * Records that the opener finished, and how many chunks the queue held when
+     * it did. Read before the queue advances, so the count is the one that was
+     * available to follow this utterance - which is what separates an auto-read
+     * message appended behind a still-speaking opener from one appended long
+     * after the queue ran dry.
+     */
+    private fun closePaceGapOpener(completedChunkIndex: Int) {
+        val opener = gapOpener ?: return
+        if (opener.epoch != engineEpoch || opener.chunkIndex != completedChunkIndex) return
+        gapOpener = opener.copy(completed = true, chunkCountAtCompletion = state.value.chunkCount)
+    }
+
+    /**
+     * Closes the gap the previous utterance opened, if it measured anything.
+     *
+     * Only a gap sample is persisted. The bootstrap below is allowed to steer
+     * the estimate within this process, but the number written against a voice
+     * has to be one this app can defend, and a bootstrap sample carries a
+     * deduction nobody has measured. Because every accepted sample blends into
+     * the same field, the calibrator is re-seeded from storage before the FIRST
+     * gap is believed - otherwise the first thing persisted would be
+     * three-quarters bootstrap. The re-seed is only kept if that gap is
+     * actually accepted.
+     */
+    private fun observePaceGap(
+        startingChunkIndex: Int,
+        startingAtMs: Long,
+    ) {
+        val outcome = ttsPaceOutcomeOf(gapOpener, engineEpoch, startingChunkIndex, startingAtMs)
+        val sample = (outcome as? TtsPaceOutcome.Measured)?.sample ?: return
+        val bootstrapPace = paceCalibrator.msPerUnitAt1x
+        if (!bootstrapRetired) paceCalibrator.reset(storedPace())
+        val observation = paceCalibrator.observe(sample.units, sample.elapsedMs, sample.rate)
+        if (observation == TtsPaceObservation.Rejected) {
+            if (!bootstrapRetired) paceCalibrator.reset(bootstrapPace)
+            return
+        }
+        bootstrapRetired = true
+        // Persisted on ACCEPTANCE, not on movement: a voice whose pace already
+        // matches the value held has still been measured, and a store that only
+        // remembers changes forgets exactly those voices.
+        timingStore?.setMsPerUnitAt1x(engineKey, paceCalibrator.msPerUnitAt1x)
+    }
+
+    /**
+     * The bootstrap lane: one utterance's own start-to-done interval, minus the
+     * lead-in the estimate assumes.
+     *
+     * It is kept because a single-sentence message is one utterance and closes
+     * no gap, so removing it would leave "read one message" permanently on the
+     * seeded default. It is never persisted, and it is retired for good once a
+     * gap has measured this engine, because the interval it uses contains an
+     * engine-specific offset this process cannot see - see [ttsPaceOutcomeOf].
+     *
+     * Its guards are deliberately left exactly as they were. The deduction it
+     * carries is worth least on a short utterance, and tightening the floor for
+     * that is a real question - but it is a question about the lane this change
+     * supersedes, and it cannot be asserted observably from here, so it is not
+     * smuggled in untested.
+     */
+    private fun observeBootstrapPace(
+        chunk: TtsChunk,
+        timing: ActiveUtteranceTiming,
+    ) {
+        if (bootstrapRetired) return
+        val elapsedSinceStart = clock() - timing.startedAt
+        if (elapsedSinceStart <= TTS_ESTIMATED_AUDIO_LEAD_IN_MS) return
+        paceCalibrator.observe(
+            unitCount = TtsWordTimingEstimate.weightedLengthOf(chunk.text),
+            elapsedMs = elapsedSinceStart - TTS_ESTIMATED_AUDIO_LEAD_IN_MS,
+            rate = timing.rate,
+        )
+    }
+
     // Navigation never acquires audio focus: while paused it only repositions
     // the queue, and speech starts again on resume().
     private fun canNavigate(): Boolean = state.value is TtsState.Speaking || state.value is TtsState.Paused
@@ -312,7 +426,20 @@ class TtsController internal constructor(
         val chunk = queue.submittedChunk(activeUtteranceId) ?: return
         rangeProbe.onUtteranceStart()
         val appliedRate = utteranceRates[activeUtteranceId] ?: speechRate()
-        activeTiming = ActiveUtteranceTiming(activeUtteranceId, clock(), appliedRate)
+        val startedAt = clock()
+        observePaceGap(chunk.index, startedAt)
+        gapOpener =
+            TtsPaceGapOpener(
+                epoch = engineEpoch,
+                chunkIndex = chunk.index,
+                startedAtMs = startedAt,
+                rate = appliedRate,
+                units = TtsWordTimingEstimate.weightedLengthOf(chunk.text),
+                endsSentence = ttsUtteranceEndsSentence(chunk.text),
+                wasFirstSpokenByEngine = !engineHasSpoken,
+            )
+        engineHasSpoken = true
+        activeTiming = ActiveUtteranceTiming(activeUtteranceId, startedAt, appliedRate)
         if (rangeProbe.reportsRanges != true) {
             // Runs whenever the engine has not PROVEN it reports timing. Waiting
             // for the probe to prove the opposite would leave the first message or
@@ -355,22 +482,8 @@ class TtsController internal constructor(
             val timing = activeTiming?.takeIf { it.utteranceId == utteranceId }
             if (timing != null) activeTiming = null
             utteranceId?.let(utteranceRates::remove)
-            if (timing != null) {
-                // onStart precedes audible speech by the same bounded lead-in
-                // used by the estimate. Android guarantees onDone follows full
-                // playback, so learn that audible interval without inventing a
-                // second, engine-specific teardown deduction.
-                val elapsedSinceStart = clock() - timing.startedAt
-                if (elapsedSinceStart > TTS_ESTIMATED_AUDIO_LEAD_IN_MS) {
-                    val moved =
-                        paceCalibrator.observe(
-                            unitCount = TtsWordTimingEstimate.weightedLengthOf(chunk.text),
-                            elapsedMs = elapsedSinceStart - TTS_ESTIMATED_AUDIO_LEAD_IN_MS,
-                            rate = timing.rate,
-                        )
-                    if (moved) timingStore?.setMsPerUnitAt1x(engineKey, paceCalibrator.msPerUnitAt1x)
-                }
-            }
+            closePaceGapOpener(chunk.index)
+            if (timing != null) observeBootstrapPace(chunk, timing)
             if (rangeProbe.onUtteranceDone(chunk.text.length)) {
                 timingStore?.setRangeVerdict(engineKey, false)
             }
