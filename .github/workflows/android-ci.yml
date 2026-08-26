@@ -95,6 +95,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Verify packaged system labels for every app variant
+        run: ./scripts/test-system-labels.sh
+
       - name: Compile (Kotlin)
         run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --no-daemon --stacktrace
 

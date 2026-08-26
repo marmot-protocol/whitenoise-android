@@ -221,7 +221,6 @@ val prPreviewChannel: String? = System.getenv("PR_PREVIEW_CHANNEL")?.takeIf { it
 // A fixed preview-only code therefore lets a tester move between any two PR
 // builds without uninstalling and losing the preview app's data.
 val prPreviewVersionCode = 2_000_000_000
-val defaultAppName = "White Noise"
 val buildShortSha =
     System.getenv("PREVIEW_HEAD_SHA")?.take(7)
         ?: System.getenv("GITHUB_SHA")?.take(7)
@@ -279,7 +278,7 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            manifestPlaceholders["appName"] = defaultAppName
+            manifestPlaceholders["appName"] = "White Noise Dev"
             manifestPlaceholders["deepLinkScheme"] = "whitenoise-dev"
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-dev".asBuildConfigString())
             buildConfigField(
@@ -372,7 +371,7 @@ android {
             if (hasProductionReleaseSigning) {
                 signingConfig = signingConfigs.getByName("productionRelease")
             }
-            manifestPlaceholders["appName"] = defaultAppName
+            manifestPlaceholders["appName"] = "White Noise"
             manifestPlaceholders["deepLinkScheme"] = "whitenoise"
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise".asBuildConfigString())
 
@@ -465,7 +464,7 @@ android {
             if (hasStagingReleaseSigning) {
                 signingConfig = signingConfigs.getByName("stagingRelease")
             }
-            manifestPlaceholders["appName"] = defaultAppName
+            manifestPlaceholders["appName"] = "White Noise Staging"
             manifestPlaceholders["deepLinkScheme"] = "whitenoise-staging"
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-staging".asBuildConfigString())
             buildConfigField(
