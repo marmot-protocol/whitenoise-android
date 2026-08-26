@@ -7713,15 +7713,18 @@ class ConversationController(
      * been committed to the projection and published — i.e. the send has
      * visibly started. [onDurablyAccepted] runs only after MDK returns a typed
      * accepted disposition, so the caller can delete the persisted composer
-     * draft without losing a pre-acceptance send across process death. Neither
-     * callback runs when a guard rejects the send (no account yet, blank text,
-     * unknown/non-member state, or a terminal group).
+     * draft without losing a pre-acceptance send across process death.
+     * [onTerminalFailure] distinguishes a definite failure from an ambiguous
+     * delivery that remains Pending. None of the callbacks run when a guard
+     * rejects the send (no account yet, blank text, unknown/non-member state,
+     * or a terminal group).
      * The edit path also leaves [onAccepted] uncalled: the composer restores its
      * pre-edit draft via the `editingMessageId` LaunchedEffect, not by clearing.
      */
     suspend fun send(
         text: String,
         onAccepted: () -> Unit = {},
+        onTerminalFailure: () -> Unit = {},
         onDurablyAccepted: () -> Unit = {},
     ) {
         val trimmed = text.trim()
@@ -7919,6 +7922,7 @@ class ConversationController(
                 forgetSendTrace(tempId)
                 publishTimelineFromIndexes()
                 markActiveAccountRemovedFromMembers(account)
+                onTerminalFailure()
                 return
             }
             if (isAmbiguousRelayDeliveryError(throwable)) {
@@ -7964,6 +7968,7 @@ class ConversationController(
             )
             forgetSendTrace(tempId)
             presentSendFailure(appState, throwable)
+            onTerminalFailure()
         }
     }
 
@@ -7988,62 +7993,65 @@ class ConversationController(
         trimmed: String,
         trace: PerformanceTrace?,
     ): dev.ipf.marmotkit.SendSummaryFfi =
-        retryPendingConversationSend(
-            onTransientFailure = { attempt, _ -> logSendRetry(trace, attempt) },
-        ) { attempt ->
-            // Serialize only this commit-producing FFI attempt. Releasing the
-            // lock before retryPendingConversationSend delays prevents an
-            // offline pending message from blocking every other group mutation.
-            val lockWaitStartMs = trace?.let { traceNowMs() }
-            appState.withGroupCommitLock(account, group.groupIdHex) {
-                val lockHeldAtMs = trace?.let { traceNowMs() }
-                sendTrace(
-                    trace,
-                    PerformancePhase.COMMIT_LOCK_ACQUIRED,
-                    durationMs = lockHeldAtMs?.minus(lockWaitStartMs ?: lockHeldAtMs) ?: 0L,
-                    attempt = attempt,
-                )
-                // Time the FFI hop itself (App → engine `send_message`: MLS
-                // commit + encrypt + publish + relay ack round-trip, all
-                // synchronous inside this call). This is the primary "long
-                // pole" candidate the issue asks to measure — how long the
-                // `sendText`/`replyToMessage` call blocks before returning
-                // (issue #913).
-                val ffiStartMs = trace?.let { traceNowMs() }
-                sendTrace(
-                    trace,
-                    PerformancePhase.FFI_START,
-                    result = PerformanceResult.PENDING,
-                    layer = PerformanceLayer.FFI,
-                    attempt = attempt,
-                )
-                try {
-                    val summary = textPublisher(replyTarget, account, group.groupIdHex, trimmed)
+        appState.withConversationTextSendOrder(account, group.groupIdHex) {
+            retryPendingConversationSend(
+                onTransientFailure = { attempt, _ -> logSendRetry(trace, attempt) },
+            ) { attempt ->
+                // Serialize only this commit-producing FFI attempt. Releasing the
+                // commit lock before retry backoff keeps reactions and other
+                // mutations usable; the outer text-order lock keeps later text
+                // sends behind this one until its outcome is known.
+                val lockWaitStartMs = trace?.let { traceNowMs() }
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    val lockHeldAtMs = trace?.let { traceNowMs() }
                     sendTrace(
                         trace,
-                        PerformancePhase.FFI_RETURN,
-                        durationMs = ffiStartMs?.let { traceNowMs() - it } ?: 0L,
-                        layer = PerformanceLayer.FFI,
+                        PerformancePhase.COMMIT_LOCK_ACQUIRED,
+                        durationMs = lockHeldAtMs?.minus(lockWaitStartMs ?: lockHeldAtMs) ?: 0L,
                         attempt = attempt,
-                        count = summary.messageIds.size,
                     )
+                    // Time the FFI hop itself (App → engine `send_message`: MLS
+                    // commit + encrypt + publish + relay ack round-trip, all
+                    // synchronous inside this call). This is the primary "long
+                    // pole" candidate the issue asks to measure — how long the
+                    // `sendText`/`replyToMessage` call blocks before returning
+                    // (issue #913).
+                    val ffiStartMs = trace?.let { traceNowMs() }
                     sendTrace(
                         trace,
-                        PerformancePhase.TRANSPORT_COMPLETE,
-                        layer = PerformanceLayer.TRANSPORT,
-                        count = summary.messageIds.size,
-                    )
-                    summary
-                } catch (throwable: Throwable) {
-                    sendTrace(
-                        trace,
-                        PerformancePhase.FFI_ERROR,
-                        durationMs = ffiStartMs?.let { traceNowMs() - it } ?: 0L,
-                        result = PerformanceResult.FAILURE,
+                        PerformancePhase.FFI_START,
+                        result = PerformanceResult.PENDING,
                         layer = PerformanceLayer.FFI,
                         attempt = attempt,
                     )
-                    throw throwable
+                    try {
+                        val summary = textPublisher(replyTarget, account, group.groupIdHex, trimmed)
+                        sendTrace(
+                            trace,
+                            PerformancePhase.FFI_RETURN,
+                            durationMs = ffiStartMs?.let { traceNowMs() - it } ?: 0L,
+                            layer = PerformanceLayer.FFI,
+                            attempt = attempt,
+                            count = summary.messageIds.size,
+                        )
+                        sendTrace(
+                            trace,
+                            PerformancePhase.TRANSPORT_COMPLETE,
+                            layer = PerformanceLayer.TRANSPORT,
+                            count = summary.messageIds.size,
+                        )
+                        summary
+                    } catch (throwable: Throwable) {
+                        sendTrace(
+                            trace,
+                            PerformancePhase.FFI_ERROR,
+                            durationMs = ffiStartMs?.let { traceNowMs() - it } ?: 0L,
+                            result = PerformanceResult.FAILURE,
+                            layer = PerformanceLayer.FFI,
+                            attempt = attempt,
+                        )
+                        throw throwable
+                    }
                 }
             }
         }

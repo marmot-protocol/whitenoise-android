@@ -34,7 +34,6 @@ internal fun isTransientRelaySendError(throwable: Throwable): Boolean {
     return ("connect relay failed" in text) ||
         ("connect relay" in text && ("timed out" in text || "timeout" in text)) ||
         ("connection refused" in text) ||
-        ("connection reset" in text) ||
         ("no relay endpoints" in text)
 }
 

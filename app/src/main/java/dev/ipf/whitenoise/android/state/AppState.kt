@@ -2489,10 +2489,10 @@ class WhiteNoiseAppState private constructor(
                 durablyAccepted = true
                 pendingClear?.let(::clearDraftAfterSuccessfulSend)
             },
+            onTerminalFailure = {
+                if (accepted && !durablyAccepted) pendingClear?.let(::restoreDraftAfterFailedSend)
+            },
         )
-        if (accepted && !durablyAccepted) {
-            pendingClear?.let(::restoreDraftAfterFailedSend)
-        }
     }
 
     internal suspend fun deleteDraftBeforeGroupRemoval(
@@ -2537,41 +2537,22 @@ class WhiteNoiseAppState private constructor(
     // Serializes commit-producing FFI calls for the same (account, group) across
     // ChatsController and ConversationController so concurrent mutations don't race
     // the per-account actor and surface PendingPublish as a generic toast.
-    private class GroupCommitLockEntry {
-        val mutex = Mutex()
-        var users = 0
-    }
-
-    private val groupCommitLocks = mutableMapOf<String, GroupCommitLockEntry>()
-    private val groupCommitLocksLock = Any()
+    private val groupCommitLocks = KeyedMutexPool()
+    private val conversationTextSendOrderLocks = KeyedMutexPool()
 
     suspend fun <T> withGroupCommitLock(
         accountRef: String,
         groupIdHex: String,
         block: suspend () -> T,
-    ): T {
-        val key = "$accountRef|$groupIdHex"
-        val entry =
-            synchronized(groupCommitLocksLock) {
-                groupCommitLocks.getOrPut(key) { GroupCommitLockEntry() }.also { it.users += 1 }
-            }
-        try {
-            return entry.mutex.withLock { block() }
-        } finally {
-            synchronized(groupCommitLocksLock) {
-                entry.users -= 1
-                if (entry.users == 0 && !entry.mutex.isLocked && groupCommitLocks[key] === entry) {
-                    groupCommitLocks.remove(key)
-                }
-            }
-        }
-    }
+    ): T = groupCommitLocks.withLock("$accountRef|$groupIdHex", block)
 
-    private fun pruneIdleGroupCommitLocks() {
-        synchronized(groupCommitLocksLock) {
-            groupCommitLocks.entries.removeAll { (_, entry) -> entry.users == 0 && !entry.mutex.isLocked }
-        }
-    }
+    suspend fun <T> withConversationTextSendOrder(
+        accountRef: String,
+        groupIdHex: String,
+        block: suspend () -> T,
+    ): T = conversationTextSendOrderLocks.withLock("$accountRef|$groupIdHex", block)
+
+    private fun pruneIdleGroupCommitLocks() = groupCommitLocks.pruneIdle()
 
     internal fun optimisticMessages(
         accountRef: String?,

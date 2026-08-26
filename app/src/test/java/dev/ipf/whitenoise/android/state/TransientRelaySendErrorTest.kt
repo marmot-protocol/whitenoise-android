@@ -129,9 +129,9 @@ class TransientRelaySendErrorTest {
     }
 
     @Test
-    fun connectionRefusedAndResetAreTransient() {
+    fun connectionRefusedIsTransientButUnqualifiedResetIsAmbiguous() {
         assertTrue(isTransientRelaySendError(RuntimeException("Connection refused")))
-        assertTrue(isTransientRelaySendError(RuntimeException("connection reset by peer")))
+        assertFalse(isTransientRelaySendError(RuntimeException("connection reset by peer")))
     }
 
     @Test

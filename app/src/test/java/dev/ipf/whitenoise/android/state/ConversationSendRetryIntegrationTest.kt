@@ -27,6 +27,8 @@ import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
@@ -664,6 +666,51 @@ class ConversationSendRetryIntegrationTest {
             otherCommit.await()
             send.await()
             assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+        }
+
+    @Test
+    fun pendingConnectRetryKeepsALaterTextSendBehindTheEarlierMessage() =
+        runBlocking {
+            val attempts = mutableListOf<String>()
+            val firstAttemptStarted = CompletableDeferred<Unit>()
+            var firstAttempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, text ->
+                        attempts += text
+                        if (text == "first") {
+                            firstAttempts += 1
+                            if (firstAttempts == 1) {
+                                firstAttemptStarted.complete(Unit)
+                                throw MarmotKitException.Publish("connect relay failed")
+                            }
+                        }
+                        SendSummaryFfi(
+                            published = 1u,
+                            messageIds = listOf(if (text == "first") "11".repeat(32) else "22".repeat(32)),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            val first = async { controller.send("first") }
+            firstAttemptStarted.await()
+            val second = async { controller.send("second") }
+            delay(SEND_RETRY_BACKOFF_MS / 4)
+
+            assertEquals(
+                "a later text must not publish while the earlier text is backing off",
+                listOf("first"),
+                attempts,
+            )
+
+            first.await()
+            second.await()
+            assertEquals(listOf("first", "first", "second"), attempts)
         }
 
     @Test
