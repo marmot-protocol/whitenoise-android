@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.speech.RecognizerIntent
+import android.view.ViewTreeObserver
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,6 +35,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -534,15 +537,34 @@ private fun WarmResumeFrameSurface(
     surface: WarmResumeRenderedSurface,
     content: @Composable () -> Unit,
 ) {
-    LaunchedEffect(activityToken, foregroundEpoch, surface) {
-        if (foregroundEpoch > 0) {
-            withFrameNanos { }
-            WarmResumeTrace.renderedSurfaceFrame(
-                activityToken = activityToken,
-                foregroundEpoch = foregroundEpoch,
-                surface = surface,
-            )
+    val view = LocalView.current
+    DisposableEffect(view, activityToken, foregroundEpoch, surface) {
+        if (foregroundEpoch <= 0) return@DisposableEffect onDispose { }
+
+        val observer = view.viewTreeObserver
+        var recorded = false
+        var attached = true
+        lateinit var listener: ViewTreeObserver.OnDrawListener
+
+        fun detachListener() {
+            if (!attached) return
+            attached = false
+            if (observer.isAlive) observer.removeOnDrawListener(listener)
         }
+        listener =
+            ViewTreeObserver.OnDrawListener {
+                if (!recorded) {
+                    recorded = true
+                    WarmResumeTrace.renderedSurfaceFrame(
+                        activityToken = activityToken,
+                        foregroundEpoch = foregroundEpoch,
+                        surface = surface,
+                    )
+                    view.post(::detachListener)
+                }
+            }
+        observer.addOnDrawListener(listener)
+        onDispose(::detachListener)
     }
     content()
 }

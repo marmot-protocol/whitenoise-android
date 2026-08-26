@@ -30,6 +30,37 @@ class ProcessRestorationLocalShellBeforeNotificationReceiverTest {
     private val context: Application = RuntimeEnvironment.getApplication()
 
     @Test
+    fun failedSignedOutAccountRestorationDoesNotPublishReady() =
+        runBlocking {
+            val signedOutAccount =
+                AccountSummaryFfi(
+                    label = "signed-out-account",
+                    accountIdHex = "b".repeat(64),
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = true,
+                    running = false,
+                )
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    accounts = listOf(signedOutAccount),
+                    signInFailure = IllegalStateException("test sign-in failure"),
+                )
+
+            try {
+                fixture.bootstrap()
+
+                assertTrue(
+                    "failed signed-out restoration must keep the authenticated shell unavailable",
+                    fixture.appState.phase is AppPhase.Failed,
+                )
+            } finally {
+                fixture.close()
+            }
+        }
+
+    @Test
     fun localProjectionIsUsefulBeforeReceiverConvergenceCompletes() =
         runBlocking {
             val account =

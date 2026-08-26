@@ -51,6 +51,7 @@ internal class NotificationBootstrapTestFixture(
     private val chatListRows: List<ChatListRowFfi> = emptyList(),
     private val chatGroups: List<AppGroupRecordFfi> = emptyList(),
     private val markReadRow: ChatListRowFfi? = null,
+    private val signInFailure: Throwable? = null,
 ) {
     private val appContext = context.applicationContext
     private val updates = Channel<NotificationUpdateFfi>(Channel.UNLIMITED)
@@ -189,6 +190,7 @@ internal class NotificationBootstrapTestFixture(
                     signerRegistrationCalls.incrementAndGet()
                     Unit
                 }
+                "signInAccount" -> signInFailure?.let { throw it } ?: Unit
                 "toString" -> "NotificationBootstrapMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()

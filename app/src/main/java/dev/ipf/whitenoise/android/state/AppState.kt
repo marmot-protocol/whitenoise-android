@@ -4154,33 +4154,29 @@ class WhiteNoiseAppState private constructor(
                 // once Ready is visible, UI work may require signing even while
                 // receiver convergence continues in the background.
                 traceStartupStage("external-signer-registration") { reregisterExternalSigners() }
-                val target =
-                    activeAccountRef?.takeIf { ref -> accounts.any { it.label == ref } }
-                        ?: accounts.first().label
-                val targetAccount = accounts.first { it.label == target }
+                val targetAccount = startupAccount()
+                val target = targetAccount.label
                 if (targetAccount.signedOut) {
                     // A signed-out account is not a safe locally authenticated
                     // shell. Preserve the notification ordering barrier before
                     // sign-in can emit work or request external signatures.
                     completeReceiverGatedStartup()
                 }
-                traceStartupStage("account-activation") {
-                    // The callback is the local-ready boundary. The shell mounts
-                    // before profile/notification/push warmup and before the
-                    // cross-account unread roster fold.
-                    setActiveAccount(
-                        label = target,
-                        deferUnreadRefresh = true,
-                        preloadPolicy = AccountSwitchPreloadPolicy.STARTUP_RESTORATION,
-                        awaitPostActivationWork = {
-                            if (!targetAccount.signedOut) completeReceiverGatedStartup()
-                        },
-                        onActivated = { phase = AppPhase.Ready },
-                    )
-                }
-                // Preserve the old behavior when an attempted sign-in returns
-                // before reaching setActiveAccount's activation callback.
-                if (phase == AppPhase.Bootstrapping) phase = AppPhase.Ready
+                val activated =
+                    traceStartupStage("account-activation") {
+                        // The callback is the local-ready boundary. The shell mounts before
+                        // profile/notification/push warmup and the cross-account unread fold.
+                        setActiveAccount(
+                            label = target,
+                            deferUnreadRefresh = true,
+                            preloadPolicy = AccountSwitchPreloadPolicy.STARTUP_RESTORATION,
+                            awaitPostActivationWork = {
+                                if (!targetAccount.signedOut) completeReceiverGatedStartup()
+                            },
+                            onActivated = { phase = AppPhase.Ready },
+                        )
+                    }
+                check(activated) { "startup account activation did not complete" }
             }
             bootstrapCompleted = true
         } catch (error: Throwable) {
@@ -4194,6 +4190,10 @@ class WhiteNoiseAppState private constructor(
             phase = AppPhase.Failed(privacySafeErrorPresentation("APP_BOOTSTRAP", error))
         }
     }
+
+    private fun startupAccount(): AccountSummaryFfi = configuredAccount() ?: accounts.first()
+
+    private fun configuredAccount(): AccountSummaryFfi? = accounts.firstOrNull { it.label == activeAccountRef }
 
     /**
      * The process-owned listener attempt starts with Marmot itself; only its
@@ -5037,6 +5037,7 @@ class WhiteNoiseAppState private constructor(
             }
         }
 
+    @Suppress("ReturnCount") // Sign-in failure and supersession are distinct non-activation outcomes.
     suspend fun setActiveAccount(
         label: String,
         deferUnreadRefresh: Boolean = false,
@@ -5044,7 +5045,7 @@ class WhiteNoiseAppState private constructor(
         preloadPolicy: AccountSwitchPreloadPolicy = AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT,
         awaitPostActivationWork: suspend () -> Unit = {},
         onActivated: () -> Unit = {},
-    ) {
+    ): Boolean {
         val requestGeneration = accountSwitchHandoff.beginRequest()
         val switchingAccounts = label != activeAccountRef
         if (switchingAccounts && BuildConfig.DEBUG) {
@@ -5057,7 +5058,7 @@ class WhiteNoiseAppState private constructor(
             pendingAccountSwitchTrace = null
         }
         val target = accounts.firstOrNull { it.label == label }
-        if (!restoreSignedOutAccountForActivation(target, label, deferUnreadRefresh)) return
+        if (!restoreSignedOutAccountForActivation(target, label, deferUnreadRefresh)) return false
         val activationStillWanted =
             shouldActivate() && isAccountSwitchCurrent(requestGeneration)
         val localSnapshot =
@@ -5077,7 +5078,7 @@ class WhiteNoiseAppState private constructor(
         // A route may outlive the UI intent that requested it while a signed-out
         // account is being restored. Let request-scoped callers reject that late
         // activation without cancelling the process-lifetime sign-in work.
-        if (!shouldActivate() || !isAccountSwitchCurrent(requestGeneration)) return
+        if (!shouldActivate() || !isAccountSwitchCurrent(requestGeneration)) return false
         // Account switch: drop in-process plaintext so account A's bytes
         // aren't reachable from account B's UI loops, but keep L2 (disk)
         // intact. The disk cache key is `mediaCacheKey(account, msg)`, so
@@ -5113,6 +5114,7 @@ class WhiteNoiseAppState private constructor(
             refreshLocalNotificationSettings()
             syncNativePushRegistrationIfEnabled()
         }
+        return true
     }
 
     /**
