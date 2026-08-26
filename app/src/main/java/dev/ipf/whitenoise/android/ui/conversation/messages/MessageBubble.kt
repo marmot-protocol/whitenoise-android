@@ -1051,6 +1051,27 @@ internal fun MessageBubble(
             { position: Offset -> currentMessageTextDoubleTap.value(position) }
         }
 
+    // Resolved when the gesture fires rather than on every recomposition: the
+    // conversation recomposes constantly while a message is being read, and a
+    // bubble has no reason to observe playback state just to know what a
+    // gesture it may never receive would have meant.
+    fun quickTransportFromTwoFingerSwipe() {
+        val action =
+            ttsQuickTransportActionFor(
+                state = appState.ttsController.state.value,
+                ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                canSpeakMessage = !deleted && canSpeakAloud,
+            )
+        if (action == TtsQuickTransportAction.Ignore) return
+        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+        when (action) {
+            TtsQuickTransportAction.Pause -> appState.ttsController.pause()
+            TtsQuickTransportAction.Resume -> appState.ttsController.resume()
+            TtsQuickTransportAction.StartReadingMessage -> startSpeakAloud()
+            TtsQuickTransportAction.Ignore -> Unit
+        }
+    }
+
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val selectionGutterWidth = if (selectionMode) messageBubbleSelectionGutterWidth else 0.dp
         val senderAvatarSlotWidth = if (reserveSenderAvatarSlot) MessageBubbleSenderAvatarSlotWidth else 0.dp
@@ -1087,6 +1108,15 @@ internal fun MessageBubble(
                     .messageBubbleSelectionRow(
                         selectionMode = selectionMode,
                         selected = selected,
+                    ).twoFingerSwipeDown(
+                        // Batch selection and text selection own the row while
+                        // they are active, and a deleted message has nothing to
+                        // read. Everything else keeps the shortcut, including a
+                        // bubble that cannot itself be spoken: holding what is
+                        // already playing does not need this message to have
+                        // anything to say.
+                        enabled = !selectionMode && !textSelectionMode && !deleted,
+                        onSwipe = ::quickTransportFromTwoFingerSwipe,
                     ).then(
                         // A deleted or selection-mode message has no actionable
                         // reply gesture; taps are owned by the selection row. Keep
