@@ -22,8 +22,9 @@ import org.junit.Test
  * surfaced that first failure as a hard, user-visible "send failed" instead of
  * giving the pool a brief window to (re)connect and retrying.
  *
- * The fix retries the send across a bounded budget ([SEND_RETRY_ATTEMPTS]) but
- * ONLY for failures [isTransientRelaySendError] classifies as *connect-phase*
+ * Foreground conversation sends stay pending and retry with capped backoff;
+ * bounded background operations use [SEND_RETRY_ATTEMPTS]. Both policies apply
+ * ONLY to failures [isTransientRelaySendError] classifies as *connect-phase*
  * connectivity — the cases that prove the event never reached a relay.
  *
  * IDEMPOTENCY CONTRACT (adversarial review of PR #299): the retry re-enters the
@@ -205,6 +206,21 @@ class TransientRelaySendErrorTest {
         assertFalse(isTransientRelaySendError(TransportClosed()))
     }
 
+    @Test
+    fun postPublishFailuresAreAmbiguousButExplicitRejectionIsTerminal() {
+        listOf(
+            MarmotKitException.Publish("send event failed"),
+            MarmotKitException.Publish("send event timed out"),
+            MarmotKitException.Publish("relay did not acknowledge event"),
+            MarmotKitException.Publish("publish timed out after 30s: accepted 1 of required 2"),
+            MarmotKitException.Publish("insufficient publish acknowledgements: accepted 0 of required 1"),
+            MarmotKitException.TransportClosed(),
+        ).forEach { throwable -> assertTrue(isAmbiguousRelayDeliveryError(throwable)) }
+
+        assertFalse(isAmbiguousRelayDeliveryError(MarmotKitException.Publish("relay rejected event")))
+        assertFalse(isAmbiguousRelayDeliveryError(MarmotKitException.Publish("connect relay failed")))
+    }
+
     // ---- NOT retryable: terminal / shutdown ------------------------------
 
     @Test
@@ -259,5 +275,12 @@ class TransientRelaySendErrorTest {
         // retry unboundedly (hangs the send coroutine). Pin the invariant.
         assertTrue(SEND_RETRY_ATTEMPTS in 2..6)
         assertTrue(SEND_RETRY_BACKOFF_MS in 100L..3_000L)
+    }
+
+    @Test
+    fun pendingSendBackoffGrowsAndCaps() {
+        assertEquals(SEND_RETRY_BACKOFF_MS, pendingSendRetryBackoffMs(1))
+        assertEquals(SEND_RETRY_BACKOFF_MS * 2, pendingSendRetryBackoffMs(2))
+        assertEquals(PENDING_SEND_RETRY_MAX_BACKOFF_MS, pendingSendRetryBackoffMs(100))
     }
 }

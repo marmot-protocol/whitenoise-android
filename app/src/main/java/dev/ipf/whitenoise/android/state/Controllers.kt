@@ -1236,24 +1236,6 @@ internal fun canAcceptReaction(
         disbanded = disbanded,
     )
 
-/**
- * How many times a text/reply send retries the FFI publish before surfacing a
- * user-visible failure, and how long it waits between attempts. The send path
- * in the Marmot runtime already retries individual relay sockets, but a publish
- * that begins during a *transient* connectivity gap (doze wake, network change,
- * background-connection toggle mid-reconnect) can see an empty/under-connected
- * pool at the single instant it fans out and fail fast with a *connect-phase*
- * failure — even though a relay reconnects a moment later (issue #294). One
- * bounded retry sweep across [SEND_RETRY_ATTEMPTS], gated by
- * [isTransientRelaySendError], gives the pool that moment before we tell the
- * user the send failed, so a momentary gap no longer surfaces as a hard error
- * while a sustained outage (all attempts exhausted) still does. Only failures
- * that prove the event never left the device are retried, so a re-send can
- * never duplicate a message that actually reached a relay.
- */
-internal const val SEND_RETRY_ATTEMPTS: Int = 3
-internal val SEND_RETRY_BACKOFF_MS: Long = 700L
-
 private const val AGENT_STREAM_PREVIEW_MAX_CHARS = 16 * 1024
 
 internal fun appendCappedAgentStreamPreview(
@@ -1387,119 +1369,6 @@ internal fun streamFinalDisplayPosition(
         recordedAt = displayed.record.recordedAt,
         timelineOrder = displayed.timelineOrder,
     )
-}
-
-/**
- * Whether [throwable] is a relay-connectivity failure that proves the event was
- * **never transmitted to any relay**, and is therefore safe to re-send by
- * re-entering the high-level FFI send. Recognizes only the *connect-phase*
- * reasons the Nostr transport surfaces when the relay pool is momentarily empty
- * or still handshaking at fan-out time (issue #294).
- *
- * IDEMPOTENCY IS THE CONTRACT. The bounded retry in [publishTextWithRetry]
- * retries by calling `sendText` / `replyToMessage` again, and each call builds a
- * **new** inner app event in the Marmot runtime
- * (`marmot-app::runtime::send_message`) — there is no caller-supplied
- * idempotency key. So we may only retry failures that happen *before* the
- * transport ever calls `send_event_to`; otherwise a relay that accepted the
- * first event but whose ack was lost/late would receive a second, distinct
- * event and peers would see a duplicate user message (adversarial review of
- * PR #299). The deliberately EXCLUDED post-send / ambiguous reasons are:
- *   - `send event failed`             — `send_event_to` returned an SDK error;
- *                                        the redacted reason cannot prove the
- *                                        frame was never accepted.
- *   - `send event timed out`          — `send_event_to` was called; the frame
- *                                        may have landed, only the OK ack timed
- *                                        out (transport-nostr-adapter
- *                                        `sdk_client.rs` "send event timed out").
- *   - `relay did not acknowledge event` — the relay returned the event in
- *                                        `output.failed`; it WAS transmitted.
- *   - `relay rejected event (...)`    — also returned by `output.failed` after
- *                                        the relay received the event.
- *   - `publish timed out after Ns: accepted X of required Y` /
- *     `insufficient publish acknowledgements: accepted X of required Y`
- *                                      — the same string is emitted whether
- *                                        `accepted` is 0 or > 0, so we cannot
- *                                        prove nothing landed.
- *   - `TransportClosed`               — surfaces from BOTH the worker
- *                                        command-send channel (pre-publish) and
- *                                        the response channel *after* the worker
- *                                        may have already published
- *                                        (`marmot-app::runtime` response await);
- *                                        the UniFFI variant carries an empty
- *                                        message so the two are indistinguishable,
- *                                        hence ambiguous.
- * A manual retry affordance (a user re-tapping send) is the right place to
- * recover those ambiguous cases, because the user can see whether the message
- * actually went through — an automatic re-send cannot.
- *
- * String-matched on the FFI error message + cause chain because the UniFFI
- * surface flattens these into [dev.ipf.marmotkit.MarmotKitException.Publish] /
- * `.Runtime` without a typed connectivity code. Keep the matched phrases in sync
- * with the transport-nostr-adapter connect-phase reasons (`connect relay
- * failed`, `connect relay timed out`, `connection refused`, `connection reset`,
- * `no relay endpoints`). `connect relay failed` is MDK's privacy-redacted form
- * for an underlying SDK connection error.
- * Under-matching reverts to fail-fast (the message just isn't auto-retried);
- * over-matching risks duplicate sends, so the predicate is deliberately narrow.
- */
-internal fun isTransientRelaySendError(throwable: Throwable): Boolean {
-    val text =
-        generateSequence(throwable) { it.cause }
-            .joinToString(separator = "\n") { error ->
-                listOfNotNull(error.message, error.javaClass.simpleName).joinToString(" ")
-            }.lowercase()
-    // MDK collapses per-relay failure summaries with semicolons. A batch can
-    // therefore contain a connect-phase failure alongside a reason produced
-    // only after send_event_to was called. The connect substring must not make
-    // that mixed, potentially delivered outcome eligible for an automatic
-    // high-level resend.
-    if (
-        listOf(
-            "send event failed",
-            "send event timed out",
-            "relay did not acknowledge event",
-            "relay rejected event",
-            "publish timed out after",
-            "insufficient publish acknowledgements",
-        ).any(text::contains)
-    ) {
-        return false
-    }
-    // Connect-phase only: the transport raises these before it ever calls
-    // `send_event_to`, so the event provably never reached a relay and a
-    // re-send cannot duplicate it.
-    return ("connect relay failed" in text) ||
-        ("connect relay" in text && ("timed out" in text || "timeout" in text)) ||
-        ("connection refused" in text) ||
-        ("connection reset" in text) ||
-        ("no relay endpoints" in text)
-}
-
-/**
- * Runs one text/reply publish through the shared bounded connect-phase retry
- * policy. Both initial sends and user-triggered retries use this helper so a
- * failed bubble does not become single-shot while the relay pool reconnects.
- */
-internal suspend fun <T> retryTransientRelaySend(
-    onTransientFailure: suspend (attempt: Int, throwable: Throwable) -> Unit = { _, _ -> },
-    sendAttempt: suspend (attempt: Int) -> T,
-): T {
-    var lastTransient: Throwable? = null
-    for (attempt in 1..SEND_RETRY_ATTEMPTS) {
-        try {
-            return sendAttempt(attempt)
-        } catch (throwable: Throwable) {
-            rethrowIfCancellation(throwable)
-            if (!isTransientRelaySendError(throwable)) throw throwable
-            lastTransient = throwable
-            onTransientFailure(attempt, throwable)
-            if (attempt < SEND_RETRY_ATTEMPTS) {
-                kotlinx.coroutines.delay(SEND_RETRY_BACKOFF_MS)
-            }
-        }
-    }
-    throw lastTransient ?: IllegalStateException("send retry budget exhausted")
 }
 
 internal fun mediaCacheKey(
@@ -6533,6 +6402,8 @@ internal typealias MediaImetaTagsBuilder =
 internal typealias MediaPublisher =
     suspend (String, String, List<MediaAttachmentReferenceFfi>, String?) -> SendSummaryFfi
 
+internal typealias InviteAcceptor = suspend (String, String) -> AppGroupRecordFfi
+
 class ConversationController(
     internal val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
@@ -6573,6 +6444,11 @@ class ConversationController(
         appState.marmotIo { sendMediaAttachments(account, groupIdHex, references, caption) }
     },
     private val clockMillis: () -> Long = System::currentTimeMillis,
+    private val inviteAcceptor: InviteAcceptor = { account, groupIdHex ->
+        appState.marmotIo(MarmotTraceSection.ACCEPT_GROUP_INVITE) {
+            acceptGroupInvite(account, groupIdHex)
+        }
+    },
 ) {
     private val liveSubscriptions = appState.conversationLiveSubscriptions()
 
@@ -8058,6 +7934,24 @@ class ConversationController(
                 markActiveAccountRemovedFromMembers(account)
                 return
             }
+            if (isAmbiguousRelayDeliveryError(throwable)) {
+                // The event may already be on a relay. Preserve both the
+                // optimistic bubble and chat-list preview as Pending, then let
+                // an authoritative projection or MDK convergence settle it.
+                // Calling textPublisher again here could mint a duplicate.
+                sendTrace(
+                    trace,
+                    "send-pending-ambiguous",
+                    traceElapsedMs(traceStartMs),
+                    context = arrayOf("error" to throwable.javaClass.simpleName),
+                )
+                Log.w(
+                    "ConversationController",
+                    "message delivery uncertain; keeping pending type=${throwable.javaClass.simpleName}",
+                )
+                publishTimelineFromIndexes()
+                return
+            }
             // The bubble stays visible as Failed — the row must agree instead
             // of silently reverting to the prior message.
             failOptimisticChatListPreview(tempId)
@@ -8087,16 +7981,16 @@ class ConversationController(
     }
 
     /**
-     * Publish a text/reply message, re-sending across [SEND_RETRY_ATTEMPTS] only
-     * when the failure proves the event never reached a relay
+     * Publish a text/reply message, keeping it pending and re-sending only when
+     * the failure proves the event never reached a relay
      * ([isTransientRelaySendError] — connect-phase failures). Because each
      * attempt re-enters the high-level FFI send and the runtime builds a fresh
      * inner app event per call, retrying any ambiguous post-send failure could
      * duplicate a message; the classifier is narrowed to connect-phase reasons
      * precisely so this re-send is idempotent. Terminal errors and ambiguous
      * post-send failures rethrow immediately on the first attempt. Between
-     * attempts it waits [SEND_RETRY_BACKOFF_MS] to give the relay pool time to
-     * (re)connect, and logs the relay-health snapshot at the retry decision
+     * attempts it uses capped exponential backoff to give the relay pool time
+     * to (re)connect, and logs the relay-health snapshot at the retry decision
      * point — aggregate connection counts only, no relay URLs/account/group/
      * message ids — so the intermittent failure window from #294 is diagnosable
      * from logcat without leaking PII.
@@ -8107,7 +8001,7 @@ class ConversationController(
         trimmed: String,
         trace: PerformanceTrace?,
     ): dev.ipf.marmotkit.SendSummaryFfi =
-        retryTransientRelaySend(
+        retryPendingConversationSend(
             onTransientFailure = { attempt, _ -> logSendRetry(trace, attempt) },
         ) { attempt ->
             // Time the FFI hop itself (App → engine `send_message`: MLS commit +
@@ -9754,8 +9648,16 @@ class ConversationController(
             appState.applyLocalGroupUpdate(optimisticGroup)
             val acceptedGroup =
                 runCatching {
-                    appState.marmotIo(MarmotTraceSection.ACCEPT_GROUP_INVITE) {
-                        acceptGroupInvite(account, group.groupIdHex)
+                    retryIdempotentRuntimeMutation(
+                        onTransientFailure = { attempt ->
+                            Log.w(
+                                "DMConversation",
+                                "invite accept transport unavailable; retrying " +
+                                    "attempt=$attempt/$IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS",
+                            )
+                        },
+                    ) {
+                        inviteAcceptor(account, group.groupIdHex)
                     }
                 }.getOrElse {
                     group = rollbackOptimisticAcceptedInvite(group, optimisticGroup, previousGroup)
@@ -11430,6 +11332,12 @@ class ConversationController(
         reconciledOptimisticId?.let { optimisticId ->
             preserveOptimisticDisplayPosition(record.messageIdHex, optimisticId)
             val optimisticKey = "msg:$optimisticId"
+            // An authoritative own-message projection proves the engine has
+            // durably accepted this optimistic send even if the synchronous
+            // FFI response was lost. Clear the captured draft at this point;
+            // a later send exception may be only an ambiguous acknowledgement
+            // failure and must not undo durable acceptance.
+            completeDurableAcceptance(optimisticKey)
             // Hand off own-sent media bytes from the pending optimistic to
             // the projection's cache key BEFORE the bubble's LaunchedEffect
             // can fire and ask Blossom for them. Without this, the projected
