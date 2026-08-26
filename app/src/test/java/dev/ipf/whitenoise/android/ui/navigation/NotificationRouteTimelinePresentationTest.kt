@@ -145,7 +145,7 @@ class NotificationRouteTimelinePresentationTest {
         awaitCondition { handled.get() }
         awaitCondition {
             appState.attachedConversationControllersForTest().singleOrNull()?.let { controller ->
-                ConversationTimelineTestIds.MESSAGE_A in timelineMessageIds(controller)
+                timelineMessageIds(controller) == listOf(ConversationTimelineTestIds.MESSAGE_A)
             } == true
         }
         return appState.attachedConversationControllersForTest().single()
@@ -276,7 +276,7 @@ class NotificationRouteTimelinePresentationTest {
                     val groupIdHex = arguments?.getOrNull(1) as? String
                     check(accountRef == TARGET_ACCOUNT) { "projection read used an unknown account" }
                     check(groupIdHex == ConversationTimelineTestIds.GROUP_ID) { "projection read used the wrong group" }
-                    notificationChatListRow()
+                    preGapChatListRow()
                 }
                 "subscribeChatList" -> {
                     val accountRef = arguments?.firstOrNull() as? String
@@ -291,6 +291,23 @@ class NotificationRouteTimelinePresentationTest {
                 else -> error("Unexpected Marmot call: ${method.name}")
             }
         } as MarmotInterface
+
+    private fun preGapChatListRow() =
+        notificationChatListRow().let { row ->
+            row.copy(
+                lastMessage =
+                    row.lastMessage?.copy(
+                        messageIdHex = ConversationTimelineTestIds.MESSAGE_A,
+                        plaintext = "older body",
+                        timelineAt = 1uL,
+                    ),
+                unreadCount = 0uL,
+                hasUnread = false,
+                firstUnreadMessageIdHex = null,
+                activitySortAt = 1uL,
+                updatedAt = 1uL,
+            )
+        }
 
     private fun routedTarget(accountRef: String): InboundIntentRouting {
         val target =
