@@ -42,6 +42,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
+      - name: Test release and staging transport tooling
+        run: |
+          ./scripts/release_test.sh
+          .github/scripts/test-staging-apk-transport.sh
+
       - name: Read MarmotKit artifact pin
         id: marmotkit
         shell: bash
@@ -138,6 +143,21 @@ jobs:
           chmod 600 "$keystore_path"
           printf 'WHITENOISE_STAGING_KEYSTORE_PATH=%s\n' "$keystore_path" >> "$GITHUB_ENV"
 
+      # The raw APK must stay well below the encrypted Marmot media ceiling.
+      # Legacy JNI packaging compresses native libraries and makes Android
+      # extract them at install time without changing the staging app identity.
+      - name: Configure transport-safe staging packaging
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/compact-staging-apk.gradle" <<'GRADLE'
+          gradle.beforeProject { project ->
+              project.plugins.withId("com.android.application") {
+                  project.extensions.getByName("android").packaging.jniLibs.useLegacyPackaging = true
+              }
+          }
+          GRADLE
+          printf 'STAGING_INIT_SCRIPT=%s\n' "$RUNNER_TEMP/compact-staging-apk.gradle" >> "$GITHUB_ENV"
+
       - name: Build staging APK
         env:
           WHITENOISE_STAGING_KEYSTORE_PASSWORD: ${{ secrets.WHITENOISE_STAGING_KEYSTORE_PASSWORD }}
@@ -150,7 +170,17 @@ jobs:
           WHITENOISE_STAGING_TELEMETRY_TENANT: ${{ secrets.WHITENOISE_STAGING_TELEMETRY_TENANT }}
           WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX: ${{ secrets.WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX }}
           WHITENOISE_STAGING_PUSH_RELAY_HINT: ${{ secrets.WHITENOISE_STAGING_PUSH_RELAY_HINT }}
-        run: ./scripts/release.sh --flavor staging --abi arm64-v8a
+        run: >-
+          ./scripts/release.sh --flavor staging --abi arm64-v8a
+          --gradle-init-script "$STAGING_INIT_SCRIPT"
+
+      - name: Verify transport-safe staging APK
+        shell: bash
+        run: |
+          mapfile -t apks < <(find app/build/outputs/apk/stagingZapstore/release \
+            -maxdepth 1 -type f -name 'whitenoise-staging-v8a-release-*.apk' -print)
+          [[ ${#apks[@]} -eq 1 ]]
+          .github/scripts/verify-staging-apk-transport.sh "${apks[0]}"
 
       - name: Compute short SHA
         id: sha

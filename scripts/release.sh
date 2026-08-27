@@ -15,12 +15,15 @@ set -euo pipefail
 
 usage() {
   cat <<EOF
-Usage: scripts/release.sh [--abi <ABI>] [--flavor <name>] [--help]
+Usage: scripts/release.sh [--abi <ABI>] [--flavor <name>] [--gradle-init-script <path>] [--help]
 
   --abi <ABI>       Build only a specific ABI APK, then print its path
                     (arm64-v8a | armeabi-v7a | x86 | x86_64 | universal)
   --flavor <name>   Build one release flavor, or both with "all"
                     (production | staging | all; default: production)
+  --gradle-init-script <path>
+                    Apply one regular, non-symlink Gradle init script to the
+                    release build. Intended for trusted CI packaging policy.
   --help            Show this help
 
 Production signing creds (in local.properties or env):
@@ -45,10 +48,11 @@ EOF
 
 TARGET_ABI=""
 FLAVOR="production"
+GRADLE_INIT_SCRIPT=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --abi)
-      if [[ $# -lt 2 || "$2" == --* ]]; then
+      if [[ $# -lt 2 || -z "$2" || "$2" == --* ]]; then
         echo "error: --abi requires a value" >&2
         usage
         exit 1
@@ -63,6 +67,15 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       FLAVOR="$2"
+      shift 2
+      ;;
+    --gradle-init-script)
+      if [[ $# -lt 2 || -z "$2" || "$2" == --* ]]; then
+        echo "error: --gradle-init-script requires a path" >&2
+        usage
+        exit 1
+      fi
+      GRADLE_INIT_SCRIPT="$2"
       shift 2
       ;;
     --help|-h) usage; exit 0 ;;
@@ -119,6 +132,15 @@ case "$FLAVOR" in
     exit 1
     ;;
 esac
+
+GRADLE_EXTRA_ARGS=()
+if [[ -n "$GRADLE_INIT_SCRIPT" ]]; then
+  if [[ ! -f "$GRADLE_INIT_SCRIPT" || -L "$GRADLE_INIT_SCRIPT" ]]; then
+    echo "error: Gradle init script must be a regular non-symlink file: $GRADLE_INIT_SCRIPT" >&2
+    exit 1
+  fi
+  GRADLE_EXTRA_ARGS=(-I "$GRADLE_INIT_SCRIPT")
+fi
 
 if [[ "$FLAVOR" == "all" ]]; then
   BUILD_FLAVORS=(production staging)
@@ -249,9 +271,11 @@ for flavor in "${BUILD_FLAVORS[@]}"; do
     rm -f "$APK_DIR"/*.apk
     if [[ "$TARGET_ABI" == "universal" ]]; then
       ./gradlew ":app:assemble${flavor_task}Release" \
+        "${GRADLE_EXTRA_ARGS[@]}" \
         -Pandroid.injected.testOnly=false
     else
       ./gradlew ":app:assemble${flavor_task}Release" \
+        "${GRADLE_EXTRA_ARGS[@]}" \
         -Pandroid.injected.build.abi="$TARGET_ABI" \
         -Pandroid.injected.testOnly=false
     fi
@@ -281,7 +305,7 @@ for flavor in "${BUILD_FLAVORS[@]}"; do
     selected_apks+=("$selected_apk")
   else
     echo "==> Assembling $flavor release APKs"
-    ./gradlew ":app:assemble${flavor_task}Release"
+    ./gradlew ":app:assemble${flavor_task}Release" "${GRADLE_EXTRA_ARGS[@]}"
   fi
 done
 
