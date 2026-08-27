@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +39,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
@@ -47,6 +49,7 @@ import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -79,6 +82,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -148,6 +154,9 @@ internal fun maskedIdentitySecret(
 ): String = if (revealed) secret else "•".repeat(MASKED_IDENTITY_SECRET_LENGTH)
 
 internal const val IDENTITY_SECRET_EXPORT_CONTENT_TAG = "identity-secret-export-content"
+internal const val ACCOUNT_ACTIONS_GROUP_TAG = "account-actions-group"
+internal const val SIGN_OUT_ACTION_TAG = "sign-out-action"
+internal const val WIPE_ACTION_TAG = "wipe-action"
 private const val MASKED_IDENTITY_SECRET_LENGTH = 24
 
 internal suspend fun exportIdentitySecretForSession(
@@ -170,6 +179,7 @@ internal suspend fun exportIdentitySecretForSession(
 internal fun AccountKeysScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
+    contentWindowInsets: WindowInsets = ScaffoldDefaults.contentWindowInsets,
 ) {
     // The screen surfaces the raw nsec; keep it out of Recents thumbnails and
     // screenshots, matching the encrypted-backup sheet's posture.
@@ -225,6 +235,7 @@ internal fun AccountKeysScreen(
     }
 
     Scaffold(
+        contentWindowInsets = contentWindowInsets,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.account_and_keys)) },
@@ -287,39 +298,53 @@ internal fun AccountKeysScreen(
             }
             item {
                 SectionCard(title = stringResource(R.string.account_session)) {
-                    Text(
-                        stringResource(R.string.sign_out_session_help),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    // Primary, non-destructive sign-out. Opens an explanatory
-                    // sheet; the sheet's button performs the actual sign-out so
-                    // the user reads what stays vs. changes before committing.
-                    Button(
-                        onClick = { showSignOutSheet = true },
-                        enabled = active != null,
-                        modifier = Modifier.fillMaxWidth(),
+                    Column(
+                        modifier =
+                            Modifier.fillMaxWidth().testTag(ACCOUNT_ACTIONS_GROUP_TAG).semantics {
+                                isTraversalGroup = true
+                            },
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.sign_out))
-                    }
-                    // Destructive "Sign Out & Wipe". Gated on engine FFI
-                    // availability (#348): the relay + MLS teardown is an engine
-                    // sub-issue that doesn't exist on the binding surface yet, so
-                    // we don't surface an affordance we can't honor.
-                    if (WIPE_ENGINE_FFI_AVAILABLE) {
-                        OutlinedButton(
-                            onClick = { showWipeSheet = true },
+                        Text(
+                            stringResource(R.string.sign_out_session_help),
+                            modifier = Modifier.semantics { traversalIndex = 0f },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        // Primary, non-destructive sign-out. Opens an explanatory
+                        // sheet; the sheet's button performs the actual sign-out so
+                        // the user reads what stays vs. changes before committing.
+                        Button(
+                            onClick = { showSignOutSheet = true },
                             enabled = active != null,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors =
-                                ButtonDefaults.outlinedButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.error,
-                                ),
+                            modifier =
+                                Modifier.fillMaxWidth().testTag(SIGN_OUT_ACTION_TAG).semantics {
+                                    traversalIndex = 1f
+                                },
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = null)
+                            Icon(Icons.Default.Close, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.sign_out_and_wipe))
+                            Text(stringResource(R.string.sign_out))
+                        }
+                        // A neutral divider creates a distinct terminal danger area
+                        // without making the whole section look like an error state.
+                        if (WIPE_ENGINE_FFI_AVAILABLE) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            OutlinedButton(
+                                onClick = { showWipeSheet = true },
+                                enabled = active != null,
+                                modifier =
+                                    Modifier.fillMaxWidth().testTag(WIPE_ACTION_TAG).semantics {
+                                        traversalIndex = 2f
+                                    },
+                                colors =
+                                    ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error,
+                                    ),
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.sign_out_and_wipe))
+                            }
                         }
                     }
                 }
