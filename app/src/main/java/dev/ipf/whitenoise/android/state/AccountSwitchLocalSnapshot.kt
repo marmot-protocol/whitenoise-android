@@ -82,6 +82,42 @@ internal data class AccountSwitchIdentityStateCounts(
             "avatar-key=$avatarIdentityKeyReady/$avatarIdentityKeyMissing"
 }
 
+private fun usefulAccountSwitchProfile(
+    accountIdHex: String?,
+    profilesById: Map<String, AccountSwitchProfileSeed>,
+): AccountSwitchProfileSeed? =
+    accountIdHex
+        ?.let { profilesById[it.lowercase()] }
+        ?.takeIf { it.displayName != null || it.avatarUrl != null }
+
+private fun accountSwitchPeerId(
+    row: ChatListRowFfi,
+    membersByGroup: Map<String, AppGroupMemberIdsFfi>,
+    activeAccountIdHex: String?,
+): String? {
+    val members =
+        membersByGroup[row.groupIdHex.lowercase()]
+            ?.memberIdsHex
+            ?.filter(String::isNotBlank)
+            ?.distinctBy(String::lowercase)
+            .orEmpty()
+    if (!GroupProjector.isDm(row.conversationKind, members.size, row.groupName)) return null
+    return members.singleOrNull { member ->
+        activeAccountIdHex != null && !member.equals(activeAccountIdHex, ignoreCase = true)
+    }
+}
+
+private fun accountSwitchRowHasAvatarIdentity(
+    row: ChatListRowFfi,
+    group: AppGroupRecordFfi?,
+    peerProfile: AccountSwitchProfileSeed?,
+): Boolean =
+    ProfileSanitizer.protocolImageUrl(row.avatarUrl) != null ||
+        row.avatar?.imageHashHex?.isNotBlank() == true ||
+        ProfileSanitizer.protocolImageUrl(group?.avatarUrl) != null ||
+        group?.imageHashHex?.isNotBlank() == true ||
+        peerProfile?.avatarUrl != null
+
 /** Classify the local-ready snapshot without retaining or logging identity values. */
 internal fun accountSwitchIdentityStateCounts(
     rows: List<ChatListRowFfi>,
@@ -96,24 +132,9 @@ internal fun accountSwitchIdentityStateCounts(
     val profilesById = profiles.associateBy { it.accountIdHex.lowercase() }
     val identityGroupIds = accountSwitchFirstFrameMemberGroupIds(rows).mapTo(mutableSetOf()) { it.lowercase() }
 
-    fun usefulProfile(accountIdHex: String?): AccountSwitchProfileSeed? =
-        accountIdHex
-            ?.let { profilesById[it.lowercase()] }
-            ?.takeIf { it.displayName != null || it.avatarUrl != null }
+    fun usefulProfile(accountIdHex: String?) = usefulAccountSwitchProfile(accountIdHex, profilesById)
 
-    fun peerId(row: ChatListRowFfi): String? {
-        val members =
-            membersByGroup[row.groupIdHex.lowercase()]
-                ?.memberIdsHex
-                ?.filter(String::isNotBlank)
-                ?.distinctBy(String::lowercase)
-                .orEmpty()
-        val isDirect = GroupProjector.isDm(row.conversationKind, members.size, row.groupName)
-        if (!isDirect) return null
-        return members.singleOrNull { member ->
-            activeAccountIdHex != null && !member.equals(activeAccountIdHex, ignoreCase = true)
-        }
-    }
+    fun peerId(row: ChatListRowFfi): String? = accountSwitchPeerId(row, membersByGroup, activeAccountIdHex)
 
     val groupRows = rows.filter { it.conversationKind != ChatConversationKindFfi.DIRECT }
     val namedReady =
@@ -121,7 +142,10 @@ internal fun accountSwitchIdentityStateCounts(
             ProfileSanitizer.displayName(row.groupName) != null ||
                 ProfileSanitizer.displayName(groupsById[row.groupIdHex.lowercase()]?.name) != null
         }
-    val directRows = rows.filter { row -> peerId(row) != null || row.conversationKind == ChatConversationKindFfi.DIRECT }
+    val directRows =
+        rows.filter { row ->
+            peerId(row) != null || row.conversationKind == ChatConversationKindFfi.DIRECT
+        }
     val directReady = directRows.count { row -> usefulProfile(peerId(row)) != null }
     val memberReady =
         rows.count { row ->
@@ -134,11 +158,7 @@ internal fun accountSwitchIdentityStateCounts(
     val avatarReady =
         rows.count { row ->
             val group = groupsById[row.groupIdHex.lowercase()]
-            ProfileSanitizer.protocolImageUrl(row.avatarUrl) != null ||
-                row.avatar?.imageHashHex?.isNotBlank() == true ||
-                ProfileSanitizer.protocolImageUrl(group?.avatarUrl) != null ||
-                group?.imageHashHex?.isNotBlank() == true ||
-                usefulProfile(peerId(row))?.avatarUrl != null
+            accountSwitchRowHasAvatarIdentity(row, group, usefulProfile(peerId(row)))
         }
 
     return AccountSwitchIdentityStateCounts(
@@ -217,7 +237,7 @@ internal fun accountSwitchProfileSeed(
         profile = profile,
         displayName =
             ProfileSanitizer.displayName(
-                rawDisplayName ?: profile?.displayName ?: profile?.name,
+                if (profile != null) profile.displayName ?: profile.name else rawDisplayName,
             ),
         avatarUrl = ProfileSanitizer.protocolImageUrl(profile?.picture),
     )

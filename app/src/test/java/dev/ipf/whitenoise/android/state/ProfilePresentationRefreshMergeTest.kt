@@ -46,6 +46,31 @@ class ProfilePresentationRefreshMergeTest {
     }
 
     @Test
+    fun accountSwitchSeedDoesNotRestoreANameRemovedByTheAuthoritativeProfile() {
+        val removed = profile(displayName = null, name = null, picture = NEW_AVATAR)
+
+        val result = accountSwitchProfileSeed(ACCOUNT_ID, removed, rawDisplayName = "Alice")
+
+        assertNull(result.displayName)
+        assertEquals(NEW_AVATAR, result.avatarUrl)
+    }
+
+    @Test
+    fun warmSelectionSkipsCachedIdleProfilesButKeepsInFlightMaterializations() {
+        val cachedIds = setOf("cached", "materializing")
+        val materializingIds = setOf("materializing")
+
+        val result =
+            profilePresentationIdsNeedingWarm(
+                accountIdHexes = listOf(" cached ", "materializing", "cold", "cold", " "),
+                hasCachedPresentation = cachedIds::contains,
+                hasMaterialization = materializingIds::contains,
+            )
+
+        assertEquals(listOf("materializing", "cold"), result)
+    }
+
+    @Test
     fun newerAuthoritativeProfileReplacesTheRetainedValue() {
         val current = ProfilePresentation(displayName = "Alice", avatarUrl = OLD_AVATAR)
         val newer = profile(displayName = "Alice new", name = "alice", picture = NEW_AVATAR)
@@ -70,6 +95,7 @@ class ProfilePresentationRefreshMergeTest {
     )
 
     private companion object {
+        const val ACCOUNT_ID = "account-id"
         const val OLD_AVATAR = "https://profiles.example/alice-old.jpg"
         const val NEW_AVATAR = "https://profiles.example/alice-new.jpg"
     }

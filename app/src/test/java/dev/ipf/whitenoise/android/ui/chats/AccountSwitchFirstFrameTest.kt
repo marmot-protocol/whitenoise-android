@@ -96,52 +96,7 @@ class AccountSwitchFirstFrameTest {
     fun completeTargetIdentitySnapshotOwnsTheFirstComposition() =
         runBlocking {
             val appState = identityAppState()
-            val named =
-                row(title = TARGET_NAMED_TITLE, groupId = NAMED_GROUP_ID)
-                    .copy(avatarUrl = TARGET_NAMED_AVATAR)
-            val direct =
-                row(title = "", groupId = DIRECT_GROUP_ID)
-                    .copy(groupName = "", conversationKind = ChatConversationKindFfi.DIRECT)
-            val memberDerived =
-                row(title = "", groupId = MEMBER_GROUP_ID)
-                    .copy(
-                        groupName = "",
-                        avatar =
-                            ChatListAvatarFfi(
-                                imageHashHex = TARGET_MEMBER_AVATAR_HASH,
-                                imageKeyHex = "redacted-test-key",
-                                imageNonceHex = "redacted-test-nonce",
-                                imageUploadKeyHex = "redacted-test-upload-key",
-                                mediaType = "image/png",
-                            ),
-                    )
-            val snapshot =
-                AccountSwitchLocalSnapshot(
-                    accountRef = TARGET_ACCOUNT,
-                    activeAccountIdHex = TARGET_ACCOUNT_HEX,
-                    rows = listOf(named, direct, memberDerived),
-                    groups =
-                        listOf(
-                            emptyGroupRecord(named).copy(name = TARGET_NAMED_TITLE, avatarUrl = TARGET_NAMED_AVATAR),
-                            emptyGroupRecord(direct),
-                            emptyGroupRecord(memberDerived).copy(imageHashHex = TARGET_MEMBER_AVATAR_HASH),
-                        ),
-                    memberIds =
-                        listOf(
-                            AppGroupMemberIdsFfi(DIRECT_GROUP_ID, listOf(TARGET_ACCOUNT_HEX, PEER_ID), emptyList()),
-                            AppGroupMemberIdsFfi(
-                                MEMBER_GROUP_ID,
-                                listOf(TARGET_ACCOUNT_HEX, PEER_ID, MEMBER_OTHER_ID),
-                                emptyList(),
-                            ),
-                        ),
-                    profiles =
-                        listOf(
-                            profileSeed(PEER_ID, PEER_NAME, PEER_AVATAR),
-                            profileSeed(ACCOUNT_A_HEX, ACCOUNT_A_NAME, ACCOUNT_A_AVATAR),
-                            profileSeed(WORK_ACCOUNT_HEX, WORK_ACCOUNT_NAME, WORK_ACCOUNT_AVATAR),
-                        ),
-                )
+            val snapshot = completeIdentitySnapshot()
             // setActiveAccount applies these seeds before publishing the controller handoff.
             snapshot.profiles.forEach(appState::applyAccountSwitchProfileSeed)
             val controller =
@@ -185,6 +140,61 @@ class AccountSwitchFirstFrameTest {
 
             controller.onCleared()
         }
+
+    private fun completeIdentitySnapshot(): AccountSwitchLocalSnapshot {
+        val named =
+            row(title = TARGET_NAMED_TITLE, groupId = NAMED_GROUP_ID)
+                .copy(avatarUrl = TARGET_NAMED_AVATAR)
+        val direct =
+            row(title = "", groupId = DIRECT_GROUP_ID)
+                .copy(groupName = "", conversationKind = ChatConversationKindFfi.DIRECT)
+        val memberDerived =
+            row(title = "", groupId = MEMBER_GROUP_ID)
+                .copy(
+                    groupName = "",
+                    avatar =
+                        ChatListAvatarFfi(
+                            imageHashHex = TARGET_MEMBER_AVATAR_HASH,
+                            imageKeyHex = "redacted-test-key",
+                            imageNonceHex = "redacted-test-nonce",
+                            imageUploadKeyHex = "redacted-test-upload-key",
+                            mediaType = "image/png",
+                        ),
+                )
+        return AccountSwitchLocalSnapshot(
+            accountRef = TARGET_ACCOUNT,
+            activeAccountIdHex = TARGET_ACCOUNT_HEX,
+            rows = listOf(named, direct, memberDerived),
+            groups =
+                listOf(
+                    emptyGroupRecord(named).copy(
+                        name = TARGET_NAMED_TITLE,
+                        avatarUrl = TARGET_NAMED_AVATAR,
+                    ),
+                    emptyGroupRecord(direct),
+                    emptyGroupRecord(memberDerived).copy(imageHashHex = TARGET_MEMBER_AVATAR_HASH),
+                ),
+            memberIds =
+                listOf(
+                    AppGroupMemberIdsFfi(
+                        DIRECT_GROUP_ID,
+                        listOf(TARGET_ACCOUNT_HEX, PEER_ID),
+                        emptyList(),
+                    ),
+                    AppGroupMemberIdsFfi(
+                        MEMBER_GROUP_ID,
+                        listOf(TARGET_ACCOUNT_HEX, PEER_ID, MEMBER_OTHER_ID),
+                        emptyList(),
+                    ),
+                ),
+            profiles =
+                listOf(
+                    profileSeed(PEER_ID, PEER_NAME, PEER_AVATAR),
+                    profileSeed(ACCOUNT_A_HEX, ACCOUNT_A_NAME, ACCOUNT_A_AVATAR),
+                    profileSeed(WORK_ACCOUNT_HEX, WORK_ACCOUNT_NAME, WORK_ACCOUNT_AVATAR),
+                ),
+        )
+    }
 
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(

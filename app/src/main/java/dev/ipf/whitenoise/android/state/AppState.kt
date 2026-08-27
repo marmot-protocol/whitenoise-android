@@ -8412,10 +8412,11 @@ class WhiteNoiseAppState private constructor(
      */
     suspend fun warmProfilePresentationsBlocking(accountIdHexes: Iterable<String>) {
         val ids =
-            accountIdHexes
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-                .distinct()
+            profilePresentationIdsNeedingWarm(
+                accountIdHexes = accountIdHexes,
+                hasCachedPresentation = profilePresentations::containsKey,
+                hasMaterialization = profileMaterializations::containsKey,
+            )
         if (ids.isEmpty()) return
         val gate = Semaphore(PROFILE_PRESENTATION_WARM_FANOUT)
         coroutineScope {

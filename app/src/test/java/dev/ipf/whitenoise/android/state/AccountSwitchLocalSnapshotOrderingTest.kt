@@ -44,7 +44,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val seededSnapshot = body.indexOf("val seededLocalSnapshot")
         val seededRenderFrame = body.indexOf("awaitRenderedChatListFrame()", startIndex = seededSnapshot)
         val seededCatchUp = body.indexOf("appState.launchCatchUpAccounts()", startIndex = seededRenderFrame)
-        val seededRecompute = body.indexOf("recompute(scheduleBackgroundEnrichment = false)", startIndex = seededCatchUp)
+        val seededRecompute =
+            body.indexOf(
+                "recompute(scheduleBackgroundEnrichment = false)",
+                startIndex = seededCatchUp,
+            )
         val firstSnapshot = body.indexOf("chatListStream.snapshot()")
         val localRowsReady = body.indexOf("recordAccountSwitchLocalRowsReady", startIndex = firstSnapshot)
         val secondSnapshot = body.indexOf("chatStream.snapshot()")
@@ -125,7 +129,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val members = presentation.indexOf("loadAccountSwitchMemberIds")
         val membersGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = members)
         val directProfiles = presentation.indexOf("val directProfiles", startIndex = membersGuard)
-        val directProfilesGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = directProfiles)
+        val directProfilesGuard =
+            presentation.indexOf(
+                "ensureAccountSwitchRequestIsCurrent",
+                startIndex = directProfiles,
+            )
         val topBarAwait = presentation.indexOf("topBarProfilesDeferred.await()", startIndex = directProfilesGuard)
         val topBarGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = topBarAwait)
 
@@ -158,8 +166,14 @@ class AccountSwitchLocalSnapshotOrderingTest {
             "the target ref must own the bounded top-bar profile seed projection",
             "accountSwitchProfileSeedIds(emptyList(), accounts, accountRef)" in snapshot,
         )
-        assertTrue("direct peers must still derive from the identity-critical member projection", "initialDirectPeerProfileIds" in directPeers)
-        assertTrue("top-bar and direct-peer seeds must be merged before publication", "directProfiles + topBarProfiles" in snapshot)
+        assertTrue(
+            "direct peers must still derive from the identity-critical member projection",
+            "initialDirectPeerProfileIds" in directPeers,
+        )
+        assertTrue(
+            "top-bar and direct-peer seeds must be merged before publication",
+            "directProfiles + topBarProfiles" in snapshot,
+        )
         val seedProjection =
             source
                 .substringAfter("internal fun accountSwitchProfileSeedIds(")
