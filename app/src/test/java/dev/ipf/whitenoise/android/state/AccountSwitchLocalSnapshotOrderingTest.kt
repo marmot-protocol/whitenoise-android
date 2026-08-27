@@ -88,10 +88,15 @@ class AccountSwitchLocalSnapshotOrderingTest {
                 startIndex = preload,
             )
         val cacheClear = body.indexOf("clearCrossAccountCaches()", startIndex = finalGenerationGuard)
+        val profileSeeds =
+            body.indexOf(
+                "localSnapshot.profiles.forEach(::applyAccountSwitchProfileSeed)",
+                startIndex = cacheClear,
+            )
         val handoff =
             body.indexOf(
                 "accountSwitchHandoff.publish(requestGeneration, localSnapshot)",
-                startIndex = cacheClear,
+                startIndex = profileSeeds,
             )
         val publishAccount = body.indexOf("activeAccountRef = label", startIndex = handoff)
 
@@ -102,7 +107,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
             "cross-account caches must clear only after the final generation guard",
             cacheClear > finalGenerationGuard,
         )
-        assertTrue("the one-shot local handoff must be ready before active account changes", handoff > cacheClear)
+        assertTrue("target profile seeds must apply after the old account caches clear", profileSeeds > cacheClear)
+        assertTrue("the one-shot handoff must publish after target profile seeds", handoff > profileSeeds)
         assertTrue("the active account must publish only after the handoff is installed", publishAccount > handoff)
     }
 
@@ -122,6 +128,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val presentationStart = body.indexOf("val presentationDeferred", startIndex = rowsGuard)
         val groupsAwait = body.indexOf("groupsDeferred.await()", startIndex = presentationStart)
         val groupsGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = groupsAwait)
+        val groupsReadyCount =
+            body.indexOf(
+                "recordAccountSwitchPreloadStage(accountRef, \"cached-groups-ready\", groups.size)",
+                startIndex = groupsGuard,
+            )
         val presentationAwait = body.indexOf("presentationDeferred.await()", startIndex = groupsGuard)
         val presentationGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = presentationAwait)
         val cleanup = body.indexOf("withContext(NonCancellable + Dispatchers.IO)", startIndex = groupsGuard)
@@ -143,6 +154,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue(rowsGuard > rows)
         assertTrue("presentation work must overlap the already-started group snapshot", presentationStart > rowsGuard)
         assertTrue(groupsGuard > groupsAwait)
+        assertTrue("cached-group diagnostics must report groups rather than rows", groupsReadyCount > groupsGuard)
         assertTrue(presentationGuard > presentationAwait)
         assertTrue("bounded top-bar profiles must overlap member projection", topBarProfiles in 0..<members)
         assertTrue(membersGuard > members)
@@ -182,6 +194,18 @@ class AccountSwitchLocalSnapshotOrderingTest {
             "the shared top-bar limit must bound profile warming",
             "take(MAX_TOP_BAR_OTHER_ACCOUNTS)" in seedProjection,
         )
+    }
+
+    @Test
+    fun blockingProfileWarmSelectsWorkAtomicallyBeforeLaunchingReads() {
+        val body = appStateSource().readText().kotlinFunctionBody("warmProfilePresentationsBlocking")
+        val lock = body.indexOf("synchronized(profilePresentationLock)")
+        val selection = body.indexOf("profilePresentationIdsNeedingWarm", startIndex = lock)
+        val reads = body.indexOf("coroutineScope", startIndex = selection)
+
+        assertTrue("warm selection must observe both profile caches under their shared lock", lock >= 0)
+        assertTrue("profile selection must happen while the shared lock is held", selection > lock)
+        assertTrue("profile I/O must start only after the atomic selection", reads > selection)
     }
 
     @Test

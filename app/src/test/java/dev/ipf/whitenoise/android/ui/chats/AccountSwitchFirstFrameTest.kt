@@ -97,7 +97,9 @@ class AccountSwitchFirstFrameTest {
         runBlocking {
             val appState = identityAppState()
             val snapshot = completeIdentitySnapshot()
-            // setActiveAccount applies these seeds before publishing the controller handoff.
+            // Production seed-before-handoff ordering and activation visibility are covered by
+            // AccountSwitchLocalSnapshotOrderingTest and AccountSwitchPerformanceIntegrationTest.
+            // This screen test isolates the resulting target snapshot's first composition.
             snapshot.profiles.forEach(appState::applyAccountSwitchProfileSeed)
             val controller =
                 ChatsController(

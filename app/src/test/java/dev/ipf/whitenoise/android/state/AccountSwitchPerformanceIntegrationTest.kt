@@ -34,9 +34,18 @@ class AccountSwitchPerformanceIntegrationTest {
 
             try {
                 fixture.bootstrap()
+                var snapshotAtActivation: AccountSwitchLocalSnapshot? = null
+                var profileTitleAtActivation: String? = null
                 val activated =
                     withTimeout(5_000L) {
-                        fixture.appState.setActiveAccount(ACCOUNT_B)
+                        fixture.appState.setActiveAccount(
+                            ACCOUNT_B,
+                            onActivated = {
+                                snapshotAtActivation =
+                                    fixture.appState.consumeAccountSwitchLocalSnapshot(ACCOUNT_B)
+                                profileTitleAtActivation = fixture.appState.chatMemberTitleCached(ACCOUNT_A_ID)
+                            },
+                        )
                     }
 
                 assertTrue(activated)
@@ -48,8 +57,9 @@ class AccountSwitchPerformanceIntegrationTest {
                 )
                 assertEquals(
                     rows,
-                    fixture.appState.consumeAccountSwitchLocalSnapshot(ACCOUNT_B)?.rows,
+                    snapshotAtActivation?.rows,
                 )
+                assertEquals("target profile seeds must be visible at activation", "Alice", profileTitleAtActivation)
             } finally {
                 fixture.close()
             }

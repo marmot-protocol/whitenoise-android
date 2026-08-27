@@ -30,6 +30,25 @@ class AccountSwitchIdentityPreloadTest {
     }
 
     @Test
+    fun duplicateIdentityRowsCountReadinessOnlyOnceIgnoringHexCase() {
+        val lower = row("abcdef", "", ChatConversationKindFfi.DIRECT)
+        val upper = row("ABCDEF", "", ChatConversationKindFfi.DIRECT)
+        val members = listOf(AppGroupMemberIdsFfi("abcdef", listOf(SELF, PEER), emptyList()))
+
+        val counts =
+            accountSwitchIdentityStateCounts(
+                rows = listOf(lower, upper),
+                memberIds = members,
+                profiles = emptyList(),
+                activeAccountIdHex = SELF,
+                topBarProfileIds = emptyList(),
+            )
+
+        assertEquals(1, counts.memberDerivedPresentationReady)
+        assertEquals(0, counts.memberDerivedPresentationMissing)
+    }
+
+    @Test
     fun groupNameThatSanitizesToEmptyStillPreloadsItsMemberDerivedFallback() {
         val spoofOnlyName = row("sanitized-empty", "\u202E\u200B", ChatConversationKindFfi.GROUP)
 

@@ -147,12 +147,14 @@ internal fun accountSwitchIdentityStateCounts(
             peerId(row) != null || row.conversationKind == ChatConversationKindFfi.DIRECT
         }
     val directReady = directRows.count { row -> usefulProfile(peerId(row)) != null }
-    val memberReady =
-        rows.count { row ->
+    val memberReadyGroupIds =
+        rows.mapNotNullTo(mutableSetOf()) { row ->
             val key = row.groupIdHex.lowercase()
-            key in identityGroupIds &&
-                membersByGroup[key]?.memberIdsHex?.any(String::isNotBlank) == true &&
-                (row.conversationKind != ChatConversationKindFfi.DIRECT || peerId(row) != null)
+            val isReady =
+                key in identityGroupIds &&
+                    membersByGroup[key]?.memberIdsHex?.any(String::isNotBlank) == true &&
+                    (row.conversationKind != ChatConversationKindFfi.DIRECT || peerId(row) != null)
+            key.takeIf { isReady }
         }
     val topBarReady = topBarProfileIds.count { id -> usefulProfile(id) != null }
     val avatarReady =
@@ -168,8 +170,8 @@ internal fun accountSwitchIdentityStateCounts(
         directPeerPresentationMissing = directRows.size - directReady,
         topBarProfileReady = topBarReady,
         topBarProfileMissing = topBarProfileIds.size - topBarReady,
-        memberDerivedPresentationReady = memberReady,
-        memberDerivedPresentationMissing = identityGroupIds.size - memberReady,
+        memberDerivedPresentationReady = memberReadyGroupIds.size,
+        memberDerivedPresentationMissing = identityGroupIds.size - memberReadyGroupIds.size,
         avatarIdentityKeyReady = avatarReady,
         avatarIdentityKeyMissing = rows.size - avatarReady,
     )

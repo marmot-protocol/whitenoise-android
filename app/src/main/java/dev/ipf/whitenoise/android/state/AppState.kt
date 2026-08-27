@@ -4905,7 +4905,7 @@ class WhiteNoiseAppState private constructor(
                     }
                 val groups = groupsDeferred.await()
                 ensureAccountSwitchRequestIsCurrent(generation)
-                recordAccountSwitchPreloadStage(accountRef, "cached-groups-ready", rows.size)
+                recordAccountSwitchPreloadStage(accountRef, "cached-groups-ready", groups.size)
                 val presentation = presentationDeferred.await()
                 ensureAccountSwitchRequestIsCurrent(generation)
 
@@ -8395,7 +8395,6 @@ class WhiteNoiseAppState private constructor(
      * its initial paint, so for a chat whose history is already on device the
      * sender name + avatar slot render empty for a few frames and then pop in
      * once the off-main local read lands and bumps [profileRevision] (#609).
-     *
      * This suspends until every sender's presentation is materialized into the
      * caches, so a caller that awaits it before publishing a timeline page
      * guarantees the first composition observes a populated presentation rather
@@ -8412,11 +8411,13 @@ class WhiteNoiseAppState private constructor(
      */
     suspend fun warmProfilePresentationsBlocking(accountIdHexes: Iterable<String>) {
         val ids =
-            profilePresentationIdsNeedingWarm(
-                accountIdHexes = accountIdHexes,
-                hasCachedPresentation = profilePresentations::containsKey,
-                hasMaterialization = profileMaterializations::containsKey,
-            )
+            synchronized(profilePresentationLock) {
+                profilePresentationIdsNeedingWarm(
+                    accountIdHexes = accountIdHexes,
+                    hasCachedPresentation = profilePresentations::containsKey,
+                    hasMaterialization = profileMaterializations::containsKey,
+                )
+            }
         if (ids.isEmpty()) return
         val gate = Semaphore(PROFILE_PRESENTATION_WARM_FANOUT)
         coroutineScope {
