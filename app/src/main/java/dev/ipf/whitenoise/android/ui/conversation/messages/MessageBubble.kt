@@ -1516,6 +1516,18 @@ internal fun MessageBubble(
                         anyConfirmedMedia -> mediaCaption
                         else -> displayedBody
                     }
+                val displayedMarkdownDocument =
+                    rememberMessageMarkdownDocumentForDisplayedBody(
+                        messageIdHex = record.messageIdHex,
+                        bodyText = bodyTextToRender,
+                        recordPlaintext = record.plaintext,
+                        storedDocument = record.contentTokens,
+                        overrideDocument = editedMarkdownDocument,
+                        deleted = deleted,
+                        persistedFailure = persistedFailure,
+                        fallbackParsingEnabled = record.kind == 9uL,
+                        parseMarkdown = parseMarkdown,
+                    )
                 val bodyOrWarningInsideBubble =
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, invalidationWarning)
                 // Captions/plain bodies sit on the resolved bubble background and therefore use
@@ -1703,7 +1715,7 @@ internal fun MessageBubble(
                                     appState = appState,
                                     eventCardResolver = eventCardResolver,
                                     bodyText = bodyTextToRender,
-                                    bodyMarkdownDocument = editedMarkdownDocument,
+                                    bodyMarkdownDocument = displayedMarkdownDocument,
                                     deleted = deleted,
                                     persistedFailure = persistedFailure,
                                     textSelectionMode = textSelectionMode,
@@ -1770,7 +1782,7 @@ internal fun MessageBubble(
                                     appState = appState,
                                     eventCardResolver = eventCardResolver,
                                     bodyText = bodyTextToRender,
-                                    bodyMarkdownDocument = editedMarkdownDocument,
+                                    bodyMarkdownDocument = displayedMarkdownDocument,
                                     deleted = deleted,
                                     persistedFailure = persistedFailure,
                                     textSelectionMode = textSelectionMode,
@@ -1835,7 +1847,7 @@ internal fun MessageBubble(
                             appState = appState,
                             eventCardResolver = eventCardResolver,
                             bodyText = bodyTextToRender,
-                            bodyMarkdownDocument = editedMarkdownDocument,
+                            bodyMarkdownDocument = displayedMarkdownDocument,
                             deleted = deleted,
                             persistedFailure = persistedFailure,
                             textSelectionMode = textSelectionMode,
@@ -1948,21 +1960,12 @@ internal fun MessageBubble(
                         }
                     val canUseExpandedComposer = !deleted && !readOnly && composerGate == ComposerGate.COMPOSER
                     val expandedBody = bodyTextToRender ?: displayedBody
-                    val expandedMarkdownDocument =
-                        messageMarkdownDocumentForDisplayedBody(
-                            bodyText = expandedBody,
-                            recordPlaintext = record.plaintext,
-                            storedDocument = record.contentTokens,
-                            overrideDocument = editedMarkdownDocument,
-                            deleted = deleted,
-                            persistedFailure = persistedFailure,
-                        )
                     MessageFullScreenView(
                         senderDisplayName = appState.displayName(record.sender),
                         senderSeed = record.sender,
                         senderAvatarUrl = appState.avatarUrl(record.sender),
                         body = expandedBody,
-                        bodyMarkdownDocument = expandedMarkdownDocument,
+                        bodyMarkdownDocument = displayedMarkdownDocument,
                         mentionDisplayName =
                             remember(appState) {
                                 { bech32: String -> appState.mentionDisplayName(bech32) }
