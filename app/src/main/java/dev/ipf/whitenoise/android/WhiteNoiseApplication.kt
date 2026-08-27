@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.applyApplicationLanguageTag
 import dev.ipf.whitenoise.android.state.persistedApplicationLanguageTag
 import dev.ipf.whitenoise.android.ui.createRecentEmojiRecentsOwner
+import dev.ipf.whitenoise.android.ui.navigation.MainShellProcessState
 import dev.ipf.whitenoise.android.updates.AppUpdateWorker
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +22,20 @@ open class WhiteNoiseApplication : Application() {
 
     val recentEmojiRecentsOwner by lazy {
         createRecentEmojiRecentsOwner()
+    }
+
+    private val mainShellProcessStateDelegate =
+        lazy {
+            MainShellProcessState(appState)
+        }
+    internal val mainShellProcessState: MainShellProcessState by mainShellProcessStateDelegate
+
+    /** Reset task-owned UI state without discarding the process-warm chat list. */
+    internal fun onTaskRemoved() {
+        if (mainShellProcessStateDelegate.isInitialized()) {
+            mainShellProcessState.onTaskRemoved()
+        }
+        appState.onTaskRemoved()
     }
 
     /**

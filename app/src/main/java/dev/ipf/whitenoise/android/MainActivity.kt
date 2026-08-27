@@ -46,6 +46,8 @@ import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
 import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
 import dev.ipf.whitenoise.android.ui.common.retainSecureFlag
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
+import dev.ipf.whitenoise.android.ui.navigation.WarmResumeLifecycleClass
+import dev.ipf.whitenoise.android.ui.navigation.warmResumeActivityLifecycleClass
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.updates.AppUpdateNavigation
 
@@ -67,8 +69,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var amberSignerLauncher: ActivityResultLauncher<Intent>
     private var warmResumeTraceToken = 0
     private var warmResumeEpoch by mutableStateOf(0)
+    private var warmResumeLifecycleClass = WarmResumeLifecycleClass.ColdProcessStart
+    private var mainShellHolderCreatedForActivity = false
     private val mainShellStateHolder: MainShellStateHolder by viewModels {
-        MainShellStateHolder.Factory(appState)
+        MainShellStateHolder.Factory(
+            appState = appState,
+            processState = (application as WhiteNoiseApplication).mainShellProcessState,
+            onHolderCreated = { mainShellHolderCreatedForActivity = true },
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,14 +89,29 @@ class MainActivity : AppCompatActivity() {
         setTheme(preComposeThemeFor(firstFrameTheme(), initialSystemDarkTheme))
         super.onCreate(savedInstanceState)
         appState = (application as WhiteNoiseApplication).appState
+        val processProjectionAlreadyOwned =
+            (application as WhiteNoiseApplication)
+                .mainShellProcessState
+                .localProjectionAvailable(
+                    activeAccountRef = appState.activeAccountRef,
+                    runtimeGeneration = appState.runtimeGeneration,
+                )
+        // Resolve the ViewModel before classifying this Activity. The factory
+        // runs only for a genuinely fresh ViewModelStore; retained recreation
+        // returns the existing holder without invoking it.
+        mainShellStateHolder
+        warmResumeLifecycleClass =
+            warmResumeActivityLifecycleClass(
+                holderCreatedForActivity = mainShellHolderCreatedForActivity,
+                processProjectionAlreadyOwned = processProjectionAlreadyOwned,
+                savedStateAvailable = savedInstanceState != null,
+            )
         warmResumeTraceToken =
             WarmResumeTrace.activityCreated(
-                recreated = savedInstanceState != null,
+                lifecycleClass = warmResumeLifecycleClass,
+                savedStateAvailable = savedInstanceState != null,
                 runtimeGeneration = appState.runtimeGeneration,
             )
-        // Create the holder before installing the splash predicate so an
-        // Activity recreation can report its retained useful frame immediately.
-        mainShellStateHolder
         holdSplashThroughBootstrap(splashScreen, splashInstalledAtMs)
         appState.onAllowChatScreenshotsChanged = allowChatScreenshotsCallback
         applyRecentsPreferenceSecureFlag(
@@ -199,7 +222,7 @@ class MainActivity : AppCompatActivity() {
                     phase = appState.phase,
                     elapsedMs = SystemClock.elapsedRealtime() - installedAtMs,
                     firstUsefulFrameReady =
-                        mainShellStateHolder.firstUsefulFrameReady(
+                        mainShellStateHolder.prepareFirstUsefulFrame(
                             phase = appState.phase,
                             activeAccountRef = appState.activeAccountRef,
                             runtimeGeneration = appState.runtimeGeneration,
@@ -262,7 +285,11 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         warmResumeEpoch += 1
-        WarmResumeTrace.foregroundStarted(warmResumeTraceToken, warmResumeEpoch)
+        WarmResumeTrace.foregroundStarted(
+            activityToken = warmResumeTraceToken,
+            foregroundEpoch = warmResumeEpoch,
+            activityClass = warmResumeLifecycleClass,
+        )
         if (::appState.isInitialized) {
             // A stopped Activity receives onStart before onNewIntent when a
             // notification brings its existing task forward. Defer the

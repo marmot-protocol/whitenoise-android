@@ -50,7 +50,7 @@ class AppStartupReadinessTest {
 
         assertTrue(snapshot >= 0)
         assertTrue(signer > snapshot)
-        assertTrue(ready > signer)
+        assertTrue("Signer callbacks must be restored before the shell becomes operational", ready > signer)
         assertTrue("Unread roster folds must not return to the bootstrap critical path", blockingFold < 0)
     }
 

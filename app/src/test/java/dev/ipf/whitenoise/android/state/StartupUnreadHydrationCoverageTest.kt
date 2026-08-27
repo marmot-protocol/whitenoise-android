@@ -28,16 +28,21 @@ class StartupUnreadHydrationCoverageTest {
     }
 
     @Test
-    fun bootstrapPublishesReadyAtTheExistingLocalActivationBoundary() {
+    fun bootstrapPublishesReadyOnlyAtTheLocalActivationBoundary() {
         val bootstrap = appStateSource().readText().functionBody("bootstrapLocked")
         val activate = bootstrap.indexOf("setActiveAccount(")
         val ready = bootstrap.indexOf("onActivated = { phase = AppPhase.Ready }", startIndex = activate)
+        val requireActivation = bootstrap.indexOf("check(activated)", startIndex = ready)
 
         assertTrue("bootstrap must select an account before publishing Ready", activate >= 0)
         assertTrue("Ready must be published from the account's local activation callback", ready > activate)
         assertTrue(
-            "a failed sign-in must retain the previous bootstrap fallback",
-            bootstrap.indexOf("if (phase == AppPhase.Bootstrapping)", startIndex = ready) > ready,
+            "bootstrap must fail closed when account activation never reaches that callback",
+            requireActivation > ready,
+        )
+        assertFalse(
+            "failed activation must never fall through to Ready",
+            "if (phase == AppPhase.Bootstrapping)" in bootstrap,
         )
     }
 

@@ -99,7 +99,9 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
     @Test
     fun localPreloadFencesEverySuspendingStageAndAlwaysClosesTemporarySubscriptions() {
-        val body = appStateSource().readText().kotlinFunctionBody("loadAccountSwitchLocalSnapshot")
+        val source = appStateSource().readText()
+        val body = source.kotlinFunctionBody("loadAccountSwitchLocalSnapshot")
+        val presentation = source.kotlinFunctionBody("loadAccountSwitchPresentationSeeds")
         val firstSubscription = body.indexOf("subscribeChatList")
         val firstGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = firstSubscription)
         val secondSubscription = body.indexOf("subscribeChats", startIndex = firstGuard)
@@ -108,11 +110,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val rowsGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = rows)
         val groups = body.indexOf("chatsSubscription.snapshot()", startIndex = rowsGuard)
         val groupsGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = groups)
-        val members = body.indexOf("loadAccountSwitchMemberIds", startIndex = groupsGuard)
-        val membersGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = members)
-        val profiles = body.indexOf("loadAccountSwitchProfileSeeds", startIndex = membersGuard)
-        val profilesGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = profiles)
-        val cleanup = body.indexOf("withContext(NonCancellable + Dispatchers.IO)", startIndex = profilesGuard)
+        val cleanup = body.indexOf("withContext(NonCancellable + Dispatchers.IO)", startIndex = groupsGuard)
+        val members = presentation.indexOf("loadAccountSwitchMemberIds")
+        val membersGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = members)
+        val profiles = presentation.indexOf("loadAccountSwitchProfileSeeds", startIndex = membersGuard)
+        val profilesGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = profiles)
 
         assertTrue(firstGuard > firstSubscription)
         assertTrue(secondGuard > secondSubscription)
@@ -120,7 +122,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue(groupsGuard > groups)
         assertTrue(membersGuard > members)
         assertTrue(profilesGuard > profiles)
-        assertTrue("temporary subscriptions must close even for stale/cancelled loads", cleanup > profilesGuard)
+        assertTrue("temporary subscriptions must close even for stale/cancelled loads", cleanup > groupsGuard)
         assertTrue("chat-list subscription must close", "chatListSubscription?.close()" in body)
         assertTrue("group subscription must close", "chatsSubscription?.close()" in body)
     }
@@ -128,7 +130,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun localProfileWarmUsesTheTargetAccountAndSharedTopBarLimit() {
         val source = appStateSource().readText()
-        val snapshot = source.kotlinFunctionBody("loadAccountSwitchLocalSnapshot")
+        val snapshot = source.kotlinFunctionBody("loadAccountSwitchPresentationSeeds")
         val loader = source.kotlinFunctionBody("loadAccountSwitchProfileSeeds")
 
         assertTrue("the target ref must own the profile seed projection", "targetAccountRef = accountRef" in snapshot)
@@ -237,7 +239,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
     @Test
     fun notificationPriorityPolicySkipsBroadPreloadAndDefersBestEffortWork() {
-        val policy = appStateSource().readText()
+        val policy = accountSwitchSnapshotSource().readText()
         val body = setActiveAccountSection()
         val policyGate = body.indexOf("shouldLoadAccountSwitchLocalSnapshot(")
         val broadSnapshot = body.indexOf("loadAccountSwitchLocalSnapshot(label, requestGeneration)")
@@ -348,6 +350,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
     private fun controllersSource(): File = source("state/Controllers.kt")
 
     private fun appStateSource(): File = source("state/AppState.kt")
+
+    private fun accountSwitchSnapshotSource(): File = source("state/AccountSwitchLocalSnapshot.kt")
 
     private fun setActiveAccountSection(): String {
         val source = appStateSource().readText()
