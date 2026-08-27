@@ -50,6 +50,11 @@ jobs:
       - name: Test PR preview publisher
         run: bash .github/scripts/test-upload-pr-apk-to-blossom.sh
 
+      - name: Test release and staging transport tooling
+        run: |
+          ./scripts/release_test.sh
+          .github/scripts/test-staging-apk-transport.sh
+
       - name: Test MarmotKit artifact preparation
         run: ./scripts/test-prepare-marmotkit-artifact.sh
 
