@@ -325,7 +325,7 @@ private fun SettingsHomeScreen(
             activeAccount?.let { account ->
                 SettingsHomeAccount(
                     title = appState.displayName(account.accountIdHex),
-                    subtitle = appState.shortNpub(account.accountIdHex),
+                    subtitle = appState.npubForDisplay(account.accountIdHex),
                     seed = account.accountIdHex,
                     pictureUrl = appState.avatarUrl(account.accountIdHex),
                 )
