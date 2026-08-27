@@ -52,6 +52,7 @@ internal fun buildShareShortcut(
     context: Context,
     target: ShareShortcutTarget,
     existingTitle: String? = null,
+    rank: Int = 0,
 ): ShortcutInfoCompat? {
     val shortcutId = conversationShortcutId(target.accountRef, target.groupIdHex) ?: return null
     val title = preferredConversationShortcutTitle(target.title, existingTitle)
@@ -66,6 +67,7 @@ internal fun buildShareShortcut(
                 avatarBitmap = null,
             ),
         ).setIntent(buildShareShortcutIntent(context))
+        .setRank(rank)
         .setLongLived(true)
         .setCategories(setOf(CONVERSATION_SHARE_TARGET_CATEGORY))
         .setExtras(checkNotNull(conversationShortcutAccountExtras(target.accountRef)))
@@ -108,16 +110,22 @@ class ShareShortcutPublisher(
             if (targets.isEmpty()) {
                 emptyList()
             } else {
-                targets.mapNotNull { target ->
-                    val shortcutId = conversationShortcutId(accountRef, target.groupIdHex) ?: return@mapNotNull null
+                targets.mapIndexedNotNull { rank, target ->
+                    val shortcutId =
+                        conversationShortcutId(accountRef, target.groupIdHex)
+                            ?: return@mapIndexedNotNull null
                     val existing = existingById[shortcutId]
                     if (existing != null && conversationShortcutIsRich(existing)) {
-                        existing
+                        ShortcutInfoCompat
+                            .Builder(existing)
+                            .setRank(rank)
+                            .build()
                     } else {
                         buildShareShortcut(
                             context,
                             target,
                             existing?.longLabel?.toString(),
+                            rank,
                         )
                     }
                 }

@@ -56,6 +56,26 @@ class ShareRequestTest {
     }
 
     @Test
+    fun routeInboundIntent_bareRelaunchPreservesPendingShare() {
+        val share =
+            ShareRequest(
+                SharePayload("pending", emptyList(), "text/plain"),
+                shortcutId = null,
+                requestId = "pending-share",
+            )
+
+        val routed =
+            routeInboundIntent(
+                parsedTarget = null,
+                shareRequest = null,
+                dataString = null,
+                current = noPending.copy(shareRequest = share),
+            )
+
+        assertEquals(share, routed.shareRequest)
+    }
+
+    @Test
     fun resolveDirectShareGroupId_matchesShortcutWithinActiveChatsOnly() {
         val accountRef = "acct-a"
         val groupId = "group-1"
