@@ -41,7 +41,7 @@ class SettingsScreenScreenshotTest {
                         account =
                             SettingsHomeAccount(
                                 title = "Alice",
-                                subtitle = "npub1alice0000",
+                                subtitle = FULL_NPUB,
                                 seed = "alice-account-id",
                                 pictureUrl = null,
                             ),
@@ -98,7 +98,7 @@ class SettingsScreenScreenshotTest {
             account =
                 SettingsHomeAccount(
                     title = "Alice",
-                    subtitle = "npub1alice0000",
+                    subtitle = FULL_NPUB,
                     seed = "alice-account-id",
                     pictureUrl = null,
                 ),
@@ -123,5 +123,6 @@ class SettingsScreenScreenshotTest {
 
     private companion object {
         const val SETTINGS_WITH_CONFIRMATION_TAG = "settings-with-global-confirmation"
+        const val FULL_NPUB = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
     }
 }
