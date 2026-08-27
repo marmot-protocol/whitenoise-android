@@ -1947,11 +1947,39 @@ internal fun MessageBubble(
                             controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
                         }
                     val canUseExpandedComposer = !deleted && !readOnly && composerGate == ComposerGate.COMPOSER
+                    val expandedBody = bodyTextToRender ?: displayedBody
+                    val expandedMarkdownDocument =
+                        messageMarkdownDocumentForDisplayedBody(
+                            bodyText = expandedBody,
+                            recordPlaintext = record.plaintext,
+                            storedDocument = record.contentTokens,
+                            overrideDocument = editedMarkdownDocument,
+                            deleted = deleted,
+                            persistedFailure = persistedFailure,
+                        )
                     MessageFullScreenView(
                         senderDisplayName = appState.displayName(record.sender),
                         senderSeed = record.sender,
                         senderAvatarUrl = appState.avatarUrl(record.sender),
-                        body = displayedBody,
+                        body = expandedBody,
+                        bodyMarkdownDocument = expandedMarkdownDocument,
+                        mentionDisplayName =
+                            remember(appState) {
+                                { bech32: String -> appState.mentionDisplayName(bech32) }
+                            },
+                        isGroupMember =
+                            if (controller.membersLoaded) {
+                                remember(appState, controller) {
+                                    { bech32: String -> appState.isRosterMember(bech32, controller.members) }
+                                }
+                            } else {
+                                null
+                            },
+                        onNostrProfileTap =
+                            remember(appState) {
+                                { bech32: String -> appState.presentNostrProfile(bech32) }
+                            },
+                        onCopyMarkdownLink = ::copyMarkdownLink,
                         timeText = rememberedClockTime(record.recordedAt),
                         showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
                         status = item.status,
