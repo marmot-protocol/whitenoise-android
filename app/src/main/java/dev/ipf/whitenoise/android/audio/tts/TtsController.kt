@@ -440,12 +440,13 @@ class TtsController internal constructor(
             )
         engineHasSpoken = true
         activeTiming = ActiveUtteranceTiming(activeUtteranceId, startedAt, appliedRate)
-        if (!rangeProbe.hasConfirmedRangeCapability) {
-            // Runs whenever the engine has not PROVEN it reports timing. Waiting
-            // for the probe to prove the opposite would leave the first message or
-            // two of every fresh session with no word highlight at all; running
-            // optimistically is safe because the first real range callback yields
-            // this schedule permanently.
+        if (rangeProbe.reportsRanges != true) {
+            // A stored capable verdict is provisional for evidence collection,
+            // but it remains the playback-lane decision until enough answerable
+            // silence overturns it. Starting the estimate over that lane races a
+            // range-capable engine and can leave neither the engine nor estimate
+            // owning the visible passage. A restored stale verdict still recovers:
+            // onDone keeps examining it and arms the estimate after overturning it.
             wordTicker.start(
                 utteranceId = activeUtteranceId,
                 words =
@@ -466,8 +467,9 @@ class TtsController internal constructor(
         start: Int,
         end: Int,
     ): Boolean {
-        // A real engine range that arrived mid-utterance takes over permanently.
-        if (rangeProbe.hasConfirmedRangeCapability) return false
+        // A capable verdict (restored or confirmed here) owns this playback lane;
+        // estimated ranges are only accepted after silence overturns that verdict.
+        if (rangeProbe.reportsRanges == true) return false
         return queue.onRangeStart(utteranceId, start, end, ESTIMATED_RANGE_FRAME) !=
             TtsPlaybackQueue.RangeApplication.Stale
     }
@@ -528,7 +530,7 @@ class TtsController internal constructor(
                 // engine callback must not erase a word already painted by the
                 // estimate. Once the engine is confirmed capable, preserve the
                 // original engine-only behavior and fall back to the sentence.
-                retainVisibleWordOnFallback = !rangeProbe.hasConfirmedRangeCapability,
+                retainVisibleWordOnFallback = rangeProbe.reportsRanges != true,
             )
         if (application != TtsPlaybackQueue.RangeApplication.VisibleWord) return
         // Confirm on EVERY usable range, not only the first: a verdict restored

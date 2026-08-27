@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.speech.tts.TextToSpeech
+import dev.ipf.whitenoise.android.ui.conversation.timelineRowTtsHighlightPassage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -43,6 +44,10 @@ class TtsEstimatedTimingLaneTest {
                 listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
                 harness.controller.state.value.passage
                     ?.visibleWord,
+            )
+            assertEquals(
+                harness.controller.state.value.passage,
+                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
             )
 
             advanceTimeBy(600)
@@ -110,7 +115,7 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun aRestoredCapableVerdictUsesEstimatesUntilAUsableRangeReconfirmsIt() =
+    fun aRestoredCapableVerdictKeepsTheEngineLaneUntilAUsableRangeReconfirmsIt() =
         runTest {
             val harness = LaneHarness(this)
             harness.store.verdicts[ENGINE_KEY] = true
@@ -119,29 +124,55 @@ class TtsEstimatedTimingLaneTest {
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
 
             harness.engine.start(index = 0)
-            advanceTimeBy(150)
-            runCurrent()
-
-            val estimatedPassage = harness.controller.state.value.passage
-            assertEquals(0, estimatedPassage?.sentenceIndex)
+            val enginePassage = harness.controller.state.value.passage
+            assertEquals(0, enginePassage?.sentenceIndex)
+            assertEquals(emptyList<TtsVisibleTextSpan>(), enginePassage?.visibleWord)
             assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
-                estimatedPassage?.visibleWord,
+                enginePassage,
+                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
             )
 
-            // A provisional stored verdict must not let an unusable engine
-            // callback erase the estimated word that is keeping speech visible.
+            // A stored capable verdict keeps the same engine-owned lane as
+            // master. Provisionality affects evidence collection, not which
+            // producer owns the visible passage while the engine is speaking.
+            // onStart publishes the sentence immediately; no asynchronous word
+            // estimate is allowed to race the engine and replace it.
+            advanceTimeBy(2_000)
+            runCurrent()
+            assertEquals(enginePassage, harness.controller.state.value.passage)
+
+            // An unusable callback falls back to the sentence, as it did before
+            // the restored-verdict changes, rather than handing ownership to an
+            // asynchronous estimate racing the range-capable engine.
             harness.engine.range(index = 0, start = 0, end = 0)
-            assertEquals(estimatedPassage, harness.controller.state.value.passage)
+            assertEquals(
+                0,
+                harness.controller.state.value.passage
+                    ?.sentenceIndex,
+            )
+            assertEquals(
+                emptyList<TtsVisibleTextSpan>(),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+            assertEquals(
+                enginePassage,
+                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
+            )
 
             // The first usable real callback reconfirms the restored verdict and
-            // retires the estimator without rewriting an unchanged true value.
+            // publishes both the active sentence and current word without
+            // rewriting an unchanged true value.
             harness.engine.range(index = 0, start = 6, end = 11)
             assertEquals(0, harness.store.rangeVerdictWrites)
             assertEquals(
                 listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
                 harness.controller.state.value.passage
                     ?.visibleWord,
+            )
+            assertEquals(
+                harness.controller.state.value.passage,
+                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
             )
 
             advanceTimeBy(2_000)
@@ -240,6 +271,10 @@ class TtsEstimatedTimingLaneTest {
                 listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
                 harness.controller.state.value.passage
                     ?.visibleWord,
+            )
+            assertEquals(
+                harness.controller.state.value.passage,
+                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
             )
         }
 
