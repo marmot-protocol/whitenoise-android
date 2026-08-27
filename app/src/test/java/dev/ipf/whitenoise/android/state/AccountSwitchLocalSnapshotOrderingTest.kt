@@ -44,6 +44,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val seededSnapshot = body.indexOf("val seededLocalSnapshot")
         val seededRenderFrame = body.indexOf("awaitRenderedChatListFrame()", startIndex = seededSnapshot)
         val seededCatchUp = body.indexOf("appState.launchCatchUpAccounts()", startIndex = seededRenderFrame)
+        val seededRecompute = body.indexOf("recompute(scheduleBackgroundEnrichment = false)", startIndex = seededCatchUp)
         val firstSnapshot = body.indexOf("chatListStream.snapshot()")
         val localRowsReady = body.indexOf("recordAccountSwitchLocalRowsReady", startIndex = firstSnapshot)
         val secondSnapshot = body.indexOf("chatStream.snapshot()")
@@ -54,6 +55,10 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
         assertTrue("a constructor seed must be detected before bind clears state", seededSnapshot >= 0)
         assertTrue("the seeded target list must draw before its catch-up starts", seededCatchUp > seededRenderFrame)
+        assertTrue(
+            "deferred rosters must wait for the batched live hydration instead of starting an N-call fan-out",
+            seededRecompute > seededCatchUp,
+        )
         assertTrue("chat-list snapshot must be read", firstSnapshot >= 0)
         assertTrue("cached-row timing must follow its local snapshot", localRowsReady > firstSnapshot)
         assertTrue("chats snapshot must follow the chat-list snapshot", secondSnapshot > firstSnapshot)
@@ -106,22 +111,35 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val firstGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = firstSubscription)
         val secondSubscription = body.indexOf("subscribeChats", startIndex = firstGuard)
         val secondGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = secondSubscription)
-        val rows = body.indexOf("chatListSubscription.snapshot()", startIndex = secondGuard)
+        val groupsStart = body.indexOf("val groupsDeferred = async", startIndex = secondGuard)
+        val groupsSnapshot = body.indexOf("chatsSubscription.snapshot()", startIndex = groupsStart)
+        val rows = body.indexOf("chatListSubscription.snapshot()", startIndex = groupsSnapshot)
         val rowsGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = rows)
-        val groups = body.indexOf("chatsSubscription.snapshot()", startIndex = rowsGuard)
-        val groupsGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = groups)
+        val presentationStart = body.indexOf("val presentationDeferred", startIndex = rowsGuard)
+        val groupsAwait = body.indexOf("groupsDeferred.await()", startIndex = presentationStart)
+        val groupsGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = groupsAwait)
+        val presentationAwait = body.indexOf("presentationDeferred.await()", startIndex = groupsGuard)
+        val presentationGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = presentationAwait)
         val cleanup = body.indexOf("withContext(NonCancellable + Dispatchers.IO)", startIndex = groupsGuard)
+        val topBarProfiles = presentation.indexOf("topBarProfilesDeferred = async")
         val members = presentation.indexOf("loadAccountSwitchMemberIds")
         val membersGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = members)
-        val profiles = presentation.indexOf("loadAccountSwitchProfileSeeds", startIndex = membersGuard)
-        val profilesGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = profiles)
+        val directProfiles = presentation.indexOf("val directProfiles", startIndex = membersGuard)
+        val directProfilesGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = directProfiles)
+        val topBarAwait = presentation.indexOf("topBarProfilesDeferred.await()", startIndex = directProfilesGuard)
+        val topBarGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = topBarAwait)
 
         assertTrue(firstGuard > firstSubscription)
         assertTrue(secondGuard > secondSubscription)
+        assertTrue("the independent group snapshot must start before the row snapshot", groupsSnapshot > groupsStart)
         assertTrue(rowsGuard > rows)
-        assertTrue(groupsGuard > groups)
+        assertTrue("presentation work must overlap the already-started group snapshot", presentationStart > rowsGuard)
+        assertTrue(groupsGuard > groupsAwait)
+        assertTrue(presentationGuard > presentationAwait)
+        assertTrue("bounded top-bar profiles must overlap member projection", topBarProfiles in 0..<members)
         assertTrue(membersGuard > members)
-        assertTrue(profilesGuard > profiles)
+        assertTrue(directProfilesGuard > directProfiles)
+        assertTrue(topBarGuard > topBarAwait)
         assertTrue("temporary subscriptions must close even for stale/cancelled loads", cleanup > groupsGuard)
         assertTrue("chat-list subscription must close", "chatListSubscription?.close()" in body)
         assertTrue("group subscription must close", "chatsSubscription?.close()" in body)
@@ -131,10 +149,17 @@ class AccountSwitchLocalSnapshotOrderingTest {
     fun localProfileWarmUsesTheTargetAccountAndSharedTopBarLimit() {
         val source = appStateSource().readText()
         val snapshot = source.kotlinFunctionBody("loadAccountSwitchPresentationSeeds")
-        val loader = source.kotlinFunctionBody("loadAccountSwitchProfileSeeds")
+        val directPeers =
+            accountSwitchSnapshotSource()
+                .readText()
+                .kotlinFunctionBody("accountSwitchDirectPeerProfileIds")
 
-        assertTrue("the target ref must own the profile seed projection", "targetAccountRef = accountRef" in snapshot)
-        assertTrue("top-bar accounts must join direct-peer profile seeds", "accountSwitchProfileSeedIds" in loader)
+        assertTrue(
+            "the target ref must own the bounded top-bar profile seed projection",
+            "accountSwitchProfileSeedIds(emptyList(), accounts, accountRef)" in snapshot,
+        )
+        assertTrue("direct peers must still derive from the identity-critical member projection", "initialDirectPeerProfileIds" in directPeers)
+        assertTrue("top-bar and direct-peer seeds must be merged before publication", "directProfiles + topBarProfiles" in snapshot)
         val seedProjection =
             source
                 .substringAfter("internal fun accountSwitchProfileSeedIds(")

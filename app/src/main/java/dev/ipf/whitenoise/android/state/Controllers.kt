@@ -4020,7 +4020,12 @@ class ChatsController private constructor(
                     appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
                     catchUpStarted = true
                     appState.launchCatchUpAccounts()
-                    recompute()
+                    // A performance-shaped handoff may contain only the
+                    // rosters needed to render first-frame identity. Do not
+                    // turn every deferred named-group roster into an N-call
+                    // `groupMembers` fan-out here: the live subscription path
+                    // immediately below owns one batched member-id hydration.
+                    recompute(scheduleBackgroundEnrichment = false)
                 }
             }
             while (coroutineContext.isActive && shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {

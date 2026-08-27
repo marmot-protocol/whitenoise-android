@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGeneration
@@ -149,6 +150,38 @@ internal data class ProfilePresentation(
     companion object {
         val Empty = ProfilePresentation(displayName = null, avatarUrl = null)
     }
+}
+
+/**
+ * Merge a refresh result without letting a transient local/profile miss erase
+ * an identity that was already useful on screen. A non-null profile is the
+ * explicit authoritative state: blank name/picture fields therefore clear the
+ * old values. A name-only result updates that field while retaining the known
+ * avatar; a completely empty result retains the current presentation.
+ */
+internal fun refreshedProfilePresentation(
+    current: ProfilePresentation,
+    profile: UserProfileMetadataFfi?,
+    rawDisplayName: String?,
+): ProfilePresentation {
+    val refreshedDisplayName =
+        ProfileSanitizer.displayName(
+            rawDisplayName ?: profile?.displayName ?: profile?.name,
+        )
+    return ProfilePresentation(
+        displayName =
+            if (profile != null) {
+                refreshedDisplayName
+            } else {
+                refreshedDisplayName ?: current.displayName
+            },
+        avatarUrl =
+            if (profile != null) {
+                ProfileSanitizer.protocolImageUrl(profile.picture)
+            } else {
+                current.avatarUrl
+            },
+    )
 }
 
 internal data class ProfileMaterializationReservation(
