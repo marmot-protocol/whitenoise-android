@@ -440,7 +440,7 @@ class TtsController internal constructor(
             )
         engineHasSpoken = true
         activeTiming = ActiveUtteranceTiming(activeUtteranceId, startedAt, appliedRate)
-        if (rangeProbe.reportsRanges != true) {
+        if (!rangeProbe.hasConfirmedRangeCapability) {
             // Runs whenever the engine has not PROVEN it reports timing. Waiting
             // for the probe to prove the opposite would leave the first message or
             // two of every fresh session with no word highlight at all; running
@@ -467,7 +467,7 @@ class TtsController internal constructor(
         end: Int,
     ): Boolean {
         // A real engine range that arrived mid-utterance takes over permanently.
-        if (rangeProbe.reportsRanges == true) return false
+        if (rangeProbe.hasConfirmedRangeCapability) return false
         return queue.onRangeStart(utteranceId, start, end, ESTIMATED_RANGE_FRAME) !=
             TtsPlaybackQueue.RangeApplication.Stale
     }
@@ -528,7 +528,7 @@ class TtsController internal constructor(
                 // engine callback must not erase a word already painted by the
                 // estimate. Once the engine is confirmed capable, preserve the
                 // original engine-only behavior and fall back to the sentence.
-                retainVisibleWordOnFallback = rangeProbe.reportsRanges != true,
+                retainVisibleWordOnFallback = !rangeProbe.hasConfirmedRangeCapability,
             )
         if (application != TtsPlaybackQueue.RangeApplication.VisibleWord) return
         // Confirm on EVERY usable range, not only the first: a verdict restored
@@ -538,7 +538,7 @@ class TtsController internal constructor(
         // onRangeStart sets reportsRanges itself - a guard evaluated afterwards
         // would always be false, and a first-proof range would then neither
         // retire the estimate nor persist what it had just proved.
-        val wasProven = rangeProbe.reportsRanges == true
+        val wasProven = rangeProbe.hasConfirmedRangeCapability
         rangeProbe.onRangeStart()
         if (!wasProven) {
             wordTicker.stop()

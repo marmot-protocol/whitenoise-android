@@ -27,6 +27,7 @@ import java.util.Locale
  * make, only a statement about how the controller reacts if it happens.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("LargeClass") // Estimated timing, range capability, and pace calibration share one engine/controller harness.
 class TtsEstimatedTimingLaneTest {
     @Test
     fun rangeSilentEngineGetsEstimatedWordHighlights() =
@@ -109,7 +110,7 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun aPersistedCapableVerdictNeverArmsTheEstimate() =
+    fun aRestoredCapableVerdictUsesEstimatesUntilAUsableRangeReconfirmsIt() =
         runTest {
             val harness = LaneHarness(this)
             harness.store.verdicts[ENGINE_KEY] = true
@@ -118,11 +119,35 @@ class TtsEstimatedTimingLaneTest {
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
 
             harness.engine.start(index = 0)
-            advanceTimeBy(2_000)
+            advanceTimeBy(150)
             runCurrent()
 
+            val estimatedPassage = harness.controller.state.value.passage
+            assertEquals(0, estimatedPassage?.sentenceIndex)
             assertEquals(
-                emptyList<TtsVisibleTextSpan>(),
+                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
+                estimatedPassage?.visibleWord,
+            )
+
+            // A provisional stored verdict must not let an unusable engine
+            // callback erase the estimated word that is keeping speech visible.
+            harness.engine.range(index = 0, start = 0, end = 0)
+            assertEquals(estimatedPassage, harness.controller.state.value.passage)
+
+            // The first usable real callback reconfirms the restored verdict,
+            // persists that fresh evidence, and retires the estimator.
+            harness.engine.range(index = 0, start = 6, end = 11)
+            assertEquals(1, harness.store.rangeVerdictWrites)
+            assertEquals(
+                listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+
+            advanceTimeBy(2_000)
+            runCurrent()
+            assertEquals(
+                listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
                 harness.controller.state.value.passage
                     ?.visibleWord,
             )
@@ -836,6 +861,7 @@ class TtsEstimatedTimingLaneTest {
     private class FakeTimingStore : TtsTimingStore {
         val verdicts = mutableMapOf<String, Boolean>()
         val paces = mutableMapOf<String, Double>()
+        var rangeVerdictWrites = 0
         var paceWrites = 0
 
         override fun rangeVerdict(engineKey: String): Boolean? = verdicts[engineKey]
@@ -845,6 +871,7 @@ class TtsEstimatedTimingLaneTest {
             verdict: Boolean,
         ) {
             verdicts[engineKey] = verdict
+            rangeVerdictWrites++
         }
 
         override fun msPerUnitAt1x(engineKey: String): Double? = paces[engineKey]

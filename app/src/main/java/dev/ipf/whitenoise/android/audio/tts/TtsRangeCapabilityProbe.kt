@@ -54,6 +54,10 @@ internal class TtsRangeCapabilityProbe(
     var isConfirmed: Boolean = false
         private set
 
+    /** True only when this attachment has itself observed usable range timing. */
+    val hasConfirmedRangeCapability: Boolean
+        get() = reportsRanges == true && isConfirmed
+
     private var sawRangeForCurrentUtterance = false
     private var silentChars = 0
 
