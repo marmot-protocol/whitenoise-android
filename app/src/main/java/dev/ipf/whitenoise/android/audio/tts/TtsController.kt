@@ -534,15 +534,16 @@ class TtsController internal constructor(
         // Confirm on EVERY usable range, not only the first: a verdict restored
         // from storage is provisional, and confirmation is what stops it being
         // obeyed for the life of the process after the engine has stopped
-        // earning it. The snapshot is read before confirming, because
-        // onRangeStart sets reportsRanges itself - a guard evaluated afterwards
-        // would always be false, and a first-proof range would then neither
-        // retire the estimate nor persist what it had just proved.
+        // earning it. The snapshots are read before confirming, because
+        // onRangeStart sets reportsRanges itself - guards evaluated afterwards
+        // would always be false. A first proof retires the estimate and persists
+        // a newly learned verdict, but does not rewrite a restored true verdict.
         val wasProven = rangeProbe.hasConfirmedRangeCapability
+        val wasCapable = rangeProbe.reportsRanges == true
         rangeProbe.onRangeStart()
         if (!wasProven) {
             wordTicker.stop()
-            timingStore?.setRangeVerdict(engineKey, true)
+            if (!wasCapable) timingStore?.setRangeVerdict(engineKey, true)
         }
     }
 

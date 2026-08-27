@@ -134,10 +134,10 @@ class TtsEstimatedTimingLaneTest {
             harness.engine.range(index = 0, start = 0, end = 0)
             assertEquals(estimatedPassage, harness.controller.state.value.passage)
 
-            // The first usable real callback reconfirms the restored verdict,
-            // persists that fresh evidence, and retires the estimator.
+            // The first usable real callback reconfirms the restored verdict and
+            // retires the estimator without rewriting an unchanged true value.
             harness.engine.range(index = 0, start = 6, end = 11)
-            assertEquals(1, harness.store.rangeVerdictWrites)
+            assertEquals(0, harness.store.rangeVerdictWrites)
             assertEquals(
                 listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
                 harness.controller.state.value.passage
