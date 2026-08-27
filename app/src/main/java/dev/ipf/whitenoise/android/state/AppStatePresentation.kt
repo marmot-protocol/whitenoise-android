@@ -166,7 +166,11 @@ internal fun refreshedProfilePresentation(
 ): ProfilePresentation {
     val refreshedDisplayName =
         ProfileSanitizer.displayName(
-            rawDisplayName ?: profile?.displayName ?: profile?.name,
+            if (profile != null) {
+                profile.displayName ?: profile.name
+            } else {
+                rawDisplayName
+            },
         )
     return ProfilePresentation(
         displayName =

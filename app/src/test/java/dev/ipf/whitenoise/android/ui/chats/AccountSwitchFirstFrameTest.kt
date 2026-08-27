@@ -96,7 +96,6 @@ class AccountSwitchFirstFrameTest {
     fun completeTargetIdentitySnapshotOwnsTheFirstComposition() =
         runBlocking {
             val appState = identityAppState()
-            appState.warmProfilePresentationsBlocking(listOf(PEER_ID, ACCOUNT_A_HEX, WORK_ACCOUNT_HEX))
             val named =
                 row(title = TARGET_NAMED_TITLE, groupId = NAMED_GROUP_ID)
                     .copy(avatarUrl = TARGET_NAMED_AVATAR)
@@ -143,6 +142,8 @@ class AccountSwitchFirstFrameTest {
                             profileSeed(WORK_ACCOUNT_HEX, WORK_ACCOUNT_NAME, WORK_ACCOUNT_AVATAR),
                         ),
                 )
+            // setActiveAccount applies these seeds before publishing the controller handoff.
+            snapshot.profiles.forEach(appState::applyAccountSwitchProfileSeed)
             val controller =
                 ChatsController(
                     appState = appState,
@@ -206,8 +207,6 @@ class AccountSwitchFirstFrameTest {
                     account(WORK_ACCOUNT, WORK_ACCOUNT_HEX),
                 ),
             activeAccountRef = TARGET_ACCOUNT,
-            profileReader = { id -> identityProfile(id) },
-            profileDisplayNameReader = { id -> identityProfile(id)?.displayName },
             profileRefreshRequest = {},
         )
 
@@ -232,14 +231,6 @@ class AccountSwitchFirstFrameTest {
         signedOut = false,
         running = true,
     )
-
-    private fun identityProfile(id: String): UserProfileMetadataFfi? =
-        when (id) {
-            PEER_ID -> profile(PEER_NAME, PEER_AVATAR)
-            ACCOUNT_A_HEX -> profile(ACCOUNT_A_NAME, ACCOUNT_A_AVATAR)
-            WORK_ACCOUNT_HEX -> profile(WORK_ACCOUNT_NAME, WORK_ACCOUNT_AVATAR)
-            else -> null
-        }
 
     private fun profile(
         displayName: String,

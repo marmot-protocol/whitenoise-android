@@ -9861,7 +9861,7 @@ class WhiteNoiseAppState private constructor(
         return accountSwitchProfileSeed(id, profile, rawDisplayName)
     }
 
-    private fun applyAccountSwitchProfileSeed(seed: AccountSwitchProfileSeed) {
+    internal fun applyAccountSwitchProfileSeed(seed: AccountSwitchProfileSeed) {
         applyProfilePresentation(
             accountIdHex = seed.accountIdHex,
             profile = seed.profile,

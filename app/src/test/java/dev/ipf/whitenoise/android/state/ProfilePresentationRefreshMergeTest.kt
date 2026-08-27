@@ -35,6 +35,17 @@ class ProfilePresentationRefreshMergeTest {
     }
 
     @Test
+    fun explicitAuthoritativeNameRemovalBeatsAStaleNameOnlyResult() {
+        val current = ProfilePresentation(displayName = "Alice", avatarUrl = OLD_AVATAR)
+        val removed = profile(displayName = null, name = null, picture = NEW_AVATAR)
+
+        val result = refreshedProfilePresentation(current, profile = removed, rawDisplayName = "Alice")
+
+        assertNull(result.displayName)
+        assertEquals(NEW_AVATAR, result.avatarUrl)
+    }
+
+    @Test
     fun newerAuthoritativeProfileReplacesTheRetainedValue() {
         val current = ProfilePresentation(displayName = "Alice", avatarUrl = OLD_AVATAR)
         val newer = profile(displayName = "Alice new", name = "alice", picture = NEW_AVATAR)
