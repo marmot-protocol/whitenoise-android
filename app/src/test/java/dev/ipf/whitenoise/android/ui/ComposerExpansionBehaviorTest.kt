@@ -21,12 +21,19 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
+import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
+import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_INDICATOR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
@@ -40,9 +47,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 class ComposerExpansionBehaviorTest {
     @get:Rule
@@ -131,6 +140,47 @@ class ComposerExpansionBehaviorTest {
         composeRule
             .onNodeWithContentDescription(app.getString(R.string.composer_resize))
             .assertDoesNotExist()
+    }
+
+    @Test
+    fun thresholdDraftWithDictationAndAttachmentsSettlesWithoutLayoutOscillation() {
+        val draft = "#938 close as done, win obtained"
+
+        render(
+            draft = draft,
+            dictationController = idleDictationController(TextFieldValue(draft)),
+            width = 300,
+        )
+
+        resizeHandle().assertExists()
+        val settledHeight =
+            composeRule
+                .onNodeWithTag(TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+
+        repeat(6) { composeRule.mainClock.advanceTimeByFrame() }
+        composeRule.waitForIdle()
+
+        resizeHandle().assertExists()
+        val finalHeight =
+            composeRule
+                .onNodeWithTag(TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        assertTrue("the unchanged draft must keep one composer height", abs(finalHeight - settledHeight) <= 1f)
+    }
+
+    @Test
+    fun deletingAnAutomaticLongDraftBackToOneLineRestoresCompactControls() {
+        val draft = longDraft()
+        render(draft)
+        resizeHandle().assertExists()
+
+        composeRule.onNodeWithText(draft).performTextReplacement("Short draft")
+        composeRule.waitForIdle()
+
+        resizeHandle().assertDoesNotExist()
     }
 
     @Test
@@ -236,11 +286,13 @@ class ComposerExpansionBehaviorTest {
     private fun render(
         draft: String,
         overlayBackRegistrar: ComposerOverlayBackRegistrar? = null,
+        dictationController: ConversationDictationController? = null,
+        width: Int = 360,
     ) {
         var value by mutableStateOf(TextFieldValue(draft))
         composeRule.setContent {
             WhiteNoiseTheme {
-                Surface(modifier = Modifier.width(360.dp).height(720.dp)) {
+                Surface(modifier = Modifier.width(width.dp).height(720.dp)) {
                     Box {
                         ComposerBar(
                             replyingTo = null,
@@ -249,6 +301,9 @@ class ComposerExpansionBehaviorTest {
                             onSend = { _, _ -> },
                             onPickFromGallery = {},
                             onPickDocument = {},
+                            dictationController = dictationController,
+                            dictationAccountRef = dictationController?.let { ACCOUNT },
+                            dictationGroupIdHex = dictationController?.let { GROUP },
                             initialDraft = value,
                             onDraftChange = { value = it },
                             overlayBackRegistrar = overlayBackRegistrar,
@@ -260,6 +315,34 @@ class ComposerExpansionBehaviorTest {
         }
         composeRule.waitForIdle()
     }
+
+    @Suppress("MaxLineLength")
+    private fun idleDictationController(draft: TextFieldValue): ConversationDictationController =
+        ConversationDictationController(
+            platform =
+                object : ConversationDictationPlatform {
+                    override fun hasRecordAudioPermission() = true
+
+                    override fun recognitionAvailable() = true
+
+                    override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession =
+                        object : ConversationDictationRecognitionSession {
+                            override fun start() = Unit
+
+                            override fun stop() = Unit
+
+                            override fun cancel() = Unit
+
+                            override fun destroy() = Unit
+                        }
+                },
+            readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, 0L) },
+            writeDraft = { _, _, _, _ -> true },
+            disclosureAccepted = { true },
+            markDisclosureAccepted = {},
+            scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
+            elapsedRealtime = { 0L },
+        )
 
     private fun resizeHandle() = composeRule.onNodeWithContentDescription(app.getString(R.string.composer_resize))
 
@@ -289,5 +372,7 @@ class ComposerExpansionBehaviorTest {
 
     private companion object {
         const val TAG = "expandable-composer"
+        const val ACCOUNT = "account"
+        const val GROUP = "group"
     }
 }

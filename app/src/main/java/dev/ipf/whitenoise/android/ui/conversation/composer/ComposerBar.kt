@@ -1049,7 +1049,7 @@ internal fun ComposerBar(
                         dictationActiveElsewhere -> 48.dp
                         else -> primaryTrailingActionWidth
                     }
-                Box(
+                BoxWithConstraints(
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -1164,6 +1164,10 @@ internal fun ComposerBar(
                             } else {
                                 null
                             },
+                        compactMeasurementWidth =
+                            (maxWidth - trailingControlsWidth - 8.dp)
+                                .coerceAtLeast(1.dp),
+                        compactMeasurementReservesTrailingAction = false,
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
                         modifier =
                             Modifier

@@ -46,6 +46,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +70,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -76,6 +78,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -86,7 +89,10 @@ import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
@@ -141,11 +147,17 @@ internal fun ComposerPill(
     onHeightDrag: (Float) -> Unit = {},
     onHeightDragStopped: () -> Unit = {},
     trailingAction: (@Composable RowScope.() -> Unit)? = null,
+    // Automatic expansion changes both this pill's padding and ComposerBar's
+    // outer trailing reservation. Measure the threshold against the compact
+    // pill width so the chosen mode cannot invalidate its own line count.
+    compactMeasurementWidth: Dp? = null,
+    compactMeasurementReservesTrailingAction: Boolean = trailingAction != null,
     inputContentVisible: Boolean = true,
     inputFocusEnabled: Boolean = true,
     onMultilineControlsChanged: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
     val resizeComposerDescription = stringResource(R.string.composer_resize)
     val latestOnPasteImageUris by rememberUpdatedState(onPasteImageUris)
     val latestOnPreImeBack by rememberUpdatedState(onPreImeBack)
@@ -262,12 +274,70 @@ internal fun ComposerPill(
             (if (onDictation != null) 48.dp else 0.dp) +
             (if (hasAttachmentAction) 36.dp else 0.dp) +
             (if (trailingAction != null) 44.dp else 0.dp)
+    val compactMeasurementTrailingReserve =
+        4.dp +
+            (if (onDictation != null) 48.dp else 0.dp) +
+            (if (hasAttachmentAction) 36.dp else 0.dp) +
+            (if (compactMeasurementReservesTrailingAction) 44.dp else 0.dp)
+    val composerTextStyle =
+        LocalTextStyle.current.copy(
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 16.sp,
+            textDirection = TextDirection.ContentOrLtr,
+        )
+    val textMeasurer = rememberTextMeasurer()
+    val compactLineCount =
+        compactMeasurementWidth?.let { measurementWidth ->
+            val maxTextWidthPx =
+                with(density) {
+                    (measurementWidth - 52.dp - compactMeasurementTrailingReserve)
+                        .coerceAtLeast(1.dp)
+                        .roundToPx()
+                }
+            remember(
+                textFieldValue.text,
+                mentionVisualTransformation,
+                composerTextStyle,
+                maxTextWidthPx,
+                textMeasurer,
+            ) {
+                val visualText =
+                    mentionVisualTransformation
+                        .filter(AnnotatedString(textFieldValue.text))
+                        .text
+                textMeasurer
+                    .measure(
+                        text = visualText,
+                        style = composerTextStyle,
+                        constraints = Constraints(maxWidth = maxTextWidthPx),
+                    ).lineCount
+            }
+        }
     val expandedHeightModifier =
         if (expansionMode == ComposerExpansionMode.Automatic) {
             Modifier
         } else {
             Modifier.fillMaxHeight()
         }
+
+    fun updateMultilineControls(lineCount: Int) {
+        val nextMultilineControls =
+            when {
+                multilineControls && lineCount <= 1 -> false
+                !multilineControls && lineCount >= 3 -> true
+                else -> multilineControls
+            }
+        if (nextMultilineControls != multilineControls) {
+            multilineControls = nextMultilineControls
+            onMultilineControlsChanged(nextMultilineControls)
+        }
+    }
+
+    if (compactLineCount != null) {
+        LaunchedEffect(compactLineCount) {
+            updateMultilineControls(compactLineCount)
+        }
+    }
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -350,12 +420,7 @@ internal fun ComposerPill(
                                     false
                                 }
                             },
-                    textStyle =
-                        LocalTextStyle.current.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 16.sp,
-                            textDirection = TextDirection.ContentOrLtr,
-                        ),
+                    textStyle = composerTextStyle,
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     visualTransformation = mentionVisualTransformation,
                     // #404: in SendMessage mode the soft-keyboard action sends;
@@ -375,16 +440,7 @@ internal fun ComposerPill(
                     keyboardActions = KeyboardActions(onSend = { onImeSend() }),
                     maxLines = Int.MAX_VALUE,
                     onTextLayout = { layout ->
-                        val nextMultilineControls =
-                            when {
-                                multilineControls && layout.lineCount <= 1 -> false
-                                !multilineControls && layout.lineCount >= 3 -> true
-                                else -> multilineControls
-                            }
-                        if (nextMultilineControls != multilineControls) {
-                            multilineControls = nextMultilineControls
-                            onMultilineControlsChanged(nextMultilineControls)
-                        }
+                        if (compactLineCount == null) updateMultilineControls(layout.lineCount)
                     },
                 )
                 if (textFieldValue.text.isEmpty()) {

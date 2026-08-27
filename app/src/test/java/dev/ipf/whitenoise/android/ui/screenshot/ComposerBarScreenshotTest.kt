@@ -125,6 +125,22 @@ class ComposerBarScreenshotTest {
     }
 
     @Test
+    fun composerLineThresholdIsStableAtLargeFontInRtl() {
+        render(
+            darkTheme = false,
+            draft = "#938 close as done, win obtained",
+            width = 300,
+            fontScale = 1.45f,
+            rtl = true,
+            dictationPreview = DictationPreview.Idle,
+            attachmentsEnabled = true,
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/composer_line_threshold_large_font_rtl.png")
+    }
+
+    @Test
     fun composerDictationIsVisuallyDistinctFromVoiceNoteOnBlankDraft() {
         val voiceRecording = previewVoiceRecordingController()
         try {
@@ -299,6 +315,7 @@ class ComposerBarScreenshotTest {
         showReply: Boolean = false,
         showEdit: Boolean = false,
         voiceRecordingController: VoiceRecordingController? = null,
+        attachmentsEnabled: Boolean = false,
     ) {
         val dictation = dictationPreview?.let { createDictationPreview(it, TextFieldValue(draft)) }
         composeRule.setContent {
@@ -319,6 +336,8 @@ class ComposerBarScreenshotTest {
                             messageTextCopy = MessageTextCopy.Default,
                             onCancelReply = {},
                             onSend = { _, _ -> },
+                            onPickFromGallery = {}.takeIf { attachmentsEnabled },
+                            onPickDocument = {}.takeIf { attachmentsEnabled },
                             initialDraft = TextFieldValue(draft),
                             editingMessageId = "edited-message".takeIf { showEdit },
                             editingInitialText = "Message being edited".takeIf { showEdit },
