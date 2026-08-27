@@ -95,6 +95,15 @@ fun SettingsAccountHeader(
     val protocolPictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
     val avatarImageAvailable = rememberAvatarImageAvailable(protocolPictureUrl)
     var viewerOpen by remember(protocolPictureUrl) { mutableStateOf(false) }
+    val avatarClickModifier =
+        if (avatarImageAvailable) {
+            Modifier.clickable(
+                onClickLabel = stringResource(R.string.profile_view_picture),
+                role = Role.Button,
+            ) { viewerOpen = true }
+        } else {
+            Modifier
+        }
     Row(
         modifier =
             Modifier
@@ -127,11 +136,8 @@ fun SettingsAccountHeader(
                     modifier =
                         Modifier
                             .clip(CircleShape)
-                            .clickable(
-                                enabled = avatarImageAvailable,
-                                onClickLabel = stringResource(R.string.profile_view_picture),
-                                role = Role.Button,
-                            ) { viewerOpen = true },
+                            .then(avatarClickModifier)
+                            .testTag(SETTINGS_ACCOUNT_AVATAR_TAG),
                 ) {
                     Avatar(
                         title = title,
@@ -144,6 +150,7 @@ fun SettingsAccountHeader(
             headlineContent = {
                 Text(
                     text = title,
+                    modifier = Modifier.testTag(SETTINGS_ACCOUNT_TITLE_TAG),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -159,7 +166,11 @@ fun SettingsAccountHeader(
                 )
             },
             trailingContent = {
-                Icon(Icons.Default.ExpandMore, contentDescription = null)
+                Icon(
+                    Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier.testTag(SETTINGS_ACCOUNT_EXPAND_TAG),
+                )
             },
         )
         IconButton(
@@ -186,7 +197,10 @@ fun SettingsAccountHeader(
 
 internal const val SETTINGS_ACCOUNT_HEADER_TAG = "settings-account-header"
 internal const val SETTINGS_ACCOUNT_SELECTOR_TARGET_TAG = "settings-account-selector-target"
+internal const val SETTINGS_ACCOUNT_AVATAR_TAG = "settings-account-avatar"
+internal const val SETTINGS_ACCOUNT_TITLE_TAG = "settings-account-title"
 internal const val SETTINGS_ACCOUNT_NPUB_TAG = "settings-account-npub"
+internal const val SETTINGS_ACCOUNT_EXPAND_TAG = "settings-account-expand"
 internal const val SETTINGS_ACCOUNT_QR_TARGET_TAG = "settings-account-qr-target"
 
 internal const val ACCOUNT_SELECTOR_CONTENT_TAG = "account-selector-content"

@@ -17,7 +17,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -95,11 +97,22 @@ class SettingsAccountHeaderTest {
         assertTrue("npub should consume the available middle column", npubBounds.width > 140f)
         val npubLayout = npubTextLayout()
         assertEquals(1, npubLayout.lineCount)
+        assertEquals(TextOverflow.MiddleEllipsis, npubLayout.layoutInput.overflow)
+        composeRule
+            .onNodeWithTag(SETTINGS_ACCOUNT_NPUB_TAG, useUnmergedTree = true)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Text, listOf(AnnotatedString(FULL_NPUB))))
     }
 
     @Test
     fun largeFontRtlHeaderKeepsNpubAndQrBoundsDisjoint() {
-        render(fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
+        var selectorClicks = 0
+        var qrClicks = 0
+        render(
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+            onOpenSelector = { selectorClicks += 1 },
+            onOpenQr = { qrClicks += 1 },
+        )
 
         val selectorBounds =
             composeRule
@@ -121,6 +134,71 @@ class SettingsAccountHeaderTest {
         assertTrue(npubBounds.left >= selectorBounds.left)
         assertTrue(npubBounds.right <= selectorBounds.right)
         assertEquals(1, npubTextLayout().lineCount)
+
+        composeRule.onNodeWithTag(SETTINGS_ACCOUNT_QR_TARGET_TAG).performTouchInput {
+            click(Offset(x = 1f, y = center.y))
+            click(Offset(x = width - 1f, y = center.y))
+        }
+        composeRule.runOnIdle {
+            assertEquals(0, selectorClicks)
+            assertEquals(2, qrClicks)
+        }
+    }
+
+    @Test
+    fun identitySubregionsOpenSelectorWhenAvatarHasNoViewer() {
+        var selectorClicks = 0
+        var qrClicks = 0
+        render(
+            onOpenSelector = { selectorClicks += 1 },
+            onOpenQr = { qrClicks += 1 },
+        )
+
+        listOf(
+            SETTINGS_ACCOUNT_AVATAR_TAG,
+            SETTINGS_ACCOUNT_TITLE_TAG,
+            SETTINGS_ACCOUNT_NPUB_TAG,
+            SETTINGS_ACCOUNT_EXPAND_TAG,
+        ).forEach { tag ->
+            composeRule.onNodeWithTag(tag, useUnmergedTree = true).performTouchInput { click(center) }
+        }
+
+        composeRule.runOnIdle {
+            assertEquals(4, selectorClicks)
+            assertEquals(0, qrClicks)
+        }
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w840dp-h780dp-mdpi")
+    fun wideHeaderKeepsFullNpubOnOneLineWithoutOverlap() {
+        render()
+
+        val selectorBounds =
+            composeRule
+                .onNodeWithTag(SETTINGS_ACCOUNT_SELECTOR_TARGET_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val qrBounds =
+            composeRule
+                .onNodeWithTag(SETTINGS_ACCOUNT_QR_TARGET_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val npubBounds =
+            composeRule
+                .onNodeWithTag(SETTINGS_ACCOUNT_NPUB_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val npubLayout = npubTextLayout()
+
+        assertFalse("selector and QR targets overlap", selectorBounds.overlaps(qrBounds))
+        assertTrue(npubBounds.left >= selectorBounds.left)
+        assertTrue(npubBounds.right <= selectorBounds.right)
+        assertEquals(1, npubLayout.lineCount)
+        assertEquals(TextOverflow.MiddleEllipsis, npubLayout.layoutInput.overflow)
+        composeRule
+            .onNodeWithTag(SETTINGS_ACCOUNT_NPUB_TAG, useUnmergedTree = true)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Text, listOf(AnnotatedString(FULL_NPUB))))
     }
 
     private fun npubTextLayout(): TextLayoutResult {
