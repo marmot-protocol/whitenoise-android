@@ -87,99 +87,23 @@ fun SettingsAccountHeader(
     onOpenQr: () -> Unit,
     onEditProfilePicture: () -> Unit = {},
 ) {
-    val switchAccountDescription = stringResource(R.string.switch_account)
-    val copyDescription = stringResource(R.string.copy)
-    val clipboardLabel = stringResource(R.string.public_key)
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
     val protocolPictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
     val avatarImageAvailable = rememberAvatarImageAvailable(protocolPictureUrl)
     var viewerOpen by remember(protocolPictureUrl) { mutableStateOf(false) }
-    val avatarClickModifier =
-        if (avatarImageAvailable) {
-            Modifier.clickable(
-                onClickLabel = stringResource(R.string.profile_view_picture),
-                role = Role.Button,
-            ) { viewerOpen = true }
-        } else {
-            Modifier
-        }
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .settingsRowAmoledSurfaceBorder()
-                .testTag(SETTINGS_ACCOUNT_HEADER_TAG),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ListItem(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .combinedClickable(
-                        onClickLabel = switchAccountDescription,
-                        onLongClickLabel = copyDescription,
-                        role = Role.Button,
-                        onLongClick = {
-                            scope.launch {
-                                clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(clipboardLabel, subtitle)))
-                            }
-                        },
-                        onClick = onOpenAccountSelector,
-                    ).semantics(mergeDescendants = true) {
-                        contentDescription = switchAccountDescription
-                        stateDescription = subtitle
-                    }.testTag(SETTINGS_ACCOUNT_SELECTOR_TARGET_TAG),
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            leadingContent = {
-                Box(
-                    modifier =
-                        Modifier
-                            .clip(CircleShape)
-                            .then(avatarClickModifier)
-                            .testTag(SETTINGS_ACCOUNT_AVATAR_TAG),
-                ) {
-                    Avatar(
-                        title = title,
-                        seed = seed,
-                        size = 52.dp,
-                        pictureUrl = protocolPictureUrl,
-                    )
-                }
-            },
-            headlineContent = {
-                Text(
-                    text = title,
-                    modifier = Modifier.testTag(SETTINGS_ACCOUNT_TITLE_TAG),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            },
-            supportingContent = {
-                Text(
-                    text = subtitle,
-                    modifier = Modifier.fillMaxWidth().testTag(SETTINGS_ACCOUNT_NPUB_TAG),
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.MiddleEllipsis,
-                    softWrap = false,
-                )
-            },
-            trailingContent = {
-                Icon(
-                    Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    modifier = Modifier.testTag(SETTINGS_ACCOUNT_EXPAND_TAG),
-                )
-            },
+    val presentation =
+        SettingsAccountHeaderPresentation(
+            title = title,
+            subtitle = subtitle,
+            seed = seed,
+            pictureUrl = protocolPictureUrl,
+            avatarImageAvailable = avatarImageAvailable,
         )
-        IconButton(
-            onClick = onOpenQr,
-            modifier = Modifier.size(48.dp).testTag(SETTINGS_ACCOUNT_QR_TARGET_TAG),
-        ) {
-            Icon(Icons.Default.QrCode, contentDescription = stringResource(R.string.my_qr_code))
-        }
-    }
+    SettingsAccountHeaderRow(
+        presentation = presentation,
+        onOpenAccountSelector = onOpenAccountSelector,
+        onOpenQr = onOpenQr,
+        onOpenAvatar = { viewerOpen = true },
+    )
     if (viewerOpen && protocolPictureUrl != null && avatarImageAvailable) {
         AvatarFullScreenViewer(
             title = title,
@@ -193,6 +117,147 @@ fun SettingsAccountHeader(
             },
         )
     }
+}
+
+private data class SettingsAccountHeaderPresentation(
+    val title: String,
+    val subtitle: String,
+    val seed: String,
+    val pictureUrl: String?,
+    val avatarImageAvailable: Boolean,
+)
+
+@Suppress("FunctionNaming")
+@Composable
+private fun SettingsAccountHeaderRow(
+    presentation: SettingsAccountHeaderPresentation,
+    onOpenAccountSelector: () -> Unit,
+    onOpenQr: () -> Unit,
+    onOpenAvatar: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .settingsRowAmoledSurfaceBorder()
+                .testTag(SETTINGS_ACCOUNT_HEADER_TAG),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SettingsAccountSelectorTarget(
+            presentation = presentation,
+            onOpenAccountSelector = onOpenAccountSelector,
+            onOpenAvatar = onOpenAvatar,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(
+            onClick = onOpenQr,
+            modifier = Modifier.size(48.dp).testTag(SETTINGS_ACCOUNT_QR_TARGET_TAG),
+        ) {
+            Icon(Icons.Default.QrCode, contentDescription = stringResource(R.string.my_qr_code))
+        }
+    }
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun SettingsAccountSelectorTarget(
+    presentation: SettingsAccountHeaderPresentation,
+    onOpenAccountSelector: () -> Unit,
+    onOpenAvatar: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val switchAccountDescription = stringResource(R.string.switch_account)
+    val clipboard = LocalClipboard.current
+    val clipboardLabel = stringResource(R.string.public_key)
+    val scope = rememberCoroutineScope()
+    ListItem(
+        modifier =
+            modifier
+                .combinedClickable(
+                    onClickLabel = switchAccountDescription,
+                    onLongClickLabel = stringResource(R.string.copy),
+                    role = Role.Button,
+                    onLongClick = {
+                        scope.launch {
+                            val clip = ClipData.newPlainText(clipboardLabel, presentation.subtitle)
+                            clipboard.setClipEntry(ClipEntry(clip))
+                        }
+                    },
+                    onClick = onOpenAccountSelector,
+                ).semantics(mergeDescendants = true) {
+                    contentDescription = switchAccountDescription
+                    stateDescription = presentation.subtitle
+                }.testTag(SETTINGS_ACCOUNT_SELECTOR_TARGET_TAG),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        leadingContent = {
+            SettingsAccountHeaderAvatar(presentation = presentation, onOpenAvatar = onOpenAvatar)
+        },
+        headlineContent = { SettingsAccountHeaderTitle(presentation.title) },
+        supportingContent = { SettingsAccountHeaderNpub(presentation.subtitle) },
+        trailingContent = {
+            Icon(
+                Icons.Default.ExpandMore,
+                contentDescription = null,
+                modifier = Modifier.testTag(SETTINGS_ACCOUNT_EXPAND_TAG),
+            )
+        },
+    )
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun SettingsAccountHeaderAvatar(
+    presentation: SettingsAccountHeaderPresentation,
+    onOpenAvatar: () -> Unit,
+) {
+    val clickModifier =
+        if (presentation.avatarImageAvailable) {
+            Modifier.clickable(
+                onClickLabel = stringResource(R.string.profile_view_picture),
+                role = Role.Button,
+                onClick = onOpenAvatar,
+            )
+        } else {
+            Modifier
+        }
+    Box(
+        modifier =
+            Modifier
+                .clip(CircleShape)
+                .then(clickModifier)
+                .testTag(SETTINGS_ACCOUNT_AVATAR_TAG),
+    ) {
+        Avatar(
+            title = presentation.title,
+            seed = presentation.seed,
+            size = 52.dp,
+            pictureUrl = presentation.pictureUrl,
+        )
+    }
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun SettingsAccountHeaderTitle(title: String) {
+    Text(
+        text = title,
+        modifier = Modifier.testTag(SETTINGS_ACCOUNT_TITLE_TAG),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun SettingsAccountHeaderNpub(npub: String) {
+    Text(
+        text = npub,
+        modifier = Modifier.fillMaxWidth().testTag(SETTINGS_ACCOUNT_NPUB_TAG),
+        fontFamily = FontFamily.Monospace,
+        maxLines = 1,
+        overflow = TextOverflow.MiddleEllipsis,
+        softWrap = false,
+    )
 }
 
 internal const val SETTINGS_ACCOUNT_HEADER_TAG = "settings-account-header"
