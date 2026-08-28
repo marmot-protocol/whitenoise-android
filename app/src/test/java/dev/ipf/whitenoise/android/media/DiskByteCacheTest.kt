@@ -1139,6 +1139,47 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun coldReadinessHandoffPublishesOnlyAfterAuthenticatedBytesAreReadable() {
+        val payload = ByteArray(40) { 8 }
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).put("persisted", payload)
+        val hydrationEntered = CountDownLatch(1)
+        val releaseHydration = CountDownLatch(1)
+        val cold =
+            DiskByteCache(
+                BlockingListFilesDir(dir, hydrationEntered, releaseHydration),
+                keyProvider = keyProvider,
+                maxBytes = 1024,
+            )
+        val readFinished = CountDownLatch(1)
+        var authenticated: ByteArray? = null
+        val reader =
+            Thread {
+                try {
+                    authenticated = cold.get("persisted")
+                } finally {
+                    readFinished.countDown()
+                }
+            }
+
+        reader.start()
+        try {
+            assertTrue(hydrationEntered.await(5, TimeUnit.SECONDS))
+            assertFalse(
+                "readiness must not publish while cold hydration is blocked",
+                readFinished.await(100, TimeUnit.MILLISECONDS),
+            )
+            assertFalse("the main-safe peek remains a miss before handoff", cold.contains("persisted"))
+        } finally {
+            releaseHydration.countDown()
+            reader.join(5_000)
+        }
+
+        assertTrue(readFinished.await(5, TimeUnit.SECONDS))
+        assertTrue(authenticated!!.contentEquals(payload))
+        assertTrue("the index is ready after the authenticated handoff", cold.contains("persisted"))
+    }
+
+    @Test
     fun contains_afterHydration_reflectsIndexWithoutSeedingIt() {
         val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put("present", ByteArray(40) { 1 })

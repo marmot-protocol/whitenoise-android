@@ -17,10 +17,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -78,15 +81,19 @@ internal fun MediaFileBubble(
     val pillKey = "$messageIdHex#$attachmentIndex"
     var openRequested by remember(pillKey) { mutableStateOf(false) }
     var readerOpen by rememberSaveable(pillKey) { mutableStateOf(false) }
-    val transferStateFlow =
+    val initiallyAvailable =
         remember(controller, pillKey, mine) {
+            mine || controller.hasCachedAttachmentInMemory(messageIdHex, attachmentIndex)
+        }
+    val transferStateFlow =
+        remember(controller, pillKey, initiallyAvailable) {
             controller.attachmentTransferState(
                 messageIdHex = messageIdHex,
                 attachmentIndex = attachmentIndex,
-                initiallyAvailable = mine,
+                initiallyAvailable = initiallyAvailable,
             )
         }
-    DisposableEffect(controller, pillKey, mine) {
+    DisposableEffect(controller, pillKey, initiallyAvailable) {
         onDispose {
             controller.releaseAttachmentTransferState(messageIdHex, attachmentIndex)
         }
@@ -108,11 +115,23 @@ internal fun MediaFileBubble(
     val installPermissionUnavailableMessage = stringResource(R.string.media_apk_permission_unavailable)
     val installUnsupportedMessage = stringResource(R.string.media_apk_install_unsupported)
     val invalidPackageMessage = stringResource(R.string.media_apk_invalid)
-    // Reconcile the controller-owned transfer presentation against cache
-    // hydration/eviction. This probe never owns or cancels a running transfer.
     val cacheRevision by appState.mediaCacheRevision.collectAsState()
-    LaunchedEffect(pillKey, mine, cacheRevision) {
+    val firstFrameCacheResolved =
+        rememberAttachmentFirstFrameCacheResolution(
+            owner = controller,
+            key = pillKey,
+            initiallyResolved = initiallyAvailable,
+        ) {
+            controller.refreshAttachmentTransferState(messageIdHex, attachmentIndex)
+        }
+    var reconciledCacheRevision by remember(controller, pillKey) { mutableStateOf(cacheRevision) }
+    // Later cache writes and evictions still reconcile the controller-owned
+    // state, but they never re-hide a card that already crossed the first-frame
+    // boundary. This probe never owns or cancels a running transfer.
+    LaunchedEffect(pillKey, mine, cacheRevision, firstFrameCacheResolved) {
+        if (!firstFrameCacheResolved || cacheRevision == reconciledCacheRevision) return@LaunchedEffect
         controller.refreshAttachmentTransferState(messageIdHex, attachmentIndex)
+        reconciledCacheRevision = cacheRevision
     }
     // Auto-download gate (#407): local own sends stay available, while a
     // cache-missing own file bypasses the matrix only when the account backlog
@@ -298,10 +317,17 @@ internal fun MediaFileBubble(
         modifier =
             Modifier
                 .fileBubbleWidth()
-                .testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
+                .then(
+                    if (firstFrameCacheResolved) {
+                        Modifier
+                    } else {
+                        Modifier.alpha(0f).semantics { hideFromAccessibility() }
+                    },
+                ).testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
                 .combinedClickable(
                     enabled =
-                        canRequestAttachmentOpen(transferState, reference.sourceEpoch, mine),
+                        firstFrameCacheResolved &&
+                            canRequestAttachmentOpen(transferState, reference.sourceEpoch, mine),
                     onLongClick = onLongPress,
                     onClick = {
                         if (openRequested) return@combinedClickable
@@ -351,6 +377,26 @@ internal fun MediaFileBubble(
             onDismiss = { readerOpen = false },
         )
     }
+}
+
+/**
+ * Holds a received file card behind one definitive off-main cache result.
+ * Resolving remains usable by transfer orchestration, but is never committed
+ * as that card's first user-visible frame.
+ */
+@Composable
+internal fun rememberAttachmentFirstFrameCacheResolution(
+    owner: Any,
+    key: String,
+    initiallyResolved: Boolean,
+    resolve: suspend () -> Unit,
+): Boolean {
+    var resolved by remember(owner, key) { mutableStateOf(initiallyResolved) }
+    LaunchedEffect(owner, key) {
+        resolve()
+        resolved = true
+    }
+    return resolved
 }
 
 private const val MEDIA_FILE_BUBBLE_TAG = "MediaFileBubble"

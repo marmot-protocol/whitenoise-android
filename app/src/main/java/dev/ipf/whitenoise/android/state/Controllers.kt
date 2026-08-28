@@ -9125,6 +9125,15 @@ class ConversationController(
         return appState.diskMediaCache.contains(cacheKey)
     }
 
+    /** Main-safe L1 probe used to seed a returning file bubble without a frame gap. */
+    internal fun hasCachedAttachmentInMemory(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): Boolean {
+        val account = conversationAccountRef ?: return false
+        return appState.cachedMediaPlaintext(mediaCacheKey(account, messageIdHex, attachmentIndex)) != null
+    }
+
     /** Resolve a cold disk-index state without performing main-thread I/O. */
     suspend fun hasCachedAttachmentAfterHydration(
         messageIdHex: String,
@@ -9161,7 +9170,11 @@ class ConversationController(
         attachmentIndex: Int,
     ) {
         attachmentTransfers.refresh(attachmentTransferKey(messageIdHex, attachmentIndex)) {
-            hasCachedAttachmentAfterHydration(messageIdHex, attachmentIndex)
+            val account = conversationAccountRef ?: return@refresh false
+            appState.hasCachedAttachmentAfterHydration(
+                AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+                hydrateMemory = true,
+            )
         }
     }
 

@@ -43,7 +43,9 @@ internal class AttachmentTransferCoordinator(
     private val availabilitySignals = AttachmentAvailabilitySignals()
     private val active = mutableMapOf<String, Deferred<ByteArray>>()
     private val terminalGenerations = mutableMapOf<String, Long>()
+    private val refreshGenerations = mutableMapOf<String, Long>()
     private val observerCounts = mutableMapOf<String, Int>()
+    private var nextRefreshGeneration = 0L
 
     fun acquireState(
         key: String,
@@ -89,13 +91,23 @@ internal class AttachmentTransferCoordinator(
         key: String,
         probe: suspend () -> Boolean,
     ) {
-        val generation = synchronized(lock) { terminalGenerations[key] ?: 0L }
+        val (terminalGeneration, refreshGeneration) =
+            synchronized(lock) {
+                nextRefreshGeneration += 1L
+                val refreshGeneration = nextRefreshGeneration
+                refreshGenerations[key] = refreshGeneration
+                (terminalGenerations[key] ?: 0L) to refreshGeneration
+            }
         val available = probeForRefresh(probe)
         synchronized(lock) {
+            // A newer cache probe supersedes this result. In particular, a
+            // slow cold miss must not demote a later authenticated L2 hit and
+            // transiently reopen the automatic-download path.
+            if (refreshGenerations[key] != refreshGeneration) return
             // The cache probe runs outside the lock. A transfer may finish and
             // publish a newer terminal state while the probe is suspended, so
             // never let that stale result overwrite the completion state.
-            val state = currentStateForRefresh(key, generation) ?: return
+            val state = currentStateForRefresh(key, terminalGeneration) ?: return
             state.value = refreshedState(state.value, available)
             availabilitySignals.onRefresh(key, available)
         }
@@ -207,6 +219,7 @@ internal class AttachmentTransferCoordinator(
         ) {
             observerCounts.remove(key)
             terminalGenerations.remove(key)
+            refreshGenerations.remove(key)
             states.remove(key)
             availabilitySignals.retire(key)
         }

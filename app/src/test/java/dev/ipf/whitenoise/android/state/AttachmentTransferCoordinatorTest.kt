@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.ui.conversation.media.shouldStartAttachmentDownload
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -137,6 +138,81 @@ class AttachmentTransferCoordinatorTest {
                     releaseProbe.complete(Unit)
                     refresh.await()
                     assertEquals(AttachmentTransferState.Available, coordinator.state("file", false).value)
+                } finally {
+                    scope.cancel()
+                }
+            }
+        }
+
+    @Test
+    fun definitiveColdL2HitCannotBeDemotedOrStartCompetingRemoteWork() =
+        runBlocking {
+            withTimeout(5_000) {
+                val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+                try {
+                    val coordinator = AttachmentTransferCoordinator(scope)
+                    val state = coordinator.acquireState("cold-file", initiallyAvailable = false)
+                    val staleMissStarted = CompletableDeferred<Unit>()
+                    val releaseStaleMiss = CompletableDeferred<Unit>()
+                    val staleMiss =
+                        async {
+                            coordinator.refresh("cold-file") {
+                                staleMissStarted.complete(Unit)
+                                releaseStaleMiss.await()
+                                false
+                            }
+                        }
+                    staleMissStarted.await()
+
+                    coordinator.refresh("cold-file") { true }
+                    val remoteCalls = AtomicInteger(0)
+                    if (
+                        shouldStartAttachmentDownload(
+                            transferState = state.value,
+                            policyAllowsDownload = true,
+                            sourceEpoch = 1uL,
+                            mine = false,
+                        )
+                    ) {
+                        remoteCalls.incrementAndGet()
+                    }
+                    releaseStaleMiss.complete(Unit)
+                    staleMiss.await()
+
+                    assertEquals(AttachmentTransferState.Available, state.value)
+                    assertEquals("the cache hit must suppress automatic remote work", 0, remoteCalls.get())
+                } finally {
+                    scope.cancel()
+                }
+            }
+        }
+
+    @Test
+    fun retiredColdProbeCannotMutateAReopenedAttachmentState() =
+        runBlocking {
+            withTimeout(5_000) {
+                val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+                try {
+                    val coordinator = AttachmentTransferCoordinator(scope)
+                    coordinator.acquireState("file", initiallyAvailable = false)
+                    val oldProbeStarted = CompletableDeferred<Unit>()
+                    val releaseOldProbe = CompletableDeferred<Unit>()
+                    val oldProbe =
+                        async {
+                            coordinator.refresh("file") {
+                                oldProbeStarted.complete(Unit)
+                                releaseOldProbe.await()
+                                false
+                            }
+                        }
+                    oldProbeStarted.await()
+
+                    coordinator.releaseState("file")
+                    val reopened = coordinator.acquireState("file", initiallyAvailable = true)
+                    releaseOldProbe.complete(Unit)
+                    oldProbe.await()
+
+                    assertEquals(AttachmentTransferState.Available, reopened.value)
                 } finally {
                     scope.cancel()
                 }
