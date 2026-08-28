@@ -238,9 +238,12 @@ internal fun accountSwitchProfileSeed(
         accountIdHex = accountIdHex,
         profile = profile,
         displayName =
-            ProfileSanitizer.displayName(
-                if (profile != null) profile.displayName ?: profile.name else rawDisplayName,
-            ),
+            if (profile != null) {
+                ProfileSanitizer.displayName(profile.displayName)
+                    ?: ProfileSanitizer.displayName(profile.name)
+            } else {
+                ProfileSanitizer.displayName(rawDisplayName)
+            },
         avatarUrl = ProfileSanitizer.protocolImageUrl(profile?.picture),
     )
 

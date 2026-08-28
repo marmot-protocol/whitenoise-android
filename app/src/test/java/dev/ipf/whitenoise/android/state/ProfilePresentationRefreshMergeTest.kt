@@ -56,6 +56,16 @@ class ProfilePresentationRefreshMergeTest {
     }
 
     @Test
+    fun accountSwitchSeedUsesValidNameWhenDisplayNameSanitizesToNull() {
+        val profile = profile(displayName = "\u0000 \t", name = "Alice", picture = NEW_AVATAR)
+
+        val result = accountSwitchProfileSeed(ACCOUNT_ID, profile, rawDisplayName = "stale-name")
+
+        assertEquals("Alice", result.displayName)
+        assertEquals(NEW_AVATAR, result.avatarUrl)
+    }
+
+    @Test
     fun warmSelectionSkipsCachedIdleProfilesButKeepsInFlightMaterializations() {
         val cachedIds = setOf("cached", "materializing")
         val materializingIds = setOf("materializing")
