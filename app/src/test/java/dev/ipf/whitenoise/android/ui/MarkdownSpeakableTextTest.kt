@@ -393,6 +393,39 @@ class MarkdownSpeakableTextTest {
     }
 
     @Test
+    fun aNamedUnknownMentionKeepsItsLineSpeakable() {
+        val unknown = "npub1" + "w".repeat(58)
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(
+                                MarkdownInlineFfi.NostrMention(
+                                    MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, unknown),
+                                ),
+                            ),
+                        ),
+                    ),
+            )
+
+        // Omitting the key silences a line that holds nothing else, so read
+        // aloud simply pauses there. Naming the person generically keeps the
+        // line audible without reciting the key.
+        assertEquals("", markdownDocumentToSpeakableText(document))
+        assertEquals(
+            "@Someone.",
+            markdownDocumentToSpeakableText(
+                document = document,
+                mentionDisplayName = { "Someone" },
+                isGroupMember = { true },
+            ),
+        )
+    }
+
+    @Test
     fun bareUrlsAreOmittedAndLineBreaksRemainSentenceBoundaries() {
         val document =
             MarkdownDocumentFfi(
