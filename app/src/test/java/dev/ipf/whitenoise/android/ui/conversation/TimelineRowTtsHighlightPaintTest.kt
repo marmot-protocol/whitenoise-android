@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightRangeKey
@@ -217,7 +218,10 @@ class TimelineRowTtsHighlightPaintTest {
                     message = record,
                     editedText = null,
                     senderDisplayName = SENDER_NAME,
-                    parseMarkdown = { emptyDocument() },
+                    // Production hands both sides the same parser. Giving the
+                    // speaking side a stub would let the two projections
+                    // diverge for a reason the app never has.
+                    parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
                 )!!
             }
 
