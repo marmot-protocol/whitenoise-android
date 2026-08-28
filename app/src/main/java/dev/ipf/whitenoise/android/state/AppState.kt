@@ -2264,6 +2264,10 @@ class WhiteNoiseAppState private constructor(
         )
     private val notificationScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    private val notificationLocalIdentityReader =
+        NotificationLocalIdentityReader(notificationScope, notificationDispatcher) { senderIdHex ->
+            marmotIo { displayName(senderIdHex) }
+        }
     private val notificationEnrichmentGate = Semaphore(NOTIFICATION_ENRICHMENT_FANOUT)
     private var accountCatchUpJob: Job? = null
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
@@ -8996,21 +9000,20 @@ class WhiteNoiseAppState private constructor(
         requestProfile(accountIdHex)
     }
 
-    // A notification renders once and never recomposes, so resolve the name via
-    // the awaited directory lookup (it spans every signed-in account) rather than
-    // the in-memory cache, which is cold right after an FCM wake.
-    private suspend fun notificationSenderName(update: NotificationUpdateFfi): String? {
+    private suspend fun notificationSenderName(
+        update: NotificationUpdateFfi,
+        firstPost: Boolean = false,
+    ): String? {
         val senderIdHex = update.sender.accountIdHex
         if (senderIdHex.isBlank()) return null
-        val contactNickname = contactNicknameFor(update.accountRef, senderIdHex)
+        val contactNickname = notificationSenderNameOverride(contactNicknameFor(update.accountRef, senderIdHex), null)
         val localProfileName =
-            runCatchingCancellable { marmotIo { displayName(senderIdHex) } }
-                .getOrNull()
-        // Leave an unresolved local name null: LocalNotificationFormatter can
-        // then use the sender name carried by the notification payload before
-        // applying its final short-npub fallback. Returning the npub here masked
-        // a usable payload name during cold profile-cache startup.
-        return notificationSenderNameOverride(contactNickname, localProfileName)
+            when {
+                contactNickname != null -> null
+                firstPost -> notificationLocalIdentityReader.read(senderIdHex)
+                else -> runCatchingCancellable { marmotIo { displayName(senderIdHex) } }.getOrNull()
+            }
+        return contactNickname ?: notificationSenderNameOverride(null, localProfileName)
             ?: notificationDisplayNameHints[senderIdHex]
     }
 
@@ -9427,11 +9430,10 @@ class WhiteNoiseAppState private constructor(
     private suspend fun enrichPostedNotificationUpdate(
         update: NotificationUpdateFfi,
         preWarmedAvatars: PreWarmedNotificationAvatars,
-        postEpoch: Long,
-        engineMuted: Boolean,
+        firstPost: NotificationFirstPost,
     ): Boolean {
-        if (!isNotificationEnrichmentAllowed(update, postEpoch, engineMuted)) return false
-        val senderNameOverride = notificationSenderName(update)
+        if (!isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted)) return false
+        val senderNameOverride = firstPost.senderName ?: notificationSenderName(update)
         val systemText = notificationGroupSystemText(update, senderNameOverride)
         val previewTextOverride =
             systemText?.body ?: if (LocalNotificationFormatter.needsPreviewTextResolution(update)) {
@@ -9454,7 +9456,7 @@ class WhiteNoiseAppState private constructor(
             notificationConversationAvatarUrl(update, senderAvatarUrl, preWarmedAvatars.groupAvatarUrl)
         // A lock can arrive during any suspending enrichment above. Re-check
         // after all app-state lookups so a silent update never reveals content.
-        return isNotificationEnrichmentAllowed(update, postEpoch, engineMuted) &&
+        return isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted) &&
             localNotificationPresenter.show(
                 update,
                 conversationTitle,
@@ -9474,36 +9476,35 @@ class WhiteNoiseAppState private constructor(
                 replaceCurrentMessage = true,
                 shortNpub = ::shortNpub,
                 isPostStillAllowed = {
-                    isNotificationEnrichmentAllowed(update, postEpoch, engineMuted)
+                    isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted)
                 },
             )
     }
 
     private suspend fun postInitialNotificationUpdate(
         update: NotificationUpdateFfi,
-        postEpoch: Long,
-        engineMuted: Boolean,
+        firstPost: NotificationFirstPost,
     ): Boolean {
-        val shouldPost = shouldPostNotification(update, engineMuted)
         appStateDebug {
-            "notification eligibility outcome=${if (shouldPost) "post" else "skip"} " +
-                "trigger=${update.trigger} app_lock=$appLockScreenVisible engine_muted=$engineMuted"
+            "notification eligibility outcome=${if (firstPost.shouldPost) "post" else "skip"} " +
+                "trigger=${update.trigger} app_lock=$appLockScreenVisible engine_muted=${firstPost.engineMuted}"
         }
-        if (!shouldPost) return false
+        if (!firstPost.shouldPost) return false
 
         val redactContent = appLockScreenVisible
 
         var posted =
             localNotificationPresenter.show(
                 update = update,
+                senderNameOverride = firstPost.senderName,
                 redactContent = redactContent,
                 directShareEligible = !redactContent && update.accountRef == activeAccountRef,
                 shortNpub = ::cachedShortNpubOrUnknown,
                 isPostStillAllowed = {
                     isNotificationGenerationPostAllowed(
                         update = update,
-                        postEpoch = postEpoch,
-                        engineMuted = engineMuted,
+                        postEpoch = firstPost.epoch,
+                        engineMuted = firstPost.engineMuted,
                         requireUnlocked = !redactContent,
                     )
                 },
@@ -9521,8 +9522,8 @@ class WhiteNoiseAppState private constructor(
                     isPostStillAllowed = {
                         isNotificationGenerationPostAllowed(
                             update = update,
-                            postEpoch = postEpoch,
-                            engineMuted = engineMuted,
+                            postEpoch = firstPost.epoch,
+                            engineMuted = firstPost.engineMuted,
                             requireUnlocked = false,
                         )
                     },
@@ -9544,17 +9545,16 @@ class WhiteNoiseAppState private constructor(
 
     private fun scheduleNotificationEnrichment(
         update: NotificationUpdateFfi,
-        postEpoch: Long,
-        engineMuted: Boolean,
+        firstPost: NotificationFirstPost,
         receivedAtElapsedMs: Long,
     ) {
         notificationScope.launch(notificationDispatcher) {
             notificationEnrichmentGate.withPermit {
-                if (!isNotificationEnrichmentAllowed(update, postEpoch, engineMuted)) {
+                if (!isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted)) {
                     return@withPermit
                 }
-                val avatars = preWarmNotificationAvatars(update, engineMuted)
-                val enriched = enrichPostedNotificationUpdate(update, avatars, postEpoch, engineMuted)
+                val avatars = preWarmNotificationAvatars(update, firstPost.engineMuted)
+                val enriched = enrichPostedNotificationUpdate(update, avatars, firstPost)
                 appStateDebug {
                     "notification timing stage=enrichment-complete " +
                         "elapsed_ms=${(SystemClock.elapsedRealtime() - receivedAtElapsedMs).coerceAtLeast(0L)} " +
@@ -9631,18 +9631,25 @@ class WhiteNoiseAppState private constructor(
         applyNotificationDisplayNameHint(update)
         scheduleIncomingDocumentDownloadMaintenance(update)
         val postEpoch = notificationPostEpoch.capture()
-        // One durable-mute read per update: the initial post, enrichment, and
-        // each synchronous post-time re-check reuse it.
         val engineMuted = engineNotificationMuted(update)
+        val shouldPost = shouldPostNotification(update, engineMuted)
+        val firstPost =
+            NotificationFirstPost(
+                epoch = postEpoch,
+                engineMuted = engineMuted,
+                shouldPost = shouldPost,
+                senderName =
+                    if (shouldPost && !appLockScreenVisible) notificationSenderName(update, firstPost = true) else null,
+            )
         appStateDebug {
             "notification timing stage=eligibility-complete " +
                 "elapsed_ms=${(SystemClock.elapsedRealtime() - receivedAtElapsedMs).coerceAtLeast(0L)} outcome=resolved"
         }
         val posted =
             postBeforeNotificationEnrichment(
-                post = { postInitialNotificationUpdate(update, postEpoch, engineMuted) },
+                post = { postInitialNotificationUpdate(update, firstPost) },
                 scheduleEnrichment = {
-                    scheduleNotificationEnrichment(update, postEpoch, engineMuted, receivedAtElapsedMs)
+                    scheduleNotificationEnrichment(update, firstPost, receivedAtElapsedMs)
                 },
             )
         appStateDebug {
@@ -9654,10 +9661,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     private fun schedulePostNotificationMaintenance(update: NotificationUpdateFfi) {
-        // Coalesce the unread refresh across a burst instead of paying the
-        // chat-list + per-group roster cost once per update. The scheduler
-        // drains pending accounts off the subscription loop, so the loop stays
-        // free to process the next update (#729).
+        // Coalesce burst refreshes and drain them off the subscription loop (#729).
         if (networkNotificationRecoverySuppressed) return
         unreadRefreshScheduler.schedule(update.accountRef)
         signalNotificationDrain()
