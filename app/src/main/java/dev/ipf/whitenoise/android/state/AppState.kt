@@ -3901,56 +3901,7 @@ class WhiteNoiseAppState private constructor(
     internal suspend fun hasCachedAttachmentAfterHydration(
         request: AttachmentTransferRequest,
         hydrateMemory: Boolean = false,
-    ): Boolean {
-        val presentationSession =
-            if (hydrateMemory) {
-                MediaCachePresentationSession(request.accountRef, mediaUploadSessionEpoch())
-            } else {
-                null
-            }
-        val cacheKey =
-            mediaCacheKey(
-                request.accountRef,
-                request.groupIdHex,
-                request.messageIdHex,
-                request.attachmentIndex,
-            )
-        val (presentationCurrentAtStart, initialMemoryHit) =
-            withContext(Dispatchers.Main.immediate) {
-                val presentationCurrent = mediaCachePresentationSessionCurrent(presentationSession)
-                presentationCurrent to (presentationCurrent && cachedMediaPlaintext(cacheKey) != null)
-            }
-        val diskBytes =
-            if (!initialMemoryHit && hydrateMemory && presentationCurrentAtStart) {
-                withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
-            } else {
-                null
-            }
-        val diskHit =
-            withContext(Dispatchers.Main.immediate) {
-                val presentationCurrent = mediaCachePresentationSessionCurrent(presentationSession)
-                if (diskBytes != null && presentationCurrent) {
-                    cacheMediaPlaintext(cacheKey, diskBytes)
-                }
-                presentationCurrent && diskBytes != null
-            } ||
-                (
-                    !hydrateMemory &&
-                        withContext(Dispatchers.IO) {
-                            diskMediaCache.containsAfterHydration(cacheKey)
-                        }
-                )
-        return withContext(Dispatchers.Main.immediate) {
-            mediaCachePresentationSessionCurrent(presentationSession) &&
-                (initialMemoryHit || diskHit || cachedMediaPlaintext(cacheKey) != null)
-        }
-    }
-
-    private fun mediaCachePresentationSessionCurrent(session: MediaCachePresentationSession?): Boolean {
-        assertMainThread { "mediaCachePresentationSessionCurrent" }
-        return session == null ||
-            (activeAccountRef == session.accountRef && mediaUploadSessionEpoch() == session.epoch)
-    }
+    ): Boolean = hasCachedAttachmentForPresentation(request, hydrateMemory)
 
     /**
      * Shared download/cache implementation for UI controllers and durable work.
