@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -19,7 +20,7 @@ internal suspend fun WhiteNoiseAppState.parseMarkdownOrEmpty(text: String): Mark
         marmotIo { parseMarkdown(text) }
     } catch (throwable: Throwable) {
         rethrowIfCancellation(throwable)
-        MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0))
+        EMPTY_MARKDOWN_DOCUMENT
     }
 
 /** Re-parse only ordinary, visible text rows whose projected Markdown is absent. */

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import kotlinx.coroutines.CancellationException
 
 internal suspend fun parseMarkdownOrEmptyDocument(
@@ -12,9 +13,5 @@ internal suspend fun parseMarkdownOrEmptyDocument(
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {
-        MarkdownDocumentFfi(
-            truncated = false,
-            blocks = emptyList(),
-            blankLinesBefore = byteArrayOf(),
-        )
+        EMPTY_MARKDOWN_DOCUMENT
     }
