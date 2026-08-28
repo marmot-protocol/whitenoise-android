@@ -15,7 +15,6 @@
             android:name="dev.ipf.whitenoise.android.share.ExternalShareDispatchActivity"
             android:excludeFromRecents="true"
             android:exported="false"
-            android:process=":external-share-test-source"
             android:taskAffinity="dev.ipf.whitenoise.android.external-share-test-source" />
     </application>
 </manifest>

@@ -16,6 +16,7 @@ on:
   pull_request:
     paths:
       - 'app/build.gradle.kts'
+      - 'app/src/androidTest/AndroidManifest.xml'
       - 'app/src/main/marmotkit/**'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/core/ForwardMediaReferenceFfiIntegrationTest.kt'
       # Read-aloud highlights are geometry over real font metrics, which
