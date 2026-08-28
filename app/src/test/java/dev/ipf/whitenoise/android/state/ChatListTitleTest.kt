@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -239,6 +240,24 @@ class ChatListTitleTest {
 
         assertEquals("https://example.com/avatar.jpg", item.group.avatarUrl)
         assertEquals("hash-1234", item.group.imageHashHex)
+    }
+
+    @Test
+    fun explicitAuthoritativeGroupAvatarRemovalClearsTheIdentity() {
+        val item =
+            chatListItemFromProjection(
+                row = row(groupId = "test-group", rawTitle = "Named"),
+                group =
+                    group(name = "Named").copy(
+                        avatarUrl = null,
+                        imageHashHex = null,
+                    ),
+                activeAccountIdHex = "me-acc",
+                members = null,
+            )
+
+        assertNull(item.group.avatarUrl)
+        assertNull(item.group.imageHashHex)
     }
 
     // --- fixtures ---

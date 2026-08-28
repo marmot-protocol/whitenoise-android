@@ -4850,6 +4850,21 @@ class WhiteNoiseAppState private constructor(
         appStateDebug { "account-switch $stage +${elapsedMs}ms rows=$rowCount" }
     }
 
+    private fun recordAccountSwitchIdentityState(
+        accountRef: String,
+        snapshot: AccountSwitchLocalSnapshot,
+    ) {
+        val trace = pendingAccountSwitchTrace ?: return
+        if (trace.accountRef != accountRef) return
+        val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
+        val counts =
+            accountSwitchIdentityStateCounts(
+                snapshot = snapshot,
+                topBarProfileIds = accountSwitchProfileSeedIds(emptyList(), accounts, accountRef),
+            )
+        appStateDebug { "account-switch identity-state +${elapsedMs}ms ${counts.privacySafeTrace()}" }
+    }
+
     /**
      * Read the target account's local MDK projection before publishing the new
      * active account. The old account remains composed behind the selector
@@ -4870,29 +4885,41 @@ class WhiteNoiseAppState private constructor(
             ensureAccountSwitchRequestIsCurrent(generation)
             recordAccountSwitchPreloadStage(accountRef, "local-subscriptions-ready", 0)
 
-            val rows = withContext(Dispatchers.IO) { chatListSubscription.snapshot() }
-            ensureAccountSwitchRequestIsCurrent(generation)
-            recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
+            coroutineScope {
+                // These two immutable local snapshots are independent. Start
+                // the group read immediately so its SQLite/FFI cost overlaps
+                // the row read and the identity-only presentation work.
+                val groupsDeferred = async(Dispatchers.IO) { chatsSubscription.snapshot() }
+                val rows = withContext(Dispatchers.IO) { chatListSubscription.snapshot() }
+                ensureAccountSwitchRequestIsCurrent(generation)
+                recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
 
-            val groups = withContext(Dispatchers.IO) { chatsSubscription.snapshot() }
-            ensureAccountSwitchRequestIsCurrent(generation)
-            recordAccountSwitchPreloadStage(accountRef, "cached-groups-ready", rows.size)
+                val presentationDeferred =
+                    async {
+                        loadAccountSwitchPresentationSeeds(
+                            accountRef = accountRef,
+                            generation = generation,
+                            rows = rows,
+                            includePresentationSeeds = includePresentationSeeds,
+                        )
+                    }
+                val groups = groupsDeferred.await()
+                ensureAccountSwitchRequestIsCurrent(generation)
+                recordAccountSwitchPreloadStage(accountRef, "cached-groups-ready", groups.size)
+                val presentation = presentationDeferred.await()
+                ensureAccountSwitchRequestIsCurrent(generation)
 
-            val presentation =
-                loadAccountSwitchPresentationSeeds(
+                AccountSwitchLocalSnapshot(
                     accountRef = accountRef,
-                    generation = generation,
+                    activeAccountIdHex = presentation.activeAccountIdHex,
                     rows = rows,
-                    includePresentationSeeds = includePresentationSeeds,
-                )
-            AccountSwitchLocalSnapshot(
-                accountRef = accountRef,
-                activeAccountIdHex = presentation.activeAccountIdHex,
-                rows = rows,
-                groups = groups,
-                memberIds = presentation.memberIds,
-                profiles = presentation.profiles,
-            )
+                    groups = groups,
+                    memberIds = presentation.memberIds,
+                    profiles = presentation.profiles,
+                ).also { snapshot ->
+                    if (includePresentationSeeds) recordAccountSwitchIdentityState(accountRef, snapshot)
+                }
+            }
         } catch (_: AccountSwitchSnapshotSuperseded) {
             null
         } catch (cancel: CancellationException) {
@@ -4915,37 +4942,48 @@ class WhiteNoiseAppState private constructor(
         generation: Long,
         rows: List<ChatListRowFfi>,
         includePresentationSeeds: Boolean,
-    ): AccountSwitchPresentationSeeds {
-        val activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
-        if (!includePresentationSeeds) {
-            recordAccountSwitchPreloadStage(accountRef, "member-derived-local-deferred", rows.size)
-            return AccountSwitchPresentationSeeds(activeAccountIdHex, emptyList(), emptyList())
-        }
-        val memberIds = loadAccountSwitchMemberIds(accountRef, rows)
-        ensureAccountSwitchRequestIsCurrent(generation)
-        recordAccountSwitchPreloadStage(
-            accountRef,
-            accountSwitchMemberStage(rows, memberIds),
-            rows.size,
-        )
-        val profiles =
-            loadAccountSwitchProfileSeeds(
-                rows = rows,
-                memberIds = memberIds,
-                activeAccountIdHex = activeAccountIdHex,
-                targetAccountRef = accountRef,
+    ): AccountSwitchPresentationSeeds =
+        coroutineScope {
+            val activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
+            if (!includePresentationSeeds) {
+                recordAccountSwitchPreloadStage(accountRef, "member-derived-local-deferred", rows.size)
+                return@coroutineScope AccountSwitchPresentationSeeds(activeAccountIdHex, emptyList(), emptyList())
+            }
+            // Overlap bounded top-bar reads with the identity-critical member page.
+            val topBarProfileIds = accountSwitchProfileSeedIds(emptyList(), accounts, accountRef)
+            val topBarProfilesDeferred = async { loadAccountSwitchProfileSeeds(topBarProfileIds) }
+            val memberIds = loadAccountSwitchMemberIds(accountRef, rows)
+            ensureAccountSwitchRequestIsCurrent(generation)
+            recordAccountSwitchPreloadStage(
+                accountRef,
+                accountSwitchMemberStage(rows, memberIds),
+                rows.size,
             )
-        ensureAccountSwitchRequestIsCurrent(generation)
-        recordAccountSwitchPreloadStage(accountRef, "persisted-profiles-ready", rows.size)
-        return AccountSwitchPresentationSeeds(activeAccountIdHex, memberIds, profiles)
-    }
+            val directPeerProfileIds = accountSwitchDirectPeerProfileIds(rows, memberIds, activeAccountIdHex)
+            val topBarKeys = topBarProfileIds.mapTo(mutableSetOf()) { it.lowercase(Locale.ROOT) }
+            val directProfiles =
+                loadAccountSwitchProfileSeeds(
+                    directPeerProfileIds.filterNot { it.lowercase(Locale.ROOT) in topBarKeys },
+                )
+            ensureAccountSwitchRequestIsCurrent(generation)
+            val topBarProfiles = topBarProfilesDeferred.await()
+            ensureAccountSwitchRequestIsCurrent(generation)
+            recordAccountSwitchPreloadStage(accountRef, "persisted-profiles-ready", rows.size)
+            AccountSwitchPresentationSeeds(
+                activeAccountIdHex = activeAccountIdHex,
+                memberIds = memberIds,
+                profiles = (directProfiles + topBarProfiles).distinctBy { it.accountIdHex.lowercase(Locale.ROOT) },
+            )
+        }
 
     private suspend fun loadAccountSwitchMemberIds(
         accountRef: String,
         rows: List<ChatListRowFfi>,
-    ): List<AppGroupMemberIdsFfi> =
-        runCatchingCancellable {
-            loadGroupMemberIdsPages(rows.map { it.groupIdHex }) { page ->
+    ): List<AppGroupMemberIdsFfi> {
+        val identityGroupIds = accountSwitchFirstFrameMemberGroupIds(rows)
+        if (identityGroupIds.isEmpty()) return emptyList()
+        return runCatchingCancellable {
+            loadGroupMemberIdsPages(identityGroupIds) { page ->
                 marmotIo { groupMemberIdsPage(accountRef, page) }
             }
         }.onFailure { error ->
@@ -4953,40 +4991,15 @@ class WhiteNoiseAppState private constructor(
                 "account-switch local member projection failed: ${error.readableMessage()}"
             }
         }.getOrDefault(emptyList())
-
-    private fun accountSwitchMemberStage(
-        rows: List<ChatListRowFfi>,
-        memberIds: List<AppGroupMemberIdsFfi>,
-    ): String {
-        val projectedGroupIds = memberIds.mapTo(mutableSetOf()) { it.groupIdHex.lowercase(Locale.ROOT) }
-        return if (rows.all { it.groupIdHex.lowercase(Locale.ROOT) in projectedGroupIds }) {
-            "member-derived-local-ready"
-        } else {
-            "member-derived-local-deferred"
-        }
     }
 
-    private suspend fun loadAccountSwitchProfileSeeds(
-        rows: List<ChatListRowFfi>,
-        memberIds: List<AppGroupMemberIdsFfi>,
-        activeAccountIdHex: String?,
-        targetAccountRef: String,
-    ): List<AccountSwitchProfileSeed> {
-        val rowsByGroup = rows.associateBy { it.groupIdHex.lowercase(Locale.ROOT) }
-        val peerIds =
-            initialDirectPeerProfileIds(memberIds, activeAccountIdHex) { groupIdHex, memberCount ->
-                rowsByGroup[groupIdHex.lowercase(Locale.ROOT)]?.let { row ->
-                    GroupProjector.isDm(row.conversationKind, memberCount, row.groupName)
-                } == true
-            }
-        val profileIds = accountSwitchProfileSeedIds(peerIds, accounts, targetAccountRef)
-        return coroutineScope {
+    private suspend fun loadAccountSwitchProfileSeeds(profileIds: List<String>): List<AccountSwitchProfileSeed> =
+        coroutineScope {
             val gate = Semaphore(PROFILE_PRESENTATION_WARM_FANOUT)
             profileIds
                 .map { id -> async { gate.withPermit { loadAccountSwitchProfileSeed(id) } } }
                 .awaitAll()
         }
-    }
 
     internal fun consumeAccountSwitchLocalSnapshot(accountRef: String?) = accountSwitchHandoff.consume(accountRef)
 
@@ -8382,7 +8395,6 @@ class WhiteNoiseAppState private constructor(
      * its initial paint, so for a chat whose history is already on device the
      * sender name + avatar slot render empty for a few frames and then pop in
      * once the off-main local read lands and bumps [profileRevision] (#609).
-     *
      * This suspends until every sender's presentation is materialized into the
      * caches, so a caller that awaits it before publishing a timeline page
      * guarantees the first composition observes a populated presentation rather
@@ -8398,18 +8410,18 @@ class WhiteNoiseAppState private constructor(
      * job of [requestProfile]/[requestProfiles].
      */
     suspend fun warmProfilePresentationsBlocking(accountIdHexes: Iterable<String>) {
-        val uncachedIds =
-            accountIdHexes
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-                .distinct()
-                .filterNot { id ->
-                    synchronized(profilePresentationLock) { profilePresentations.containsKey(id) }
-                }
-        if (uncachedIds.isEmpty()) return
+        val ids =
+            synchronized(profilePresentationLock) {
+                profilePresentationIdsNeedingWarm(
+                    accountIdHexes = accountIdHexes,
+                    hasCachedPresentation = profilePresentations::containsKey,
+                    hasMaterialization = profileMaterializations::containsKey,
+                )
+            }
+        if (ids.isEmpty()) return
         val gate = Semaphore(PROFILE_PRESENTATION_WARM_FANOUT)
         coroutineScope {
-            uncachedIds
+            ids
                 .map { id ->
                     async {
                         gate.withPermit {
@@ -8509,29 +8521,33 @@ class WhiteNoiseAppState private constructor(
             } finally {
                 profileRefreshGate.finish(accountIdHex, System.currentTimeMillis())
             }
-        if (profile != null) {
-            // Resolve everything that needs the FFI off the main thread (this
-            // completion runs on profileScope = Main.immediate), then apply the
-            // in-memory caches on the main thread. The read accessors serve from
-            // these caches so composition never crosses the binding. See #4, #49.
-            val rawDisplayName =
-                if (profileDisplayNameReader != null) {
-                    runCatchingCancellable { profileDisplayNameReader.invoke(accountIdHex) }.getOrNull()
-                } else {
-                    runCatchingCancellable { marmotIo { displayName(accountIdHex) } }.getOrNull()
-                }
-            val displayName = rawDisplayName?.let { ProfileSanitizer.displayName(it) }
-            val presentation =
-                ProfilePresentation(
-                    displayName = displayName,
-                    avatarUrl = ProfileSanitizer.protocolImageUrl(profile.picture),
-                )
+        // A total miss is not an authoritative deletion and must not blank a
+        // first-frame value while relay/local refresh is pending (#2094).
+        val localReadInFlight =
+            synchronized(profilePresentationLock) { profileMaterializations.containsKey(accountIdHex) }
+        val rawDisplayName =
+            if (profile == null && localReadInFlight) {
+                null // The shared local materialization owns this read.
+            } else if (profileDisplayNameReader != null) {
+                runCatchingCancellable { profileDisplayNameReader.invoke(accountIdHex) }.getOrNull()
+            } else {
+                runCatchingCancellable { marmotIo { displayName(accountIdHex) } }.getOrNull()
+            }
+        if (profile != null || rawDisplayName != null) {
             // Drop the result if an account switch / sign-out cleared the caches
             // while this refresh was in flight, so we don't repopulate them with
             // the previous account's data.
             withContext(Dispatchers.Main.immediate) {
                 if (profileCacheEpoch.get() == epoch) {
-                    applyProfilePresentation(accountIdHex, profile, presentation)
+                    val current =
+                        synchronized(profilePresentationLock) {
+                            profilePresentations[accountIdHex] ?: ProfilePresentation.Empty
+                        }
+                    applyProfilePresentation(
+                        accountIdHex = accountIdHex,
+                        profile = profile,
+                        presentation = refreshedProfilePresentation(current, profile, rawDisplayName),
+                    )
                 }
             }
         }
@@ -9781,12 +9797,12 @@ class WhiteNoiseAppState private constructor(
      */
     private fun reserveProfileMaterialization(id: String): ProfileMaterializationReservation? =
         synchronized(profilePresentationLock) {
-            if (profilePresentations.containsKey(id)) {
+            profileMaterializations[id]?.let { running ->
+                ProfileMaterializationReservation(running, ownsRead = false)
+            } ?: if (profilePresentations.containsKey(id)) {
                 null
             } else {
-                profileMaterializations[id]?.let { running ->
-                    ProfileMaterializationReservation(running, ownsRead = false)
-                } ?: CompletableDeferred<Unit>().let { completion ->
+                CompletableDeferred<Unit>().let { completion ->
                     profileMaterializations.put(id, completion)
                     ProfileMaterializationReservation(completion, ownsRead = true)
                 }
@@ -9839,26 +9855,21 @@ class WhiteNoiseAppState private constructor(
                 runCatchingCancellable { marmotIo { userProfile(id) } }.getOrNull()
             }
         val rawDisplayName =
-            if (profileDisplayNameReader != null) {
+            if (profile != null) {
+                // accountSwitchProfileSeed treats a persisted profile as the
+                // authoritative name state, including an explicit clear. A
+                // separate displayName read cannot affect that result, so do
+                // not add one redundant FFI/database call per warmed identity.
+                null
+            } else if (profileDisplayNameReader != null) {
                 runCatchingCancellable { profileDisplayNameReader.invoke(id) }.getOrNull()
             } else {
                 runCatchingCancellable { marmotIo { displayName(id) } }.getOrNull()
             }
-        val displayName = rawDisplayName?.let { ProfileSanitizer.displayName(it) }
-        val presentation =
-            ProfilePresentation(
-                displayName = displayName,
-                avatarUrl = ProfileSanitizer.protocolImageUrl(profile?.picture),
-            )
-        return AccountSwitchProfileSeed(
-            accountIdHex = id,
-            profile = profile,
-            displayName = presentation.displayName,
-            avatarUrl = presentation.avatarUrl,
-        )
+        return accountSwitchProfileSeed(id, profile, rawDisplayName)
     }
 
-    private fun applyAccountSwitchProfileSeed(seed: AccountSwitchProfileSeed) {
+    internal fun applyAccountSwitchProfileSeed(seed: AccountSwitchProfileSeed) {
         applyProfilePresentation(
             accountIdHex = seed.accountIdHex,
             profile = seed.profile,
