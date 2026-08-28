@@ -177,20 +177,6 @@ internal fun DevicePrivacyScreen(
                             },
                         )
                     }
-                    if (appState.auditLogSettings?.enabled == true) {
-                        item {
-                            Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                                AuditRedactionSwitch(
-                                    checked = appState.redactSensitiveAuditData,
-                                    enabled = !auditLogsBusy,
-                                    busy = auditLogsBusy,
-                                    onApplyRedaction = { redact ->
-                                        runAuditMutation { appState.setRedactSensitiveAuditData(redact) }
-                                    },
-                                )
-                            }
-                        }
-                    }
                     item {
                         AuditLogExportRow(
                             enabled = !auditLogsBusy,

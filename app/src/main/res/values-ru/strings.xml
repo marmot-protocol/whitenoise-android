@@ -482,11 +482,6 @@
     <string name="audit_logs_settings_subtitle">Создавать и отправлять файлы журналов аудита безопасности.</string>
     <string name="delete_audit_logs">Удалить журналы аудита</string>
     <string name="delete_audit_logs_subtitle">Удаляет все локальные файлы журнала аудита. Если запись активна, она продолжится в новом файле.</string>
-    <string name="redact_audit_data">Скрывать конфиденциальные данные аудита</string>
-    <string name="redact_audit_data_subtitle">Исключает расшифрованное содержимое и полные идентификаторы из файлов аудита; сохраняет солёные ссылки, хеши и счётчики.</string>
-    <string name="redact_audit_data_confirm_title">Записывать полные данные аудита?</string>
-    <string name="redact_audit_data_confirm_body">Файлы аудита тогда могут содержать расшифрованные сообщения, содержимое приложения и полные идентификаторы. Оставьте скрытие включённым, если полные криминалистические данные не нужны.</string>
-    <string name="redact_audit_data_confirm_action">Записывать полные данные</string>
     <string name="developer">Разработчик</string>
     <string name="developer_mode">Режим разработчика</string>
     <string name="developer_mode_subtitle">Показывает диагностику и внутренние компоненты MLS.</string>

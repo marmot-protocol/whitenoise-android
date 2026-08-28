@@ -5,7 +5,6 @@ import android.content.Context
 import android.os.Looper
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
-import dev.ipf.marmotkit.AuditDataModeFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscription
@@ -140,11 +139,7 @@ internal class NotificationBootstrapTestFixture(
                     emitAtFirstPostStartFfiBoundary()
                     RelayTelemetrySettingsFfi(exportEnabled = false, exportIntervalSeconds = 60uL)
                 }
-                "auditLogSettings" ->
-                    AuditLogSettingsFfi(
-                        enabled = false,
-                        dataMode = AuditDataModeFfi.OBFUSCATED_SENSITIVE_DATA,
-                    )
+                "auditLogSettings" -> AuditLogSettingsFfi(enabled = false)
                 "setAuditLogSettings" -> arguments?.first()
                 "chatNotificationSettings" ->
                     ChatNotificationSettingsFfi(

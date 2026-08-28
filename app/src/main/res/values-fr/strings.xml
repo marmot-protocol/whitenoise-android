@@ -450,11 +450,6 @@
     <string name="audit_logs_settings_subtitle">Créer et envoyer des fichiers de journaux d’audit de sécurité.</string>
     <string name="delete_audit_logs">Supprimer les journaux d’audit</string>
     <string name="delete_audit_logs_subtitle">Supprime tous les fichiers d’audit locaux. Si la journalisation reste active, elle continue dans un nouveau fichier.</string>
-    <string name="redact_audit_data">Masquer les données d’audit sensibles</string>
-    <string name="redact_audit_data_subtitle">Exclut le contenu déchiffré et les identités complètes des fichiers d’audit ; conserve les références salées, les empreintes et les compteurs.</string>
-    <string name="redact_audit_data_confirm_title">Enregistrer les données d’audit complètes ?</string>
-    <string name="redact_audit_data_confirm_body">Sans masquage, les fichiers d’audit peuvent contenir les messages déchiffrés, le contenu de l’application et les identités complètes. Laissez-le activé sauf si vous avez besoin du détail forensique complet.</string>
-    <string name="redact_audit_data_confirm_action">Enregistrer les données complètes</string>
     <string name="developer">Développeur</string>
     <string name="developer_mode">Mode développeur</string>
     <string name="developer_mode_subtitle">Affiche les diagnostics et les éléments internes MLS.</string>

@@ -1992,9 +1992,6 @@ class WhiteNoiseAppState private constructor(
     var auditLogSettings by mutableStateOf<AuditLogSettingsFfi?>(null)
         private set
 
-    val redactSensitiveAuditData: Boolean
-        get() = auditLogSettings?.let(AuditLogSettingsPolicy::redactsSensitiveData) ?: true
-
     var runtimeGeneration by mutableStateOf(0)
         private set
 
@@ -5978,25 +5975,6 @@ class WhiteNoiseAppState private constructor(
         relayTelemetrySettings = runCatchingCancellable { marmotIo { relayTelemetrySettings() } }.getOrNull()
         auditLogSettingsMutex.withLock {
             auditLogSettings = runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()
-            reconcileRedactionWithEngineAuditModeLocked()
-        }
-    }
-
-    // Existing installs may have FULL_DATA before the one-time safe-default
-    // migration ran. If the engine update fails, leave the marker pending so
-    // the next refresh retries instead of silently opting out.
-    private suspend fun reconcileRedactionWithEngineAuditModeLocked() {
-        val settings = auditLogSettings ?: return
-        val migrated =
-            runCatchingCancellable {
-                executeAuditLogSettingsMigration(
-                    action = AuditLogSettingsPolicy.evaluateMigration(preferences, settings),
-                    persist = { updated -> marmotIo { setAuditLogSettings(updated) } },
-                    complete = { AuditLogSettingsPolicy.completeMigration(preferences) },
-                )
-            }.getOrNull()
-        if (migrated != null) {
-            auditLogSettings = migrated
         }
     }
 
@@ -6027,32 +6005,12 @@ class WhiteNoiseAppState private constructor(
             // in place via a recorder hot-swap (enable → live recorder,
             // disable → flush + close); no session reopen or runtime restart
             // required on the host side.
-            // The data mode follows the engine-backed audit settings, so the
-            // choice survives toggling audit logging off and on.
             updateAuditLogSettingsSerialized(
                 mutex = auditLogSettingsMutex,
                 cachedSettings = { auditLogSettings },
                 storeCachedSettings = { auditLogSettings = it },
                 loadFromEngine = { marmotIo { auditLogSettings() } },
-                transform = { AuditLogSettingsPolicy.settingsWithEnabled(it, enabled) },
-                persistToEngine = { settings -> marmotIo { setAuditLogSettings(settings) } },
-            )
-            presentTransient(R.string.toast_security_privacy_updated)
-            true
-        }.getOrElse {
-            if (it is CancellationException) throw it
-            presentFailure(R.string.toast_couldnt_update_security_privacy, "SECURITY_PRIVACY_UPDATE", it)
-            false
-        }
-
-    suspend fun setRedactSensitiveAuditData(redact: Boolean): Boolean =
-        runCatching {
-            updateAuditLogSettingsSerialized(
-                mutex = auditLogSettingsMutex,
-                cachedSettings = { auditLogSettings },
-                storeCachedSettings = { auditLogSettings = it },
-                loadFromEngine = { marmotIo { auditLogSettings() } },
-                transform = { AuditLogSettingsPolicy.settingsWithRedaction(it, redact) },
+                transform = { it.copy(enabled = enabled) },
                 persistToEngine = { settings -> marmotIo { setAuditLogSettings(settings) } },
             )
             presentTransient(R.string.toast_security_privacy_updated)
@@ -9062,7 +9020,7 @@ class WhiteNoiseAppState private constructor(
         update.messageIdHex?.let { messageId ->
             // A small recent tail; the just-arrived message is within it, and a
             // miss simply falls back to the generic notification body.
-            runCatchingCancellable { marmotIo { messages(update.accountRef, update.groupIdHex, 30u) } }
+            runCatchingCancellable { marmotIo { messages(update.accountRef, update.groupIdHex, 30u, null) } }
                 .getOrNull()
                 ?.firstOrNull { it.messageIdHex.equals(messageId, ignoreCase = true) }
         }

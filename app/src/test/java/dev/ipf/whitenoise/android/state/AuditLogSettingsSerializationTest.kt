@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.AuditDataModeFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -11,13 +10,9 @@ import org.junit.Test
 
 class AuditLogSettingsSerializationTest {
     @Test
-    fun serializedConcurrentUpdatesPreserveEnabledAndDataMode() =
+    fun concurrentUpdatesArePersistedInCallOrder() =
         runTest {
-            val initial =
-                AuditLogSettingsFfi(
-                    enabled = true,
-                    dataMode = AuditDataModeFfi.FULL_DATA,
-                )
+            val initial = AuditLogSettingsFfi(enabled = true)
             var cached: AuditLogSettingsFfi? = initial
             val engine = initial.copy()
             val mutex = Mutex()
@@ -32,12 +27,11 @@ class AuditLogSettingsSerializationTest {
                     loadFromEngine = { engine },
                     transform = transform,
                     persistToEngine = { requested ->
-                        if (requested.enabled == false && requested.dataMode == AuditDataModeFfi.FULL_DATA) {
+                        if (!requested.enabled) {
                             firstPersistEntered.complete(Unit)
                             releaseFirstPersist.await()
                         }
                         engine.enabled = requested.enabled
-                        engine.dataMode = requested.dataMode
                         requested
                     },
                 )
@@ -45,26 +39,20 @@ class AuditLogSettingsSerializationTest {
 
             val disableLogging =
                 async {
-                    serializedUpdate { AuditLogSettingsPolicy.settingsWithEnabled(it, enabled = false) }
+                    serializedUpdate { it.copy(enabled = false) }
                 }
-            val enableRedaction =
+            val enableLogging =
                 async {
                     firstPersistEntered.await()
-                    serializedUpdate { AuditLogSettingsPolicy.settingsWithRedaction(it, redact = true) }
+                    serializedUpdate { it.copy(enabled = true) }
                 }
 
             firstPersistEntered.await()
             releaseFirstPersist.complete(Unit)
             disableLogging.await()
-            enableRedaction.await()
+            enableLogging.await()
 
-            assertEquals(
-                AuditLogSettingsFfi(
-                    enabled = false,
-                    dataMode = AuditDataModeFfi.OBFUSCATED_SENSITIVE_DATA,
-                ),
-                cached,
-            )
+            assertEquals(AuditLogSettingsFfi(enabled = true), cached)
             assertEquals(cached, engine)
         }
 }
