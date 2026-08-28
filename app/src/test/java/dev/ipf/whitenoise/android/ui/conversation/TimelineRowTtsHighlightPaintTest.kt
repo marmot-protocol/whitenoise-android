@@ -208,6 +208,45 @@ class TimelineRowTtsHighlightPaintTest {
         )
     }
 
+    @Test
+    fun speakingPassagePaintsHighlightWhenTheRecordHasNoStoredContentTokens() {
+        val record = untokenizedRecord()
+        val entry =
+            runBlocking {
+                projectTtsSpeakableEntry(
+                    message = record,
+                    editedText = null,
+                    senderDisplayName = SENDER_NAME,
+                    parseMarkdown = { emptyDocument() },
+                )!!
+            }
+
+        composeRule.setContent {
+            val item = timelineMessage(record)
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth()) {
+                    key(item.record.messageIdHex) {
+                        row(item)
+                    }
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        val idlePixels = renderedPixels()
+
+        check(appState.ttsController.speak(listOf(entry), Locale.US))
+        composeRule.waitForIdle()
+        val speakingPixels = renderedPixels()
+        val diagnostics = seamDiagnostics()
+
+        assertTrue(
+            "Read-aloud painted nothing for a message with no stored content tokens. " +
+                "Seam state: $diagnostics",
+            changedPixelCount(idlePixels, speakingPixels) > 0,
+        )
+    }
+
     /**
      * Names the first seam that dropped the highlight. The progress tag proves
      * the passage cleared the bubble's message and projection identity gate;
@@ -357,6 +396,36 @@ class TimelineRowTtsHighlightPaintTest {
                         blankLinesBefore = byteArrayOf(0),
                     ),
                 ),
+        )
+
+    /**
+     * A message the parser gave no blocks for, which is every message stored
+     * before content tokens existed. The speakable source then reports
+     * `useStoredContentTokens = false`, and the bubble has no edited document
+     * to fall back on.
+     */
+    private fun untokenizedRecord() =
+        AppMessageRecordFfi(
+            messageIdHex = MESSAGE_D,
+            direction = "received",
+            groupIdHex = GROUP_ID,
+            sender = SENDER_ID,
+            plaintext = BODY,
+            contentTokens = emptyDocument(),
+            kind = 9uL,
+            tags = emptyList(),
+            sourceEpoch = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
+            recordedAt = 1uL,
+            receivedAt = 1uL,
+        )
+
+    private fun emptyDocument() =
+        MarkdownDocumentFfi(
+            truncated = false,
+            blankLinesBefore = byteArrayOf(),
+            blocks = emptyList(),
         )
 
     private fun renderedPixels(): IntArray {
@@ -538,6 +607,7 @@ class TimelineRowTtsHighlightPaintTest {
         val MESSAGE_A = "05" + "00".repeat(31)
         val MESSAGE_B = "06" + "00".repeat(31)
         val MESSAGE_C = "07" + "00".repeat(31)
+        val MESSAGE_D = "08" + "00".repeat(31)
         const val LONG_BODY_LINES = 90
         const val RICH_BODY =
             "# Release notes\n\nImportant **bright** details with `code` and [a link](https://example.com/docs).\n\n- First item.\n\n> A quoted line."
