@@ -32,6 +32,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.state.AttachmentTransferCoordinator
+import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -45,6 +46,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -227,6 +229,29 @@ class ReceivedFileCachedFirstFrameTest {
                 state.value == AttachmentTransferState.Remote
         }
         composeRule.runOnIdle { assertEquals(1, resolveCalls.get()) }
+    }
+
+    @Test
+    fun warmL1HitSkipsColdL2Probe() {
+        val diskProbeCalls = AtomicInteger(0)
+        val coldCache =
+            DiskByteCache(
+                File(cacheDir, "warm-l1"),
+                maxBytes = 1024,
+                keyProvider = keyProvider,
+                beforeOrphanTmpSweep = diskProbeCalls::incrementAndGet,
+            )
+        val appState = appState(coldCache, AtomicInteger(0))
+        val messageIdHex = "12" + "00".repeat(31)
+        val cacheKey = mediaCacheKey(ACCOUNT_REF, GROUP_ID, messageIdHex, 0)
+        val request = AttachmentTransferRequest(ACCOUNT_REF, GROUP_ID, messageIdHex, 0)
+
+        composeRule.runOnIdle {
+            assertTrue(appState.cacheMediaPlaintext(cacheKey, ByteArray(40) { 8 }))
+            assertTrue(runBlocking { appState.hasCachedAttachmentAfterHydration(request) })
+        }
+
+        assertEquals("an L1 hit must not hydrate or probe L2", 0, diskProbeCalls.get())
     }
 
     @Composable

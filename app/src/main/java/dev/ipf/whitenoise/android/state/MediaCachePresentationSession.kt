@@ -42,17 +42,19 @@ internal suspend fun WhiteNoiseAppState.hasCachedAttachmentForPresentation(
             null
         }
     val diskHit =
-        withContext(Dispatchers.Main.immediate) {
-            val presentationCurrent = mediaCachePresentationSessionCurrent(presentationSession)
-            if (diskBytes != null && presentationCurrent) cacheMediaPlaintext(cacheKey, diskBytes)
-            presentationCurrent && diskBytes != null
-        } ||
-            (
-                !hydrateMemory &&
-                    withContext(Dispatchers.IO) {
-                        diskMediaCache.containsAfterHydration(cacheKey)
-                    }
-            )
+        when {
+            diskBytes != null ->
+                withContext(Dispatchers.Main.immediate) {
+                    val presentationCurrent = mediaCachePresentationSessionCurrent(presentationSession)
+                    if (presentationCurrent) cacheMediaPlaintext(cacheKey, diskBytes)
+                    presentationCurrent
+                }
+            !hydrateMemory && !initialMemoryHit ->
+                withContext(Dispatchers.IO) {
+                    diskMediaCache.containsAfterHydration(cacheKey)
+                }
+            else -> false
+        }
     return withContext(Dispatchers.Main.immediate) {
         mediaCachePresentationSessionCurrent(presentationSession) &&
             (initialMemoryHit || diskHit || cachedMediaPlaintext(cacheKey) != null)
