@@ -398,14 +398,23 @@ private fun MappedTextBuilder.appendSpeakableNostrEntity(
     maxChars: Int,
     leafId: String,
 ) {
-    val display =
+    val resolved =
         markdownNostrEntityDisplay(
             entity = entity,
             mention = isMention,
             mentionDisplayName = mentionDisplayName,
             isGroupMember = isGroupMember,
-        ).visibleText.safeUtf16Prefix(maxChars)
-    append(MappedText.direct(display, leafId))
+        )
+    // With no profile to name the key, the bubble still shows a shortened
+    // bech32 because it is selectable and tappable. Speech has neither
+    // affordance, so reading it aloud spells sixty characters of base32 that
+    // carry nothing. Omit it the same way an unreadable URL is omitted, and
+    // leave the visible token unmapped so the highlight simply skips it.
+    if (resolved.name == null) {
+        appendSynthetic(" ")
+        return
+    }
+    append(MappedText.direct(resolved.visibleText.safeUtf16Prefix(maxChars), leafId))
 }
 
 private class SpeakableCollector {
