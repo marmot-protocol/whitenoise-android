@@ -180,12 +180,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (expectedFailure: Throwable) {
-            Log.w(
-                TAG,
-                "durable attachment download failed " +
-                    "msg=${request.messageIdHex.take(LOG_ID_PREFIX_LENGTH)}#${request.attachmentIndex}",
-                expectedFailure,
-            )
+            Log.w(TAG, "durable_attachment_download_failed")
             if (shouldRetryAttachmentDownloadWork(runAttemptCount, expectedFailure)) {
                 Result.retry()
             } else {
@@ -217,7 +212,6 @@ class AttachmentDownloadWorker : CoroutineWorker {
         internal const val MAX_RETRY_ATTEMPTS = 1
         private const val TAG = "DMAttachmentWorker"
         private const val BACKOFF_SECONDS = 30L
-        private const val LOG_ID_PREFIX_LENGTH = 8
 
         internal fun enqueue(
             context: Context,
@@ -256,7 +250,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
                     ExistingWorkPolicy.KEEP,
                     work,
                 )
-            }.onFailure { Log.w(TAG, "failed to enqueue durable attachment download", it) }
+            }.onFailure { Log.w(TAG, "attachment_download_enqueue_failed") }
         }
 
         internal suspend fun cancelQueuedAutomatic(

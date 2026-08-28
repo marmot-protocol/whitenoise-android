@@ -352,7 +352,7 @@ internal class LegacyDraftMigrationSource(
 
     fun read(): Map<String, String> =
         runCatching { store.readAll() }.getOrElse {
-            Log.w(LOG_TAG, "legacy draft store unreadable", it)
+            Log.w(LOG_TAG, "legacy_draft_store_unreadable")
             emptyMap()
         }
 

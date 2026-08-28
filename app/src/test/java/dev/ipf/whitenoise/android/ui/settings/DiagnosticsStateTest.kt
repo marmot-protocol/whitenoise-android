@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnosticStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -17,6 +18,7 @@ class DiagnosticsStateTest {
                 eventCount = 0,
                 streaming = false,
                 sendingPing = false,
+                performanceStatus = PerformanceDiagnosticStatus.Unavailable,
             )
 
         assertEquals(
@@ -61,6 +63,7 @@ class DiagnosticsStateTest {
                 eventCount = 7,
                 streaming = true,
                 sendingPing = false,
+                performanceStatus = PerformanceDiagnosticStatus.Unavailable,
             )
 
         assertFalse(state.showRelayHealthEmptyState)
@@ -72,5 +75,32 @@ class DiagnosticsStateTest {
             state.relayHealthValues.map { it.value },
         )
         assertEquals(listOf("personal", "2", "4"), state.runtimeValues.map { it.value })
+    }
+
+    @Test
+    fun availablePerformanceDiagnosticsShowsLocalOptInAndStatus() {
+        val performanceStatus =
+            PerformanceDiagnosticStatus(
+                available = true,
+                active = true,
+                remainingMillis = 60_000L,
+                emittedCount = 3,
+                droppedCount = 0,
+            )
+
+        val state =
+            diagnosticsState(
+                relayHealth = null,
+                activeAccountRef = null,
+                accountCount = 0,
+                bootstrapRelayCount = 0,
+                eventCount = 0,
+                streaming = false,
+                sendingPing = false,
+                performanceStatus = performanceStatus,
+            )
+
+        assertTrue(DiagnosticsSection.Performance in state.sections)
+        assertEquals(performanceStatus, state.performanceStatus)
     }
 }

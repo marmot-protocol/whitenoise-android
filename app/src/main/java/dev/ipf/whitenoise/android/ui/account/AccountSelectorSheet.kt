@@ -418,9 +418,9 @@ internal fun AccountSelectorSheet(
             appState.refreshAccounts()
         } catch (error: kotlin.coroutines.cancellation.CancellationException) {
             throw error
-        } catch (error: Exception) {
+        } catch (_: Exception) {
             // Keep the cached account list rather than failing the sheet.
-            Log.w("AccountSelectorSheet", "refreshAccounts failed, using cached list", error)
+            Log.w("AccountSelectorSheet", "account_refresh_failed_using_cache")
         } finally {
             refreshingAccounts = false
         }

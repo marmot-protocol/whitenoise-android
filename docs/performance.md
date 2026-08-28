@@ -23,6 +23,25 @@ Install the Android SDK (including Platform Tools for `adb`), `jq`, and ripgrep
 Android SDK Command-Line Tools or `unzip` as a fallback. The scripts check these
 commands up front and report the missing dependency.
 
+## Local WNPerf device diagnostics
+
+Debug, PR-preview, and staging builds expose a **Performance logs** switch under
+**Settings → Developer → Diagnostics**. It is off by default. Enabling it writes
+only the closed `WNPerf` timing schema to Logcat for up to 30 minutes; disabling
+it stops new events immediately. The session and its process-local counters are
+never persisted, so a process restart also disables ordinary device collection.
+The benchmark-selector build is the one exception: choosing that purpose-built
+local variant is the runner's explicit opt-in before its cold-start measurement.
+
+To validate a slow journey on a staging device, enable the switch, reproduce one
+operation, then open **App info → View logs** and filter for `WNPerf`. Confirm the
+lines identify `op`, `phase`, `layer`, bounded timings/counts, and a closed
+`result`, and contain no account/group/message identifiers, npubs/pubkeys, URLs,
+filenames/paths, notification or message text, ciphertext, keys/tokens, or raw
+errors. Turn the switch off and repeat an action to confirm no new lines appear.
+White Noise controls future emission only; retention of lines already written to
+Logcat is controlled by Android/GrapheneOS.
+
 ## Prepare a physical-device fixture
 
 Use a dedicated API 34+ device with animations disabled and a stable power and
@@ -64,9 +83,10 @@ benchmark APKs are installed or updated in place; the runner never uninstalls a
 package, so authenticated app data remains intact on a personal physical device.
 
 Before the controlled Macrobenchmark iterations, the runner also records the
-first cold launch after that in-place replacement. The release-like build emits
-identifier-free startup milestones for the system-splash handoff and the first
-authoritative local chat-list frame. The host runner requires a cold Activity
+first cold launch after that in-place replacement. The explicitly selected
+release-like benchmark build emits privacy-safe `WNPerf` startup milestones for
+the system-splash handoff and the first authoritative local chat-list frame. The
+host runner requires a cold Activity
 launch, requires both milestones, and rejects a Compose handoff at or beyond two
 seconds. It writes the exact APK SHA-256, named device/API/build fingerprint,
 Activity launch timing, splash handoff timing, time to first app-owned Compose
@@ -174,8 +194,9 @@ account, group, or message identifier.
 `timeToFirstComposeUiMs` is the conservative later value of Android's Activity
 launch time and the monotonic system-splash handoff; this prevents Application
 startup before the app trace exists from disappearing from the result.
-`timeToReadyMs` is the first locally authoritative chat-list frame measured
-from the device-uptime sample taken immediately before launch. Do not
+`timeToReadyMs` is the first locally authoritative chat-list frame measured by
+the process-local `app_start` trace; pre-AppState launch work remains represented
+by the separate Activity timing. Do not
 substitute emulator output for the named physical-device evidence required by
 the startup issue.
 

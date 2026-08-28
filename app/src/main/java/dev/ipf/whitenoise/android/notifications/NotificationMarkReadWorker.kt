@@ -109,8 +109,8 @@ class NotificationMarkReadWorker(
                 true
             } catch (cancel: CancellationException) {
                 throw cancel
-            } catch (failure: Throwable) {
-                Log.w(TAG, "failed to enqueue notification mark-read", failure)
+            } catch (_: Throwable) {
+                Log.w(TAG, "notification_mark_read_enqueue_failed")
                 false
             }
 

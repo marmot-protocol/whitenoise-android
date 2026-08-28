@@ -455,6 +455,10 @@
     <string name="developer_mode_subtitle">Mostra la diagnostica e gli interni MLS.</string>
     <string name="diagnostics">Diagnostica</string>
     <string name="diagnostics_settings_subtitle">Inoltro integrità e componenti interni MLS</string>
+    <string name="performance_logs">Log delle prestazioni</string>
+    <string name="performance_logs_description">Scrive temporaneamente in Logcat eventi di temporizzazione rispettosi della privacy. Si interrompe dopo 30 minuti o al riavvio dell’app.</string>
+    <string name="performance_logs_active">Attivo · %1$d min rimanenti</string>
+    <string name="performance_logs_inactive">Inattivo</string>
     <string name="group_system_show_details">Mostra dettagli</string>
     <string name="group_system_hide_details">Nascondi dettagli</string>
     <string name="local_notifications">Notifiche</string>

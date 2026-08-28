@@ -455,6 +455,10 @@
     <string name="developer_mode_subtitle">Zeigt Diagnosen und MLS-Interna an.</string>
     <string name="diagnostics">Diagnose</string>
     <string name="diagnostics_settings_subtitle">Relay-Zustand und MLS-Interna</string>
+    <string name="performance_logs">Leistungsprotokolle</string>
+    <string name="performance_logs_description">Schreibt vorübergehend datenschutzfreundliche Zeitmessungen in Logcat. Endet nach 30 Minuten oder beim Neustart der App.</string>
+    <string name="performance_logs_active">Aktiv · noch %1$d Min.</string>
+    <string name="performance_logs_inactive">Inaktiv</string>
     <string name="group_system_show_details">Details anzeigen</string>
     <string name="group_system_hide_details">Details ausblenden</string>
     <string name="local_notifications">Benachrichtigungen</string>

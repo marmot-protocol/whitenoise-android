@@ -132,7 +132,7 @@ internal fun readSharedContact(
                     contactId = if (cursor.isNull(2)) null else cursor.getLong(2)
                 }
             }
-    }.onFailure { Log.w(TAG, "picked phone row query failed", it) }
+    }.onFailure { Log.w(TAG, "contact_phone_query_failed") }
     val email = contactId?.let { readPrimaryEmail(resolver, it) }
     return SharedContact(name = name, phone = phone, email = email).takeUnless { it.isEmpty }
 }

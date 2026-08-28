@@ -41,14 +41,13 @@ class BootstrapSplashHandoffTest {
     }
 
     @Test
-    fun releaseLikeBenchmarkKeepsPrivacySafeStartupMarkers() {
+    fun startupMarkersUseTheOptInTypedPerformanceEmitter() {
         val source = appStateSource()
-        val startupTiming = source.substringAfter("private fun startupTiming(")
+        val startupTiming = startupPerformanceSource()
 
-        assertTrue(startupTiming.contains("BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS"))
-        assertTrue(startupTiming.contains("uptime_ms="))
-        assertTrue(source.contains("startupTiming(\"system-splash-handoff\""))
-        assertTrue(source.contains("startupTiming(\"first-local-frame\""))
+        assertTrue(startupTiming.contains("PerformanceDiagnostics.record("))
+        assertTrue(source.contains("startupPerformance.record(PerformancePhase.SYSTEM_SPLASH_HANDOFF"))
+        assertTrue(source.contains("startupPerformance.record(PerformancePhase.FIRST_LOCAL_FRAME"))
     }
 
     @Test
@@ -91,4 +90,10 @@ class BootstrapSplashHandoffTest {
             File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull(File::isFile)?.readText() ?: error("Missing AppState.kt")
+
+    private fun startupPerformanceSource(): String =
+        sequenceOf(
+            File("src/main/java/dev/ipf/whitenoise/android/diagnostics/StartupPerformanceDiagnostics.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/diagnostics/StartupPerformanceDiagnostics.kt"),
+        ).firstOrNull(File::isFile)?.readText() ?: error("Missing StartupPerformanceDiagnostics.kt")
 }

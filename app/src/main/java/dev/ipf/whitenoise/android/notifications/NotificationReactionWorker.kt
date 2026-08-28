@@ -120,7 +120,7 @@ class NotificationReactionWorker(
             }.exceptionOrNull()
         if (runtimeFailure != null) {
             if (runtimeFailure is CancellationException) throw runtimeFailure
-            Log.w(TAG, "notification reaction runtime start failed", runtimeFailure)
+            Log.w(TAG, "notification_reaction_runtime_start_failed")
             return retryableReactionFailureResult(retryStore, retryKey)
         }
 
@@ -165,7 +165,7 @@ class NotificationReactionWorker(
                 withContext(Dispatchers.Main.immediate) {
                     application.recentEmojiRecentsOwner.onEmojiUsed(input.reaction)
                 }
-            }.onFailure { Log.w(TAG, "reaction sent but recent-emoji update failed", it) }
+            }.onFailure { Log.w(TAG, "notification_reaction_recent_emoji_failed") }
             runCatching {
                 withContext(Dispatchers.Main.immediate) {
                     application.appState.markNotificationMessageRead(
@@ -176,7 +176,7 @@ class NotificationReactionWorker(
                                 .orEmpty(),
                     )
                 }
-            }.onFailure { Log.w(TAG, "reaction sent but mark-read failed", it) }
+            }.onFailure { Log.w(TAG, "notification_reaction_mark_read_failed") }
             runCatching {
                 // Receiver cleanup normally removes the card immediately. This
                 // is a process-death fallback. It clears API 34+'s RemoteInput
@@ -188,7 +188,7 @@ class NotificationReactionWorker(
                     reaction = input.reaction,
                     dismissalBaselineMs = input.actionStartedAtMs,
                 )
-            }.onFailure { Log.w(TAG, "reaction sent but notification cleanup failed", it) }
+            }.onFailure { Log.w(TAG, "notification_reaction_card_cleanup_failed") }
             retryStore.clear(retryKey)
             Result.success()
         }
@@ -210,7 +210,7 @@ class NotificationReactionWorker(
         retryStore: NotificationActionRetryStore,
         retryKey: String,
     ): Result {
-        Log.w(TAG, "failed to decrypt notification reaction", failure)
+        Log.w(TAG, "notification_reaction_decrypt_failed")
         val attempt = retryStore.recordOperationFailureAttempt(retryKey)
         return if (attempt != null && NotificationReplyWorker.shouldRetryAfterCryptoFailure(failure, attempt)) {
             Result.retry()
@@ -299,7 +299,7 @@ class NotificationReactionWorker(
                 }
             val failure = enqueueResult.exceptionOrNull()
             if (failure is CancellationException) throw failure
-            if (failure != null) Log.w(TAG, "failed to encrypt or enqueue notification reaction", failure)
+            if (failure != null) Log.w(TAG, "notification_reaction_enqueue_failed")
             return enqueueResult.getOrDefault(false)
         }
 

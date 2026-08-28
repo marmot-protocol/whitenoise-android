@@ -10,8 +10,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import java.io.File
 
-private const val LOG_ID_PREFIX_LENGTH = 8
-
 /** Materializes a reusable artifact for external viewers without duplicating an active transfer. */
 internal suspend fun materializeMediaFile(
     context: Context,
@@ -39,7 +37,7 @@ internal suspend fun materializeMediaFile(
             },
         )
     }.onFailure {
-        logMediaFileDownloadFailure(messageIdHex, attachmentIndex, it)
+        logMediaFileDownloadFailure()
     }.getOrNull()
 }
 
@@ -100,7 +98,7 @@ internal suspend fun loadMediaFileBytes(
                 retainedPlaintext = retained,
             ).await()
     }.onFailure {
-        logMediaFileDownloadFailure(messageIdHex, attachmentIndex, it)
+        logMediaFileDownloadFailure()
     }.getOrNull()
 }
 
@@ -119,14 +117,6 @@ private fun retainedMediaFileBytes(
         null
     }
 
-private fun logMediaFileDownloadFailure(
-    messageIdHex: String,
-    attachmentIndex: Int,
-    error: Throwable,
-) {
-    Log.w(
-        "MediaFileBubble",
-        "download failed for msg=${messageIdHex.take(LOG_ID_PREFIX_LENGTH)}#$attachmentIndex",
-        error,
-    )
+private fun logMediaFileDownloadFailure() {
+    Log.w("MediaFileBubble", "attachment_download_failed")
 }

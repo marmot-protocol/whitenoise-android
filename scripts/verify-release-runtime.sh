@@ -263,4 +263,22 @@ if grep -En "VerifyError|Verifier rejected class|FATAL EXCEPTION" "$log_path"; t
   exit 1
 fi
 
+# Production must compile the opt-in performance facility off. Keep this as a
+# runtime assertion too so a future flavor/build-type merge cannot silently
+# expose WNPerf in the shipping process.
+if grep -En "WNPerf" "$log_path"; then
+  echo "error: production release emitted WNPerf diagnostics" >&2
+  exit 1
+fi
+
+# These app-owned tags participate in the covered startup/chat/media journeys.
+# Reject the dynamic value shapes previously found by the source inventory:
+# protocol ids, URLs/paths, raw report/error fields, and Throwable text.
+app_log_tags="WhiteNoiseApplication|WhiteNoiseAppState|DMAppState|DMAttachmentDownload|DMSend|DMConversation|DMChats|DiskByteCache|AppUpdateWorker|DMForegroundSvc"
+dynamic_value_patterns="npub1|nsec1|https?://|/data/|[[:xdigit:]]{64}|detail=|group=|message=|filename=|path=|report=|reason=|Exception|Caused by:"
+if grep -En "($app_log_tags).*($dynamic_value_patterns)" "$log_path"; then
+  echo "error: production release emitted a known dynamic identifier/error log pattern" >&2
+  exit 1
+fi
+
 printf 'Release runtime verification passed for %s (pid %s).\n' "$application_id" "$app_pid"

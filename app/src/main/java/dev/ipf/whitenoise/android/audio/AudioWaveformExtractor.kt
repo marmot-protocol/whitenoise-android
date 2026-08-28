@@ -72,7 +72,7 @@ object AudioWaveformExtractor {
                         }.also { cache.put(cacheKey, it ?: UNAVAILABLE_WAVEFORM) }
                 } catch (throwable: Throwable) {
                     if (throwable is CancellationException) throw throwable
-                    Log.w(TAG, "decode failed", throwable)
+                    Log.w(TAG, "waveform_decode_failed")
                     null
                 }
             }

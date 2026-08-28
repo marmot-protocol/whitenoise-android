@@ -170,11 +170,7 @@ internal fun MediaVideoGridTile(
             if (it is kotlinx.coroutines.CancellationException) {
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
-                Log.w(
-                    "MediaVideoGridTile",
-                    "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
-                    it,
-                )
+                Log.w("MediaVideoGridTile", "video_tile_auto_materialize_failed")
                 failed = true
             }
         }
@@ -465,11 +461,7 @@ internal fun MediaVideoBubble(
             if (it is kotlinx.coroutines.CancellationException) {
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
-                Log.w(
-                    "MediaVideoBubble",
-                    "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
-                    it,
-                )
+                Log.w("MediaVideoBubble", "video_auto_materialize_failed")
                 failed = true
             }
         }
@@ -1036,7 +1028,7 @@ internal fun VideoViewerPage(
         }.onSuccess { localFile = it }
             .onFailure {
                 if (it is CancellationException) throw it
-                Log.w("VideoViewerPage", "materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)
+                Log.w("VideoViewerPage", "video_materialize_failed")
                 loadFailed = true
             }
     }

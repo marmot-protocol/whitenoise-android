@@ -65,7 +65,7 @@ class NotificationReplyWorker(
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (failure: Exception) {
-                        Log.w(TAG, "failed to decrypt notification reply", failure)
+                        Log.w(TAG, "notification_reply_decrypt_failed")
                         return cryptoFailureResult(failure, retryStore, retryKey)
                     }
                 NotificationReplyInput.Malformed -> return Result.failure().also { retryStore.clear(retryKey) }
@@ -169,15 +169,15 @@ class NotificationReplyWorker(
             markReadAfterReply(application, action)
         } catch (cancel: CancellationException) {
             throw cancel
-        } catch (throwable: Throwable) {
-            Log.w(TAG, "reply sent but mark-read cleanup failed", throwable)
+        } catch (_: Throwable) {
+            Log.w(TAG, "notification_reply_mark_read_cleanup_failed")
         }
         try {
             dismissSentReplyNotification(applicationContext, action, reply)
         } catch (cancel: CancellationException) {
             throw cancel
-        } catch (throwable: Throwable) {
-            Log.w(TAG, "reply sent but notification cleanup failed", throwable)
+        } catch (_: Throwable) {
+            Log.w(TAG, "notification_reply_card_cleanup_failed")
         }
         notificationReplyActionHandled(sent = true)
         return Result.success()
@@ -404,8 +404,8 @@ class NotificationReplyWorker(
                 true
             } catch (cancel: CancellationException) {
                 throw cancel
-            } catch (failure: Throwable) {
-                Log.w(TAG, "failed to encrypt or enqueue notification reply", failure)
+            } catch (_: Throwable) {
+                Log.w(TAG, "notification_reply_enqueue_failed")
                 false
             }
 

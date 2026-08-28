@@ -455,6 +455,10 @@
     <string name="developer_mode_subtitle">Teşhisleri ve MLS dahili bilgilerini gösterir.</string>
     <string name="diagnostics">Teşhis</string>
     <string name="diagnostics_settings_subtitle">Aktarma durumu ve MLS dahili bilgileri</string>
+    <string name="performance_logs">Performans günlükleri</string>
+    <string name="performance_logs_description">Gizliliği koruyan zamanlama olaylarını geçici olarak Logcat’e yazar. 30 dakika sonra veya uygulama yeniden başlatıldığında durur.</string>
+    <string name="performance_logs_active">Etkin · %1$d dk kaldı</string>
+    <string name="performance_logs_inactive">Etkin değil</string>
     <string name="group_system_show_details">Ayrıntıları göster</string>
     <string name="group_system_hide_details">Ayrıntıları gizle</string>
     <string name="local_notifications">Bildirimler</string>

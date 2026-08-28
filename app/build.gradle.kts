@@ -250,6 +250,10 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "false")
+        // Production release must resolve the local WNPerf facility to a
+        // compile-time false constant. Non-production flavors and debug builds
+        // override this below; runtime collection still requires explicit opt-in.
+        buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "false")
         buildConfigField(
             "String",
             "MDK_SHORT_SHA",
@@ -312,6 +316,7 @@ android {
                 environmentRuntimeConfigProperty("dev", "AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "dev".asBuildConfigString())
+            buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
             buildConfigField(
                 "String",
                 "WHITENOISE_TELEMETRY_TENANT",
@@ -346,6 +351,7 @@ android {
             buildConfigField("String", "WHITENOISE_AUDIT_LOG_ENDPOINT", "".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_AUDIT_LOG_AUTH_TOKEN", "".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "preview".asBuildConfigString())
+            buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
             buildConfigField("String", "WHITENOISE_TELEMETRY_TENANT", "whitenoise-android-preview".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_PUSH_SERVER_PUBKEY_HEX", "".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_PUSH_RELAY_HINT", "".asBuildConfigString())
@@ -498,6 +504,7 @@ android {
                 environmentRuntimeConfigProperty("staging", "AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "staging".asBuildConfigString())
+            buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
             buildConfigField(
                 "String",
                 "WHITENOISE_TELEMETRY_TENANT",
@@ -538,6 +545,7 @@ android {
             // google-services.json clients still match. Use the staging release
             // APK for side-by-side device use.
             versionNameSuffix = "-debug"
+            buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
         }
         release {
             isMinifyEnabled = true

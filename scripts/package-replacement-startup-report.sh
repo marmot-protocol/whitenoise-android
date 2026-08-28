@@ -34,16 +34,18 @@ read_launch_value() {
   awk -F': ' -v key="$key" '$1 == key {value = $2} END {gsub(/\r$/, "", value); print value}' "$launch_output"
 }
 
-read_stage_value() {
-  local stage="$1"
+read_phase_value() {
+  local phase="$1"
   local key="$2"
-  awk -v target="stage=$stage" -v value_prefix="$key=" '
+  awk -v target_op="op=app_start" -v target_phase="phase=$phase" -v value_prefix="$key=" '
     {
-      stage_matches = 0
+      op_matches = 0
+      phase_matches = 0
       for (field_index = 1; field_index <= NF; field_index += 1) {
-        if ($field_index == target) stage_matches += 1
+        if ($field_index == target_op) op_matches += 1
+        if ($field_index == target_phase) phase_matches += 1
       }
-      if (stage_matches != 1) next
+      if (op_matches != 1 || phase_matches != 1) next
       for (field_index = 1; field_index <= NF; field_index += 1) {
         if (index($field_index, value_prefix) == 1 &&
           substr($field_index, length(value_prefix) + 1) ~ /^[0-9]+$/) {
@@ -87,23 +89,17 @@ if [[ ! "$launch_started_uptime_ms" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
-if ! splash_handoff_uptime_ms="$(read_stage_value system-splash-handoff uptime_ms)"; then
+if ! splash_handoff_ms="$(read_phase_value system_splash_handoff elapsed_ms)"; then
   echo "Expected exactly one system-splash-handoff startup marker." >&2
   exit 1
 fi
-if ! ready_uptime_ms="$(read_stage_value first-local-frame uptime_ms)"; then
+if ! ready_ms="$(read_phase_value first_local_frame elapsed_ms)"; then
   echo "Expected exactly one first-local-frame startup marker." >&2
   exit 1
 fi
-if ((splash_handoff_uptime_ms < launch_started_uptime_ms || ready_uptime_ms < launch_started_uptime_ms)); then
-  echo "Startup markers predate this package-replacement launch." >&2
-  exit 1
-fi
-splash_handoff_ms=$((splash_handoff_uptime_ms - launch_started_uptime_ms))
-ready_ms=$((ready_uptime_ms - launch_started_uptime_ms))
 # Activity TotalTime includes launch work before Application/AppState exists,
-# while the marker proves when the retained splash actually released. Use the
-# conservative later value so neither side of the handoff can be hidden.
+# while WNPerf elapsed time begins with AppState. Use the conservative later
+# value so pre-AppState work cannot be hidden from the splash bound.
 if ((total_time_ms > splash_handoff_ms)); then
   first_compose_ui_ms="$total_time_ms"
 else

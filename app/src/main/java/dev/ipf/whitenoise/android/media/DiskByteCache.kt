@@ -520,7 +520,7 @@ internal class DiskByteCache(
             val deleted = runCatching { file.delete() || !file.exists() }.getOrDefault(false)
             if (!deleted) {
                 complete = false
-                android.util.Log.w("DiskByteCache", "failed to delete legacy plaintext ${file.name}")
+                android.util.Log.w("DiskByteCache", "failed to delete legacy plaintext")
                 continue
             }
             val encryptedPeer = File(file.parentFile, file.name.removeSuffix(LEGACY_SUFFIX) + SUFFIX)
@@ -539,7 +539,7 @@ internal class DiskByteCache(
             if (generation != generationAtStart) return
             files.forEach { file ->
                 runCatching { file.delete() }.onFailure {
-                    android.util.Log.w("DiskByteCache", "failed to delete hydration artifact ${file.name}", it)
+                    android.util.Log.w("DiskByteCache", "failed to delete hydration artifact")
                 }
             }
         }

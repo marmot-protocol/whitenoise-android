@@ -148,6 +148,12 @@ class AndroidReleaseRuntimeWorkflowCoverageTest {
             "a not-yet-visible app process must not bypass the bounded PID readiness loop",
             "pidof \"\$application_id\" 2> /dev/null | tr -d '\\r' || true" in verifierScript,
         )
+        assertTrue(
+            "production runtime verification must reject WNPerf and dynamic app-log value shapes",
+            "production release emitted WNPerf diagnostics" in verifierScript &&
+                "dynamic_value_patterns" in verifierScript &&
+                "known dynamic identifier/error log pattern" in verifierScript,
+        )
     }
 
     private fun assertRequiredCheckAggregation(aggregateJob: String) {

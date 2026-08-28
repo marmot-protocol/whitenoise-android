@@ -444,6 +444,10 @@
     <string name="developer_mode_subtitle">显示诊断和 MLS 内部结构。</string>
     <string name="diagnostics">诊断</string>
     <string name="diagnostics_settings_subtitle">继电器健康状况和 MLS 内部结构</string>
+    <string name="performance_logs">性能日志</string>
+    <string name="performance_logs_description">临时将保护隐私的计时事件写入 Logcat。30 分钟后或应用重启时停止。</string>
+    <string name="performance_logs_active">已启用 · 剩余 %1$d 分钟</string>
+    <string name="performance_logs_inactive">未启用</string>
     <string name="group_system_show_details">显示详情</string>
     <string name="group_system_hide_details">隐藏详情</string>
     <string name="local_notifications">通知</string>
