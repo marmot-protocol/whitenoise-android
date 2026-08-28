@@ -450,11 +450,6 @@
     <string name="audit_logs_settings_subtitle">Crear y enviar archivos de auditoría de seguridad.</string>
     <string name="delete_audit_logs">Eliminar registros de auditoría</string>
     <string name="delete_audit_logs_subtitle">Borra todos los archivos locales de auditoría. Si la auditoría sigue activa, continúa en un archivo nuevo.</string>
-    <string name="redact_audit_data">Ocultar datos sensibles de auditoría</string>
-    <string name="redact_audit_data_subtitle">Excluye el contenido descifrado y las identidades completas de los archivos de auditoría; conserva referencias con sal, resúmenes y recuentos.</string>
-    <string name="redact_audit_data_confirm_title">¿Registrar datos completos de auditoría?</string>
-    <string name="redact_audit_data_confirm_body">Sin esta protección, los archivos de auditoría pueden incluir mensajes descifrados, contenido de la aplicación e identidades completas. Déjala activada salvo que necesites el detalle forense completo.</string>
-    <string name="redact_audit_data_confirm_action">Registrar datos completos</string>
     <string name="developer">Desarrollador</string>
     <string name="developer_mode">Modo desarrollador</string>
     <string name="developer_mode_subtitle">Muestra diagnósticos y elementos internos de MLS.</string>

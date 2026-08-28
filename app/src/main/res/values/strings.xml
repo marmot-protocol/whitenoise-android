@@ -564,11 +564,6 @@
     <string name="export_audit_logs_confirm_action" translatable="false">Choose recipient</string>
     <string name="delete_audit_logs">Delete audit logs</string>
     <string name="delete_audit_logs_subtitle">Remove all local forensic audit files. Logging continues on a fresh file if it\'s still on.</string>
-    <string name="redact_audit_data">Redact sensitive audit data</string>
-    <string name="redact_audit_data_subtitle">Strip decrypted content and full identities from audit files, keeping salted references, digests and counts.</string>
-    <string name="redact_audit_data_confirm_title">Record full audit data?</string>
-    <string name="redact_audit_data_confirm_body">With redaction off, audit files may include decrypted message and app content plus full identities. Leave it on unless you need complete forensic detail.</string>
-    <string name="redact_audit_data_confirm_action">Record full data</string>
     <string name="developer">Developer</string>
     <string name="developer_mode">Developer mode</string>
     <string name="developer_mode_subtitle">Shows diagnostics and MLS internals.</string>

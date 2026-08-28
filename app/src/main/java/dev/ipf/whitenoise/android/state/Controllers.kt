@@ -6518,14 +6518,15 @@ private fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
         TimelineUpdateTriggerFfi.AGENT_STREAM_FINISHED,
         TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
         TimelineUpdateTriggerFfi.RECEIPT_CHANGED,
-        // New triggers from the typed Hermes-agent / group-system surface.
-        // None of these mutate reaction tallies, so they fall in the false
-        // bucket — kept explicit so a future trigger that *does* change
+        // Typed agent, group-system, and custom-event updates do not mutate
+        // reaction tallies, so they fall in the false bucket — kept explicit
+        // so a future trigger that *does* change
         // reactions fails the exhaustiveness check rather than silently
         // missing a recompute.
         TimelineUpdateTriggerFfi.AGENT_ACTIVITY,
         TimelineUpdateTriggerFfi.AGENT_OPERATION,
         TimelineUpdateTriggerFfi.GROUP_SYSTEM,
+        TimelineUpdateTriggerFfi.CUSTOM_EVENT,
         -> false
     }
 
@@ -10939,7 +10940,7 @@ class ConversationController(
         val account = conversationAccountRef ?: return null
         return runCatchingCancellable {
             withContext(Dispatchers.IO) {
-                appState.marmotIo { messages(account, group.groupIdHex, 120u) }
+                appState.marmotIo { messages(account, group.groupIdHex, 120u, null) }
             }
         }.onFailure {
             Log.w(
