@@ -458,7 +458,7 @@ class ConversationTtsFollowPolicyTest {
     }
 
     @Test
-    fun fullyVisibleSentenceStaysPutAndClippedSentenceUsesNearestEdge() {
+    fun fullyVisibleSentenceStaysPutAndAnyClippedSentenceGoesToTheTop() {
         assertEquals(
             TtsFollowViewportDecision.Stay,
             decide(itemOffset = 0, sentenceTop = 350, sentenceBottom = 450),
@@ -467,20 +467,22 @@ class ConversationTtsFollowPolicyTest {
             TtsFollowViewportDecision.ScrollToItemOffset(-50),
             decide(itemOffset = 0, sentenceTop = -50, sentenceBottom = 50),
         )
+        // Clipped at the bottom, so the whole sentence comes to the top rather
+        // than rising by its overflow and clipping again on the next words.
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(50),
+            TtsFollowViewportDecision.ScrollToItemOffset(850),
             decide(itemOffset = 0, sentenceTop = 850, sentenceBottom = 1_050),
         )
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(1),
+            TtsFollowViewportDecision.ScrollToItemOffset(900),
             decide(itemOffset = 0, sentenceTop = 900, sentenceBottom = 1_001),
         )
     }
 
     @Test
-    fun bottomClippedSentenceUsesViewportEndWithNonZeroOrigin() {
+    fun bottomClippedSentenceGoesToTheTopWithNonZeroOrigin() {
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(1),
+            TtsFollowViewportDecision.ScrollToItemOffset(900),
             TtsFollowViewport.decide(
                 viewportStart = 200,
                 viewportEnd = 1_200,
