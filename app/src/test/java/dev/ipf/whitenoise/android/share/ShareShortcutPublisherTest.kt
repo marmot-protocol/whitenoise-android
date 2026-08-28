@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA
 import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountScope
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
@@ -156,7 +157,11 @@ class ShareShortcutPublisherTest {
         assertEquals(1, republished.rank)
         assertEquals(rich.locusId, republished.locusId)
         assertEquals(rich.intent, republished.intent)
-        assertEquals(rich.extras, republished.extras)
+        assertEquals(
+            conversationShortcutAccountScope("acct"),
+            republished.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA),
+        )
+        assertTrue(republished.categories?.contains(CONVERSATION_SHARE_TARGET_CATEGORY) == true)
     }
 
     @Test

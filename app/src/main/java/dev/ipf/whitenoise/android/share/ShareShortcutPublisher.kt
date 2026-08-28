@@ -2,10 +2,15 @@ package dev.ipf.whitenoise.android.share
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
 import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountExtras
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
@@ -22,6 +27,8 @@ data class ShareShortcutTarget(
     val accountRef: String,
     val groupIdHex: String,
     val title: String,
+    val avatarUrl: String? = null,
+    val avatarBitmap: Bitmap? = null,
 )
 
 internal fun selectShareShortcutTargets(
@@ -39,6 +46,10 @@ internal fun selectShareShortcutTargets(
                 accountRef = accountRef,
                 groupIdHex = groupId,
                 title = displayTitle(item),
+                avatarUrl =
+                    ProfileSanitizer.protocolImageUrl(item.group.avatarUrl)
+                        ?: ProfileSanitizer.protocolImageUrl(item.projection?.avatarUrl),
+                avatarBitmap = item.firstFrameAvatar?.image?.asAndroidBitmap(),
             )
         }
 
@@ -72,6 +83,55 @@ internal fun buildShareShortcut(
         .setCategories(setOf(CONVERSATION_SHARE_TARGET_CATEGORY))
         .setExtras(checkNotNull(conversationShortcutAccountExtras(target.accountRef)))
         .build()
+}
+
+/**
+ * Rebuild a notification-published shortcut through the public AndroidX API.
+ * AndroidX's shortcut copy constructor is library-internal, so copying it from
+ * application code fails Android Lint's RestrictedApi check.
+ */
+private fun rebuildRichShareShortcut(
+    context: Context,
+    target: ShareShortcutTarget,
+    existing: ShortcutInfoCompat,
+    rank: Int,
+): ShortcutInfoCompat {
+    val title = preferredConversationShortcutTitle(target.title, existing.longLabel?.toString())
+    val icon =
+        notificationConversationIcon(
+            title = title,
+            seed = existing.id,
+            avatarBitmap = target.avatarBitmap ?: AvatarImageLoader.peekBitmap(target.avatarUrl),
+        )
+    val person =
+        Person
+            .Builder()
+            .setName(title)
+            .setKey(existing.id)
+            .setIcon(icon)
+            .build()
+    val builder =
+        ShortcutInfoCompat
+            .Builder(context, existing.id)
+            .setShortLabel(title.take(SHARE_SHORTCUT_SHORT_LABEL_MAX).ifBlank { context.getString(R.string.app_name) })
+            .setLongLabel(title)
+            .setIcon(icon)
+            .setIntents(existing.intents)
+            .setPerson(person)
+            .setRank(rank)
+            .setLongLived(true)
+            .setCategories(existing.categories.orEmpty() + CONVERSATION_SHARE_TARGET_CATEGORY)
+            .setExtras(
+                existing.extras
+                    ?: checkNotNull(conversationShortcutAccountExtras(target.accountRef)),
+            )
+    existing.activity?.let(builder::setActivity)
+    existing.disabledMessage?.let(builder::setDisabledMessage)
+    existing.locusId?.let(builder::setLocusId)
+    if (existing.excludedFromSurfaces != 0) {
+        builder.setExcludedFromSurfaces(existing.excludedFromSurfaces)
+    }
+    return builder.build()
 }
 
 class ShareShortcutPublisher(
@@ -116,10 +176,7 @@ class ShareShortcutPublisher(
                             ?: return@mapIndexedNotNull null
                     val existing = existingById[shortcutId]
                     if (existing != null && conversationShortcutIsRich(existing)) {
-                        ShortcutInfoCompat
-                            .Builder(existing)
-                            .setRank(rank)
-                            .build()
+                        rebuildRichShareShortcut(context, target, existing, rank)
                     } else {
                         buildShareShortcut(
                             context,
