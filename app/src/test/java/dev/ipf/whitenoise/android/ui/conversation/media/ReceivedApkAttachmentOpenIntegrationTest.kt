@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import androidx.core.content.FileProvider
+import dev.ipf.whitenoise.android.state.AttachmentOpenIntentClaim
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -230,6 +231,57 @@ class ReceivedApkAttachmentOpenIntegrationTest {
         }
 
     @Test
+    fun navigationChangeDuringUnknownSourcesSettingsSuppressesTheInstallerRetry() =
+        runTest {
+            val source = validApkArtifact("permission-destination-change.apk")
+            val context = RecordingContext(applicationContext())
+            var destinationVisible = true
+            var permissionGranted = false
+            val persistenceEvents = mutableListOf<String>()
+            val dispatchGuard = AttachmentDispatchGuard(canDispatch = { destinationVisible })
+
+            val result =
+                openAttachmentWithPersistedInstallerPermission(
+                    source = source,
+                    mediaType = ANDROID_PACKAGE_MIME,
+                    fileName = "permission-destination-change.apk",
+                    open = { requestedSource, requestedMediaType, requestedFileName ->
+                        openAttachmentExternally(
+                            context = context,
+                            source = requestedSource,
+                            mediaType = requestedMediaType,
+                            fileName = requestedFileName,
+                            selfUpdateEnabled = true,
+                            canRequestPackageInstalls = { permissionGranted },
+                            dispatchGuard = dispatchGuard,
+                        )
+                    },
+                    requestInstallPermission = {
+                        permissionGranted = true
+                        destinationVisible = false
+                        true
+                    },
+                    persistence =
+                        InstallerPermissionPersistence(
+                            claim = AttachmentOpenIntentClaim.Fresh,
+                            begin = {
+                                persistenceEvents += "begin"
+                                true
+                            },
+                            finish = {
+                                persistenceEvents += "finish"
+                                true
+                            },
+                            abandon = { persistenceEvents += "abandon" },
+                        ),
+                )
+
+            assertEquals(OpenAttachmentResult.DestinationNotVisible, result)
+            assertEquals(listOf("begin", "finish"), persistenceEvents)
+            assertNull(context.startedIntent)
+        }
+
+    @Test
     fun trimmedArtifactHasAStableMissingOutcomeWithoutLaunching() =
         runTest {
             val missing = artifact("trimmed.apk")
@@ -299,6 +351,7 @@ class ReceivedApkAttachmentOpenIntegrationTest {
         assertTrue(normalizedBubble.contains("AttachmentDispatchGuard("))
         assertTrue(normalizedBubble.contains("appState.attachmentOpens.isVisible(request)"))
         assertTrue(mainShell.contains("appState.attachmentOpens.setDestination("))
+        assertTrue(mainShell.contains("mutableLongStateOf(newAttachmentOpenNavigationGeneration())"))
         assertTrue(
             normalizedLibrary.contains(
                 "openAttachment( fetchFile(), row.reference.mediaType, row.reference.fileName, null, null, )",

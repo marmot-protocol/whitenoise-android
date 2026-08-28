@@ -6,7 +6,9 @@ import androidx.lifecycle.LifecycleRegistry
 import dev.ipf.whitenoise.android.state.AttachmentOpenRequest
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
+import dev.ipf.whitenoise.android.state.attachmentOpenChatSelectionMatches
 import dev.ipf.whitenoise.android.state.attachmentOpenDestinationVisible
+import dev.ipf.whitenoise.android.state.newAttachmentOpenNavigationGeneration
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -17,11 +19,13 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.UUID
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -60,10 +64,40 @@ class AttachmentOpenLifecycleTest {
                 selectedDestination = request.destination,
                 request = request,
                 appInForeground = true,
+                activeAccountRef = "account-b",
+                activeGroupIdHex = transfer.groupIdHex,
+            ),
+        )
+        assertFalse(
+            attachmentOpenDestinationVisible(
+                selectedDestination = request.destination,
+                request = request,
+                appInForeground = true,
                 activeAccountRef = transfer.accountRef,
                 activeGroupIdHex = "ef".repeat(32),
             ),
         )
+    }
+
+    @Test
+    fun coldNavigationSessionsCannotReuseLegacyOrAnotherSessionsGeneration() {
+        val first = newAttachmentOpenNavigationGeneration(UUID(1L, 2L))
+        val second = newAttachmentOpenNavigationGeneration(UUID(4L, 8L))
+
+        assertTrue(first < 0L)
+        assertTrue(second < 0L)
+        assertNotEquals(first, second)
+        assertNotEquals(0L, first)
+        assertNotEquals(1L, first)
+    }
+
+    @Test
+    fun attachmentOpenSelectionNeverTreatsMissingRouteSlotsAsAVisibleChat() {
+        assertFalse(attachmentOpenChatSelectionMatches(null, null))
+        assertFalse(attachmentOpenChatSelectionMatches("chat-a", null))
+        assertFalse(attachmentOpenChatSelectionMatches(null, "chat-a"))
+        assertFalse(attachmentOpenChatSelectionMatches("chat-a", "chat-b"))
+        assertTrue(attachmentOpenChatSelectionMatches("chat-a", "chat-a"))
     }
 
     @Test

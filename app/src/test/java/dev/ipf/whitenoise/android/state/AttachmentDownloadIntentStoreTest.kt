@@ -10,6 +10,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.UUID
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -79,6 +80,26 @@ class AttachmentDownloadIntentStoreTest {
 
         assertFalse(store.hasDispatchableOpenIntent(OPEN_REQUEST_A.copy(navigationGeneration = 8L)))
         assertTrue(store.hasDispatchableOpenIntent(OPEN_REQUEST_A))
+    }
+
+    @Test
+    fun coldNavigationSessionCannotClaimAnOlderSessionsPersistedOpen() {
+        val olderSession =
+            OPEN_REQUEST_A.copy(
+                navigationGeneration = newAttachmentOpenNavigationGeneration(UUID(1L, 2L)),
+            )
+        val coldSession =
+            OPEN_REQUEST_A.copy(
+                navigationGeneration = newAttachmentOpenNavigationGeneration(UUID(4L, 8L)),
+            )
+        val store = AttachmentDownloadIntentStore(preferences)
+
+        store.markOpenIntent(olderSession)
+
+        assertTrue(store.hasDispatchableOpenIntent(olderSession))
+        assertFalse(store.hasDispatchableOpenIntent(coldSession))
+        assertFalse(store.consumeOpenIntent(coldSession))
+        assertTrue(store.hasDispatchableOpenIntent(olderSession))
     }
 
     @Test

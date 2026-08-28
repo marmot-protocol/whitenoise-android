@@ -74,8 +74,10 @@ import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.attachmentOpenChatSelectionMatches
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
+import dev.ipf.whitenoise.android.state.newAttachmentOpenNavigationGeneration
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.observeTtsConversationDestination
 import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
@@ -428,7 +430,9 @@ internal fun MainShell(
     var shellNavState by rememberSaveable(stateSaver = ShellNavigationStateSaver) {
         mutableStateOf(ShellNavigationState())
     }
-    var attachmentOpenNavigationGeneration by rememberSaveable { mutableLongStateOf(0L) }
+    var attachmentOpenNavigationGeneration by rememberSaveable {
+        mutableLongStateOf(newAttachmentOpenNavigationGeneration())
+    }
     var previousAttachmentOpenDestinationKey by rememberSaveable {
         mutableStateOf(ATTACHMENT_OPEN_DESTINATION_UNINITIALIZED)
     }
@@ -1621,6 +1625,7 @@ internal fun MainShell(
     val controllerChat =
         selectedChat?.takeIf { navAccountStable && conversationAccountRef != null }
             ?: accountOwnedPendingConversationOpen?.item
+    val controllerChatId = controllerChat?.id
     val selectedOrPendingConversationController =
         controllerChat?.let { openChat ->
             conversationAccountRef?.let { accountRef ->
@@ -1667,7 +1672,7 @@ internal fun MainShell(
             ?.takeIf {
                 navAccountStable &&
                     selectedConversationTimelineVisible &&
-                    attachmentOpenSelectedChat?.id == controllerChat.id &&
+                    attachmentOpenChatSelectionMatches(attachmentOpenSelectedChat?.id, controllerChatId) &&
                     appState.pendingProfileNpub == null &&
                     profileGroupForegroundState.initialMember == null &&
                     !routingNotification &&
@@ -1713,7 +1718,7 @@ internal fun MainShell(
     ConversationNotificationOwnershipEffect(
         selectedChatId = selectedChat?.id,
         selectedGroupIdHex = selectedChat?.group?.groupIdHex,
-        renderedChatId = controllerChat?.id,
+        renderedChatId = controllerChatId,
         renderedAccountRef = selectedOrPendingConversationController?.boundAccountRef,
         navigationAccountStable = navAccountStable,
         timelineVisible = selectedConversationTimelineVisible,

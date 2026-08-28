@@ -8,6 +8,8 @@ internal enum class AttachmentOpenIntentClaim {
     InstallPermissionRecovery,
 }
 
+private const val OPEN_TOKEN_SEPARATOR = ":"
+
 /**
  * Persists Android-owned scheduling intent only. MDK remains the authority for
  * attachment references, cryptographic material, transfer state, and bytes.
@@ -218,7 +220,6 @@ internal class AttachmentDownloadIntentStore(
         const val INTERACTIVE_IDENTITIES = "attachment_download_interactive_identities"
         const val OPEN_IDENTITIES = "attachment_download_open_identities"
         const val INSTALL_PERMISSION_IDENTITIES = "attachment_install_permission_identities"
-        const val OPEN_TOKEN_SEPARATOR = ":"
         val ACTIVE_INSTALL_PERMISSION_IDENTITIES = mutableSetOf<String>()
     }
 }
@@ -236,5 +237,9 @@ private fun destinationToken(destination: AttachmentOpenDestination): String =
         ).joinToString("\u0000"),
     )
 
-@Suppress("MaxLineLength") // Keep this single-argument expression in ktlint's required form.
-private fun openRequestToken(request: AttachmentOpenRequest): String = "${destinationToken(request.destination)}:${requestToken(request.transferRequest)}"
+private fun openRequestToken(request: AttachmentOpenRequest): String =
+    buildString {
+        append(destinationToken(request.destination))
+        append(OPEN_TOKEN_SEPARATOR)
+        append(requestToken(request.transferRequest))
+    }
