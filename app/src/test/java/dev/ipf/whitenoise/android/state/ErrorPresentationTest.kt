@@ -96,7 +96,8 @@ class ErrorPresentationTest {
             "ui/group/GroupEditScreen.kt" to
                 listOf("GROUP_IMAGE_PREPARE", "GROUP_AVATAR_UPDATE", "GROUP_IMAGE_UPLOAD"),
             "ui/profile/ProfileEditScreen.kt" to listOf("PROFILE_EDIT_LOAD"),
-            "ui/conversation/media/MediaViewer.kt" to listOf("MEDIA_VIEWER_IMAGE_SHARE"),
+            "ui/conversation/media/MediaViewer.kt" to
+                listOf("MEDIA_VIEWER_IMAGE_SHARE", "MEDIA_VIEWER_VIDEO_SHARE"),
             "ui/medialibrary/MediaLibrary.kt" to
                 listOf(
                     "MEDIA_LIBRARY_VOICE_LOAD",

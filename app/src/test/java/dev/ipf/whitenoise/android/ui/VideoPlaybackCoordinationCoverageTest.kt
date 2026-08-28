@@ -10,19 +10,20 @@ class VideoPlaybackCoordinationCoverageTest {
     @Test
     fun everyVideoPlayerOwnsAudioFocusAndPausesVoicePlayback() {
         val source = mediaVideoSource().readText()
+        val body = source.functionBody("VideoViewerPage")
 
-        listOf("FullscreenVideoPlayer", "VideoViewerPage").forEach { functionName ->
-            val body = source.functionBody(functionName)
-
-            assertTrue(
-                "$functionName must delegate audio focus to Media3",
-                "setAudioAttributes(videoPlaybackAudioAttributes, true)" in body,
-            )
-            assertTrue(
-                "$functionName must stop voice-note audio before video playback",
-                "VoicePlaybackController.pause()" in body,
-            )
-        }
+        assertTrue(
+            "the shared video viewer must delegate audio focus to Media3",
+            "setAudioAttributes(videoPlaybackAudioAttributes, true)" in body,
+        )
+        assertTrue(
+            "the shared video viewer must stop voice-note audio before video playback",
+            "VoicePlaybackController.pause()" in body,
+        )
+        assertFalse(
+            "direct videos must not create a second player outside the shared viewer",
+            "FullscreenVideoPlayer" in source,
+        )
     }
 
     @Test

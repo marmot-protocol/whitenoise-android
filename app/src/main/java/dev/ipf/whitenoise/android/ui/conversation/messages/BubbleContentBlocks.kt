@@ -198,12 +198,13 @@ internal fun ColumnScope.BubbleMediaBlocks(
             ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                     MediaVideoBubble(
-                        messageIdHex = record.messageIdHex,
+                        item = item,
                         attachmentIndex = entry.index,
                         reference = entry.value,
                         mine = mine,
                         controller = controller,
                         appState = appState,
+                        conversationVisualPages = conversationVisualPages,
                         onLongPress = onMediaLongPress,
                         attachedToCaption = attachedToCaption,
                     )
@@ -331,12 +332,13 @@ internal fun ColumnScope.BubbleMediaBlocks(
             ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                     MediaVideoBubble(
-                        messageIdHex = record.messageIdHex,
+                        item = item,
                         attachmentIndex = entry.index,
                         reference = entry.value,
                         mine = true,
                         controller = controller,
                         appState = appState,
+                        conversationVisualPages = conversationVisualPages,
                         onLongPress = onMediaLongPress,
                         uploading = !uploadFailed,
                         uploadFailed = uploadFailed,
