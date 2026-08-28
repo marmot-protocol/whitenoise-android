@@ -3943,6 +3943,20 @@ class ChatsController private constructor(
     private var activeChatListSubscription: ChatListSubscription? = null
     private var activeChatsSubscription: ChatsSubscription? = null
     private var bindJob: Job? = null
+    private val connectionOwner =
+        ChatListConnectionOwner(appState) {
+            synchronized(liveSubscriptionLock) {
+                activeChatListSubscription != null &&
+                    activeChatsSubscription != null &&
+                    accountRef == boundAccountRef &&
+                    accountRef == appState.activeAccountRef
+            }
+        }
+    internal val connectionState: ChatListConnectionState get() = connectionOwner.state
+
+    fun refreshConnectionReadiness() = connectionOwner.refresh()
+
+    fun invalidateConnectionReadiness() = connectionOwner.invalidate()
 
     suspend fun closeLiveSubscriptionsForAccountTeardown(accountRef: String) {
         val teardown =
@@ -3952,6 +3966,7 @@ class ChatsController private constructor(
                 } else {
                     this.accountRef = null
                     boundAccountRef = null
+                    invalidateConnectionReadiness()
                     val current = Triple(activeChatListSubscription, activeChatsSubscription, bindJob)
                     activeChatListSubscription = null
                     activeChatsSubscription = null
@@ -3993,6 +4008,7 @@ class ChatsController private constructor(
             resetBackingState()
         }
         bindEpoch += 1L
+        connectionOwner.reset(accountRef, bindEpoch)
         recompute(scheduleBackgroundEnrichment = seededLocalSnapshot == null)
         error = null
         terminalLoadFailure = false
@@ -4008,7 +4024,8 @@ class ChatsController private constructor(
         appState.refreshDraftSummaries(accountRef)
         try {
             var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
-            var catchUpStarted = preserveLoadedContent && seededLocalSnapshot == null && keepLoadedContent
+            var localFramePresented = preserveLoadedContent && seededLocalSnapshot == null && keepLoadedContent
+            var pendingReadinessCatchUp: Deferred<Boolean>? = null
             if (seededLocalSnapshot != null) {
                 // The one-shot MDK seed was installed synchronously during
                 // controller construction, before this LaunchedEffect began.
@@ -4018,8 +4035,8 @@ class ChatsController private constructor(
                 awaitRenderedChatListFrame()
                 if (shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
                     appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
-                    catchUpStarted = true
-                    appState.launchCatchUpAccounts()
+                    localFramePresented = true
+                    pendingReadinessCatchUp = appState.launchCatchUpAccounts()
                     // A performance-shaped handoff may contain only the
                     // rosters needed to render first-frame identity. Do not
                     // turn every deferred named-group roster into an N-call
@@ -4032,6 +4049,7 @@ class ChatsController private constructor(
                 var chatListSubscription: ChatListSubscription? = null
                 var chatsSubscription: ChatsSubscription? = null
                 var receivedLiveUpdate = false
+                val connectionAttempt = connectionOwner.beginSessionAttempt(accountRef, bindEpoch)
                 try {
                     val chatListStream =
                         appState.marmotIo { subscribeChatList(accountRef, includeArchived = true) }
@@ -4070,17 +4088,17 @@ class ChatsController private constructor(
                     recompute()
 
                     // The per-account SQLite projection is the local-ready
-                    // boundary. Give it one complete draw before asking relays
-                    // to converge the already-active subscriptions: offline or
-                    // slow catch-up must never hold a black switch screen. A
-                    // later stream update folds fresh rename/avatar/membership
-                    // state into these same maps (#252, #1698).
-                    if (!catchUpStarted) {
+                    // boundary. Draw it before relay catch-up; later stream
+                    // updates fold fresh state into these maps (#252, #1698).
+                    if (!localFramePresented) {
                         awaitRenderedChatListFrame()
                         appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
-                        catchUpStarted = true
-                        appState.launchCatchUpAccounts()
+                        localFramePresented = true
+                        pendingReadinessCatchUp = connectionOwner.launchCatchUp()
                     }
+                    val readinessCatchUp = pendingReadinessCatchUp ?: connectionOwner.launchCatchUp()
+                    pendingReadinessCatchUp = null
+                    connectionOwner.observe(readinessCatchUp)
 
                     coroutineScope {
                         runUntilFirstLiveSubscriptionEnds(
@@ -4091,6 +4109,7 @@ class ChatsController private constructor(
                                             chatListStream.nextUpdate()
                                         } ?: break
                                     receivedLiveUpdate = true
+                                    connectionOwner.noteLiveUpdate(connectionAttempt)
                                     when (update) {
                                         is ChatListSubscriptionUpdateFfi.Row -> {
                                             val row = update.row
@@ -4127,6 +4146,7 @@ class ChatsController private constructor(
                                             chatStream.next()
                                         } ?: break
                                     receivedLiveUpdate = true
+                                    connectionOwner.noteLiveUpdate(connectionAttempt)
                                     requestGroupProfiles(update)
                                     chatsDebug { "chat update account=${accountRef.take(8)} ${update.debugSummary()}" }
                                     foldGroup(update)
@@ -4157,13 +4177,7 @@ class ChatsController private constructor(
                                 ),
                         )
                 } finally {
-                    // NonCancellable: a cancelled bind must still close subscriptions
-                    // so a retry loop or account switch cannot leak account-wide
-                    // chat-list/chats handles. (Originally surfaced in #270.)
-                    withContext(NonCancellable + Dispatchers.IO) {
-                        runCatching { chatListSubscription?.close() }
-                        runCatching { chatsSubscription?.close() }
-                    }
+                    pendingReadinessCatchUp = null
                     synchronized(liveSubscriptionLock) {
                         if (activeChatListSubscription === chatListSubscription) {
                             activeChatListSubscription = null
@@ -4171,6 +4185,14 @@ class ChatsController private constructor(
                         if (activeChatsSubscription === chatsSubscription) {
                             activeChatsSubscription = null
                         }
+                    }
+                    connectionOwner.finishSessionAttempt(connectionAttempt)
+                    // NonCancellable: a cancelled bind must still close subscriptions
+                    // so a retry loop or account switch cannot leak account-wide
+                    // chat-list/chats handles. (Originally surfaced in #270.)
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        runCatching { chatListSubscription?.close() }
+                        runCatching { chatsSubscription?.close() }
                     }
                 }
                 if (!coroutineContext.isActive || !shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) break
@@ -6038,6 +6060,7 @@ class ChatsController private constructor(
                 bindJob.also { bindJob = null }
             }
         jobToCancel?.cancel()
+        connectionOwner.clear()
         pendingInitialLocalSnapshot = null
         resetBackingState()
         items = emptyList()

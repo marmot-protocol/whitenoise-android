@@ -1019,7 +1019,7 @@ internal fun ChatsScreen(
 
     Scaffold(
         topBar = {
-            val connectivityState = rememberChatListConnectivityState(appState)
+            val connectivityState = rememberChatListConnectivityState(appState, controller)
             Column {
                 if (selectionMode) {
                     ChatListSelectionBar(
