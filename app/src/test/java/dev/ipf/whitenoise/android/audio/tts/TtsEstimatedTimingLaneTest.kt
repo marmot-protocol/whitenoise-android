@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.speech.tts.TextToSpeech
+import dev.ipf.whitenoise.android.ui.conversation.timelineRowTtsHighlightPassage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -27,6 +28,7 @@ import java.util.Locale
  * make, only a statement about how the controller reacts if it happens.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("LargeClass") // Estimated timing, range capability, and pace calibration share one engine/controller harness.
 class TtsEstimatedTimingLaneTest {
     @Test
     fun rangeSilentEngineGetsEstimatedWordHighlights() =
@@ -42,6 +44,10 @@ class TtsEstimatedTimingLaneTest {
                 listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
                 harness.controller.state.value.passage
                     ?.visibleWord,
+            )
+            assertEquals(
+                harness.controller.state.value.passage,
+                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
             )
 
             advanceTimeBy(600)
@@ -109,7 +115,7 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun aPersistedCapableVerdictNeverArmsTheEstimate() =
+    fun aRestoredCapableVerdictKeepsTheEngineLaneUntilAUsableRangeReconfirmsIt() =
         runTest {
             val harness = LaneHarness(this)
             harness.store.verdicts[ENGINE_KEY] = true
@@ -118,11 +124,61 @@ class TtsEstimatedTimingLaneTest {
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
 
             harness.engine.start(index = 0)
+            val enginePassage = harness.controller.state.value.passage
+            assertEquals(0, enginePassage?.sentenceIndex)
+            assertEquals(emptyList<TtsVisibleTextSpan>(), enginePassage?.visibleWord)
+            assertEquals(
+                enginePassage,
+                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
+            )
+
+            // A stored capable verdict keeps the same engine-owned lane as
+            // master. Provisionality affects evidence collection, not which
+            // producer owns the visible passage while the engine is speaking.
+            // onStart publishes the sentence immediately; no asynchronous word
+            // estimate is allowed to race the engine and replace it.
             advanceTimeBy(2_000)
             runCurrent()
+            assertEquals(enginePassage, harness.controller.state.value.passage)
 
+            // An unusable callback falls back to the sentence, as it did before
+            // the restored-verdict changes, rather than handing ownership to an
+            // asynchronous estimate racing the range-capable engine.
+            harness.engine.range(index = 0, start = 0, end = 0)
+            assertEquals(
+                0,
+                harness.controller.state.value.passage
+                    ?.sentenceIndex,
+            )
             assertEquals(
                 emptyList<TtsVisibleTextSpan>(),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+            assertEquals(
+                enginePassage,
+                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
+            )
+
+            // The first usable real callback reconfirms the restored verdict and
+            // publishes both the active sentence and current word without
+            // rewriting an unchanged true value.
+            harness.engine.range(index = 0, start = 6, end = 11)
+            assertEquals(0, harness.store.rangeVerdictWrites)
+            assertEquals(
+                listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+            assertEquals(
+                harness.controller.state.value.passage,
+                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
+            )
+
+            advanceTimeBy(2_000)
+            runCurrent()
+            assertEquals(
+                listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
                 harness.controller.state.value.passage
                     ?.visibleWord,
             )
@@ -188,6 +244,100 @@ class TtsEstimatedTimingLaneTest {
             harness.engine.complete(index = 0)
 
             assertEquals(false, harness.store.verdicts[ENGINE_KEY])
+        }
+
+    @Test
+    fun aPersistedCapableVerdictIsOverturnedWhenTheEngineStopsReportingRanges() =
+        runTest {
+            val harness = LaneHarness(this)
+            harness.store.verdicts[ENGINE_KEY] = true
+            harness.controller.detachEngine()
+            harness.controller.attachEngine(harness.engine, engineKey = ENGINE_KEY)
+            assertTrue(harness.controller.speak(listOf(plainEntry(OVERTURNING_TEXT)), Locale.US))
+
+            harness.engine.start(index = 0)
+            harness.engine.complete(index = 0)
+
+            assertEquals(false, harness.store.verdicts[ENGINE_KEY])
+
+            // ...and the estimate takes over from the next utterance, which is
+            // the whole point of overturning it.
+            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
+            harness.engine.start(index = 1)
+            advanceTimeBy(150)
+            runCurrent()
+
+            assertEquals(
+                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+            assertEquals(
+                harness.controller.state.value.passage,
+                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
+            )
+        }
+
+    @Test
+    fun aPayloadWithNoVisibleMappingIsNotEvidenceAgainstTheEngine() =
+        runTest {
+            val harness = LaneHarness(this)
+            // The plain speak overload carries no visible spans, so no engine
+            // range from it could ever resolve to a word. Its silence says
+            // nothing about the engine and must not be credited against it.
+            assertTrue(harness.controller.speak(OVERTURNING_TEXT, Locale.US))
+            harness.engine.start(index = 0)
+            harness.engine.complete(index = 0)
+
+            assertEquals(null, harness.store.verdicts[ENGINE_KEY])
+
+            // Witness: the same text WITH a visible mapping does conclude, so
+            // the assertion above is about the mapping and not about length.
+            assertTrue(harness.controller.speak(listOf(plainEntry(OVERTURNING_TEXT)), Locale.US))
+            harness.engine.start(index = 1)
+            harness.engine.complete(index = 1)
+
+            assertEquals(false, harness.store.verdicts[ENGINE_KEY])
+        }
+
+    @Test
+    fun textOutsideAVisibleSpanIsNotEvidenceAgainstTheEngine() =
+        runTest {
+            val harness = LaneHarness(this)
+            // Only the opening words are mapped to visible text. A range
+            // anywhere else could never resolve to a word whatever the engine
+            // does, so the engine has not been asked a question there.
+            assertTrue(
+                harness.controller.speak(
+                    listOf(partiallyMappedEntry(OVERTURNING_TEXT, mappedLength = 20)),
+                    Locale.US,
+                ),
+            )
+            harness.engine.start(index = 0)
+            harness.engine.complete(index = 0)
+
+            assertEquals(null, harness.store.verdicts[ENGINE_KEY])
+
+            // Witness: the same text fully mapped does conclude, so this is
+            // about the mapping and not about the length.
+            assertTrue(harness.controller.speak(listOf(plainEntry(OVERTURNING_TEXT)), Locale.US))
+            harness.engine.start(index = 1)
+            harness.engine.complete(index = 1)
+
+            assertEquals(false, harness.store.verdicts[ENGINE_KEY])
+        }
+
+    @Test
+    fun anEmojiOnlyMessageIsNotEvidenceAgainstTheEngine() =
+        runTest {
+            val harness = LaneHarness(this)
+            val emoji = "\uD83D\uDE42".repeat(80)
+            assertTrue(harness.controller.speak(listOf(plainEntry(emoji)), Locale.US))
+
+            harness.engine.start(index = 0)
+            harness.engine.complete(index = 0)
+
+            assertEquals(null, harness.store.verdicts[ENGINE_KEY])
         }
 
     @Test
@@ -664,6 +814,26 @@ class TtsEstimatedTimingLaneTest {
             )
         }
 
+    private fun partiallyMappedEntry(
+        text: String,
+        mappedLength: Int,
+        messageIdHex: String = "m1",
+    ): TtsSpeakableEntry =
+        TtsSpeakableEntry(
+            senderKey = "",
+            senderDisplayName = "",
+            text = text,
+            messageIdHex = messageIdHex,
+            spokenTextSpans =
+                listOf(
+                    TtsSpokenTextSpan(
+                        TtsTextRange(0, mappedLength),
+                        TtsVisibleTextSpan("b0/n0", 0, mappedLength),
+                    ),
+                ),
+            projectionId = "projection-",
+        )
+
     private fun plainEntry(
         text: String = "Hello world.",
         messageIdHex: String = "m1",
@@ -726,6 +896,7 @@ class TtsEstimatedTimingLaneTest {
     private class FakeTimingStore : TtsTimingStore {
         val verdicts = mutableMapOf<String, Boolean>()
         val paces = mutableMapOf<String, Double>()
+        var rangeVerdictWrites = 0
         var paceWrites = 0
 
         override fun rangeVerdict(engineKey: String): Boolean? = verdicts[engineKey]
@@ -735,6 +906,7 @@ class TtsEstimatedTimingLaneTest {
             verdict: Boolean,
         ) {
             verdicts[engineKey] = verdict
+            rangeVerdictWrites++
         }
 
         override fun msPerUnitAt1x(engineKey: String): Double? = paces[engineKey]
@@ -836,6 +1008,16 @@ class TtsEstimatedTimingLaneTest {
 
     private companion object {
         const val ENGINE_KEY = "com.example.tts"
+
+        /**
+         * Long enough to clear the probe's overturn threshold in one utterance,
+         * and free of terminal punctuation so the chunker keeps it whole.
+         */
+        val OVERTURNING_TEXT =
+            (
+                "The capability probe needs a great deal of answerable text before it will " +
+                    "overturn a verdict that storage already claims and that is deliberate "
+            ).repeat(3)
 
         /** A gap that closes a sentence carries the handover and the breath. */
         const val SENTENCE_SEAM_MS = TTS_UTTERANCE_HANDOVER_MS + TTS_SENTENCE_BREATH_MS
