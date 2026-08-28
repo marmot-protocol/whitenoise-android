@@ -220,6 +220,7 @@ internal suspend fun openAttachmentExternally(
     canRequestPackageInstalls: () -> Boolean = {
         runCatching { context.packageManager.canRequestPackageInstalls() }.getOrDefault(false)
     },
+    dispatchGuard: AttachmentDispatchGuard? = null,
 ): OpenAttachmentResult =
     withContext(Dispatchers.IO) { validatedAttachmentCacheFile(source) }
         ?.let { completeSource ->
@@ -240,6 +241,7 @@ internal suspend fun openAttachmentExternally(
                         selfUpdateEnabled = selfUpdateEnabled,
                         sdkInt = sdkInt,
                         canRequestPackageInstalls = canRequestPackageInstalls,
+                        dispatchGuard = dispatchGuard,
                     )
                 AttachmentOpenClassification.InvalidAndroidPackage -> OpenAttachmentResult.InvalidPackage
             }
@@ -253,8 +255,10 @@ private suspend fun openReadyAttachment(
     selfUpdateEnabled: Boolean,
     sdkInt: Int,
     canRequestPackageInstalls: () -> Boolean,
+    dispatchGuard: AttachmentDispatchGuard?,
 ): OpenAttachmentResult =
     when {
+        dispatchGuard?.canDispatch?.invoke() == false -> OpenAttachmentResult.DestinationNotVisible
         mediaType == ANDROID_PACKAGE_MIME && !selfUpdateEnabled -> OpenAttachmentResult.InstallUnsupported
         requiresAndroidPackageInstallPermission(
             mediaType = mediaType,
@@ -265,7 +269,7 @@ private suspend fun openReadyAttachment(
         else ->
             try {
                 val uri = withContext(Dispatchers.IO) { fileProviderUri(context.applicationContext, source) }
-                launchAttachmentIntent(context, uri, mediaType)
+                launchAttachmentIntent(context, uri, mediaType, dispatchGuard)
             } catch (error: CancellationException) {
                 throw error
             } catch (_: SecurityException) {
@@ -281,29 +285,36 @@ private fun launchAttachmentIntent(
     context: Context,
     uri: Uri,
     mediaType: String,
+    dispatchGuard: AttachmentDispatchGuard?,
 ): OpenAttachmentResult {
-    val intent = attachmentOpenIntent(uri, mediaType)
-    return try {
-        context.startActivity(intent)
-        OpenAttachmentResult.Opened
-    } catch (error: CancellationException) {
-        throw error
-    } catch (_: ActivityNotFoundException) {
-        if (mediaType == ANDROID_PACKAGE_MIME) {
-            OpenAttachmentResult.NoInstaller
-        } else {
-            OpenAttachmentResult.NoHandler
-        }
-    } catch (_: SecurityException) {
-        // FileProvider grant rejected, or target activity has no permission
-        // to access this URI for some reason. Surfacing this as a generic
-        // error is more useful than crashing.
-        OpenAttachmentResult.SecurityFailure
-    } catch (_: IllegalArgumentException) {
-        OpenAttachmentResult.Error
-    } catch (_: RuntimeException) {
-        OpenAttachmentResult.Error
+    if (dispatchGuard?.canDispatch?.invoke() == false) {
+        return OpenAttachmentResult.DestinationNotVisible.also(dispatchGuard.onPlatformDispatchResult)
     }
+    val intent = attachmentOpenIntent(uri, mediaType)
+    dispatchGuard?.onPlatformDispatchStarted?.invoke()
+    return (
+        try {
+            context.startActivity(intent)
+            OpenAttachmentResult.Opened
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: ActivityNotFoundException) {
+            if (mediaType == ANDROID_PACKAGE_MIME) {
+                OpenAttachmentResult.NoInstaller
+            } else {
+                OpenAttachmentResult.NoHandler
+            }
+        } catch (_: SecurityException) {
+            // FileProvider grant rejected, or target activity has no permission
+            // to access this URI for some reason. Surfacing this as a generic
+            // error is more useful than crashing.
+            OpenAttachmentResult.SecurityFailure
+        } catch (_: IllegalArgumentException) {
+            OpenAttachmentResult.Error
+        } catch (_: RuntimeException) {
+            OpenAttachmentResult.Error
+        }
+    ).also { dispatchGuard?.onPlatformDispatchResult?.invoke(it) }
 }
 
 internal fun attachmentOpenIntent(

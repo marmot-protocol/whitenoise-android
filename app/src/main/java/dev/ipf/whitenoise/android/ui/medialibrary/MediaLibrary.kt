@@ -1034,6 +1034,7 @@ private fun FileLibraryRow(
                                     row.reference.mediaType,
                                     row.reference.fileName,
                                     null,
+                                    null,
                                 )
                             }.getOrElse { error ->
                                 appState.presentFailure(
@@ -1045,7 +1046,9 @@ private fun FileLibraryRow(
                                 return@launch
                             }
                         when (outcome) {
-                            OpenAttachmentResult.Opened -> Unit
+                            OpenAttachmentResult.Opened,
+                            OpenAttachmentResult.DestinationNotVisible,
+                            -> Unit
                             OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
                             OpenAttachmentResult.NoInstaller -> appState.present(noInstallerMessage)
                             OpenAttachmentResult.InstallPermissionDenied,

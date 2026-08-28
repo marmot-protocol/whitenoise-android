@@ -19,6 +19,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -69,6 +70,7 @@ import dev.ipf.whitenoise.android.share.shouldPresentInboundShare
 import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -425,6 +427,10 @@ internal fun MainShell(
     // and invalidates a captured pending generation (issue #1953).
     var shellNavState by rememberSaveable(stateSaver = ShellNavigationStateSaver) {
         mutableStateOf(ShellNavigationState())
+    }
+    var attachmentOpenNavigationGeneration by rememberSaveable { mutableLongStateOf(0L) }
+    var previousAttachmentOpenDestinationKey by rememberSaveable {
+        mutableStateOf(ATTACHMENT_OPEN_DESTINATION_UNINITIALIZED)
     }
     var pendingTtsDestinationNavigation by remember {
         mutableStateOf<TtsDestinationNavigationRequest?>(null)
@@ -1654,6 +1660,50 @@ internal fun MainShell(
             ?.takeIf { it.controller === selectedOrPendingConversationController }
             ?.visible
             ?: true
+    val attachmentOpenSelectedChat = selectedChat
+    val attachmentOpenDestinationAccountRef =
+        selectedOrPendingConversationController
+            ?.boundAccountRef
+            ?.takeIf {
+                navAccountStable &&
+                    selectedConversationTimelineVisible &&
+                    attachmentOpenSelectedChat?.id == controllerChat.id &&
+                    appState.pendingProfileNpub == null &&
+                    profileGroupForegroundState.initialMember == null &&
+                    !routingNotification &&
+                    !routingShare &&
+                    !routingAppUpdate &&
+                    pendingTtsDestinationNavigation == null
+            }
+    val attachmentOpenDestinationGroupId =
+        attachmentOpenSelectedChat?.group?.groupIdHex.takeIf { attachmentOpenDestinationAccountRef != null }
+    val attachmentOpenDestinationKey =
+        if (attachmentOpenDestinationAccountRef != null && attachmentOpenDestinationGroupId != null) {
+            "$attachmentOpenDestinationAccountRef\u0000${attachmentOpenDestinationGroupId.lowercase()}"
+        } else {
+            ATTACHMENT_OPEN_DESTINATION_NONE
+        }
+    val attachmentOpenDestinationGeneration =
+        if (previousAttachmentOpenDestinationKey == attachmentOpenDestinationKey) {
+            attachmentOpenNavigationGeneration
+        } else {
+            attachmentOpenNavigationGeneration + 1L
+        }
+    SideEffect {
+        appState.attachmentOpens.setDestination(
+            attachmentOpenDestinationAccountRef?.let { accountRef ->
+                AttachmentOpenDestination(
+                    accountRef = accountRef,
+                    groupIdHex = requireNotNull(attachmentOpenDestinationGroupId),
+                    navigationGeneration = attachmentOpenDestinationGeneration,
+                )
+            },
+        )
+        if (previousAttachmentOpenDestinationKey != attachmentOpenDestinationKey) {
+            previousAttachmentOpenDestinationKey = attachmentOpenDestinationKey
+            attachmentOpenNavigationGeneration = attachmentOpenDestinationGeneration
+        }
+    }
     // Follow the selected controller directly so a chat-to-chat switch never
     // hops through null. The account-stability guard is essential: during an
     // ordinary account switch the old selection survives for one composition,
@@ -2165,3 +2215,6 @@ internal fun MainShell(
         }
     }
 }
+
+private const val ATTACHMENT_OPEN_DESTINATION_UNINITIALIZED = "attachment-open-uninitialized"
+private const val ATTACHMENT_OPEN_DESTINATION_NONE = "attachment-open-none"

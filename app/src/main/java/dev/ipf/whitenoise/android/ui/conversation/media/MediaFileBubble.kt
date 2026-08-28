@@ -28,7 +28,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
-import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
+import dev.ipf.whitenoise.android.state.AttachmentOpenPhase
+import dev.ipf.whitenoise.android.state.AttachmentOpenTrace
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -75,10 +76,6 @@ internal fun MediaFileBubble(
     val openAttachment = rememberAttachmentOpener()
     val lifecycleOwner = LocalLifecycleOwner.current
     val pillKey = "$messageIdHex#$attachmentIndex"
-    val attachmentOpenRequest =
-        controller.boundAccountRef?.let { accountRef ->
-            AttachmentTransferRequest(accountRef, controller.group.groupIdHex, messageIdHex, attachmentIndex)
-        }
     var openRequested by remember(pillKey) { mutableStateOf(false) }
     var readerOpen by rememberSaveable(pillKey) { mutableStateOf(false) }
     val transferStateFlow =
@@ -147,18 +144,19 @@ internal fun MediaFileBubble(
     }
 
     // A tap is persisted as scheduling identity before work starts. This effect
-    // is therefore re-created by rotation, navigation return, or process
-    // recreation, joins the same transfer, and atomically consumes the intent
-    // immediately before the one external viewer launch.
+    // is therefore re-created by rotation or process recreation within the
+    // same visible destination, joins the same transfer, and atomically
+    // consumes the intent immediately before the one external viewer launch.
     LaunchedEffect(
         controller,
         pillKey,
         reference.sourceEpoch,
-        appState.attachmentOpenIntentRevision,
+        appState.attachmentOpens.revision,
         lifecycleOwner,
     ) {
-        val request = attachmentOpenRequest ?: return@LaunchedEffect
-        if (!appState.hasAttachmentOpenIntent(request)) return@LaunchedEffect
+        val request = controller.attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return@LaunchedEffect
+        if (!appState.attachmentOpens.hasIntent(request)) return@LaunchedEffect
+        AttachmentOpenTrace.phase(request, AttachmentOpenPhase.MaterializationStarted)
         openRequested = true
         try {
             val file =
@@ -176,21 +174,41 @@ internal fun MediaFileBubble(
                     durableAvailabilityExpected = reference.sourceEpoch != 0uL,
                     awaitNextDurableAvailability = {
                         controller.awaitNextAttachmentAvailability(messageIdHex, attachmentIndex)
+                        AttachmentOpenTrace.phase(request, AttachmentOpenPhase.DurableAvailabilityObserved)
                     },
                     onWaitingForDurableAvailability = {
-                        // Keep the persisted intent, but allow another tap to
-                        // replace this wait with an immediate retry.
-                        openRequested = false
+                        AttachmentOpenTrace.phase(request, AttachmentOpenPhase.WaitingForDurableAvailability)
+                        // Keep one visible pending state. Repeated taps still
+                        // ripple but remain idempotent while the durable
+                        // transfer/cache publication continues independently.
                     },
                     onTerminalFailure = { appState.present(couldntLoadMessage) },
                 ) ?: return@LaunchedEffect
+            AttachmentOpenTrace.phase(request, AttachmentOpenPhase.CacheArtifactReady)
             openRequested = true
-            if (!lifecycleOwner.lifecycle.awaitResumedOrDestroyed()) return@LaunchedEffect
+            val lifecycleEligible = lifecycleOwner.lifecycle.awaitResumedOrDestroyed()
+            AttachmentOpenTrace.phase(
+                request,
+                AttachmentOpenPhase.LifecycleEligibility,
+                outcome = if (lifecycleEligible) "eligible" else "destroyed",
+            )
+            if (!lifecycleEligible) return@LaunchedEffect
+            val destinationVisible = appState.attachmentOpens.isVisible(request)
+            AttachmentOpenTrace.phase(
+                request,
+                AttachmentOpenPhase.VisibilityEligibility,
+                outcome = if (destinationVisible) "eligible" else "stale",
+            )
+            if (!destinationVisible) {
+                appState.attachmentOpens.consume(request)
+                AttachmentOpenTrace.finish(request, "destination_not_visible")
+                return@LaunchedEffect
+            }
             var openResult: OpenAttachmentResult? = null
             val dispatched =
                 claimAndDispatchAttachmentOpenReportingFailure(
-                    claim = { appState.claimAttachmentOpenIntent(request) },
-                    restore = { appState.restoreAttachmentOpenIntent(request) },
+                    claim = { appState.attachmentOpens.claim(request) },
+                    restore = { appState.attachmentOpens.restore(request) },
                     dispatch = { claim ->
                         openResult =
                             openAttachment(
@@ -199,9 +217,33 @@ internal fun MediaFileBubble(
                                 reference.fileName,
                                 InstallerPermissionPersistence(
                                     claim = claim,
-                                    begin = { appState.beginAttachmentInstallPermissionRequest(request) },
-                                    finish = { appState.finishAttachmentInstallPermissionRequest(request) },
-                                    abandon = { appState.abandonAttachmentInstallPermissionRequest(request) },
+                                    begin = { appState.attachmentOpens.beginInstallPermission(request) },
+                                    finish = { appState.attachmentOpens.finishInstallPermission(request) },
+                                    abandon = { appState.attachmentOpens.abandonInstallPermission(request) },
+                                ),
+                                AttachmentDispatchGuard(
+                                    canDispatch = {
+                                        appState.attachmentOpens.isVisible(request).also { visible ->
+                                            AttachmentOpenTrace.phase(
+                                                request,
+                                                AttachmentOpenPhase.VisibilityEligibility,
+                                                outcome = if (visible) "eligible" else "stale",
+                                            )
+                                        }
+                                    },
+                                    onPlatformDispatchStarted = {
+                                        AttachmentOpenTrace.phase(
+                                            request,
+                                            AttachmentOpenPhase.PlatformDispatchStarted,
+                                        )
+                                    },
+                                    onPlatformDispatchResult = { result ->
+                                        AttachmentOpenTrace.phase(
+                                            request,
+                                            AttachmentOpenPhase.PlatformDispatchResult,
+                                            outcome = result.name.lowercase(java.util.Locale.ROOT),
+                                        )
+                                    },
                                 ),
                             )
                     },
@@ -211,12 +253,16 @@ internal fun MediaFileBubble(
                             "attachment viewer launch failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
                             failure,
                         )
+                        AttachmentOpenTrace.finish(request, "launch_failure")
                         appState.present(couldntOpenMessage, copyable = true)
                     },
                 )
             if (!dispatched) return@LaunchedEffect
             val resolvedOpenResult = checkNotNull(openResult)
-            if (resolvedOpenResult != OpenAttachmentResult.Opened) {
+            if (
+                resolvedOpenResult != OpenAttachmentResult.Opened &&
+                resolvedOpenResult != OpenAttachmentResult.DestinationNotVisible
+            ) {
                 Log.w(
                     MEDIA_FILE_BUBBLE_TAG,
                     "attachment open outcome=${resolvedOpenResult.name} " +
@@ -225,6 +271,7 @@ internal fun MediaFileBubble(
             }
             when (resolvedOpenResult) {
                 OpenAttachmentResult.Opened -> Unit
+                OpenAttachmentResult.DestinationNotVisible -> Unit
                 OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
                 OpenAttachmentResult.NoInstaller -> appState.present(noInstallerMessage)
                 OpenAttachmentResult.InstallPermissionDenied,
@@ -240,6 +287,10 @@ internal fun MediaFileBubble(
                 OpenAttachmentResult.Error,
                 -> appState.present(couldntOpenMessage, copyable = true)
             }
+            AttachmentOpenTrace.finish(
+                request,
+                resolvedOpenResult.name.lowercase(java.util.Locale.ROOT),
+            )
         } finally {
             openRequested = false
         }
@@ -255,16 +306,15 @@ internal fun MediaFileBubble(
                 .testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
                 .combinedClickable(
                     enabled =
-                        !openRequested &&
-                            canRequestAttachmentOpen(transferState, reference.sourceEpoch, mine),
+                        canRequestAttachmentOpen(transferState, reference.sourceEpoch, mine),
                     onLongClick = onLongPress,
                     onClick = {
+                        if (openRequested) return@combinedClickable
                         if (textCandidate != null) {
                             readerOpen = true
                             return@combinedClickable
                         }
-                        openRequested = true
-                        controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                        openRequested = controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
                     },
                 ),
     ) {
@@ -277,6 +327,7 @@ internal fun MediaFileBubble(
             status = status,
             retention = retention,
             reserveRetentionSpace = reserveRetentionSpace,
+            openPending = openRequested,
         )
     }
     if (readerOpen && textCandidate != null) {
@@ -300,8 +351,7 @@ internal fun MediaFileBubble(
             },
             onOpenExternal = openExternal@{
                 readerOpen = false
-                openRequested = true
-                controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                openRequested = controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
             },
             onDismiss = { readerOpen = false },
         )

@@ -913,6 +913,7 @@
     <string name="media_tap_to_download">Нажмите, чтобы скачать</string>
     <string name="media_preparing_download">Подготовка к скачиванию</string>
     <string name="media_downloading">Скачивание</string>
+    <string name="media_opening">Открытие</string>
     <string name="media_save">Сохранить</string>
     <string name="media_saved">Сохранено в галерею</string>
     <string name="media_save_failed">Не удалось сохранить изображение</string>

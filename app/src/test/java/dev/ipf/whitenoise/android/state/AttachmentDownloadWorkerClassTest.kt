@@ -65,7 +65,7 @@ class AttachmentDownloadWorkerClassTest {
             val request = testRequest()
             val preferences = appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
             AttachmentDownloadIntentStore(preferences).apply {
-                markOpenIntent(request)
+                markOpenIntent(AttachmentOpenRequest(request, navigationGeneration = 0L))
                 pauseAutomatic(request.accountRef)
             }
 

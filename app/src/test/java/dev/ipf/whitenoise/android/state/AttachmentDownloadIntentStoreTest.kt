@@ -22,8 +22,8 @@ class AttachmentDownloadIntentStoreTest {
     @Before
     fun reset() {
         AttachmentDownloadIntentStore(preferences).apply {
-            abandonInstallPermissionRequest(REQUEST_A)
-            abandonInstallPermissionRequest(REQUEST_B)
+            abandonInstallPermissionRequest(OPEN_REQUEST_A)
+            abandonInstallPermissionRequest(OPEN_REQUEST_B)
         }
         preferences.edit().clear().commit()
     }
@@ -55,73 +55,99 @@ class AttachmentDownloadIntentStoreTest {
     @Test
     fun persistedOpenIntentIsConsumedExactlyOnceAndScopedToIdentity() {
         AttachmentDownloadIntentStore(preferences).apply {
-            markOpenIntent(REQUEST_A)
-            markOpenIntent(REQUEST_A)
+            markOpenIntent(OPEN_REQUEST_A)
+            markOpenIntent(OPEN_REQUEST_A)
         }
         val recreated = AttachmentDownloadIntentStore(preferences)
 
-        assertTrue(recreated.hasOpenIntent(REQUEST_A))
-        assertFalse(recreated.hasOpenIntent(REQUEST_B))
-        assertTrue(recreated.consumeOpenIntent(REQUEST_A))
-        assertFalse(recreated.consumeOpenIntent(REQUEST_A))
-        assertFalse(AttachmentDownloadIntentStore(preferences).hasOpenIntent(REQUEST_A))
+        assertTrue(recreated.hasOpenIntent(OPEN_REQUEST_A))
+        assertFalse(recreated.hasOpenIntent(OPEN_REQUEST_B))
+        assertTrue(recreated.consumeOpenIntent(OPEN_REQUEST_A))
+        assertFalse(recreated.consumeOpenIntent(OPEN_REQUEST_A))
+        assertFalse(AttachmentDownloadIntentStore(preferences).hasOpenIntent(OPEN_REQUEST_A))
+    }
+
+    @Test
+    fun navigationSessionScopesFreshAndPermissionRecoveryIntents() {
+        val store = AttachmentDownloadIntentStore(preferences)
+        store.markOpenIntent(OPEN_REQUEST_A)
+
+        assertFalse(store.hasDispatchableOpenIntent(OPEN_REQUEST_A.copy(navigationGeneration = 8L)))
+        assertTrue(store.claimOpenIntent(OPEN_REQUEST_A) == AttachmentOpenIntentClaim.Fresh)
+        assertTrue(store.beginInstallPermissionRequest(OPEN_REQUEST_A))
+        store.abandonInstallPermissionRequest(OPEN_REQUEST_A)
+
+        assertFalse(store.hasDispatchableOpenIntent(OPEN_REQUEST_A.copy(navigationGeneration = 8L)))
+        assertTrue(store.hasDispatchableOpenIntent(OPEN_REQUEST_A))
+    }
+
+    @Test
+    fun leavingTheOriginatingDestinationCancelsItsOpenButKeepsTheDownloadIntent() {
+        val store = AttachmentDownloadIntentStore(preferences)
+        store.markOpenIntent(OPEN_REQUEST_A)
+        store.setInteractive(REQUEST_A, interactive = true)
+
+        store.retainOpenIntentsForDestination(OPEN_REQUEST_B.destination)
+
+        assertFalse(store.hasDispatchableOpenIntent(OPEN_REQUEST_A))
+        assertTrue(store.isInteractive(REQUEST_A))
     }
 
     @Test
     fun installPermissionHandoffRecoversOnlyAfterItsProcessOwnerIsGone() {
         val store = AttachmentDownloadIntentStore(preferences)
-        store.markOpenIntent(REQUEST_A)
+        store.markOpenIntent(OPEN_REQUEST_A)
 
-        assertTrue(store.claimOpenIntent(REQUEST_A) == AttachmentOpenIntentClaim.Fresh)
-        assertTrue(store.beginInstallPermissionRequest(REQUEST_A))
-        assertFalse(store.hasDispatchableOpenIntent(REQUEST_A))
-        assertFalse(AttachmentDownloadIntentStore(preferences).hasDispatchableOpenIntent(REQUEST_A))
+        assertTrue(store.claimOpenIntent(OPEN_REQUEST_A) == AttachmentOpenIntentClaim.Fresh)
+        assertTrue(store.beginInstallPermissionRequest(OPEN_REQUEST_A))
+        assertFalse(store.hasDispatchableOpenIntent(OPEN_REQUEST_A))
+        assertFalse(AttachmentDownloadIntentStore(preferences).hasDispatchableOpenIntent(OPEN_REQUEST_A))
 
-        store.abandonInstallPermissionRequest(REQUEST_A)
+        store.abandonInstallPermissionRequest(OPEN_REQUEST_A)
         val recreated = AttachmentDownloadIntentStore(preferences)
-        assertTrue(recreated.hasDispatchableOpenIntent(REQUEST_A))
+        assertTrue(recreated.hasDispatchableOpenIntent(OPEN_REQUEST_A))
         assertTrue(
-            recreated.claimOpenIntent(REQUEST_A) == AttachmentOpenIntentClaim.InstallPermissionRecovery,
+            recreated.claimOpenIntent(OPEN_REQUEST_A) == AttachmentOpenIntentClaim.InstallPermissionRecovery,
         )
-        assertFalse(recreated.hasDispatchableOpenIntent(REQUEST_A))
+        assertFalse(recreated.hasDispatchableOpenIntent(OPEN_REQUEST_A))
     }
 
     @Test
     fun failedFinalLaunchRestoresFreshIntentWithoutDuplicatingPermissionHandoff() {
         val store = AttachmentDownloadIntentStore(preferences)
-        store.markOpenIntent(REQUEST_A)
-        assertTrue(store.claimOpenIntent(REQUEST_A) == AttachmentOpenIntentClaim.Fresh)
-        assertTrue(store.beginInstallPermissionRequest(REQUEST_A))
+        store.markOpenIntent(OPEN_REQUEST_A)
+        assertTrue(store.claimOpenIntent(OPEN_REQUEST_A) == AttachmentOpenIntentClaim.Fresh)
+        assertTrue(store.beginInstallPermissionRequest(OPEN_REQUEST_A))
 
-        store.markOpenIntent(REQUEST_A)
-        store.restoreOpenIntent(REQUEST_A)
-        assertFalse(store.hasOpenIntent(REQUEST_A))
+        store.markOpenIntent(OPEN_REQUEST_A)
+        store.restoreOpenIntent(OPEN_REQUEST_A)
+        assertFalse(store.hasOpenIntent(OPEN_REQUEST_A))
 
-        assertTrue(store.finishInstallPermissionRequest(REQUEST_A))
-        store.restoreOpenIntent(REQUEST_A)
-        assertTrue(store.hasOpenIntent(REQUEST_A))
-        assertTrue(store.hasDispatchableOpenIntent(REQUEST_A))
+        assertTrue(store.finishInstallPermissionRequest(OPEN_REQUEST_A))
+        store.restoreOpenIntent(OPEN_REQUEST_A)
+        assertTrue(store.hasOpenIntent(OPEN_REQUEST_A))
+        assertTrue(store.hasDispatchableOpenIntent(OPEN_REQUEST_A))
     }
 
     @Test
     fun failedDiskCommitKeepsTheIntentPendingAcrossStoreRecreation() {
-        AttachmentDownloadIntentStore(preferences).markOpenIntent(REQUEST_A)
+        AttachmentDownloadIntentStore(preferences).markOpenIntent(OPEN_REQUEST_A)
         val failingPreferences = CommitFailingSharedPreferences(preferences)
         val store = AttachmentDownloadIntentStore(failingPreferences)
         var observedMissingBeforeRecovery = false
         failingPreferences.onFailedCommit = {
-            assertFalse(store.hasOpenIntent(REQUEST_A))
+            assertFalse(store.hasOpenIntent(OPEN_REQUEST_A))
             observedMissingBeforeRecovery = true
         }
 
-        assertFalse(store.consumeOpenIntent(REQUEST_A))
+        assertFalse(store.consumeOpenIntent(OPEN_REQUEST_A))
         assertTrue(observedMissingBeforeRecovery)
         assertTrue(failingPreferences.recoveryApplied)
-        assertTrue(store.hasOpenIntent(REQUEST_A))
-        assertTrue(AttachmentDownloadIntentStore(preferences).hasOpenIntent(REQUEST_A))
+        assertTrue(store.hasOpenIntent(OPEN_REQUEST_A))
+        assertTrue(AttachmentDownloadIntentStore(preferences).hasOpenIntent(OPEN_REQUEST_A))
 
-        assertTrue(AttachmentDownloadIntentStore(preferences).consumeOpenIntent(REQUEST_A))
-        assertFalse(AttachmentDownloadIntentStore(preferences).hasOpenIntent(REQUEST_A))
+        assertTrue(AttachmentDownloadIntentStore(preferences).consumeOpenIntent(OPEN_REQUEST_A))
+        assertFalse(AttachmentDownloadIntentStore(preferences).hasOpenIntent(OPEN_REQUEST_A))
     }
 
     private companion object {
@@ -135,6 +161,8 @@ class AttachmentDownloadIntentStoreTest {
                 attachmentIndex = 0,
             )
         val REQUEST_B = REQUEST_A.copy(accountRef = ACCOUNT_B)
+        val OPEN_REQUEST_A = AttachmentOpenRequest(REQUEST_A, navigationGeneration = 7L)
+        val OPEN_REQUEST_B = AttachmentOpenRequest(REQUEST_B, navigationGeneration = 7L)
     }
 }
 

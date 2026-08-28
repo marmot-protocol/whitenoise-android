@@ -3,7 +3,10 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import dev.ipf.whitenoise.android.state.AttachmentOpenRequest
+import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
+import dev.ipf.whitenoise.android.state.attachmentOpenDestinationVisible
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -23,6 +26,46 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AttachmentOpenLifecycleTest {
+    @Test
+    fun externalDispatchRequiresTheExactVisibleNavigationSession() {
+        val transfer =
+            AttachmentTransferRequest(
+                accountRef = "account-a",
+                groupIdHex = "ab".repeat(32),
+                messageIdHex = "cd".repeat(32),
+                attachmentIndex = 0,
+            )
+        val request = AttachmentOpenRequest(transfer, navigationGeneration = 7L)
+
+        assertTrue(
+            attachmentOpenDestinationVisible(
+                selectedDestination = request.destination,
+                request = request,
+                appInForeground = true,
+                activeAccountRef = transfer.accountRef,
+                activeGroupIdHex = transfer.groupIdHex,
+            ),
+        )
+        assertFalse(
+            attachmentOpenDestinationVisible(
+                selectedDestination = request.destination.copy(navigationGeneration = 8L),
+                request = request,
+                appInForeground = true,
+                activeAccountRef = transfer.accountRef,
+                activeGroupIdHex = transfer.groupIdHex,
+            ),
+        )
+        assertFalse(
+            attachmentOpenDestinationVisible(
+                selectedDestination = request.destination,
+                request = request,
+                appInForeground = true,
+                activeAccountRef = transfer.accountRef,
+                activeGroupIdHex = "ef".repeat(32),
+            ),
+        )
+    }
+
     @Test
     fun pendingOpenWaitsUntilTheOwningLifecycleResumes() =
         runBlocking {

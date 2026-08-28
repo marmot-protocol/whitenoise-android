@@ -287,6 +287,27 @@ class ReceivedFileTimestampScreenshotTest {
             .captureRoboImage("src/test/snapshots/sent_file_timestamp_dark_large_rtl.png")
     }
 
+    @Test
+    fun receivedApkOpeningShowsVisiblePendingState() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(modifier = Modifier.padding(16.dp).testTag(APK_OPENING_TAG)) {
+                    FileCard(
+                        reference = reference("whitenoise-pr.apk", "application/vnd.android.package-archive"),
+                        transferState = AttachmentTransferState.Available,
+                        timestampText = APK_OPENING_TIME,
+                        openPending = true,
+                    )
+                }
+            }
+        }
+
+        composeRule.onAllNodesWithContentDescription("Opening").assertCountEquals(1)
+        composeRule
+            .onNodeWithTag(APK_OPENING_TAG)
+            .captureRoboImage("src/test/snapshots/received_apk_opening_light.png")
+    }
+
     @Composable
     private fun FileCard(
         reference: MediaAttachmentReferenceFfi,
@@ -295,6 +316,7 @@ class ReceivedFileTimestampScreenshotTest {
         showStatus: Boolean = false,
         status: MessageStatus = MessageStatus.Received,
         retention: RetentionIndicatorInput? = null,
+        openPending: Boolean = false,
     ) {
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant,
@@ -310,6 +332,7 @@ class ReceivedFileTimestampScreenshotTest {
                 status = status,
                 retention = retention,
                 retentionClockMillis = { RETENTION_NOW_MILLIS },
+                openPending = openPending,
             )
         }
     }
@@ -351,6 +374,8 @@ class ReceivedFileTimestampScreenshotTest {
         const val RTL_TIME = "10:05 AM"
         const val SENT_RTL_TAG = "sent-file-timestamp-rtl"
         const val SENT_RTL_TIME = "10:06 AM"
+        const val APK_OPENING_TAG = "received-apk-opening"
+        const val APK_OPENING_TIME = "10:07 AM"
         const val SPREADSHEET_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         const val SENDING_CARD_TAG = "sending-file-card"
         const val RECEIVED_CARD_TAG = "received-file-card"
