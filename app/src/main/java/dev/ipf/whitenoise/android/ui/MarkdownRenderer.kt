@@ -82,8 +82,10 @@ import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
+import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlight
-import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlightColor
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import java.net.IDN
 import java.net.URI
 import java.util.Locale
@@ -147,6 +149,7 @@ internal fun MarkdownMessageBody(
     // Accessibility actions invoke the same copy path without a pointer event.
     onCopyLink: ((String) -> Unit)? = null,
     ttsLeafHighlightResolver: TtsLeafHighlightResolver? = null,
+    ttsReadAloudHighlightStyle: TtsReadAloudHighlightStyle? = null,
     ttsSentenceLayoutReporter: TtsSentenceLayoutReporter? = null,
 ) {
     val context = LocalContext.current
@@ -184,6 +187,7 @@ internal fun MarkdownMessageBody(
         LocalMarkdownLinkTextLayoutReporter provides onLinkTextLayoutChanged,
         LocalMarkdownLinkCopyHandler provides onCopyLink,
         LocalTtsLeafHighlightResolver provides ttsLeafHighlightResolver,
+        LocalTtsReadAloudHighlightStyle provides ttsReadAloudHighlightStyle,
         LocalTtsSentenceLayoutReporter provides ttsSentenceLayoutReporter,
     ) {
         MarkdownBlockList(
@@ -407,6 +411,9 @@ private val LocalSelectableTextLayoutReporter =
 private val LocalTtsLeafHighlightResolver =
     compositionLocalOf<TtsLeafHighlightResolver?> { null }
 
+private val LocalTtsReadAloudHighlightStyle =
+    compositionLocalOf<TtsReadAloudHighlightStyle?> { null }
+
 private val LocalTtsSentenceLayoutReporter =
     compositionLocalOf<TtsSentenceLayoutReporter?> { null }
 
@@ -419,6 +426,18 @@ private val LocalMarkdownLinkCopyHandler =
 private class MarkdownTextLayoutTracker {
     var layoutResult: TextLayoutResult? = null
     var coordinates: LayoutCoordinates? = null
+}
+
+@Composable
+private fun rememberMarkdownFallbackHighlightStyle(): TtsReadAloudHighlightStyle {
+    val colorScheme = MaterialTheme.colorScheme
+    return rememberTtsReadAloudHighlightStyle(
+        background = colorScheme.surfaceVariant,
+        content = colorScheme.onSurfaceVariant,
+        sentenceAccent = colorScheme.outlineVariant,
+        wordAccent = colorScheme.tertiary,
+        amoled = isAmoledSurfaceTheme(),
+    )
 }
 
 /** Text leaf used by the rendered Markdown document (dialog chrome excluded). */
@@ -440,7 +459,8 @@ private fun MarkdownBodyText(
     val linkDestinations = remember(text) { markdownLinkDestinations(text) }
     val reportsLinks = remember(text) { text.getLinkAnnotations(0, text.length).isNotEmpty() }
     val tracker = remember(leafId, text) { MarkdownTextLayoutTracker() }
-    val highlightColor = ttsReadAloudHighlightColor()
+    val fallbackHighlightStyle = rememberMarkdownFallbackHighlightStyle()
+    val highlightStyle = LocalTtsReadAloudHighlightStyle.current ?: fallbackHighlightStyle
     var layoutResult by remember(leafId, text) { mutableStateOf<TextLayoutResult?>(null) }
     val highlight =
         remember(highlightResolver, leafId, text.text) {
@@ -488,7 +508,7 @@ private fun MarkdownBodyText(
         modifier =
             modifier
                 .then(accessibilityModifier)
-                .ttsReadAloudHighlight(layoutResult, highlight, highlightColor)
+                .ttsReadAloudHighlight(layoutResult, highlight, highlightStyle)
                 .onGloballyPositioned { coordinates ->
                     tracker.coordinates = coordinates
                     reportIfReady()
