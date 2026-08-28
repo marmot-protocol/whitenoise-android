@@ -204,12 +204,7 @@ internal fun resolveTtsReadAloudHighlightStyle(
     val opaqueBackground = opaqueArgb(background)
     val opaqueContent = opaqueArgb(content)
     val trueBlackAmoled = amoled && opaqueBackground == OPAQUE_BLACK_ARGB
-    val fill =
-        if (trueBlackAmoled) {
-            opaqueBackground
-        } else {
-            strongestReadableSentenceFill(opaqueBackground, opaqueContent)
-        }
+    val fill = visibleReadableSentenceFill(opaqueBackground, opaqueContent)
     val sentenceMarker =
         readableMarker(
             candidates = listOf(sentenceAccent, opaqueContent, wordAccent),
@@ -225,27 +220,35 @@ internal fun resolveTtsReadAloudHighlightStyle(
     return TtsReadAloudHighlightStyleArgb(fill, sentenceMarker, wordMarker)
 }
 
-private fun strongestReadableSentenceFill(
+/**
+ * A sentence band has to satisfy two things at once: text stays readable on
+ * it, and it is distinguishable from the bubble it sits on. Blending the
+ * background away from the content satisfies only the first, and degenerates
+ * whenever the background already is the extreme it moves toward - a true
+ * black bubble with near-white text returns black at every strength, leaving
+ * an invisible band.
+ *
+ * Blending toward the content satisfies both from either direction. On black
+ * with near-white text the starting ratio is about 21:1, so a small step
+ * toward the content stays far above AA while the band becomes visible; a
+ * light bubble behaves the same way in reverse. The weakest step that clears
+ * both tests wins, keeping the treatment subtle.
+ */
+private fun visibleReadableSentenceFill(
     background: Long,
     content: Long,
-): Long {
-    val destination =
-        if (contrastRatio(content, OPAQUE_WHITE_ARGB) >= contrastRatio(content, OPAQUE_BLACK_ARGB)) {
-            OPAQUE_WHITE_ARGB
-        } else {
-            OPAQUE_BLACK_ARGB
-        }
-    return TTS_SENTENCE_FILL_STRENGTHS
-        .map { strength -> blendOpaque(background, destination, strength) }
-        .lastOrNull { fill ->
-            contrastRatio(content, fill) >= WCAG_AA_NORMAL_TEXT_CONTRAST &&
+): Long =
+    TTS_SENTENCE_FILL_STRENGTHS
+        .map { strength -> blendOpaque(background, content, strength) }
+        .firstOrNull { fill ->
+            contrastRatio(fill, background) >= TTS_SENTENCE_FILL_MIN_SEPARATION &&
+                contrastRatio(content, fill) >= WCAG_AA_NORMAL_TEXT_CONTRAST &&
                 contrastRatio(
                     content,
                     blendOpaque(fill, content, TTS_INLINE_DECORATION_ALPHA),
                 ) >= WCAG_AA_NORMAL_TEXT_CONTRAST
         }
         ?: background
-}
 
 private fun readableMarker(
     candidates: List<Long>,
@@ -387,22 +390,6 @@ internal fun Modifier.ttsReadAloudHighlight(
                 val box = highlightBox.bounds
                 drawRect(color = style.sentenceFill, topLeft = Offset(box.left, box.top), size = box.size)
             }
-            ttsSentenceMarkerBoxes(boxes).forEach { highlightBox ->
-                val box = highlightBox.bounds
-                val markerWidth = TTS_SENTENCE_MARKER_WIDTH_DP.dp.toPx().coerceAtMost(box.width / 2f)
-                val markerLeft =
-                    ttsSentenceMarkerLeft(
-                        box = box,
-                        markerWidth = markerWidth,
-                        direction = highlightBox.paragraphDirection,
-                    )
-                drawRect(
-                    color = style.sentenceMarker,
-                    topLeft = Offset(markerLeft, box.top),
-                    size =
-                        Size(markerWidth, box.height),
-                )
-            }
         }
         wordRange?.takeUnless { it.collapsed }?.let { range ->
             highlightBoundingBoxes(layoutResult, range).forEach { highlightBox ->
@@ -425,9 +412,9 @@ internal fun ttsSentenceMarkerLeft(
     direction: ResolvedTextDirection,
 ): Float = if (direction == ResolvedTextDirection.Rtl) box.right - markerWidth else box.left
 
-private val TTS_SENTENCE_FILL_STRENGTHS = listOf(0.06f, 0.10f, 0.16f, 0.22f, 0.30f)
+private val TTS_SENTENCE_FILL_STRENGTHS = listOf(0.10f, 0.16f, 0.22f, 0.30f, 0.40f)
+private const val TTS_SENTENCE_FILL_MIN_SEPARATION = 1.2
 private const val TTS_INLINE_DECORATION_ALPHA = 0.08f
-private const val TTS_SENTENCE_MARKER_WIDTH_DP = 2f
 private const val TTS_WORD_MARKER_WIDTH_DP = 2f
 private const val ARGB_CHANNEL_MASK = 0xFFL
 private const val ARGB_RGB_MASK = 0xFFFFFFL
