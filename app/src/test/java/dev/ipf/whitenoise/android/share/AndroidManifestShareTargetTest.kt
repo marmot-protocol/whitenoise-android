@@ -88,7 +88,7 @@ class AndroidManifestShareTargetTest {
     }
 
     @Test
-    fun externalShareDispatcherReliesOnTestPackageInsteadOfPrivateProcess() {
+    fun externalShareDispatcherReliesOnTestPackageDefaults() {
         val manifest =
             listOf(
                 java.io.File("src/androidTest/AndroidManifest.xml"),
@@ -97,6 +97,7 @@ class AndroidManifestShareTargetTest {
 
         assertTrue(manifest.contains("ExternalShareDispatchActivity"))
         assertTrue(!manifest.contains("android:process="))
+        assertTrue(!manifest.contains("android:taskAffinity="))
     }
 
     private data class ParsedShareTarget(
