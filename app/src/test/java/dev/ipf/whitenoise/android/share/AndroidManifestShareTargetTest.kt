@@ -87,6 +87,18 @@ class AndroidManifestShareTargetTest {
         assertTrue(!manifest.contains("android:mimeType=\"*/*\""))
     }
 
+    @Test
+    fun externalShareDispatcherReliesOnTestPackageInsteadOfPrivateProcess() {
+        val manifest =
+            listOf(
+                java.io.File("src/androidTest/AndroidManifest.xml"),
+                java.io.File("app/src/androidTest/AndroidManifest.xml"),
+            ).first { it.exists() }.readText()
+
+        assertTrue(manifest.contains("ExternalShareDispatchActivity"))
+        assertTrue(!manifest.contains("android:process="))
+    }
+
     private data class ParsedShareTarget(
         val targetClass: String?,
         val categories: Set<String>,
