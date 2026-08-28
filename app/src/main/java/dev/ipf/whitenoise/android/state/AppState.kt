@@ -1401,11 +1401,6 @@ class WhiteNoiseAppState private constructor(
     private val mediaCacheRevisionState = MutableStateFlow(0L)
     internal val mediaCacheRevision: StateFlow<Long> = mediaCacheRevisionState.asStateFlow()
 
-    private data class MediaCachePresentationSession(
-        val accountRef: String,
-        val epoch: Int,
-    )
-
     private fun bumpMediaCacheRevision() {
         mediaCacheRevisionState.update { it + 1L }
     }
@@ -3902,11 +3897,7 @@ class WhiteNoiseAppState private constructor(
         attachmentDownloadPolicyRevision += 1
     }
 
-    /**
-     * True only when plaintext is retained in L1 or the encrypted L2 cache.
-     * When [hydrateMemory] is true, an L2 hit is authenticated and copied into
-     * L1 before availability is published to a first-frame presentation.
-     */
+    /** True for retained plaintext; [hydrateMemory] promotes authenticated L2 hits into L1. */
     internal suspend fun hasCachedAttachmentAfterHydration(
         request: AttachmentTransferRequest,
         hydrateMemory: Boolean = false,
