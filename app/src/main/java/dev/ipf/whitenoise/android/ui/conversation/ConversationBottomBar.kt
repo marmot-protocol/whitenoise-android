@@ -35,6 +35,8 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.DisbandedGroupCompose
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 
+private val ConversationTopInteractionClearance = 64.dp
+
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun ConversationBottomBar(
@@ -215,6 +217,7 @@ internal fun ConversationBottomBar(
                             onKeyboardRestoreFromCustomInputFailed = onKeyboardRestoreFromCustomInputFailed,
                             recentEmojis = recentEmojis,
                             onEmojiUsed = onEmojiUsed,
+                            topInteractionClearance = ConversationTopInteractionClearance,
                         )
                     }
                 }

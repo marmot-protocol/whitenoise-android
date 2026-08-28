@@ -7,7 +7,6 @@ import android.window.OnBackInvokedDispatcher
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -28,11 +27,11 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -81,6 +80,7 @@ import androidx.compose.ui.input.key.onPreInterceptKeyBeforeSoftKeyboard
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -117,12 +117,61 @@ import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlin.math.ceil
 import kotlin.math.floor
 
 internal const val COMPOSER_RESIZE_INDICATOR_TAG = "composer-resize-indicator"
 internal const val COMPOSER_PILL_SURFACE_TAG = "composer-pill-surface"
+
+private val ExpandedBorderHeaderInset = 28.dp
+private val CompactEditorStartInset = 52.dp
+private val ExpandedEditorHorizontalInset = 12.dp
+private val CompactEditorTopInset = 12.dp
+private val ExpandedEditorTopInset = 20.dp
+private val CompactEditorBottomInset = 8.dp
+private val ExpandedEditorBottomInset = 48.dp
+
+private fun interpolateDp(
+    start: Dp,
+    end: Dp,
+    fraction: Float,
+): Dp = start + (end - start) * fraction
+
+/**
+ * Padding whose state is read during measurement instead of composition.
+ * This lets the composer animate geometry without recomposing BasicTextField
+ * on every frame.
+ */
+private fun Modifier.deferredPadding(
+    start: () -> Dp = { 0.dp },
+    top: () -> Dp = { 0.dp },
+    end: () -> Dp = { 0.dp },
+    bottom: () -> Dp = { 0.dp },
+): Modifier =
+    layout { measurable, constraints ->
+        val startPx = start().roundToPx()
+        val topPx = top().roundToPx()
+        val endPx = end().roundToPx()
+        val bottomPx = bottom().roundToPx()
+        val horizontal = startPx + endPx
+        val vertical = topPx + bottomPx
+        val childConstraints =
+            Constraints(
+                minWidth = (constraints.minWidth - horizontal).coerceAtLeast(0),
+                maxWidth = (constraints.maxWidth - horizontal).coerceAtLeast(0),
+                minHeight = (constraints.minHeight - vertical).coerceAtLeast(0),
+                maxHeight = (constraints.maxHeight - vertical).coerceAtLeast(0),
+            )
+        val placeable =
+            measurable.measure(childConstraints)
+        val width = (placeable.width + horizontal).coerceIn(constraints.minWidth, constraints.maxWidth)
+        val height = (placeable.height + vertical).coerceIn(constraints.minHeight, constraints.maxHeight)
+        layout(width, height) {
+            placeable.placeRelative(startPx, topPx)
+        }
+    }
 
 internal data class ComposerSelectionLayout(
     val top: Float,
@@ -246,11 +295,13 @@ internal fun ComposerPill(
     onHeightDrag: (Float) -> Unit = {},
     onHeightDragStopped: () -> Unit = {},
     trailingAction: (@Composable RowScope.() -> Unit)? = null,
+    expandedTrailingActionInset: Dp = 0.dp,
     // Automatic expansion changes both this pill's padding and ComposerBar's
     // outer trailing reservation. Measure the threshold against the compact
     // pill width so the chosen mode cannot invalidate its own line count.
     compactMeasurementWidth: Dp? = null,
     compactMeasurementReservesTrailingAction: Boolean = trailingAction != null,
+    compactOuterEndInset: Dp = 0.dp,
     inputContentVisible: Boolean = true,
     inputFocusEnabled: Boolean = true,
     onMultilineControlsChanged: (Boolean) -> Unit = {},
@@ -400,53 +451,27 @@ internal fun ComposerPill(
             (if (onDictation != null) 48.dp else 0.dp) +
             (if (hasAttachmentAction) 36.dp else 0.dp) +
             (if (compactMeasurementReservesTrailingAction) 44.dp else 0.dp)
-    val expansionAnimationSpec =
-        tween<Dp>(
-            durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
-            easing = FastOutSlowInEasing,
+    // One progress value owns every moving edge. Reading it in deferred layout
+    // modifiers avoids recomposing BasicTextField on each animation frame and
+    // keeps the pill, editor, controls, and outer reservation in lockstep.
+    val expansionProgress =
+        animateFloatAsState(
+            targetValue = if (expandedLayout) 1f else 0f,
+            animationSpec =
+                tween(
+                    durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
+                    easing = FastOutSlowInEasing,
+                ),
+            label = "composer layout progress",
         )
-    val borderHeaderInset by
-        animateDpAsState(
-            targetValue = if (expandedLayout) 28.dp else 0.dp,
-            animationSpec = expansionAnimationSpec,
-            label = "composer border header inset",
-        )
-    val editorStartInset by
-        animateDpAsState(
-            targetValue = if (expandedLayout) 12.dp else 52.dp,
-            animationSpec = expansionAnimationSpec,
-            label = "composer editor start inset",
-        )
-    val editorTopInset by
-        animateDpAsState(
-            targetValue = if (expandedLayout) 20.dp else 10.dp,
-            animationSpec = expansionAnimationSpec,
-            label = "composer editor top inset",
-        )
-    val editorEndInset by
-        animateDpAsState(
-            targetValue = if (expandedLayout) 12.dp else compactTrailingReserve,
-            animationSpec = expansionAnimationSpec,
-            label = "composer editor end inset",
-        )
-    val editorBottomInset by
-        animateDpAsState(
-            targetValue = if (expandedLayout) 48.dp else 10.dp,
-            animationSpec = expansionAnimationSpec,
-            label = "composer editor bottom inset",
-        )
-    val emojiBottomInset by
-        animateDpAsState(
-            targetValue = if (expandedLayout) 4.dp else 0.dp,
-            animationSpec = expansionAnimationSpec,
-            label = "composer emoji bottom inset",
-        )
-    // The expanded resize layer occupies the same coordinates as the first
-    // line while its header padding is still animating out of compact mode.
-    // Do not expose or draw that layer until the editor has cleared its full
-    // 48dp target; otherwise a quick caret/selection gesture can resize the
-    // composer during the transition.
-    val resizeTargetReady = borderHeaderInset == 28.dp && editorTopInset == 20.dp
+    var resizeTargetReady by remember { mutableStateOf(false) }
+    LaunchedEffect(expandedLayout) {
+        resizeTargetReady = false
+        if (expandedLayout) {
+            delay(COMPOSER_EXPANSION_ANIMATION_MILLIS.toLong())
+            resizeTargetReady = true
+        }
+    }
     val composerTextStyle =
         LocalTextStyle.current.copy(
             color = MaterialTheme.colorScheme.onSurface,
@@ -458,7 +483,7 @@ internal fun ComposerPill(
         compactMeasurementWidth?.let { measurementWidth ->
             val maxTextWidthPx =
                 with(density) {
-                    (measurementWidth - 52.dp - compactMeasurementTrailingReserve)
+                    (measurementWidth - CompactEditorStartInset - compactMeasurementTrailingReserve)
                         .coerceAtLeast(1.dp)
                         .roundToPx()
                 }
@@ -502,19 +527,36 @@ internal fun ComposerPill(
         }
     }
 
-    Box(modifier = modifier) {
+    Box(
+        modifier =
+            modifier.deferredPadding(
+                end = {
+                    interpolateDp(
+                        compactOuterEndInset,
+                        0.dp,
+                        expansionProgress.value,
+                    )
+                },
+            ),
+    ) {
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant,
             shape = RoundedCornerShape(22.dp),
             border = amoledSurfaceBorderStroke(),
             modifier =
                 Modifier
-                    .padding(top = borderHeaderInset)
-                    .fillMaxWidth()
+                    .deferredPadding(
+                        top = {
+                            interpolateDp(
+                                0.dp,
+                                ExpandedBorderHeaderInset,
+                                expansionProgress.value,
+                            )
+                        },
+                    ).fillMaxWidth()
                     .then(expandedHeightModifier)
                     .testTag(COMPOSER_PILL_SURFACE_TAG),
         ) {
-            val boxAlignment = if (expandedLayout) Alignment.TopStart else Alignment.CenterStart
             Box(
                 modifier =
                     Modifier
@@ -522,17 +564,41 @@ internal fun ComposerPill(
                         .then(expandedHeightModifier),
             ) {
                 Box(
-                    contentAlignment = boxAlignment,
+                    contentAlignment = Alignment.TopStart,
                     modifier =
                         Modifier
-                            .align(boxAlignment)
+                            .align(Alignment.TopStart)
                             .fillMaxWidth()
                             .then(expandedHeightModifier)
-                            .padding(
-                                start = editorStartInset,
-                                top = editorTopInset,
-                                end = editorEndInset,
-                                bottom = editorBottomInset,
+                            .deferredPadding(
+                                start = {
+                                    interpolateDp(
+                                        CompactEditorStartInset,
+                                        ExpandedEditorHorizontalInset,
+                                        expansionProgress.value,
+                                    )
+                                },
+                                top = {
+                                    interpolateDp(
+                                        CompactEditorTopInset,
+                                        ExpandedEditorTopInset,
+                                        expansionProgress.value,
+                                    )
+                                },
+                                end = {
+                                    interpolateDp(
+                                        compactTrailingReserve,
+                                        ExpandedEditorHorizontalInset,
+                                        expansionProgress.value,
+                                    )
+                                },
+                                bottom = {
+                                    interpolateDp(
+                                        CompactEditorBottomInset,
+                                        ExpandedEditorBottomInset,
+                                        expansionProgress.value,
+                                    )
+                                },
                             ).alpha(if (inputContentVisible) 1f else 0f)
                             .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
                 ) {
@@ -638,9 +704,15 @@ internal fun ComposerPill(
                     modifier =
                         Modifier
                             .align(Alignment.BottomStart)
-                            .padding(
-                                start = 4.dp,
-                                bottom = emojiBottomInset,
+                            .deferredPadding(
+                                start = { 4.dp },
+                                bottom = {
+                                    interpolateDp(
+                                        0.dp,
+                                        4.dp,
+                                        expansionProgress.value,
+                                    )
+                                },
                             ).alpha(if (inputContentVisible) 1f else 0f)
                             .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
                 ) {
@@ -701,6 +773,19 @@ internal fun ComposerPill(
                                 modifier = Modifier.size(22.dp),
                             )
                         }
+                    }
+                    if (expandedTrailingActionInset > 0.dp) {
+                        Spacer(
+                            Modifier.deferredPadding(
+                                end = {
+                                    interpolateDp(
+                                        0.dp,
+                                        expandedTrailingActionInset,
+                                        expansionProgress.value,
+                                    )
+                                },
+                            ),
+                        )
                     }
                     trailingAction?.invoke(this)
                 }

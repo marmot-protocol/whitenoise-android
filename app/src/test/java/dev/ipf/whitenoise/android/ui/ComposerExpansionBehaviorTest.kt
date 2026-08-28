@@ -2,7 +2,9 @@ package dev.ipf.whitenoise.android.ui
 
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
@@ -32,6 +34,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
@@ -373,6 +376,55 @@ class ComposerExpansionBehaviorTest {
     }
 
     @Test
+    fun longAutomaticDraftCanBeDraggedDownToAShortManualViewport() {
+        val draft = (1..40).joinToString("\n") { "Draft line $it" }
+        render(draft)
+        val automaticBounds = composerBounds()
+
+        resizeHandle().performTouchInput {
+            val start = center
+            swipe(start, Offset(start.x, start.y + 220f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+
+        val manualBounds = composerBounds()
+        assertTrue(
+            "manual resize must shrink independently of natural draft height",
+            manualBounds.height < automaticBounds.height - 140f,
+        )
+        assertTrue(
+            "manual viewport must retain a usable one-line minimum",
+            manualBounds.height >= 140f,
+        )
+        assertTrue(
+            "manual resize must preserve the anchored bottom edge",
+            abs(manualBounds.bottom - automaticBounds.bottom) <= 1f,
+        )
+        composeRule.onNodeWithText(draft).assertExists()
+    }
+
+    @Test
+    fun fullScreenHandleStaysBelowAndDoesNotActivateTheTopBar() {
+        var topBarClicks = 0
+        render(
+            draft = longDraft(),
+            topInteractionClearance = 64.dp,
+            onTopBarClick = { topBarClicks += 1 },
+        )
+
+        resizeHandle().performClick()
+        composeRule.waitForIdle()
+        val fullScreenHandle = composerControlBounds(R.string.composer_resize)
+        assertTrue("full-screen resize target must stay below top-bar interactions", fullScreenHandle.top >= 64f)
+
+        resizeHandle().performTouchInput { click(center) }
+        composeRule.waitForIdle()
+
+        assertEquals("resize handle tap must not reach the top bar", 0, topBarClicks)
+        assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
+    }
+
+    @Test
     fun firstLineCenterTapTargetsTheEditorWithoutChangingExpansion() {
         val draft = longDraft()
         render(draft)
@@ -435,6 +487,8 @@ class ComposerExpansionBehaviorTest {
         overlayBackRegistrar: ComposerOverlayBackRegistrar? = null,
         dictationController: ConversationDictationController? = null,
         width: Int = 360,
+        topInteractionClearance: Dp = 0.dp,
+        onTopBarClick: (() -> Unit)? = null,
     ) {
         var value by mutableStateOf(TextFieldValue(draft))
         composeRule.setContent {
@@ -454,8 +508,18 @@ class ComposerExpansionBehaviorTest {
                             initialDraft = value,
                             onDraftChange = { value = it },
                             overlayBackRegistrar = overlayBackRegistrar,
+                            topInteractionClearance = topInteractionClearance,
                             modifier = Modifier.testTag(TAG),
                         )
+                        if (onTopBarClick != null) {
+                            Box(
+                                Modifier
+                                    .align(Alignment.TopCenter)
+                                    .fillMaxWidth()
+                                    .height(topInteractionClearance)
+                                    .clickable(onClick = onTopBarClick),
+                            )
+                        }
                     }
                 }
             }
