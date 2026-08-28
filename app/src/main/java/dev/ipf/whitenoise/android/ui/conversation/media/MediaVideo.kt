@@ -12,18 +12,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,7 +32,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,9 +44,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
@@ -62,6 +55,7 @@ import dev.ipf.whitenoise.android.media.playbackErrorInvalidatesAttachmentCache
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
+import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -356,11 +350,12 @@ internal fun MediaVideoGridTile(
 
 @Composable
 internal fun MediaVideoBubble(
-    messageIdHex: String,
+    item: TimelineMessage,
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    conversationVisualPages: List<MediaViewerPage>,
     mine: Boolean,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
@@ -368,6 +363,8 @@ internal fun MediaVideoBubble(
     onRetryUpload: (() -> Unit)? = null,
     attachedToCaption: Boolean = false,
 ) {
+    val record = item.record
+    val messageIdHex = record.messageIdHex
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val pillKey = "$messageIdHex#$attachmentIndex"
@@ -413,7 +410,7 @@ internal fun MediaVideoBubble(
         mutableStateOf(cachedThumbnail?.asImageBitmap())
     }
     var durationMs by remember(pillKey, epoch) { mutableStateOf(0L) }
-    var playerOpen by remember(pillKey) { mutableStateOf(false) }
+    var viewerOpen by remember(pillKey) { mutableStateOf(false) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     // Mirrors the image bubble's auto-download gate, but already-local bytes
     // bypass the network-spend policy so chat re-entry starts at Play instead
@@ -491,7 +488,7 @@ internal fun MediaVideoBubble(
         }
         localFile = playableFile
         failed = false
-        playerOpen = true
+        viewerOpen = true
     }
 
     persistedAttachmentOpenEffect(
@@ -701,41 +698,19 @@ internal fun MediaVideoBubble(
             }
         }
     }
-    if (playerOpen) {
-        val file = localFile
-        if (file != null) {
-            FullscreenVideoPlayer(
-                file = file,
-                onDismiss = { playerOpen = false },
-                onPlaybackError = {
-                    if (loading || failed) return@FullscreenVideoPlayer
-                    failed = true
-                    playerOpen = false
-                    loading = true
-                    playbackRecoveryJob.value =
-                        scope.launch {
-                            try {
-                                clearVideoAttachmentCacheAfterPlaybackFailure(
-                                    context = context,
-                                    controller = controller,
-                                    messageIdHex = messageIdHex,
-                                    attachmentIndex = attachmentIndex,
-                                    reference = reference,
-                                    mine = mine,
-                                )
-                                localFile = null
-                                posterBitmap = null
-                                durationMs = 0L
-                            } catch (t: Throwable) {
-                                if (t is CancellationException) throw t
-                                localFile = null
-                            } finally {
-                                loading = false
-                            }
-                        }
-                },
-            )
-        }
+    if (viewerOpen) {
+        ConversationMediaViewer(
+            controller = controller,
+            appState = appState,
+            conversationVisualPages = conversationVisualPages,
+            messageIdHex = record.messageIdHex,
+            attachments = listOf(IndexedValue(attachmentIndex, reference)),
+            tappedAttachmentIndex = attachmentIndex,
+            sender = record.sender,
+            recordedAt = record.recordedAt,
+            mine = mine,
+            onDismiss = { viewerOpen = false },
+        )
     }
 }
 
@@ -985,94 +960,6 @@ private fun videoAttachmentExtension(reference: MediaAttachmentReferenceFfi): St
         reference.mediaType.contains("webm", ignoreCase = true) -> "webm"
         else -> "mp4"
     }
-
-/**
- * Fullscreen player backed by Media3 ExoPlayer + PlayerView — the same
- * controller the platform media apps ship. Tap toggles the transport bar;
- * play/pause/seek work reliably without VideoView's MediaController quirks.
- */
-@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-@Composable
-private fun FullscreenVideoPlayer(
-    file: java.io.File,
-    onDismiss: () -> Unit,
-    onPlaybackError: () -> Unit,
-) {
-    val context = LocalContext.current
-    val currentOnPlaybackError by rememberUpdatedState(onPlaybackError)
-    val exo =
-        remember(file) {
-            androidx.media3.exoplayer.ExoPlayer
-                .Builder(context)
-                .build()
-                .apply {
-                    setAudioAttributes(videoPlaybackAudioAttributes, true)
-                    addListener(
-                        object : androidx.media3.common.Player.Listener {
-                            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                                if (playbackErrorInvalidatesAttachmentCache(error)) {
-                                    currentOnPlaybackError()
-                                }
-                            }
-                        },
-                    )
-                    setMediaItem(
-                        androidx.media3.common.MediaItem
-                            .fromUri(android.net.Uri.fromFile(file)),
-                    )
-                }
-        }
-    DisposableEffect(exo) { onDispose { exo.release() } }
-    LaunchedEffect(exo) {
-        VoicePlaybackController.pause()
-        exo.prepare()
-        exo.playWhenReady = true
-    }
-    androidx.compose.ui.window.Dialog(
-        onDismissRequest = onDismiss,
-        properties =
-            androidx.compose.ui.window.DialogProperties(
-                usePlatformDefaultWidth = false,
-                dismissOnBackPress = true,
-                dismissOnClickOutside = false,
-            ),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black),
-            contentAlignment = Alignment.Center,
-        ) {
-            androidx.compose.ui.viewinterop.AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { ctx ->
-                    androidx.media3.ui.PlayerView(ctx).apply {
-                        player = exo
-                        useController = true
-                        setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                        controllerShowTimeoutMs = 2500
-                    }
-                },
-                onRelease = { playerView -> playerView.player = null },
-            )
-            IconButton(
-                onClick = onDismiss,
-                modifier =
-                    Modifier
-                        .align(Alignment.TopStart)
-                        .statusBarsPadding()
-                        .padding(8.dp),
-            ) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = stringResource(R.string.cancel),
-                    tint = Color.White,
-                )
-            }
-        }
-    }
-}
 
 /**
  * One page of the full-screen pager. Owns its own download + decode + pan/zoom

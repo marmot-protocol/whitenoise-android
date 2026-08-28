@@ -55,7 +55,6 @@ class MainActivity : AppCompatActivity() {
     private var inboundProfilePayload by mutableStateOf<String?>(null)
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
     private var inboundNotificationRequestId by mutableStateOf(0L)
-    private var inboundShareRequest by mutableStateOf<ShareRequest?>(null)
     private var inboundAppUpdateTap by mutableStateOf(0)
     private var appUnlockPromptActive = false
     private var appLockBackgroundSecureFlagRetained = false
@@ -77,6 +76,20 @@ class MainActivity : AppCompatActivity() {
             processState = (application as WhiteNoiseApplication).mainShellProcessState,
             onHolderCreated = { mainShellHolderCreatedForActivity = true },
         )
+    }
+    private var inboundShareRequest: ShareRequest?
+        get() = mainShellStateHolder.inboundShareRequest.value
+        set(value) {
+            mainShellStateHolder.inboundShareRequest.value = value
+        }
+
+    internal val pendingInboundShareRequestForTest: ShareRequest?
+        get() = inboundShareRequest
+
+    internal fun acknowledgeInboundShareForTest(requestId: String) {
+        inboundShareRequest
+            ?.takeIf { it.requestId == requestId }
+            ?.let(::handleShareRequest)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -119,7 +132,10 @@ class MainActivity : AppCompatActivity() {
         )
         notificationTapTokens = NotificationTapTokens.create(this)
         registerAmberSignerLauncher()
-        consumeIntent(intent)
+        consumeIntent(
+            intent = intent,
+            retainPendingShareOnRecreation = savedInstanceState != null,
+        )
         enableEdgeToEdge()
         applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
         installComposeContent()
@@ -164,9 +180,7 @@ class MainActivity : AppCompatActivity() {
                     inboundNotificationRequestId = inboundNotificationRequestId,
                     onNotificationTargetHandled = ::handleNotificationTarget,
                     inboundShareRequest = inboundShareRequest,
-                    onShareRequestHandled = { handled ->
-                        if (inboundShareRequest == handled) inboundShareRequest = null
-                    },
+                    onShareRequestHandled = ::handleShareRequest,
                     inboundAppUpdateTap = inboundAppUpdateTap,
                     onAppUpdateTapHandled = { handled ->
                         if (inboundAppUpdateTap == handled) inboundAppUpdateTap = 0
@@ -240,7 +254,10 @@ class MainActivity : AppCompatActivity() {
      * profile-link payload. A dataless, non-notification intent leaves any
      * already-queued target/link intact (see [routeInboundIntent]).
      */
-    private fun consumeIntent(intent: Intent?) {
+    private fun consumeIntent(
+        intent: Intent?,
+        retainPendingShareOnRecreation: Boolean = false,
+    ) {
         if (AppUpdateNavigation.isUpdateTap(intent)) {
             inboundAppUpdateTap += 1
             // One-shot, like the notification tap below: clear the stored intent so
@@ -252,7 +269,12 @@ class MainActivity : AppCompatActivity() {
             NotificationNavigation.parse(intent) { notificationKey, tapToken ->
                 notificationTapTokens.isValid(notificationKey, tapToken)
             }
-        val parsedShare = parseShareRequest(intent)
+        val parsedShare =
+            if (retainPendingShareOnRecreation && inboundShareRequest != null) {
+                null
+            } else {
+                parseShareRequest(intent)
+            }
         val routing =
             routeInboundIntent(
                 parsedTarget = parsedTarget,
@@ -280,6 +302,11 @@ class MainActivity : AppCompatActivity() {
             // replay the same target after the UI has already consumed it.
             setIntent(Intent(this, MainActivity::class.java))
         }
+    }
+
+    private fun handleShareRequest(handled: ShareRequest) {
+        if (inboundShareRequest != handled) return
+        inboundShareRequest = null
     }
 
     override fun onStart() {

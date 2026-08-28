@@ -88,17 +88,20 @@ class AccountSwitchLocalSnapshotOrderingTest {
                 startIndex = preload,
             )
         val cacheClear = body.indexOf("clearCrossAccountCaches()", startIndex = finalGenerationGuard)
+        val stageSnapshot = body.indexOf("stageAccountSwitchLocalSnapshot", startIndex = cacheClear)
+        val publishAccount = body.indexOf("activeAccountRef = label", startIndex = stageSnapshot)
+        val stageBody = appStateSource().readText().kotlinFunctionBody("stageAccountSwitchLocalSnapshot")
+        val unreadProjection = stageBody.indexOf("accountUnreadValueFromRows")
         val profileSeeds =
-            body.indexOf(
+            stageBody.indexOf(
                 "localSnapshot.profiles.forEach(::applyAccountSwitchProfileSeed)",
-                startIndex = cacheClear,
+                startIndex = unreadProjection,
             )
         val handoff =
-            body.indexOf(
+            stageBody.indexOf(
                 "accountSwitchHandoff.publish(requestGeneration, localSnapshot)",
                 startIndex = profileSeeds,
             )
-        val publishAccount = body.indexOf("activeAccountRef = label", startIndex = handoff)
 
         assertTrue("each switch intent must capture a monotonic generation", generation >= 0)
         assertTrue("the target MDK snapshot must load before target publication", preload > generation)
@@ -107,9 +110,24 @@ class AccountSwitchLocalSnapshotOrderingTest {
             "cross-account caches must clear only after the final generation guard",
             cacheClear > finalGenerationGuard,
         )
-        assertTrue("target profile seeds must apply after the old account caches clear", profileSeeds > cacheClear)
-        assertTrue("the one-shot handoff must publish after target profile seeds", handoff > profileSeeds)
-        assertTrue("the active account must publish only after the handoff is installed", publishAccount > handoff)
+        assertTrue("target snapshot staging must follow cache clearing", stageSnapshot > cacheClear)
+        assertTrue(
+            "target unread rows must replace stale state before handoff publication",
+            unreadProjection >= 0,
+        )
+        assertTrue("target profile seeds must apply after unread replacement", profileSeeds > unreadProjection)
+        assertTrue(
+            "the one-shot local handoff must publish after target profile seeds",
+            handoff > profileSeeds,
+        )
+        assertTrue(
+            "the active account must publish only after snapshot staging",
+            publishAccount > stageSnapshot,
+        )
+        assertTrue(
+            "a missing target snapshot must become unknown before account publication",
+            stageBody.indexOf("accountUnreadStore.markUnknown(label)", startIndex = handoff) > handoff,
+        )
     }
 
     @Test

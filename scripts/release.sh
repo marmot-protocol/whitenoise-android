@@ -113,6 +113,37 @@ assert_not_test_only() {
   fi
 }
 
+assert_production_firebase_resources() {
+  local apk="$1"
+  local aapt_path resources
+  local missing=()
+  aapt_path="$(android_build_tool aapt)"
+  if [[ -z "$aapt_path" || ! -x "$aapt_path" ]]; then
+    echo "error: aapt not found; cannot verify release APK Firebase resources" >&2
+    exit 1
+  fi
+  if ! resources="$("$aapt_path" dump resources "$apk")"; then
+    echo "error: unable to inspect release APK resources: $apk" >&2
+    exit 1
+  fi
+
+  grep -q 'google_app_id' <<< "$resources" || missing+=(google_app_id)
+  grep -q 'gcm_defaultSenderId' <<< "$resources" || missing+=(gcm_defaultSenderId)
+  if (( ${#missing[@]} > 0 )); then
+    echo "error: production release APK is missing Firebase resources (${missing[*]}): $apk" >&2
+    exit 1
+  fi
+}
+
+assert_release_apk() {
+  local apk="$1"
+  local flavor="$2"
+  assert_not_test_only "$apk"
+  if [[ "$flavor" == "production" ]]; then
+    assert_production_firebase_resources "$apk"
+  fi
+}
+
 if [[ -n "$TARGET_ABI" ]]; then
   case "$TARGET_ABI" in
     arm64-v8a|armeabi-v7a|x86|x86_64|universal) ;;
@@ -179,6 +210,54 @@ select_release_apk() {
   fi
 
   find "$intermediate_apk_dir" -maxdepth 1 -type f -name "$pattern" 2>/dev/null | sort | head -1 || true
+}
+
+require_production_firebase_config() {
+  local config_path="$REPO_DIR/app/google-services.json"
+  local application_id="dev.ipf.whitenoise.android"
+
+  if [[ ! -f "$config_path" ]]; then
+    echo "error: production release requires app/google-services.json with an Android client for $application_id" >&2
+    exit 1
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "error: python3 is required to validate app/google-services.json" >&2
+    exit 1
+  fi
+
+  python3 - "$config_path" "$application_id" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config_path = Path(sys.argv[1])
+application_id = sys.argv[2]
+
+try:
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+except (OSError, UnicodeError, json.JSONDecodeError) as error:
+    print(f"error: unable to parse app/google-services.json: {error}", file=sys.stderr)
+    raise SystemExit(1)
+
+clients = payload.get("client", []) if isinstance(payload, dict) else []
+package_names = set()
+for client in clients:
+    if not isinstance(client, dict):
+        continue
+    client_info = client.get("client_info")
+    if not isinstance(client_info, dict):
+        continue
+    android_client_info = client_info.get("android_client_info")
+    if isinstance(android_client_info, dict):
+        package_names.add(android_client_info.get("package_name"))
+if application_id not in package_names:
+    print(
+        "error: app/google-services.json does not contain an Android client for "
+        f"{application_id}",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+PY
 }
 
 # --- Java sanity ---
@@ -252,6 +331,9 @@ require_flavor_signing() {
 }
 
 for flavor in "${BUILD_FLAVORS[@]}"; do
+  if [[ "$flavor" == "production" ]]; then
+    require_production_firebase_config
+  fi
   require_flavor_signing "$flavor"
 done
 
@@ -301,11 +383,22 @@ for flavor in "${BUILD_FLAVORS[@]}"; do
       selected_apk="$renamed_apk"
     fi
 
-    assert_not_test_only "$selected_apk"
+    assert_release_apk "$selected_apk" "$flavor"
     selected_apks+=("$selected_apk")
   else
     echo "==> Assembling $flavor release APKs"
     ./gradlew ":app:assemble${flavor_task}Release" "${GRADLE_EXTRA_ARGS[@]}"
+
+    verified_apk_count=0
+    for built_apk in "$APK_DIR"/*.apk; do
+      [[ -f "$built_apk" ]] || continue
+      assert_release_apk "$built_apk" "$flavor"
+      verified_apk_count=$((verified_apk_count + 1))
+    done
+    if (( verified_apk_count == 0 )); then
+      echo "error: no release APKs found after assembling $flavor" >&2
+      exit 1
+    fi
   fi
 done
 

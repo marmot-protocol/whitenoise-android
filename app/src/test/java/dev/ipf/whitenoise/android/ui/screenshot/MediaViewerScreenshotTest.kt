@@ -1,22 +1,32 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerGallery
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerLoadFailed
@@ -24,6 +34,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.media.visualMediaViewerGallery
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,6 +71,45 @@ class MediaViewerScreenshotTest {
             }
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_default_frame.png")
+    }
+
+    @Test
+    fun directlyOpenedVideoOffersSaveAndShare() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        var saveClicked = false
+        var shareClicked = false
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                MediaViewerFrame(
+                    senderLabel = "Alex",
+                    recordedAtLabel = "Aug 28, 2026, 11:24 AM",
+                    onDismiss = {},
+                    onSave = { saveClicked = true },
+                    onShare = { shareClicked = true },
+                    snackbarHostState = remember { SnackbarHostState() },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.align(Alignment.Center).size(72.dp),
+                    )
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.media_save))
+            .assertIsDisplayed()
+            .performClick()
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.share))
+            .assertIsDisplayed()
+            .performClick()
+        assertTrue(saveClicked)
+        assertTrue(shareClicked)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_direct_video_actions.png")
     }
 
     @Test

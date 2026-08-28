@@ -440,7 +440,7 @@ internal fun AccountSelectorSheet(
             displayName = appState::displayName,
             shortNpub = appState::shortNpub,
             avatarUrl = appState::avatarUrl,
-            unreadCountForAccount = appState::unreadCountForAccount,
+            unreadCountForAccount = appState::confirmedUnreadCountForAccount,
             actionColorsForAccount = { accountRef -> accountActionColors(appState, accountRef) },
             onSwitchAccount = { accountLabel ->
                 // Run on the process-lifetime mutation scope, not this sheet's

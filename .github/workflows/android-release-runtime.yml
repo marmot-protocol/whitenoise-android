@@ -79,8 +79,11 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Build optimized x86_64 release APK
+        # This disposable APK is never published. The exemption is constrained
+        # in Gradle to this workflow and exact Zapstore assemble task.
         run: >-
           ./gradlew :app:assembleProductionZapstoreRelease
+          -Pwhitenoise.allowUnconfiguredProductionFirebaseForReleaseRuntimeTest=true
           -Pandroid.injected.build.abi=x86_64
           -Pandroid.injected.testOnly=false
           --no-daemon --stacktrace

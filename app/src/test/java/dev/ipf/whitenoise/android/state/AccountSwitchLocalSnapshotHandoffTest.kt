@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -7,6 +8,28 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AccountSwitchLocalSnapshotHandoffTest {
+    @Test
+    fun guardedTargetZeroProjectionSupersedesAStaleUnreadIndicator() {
+        val stale =
+            AccountUnreadValue(
+                unreadCount = 6uL,
+                freshness = AccountUnreadFreshness.UNKNOWN,
+                hasManualUnread = false,
+            )
+        val handoff = AccountSwitchLocalSnapshotHandoff()
+        val generation = handoff.beginRequest()
+        val target = snapshot("account-b")
+
+        var presented = stale
+        if (handoff.publish(generation, target)) {
+            presented = accountUnreadValueFromRows(target.rows, target.activeAccountIdHex)
+        }
+
+        assertEquals(AccountUnreadFreshness.CONFIRMED, presented.freshness)
+        assertEquals(0uL, presented.confirmedUnreadCount())
+        assertFalse(presented.showsUnreadDot())
+    }
+
     @Test
     fun rapidABADiscardsTheSupersededTargetAndConsumesTheWinnerOnce() {
         val handoff = AccountSwitchLocalSnapshotHandoff()

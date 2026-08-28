@@ -590,7 +590,14 @@ internal fun MessageBubble(
             activeSpeakableDocument = null
             return@LaunchedEffect
         }
-        if (!ttsSpeakableSource.useStoredContentTokens) {
+        // Only an active edit has a rendered document to reuse. Everything else
+        // without stored content tokens - a message saved before they existed,
+        // or one the parser gave no blocks - has to be parsed here, exactly as
+        // projectTtsSpeakableEntry parses it. Substituting a null edited
+        // document leaves no projection, and the passage below is then rejected
+        // for carrying a projection id the bubble cannot match, so read-aloud
+        // speaks with no sentence or word highlight at all.
+        if (!ttsSpeakableSource.useStoredContentTokens && editedMarkdownDocument != null) {
             activeSpeakableDocument = editedMarkdownDocument
             return@LaunchedEffect
         }
@@ -617,7 +624,7 @@ internal fun MessageBubble(
                     messageSpeakableProjection(
                         bodyText = speakableIdentity.bodyText,
                         document = document,
-                        mentionDisplayName = appState::mentionDisplayName,
+                        mentionDisplayName = appState::mentionSpeechName,
                         isGroupMember =
                             if (controller.membersLoaded) {
                                 { bech32: String -> appState.isRosterMember(bech32, controller.members) }
@@ -891,7 +898,7 @@ internal fun MessageBubble(
             editedText = controller.editsByTarget[entryRecord.messageIdHex]?.latestText,
             senderDisplayName = appState.displayName(entryRecord.sender),
             parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
-            mentionDisplayName = appState::mentionDisplayName,
+            mentionDisplayName = appState::mentionSpeechName,
             isGroupMember =
                 if (controller.membersLoaded) {
                     { bech32 -> appState.isRosterMember(bech32, controller.members) }
