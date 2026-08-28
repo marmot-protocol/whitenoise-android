@@ -132,16 +132,25 @@ internal fun TtsChunk.answerableLength(): Int {
             sourceText.isCompleteGraphemeWord(sourceRange, locale) &&
             visibleSpans.coversSpokenRange(callbackStart, callbackEnd)
         ) {
-            var offset = start
-            while (offset < end) {
-                val codePoint = sourceText.codePointAt(offset)
-                if (Character.isLetterOrDigit(codePoint)) answerable++
-                offset += Character.charCount(codePoint)
-            }
+            answerable += sourceText.alphanumericCodePointCount(start, end)
         }
         start = end
     }
     return answerable
+}
+
+private fun String.alphanumericCodePointCount(
+    start: Int,
+    end: Int,
+): Int {
+    var offset = start
+    var count = 0
+    while (offset < end) {
+        val codePoint = codePointAt(offset)
+        if (Character.isLetterOrDigit(codePoint)) count++
+        offset += Character.charCount(codePoint)
+    }
+    return count
 }
 
 private fun List<TtsSpokenTextSpan>.coversSpokenRange(
