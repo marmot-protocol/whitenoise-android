@@ -52,10 +52,13 @@ internal fun chatFolderChatIds(
                     ?.takeIf { it.isNotEmpty() }
                     ?.let(::localeInvariantFold),
         )
-    return manualChatIds +
-        items
-            .filter { chatFolderRuleMatches(criteria, it, activeAccountIdHex, isMuted, displayTitle) }
-            .map { it.group.groupIdHex.lowercase(Locale.ROOT) }
+    val matched = HashSet<String>(manualChatIds)
+    items.forEach { item ->
+        if (chatFolderRuleMatches(criteria, item, activeAccountIdHex, isMuted, displayTitle)) {
+            matched.add(item.foldedId)
+        }
+    }
+    return matched
 }
 
 // The rule with its match inputs pre-normalized once per evaluation pass.
@@ -104,9 +107,15 @@ private fun chatHasAnyMember(
     val counterpart =
         (item.otherMemberAccount ?: item.presentationOtherMemberAccount)
             ?.lowercase(Locale.ROOT)
-    val roster = item.memberSnapshot?.members.orEmpty()
-    return (counterpart != null && counterpart in wantedMemberHexes) ||
-        roster.any { it.memberIdHex.lowercase(Locale.ROOT) in wantedMemberHexes }
+    if (counterpart != null && counterpart in wantedMemberHexes) return true
+    // Intersect against the roster's pre-folded ids, iterating the smaller
+    // side so a large roster is not walked for a one-pubkey rule.
+    val roster = item.memberSnapshot?.foldedMemberIds.orEmpty()
+    return if (wantedMemberHexes.size <= roster.size) {
+        wantedMemberHexes.any { it in roster }
+    } else {
+        roster.any { it in wantedMemberHexes }
+    }
 }
 
 // Same fold + substring containment the chat-list search applies to titles

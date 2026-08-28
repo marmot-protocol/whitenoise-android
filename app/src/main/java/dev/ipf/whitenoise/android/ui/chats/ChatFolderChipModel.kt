@@ -4,7 +4,6 @@ import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.SystemFolderKind
-import java.util.Locale
 
 /**
  * One renderable chat-list chip. `All` is not modeled here: it is the
@@ -45,16 +44,26 @@ internal fun chatFolderChipModels(
         .mapNotNull { folder ->
             val source = if (ruleOf(folder.id)?.archivedOnly == true) archivedItems else activeItems
             val ids = membershipOf(folder.id)
-            val members = source.filter { it.group.groupIdHex.lowercase(Locale.ROOT) in ids }
+            // One pass per folder: the chip needs only "does anything match"
+            // and the matched unread count, so neither the intermediate member
+            // list nor a per-row lowercase copy of the group id is needed.
+            var memberCount = 0
+            var unreadCount = 0
+            source.forEach { item ->
+                if (item.foldedId in ids) {
+                    memberCount++
+                    if (item.effectiveHasUnread(activeAccountIdHex)) unreadCount++
+                }
+            }
             val pending = folder.id in pendingFolderIds
-            if (members.isEmpty() && folder.id != selectedFolderId && !pending) {
+            if (memberCount == 0 && folder.id != selectedFolderId && !pending) {
                 null
             } else {
                 ChatFolderChipModel(
                     folderId = folder.id,
                     systemKind = folder.systemKind,
                     customLabel = folder.name,
-                    trailingCount = members.count { it.effectiveHasUnread(activeAccountIdHex) },
+                    trailingCount = unreadCount,
                     pending = pending,
                 )
             }

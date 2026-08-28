@@ -619,8 +619,8 @@
     <ID>MagicNumber:Controllers.kt:1210uL</ID>
     <ID>MagicNumber:Controllers.kt:8</ID>
     <ID>MagicNumber:Controllers.kt:9uL</ID>
-    <ID>MagicNumber:Controllers.kt:ChatListItem$1009uL</ID>
-    <ID>MagicNumber:Controllers.kt:ChatListItem$1200uL</ID>
+    <ID>MagicNumber:ChatListItem.kt:ChatListItem$1009uL</ID>
+    <ID>MagicNumber:ChatListItem.kt:ChatListItem$1200uL</ID>
     <ID>MagicNumber:Controllers.kt:ChatsController$8</ID>
     <ID>MagicNumber:Controllers.kt:ConversationController$1000L</ID>
     <ID>MagicNumber:Controllers.kt:ConversationController$120u</ID>
@@ -977,7 +977,7 @@
     <ID>MaxLineLength:ComposerPills.kt:&lt;no name provided&gt;$override fun originalToTransformed: Int</ID>
     <ID>MaxLineLength:ComposerPills.kt:&lt;no name provided&gt;$override fun transformedToOriginal: Int</ID>
     <ID>MaxLineLength:ContactShare.kt:internal</ID>
-    <ID>MaxLineLength:Controllers.kt:ChatListItem$fun</ID>
+    <ID>MaxLineLength:ChatListItem.kt:ChatListItem$fun</ID>
     <ID>MaxLineLength:Controllers.kt:ChatsController$"chat list remove account=${accountRef.take(8)} trigger=${update.trigger} id=${update.groupIdHex.take(8)}"</ID>
     <ID>MaxLineLength:Controllers.kt:ChatsController$"chat list update account=${accountRef.take(8)} trigger=${update.trigger} ${row.debugSummary()}"</ID>
     <ID>MaxLineLength:Controllers.kt:ChatsController$"snapshot account=${accountRef.take(8)} rows=${chatRows.size} groups=${groupRecordsById.size} "</ID>
@@ -1517,7 +1517,7 @@
     <ID>ReturnCount:ContactNotesPreferences.kt:ContactNotesPreferences$fun preferenceKey: String?</ID>
     <ID>ReturnCount:ContactNotesPreferences.kt:ContactNotesPreferences$fun writeNotes: Boolean</ID>
     <ID>ReturnCount:ContactShare.kt:internal fun parseSharedContactFromText: SharedContact?</ID>
-    <ID>ReturnCount:Controllers.kt:ChatListItem$fun removedFromGroup: Boolean</ID>
+    <ID>ReturnCount:ChatListItem.kt:ChatListItem$fun removedFromGroup: Boolean</ID>
     <ID>ReturnCount:Controllers.kt:ChatsController$fun applyChatListRow</ID>
     <ID>ReturnCount:Controllers.kt:ChatsController$fun applyOptimisticSentPreview: Boolean</ID>
     <ID>ReturnCount:Controllers.kt:ChatsController$fun rollbackOptimisticSentPreview</ID>
