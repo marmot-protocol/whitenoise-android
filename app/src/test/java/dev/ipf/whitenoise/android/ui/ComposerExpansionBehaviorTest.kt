@@ -13,17 +13,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -35,6 +40,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_INDICATOR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOverlayBackRegistrar
@@ -96,6 +102,51 @@ class ComposerExpansionBehaviorTest {
     }
 
     @Test
+    fun tapFullScreenAndCollapseAnimateHeightMonotonically() {
+        val draft = longDraft()
+        val selection = TextRange(draft.indexOf("controls"))
+        render(draft)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        editor.performTextInputSelection(selection)
+        editor.assertIsFocused()
+        val automaticHeight = composerHeight()
+
+        val expansionFrames =
+            withManualClock {
+                resizeHandle().performClick()
+                composeRule.runOnIdle { }
+                sampleComposerHeights()
+            }
+        composeRule.waitForIdle()
+        val fullHeight = composerHeight()
+
+        assertMonotonic(expansionFrames + fullHeight, increasing = true)
+        assertTrue(
+            "tap-to-full-screen must expose an intermediate animated height",
+            expansionFrames.any { it > automaticHeight + 1f && it < fullHeight - 1f },
+        )
+        assertEditorState(editor, draft, selection)
+
+        val collapseFrames =
+            withManualClock {
+                resizeHandle().performClick()
+                composeRule.runOnIdle { }
+                sampleComposerHeights()
+            }
+        composeRule.waitForIdle()
+        val collapsedHeight = composerHeight()
+
+        assertMonotonic(collapseFrames + collapsedHeight, increasing = false)
+        assertTrue(
+            "full-screen collapse must expose an intermediate animated height",
+            collapseFrames.any { it < fullHeight - 1f && it > collapsedHeight + 1f },
+        )
+        assertTrue("collapse should return to automatic height", abs(collapsedHeight - automaticHeight) <= 1f)
+        assertEditorState(editor, draft, selection)
+    }
+
+    @Test
     fun multilineControlsShareTheBottomEdgeInReadingOrder() {
         render(longDraft())
 
@@ -134,12 +185,99 @@ class ComposerExpansionBehaviorTest {
     }
 
     @Test
+    fun resizeTargetStraddlesThePillBorderWithoutOverlappingTheFirstLine() {
+        val draft = longDraft()
+        render(draft)
+
+        val target = composerControlBounds(R.string.composer_resize)
+        val surface =
+            composeRule
+                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val editor = composeRule.onNodeWithText(draft).fetchSemanticsNode().boundsInRoot
+
+        assertTrue("resize target must extend above the pill", target.top < surface.top)
+        assertTrue("resize target must extend into the pill", target.bottom > surface.top)
+        assertTrue("the visible handle center must sit on the pill border", abs(target.center.y - surface.top) <= 1f)
+        assertTrue("expanded editor inset must be materially smaller than 48dp", editor.top - surface.top < 32f)
+        assertTrue("first-line gestures must start below the resize target", editor.top >= target.bottom - 1f)
+    }
+
+    @Test
     fun twoLinesKeepTheExistingCompactComposer() {
         render("First line\nSecond line")
 
         composeRule
             .onNodeWithContentDescription(app.getString(R.string.composer_resize))
             .assertDoesNotExist()
+    }
+
+    @Test
+    fun lineThresholdsAnimateMonotonicallyAndPreserveFocusDraftAndSelection() {
+        val twoLines = "First line\nSecond line"
+        val threeLines = "$twoLines\nThird line"
+        render(twoLines)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        editor.assertIsFocused()
+        val compactHeight = composerHeight()
+
+        val growthFrames =
+            withManualClock {
+                editor.performTextInputSelection(TextRange(twoLines.length))
+                editor.performTextInput("\nThird line")
+                composeRule.runOnIdle { }
+                resizeHandle().assertDoesNotExist()
+                sampleComposerHeights()
+            }
+        composeRule.waitForIdle()
+        val expandedHeight = composerHeight()
+
+        assertMonotonic(growthFrames + expandedHeight, increasing = true)
+        assertTrue("three-line activation must grow over multiple frames", expandedHeight > compactHeight + 16f)
+        assertTrue(
+            "three-line activation must expose an intermediate animated height",
+            growthFrames.any { it > compactHeight + 1f && it < expandedHeight - 1f },
+        )
+        resizeHandle().assertExists()
+        editor.assertIsFocused()
+        assertEquals(threeLines, editor.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        assertEquals(
+            TextRange(threeLines.length),
+            editor.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange],
+        )
+
+        editor.performTextReplacement(twoLines)
+        composeRule.waitForIdle()
+        resizeHandle().assertExists()
+        val expandedTwoLineHeight = composerHeight()
+
+        val shrinkFrames =
+            withManualClock {
+                editor.performTextReplacement("First line")
+                composeRule.runOnIdle { }
+                sampleComposerHeights()
+            }
+        composeRule.waitForIdle()
+        val collapsedHeight = composerHeight()
+
+        assertMonotonic(shrinkFrames + collapsedHeight, increasing = false)
+        assertTrue(
+            "one-line deactivation must shrink over multiple frames",
+            collapsedHeight < expandedTwoLineHeight - 16f,
+        )
+        assertTrue(
+            "one-line deactivation must expose an intermediate animated height",
+            shrinkFrames.any { it < expandedTwoLineHeight - 1f && it > collapsedHeight + 1f },
+        )
+        resizeHandle().assertDoesNotExist()
+        editor.assertIsFocused()
+        assertEquals("First line", editor.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        assertEquals(
+            TextRange("First line".length),
+            editor.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange],
+        )
     }
 
     @Test
@@ -345,6 +483,53 @@ class ComposerExpansionBehaviorTest {
         )
 
     private fun resizeHandle() = composeRule.onNodeWithContentDescription(app.getString(R.string.composer_resize))
+
+    private fun composerHeight() =
+        composeRule
+            .onNodeWithTag(TAG)
+            .fetchSemanticsNode()
+            .boundsInRoot.height
+
+    private fun sampleComposerHeights(frameCount: Int = 20): List<Float> =
+        buildList {
+            repeat(frameCount) {
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.runOnIdle { }
+                add(composerHeight())
+            }
+        }
+
+    private fun <T> withManualClock(block: () -> T): T {
+        composeRule.mainClock.autoAdvance = false
+        return try {
+            block()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    private fun assertMonotonic(
+        heights: List<Float>,
+        increasing: Boolean,
+    ) {
+        heights.zipWithNext().forEach { (before, after) ->
+            if (increasing) {
+                assertTrue("composer height must not reverse while expanding: $before -> $after", after >= before - 1f)
+            } else {
+                assertTrue("composer height must not reverse while collapsing: $before -> $after", after <= before + 1f)
+            }
+        }
+    }
+
+    private fun assertEditorState(
+        editor: androidx.compose.ui.test.SemanticsNodeInteraction,
+        draft: String,
+        selection: TextRange,
+    ) {
+        editor.assertIsFocused()
+        assertEquals(draft, editor.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        assertEquals(selection, editor.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange])
+    }
 
     // The handle is one control for both resize paths; its current tap
     // outcome (expand vs collapse) is exposed as the click action's label.

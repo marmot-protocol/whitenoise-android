@@ -2,9 +2,11 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -389,6 +391,7 @@ internal fun ComposerBar(
             mutableStateOf(ComposerExpansionState())
         }
     var dismissInputAfterCollapse by remember(draftKey) { mutableStateOf(false) }
+    var composerHeightDragActive by remember(draftKey) { mutableStateOf(false) }
     var composerUsesMultilineControls by
         remember(draftKey, configuration.orientation, configuration.fontScale) {
             mutableStateOf(false)
@@ -902,7 +905,18 @@ internal fun ComposerBar(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .then(
+                    .animateContentSize(
+                        animationSpec =
+                            tween(
+                                durationMillis =
+                                    if (composerHeightDragActive) {
+                                        0
+                                    } else {
+                                        COMPOSER_EXPANSION_ANIMATION_MILLIS
+                                    },
+                                easing = FastOutSlowInEasing,
+                            ),
+                    ).then(
                         if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
                             Modifier.heightIn(max = automaticComposerCeiling)
                         } else {
@@ -1060,6 +1074,16 @@ internal fun ComposerBar(
                         dictationActiveElsewhere -> 48.dp
                         else -> primaryTrailingActionWidth
                     }
+                val composerPillEndPadding by
+                    animateDpAsState(
+                        targetValue = if (expandedControlLayout) 0.dp else trailingControlsWidth + 8.dp,
+                        animationSpec =
+                            tween(
+                                durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
+                                easing = FastOutSlowInEasing,
+                            ),
+                        label = "composer pill trailing reserve",
+                    )
                 BoxWithConstraints(
                     modifier =
                         Modifier
@@ -1142,9 +1166,11 @@ internal fun ComposerBar(
                         onImeSend = submitMessage,
                         expansionMode = composerExpansion.mode,
                         onExpansionToggle = {
+                            composerHeightDragActive = false
                             composerExpansion = toggleComposerFullScreen(composerExpansion)
                             onBottomInputChanged()
                         },
+                        onHeightDragStarted = { composerHeightDragActive = true },
                         onHeightDrag = { dragAmount ->
                             composerExpansion =
                                 dragComposerHeight(
@@ -1155,6 +1181,7 @@ internal fun ComposerBar(
                                 )
                         },
                         onHeightDragStopped = {
+                            composerHeightDragActive = false
                             composerExpansion =
                                 settleComposerHeight(
                                     state = composerExpansion,
@@ -1182,14 +1209,8 @@ internal fun ComposerBar(
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
                         modifier =
                             Modifier
-                                .padding(
-                                    end =
-                                        if (expandedControlLayout) {
-                                            0.dp
-                                        } else {
-                                            trailingControlsWidth + 8.dp
-                                        },
-                                ).fillMaxWidth()
+                                .padding(end = composerPillEndPadding)
+                                .fillMaxWidth()
                                 .then(
                                     if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
                                         Modifier

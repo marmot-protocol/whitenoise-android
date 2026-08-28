@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import kotlin.math.abs
 
+internal const val COMPOSER_EXPANSION_ANIMATION_MILLIS = 220
+
 internal enum class ComposerExpansionMode {
     Automatic,
     Manual,

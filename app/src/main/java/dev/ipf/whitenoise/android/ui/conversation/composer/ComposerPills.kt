@@ -6,6 +6,9 @@ import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
@@ -113,6 +116,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 
 internal const val COMPOSER_RESIZE_INDICATOR_TAG = "composer-resize-indicator"
+internal const val COMPOSER_PILL_SURFACE_TAG = "composer-pill-surface"
 
 internal data class ComposerSelectionLayout(
     val top: Float,
@@ -232,6 +236,7 @@ internal fun ComposerPill(
     overlayBackRegistrar: ComposerOverlayBackRegistrar? = null,
     expansionMode: ComposerExpansionMode = ComposerExpansionMode.Automatic,
     onExpansionToggle: () -> Unit = {},
+    onHeightDragStarted: () -> Unit = {},
     onHeightDrag: (Float) -> Unit = {},
     onHeightDragStopped: () -> Unit = {},
     trailingAction: (@Composable RowScope.() -> Unit)? = null,
@@ -249,6 +254,7 @@ internal fun ComposerPill(
     val resizeComposerDescription = stringResource(R.string.composer_resize)
     val latestOnPasteImageUris by rememberUpdatedState(onPasteImageUris)
     val latestOnPreImeBack by rememberUpdatedState(onPreImeBack)
+    val latestOnHeightDragStarted by rememberUpdatedState(onHeightDragStarted)
     val latestOnHeightDrag by rememberUpdatedState(onHeightDrag)
     val latestOnHeightDragStopped by rememberUpdatedState(onHeightDragStopped)
     var composerFocused by remember { mutableStateOf(false) }
@@ -388,6 +394,53 @@ internal fun ComposerPill(
             (if (onDictation != null) 48.dp else 0.dp) +
             (if (hasAttachmentAction) 36.dp else 0.dp) +
             (if (compactMeasurementReservesTrailingAction) 44.dp else 0.dp)
+    val expansionAnimationSpec =
+        tween<Dp>(
+            durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
+            easing = FastOutSlowInEasing,
+        )
+    val borderHeaderInset by
+        animateDpAsState(
+            targetValue = if (expandedLayout) 24.dp else 0.dp,
+            animationSpec = expansionAnimationSpec,
+            label = "composer border header inset",
+        )
+    val editorStartInset by
+        animateDpAsState(
+            targetValue = if (expandedLayout) 12.dp else 52.dp,
+            animationSpec = expansionAnimationSpec,
+            label = "composer editor start inset",
+        )
+    val editorTopInset by
+        animateDpAsState(
+            targetValue = if (expandedLayout) 24.dp else 10.dp,
+            animationSpec = expansionAnimationSpec,
+            label = "composer editor top inset",
+        )
+    val editorEndInset by
+        animateDpAsState(
+            targetValue = if (expandedLayout) 12.dp else compactTrailingReserve,
+            animationSpec = expansionAnimationSpec,
+            label = "composer editor end inset",
+        )
+    val editorBottomInset by
+        animateDpAsState(
+            targetValue = if (expandedLayout) 48.dp else 10.dp,
+            animationSpec = expansionAnimationSpec,
+            label = "composer editor bottom inset",
+        )
+    val emojiBottomInset by
+        animateDpAsState(
+            targetValue = if (expandedLayout) 4.dp else 0.dp,
+            animationSpec = expansionAnimationSpec,
+            label = "composer emoji bottom inset",
+        )
+    // The expanded resize layer occupies the same coordinates as the first
+    // line while its header padding is still animating out of compact mode.
+    // Do not expose or draw that layer until the editor has cleared its full
+    // 48dp target; otherwise a quick caret/selection gesture can resize the
+    // composer during the transition.
+    val resizeTargetReady = borderHeaderInset == 24.dp && editorTopInset == 24.dp
     val composerTextStyle =
         LocalTextStyle.current.copy(
             color = MaterialTheme.colorScheme.onSurface,
@@ -443,252 +496,258 @@ internal fun ComposerPill(
         }
     }
 
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(22.dp),
-        border = amoledSurfaceBorderStroke(),
-        modifier = modifier,
-    ) {
-        val boxAlignment = if (expandedLayout) Alignment.TopStart else Alignment.CenterStart
-        Box(
+    Box(modifier = modifier) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(22.dp),
+            border = amoledSurfaceBorderStroke(),
             modifier =
                 Modifier
-                    .heightIn(min = 44.dp)
-                    .then(expandedHeightModifier),
+                    .padding(top = borderHeaderInset)
+                    .fillMaxWidth()
+                    .then(expandedHeightModifier)
+                    .testTag(COMPOSER_PILL_SURFACE_TAG),
         ) {
+            val boxAlignment = if (expandedLayout) Alignment.TopStart else Alignment.CenterStart
             Box(
-                contentAlignment = boxAlignment,
                 modifier =
                     Modifier
-                        .align(boxAlignment)
-                        .fillMaxWidth()
-                        .then(expandedHeightModifier)
-                        .padding(
-                            start = if (expandedLayout) 12.dp else 52.dp,
-                            top = if (expandedLayout) 48.dp else 10.dp,
-                            end = if (expandedLayout) 12.dp else compactTrailingReserve,
-                            bottom = if (expandedLayout) 48.dp else 10.dp,
-                        ).alpha(if (inputContentVisible) 1f else 0f)
-                        .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                        .heightIn(min = 44.dp)
+                        .then(expandedHeightModifier),
             ) {
-                BasicTextField(
-                    value = textFieldValue,
-                    onValueChange = onValueChange,
+                Box(
+                    contentAlignment = boxAlignment,
                     modifier =
                         Modifier
+                            .align(boxAlignment)
                             .fillMaxWidth()
                             .then(expandedHeightModifier)
-                            // The automatic composer has a hard viewport ceiling.
-                            // Measure the editor at its natural height and own the
-                            // resulting scroll state here so programmatic bulk
-                            // commits can follow the real selection, not merely
-                            // the final text line or the conversation tail.
-                            .verticalScroll(composerScrollState)
-                            .focusProperties { canFocus = inputFocusEnabled }
-                            .contentReceiver(pasteImageReceiver)
-                            .onPreInterceptKeyBeforeSoftKeyboard { event ->
-                                when (
-                                    composerPreImeBackAction(
-                                        enabled = preImeBackEnabled,
-                                        isBackKey = event.key == Key.Back,
-                                        isKeyDown = event.type == KeyEventType.KeyDown,
-                                    )
-                                ) {
-                                    ComposerPreImeBackAction.IGNORE -> false
-                                    ComposerPreImeBackAction.CONSUME -> true
-                                    ComposerPreImeBackAction.DISMISS -> {
-                                        onPreImeBack()
-                                        true
-                                    }
-                                }
-                            }.focusRequester(composerFocus)
-                            // #589: track focus so the conversation screen's
-                            // resume observer knows whether the keyboard was up
-                            // when the app was backgrounded (Case B gate).
-                            .onFocusChanged {
-                                composerFocused = it.isFocused
-                                onComposerFocusChanged(it.isFocused)
-                            }
-                            // #404: honor the Enter-key toggle for hardware
-                            // keyboards (Bluetooth/foldable/ChromeOS). Shift+Enter
-                            // always inserts a line break as an escape hatch; in
-                            // NewLine mode a bare Enter falls through to the normal
-                            // newline insertion.
-                            .onPreviewKeyEvent { event ->
-                                if (event.type == KeyEventType.KeyDown &&
-                                    (event.key == Key.Enter || event.key == Key.NumPadEnter)
-                                ) {
-                                    when {
-                                        event.isShiftPressed -> false
-                                        enterKeyBehavior == EnterKeyBehavior.SendMessage -> {
-                                            onImeSend()
+                            .padding(
+                                start = editorStartInset,
+                                top = editorTopInset,
+                                end = editorEndInset,
+                                bottom = editorBottomInset,
+                            ).alpha(if (inputContentVisible) 1f else 0f)
+                            .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                ) {
+                    BasicTextField(
+                        value = textFieldValue,
+                        onValueChange = onValueChange,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .then(expandedHeightModifier)
+                                // The automatic composer has a hard viewport ceiling.
+                                // Measure the editor at its natural height and own the
+                                // resulting scroll state here so programmatic bulk
+                                // commits can follow the real selection, not merely
+                                // the final text line or the conversation tail.
+                                .verticalScroll(composerScrollState)
+                                .focusProperties { canFocus = inputFocusEnabled }
+                                .contentReceiver(pasteImageReceiver)
+                                .onPreInterceptKeyBeforeSoftKeyboard { event ->
+                                    when (
+                                        composerPreImeBackAction(
+                                            enabled = preImeBackEnabled,
+                                            isBackKey = event.key == Key.Back,
+                                            isKeyDown = event.type == KeyEventType.KeyDown,
+                                        )
+                                    ) {
+                                        ComposerPreImeBackAction.IGNORE -> false
+                                        ComposerPreImeBackAction.CONSUME -> true
+                                        ComposerPreImeBackAction.DISMISS -> {
+                                            onPreImeBack()
                                             true
                                         }
-                                        else -> false
                                     }
-                                } else {
-                                    false
+                                }.focusRequester(composerFocus)
+                                // #589: track focus so the conversation screen's
+                                // resume observer knows whether the keyboard was up
+                                // when the app was backgrounded (Case B gate).
+                                .onFocusChanged {
+                                    composerFocused = it.isFocused
+                                    onComposerFocusChanged(it.isFocused)
                                 }
-                            },
-                    textStyle = composerTextStyle,
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    visualTransformation = mentionVisualTransformation,
-                    // #404: in SendMessage mode the soft-keyboard action sends;
-                    // in NewLine mode the IME shows an Enter/newline key that
-                    // inserts `\n`.
-                    keyboardOptions =
-                        KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Sentences,
-                            keyboardType = KeyboardType.Text,
-                            imeAction =
-                                if (enterKeyBehavior == EnterKeyBehavior.SendMessage) {
-                                    ImeAction.Send
-                                } else {
-                                    ImeAction.Default
+                                // #404: honor the Enter-key toggle for hardware
+                                // keyboards (Bluetooth/foldable/ChromeOS). Shift+Enter
+                                // always inserts a line break as an escape hatch; in
+                                // NewLine mode a bare Enter falls through to the normal
+                                // newline insertion.
+                                .onPreviewKeyEvent { event ->
+                                    if (event.type == KeyEventType.KeyDown &&
+                                        (event.key == Key.Enter || event.key == Key.NumPadEnter)
+                                    ) {
+                                        when {
+                                            event.isShiftPressed -> false
+                                            enterKeyBehavior == EnterKeyBehavior.SendMessage -> {
+                                                onImeSend()
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    } else {
+                                        false
+                                    }
                                 },
-                        ),
-                    keyboardActions = KeyboardActions(onSend = { onImeSend() }),
-                    maxLines = Int.MAX_VALUE,
-                    onTextLayout = { layout ->
-                        if (compactLineCount == null) updateMultilineControls(layout.lineCount)
-                        val nextSnapshot =
-                            ComposerTextLayoutSnapshot(
-                                sourceText = textFieldValue.text,
-                                transformedText = transformedText,
-                                result = layout,
-                            )
-                        if (textLayoutSnapshot != nextSnapshot) textLayoutSnapshot = nextSnapshot
-                    },
-                )
-                if (textFieldValue.text.isEmpty()) {
-                    Text(
-                        stringResource(R.string.message),
-                        style = LocalTextStyle.current.copy(fontSize = 16.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    )
-                }
-            }
-
-            Box(
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(
-                            start = 4.dp,
-                            bottom = if (expandedLayout) 4.dp else 0.dp,
-                        ).alpha(if (inputContentVisible) 1f else 0f)
-                        .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
-            ) {
-                TextEntryEmojiAction(
-                    pickerOpen = emojiPickerOpen,
-                    enabled = inputContentVisible,
-                    onClick = onEmojiPickerToggle,
-                    togglesKeyboard = true,
-                )
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .height(if (onDictation != null) 48.dp else 44.dp),
-            ) {
-                if (onDictation != null) {
-                    IconButton(
-                        onClick = onDictation,
-                        enabled = inputContentVisible,
-                        modifier =
-                            Modifier
-                                .size(48.dp)
-                                .alpha(if (inputContentVisible) 1f else 0f)
-                                .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
-                    ) {
-                        // A waveform keeps text dictation visually distinct from
-                        // the plain microphone used by hold-to-record voice notes.
-                        Icon(
-                            Icons.Default.GraphicEq,
-                            contentDescription = stringResource(R.string.dictate_text),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(21.dp),
-                        )
-                    }
-                }
-                if (hasAttachmentAction) {
-                    IconButton(
-                        onClick = onAttachmentsToggle,
-                        enabled = inputContentVisible,
-                        modifier =
-                            Modifier
-                                .size(36.dp)
-                                .alpha(if (inputContentVisible) 1f else 0f)
-                                .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
-                    ) {
-                        // Swap the glyph on open (X) the way the emoji toggle swaps
-                        // to a keyboard, so sighted users get a visual cue, not just
-                        // a changed content description.
-                        Icon(
-                            if (attachmentSheetOpen) Icons.Default.Close else Icons.Default.AttachFile,
-                            contentDescription =
-                                stringResource(
-                                    if (attachmentSheetOpen) R.string.close else R.string.attach_options,
-                                ),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                }
-                trailingAction?.invoke(this)
-            }
-
-            if (expandedLayout && inputContentVisible) {
-                // One control owns both resize paths: continuous drag, and the
-                // documented accessible tap alternative that toggles full
-                // screen. The editor reserves this control's full 48dp touch
-                // target so caret and selection gestures never compete with
-                // resize gestures; the visible handle stays compact.
-                val toggleDescription =
-                    stringResource(
-                        if (expansionMode == ComposerExpansionMode.FullScreen) {
-                            R.string.composer_collapse
-                        } else {
-                            R.string.composer_expand_full_screen
+                        textStyle = composerTextStyle,
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        visualTransformation = mentionVisualTransformation,
+                        // #404: in SendMessage mode the soft-keyboard action sends;
+                        // in NewLine mode the IME shows an Enter/newline key that
+                        // inserts `\n`.
+                        keyboardOptions =
+                            KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Sentences,
+                                keyboardType = KeyboardType.Text,
+                                imeAction =
+                                    if (enterKeyBehavior == EnterKeyBehavior.SendMessage) {
+                                        ImeAction.Send
+                                    } else {
+                                        ImeAction.Default
+                                    },
+                            ),
+                        keyboardActions = KeyboardActions(onSend = { onImeSend() }),
+                        maxLines = Int.MAX_VALUE,
+                        onTextLayout = { layout ->
+                            if (compactLineCount == null) updateMultilineControls(layout.lineCount)
+                            val nextSnapshot =
+                                ComposerTextLayoutSnapshot(
+                                    sourceText = textFieldValue.text,
+                                    transformedText = transformedText,
+                                    result = layout,
+                                )
+                            if (textLayoutSnapshot != nextSnapshot) textLayoutSnapshot = nextSnapshot
                         },
                     )
+                    if (textFieldValue.text.isEmpty()) {
+                        Text(
+                            stringResource(R.string.message),
+                            style = LocalTextStyle.current.copy(fontSize = 16.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        )
+                    }
+                }
+
                 Box(
-                    contentAlignment = Alignment.Center,
                     modifier =
                         Modifier
-                            .align(Alignment.TopCenter)
-                            .width(96.dp)
-                            .height(48.dp)
-                            .pointerInput(Unit) {
-                                detectVerticalDragGestures(
-                                    onVerticalDrag = { change, dragAmount ->
-                                        change.consume()
-                                        latestOnHeightDrag(dragAmount)
-                                    },
-                                    onDragEnd = { latestOnHeightDragStopped() },
-                                    onDragCancel = { latestOnHeightDragStopped() },
-                                )
-                            }.clickable(
-                                onClickLabel = toggleDescription,
-                                role = Role.Button,
-                                onClick = onExpansionToggle,
-                            ).semantics {
-                                contentDescription = resizeComposerDescription
-                            },
+                            .align(Alignment.BottomStart)
+                            .padding(
+                                start = 4.dp,
+                                bottom = emojiBottomInset,
+                            ).alpha(if (inputContentVisible) 1f else 0f)
+                            .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
                 ) {
-                    Box(
-                        Modifier
-                            .width(36.dp)
-                            .height(4.dp)
-                            .testTag(COMPOSER_RESIZE_INDICATOR_TAG)
-                            .background(
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                                RoundedCornerShape(2.dp),
-                            ),
+                    TextEntryEmojiAction(
+                        pickerOpen = emojiPickerOpen,
+                        enabled = inputContentVisible,
+                        onClick = onEmojiPickerToggle,
+                        togglesKeyboard = true,
                     )
                 }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .height(if (onDictation != null) 48.dp else 44.dp),
+                ) {
+                    if (onDictation != null) {
+                        IconButton(
+                            onClick = onDictation,
+                            enabled = inputContentVisible,
+                            modifier =
+                                Modifier
+                                    .size(48.dp)
+                                    .alpha(if (inputContentVisible) 1f else 0f)
+                                    .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                        ) {
+                            // A waveform keeps text dictation visually distinct from
+                            // the plain microphone used by hold-to-record voice notes.
+                            Icon(
+                                Icons.Default.GraphicEq,
+                                contentDescription = stringResource(R.string.dictate_text),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(21.dp),
+                            )
+                        }
+                    }
+                    if (hasAttachmentAction) {
+                        IconButton(
+                            onClick = onAttachmentsToggle,
+                            enabled = inputContentVisible,
+                            modifier =
+                                Modifier
+                                    .size(36.dp)
+                                    .alpha(if (inputContentVisible) 1f else 0f)
+                                    .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                        ) {
+                            // Swap the glyph on open (X) the way the emoji toggle swaps
+                            // to a keyboard, so sighted users get a visual cue, not just
+                            // a changed content description.
+                            Icon(
+                                if (attachmentSheetOpen) Icons.Default.Close else Icons.Default.AttachFile,
+                                contentDescription =
+                                    stringResource(
+                                        if (attachmentSheetOpen) R.string.close else R.string.attach_options,
+                                    ),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                    }
+                    trailingAction?.invoke(this)
+                }
+            }
+        }
+
+        if (expandedLayout && resizeTargetReady && inputContentVisible) {
+            // The target straddles the pill's top border: half of its 48dp
+            // height sits outside the surface, while the compact 24dp internal
+            // header keeps the first editable line below all resize gestures.
+            val toggleDescription =
+                stringResource(
+                    if (expansionMode == ComposerExpansionMode.FullScreen) {
+                        R.string.composer_collapse
+                    } else {
+                        R.string.composer_expand_full_screen
+                    },
+                )
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .width(96.dp)
+                        .height(48.dp)
+                        .pointerInput(Unit) {
+                            detectVerticalDragGestures(
+                                onDragStart = { latestOnHeightDragStarted() },
+                                onVerticalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    latestOnHeightDrag(dragAmount)
+                                },
+                                onDragEnd = { latestOnHeightDragStopped() },
+                                onDragCancel = { latestOnHeightDragStopped() },
+                            )
+                        }.clickable(
+                            onClickLabel = toggleDescription,
+                            role = Role.Button,
+                            onClick = onExpansionToggle,
+                        ).semantics {
+                            contentDescription = resizeComposerDescription
+                        },
+            ) {
+                Box(
+                    Modifier
+                        .width(36.dp)
+                        .height(4.dp)
+                        .testTag(COMPOSER_RESIZE_INDICATOR_TAG)
+                        .background(
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                            RoundedCornerShape(2.dp),
+                        ),
+                )
             }
         }
     }
