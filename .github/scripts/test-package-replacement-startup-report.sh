@@ -18,9 +18,9 @@ WaitTime: 1640
 Complete
 EOF
   cat >"$fixture_dir/startup.log" <<'EOF'
-I/WNStartup(1234): stage=client-construction elapsed_ms=221 uptime_ms=900300 duration_ms=200
-I/WNStartup(1234): stage=system-splash-handoff elapsed_ms=1498 uptime_ms=901498
-I/WNStartup(1234): stage=first-local-frame elapsed_ms=2288 uptime_ms=902288
+I/WNPerf(1234): schema=1 session=p#1 op=app_start phase=ffi_return elapsed_ms=221 duration_ms=200 result=success layer=ffi
+I/WNPerf(1234): schema=1 session=p#1 op=app_start phase=system_splash_handoff elapsed_ms=1498 result=success layer=android
+I/WNPerf(1234): schema=1 session=p#1 op=app_start phase=first_local_frame elapsed_ms=2288 result=success layer=android
 EOF
   cat >"$fixture_dir/device.txt" <<'EOF'
 captured_at_utc=2026-08-14T03:00:00Z
@@ -49,7 +49,7 @@ jq -e '
 ' "$fixture_dir/report.json" >/dev/null
 
 cp "$fixture_dir/startup.log" "$fixture_dir/missing-marker.log"
-sed -i.bak '/first-local-frame/d' "$fixture_dir/missing-marker.log"
+sed -i.bak '/phase=first_local_frame/d' "$fixture_dir/missing-marker.log"
 if bash "$reporter" \
   "$fixture_dir/launch.txt" \
   "$fixture_dir/missing-marker.log" \
@@ -60,7 +60,7 @@ if bash "$reporter" \
   exit 1
 fi
 
-sed 's/stage=first-local-frame/stage=first-local-frame-extra/' \
+sed 's/phase=first_local_frame/phase=first_local_frame_extra/' \
   "$fixture_dir/startup.log" >"$fixture_dir/lookalike-marker.log"
 if bash "$reporter" \
   "$fixture_dir/launch.txt" \
@@ -73,7 +73,7 @@ if bash "$reporter" \
 fi
 
 cp "$fixture_dir/startup.log" "$fixture_dir/duplicate-marker.log"
-sed -n '/first-local-frame/p' "$fixture_dir/startup.log" >>"$fixture_dir/duplicate-marker.log"
+sed -n '/phase=first_local_frame/p' "$fixture_dir/startup.log" >>"$fixture_dir/duplicate-marker.log"
 if bash "$reporter" \
   "$fixture_dir/launch.txt" \
   "$fixture_dir/duplicate-marker.log" \
@@ -95,7 +95,7 @@ if bash "$reporter" \
   exit 1
 fi
 
-sed 's/system-splash-handoff elapsed_ms=1498 uptime_ms=901498/system-splash-handoff elapsed_ms=2000 uptime_ms=902000/' \
+sed 's/phase=system_splash_handoff elapsed_ms=1498/phase=system_splash_handoff elapsed_ms=2000/' \
   "$fixture_dir/startup.log" >"$fixture_dir/late-handoff.log"
 if bash "$reporter" \
   "$fixture_dir/launch.txt" \
@@ -130,15 +130,15 @@ if bash "$reporter" \
   exit 1
 fi
 
-sed 's/system-splash-handoff elapsed_ms=1498 uptime_ms=901498/system-splash-handoff elapsed_ms=1498 uptime_ms=899999/' \
-  "$fixture_dir/startup.log" >"$fixture_dir/stale-marker.log"
+sed 's/op=app_start phase=system_splash_handoff/op=chat_open phase=system_splash_handoff/' \
+  "$fixture_dir/startup.log" >"$fixture_dir/wrong-operation.log"
 if bash "$reporter" \
   "$fixture_dir/launch.txt" \
-  "$fixture_dir/stale-marker.log" \
+  "$fixture_dir/wrong-operation.log" \
   "$fixture_dir/device.txt" \
   0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  "$fixture_dir/stale.json" >/dev/null 2>&1; then
-  echo "Reporter accepted a startup marker from before this launch." >&2
+  "$fixture_dir/wrong-operation.json" >/dev/null 2>&1; then
+  echo "Reporter accepted a startup marker from another operation." >&2
   exit 1
 fi
 
