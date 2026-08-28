@@ -1,4 +1,5 @@
 import com.android.build.api.attributes.ProductFlavorAttr
+import groovy.json.JsonSlurper
 import kotlinx.kover.gradle.plugin.dsl.AggregationType
 import kotlinx.kover.gradle.plugin.dsl.CoverageUnit
 import org.gradle.api.tasks.Exec
@@ -18,11 +19,11 @@ plugins {
     alias(libs.plugins.oss.licenses)
 }
 
-// Apply the Firebase plugin only when its expected config file is present.
-// Without that file, Firebase stays uninitialized at runtime and the push
-// runtime reports unavailable; the app still compiles and runs, falling
-// back to local notifications.
-if (file("google-services.json").exists()) {
+// Dev, preview, and explicitly unsigned reproducible builds remain usable
+// without Firebase credentials. Production packaging is guarded below so a
+// signed shipping artifact cannot silently omit native-push resources.
+val googleServicesConfigFile = file("google-services.json")
+if (googleServicesConfigFile.exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
 
@@ -209,6 +210,11 @@ val hasStagingReleaseSigning = stagingReleaseSigning.isConfigured()
 val allowUnsignedRelease =
     runtimeConfigProperty("WHITENOISE_ALLOW_UNSIGNED_RELEASE", "false")
         .equals("true", ignoreCase = true)
+val allowUnconfiguredProductionFirebaseForReleaseRuntimeTest =
+    providers
+        .gradleProperty("whitenoise.allowUnconfiguredProductionFirebaseForReleaseRuntimeTest")
+        .map(String::toBooleanStrict)
+        .getOrElse(false)
 
 // PR preview inputs. The default "stable" channel deliberately keeps one
 // applicationId so every PR preview updates the same app and retains its data.
@@ -730,6 +736,91 @@ fun releaseSigningHintForPackageTask(taskName: String): String =
             "WHITENOISE_STAGING_KEYSTORE_PATH/PASSWORD/KEY_ALIAS/KEY_PASSWORD"
 
         else -> "release signing credentials"
+    }
+
+val productionApplicationId = "dev.ipf.whitenoise.android"
+
+fun configuredGoogleServicesPackageNames(): Set<String> {
+    val root =
+        try {
+            JsonSlurper().parse(googleServicesConfigFile) as? Map<*, *>
+        } catch (exception: Exception) {
+            throw GradleException(
+                "Unable to parse app/google-services.json for production release packaging.",
+                exception,
+            )
+        }
+    val clients = root?.get("client") as? Iterable<*> ?: emptyList<Any>()
+
+    return clients
+        .mapNotNull { client ->
+            val clientInfo = (client as? Map<*, *>)?.get("client_info") as? Map<*, *>
+            val androidClientInfo = clientInfo?.get("android_client_info") as? Map<*, *>
+            androidClientInfo?.get("package_name") as? String
+        }.filter(String::isNotBlank)
+        .toSet()
+}
+
+fun mayOmitProductionFirebaseConfig(): Boolean {
+    val isUnsignedReproducibleBuild = allowUnsignedRelease && !hasProductionReleaseSigning
+    val requestedTasks = gradle.startParameter.taskNames.map { it.substringAfterLast(":") }
+    val isDisposableReleaseRuntimeVerifier =
+        allowUnconfiguredProductionFirebaseForReleaseRuntimeTest &&
+            System.getenv("GITHUB_WORKFLOW") == "Android Release Runtime Verify" &&
+            requestedTasks.isNotEmpty() &&
+            requestedTasks.all { it == "assembleProductionZapstoreRelease" }
+
+    return isUnsignedReproducibleBuild || isDisposableReleaseRuntimeVerifier
+}
+
+val verifyProductionFirebaseConfig =
+    tasks.register("verifyProductionFirebaseConfig") {
+        group = "verification"
+        description = "Require Firebase resources for production release packaging"
+
+        doLast {
+            if (mayOmitProductionFirebaseConfig()) {
+                logger.warn("Production Firebase validation skipped for a non-publishable verification build.")
+                return@doLast
+            }
+            if (!googleServicesConfigFile.isFile) {
+                throw GradleException(
+                    "Production release packaging requires app/google-services.json " +
+                        "with an Android client for $productionApplicationId.",
+                )
+            }
+            if (productionApplicationId !in configuredGoogleServicesPackageNames()) {
+                throw GradleException(
+                    "app/google-services.json does not contain an Android client for " +
+                        "$productionApplicationId; refusing production release packaging.",
+                )
+            }
+        }
+    }
+
+// Attach the guard to production packaging entry points and their terminal
+// tasks. Manifest/resource inspection stays credential-free, while every
+// production APK/AAB graph requires validation. The runtime-verifier exemption
+// is restricted to its exact Zapstore assemble task, so it cannot authorize a
+// Play publication.
+tasks
+    .matching {
+        (
+            it.name.startsWith("assembleProduction") ||
+                it.name.startsWith("packageProduction") ||
+                it.name.startsWith("bundleProduction")
+        ) &&
+            it.name.endsWith("Release")
+    }.configureEach {
+        dependsOn(verifyProductionFirebaseConfig)
+    }
+tasks
+    .matching {
+        it.name != "verifyProductionFirebaseConfig" &&
+            it.name.contains("Production") &&
+            it.name.contains("Release")
+    }.configureEach {
+        mustRunAfter(verifyProductionFirebaseConfig)
     }
 
 // Fail any release packaging task when signing isn't configured for that

@@ -193,7 +193,8 @@ Staging release builds use staging-only signing values:
 - `WHITENOISE_STAGING_KEY_ALIAS`
 - `WHITENOISE_STAGING_KEY_PASSWORD`
 
-Release packaging fails if signing is unconfigured. To override for a local smoke build, set:
+Release packaging fails if signing is unconfigured. To override for an unsigned,
+non-publishable local smoke or reproducibility build, set:
 
 - `WHITENOISE_ALLOW_UNSIGNED_RELEASE=true`
 
@@ -246,7 +247,13 @@ Staging also accepts `OTLP_TOKEN_WHITENOISE_ANDROID_STAGING` as an OTLP auth-tok
 
 Unset push values mean the runtime treats push as unconfigured rather than registering against a default server.
 
-`app/google-services.json` is optional. When present, the Firebase plugin is applied and FCM works; when absent, the app falls back to local notifications. For the supported variants it must include Android clients for `dev.ipf.whitenoise.android.dev`, `dev.ipf.whitenoise.android.staging`, and `dev.ipf.whitenoise.android`.
+`app/google-services.json` is optional for dev, preview, and explicitly unsigned
+reproducibility builds. Signed production packaging requires the file and an
+Android client for `dev.ipf.whitenoise.android`; `scripts/release.sh` also
+verifies that the final APK contains `google_app_id` and
+`gcm_defaultSenderId`. When present for other supported variants, the file
+should also include clients for `dev.ipf.whitenoise.android.dev` and
+`dev.ipf.whitenoise.android.staging`.
 
 ### Building a release
 
