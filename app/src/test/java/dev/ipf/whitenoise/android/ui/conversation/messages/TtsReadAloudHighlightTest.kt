@@ -52,16 +52,18 @@ class TtsReadAloudHighlightTest {
     }
 
     @Test
-    fun sentenceMarkerUsesOneLogicalStartBoxPerWrappedLine() {
+    fun sentenceMarkerUsesParagraphDirectionWhenFirstRunDiffers() {
         val boxes =
             listOf(
-                TtsHighlightBox(Rect(10f, 0f, 30f, 20f), ResolvedTextDirection.Ltr),
-                TtsHighlightBox(Rect(35f, 0f, 55f, 20f), ResolvedTextDirection.Ltr),
+                // An RTL paragraph can begin with an LTR token. Both boxes
+                // therefore carry the paragraph direction, not their bidi run.
+                TtsHighlightBox(Rect(10f, 0f, 30f, 20f), ResolvedTextDirection.Rtl),
+                TtsHighlightBox(Rect(35f, 0f, 55f, 20f), ResolvedTextDirection.Rtl),
                 TtsHighlightBox(Rect(40f, 20f, 60f, 40f), ResolvedTextDirection.Rtl),
                 TtsHighlightBox(Rect(65f, 20f, 85f, 40f), ResolvedTextDirection.Rtl),
             )
 
-        assertEquals(listOf(boxes[0], boxes[3]), ttsSentenceMarkerBoxes(boxes))
+        assertEquals(listOf(boxes[1], boxes[3]), ttsSentenceMarkerBoxes(boxes))
     }
 
     @Test
@@ -129,5 +131,22 @@ class TtsReadAloudHighlightTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun amoledDoesNotApplyTrueBlackPaintToColoredBubble() {
+        val background = 0xFF3F4849L
+        val content = 0xFFBEC8C9L
+        val style =
+            resolveTtsReadAloudHighlightStyle(
+                background = background,
+                content = content,
+                sentenceAccent = 0xFF777700L,
+                wordAccent = 0xFF00FFFFL,
+                amoled = true,
+            )
+
+        assertTrue(style.sentenceFill != background)
+        assertTrue(style.sentenceMarker and 0xFFL != 0L || style.wordMarker and 0xFFL != 0L)
     }
 }

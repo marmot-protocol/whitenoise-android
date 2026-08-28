@@ -191,8 +191,8 @@ internal data class TtsReadAloudHighlightStyleArgb(
 /**
  * Resolves paint from the bubble's final background/content pair. Text remains
  * AA-readable on the sentence fill; sentence rails and the word underline are
- * independently non-text-readable. AMOLED keeps its true-black fill and uses
- * only blue-free markers.
+ * independently non-text-readable. A true-black AMOLED bubble keeps its black
+ * fill and uses only blue-free markers; colored bubbles retain normal paint.
  */
 internal fun resolveTtsReadAloudHighlightStyle(
     background: Long,
@@ -203,8 +203,9 @@ internal fun resolveTtsReadAloudHighlightStyle(
 ): TtsReadAloudHighlightStyleArgb {
     val opaqueBackground = opaqueArgb(background)
     val opaqueContent = opaqueArgb(content)
+    val trueBlackAmoled = amoled && opaqueBackground == OPAQUE_BLACK_ARGB
     val fill =
-        if (amoled) {
+        if (trueBlackAmoled) {
             opaqueBackground
         } else {
             strongestReadableSentenceFill(opaqueBackground, opaqueContent)
@@ -213,13 +214,13 @@ internal fun resolveTtsReadAloudHighlightStyle(
         readableMarker(
             candidates = listOf(sentenceAccent, opaqueContent, wordAccent),
             adjacent = listOf(opaqueBackground, fill),
-            blueFree = amoled,
+            blueFree = trueBlackAmoled,
         )
     val wordMarker =
         readableMarker(
             candidates = listOf(wordAccent, opaqueContent, sentenceMarker),
             adjacent = listOf(opaqueBackground, fill),
-            blueFree = amoled,
+            blueFree = trueBlackAmoled,
         )
     return TtsReadAloudHighlightStyleArgb(fill, sentenceMarker, wordMarker)
 }
@@ -393,7 +394,7 @@ internal fun Modifier.ttsReadAloudHighlight(
                     ttsSentenceMarkerLeft(
                         box = box,
                         markerWidth = markerWidth,
-                        direction = highlightBox.direction,
+                        direction = highlightBox.paragraphDirection,
                     )
                 drawRect(
                     color = style.sentenceMarker,
@@ -438,7 +439,7 @@ private const val ARGB_BLUE_SHIFT = 0
 
 internal data class TtsHighlightBox(
     val bounds: Rect,
-    val direction: ResolvedTextDirection,
+    val paragraphDirection: ResolvedTextDirection,
 )
 
 internal fun ttsSentenceMarkerBoxes(boxes: List<TtsHighlightBox>): List<TtsHighlightBox> =
@@ -446,7 +447,7 @@ internal fun ttsSentenceMarkerBoxes(boxes: List<TtsHighlightBox>): List<TtsHighl
         .groupBy { it.bounds.top to it.bounds.bottom }
         .values
         .map { lineBoxes ->
-            if (lineBoxes.first().direction == ResolvedTextDirection.Rtl) {
+            if (lineBoxes.first().paragraphDirection == ResolvedTextDirection.Rtl) {
                 lineBoxes.maxBy { it.bounds.right }
             } else {
                 lineBoxes.minBy { it.bounds.left }
@@ -485,7 +486,7 @@ private fun highlightBoundingBoxes(
                             right = max(left, right),
                             bottom = bottom,
                         ),
-                    direction = layoutResult.getBidiRunDirection(cursor),
+                    paragraphDirection = layoutResult.getParagraphDirection(cursor),
                 )
             cursor = segmentEnd
         }
