@@ -85,6 +85,12 @@ class TtsController internal constructor(
     // Locale of the active queue, retained so history pages loaded mid-session
     // chunk with the same sentence iterator the session started with.
     private var queueLocale: Locale = Locale.getDefault()
+
+    // A usable range proves only the voice selected for this locale. Keep the
+    // attachment-wide verdict provisional again when setLanguage can select a
+    // different voice without replacing the engine instance.
+    private var capabilityLocale: Locale? = null
+    private var rangeVerdictKey: String = ""
     private val queue =
         TtsPlaybackQueue(
             stopEngine = {
@@ -136,7 +142,9 @@ class TtsController internal constructor(
         // seed both from what this engine taught in earlier sessions, never
         // from whatever the previous engine left behind.
         this.engineKey = engineKey
-        rangeProbe.restore(timingStore?.rangeVerdict(engineKey))
+        rangeProbe.restore(null)
+        capabilityLocale = null
+        rangeVerdictKey = ""
         paceCalibrator.reset(storedPace())
         utteranceRates.clear()
         activeTiming = null
@@ -152,6 +160,8 @@ class TtsController internal constructor(
         engine = null
         engineKey = ""
         rangeProbe.restore(null)
+        capabilityLocale = null
+        rangeVerdictKey = ""
         utteranceRates.clear()
         activeTiming = null
         resetPaceMeasurement()
@@ -186,6 +196,17 @@ class TtsController internal constructor(
             )
             return false
         }
+        if (capabilityLocale != locale) {
+            rangeVerdictKey = ttsRangeVerdictKey(engineKey, locale)
+            val scopedVerdict = timingStore?.rangeVerdict(rangeVerdictKey)
+            // Older versions persisted one verdict per engine. Use it only as
+            // provisional fallback evidence; the first conclusion in this
+            // locale migrates it to the scoped key without deleting the legacy
+            // value needed by locales that have not yet been observed.
+            val legacyVerdict = if (scopedVerdict == null) timingStore?.rangeVerdict(engineKey) else null
+            rangeProbe.restore(scopedVerdict ?: legacyVerdict)
+        }
+        capabilityLocale = locale
         queue.start(messages, startSentenceIndex = startSentenceIndex.coerceAtLeast(0))
         return state.value !is TtsState.Error
     }
@@ -441,11 +462,12 @@ class TtsController internal constructor(
         engineHasSpoken = true
         activeTiming = ActiveUtteranceTiming(activeUtteranceId, startedAt, appliedRate)
         if (rangeProbe.reportsRanges != true) {
-            // Runs whenever the engine has not PROVEN it reports timing. Waiting
-            // for the probe to prove the opposite would leave the first message or
-            // two of every fresh session with no word highlight at all; running
-            // optimistically is safe because the first real range callback yields
-            // this schedule permanently.
+            // A stored capable verdict is provisional for evidence collection,
+            // but it remains the playback-lane decision until enough answerable
+            // silence overturns it. Starting the estimate over that lane races a
+            // range-capable engine and can leave neither the engine nor estimate
+            // owning the visible passage. A restored stale verdict still recovers:
+            // onDone keeps examining it and arms the estimate after overturning it.
             wordTicker.start(
                 utteranceId = activeUtteranceId,
                 words =
@@ -466,7 +488,8 @@ class TtsController internal constructor(
         start: Int,
         end: Int,
     ): Boolean {
-        // A real engine range that arrived mid-utterance takes over permanently.
+        // A capable verdict (restored or confirmed here) owns this playback lane;
+        // estimated ranges are only accepted after silence overturns that verdict.
         if (rangeProbe.reportsRanges == true) return false
         return queue.onRangeStart(utteranceId, start, end, ESTIMATED_RANGE_FRAME) !=
             TtsPlaybackQueue.RangeApplication.Stale
@@ -484,8 +507,8 @@ class TtsController internal constructor(
             utteranceId?.let(utteranceRates::remove)
             closePaceGapOpener(chunk.index)
             if (timing != null) observeBootstrapPace(chunk, timing)
-            if (rangeProbe.onUtteranceDone(chunk.text.length)) {
-                timingStore?.setRangeVerdict(engineKey, false)
+            if (rangeProbe.onUtteranceDone(chunk.answerableLength())) {
+                timingStore?.setRangeVerdict(rangeVerdictKey, false)
             }
         }
         queue.onDone(utteranceId)
@@ -530,13 +553,22 @@ class TtsController internal constructor(
                 // original engine-only behavior and fall back to the sentence.
                 retainVisibleWordOnFallback = rangeProbe.reportsRanges != true,
             )
-        if (
-            application == TtsPlaybackQueue.RangeApplication.VisibleWord &&
-            rangeProbe.reportsRanges != true
-        ) {
-            rangeProbe.onRangeStart()
+        if (application != TtsPlaybackQueue.RangeApplication.VisibleWord) return
+        // Confirm on EVERY usable range, not only the first: a verdict restored
+        // from storage is provisional, and confirmation is what stops it being
+        // obeyed for the life of the process after the engine has stopped
+        // earning it. The snapshots are read before confirming, because
+        // onRangeStart sets reportsRanges itself - guards evaluated afterwards
+        // would always be false. A first proof retires the estimate and persists
+        // a newly learned verdict. A legacy engine-only true verdict is written
+        // once to this locale's key when the callback confirms it.
+        val wasProven = rangeProbe.hasConfirmedRangeCapability
+        rangeProbe.onRangeStart()
+        if (!wasProven) {
             wordTicker.stop()
-            timingStore?.setRangeVerdict(engineKey, true)
+            if (timingStore?.rangeVerdict(rangeVerdictKey) != true) {
+                timingStore?.setRangeVerdict(rangeVerdictKey, true)
+            }
         }
     }
 

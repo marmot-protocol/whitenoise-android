@@ -109,6 +109,65 @@ internal class TtsRangeTracker {
     }
 }
 
+/**
+ * Counts only complete words for which an engine callback could produce the
+ * same contiguous visible mapping accepted by [TtsRangeTracker]. Mid-word
+ * fragments are not answerable evidence: no callback confined to them can
+ * satisfy [isCompleteGraphemeWord].
+ */
+internal fun TtsChunk.answerableLength(): Int {
+    val bodyStart = senderPrefix?.end ?: 0
+    if (sourceStart < 0 || sourceEnd > sourceText.length || sourceStart >= sourceEnd) return 0
+
+    val words = BreakIterator.getWordInstance(locale).apply { setText(sourceText) }
+    var start = if (sourceStart == 0) words.first() else words.following(sourceStart - 1)
+    var answerable = 0
+    while (start != BreakIterator.DONE && start < sourceEnd) {
+        val end = words.following(start)
+        if (end == BreakIterator.DONE || end > sourceEnd) break
+        val sourceRange = TtsTextRange(start, end)
+        val callbackStart = bodyStart + start - sourceStart
+        val callbackEnd = bodyStart + end - sourceStart
+        if (
+            sourceText.isCompleteGraphemeWord(sourceRange, locale) &&
+            visibleSpans.coversSpokenRange(callbackStart, callbackEnd)
+        ) {
+            answerable += sourceText.alphanumericCodePointCount(start, end)
+        }
+        start = end
+    }
+    return answerable
+}
+
+private fun String.alphanumericCodePointCount(
+    start: Int,
+    end: Int,
+): Int {
+    var offset = start
+    var count = 0
+    while (offset < end) {
+        val codePoint = codePointAt(offset)
+        if (Character.isLetterOrDigit(codePoint)) count++
+        offset += Character.charCount(codePoint)
+    }
+    return count
+}
+
+private fun List<TtsSpokenTextSpan>.coversSpokenRange(
+    start: Int,
+    end: Int,
+): Boolean {
+    var cursor = start
+    for (span in sortedBy { it.spoken.start }) {
+        val overlapStart = maxOf(start, span.spoken.start)
+        val overlapEnd = minOf(end, span.spoken.end)
+        if (overlapStart >= overlapEnd) continue
+        if (overlapStart != cursor) return false
+        cursor = overlapEnd
+    }
+    return cursor == end
+}
+
 private fun String.isCompleteGraphemeWord(
     range: TtsTextRange,
     locale: Locale,
