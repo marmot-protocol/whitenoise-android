@@ -48,6 +48,66 @@ class ChatListHeadReorderAnimationTest {
     private val rowHeight = 48.dp
 
     @Test
+    fun placementDurationScalesOnlyForAnUnpinnedSingleHeadPromotion() {
+        val originalOrder = listOf("A", "B", "C", "D", "E", "F")
+
+        assertEquals(
+            CHAT_LIST_ROW_PLACEMENT_MILLIS,
+            chatListRowPlacementDurationMillis(
+                previousOrder = originalOrder,
+                currentOrder = listOf("B", "A", "C", "D", "E", "F"),
+                pinnedBoundaryIndex = null,
+                headPromotionEligible = true,
+            ),
+        )
+        assertEquals(
+            330,
+            chatListRowPlacementDurationMillis(
+                previousOrder = originalOrder,
+                currentOrder = listOf("E", "A", "B", "C", "D", "F"),
+                pinnedBoundaryIndex = null,
+                headPromotionEligible = true,
+            ),
+        )
+        assertEquals(
+            CHAT_LIST_ROW_PLACEMENT_MAX_MILLIS,
+            chatListRowPlacementDurationMillis(
+                previousOrder = (0..20).map(Int::toString),
+                currentOrder = listOf("20") + (0 until 20).map(Int::toString),
+                pinnedBoundaryIndex = null,
+                headPromotionEligible = true,
+            ),
+        )
+        assertEquals(
+            CHAT_LIST_ROW_PLACEMENT_MILLIS,
+            chatListRowPlacementDurationMillis(
+                previousOrder = originalOrder,
+                currentOrder = listOf("E", "A", "B", "C", "D", "F"),
+                pinnedBoundaryIndex = 1,
+                headPromotionEligible = true,
+            ),
+        )
+        assertEquals(
+            CHAT_LIST_ROW_PLACEMENT_MILLIS,
+            chatListRowPlacementDurationMillis(
+                previousOrder = originalOrder,
+                currentOrder = listOf("E", "B", "A", "C", "D", "F"),
+                pinnedBoundaryIndex = null,
+                headPromotionEligible = true,
+            ),
+        )
+        assertEquals(
+            CHAT_LIST_ROW_PLACEMENT_MILLIS,
+            chatListRowPlacementDurationMillis(
+                previousOrder = originalOrder,
+                currentOrder = listOf("E", "A", "B", "C", "D", "F"),
+                pinnedBoundaryIndex = null,
+                headPromotionEligible = false,
+            ),
+        )
+    }
+
+    @Test
     fun headReorderAnimatesRowsInOppositeDirectionsAndFinishesFlushAtTop() {
         var itemIds by mutableStateOf(listOf("A", "B"))
         val listStateHolder = arrayOf<LazyListState?>(null)
@@ -112,6 +172,67 @@ class ChatListHeadReorderAnimationTest {
 
         assertEquals(0f, rowTop("B"), 0.5f)
         assertEquals(rowHeightPx, rowTop("A"), 0.5f)
+    }
+
+    @Test
+    fun middleRowPromotionHasOneMonotonicPathAndFinishesFlushAtTop() {
+        val originalOrder = listOf("A", "B", "C", "D", "E", "F")
+        val promotedOrder = listOf("E", "A", "B", "C", "D", "F")
+        var itemIds by mutableStateOf(originalOrder)
+
+        composeRule.setContent {
+            ChatListHeadReorderMotionHarness(
+                itemIds = itemIds,
+                listState = rememberLazyListState(),
+                rowHeight = rowHeight,
+            )
+        }
+
+        composeRule.waitForIdle()
+        val rowHeightPx = composeRule.density.run { rowHeight.toPx() }
+        val previousTops = originalOrder.associateWith(::rowTop).toMutableMap()
+
+        composeRule.mainClock.autoAdvance = false
+        val motionStartedAtMillis = composeRule.mainClock.currentTime
+        composeRule.runOnUiThread { itemIds = promotedOrder }
+        composeRule.runOnIdle { }
+        var sawMotionBeyondAdjacentBudget = false
+
+        repeat(60) { frame ->
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.runOnIdle { }
+
+            val promotedTop = rowTop("E")
+            val elapsedMillis = composeRule.mainClock.currentTime - motionStartedAtMillis
+            if (
+                elapsedMillis > CHAT_LIST_ROW_PLACEMENT_MILLIS + 16L &&
+                promotedTop > 0.5f
+            ) {
+                sawMotionBeyondAdjacentBudget = true
+            }
+            assertTrue(
+                "promoted row reversed direction at frame $frame: ${previousTops.getValue("E")} -> $promotedTop",
+                promotedTop <= previousTops.getValue("E") + 0.5f,
+            )
+            previousTops["E"] = promotedTop
+
+            listOf("A", "B", "C", "D").forEach { id ->
+                val top = rowTop(id)
+                assertTrue(
+                    "displaced row $id reversed direction at frame $frame: ${previousTops.getValue(id)} -> $top",
+                    top + 0.5f >= previousTops.getValue(id),
+                )
+                previousTops[id] = top
+            }
+        }
+
+        promotedOrder.forEachIndexed { index, id ->
+            assertEquals("final top for $id", rowHeightPx * index, rowTop(id), 0.5f)
+        }
+        assertTrue(
+            "a four-slot promotion should use the bounded long-distance budget",
+            sawMotionBeyondAdjacentBudget,
+        )
     }
 
     @Test
@@ -599,11 +720,20 @@ internal fun ChatListHeadReorderMotionHarness(
             isActiveList = true,
             scrollCorrectionInProgress = scrollCorrectionInProgress,
         )
+    val rowPlacementDurationMillis =
+        rememberChatListRowPlacementDurationMillis(
+            orderedRowIds = itemIds,
+            pinnedBoundaryIndex = pinnedCount,
+            datasetKey = datasetKey,
+            headPromotionEligible =
+                listState.firstVisibleItemIndex == 0 && !listState.isScrollInProgress,
+        )
     val rowPlacementInProgress =
         rememberChatListRowPlacementGate(
             orderedRowIds = itemIds,
             pinnedBoundaryIndex = pinnedCount,
             leadingItemCount = leadingItemCount,
+            placementDurationMillis = rowPlacementDurationMillis,
         )
     val interactionsEnabled = !headReorderInProgress && !rowPlacementInProgress
     SideEffect {
@@ -625,7 +755,7 @@ internal fun ChatListHeadReorderMotionHarness(
                 }
             }
             item(key = id) {
-                Box(modifier = chatListRowMotion(targetIndex)) {
+                Box(modifier = chatListRowMotion(targetIndex, rowPlacementDurationMillis)) {
                     Box(
                         modifier =
                             Modifier

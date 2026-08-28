@@ -31,11 +31,14 @@ import kotlinx.coroutines.withContext
  * keeping an exiting item composed would also keep its stale pointer and
  * semantics nodes alive while another row moves into that slot (#1828).
  */
-internal fun LazyItemScope.chatListRowMotion(targetIndex: Int): Modifier =
+internal fun LazyItemScope.chatListRowMotion(
+    targetIndex: Int,
+    placementDurationMillis: Int = CHAT_LIST_ROW_PLACEMENT_MILLIS,
+): Modifier =
     Modifier
         .animateItem(
             fadeInSpec = tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS),
-            placementSpec = tween(CHAT_LIST_ROW_PLACEMENT_MILLIS),
+            placementSpec = tween(placementDurationMillis),
             fadeOutSpec = null,
         ).zIndex(chatListTargetZIndex(targetIndex))
 

@@ -53,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
@@ -873,11 +874,27 @@ internal fun ChatsScreen(
             isActiveList = ordinaryActiveList,
             scrollCorrectionInProgress = headScrollCorrectionInProgress,
         )
+    val headPromotionMotionEligible by
+        remember(chatListState, ordinaryActiveList) {
+            derivedStateOf {
+                ordinaryActiveList &&
+                    chatListState.firstVisibleItemIndex == 0 &&
+                    !chatListState.isScrollInProgress
+            }
+        }
+    val rowPlacementDurationMillis =
+        rememberChatListRowPlacementDurationMillis(
+            orderedRowIds = if (searchActive) emptyList() else orderedVisibleChatIds,
+            pinnedBoundaryIndex = pinnedBoundary.takeUnless { searchActive },
+            datasetKey = chatListDatasetKey,
+            headPromotionEligible = headPromotionMotionEligible,
+        )
     val rowPlacementInProgress =
         rememberChatListRowPlacementGate(
             orderedRowIds = if (searchActive) emptyList() else orderedVisibleChatIds,
             pinnedBoundaryIndex = pinnedBoundary.takeUnless { searchActive },
             leadingItemCount = leadingChatListItemCount.takeUnless { searchActive } ?: 0,
+            placementDurationMillis = rowPlacementDurationMillis,
         )
     val chatListInteractionsEnabled = !headReorderInProgress && !rowPlacementInProgress
     val archivedUnreadCount =
@@ -978,7 +995,14 @@ internal fun ChatsScreen(
     val chatRowContent: @Composable LazyItemScope.(ChatListItem, Int, MessageBodyMatch?) -> Unit =
         { item, targetIndex, bodyMatch ->
             val rowId = visibleRowId(item)
-            Box(modifier = if (searchActive) Modifier else chatListRowMotion(targetIndex)) {
+            Box(
+                modifier =
+                    if (searchActive) {
+                        Modifier
+                    } else {
+                        chatListRowMotion(targetIndex, rowPlacementDurationMillis)
+                    },
+            ) {
                 ChatListRow(
                     item = item,
                     appState = appState,
