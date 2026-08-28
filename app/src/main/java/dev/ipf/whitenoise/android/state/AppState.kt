@@ -9855,7 +9855,13 @@ class WhiteNoiseAppState private constructor(
                 runCatchingCancellable { marmotIo { userProfile(id) } }.getOrNull()
             }
         val rawDisplayName =
-            if (profileDisplayNameReader != null) {
+            if (profile != null) {
+                // accountSwitchProfileSeed treats a persisted profile as the
+                // authoritative name state, including an explicit clear. A
+                // separate displayName read cannot affect that result, so do
+                // not add one redundant FFI/database call per warmed identity.
+                null
+            } else if (profileDisplayNameReader != null) {
                 runCatchingCancellable { profileDisplayNameReader.invoke(id) }.getOrNull()
             } else {
                 runCatchingCancellable { marmotIo { displayName(id) } }.getOrNull()
