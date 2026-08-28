@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class AccountUnreadTest {
     @Test
-    fun rawAccountUnreadCounts_mapsEngineIdsToUiAccountRefsWithFallbacks() {
+    fun rawAccountUnreadValues_distinguishesFreshRowsFromOmittedAccounts() {
         val accounts =
             listOf(
                 account(label = "personal", accountIdHex = "aa"),
@@ -29,14 +29,67 @@ class AccountUnreadTest {
                 account(label = "new", accountIdHex = "cc"),
             )
 
-        assertEquals(
-            mapOf("personal" to 3uL, "work" to 2uL, "new" to 0uL),
-            rawAccountUnreadCounts(
+        val values =
+            rawAccountUnreadValues(
                 accounts = accounts,
                 rawCountsByAccountId = mapOf("aa" to 3uL),
-                previous = mapOf("work" to 2uL),
+                previous =
+                    mapOf(
+                        "work" to confirmedValue(unreadCount = 2uL),
+                    ),
+            )
+
+        assertEquals(
+            AccountUnreadValue(
+                unreadCount = 3uL,
+                freshness = AccountUnreadFreshness.CONFIRMED,
+                hasManualUnread = null,
             ),
+            values.getValue("personal"),
         )
+        assertEquals(
+            AccountUnreadValue(
+                unreadCount = 2uL,
+                freshness = AccountUnreadFreshness.UNKNOWN,
+                hasManualUnread = false,
+            ),
+            values.getValue("work"),
+        )
+        assertEquals(
+            AccountUnreadValue(
+                unreadCount = 0uL,
+                freshness = AccountUnreadFreshness.UNKNOWN,
+                hasManualUnread = null,
+            ),
+            values.getValue("new"),
+        )
+    }
+
+    @Test
+    fun unknownRetainsCountWithoutPresentingItAsConfirmedUnread() {
+        val value =
+            AccountUnreadValue(
+                unreadCount = 4uL,
+                freshness = AccountUnreadFreshness.UNKNOWN,
+                hasManualUnread = false,
+            )
+
+        assertEquals(4uL, value.unreadCount)
+        assertEquals(0uL, value.confirmedUnreadCount())
+        assertFalse(value.showsUnreadDot())
+    }
+
+    @Test
+    fun unknownCountStillPreservesAuthoritativeManualUnreadAttention() {
+        val value =
+            AccountUnreadValue(
+                unreadCount = 4uL,
+                freshness = AccountUnreadFreshness.UNKNOWN,
+                hasManualUnread = true,
+            )
+
+        assertEquals(0uL, value.confirmedUnreadCount())
+        assertTrue(value.showsUnreadDot())
     }
 
     @Test
@@ -276,4 +329,11 @@ class AccountUnreadTest {
         signedOut = false,
         running = true,
     )
+
+    private fun confirmedValue(unreadCount: ULong) =
+        AccountUnreadValue(
+            unreadCount = unreadCount,
+            freshness = AccountUnreadFreshness.CONFIRMED,
+            hasManualUnread = false,
+        )
 }

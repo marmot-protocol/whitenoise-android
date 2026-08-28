@@ -6091,13 +6091,10 @@ class ChatsController private constructor(
         val unreadAccountIdHex = boundAccountIdHex()
         val projected = currentProjectedItems(unreadAccountIdHex)
         if (unreadAccountRef != null) {
-            appState.updateAccountUnreadCount(
-                unreadAccountRef,
-                accountUnreadCount(projected, unreadAccountIdHex),
-            )
-            appState.updateAccountManualUnread(
-                unreadAccountRef,
-                accountHasManualUnread(projected, unreadAccountIdHex),
+            appState.updateAccountUnreadProjection(
+                accountRef = unreadAccountRef,
+                unreadCount = accountUnreadCount(projected, unreadAccountIdHex),
+                hasManualUnread = accountHasManualUnread(projected, unreadAccountIdHex),
             )
         }
         // Hidden behind an open conversation: keep folding updates into the

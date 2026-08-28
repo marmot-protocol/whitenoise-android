@@ -45,9 +45,17 @@ class AccountSelectorContentTest {
         assertEquals(1, addCount)
     }
 
+    @Test
+    fun unknownAccountDoesNotRenderOrAnnounceTheRetainedUnreadCount() {
+        render(unreadCountForAccount = { 0uL })
+
+        composeRule.onNodeWithText("4").assertDoesNotExist()
+    }
+
     private fun render(
         onSwitchAccount: (String) -> Unit = {},
         onAddAccount: () -> Unit = {},
+        unreadCountForAccount: (String) -> ULong = { label -> if (label == "work") 4uL else 0uL },
     ) {
         val state =
             accountSelectorState(
@@ -63,7 +71,7 @@ class AccountSelectorContentTest {
                         displayName = { accountId -> if (accountId == "hex-personal") "Personal" else "Work" },
                         shortNpub = { accountId -> "npub…${accountId.takeLast(4)}" },
                         avatarUrl = { null },
-                        unreadCountForAccount = { label -> if (label == "work") 4uL else 0uL },
+                        unreadCountForAccount = unreadCountForAccount,
                         onSwitchAccount = onSwitchAccount,
                         onAddAccount = onAddAccount,
                     )
