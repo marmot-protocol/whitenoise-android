@@ -4,7 +4,6 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -12,7 +11,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -24,17 +25,25 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.speakableProjectionFromDocument
+import dev.ipf.whitenoise.android.state.BLUE_FREE_LIGHT_TEXT_ARGB
+import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
+import dev.ipf.whitenoise.android.state.OPAQUE_WHITE_ARGB
+import dev.ipf.whitenoise.android.state.WCAG_AA_NORMAL_TEXT_CONTRAST
+import dev.ipf.whitenoise.android.state.WCAG_NON_TEXT_CONTRAST
+import dev.ipf.whitenoise.android.state.contrastRatio
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlight
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 internal val TtsReadAloudHighlightRangeKey = SemanticsPropertyKey<IntRange>("TtsReadAloudHighlightRange")
 
@@ -167,8 +176,144 @@ internal fun activeTtsLeafHighlightResolver(
         resolver
     }
 
+internal data class TtsReadAloudHighlightStyle(
+    val sentenceFill: Color,
+    val sentenceMarker: Color,
+    val wordMarker: Color,
+)
+
+internal data class TtsReadAloudHighlightStyleArgb(
+    val sentenceFill: Long,
+    val sentenceMarker: Long,
+    val wordMarker: Long,
+)
+
+/**
+ * Resolves paint from the bubble's final background/content pair. Text remains
+ * AA-readable on the sentence fill; sentence rails and the word underline are
+ * independently non-text-readable. AMOLED keeps its true-black fill and uses
+ * only blue-free markers.
+ */
+internal fun resolveTtsReadAloudHighlightStyle(
+    background: Long,
+    content: Long,
+    sentenceAccent: Long,
+    wordAccent: Long,
+    amoled: Boolean,
+): TtsReadAloudHighlightStyleArgb {
+    val opaqueBackground = opaqueArgb(background)
+    val opaqueContent = opaqueArgb(content)
+    val fill =
+        if (amoled) {
+            opaqueBackground
+        } else {
+            strongestReadableSentenceFill(opaqueBackground, opaqueContent)
+        }
+    val sentenceMarker =
+        readableMarker(
+            candidates = listOf(sentenceAccent, opaqueContent, wordAccent),
+            adjacent = listOf(opaqueBackground, fill),
+            blueFree = amoled,
+        )
+    val wordMarker =
+        readableMarker(
+            candidates = listOf(wordAccent, opaqueContent, sentenceMarker),
+            adjacent = listOf(opaqueBackground, fill),
+            blueFree = amoled,
+        )
+    return TtsReadAloudHighlightStyleArgb(fill, sentenceMarker, wordMarker)
+}
+
+private fun strongestReadableSentenceFill(
+    background: Long,
+    content: Long,
+): Long {
+    val destination =
+        if (contrastRatio(content, OPAQUE_WHITE_ARGB) >= contrastRatio(content, OPAQUE_BLACK_ARGB)) {
+            OPAQUE_WHITE_ARGB
+        } else {
+            OPAQUE_BLACK_ARGB
+        }
+    return TTS_SENTENCE_FILL_STRENGTHS
+        .map { strength -> blendOpaque(background, destination, strength) }
+        .lastOrNull { fill ->
+            contrastRatio(content, fill) >= WCAG_AA_NORMAL_TEXT_CONTRAST &&
+                contrastRatio(
+                    content,
+                    blendOpaque(fill, content, TTS_INLINE_DECORATION_ALPHA),
+                ) >= WCAG_AA_NORMAL_TEXT_CONTRAST
+        }
+        ?: background
+}
+
+private fun readableMarker(
+    candidates: List<Long>,
+    adjacent: List<Long>,
+    blueFree: Boolean,
+): Long {
+    val fallbackCandidates =
+        if (blueFree) {
+            listOf(BLUE_FREE_LIGHT_TEXT_ARGB, OPAQUE_BLACK_ARGB)
+        } else {
+            listOf(OPAQUE_BLACK_ARGB, OPAQUE_WHITE_ARGB)
+        }
+    val safeCandidates =
+        (candidates.map(::opaqueArgb) + fallbackCandidates)
+            .distinct()
+            .filter { !blueFree || it and 0xFFL == 0L }
+    return checkNotNull(
+        safeCandidates.firstOrNull { candidate ->
+            adjacent.all { contrastRatio(candidate, it) >= WCAG_NON_TEXT_CONTRAST }
+        },
+    ) { "Bubble content must provide a fail-closed 3:1 marker candidate" }
+}
+
+private fun blendOpaque(
+    background: Long,
+    foreground: Long,
+    alpha: Float,
+): Long {
+    fun channel(shift: Int): Long {
+        val from = (background shr shift) and ARGB_CHANNEL_MASK
+        val to = (foreground shr shift) and ARGB_CHANNEL_MASK
+        return (from + (to - from) * alpha).roundToInt().coerceIn(ARGB_CHANNEL_MIN, ARGB_CHANNEL_MAX).toLong()
+    }
+    return OPAQUE_BLACK_ARGB or
+        (channel(ARGB_RED_SHIFT) shl ARGB_RED_SHIFT) or
+        (channel(ARGB_GREEN_SHIFT) shl ARGB_GREEN_SHIFT) or
+        channel(ARGB_BLUE_SHIFT)
+}
+
+internal fun ttsInlineDecorationSurface(
+    sentenceFill: Long,
+    content: Long,
+): Long = blendOpaque(sentenceFill, content, TTS_INLINE_DECORATION_ALPHA)
+
+private fun opaqueArgb(argb: Long): Long = OPAQUE_BLACK_ARGB or (argb and ARGB_RGB_MASK)
+
 @Composable
-internal fun ttsReadAloudHighlightColor(): Color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.28f)
+internal fun rememberTtsReadAloudHighlightStyle(
+    background: Color,
+    content: Color,
+    sentenceAccent: Color,
+    wordAccent: Color,
+    amoled: Boolean,
+): TtsReadAloudHighlightStyle =
+    remember(background, content, sentenceAccent, wordAccent, amoled) {
+        resolveTtsReadAloudHighlightStyle(
+            background = background.toArgb().toLong(),
+            content = content.toArgb().toLong(),
+            sentenceAccent = sentenceAccent.toArgb().toLong(),
+            wordAccent = wordAccent.toArgb().toLong(),
+            amoled = amoled,
+        ).let {
+            TtsReadAloudHighlightStyle(
+                sentenceFill = colorFromArgb(it.sentenceFill),
+                sentenceMarker = colorFromArgb(it.sentenceMarker),
+                wordMarker = colorFromArgb(it.wordMarker),
+            )
+        }
+    }
 
 @Composable
 internal fun readAloudMessageSemantics(
@@ -215,7 +360,7 @@ internal fun ttsHighlightTextRange(
 internal fun Modifier.ttsReadAloudHighlight(
     layoutResult: TextLayoutResult?,
     highlight: TtsLeafHighlight?,
-    color: Color,
+    style: TtsReadAloudHighlightStyle,
 ): Modifier {
     val semanticsModifier =
         if (highlight == null) {
@@ -236,28 +381,88 @@ internal fun Modifier.ttsReadAloudHighlight(
     if (sentenceRanges.isEmpty() && wordRange?.collapsed != false) return this.then(semanticsModifier)
     return this.then(semanticsModifier).drawBehind {
         sentenceRanges.forEach { range ->
-            highlightBoundingBoxes(layoutResult, range).forEach { box ->
-                drawRect(color = color, topLeft = Offset(box.left, box.top), size = box.size)
+            val boxes = highlightBoundingBoxes(layoutResult, range)
+            boxes.forEach { highlightBox ->
+                val box = highlightBox.bounds
+                drawRect(color = style.sentenceFill, topLeft = Offset(box.left, box.top), size = box.size)
+            }
+            ttsSentenceMarkerBoxes(boxes).forEach { highlightBox ->
+                val box = highlightBox.bounds
+                val markerWidth = TTS_SENTENCE_MARKER_WIDTH_DP.dp.toPx().coerceAtMost(box.width / 2f)
+                val markerLeft =
+                    ttsSentenceMarkerLeft(
+                        box = box,
+                        markerWidth = markerWidth,
+                        direction = highlightBox.direction,
+                    )
+                drawRect(
+                    color = style.sentenceMarker,
+                    topLeft = Offset(markerLeft, box.top),
+                    size =
+                        Size(markerWidth, box.height),
+                )
             }
         }
         wordRange?.takeUnless { it.collapsed }?.let { range ->
-            highlightBoundingBoxes(layoutResult, range).forEach { box ->
-                drawRect(color = color.copy(alpha = 0.72f), topLeft = Offset(box.left, box.top), size = box.size)
+            highlightBoundingBoxes(layoutResult, range).forEach { highlightBox ->
+                val box = highlightBox.bounds
+                val thickness = TTS_WORD_MARKER_WIDTH_DP.dp.toPx().coerceAtMost(box.height / 2f)
+                drawRect(
+                    color = style.wordMarker,
+                    topLeft = Offset(box.left, box.bottom - thickness),
+                    size =
+                        Size(box.width, thickness),
+                )
             }
         }
     }
 }
 
+internal fun ttsSentenceMarkerLeft(
+    box: Rect,
+    markerWidth: Float,
+    direction: ResolvedTextDirection,
+): Float = if (direction == ResolvedTextDirection.Rtl) box.right - markerWidth else box.left
+
+private val TTS_SENTENCE_FILL_STRENGTHS = listOf(0.06f, 0.10f, 0.16f, 0.22f, 0.30f)
+private const val TTS_INLINE_DECORATION_ALPHA = 0.08f
+private const val TTS_SENTENCE_MARKER_WIDTH_DP = 2f
+private const val TTS_WORD_MARKER_WIDTH_DP = 2f
+private const val ARGB_CHANNEL_MASK = 0xFFL
+private const val ARGB_RGB_MASK = 0xFFFFFFL
+private const val ARGB_CHANNEL_MIN = 0
+private const val ARGB_CHANNEL_MAX = 255
+private const val ARGB_RED_SHIFT = 16
+private const val ARGB_GREEN_SHIFT = 8
+private const val ARGB_BLUE_SHIFT = 0
+
+internal data class TtsHighlightBox(
+    val bounds: Rect,
+    val direction: ResolvedTextDirection,
+)
+
+internal fun ttsSentenceMarkerBoxes(boxes: List<TtsHighlightBox>): List<TtsHighlightBox> =
+    boxes
+        .groupBy { it.bounds.top to it.bounds.bottom }
+        .values
+        .map { lineBoxes ->
+            if (lineBoxes.first().direction == ResolvedTextDirection.Rtl) {
+                lineBoxes.maxBy { it.bounds.right }
+            } else {
+                lineBoxes.minBy { it.bounds.left }
+            }
+        }
+
 private fun highlightBoundingBoxes(
     layoutResult: TextLayoutResult,
     range: TextRange,
-): List<Rect> {
+): List<TtsHighlightBox> {
     val start = range.start.coerceIn(0, layoutResult.layoutInput.text.length)
     val end = range.end.coerceIn(start, layoutResult.layoutInput.text.length)
     if (start >= end) return emptyList()
     val startLine = layoutResult.getLineForOffset(start)
     val endLine = layoutResult.getLineForOffset(max(end - 1, start))
-    val boxes = ArrayList<Rect>()
+    val boxes = ArrayList<TtsHighlightBox>()
     for (line in startLine..endLine) {
         val lineStart = if (line == startLine) start else layoutResult.getLineStart(line)
         val lineEnd = if (line == endLine) end else layoutResult.getLineEnd(line)
@@ -272,11 +477,15 @@ private fun highlightBoundingBoxes(
             val left = layoutResult.getHorizontalPosition(cursor, usePrimaryDirection = true)
             val right = layoutResult.getHorizontalPosition(segmentEnd, usePrimaryDirection = false)
             boxes +=
-                Rect(
-                    left = min(left, right),
-                    top = top,
-                    right = max(left, right),
-                    bottom = bottom,
+                TtsHighlightBox(
+                    bounds =
+                        Rect(
+                            left = min(left, right),
+                            top = top,
+                            right = max(left, right),
+                            bottom = bottom,
+                        ),
+                    direction = layoutResult.getBidiRunDirection(cursor),
                 )
             cursor = segmentEnd
         }

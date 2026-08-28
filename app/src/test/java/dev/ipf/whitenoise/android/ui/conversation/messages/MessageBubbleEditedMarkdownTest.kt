@@ -452,6 +452,7 @@ private fun EditedMarkdownDisplayHarness(
                 collapsible = false,
                 replyPreviewPresent = false,
                 hasMedia = false,
+                bubbleBackgroundColor = MaterialTheme.colorScheme.surface,
                 bubbleContentColor = MaterialTheme.colorScheme.onSurface,
                 timestampColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 showStatus = false,
