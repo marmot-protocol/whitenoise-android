@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.VectorConverter
@@ -62,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -98,6 +98,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
+import kotlin.math.roundToInt
 
 private val ComposerManualMinimumHeight = 144.dp
 
@@ -401,6 +402,8 @@ internal fun ComposerBar(
     var composerHeightDragActive by remember(draftKey) { mutableStateOf(false) }
     var composerHeightTransitionEpoch by remember(draftKey) { mutableIntStateOf(0) }
     var completedComposerHeightTransitionEpoch by remember(draftKey) { mutableIntStateOf(0) }
+    var composerHeightTransitionStartPx by remember(draftKey) { mutableFloatStateOf(0f) }
+    var visibleComposerHeightPx by remember(draftKey) { mutableFloatStateOf(0f) }
     var composerUsesMultilineControls by
         remember(draftKey, configuration.orientation, configuration.fontScale) {
             mutableStateOf(false)
@@ -410,15 +413,12 @@ internal fun ComposerBar(
             mutableFloatStateOf(0f)
         }
     var customInputPaneHeightPx by remember(configuration.orientation) { mutableFloatStateOf(0f) }
-    LaunchedEffect(composerHeightTransitionEpoch) {
-        if (composerHeightTransitionEpoch != completedComposerHeightTransitionEpoch) {
-            delay(COMPOSER_EXPANSION_ANIMATION_MILLIS.toLong())
-            completedComposerHeightTransitionEpoch = composerHeightTransitionEpoch
-        }
-    }
 
     fun transitionComposerExpansion(next: ComposerExpansionState) {
         if (next != composerExpansion) {
+            composerHeightTransitionStartPx =
+                visibleComposerHeightPx.takeIf { it > 0f }
+                    ?: automaticComposerHeightPx
             composerHeightTransitionEpoch += 1
             composerExpansion = next
         }
@@ -912,6 +912,52 @@ internal fun ComposerBar(
             }
         val expandedControlLayout =
             composerUsesMultilineControls || composerExpansion.mode != ComposerExpansionMode.Automatic
+        val composerHeightTransitionActive =
+            composerHeightTransitionEpoch != completedComposerHeightTransitionEpoch
+        val transitionTargetHeightPx =
+            composerHeightPx(
+                state = composerExpansion,
+                automaticHeightPx = resolvedAutomaticHeightPx,
+                minimumManualHeightPx = minimumManualComposerHeightPx,
+                maximumHeightPx = maximumComposerHeightPx,
+            )
+        val composerHeightAnimation =
+            remember(composerHeightTransitionEpoch) {
+                Animatable(composerHeightTransitionStartPx)
+            }
+        // Read the animated value during measurement so height frames do not
+        // recompose BasicTextField or the rest of this large composer tree.
+        val animatedComposerHeightModifier =
+            Modifier.layout { measurable, constraints ->
+                val height =
+                    composerHeightAnimation.value
+                        .roundToInt()
+                        .coerceIn(constraints.minHeight, constraints.maxHeight)
+                val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                layout(placeable.width, height) {
+                    placeable.placeRelative(0, 0)
+                }
+            }
+        LaunchedEffect(
+            composerHeightTransitionEpoch,
+            transitionTargetHeightPx,
+        ) {
+            if (composerHeightTransitionActive) {
+                composerHeightAnimation.animateTo(
+                    transitionTargetHeightPx,
+                    tween(
+                        durationMillis =
+                            composerHeightAnimationDurationMillis(
+                                mode = composerExpansion.mode,
+                                dragActive = composerHeightDragActive,
+                                discreteTransitionActive = composerHeightTransitionActive,
+                            ),
+                        easing = FastOutSlowInEasing,
+                    ),
+                )
+                completedComposerHeightTransitionEpoch = composerHeightTransitionEpoch
+            }
+        }
 
         BackHandler(
             enabled =
@@ -934,24 +980,13 @@ internal fun ComposerBar(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .animateContentSize(
-                        animationSpec =
-                            tween(
-                                durationMillis =
-                                    composerHeightAnimationDurationMillis(
-                                        mode = composerExpansion.mode,
-                                        dragActive = composerHeightDragActive,
-                                        discreteTransitionActive =
-                                            composerHeightTransitionEpoch != completedComposerHeightTransitionEpoch,
-                                    ),
-                                easing = FastOutSlowInEasing,
-                            ),
-                        alignment = Alignment.BottomStart,
-                    ).then(
-                        if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
-                            Modifier.heightIn(max = automaticComposerCeiling)
-                        } else {
-                            Modifier.height(resolvedComposerHeight)
+                    .then(
+                        when {
+                            composerHeightDragActive -> Modifier.height(resolvedComposerHeight)
+                            composerHeightTransitionActive -> animatedComposerHeightModifier
+                            composerExpansion.mode == ComposerExpansionMode.Automatic ->
+                                Modifier.heightIn(max = automaticComposerCeiling)
+                            else -> Modifier.height(resolvedComposerHeight)
                         },
                     ).then(
                         if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
@@ -960,7 +995,11 @@ internal fun ComposerBar(
                             Modifier.background(MaterialTheme.colorScheme.background)
                         },
                     ).onSizeChanged { size ->
-                        if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
+                        visibleComposerHeightPx = size.height.toFloat()
+                        if (
+                            composerExpansion.mode == ComposerExpansionMode.Automatic &&
+                            !composerHeightTransitionActive
+                        ) {
                             automaticComposerHeightPx = size.height.toFloat()
                         }
                     }.padding(horizontal = 12.dp, vertical = 10.dp),

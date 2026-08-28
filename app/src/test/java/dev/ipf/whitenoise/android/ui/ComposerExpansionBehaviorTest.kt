@@ -64,6 +64,7 @@ import kotlin.math.abs
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+@Suppress("LargeClass")
 class ComposerExpansionBehaviorTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -292,6 +293,102 @@ class ComposerExpansionBehaviorTest {
             TextRange("First line".length),
             editor.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange],
         )
+    }
+
+    @Test
+    fun oneToTwoLineGrowthKeepsTextInsideTheComposerOnEveryFrame() {
+        val oneLine = "First line"
+        val twoLines = "$oneLine\nSecond line"
+        render(oneLine)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        val oneLineGeometry = composerGeometry()
+        val fixedBottom = oneLineGeometry.composer.bottom
+
+        val frames =
+            withManualClock {
+                editor.performTextReplacement(twoLines)
+                buildList {
+                    repeat(4) {
+                        composeRule.mainClock.advanceTimeByFrame()
+                        composeRule.runOnIdle { }
+                        assertEquals(
+                            twoLines,
+                            editor.fetchSemanticsNode().config[SemanticsProperties.EditableText].text,
+                        )
+                        add(composerGeometry())
+                    }
+                }
+            }
+
+        frames.forEach { geometry ->
+            assertTextFitsInsidePill(geometry)
+            assertTrue(
+                "natural text growth must preserve the composer bottom edge",
+                abs(geometry.composer.bottom - fixedBottom) <= 1f,
+            )
+        }
+        val allocatedHeight = frames.first().composer.height
+        assertTrue(
+            "two text lines must receive more composer height immediately",
+            allocatedHeight > oneLineGeometry.composer.height + 10f,
+        )
+        assertTrue(
+            "the editor viewport must expose the newly added line immediately",
+            frames.first().editor.height > oneLineGeometry.editor.height + 10f,
+        )
+    }
+
+    @Test
+    fun wideThresholdKeepsEditorAndPillAnchoredOnEveryFrame() {
+        val twoLines = "First line\nSecond line"
+        render(twoLines)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        val compact = composerGeometry()
+
+        val frames =
+            withManualClock {
+                editor.performTextInputSelection(TextRange(twoLines.length))
+                editor.performTextInput("\nThird line")
+                buildList {
+                    repeat(20) {
+                        composeRule.mainClock.advanceTimeByFrame()
+                        composeRule.runOnIdle { }
+                        assertEquals(
+                            "$twoLines\nThird line",
+                            editor.fetchSemanticsNode().config[SemanticsProperties.EditableText].text,
+                        )
+                        add(composerGeometry())
+                    }
+                }
+            }
+        composeRule.waitForIdle()
+        val allFrames = listOf(compact) + frames + composerGeometry()
+
+        allFrames.forEach { geometry ->
+            assertTextFitsInsidePill(geometry)
+            assertTrue(
+                "wide transition must keep the pill's leading edge fixed",
+                abs(geometry.pill.left - compact.pill.left) <= 1f,
+            )
+            assertTrue(
+                "wide transition must not slide the editor laterally",
+                abs(geometry.editor.left - compact.editor.left) <= 1f,
+            )
+            assertTrue(
+                "wide transition must preserve the composer bottom edge",
+                abs(geometry.composer.bottom - compact.composer.bottom) <= 1f,
+            )
+        }
+        assertMonotonic(allFrames.map { it.composer.height }, increasing = true)
+        assertMonotonic(allFrames.map { it.pill.width }, increasing = true)
+        val expandedWidth = allFrames.last().pill.width
+        assertTrue(
+            "wide transition must expose intermediate pill widths",
+            allFrames.any { it.pill.width > compact.pill.width + 1f && it.pill.width < expandedWidth - 1f },
+        )
+        assertEditorState(editor, "$twoLines\nThird line", TextRange("$twoLines\nThird line".length))
     }
 
     @Test
@@ -565,6 +662,36 @@ class ComposerExpansionBehaviorTest {
             .fetchSemanticsNode()
             .boundsInRoot
 
+    private fun composerGeometry() =
+        ComposerGeometry(
+            composer = composerBounds(),
+            pill =
+                composeRule
+                    .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG, useUnmergedTree = true)
+                    .fetchSemanticsNode()
+                    .boundsInRoot,
+            editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot,
+        )
+
+    private fun assertTextFitsInsidePill(geometry: ComposerGeometry) {
+        assertTrue(
+            "editor must stay inside the pill's leading edge",
+            geometry.editor.left >= geometry.pill.left - 1f,
+        )
+        assertTrue(
+            "editor must stay inside the pill's trailing edge",
+            geometry.editor.right <= geometry.pill.right + 1f,
+        )
+        assertTrue(
+            "editor must stay inside the pill's top edge",
+            geometry.editor.top >= geometry.pill.top - 1f,
+        )
+        assertTrue(
+            "editor must stay inside the pill's bottom edge",
+            geometry.editor.bottom <= geometry.pill.bottom + 1f,
+        )
+    }
+
     private fun sampleComposerHeights(
         frameCount: Int = 20,
         expectedBottom: Float? = null,
@@ -647,6 +774,12 @@ class ComposerExpansionBehaviorTest {
             "The controls remain easy to reach.\n" +
             "Nothing in the draft is replaced.\n" +
             "The final paragraph stays visible while editing."
+
+    private data class ComposerGeometry(
+        val composer: Rect,
+        val pill: Rect,
+        val editor: Rect,
+    )
 
     private companion object {
         const val TAG = "expandable-composer"

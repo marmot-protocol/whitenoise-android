@@ -127,7 +127,7 @@ internal const val COMPOSER_PILL_SURFACE_TAG = "composer-pill-surface"
 
 private val ExpandedBorderHeaderInset = 28.dp
 private val CompactEditorStartInset = 52.dp
-private val ExpandedEditorHorizontalInset = 12.dp
+private val ExpandedEditorEndInset = 12.dp
 private val CompactEditorTopInset = 12.dp
 private val ExpandedEditorTopInset = 20.dp
 private val CompactEditorBottomInset = 8.dp
@@ -571,13 +571,11 @@ internal fun ComposerPill(
                             .fillMaxWidth()
                             .then(expandedHeightModifier)
                             .deferredPadding(
-                                start = {
-                                    interpolateDp(
-                                        CompactEditorStartInset,
-                                        ExpandedEditorHorizontalInset,
-                                        expansionProgress.value,
-                                    )
-                                },
+                                // Keep the editable text on one stable leading
+                                // axis while the pill widens. Animating this
+                                // inset made the live draft slide ~40dp during
+                                // reflow, which read as a zoom/jitter on device.
+                                start = { CompactEditorStartInset },
                                 top = {
                                     interpolateDp(
                                         CompactEditorTopInset,
@@ -588,7 +586,7 @@ internal fun ComposerPill(
                                 end = {
                                     interpolateDp(
                                         compactTrailingReserve,
-                                        ExpandedEditorHorizontalInset,
+                                        ExpandedEditorEndInset,
                                         expansionProgress.value,
                                     )
                                 },
