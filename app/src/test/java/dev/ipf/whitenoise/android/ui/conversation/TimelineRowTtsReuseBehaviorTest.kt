@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightRangeKey
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudSentenceHighlightRangeKey
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -76,7 +77,7 @@ class TimelineRowTtsReuseBehaviorTest {
 
     @Test
     @Suppress("LongMethod")
-    fun keyedRowReuseClearsHighlightAndReadAloudProgress() {
+    fun controllerSpeakingPassageTraversesTimelineProjectionGateAndClearsOnRowReuse() {
         val activeEdit = "Hello *bright* world."
         val activeRecord = speakableRecord(MESSAGE_A, "Original body.")
         val otherRecord = speakableRecord(MESSAGE_B, "Other message body.")
@@ -90,9 +91,6 @@ class TimelineRowTtsReuseBehaviorTest {
                     parseMarkdown = { editedDocument() },
                 )!!
             }
-        check(appState.ttsController.speak(listOf(entry), Locale.US))
-        engine.range(index = 0, start = 13, end = 19)
-
         var showOtherMessage by mutableStateOf(false)
 
         composeRule.setContent {
@@ -144,7 +142,35 @@ class TimelineRowTtsReuseBehaviorTest {
         }
 
         composeRule.waitForIdle()
+        assertNull(highlightRange("bright"))
+        assertNull(sentenceHighlightRange("bright"))
+        composeRule.onNodeWithTag("tts-read-aloud-progress").assertDoesNotExist()
+
+        check(appState.ttsController.speak(listOf(entry), Locale.US))
+        composeRule.waitForIdle()
+        assertEquals(0 until 19, highlightRange("bright"))
+        assertEquals(0 until 19, sentenceHighlightRange("bright"))
+        composeRule
+            .onNodeWithTag("tts-read-aloud-progress")
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.ContentDescription,
+                    listOf(
+                        app.getString(
+                            R.string.tts_bar_progress,
+                            1,
+                            1,
+                            1,
+                            1,
+                        ),
+                    ),
+                ),
+            )
+
+        engine.range(index = 0, start = 13, end = 19)
+        composeRule.waitForIdle()
         assertEquals(6 until 12, highlightRange("bright"))
+        assertEquals(0 until 19, sentenceHighlightRange("bright"))
         composeRule
             .onNodeWithTag("tts-read-aloud-progress")
             .assert(
@@ -168,6 +194,7 @@ class TimelineRowTtsReuseBehaviorTest {
         composeRule.onNodeWithText("Other", substring = true, useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("bright", substring = true, useUnmergedTree = true).assertDoesNotExist()
         assertNull(highlightRange("Other"))
+        assertNull(sentenceHighlightRange("Other"))
         composeRule.onNodeWithTag("tts-read-aloud-progress").assertDoesNotExist()
     }
 
@@ -177,6 +204,13 @@ class TimelineRowTtsReuseBehaviorTest {
             .fetchSemanticsNode()
             .config
             .getOrNull(TtsReadAloudHighlightRangeKey)
+
+    private fun sentenceHighlightRange(text: String): IntRange? =
+        composeRule
+            .onNodeWithText(text, substring = true, useUnmergedTree = true)
+            .fetchSemanticsNode()
+            .config
+            .getOrNull(TtsReadAloudSentenceHighlightRangeKey)
 
     private fun timelineMessage(record: AppMessageRecordFfi) =
         TimelineMessage(

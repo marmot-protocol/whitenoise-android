@@ -433,6 +433,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     collapsible: Boolean,
     replyPreviewPresent: Boolean,
     hasMedia: Boolean,
+    bubbleBackgroundColor: Color,
     bubbleContentColor: Color,
     timestampColor: Color,
     showStatus: Boolean,
@@ -538,7 +539,15 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             } else {
                 Modifier
             }
-        val highlightColor = ttsReadAloudHighlightColor()
+        val highlightStyle =
+            if (presentedTtsLeafHighlightResolver != null) {
+                rememberTtsReadAloudHighlightStyle(
+                    backgroundColor = bubbleBackgroundColor,
+                    contentColor = bubbleContentColor,
+                )
+            } else {
+                null
+            }
         var plainLayoutResult by remember(bodyText) { mutableStateOf<TextLayoutResult?>(null) }
         var plainLayoutCoordinates by remember(bodyText) { mutableStateOf<LayoutCoordinates?>(null) }
         DisposableEffect(presentedTtsSentenceLayoutReporter, bodyText) {
@@ -548,7 +557,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
         }
         val plainHighlight = presentedTtsLeafHighlightResolver?.invoke("plain", bodyText)
         val plainHighlightModifier =
-            Modifier.ttsReadAloudHighlight(plainLayoutResult, plainHighlight, highlightColor)
+            Modifier.ttsReadAloudHighlight(plainLayoutResult, plainHighlight, highlightStyle)
         val messageTextBody: @Composable () -> Unit = {
             if (renderMarkdownBody) {
                 readAloudMessageSemantics(
@@ -582,6 +591,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                         onLinkTextLayoutChanged = markdownLinkLayoutReporter,
                         onCopyLink = onCopyMarkdownLink,
                         ttsLeafHighlightResolver = presentedTtsLeafHighlightResolver,
+                        ttsReadAloudHighlightStyle = highlightStyle,
                         ttsSentenceLayoutReporter = presentedTtsSentenceLayoutReporter,
                     )
                 }
