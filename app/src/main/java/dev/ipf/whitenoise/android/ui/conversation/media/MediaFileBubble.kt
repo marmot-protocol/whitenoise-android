@@ -45,6 +45,13 @@ import kotlin.coroutines.resume
 
 internal fun Modifier.fileBubbleWidth(): Modifier = fillMaxWidth()
 
+internal fun Modifier.fileAttachmentFirstFrameVisibility(resolved: Boolean): Modifier =
+    if (resolved) {
+        this
+    } else {
+        alpha(0f).semantics { hideFromAccessibility() }
+    }
+
 internal fun fileAttachmentCardTestTag(
     messageIdHex: String,
     attachmentIndex: Int,
@@ -317,13 +324,8 @@ internal fun MediaFileBubble(
         modifier =
             Modifier
                 .fileBubbleWidth()
-                .then(
-                    if (firstFrameCacheResolved) {
-                        Modifier
-                    } else {
-                        Modifier.alpha(0f).semantics { hideFromAccessibility() }
-                    },
-                ).testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
+                .fileAttachmentFirstFrameVisibility(firstFrameCacheResolved)
+                .testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
                 .combinedClickable(
                     enabled =
                         firstFrameCacheResolved &&
