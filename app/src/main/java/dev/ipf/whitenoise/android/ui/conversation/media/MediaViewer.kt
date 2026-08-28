@@ -422,9 +422,16 @@ internal fun FullScreenMediaViewer(
                 val owned = currentMine
                 scope.launch {
                     if (MediaReferenceSupport.isVideoMedia(ref)) {
-                        runCatching {
-                            materializeVideoAttachment(context, controller, msgId, attachmentIndex, ref, owned)
-                        }.getOrNull()?.let { shareVideo(context, it, ref.fileName, ref.mediaType) }
+                        runCatchingCancellable {
+                            val file = materializeVideoAttachment(context, controller, msgId, attachmentIndex, ref, owned)
+                            shareVideo(context, file, ref.fileName, ref.mediaType).getOrThrow()
+                        }.onFailure { error ->
+                            appState.presentMediaLaunchFailure(
+                                R.string.media_couldnt_open,
+                                "MEDIA_VIEWER_VIDEO_SHARE",
+                                error,
+                            )
+                        }
                     } else {
                         runCatchingCancellable {
                             attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
