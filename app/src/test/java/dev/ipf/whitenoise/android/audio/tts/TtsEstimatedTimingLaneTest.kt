@@ -69,7 +69,7 @@ class TtsEstimatedTimingLaneTest {
             harness.engine.start(index = 0)
             harness.engine.range(index = 0, start = 0, end = 5)
 
-            assertEquals(true, harness.store.verdicts[ENGINE_KEY])
+            assertEquals(true, harness.store.verdicts[verdictKey()])
 
             // The estimate would move on to the second word around here; the
             // engine's word must survive untouched.
@@ -98,7 +98,7 @@ class TtsEstimatedTimingLaneTest {
 
             harness.engine.range(index = 0, start = 0, end = 0)
 
-            assertEquals(null, harness.store.verdicts[ENGINE_KEY])
+            assertEquals(null, harness.store.verdicts[verdictKey()])
             assertEquals(estimatedPassage, harness.controller.state.value.passage)
             assertEquals(
                 estimatedProgress,
@@ -118,7 +118,7 @@ class TtsEstimatedTimingLaneTest {
     fun aRestoredCapableVerdictKeepsTheEngineLaneUntilAUsableRangeReconfirmsIt() =
         runTest {
             val harness = LaneHarness(this)
-            harness.store.verdicts[ENGINE_KEY] = true
+            harness.store.verdicts[verdictKey()] = true
             harness.controller.detachEngine()
             harness.controller.attachEngine(harness.engine, engineKey = ENGINE_KEY)
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
@@ -185,10 +185,27 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun unusableRangeFromConfirmedCapableEngineClearsThePreviousWord() =
+    fun aLegacyEngineVerdictMigratesOnlyAfterTheLocaleConfirmsIt() =
         runTest {
             val harness = LaneHarness(this)
             harness.store.verdicts[ENGINE_KEY] = true
+            harness.controller.detachEngine()
+            harness.controller.attachEngine(harness.engine, engineKey = ENGINE_KEY)
+
+            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
+            assertEquals(null, harness.store.verdicts[verdictKey()])
+            harness.engine.start(index = 0)
+            harness.engine.range(index = 0, start = 0, end = 5)
+
+            assertEquals(true, harness.store.verdicts[verdictKey()])
+            assertEquals(1, harness.store.rangeVerdictWrites)
+        }
+
+    @Test
+    fun unusableRangeFromConfirmedCapableEngineClearsThePreviousWord() =
+        runTest {
+            val harness = LaneHarness(this)
+            harness.store.verdicts[verdictKey()] = true
             harness.controller.detachEngine()
             harness.controller.attachEngine(harness.engine, engineKey = ENGINE_KEY)
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
@@ -214,7 +231,7 @@ class TtsEstimatedTimingLaneTest {
     fun aPersistedSilentVerdictStillRunsTheEstimate() =
         runTest {
             val harness = LaneHarness(this)
-            harness.store.verdicts[ENGINE_KEY] = false
+            harness.store.verdicts[verdictKey()] = false
             harness.controller.detachEngine()
             harness.controller.attachEngine(harness.engine, engineKey = ENGINE_KEY)
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
@@ -243,14 +260,14 @@ class TtsEstimatedTimingLaneTest {
             advanceTimeBy(3_000)
             harness.engine.complete(index = 0)
 
-            assertEquals(false, harness.store.verdicts[ENGINE_KEY])
+            assertEquals(false, harness.store.verdicts[verdictKey()])
         }
 
     @Test
     fun aPersistedCapableVerdictIsOverturnedWhenTheEngineStopsReportingRanges() =
         runTest {
             val harness = LaneHarness(this)
-            harness.store.verdicts[ENGINE_KEY] = true
+            harness.store.verdicts[verdictKey()] = true
             harness.controller.detachEngine()
             harness.controller.attachEngine(harness.engine, engineKey = ENGINE_KEY)
             assertTrue(harness.controller.speak(listOf(plainEntry(OVERTURNING_TEXT)), Locale.US))
@@ -258,7 +275,7 @@ class TtsEstimatedTimingLaneTest {
             harness.engine.start(index = 0)
             harness.engine.complete(index = 0)
 
-            assertEquals(false, harness.store.verdicts[ENGINE_KEY])
+            assertEquals(false, harness.store.verdicts[verdictKey()])
 
             // ...and the estimate takes over from the next utterance, which is
             // the whole point of overturning it.
@@ -279,6 +296,52 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
+    fun confirmedCapabilityIsReexaminedWhenTheLocaleChangesVoice() =
+        runTest {
+            val harness = LaneHarness(this)
+            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
+            harness.engine.start(index = 0)
+            harness.engine.range(index = 0, start = 0, end = 5)
+            harness.engine.complete(index = 0)
+            assertEquals(true, harness.store.verdicts[verdictKey()])
+
+            assertTrue(
+                harness.controller.speak(
+                    listOf(plainEntry(OVERTURNING_TEXT, messageIdHex = "m2")),
+                    Locale.FRANCE,
+                ),
+            )
+            harness.engine.start(index = 1)
+            harness.engine.complete(index = 1)
+
+            assertEquals(false, harness.store.verdicts[verdictKey(Locale.FRANCE)])
+            assertEquals(true, harness.store.verdicts[verdictKey(Locale.US)])
+            assertTrue(harness.controller.speak(listOf(plainEntry(messageIdHex = "m3")), Locale.FRANCE))
+            harness.engine.start(index = 2)
+            advanceTimeBy(150)
+            runCurrent()
+            assertEquals(
+                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+            harness.engine.complete(index = 2)
+
+            // Returning to the confirmed US context must not inherit the silent
+            // FR verdict or start an estimate against its range-capable voice.
+            assertTrue(harness.controller.speak(listOf(plainEntry(messageIdHex = "m4")), Locale.US))
+            harness.engine.start(index = 3)
+            advanceTimeBy(150)
+            runCurrent()
+            assertEquals(
+                emptyList<TtsVisibleTextSpan>(),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+            assertEquals(true, harness.store.verdicts[verdictKey(Locale.US)])
+        }
+
+    @Test
     fun aPayloadWithNoVisibleMappingIsNotEvidenceAgainstTheEngine() =
         runTest {
             val harness = LaneHarness(this)
@@ -289,7 +352,7 @@ class TtsEstimatedTimingLaneTest {
             harness.engine.start(index = 0)
             harness.engine.complete(index = 0)
 
-            assertEquals(null, harness.store.verdicts[ENGINE_KEY])
+            assertEquals(null, harness.store.verdicts[verdictKey()])
 
             // Witness: the same text WITH a visible mapping does conclude, so
             // the assertion above is about the mapping and not about length.
@@ -297,7 +360,7 @@ class TtsEstimatedTimingLaneTest {
             harness.engine.start(index = 1)
             harness.engine.complete(index = 1)
 
-            assertEquals(false, harness.store.verdicts[ENGINE_KEY])
+            assertEquals(false, harness.store.verdicts[verdictKey()])
         }
 
     @Test
@@ -316,7 +379,7 @@ class TtsEstimatedTimingLaneTest {
             harness.engine.start(index = 0)
             harness.engine.complete(index = 0)
 
-            assertEquals(null, harness.store.verdicts[ENGINE_KEY])
+            assertEquals(null, harness.store.verdicts[verdictKey()])
 
             // Witness: the same text fully mapped does conclude, so this is
             // about the mapping and not about the length.
@@ -324,7 +387,35 @@ class TtsEstimatedTimingLaneTest {
             harness.engine.start(index = 1)
             harness.engine.complete(index = 1)
 
-            assertEquals(false, harness.store.verdicts[ENGINE_KEY])
+            assertEquals(false, harness.store.verdicts[verdictKey()])
+        }
+
+    @Test
+    fun mappedMidWordFragmentsAreNotEvidenceAgainstTheEngine() =
+        runTest {
+            val harness = LaneHarness(this)
+            val text = "hello ".repeat(80).trimEnd()
+            val fragments =
+                Regex("hello")
+                    .findAll(text)
+                    .map { match ->
+                        val start = match.range.first + 1
+                        TtsSpokenTextSpan(
+                            TtsTextRange(start, start + 3),
+                            TtsVisibleTextSpan("b0/n0", start, start + 3),
+                        )
+                    }.toList()
+            val fragmented = plainEntry(text).copy(spokenTextSpans = fragments)
+
+            assertTrue(harness.controller.speak(listOf(fragmented), Locale.US))
+            harness.engine.start(index = 0)
+            harness.engine.complete(index = 0)
+            assertEquals(null, harness.store.verdicts[verdictKey()])
+
+            assertTrue(harness.controller.speak(listOf(plainEntry(text, "m2")), Locale.US))
+            harness.engine.start(index = 1)
+            harness.engine.complete(index = 1)
+            assertEquals(false, harness.store.verdicts[verdictKey()])
         }
 
     @Test
@@ -337,7 +428,7 @@ class TtsEstimatedTimingLaneTest {
             harness.engine.start(index = 0)
             harness.engine.complete(index = 0)
 
-            assertEquals(null, harness.store.verdicts[ENGINE_KEY])
+            assertEquals(null, harness.store.verdicts[verdictKey()])
         }
 
     @Test
@@ -705,7 +796,7 @@ class TtsEstimatedTimingLaneTest {
 
             assertEquals(TtsNavigationOutcome.Moved, harness.controller.skipNextMessage())
             harness.engine.range(index = 0, start = 0, end = 5)
-            assertEquals(null, harness.store.verdicts[ENGINE_KEY])
+            assertEquals(null, harness.store.verdicts[verdictKey()])
 
             // Ticks armed for the first utterance are stale for the new
             // generation; the new message keeps its sentence-level passage.
@@ -796,7 +887,7 @@ class TtsEstimatedTimingLaneTest {
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
             harness.engine.start(index = 0)
             harness.engine.range(index = 0, start = 0, end = 5)
-            assertEquals(true, harness.store.verdicts[ENGINE_KEY])
+            assertEquals(true, harness.store.verdicts[verdictKey()])
 
             // A different engine must not inherit A's verdict: the estimate
             // runs for it while its own capability is unknown.
@@ -1008,6 +1099,8 @@ class TtsEstimatedTimingLaneTest {
 
     private companion object {
         const val ENGINE_KEY = "com.example.tts"
+
+        fun verdictKey(locale: Locale = Locale.US): String = ttsRangeVerdictKey(ENGINE_KEY, locale)
 
         /**
          * Long enough to clear the probe's overturn threshold in one utterance,

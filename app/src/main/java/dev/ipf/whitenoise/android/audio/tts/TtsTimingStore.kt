@@ -1,15 +1,16 @@
 package dev.ipf.whitenoise.android.audio.tts
 
+import java.util.Locale
+
 /**
  * Persistence for what the timing lane has learned about a TTS engine: whether
  * it reports word ranges, and how fast its voice actually speaks.
  *
  * Both facts are engine capabilities, not protocol data — Android platform
- * preferences in the same category as the engine choice itself. They are keyed
- * by engine package because a different engine is a different capability:
- * crediting one engine's callbacks to another would permanently disable the
- * estimated highlight on a silent engine, or run it against a voice it was
- * never calibrated for.
+ * preferences in the same category as the engine choice itself. Pace is keyed
+ * by engine package. Range timing is keyed by engine package plus locale,
+ * because setLanguage can select a voice with different callback support
+ * without replacing the engine instance.
  */
 interface TtsTimingStore {
     /** Persisted range verdict for [engineKey]; null while never concluded. */
@@ -28,3 +29,9 @@ interface TtsTimingStore {
         value: Double,
     )
 }
+
+/** Stable persistence key for the smallest synthesis context Android exposes here. */
+internal fun ttsRangeVerdictKey(
+    engineKey: String,
+    locale: Locale,
+): String = if (engineKey.isEmpty()) "" else "$engineKey|locale=${locale.toLanguageTag()}"

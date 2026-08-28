@@ -85,6 +85,12 @@ class TtsController internal constructor(
     // Locale of the active queue, retained so history pages loaded mid-session
     // chunk with the same sentence iterator the session started with.
     private var queueLocale: Locale = Locale.getDefault()
+
+    // A usable range proves only the voice selected for this locale. Keep the
+    // attachment-wide verdict provisional again when setLanguage can select a
+    // different voice without replacing the engine instance.
+    private var capabilityLocale: Locale? = null
+    private var rangeVerdictKey: String = ""
     private val queue =
         TtsPlaybackQueue(
             stopEngine = {
@@ -136,7 +142,9 @@ class TtsController internal constructor(
         // seed both from what this engine taught in earlier sessions, never
         // from whatever the previous engine left behind.
         this.engineKey = engineKey
-        rangeProbe.restore(timingStore?.rangeVerdict(engineKey))
+        rangeProbe.restore(null)
+        capabilityLocale = null
+        rangeVerdictKey = ""
         paceCalibrator.reset(storedPace())
         utteranceRates.clear()
         activeTiming = null
@@ -152,6 +160,8 @@ class TtsController internal constructor(
         engine = null
         engineKey = ""
         rangeProbe.restore(null)
+        capabilityLocale = null
+        rangeVerdictKey = ""
         utteranceRates.clear()
         activeTiming = null
         resetPaceMeasurement()
@@ -186,6 +196,17 @@ class TtsController internal constructor(
             )
             return false
         }
+        if (capabilityLocale != locale) {
+            rangeVerdictKey = ttsRangeVerdictKey(engineKey, locale)
+            val scopedVerdict = timingStore?.rangeVerdict(rangeVerdictKey)
+            // Older versions persisted one verdict per engine. Use it only as
+            // provisional fallback evidence; the first conclusion in this
+            // locale migrates it to the scoped key without deleting the legacy
+            // value needed by locales that have not yet been observed.
+            val legacyVerdict = if (scopedVerdict == null) timingStore?.rangeVerdict(engineKey) else null
+            rangeProbe.restore(scopedVerdict ?: legacyVerdict)
+        }
+        capabilityLocale = locale
         queue.start(messages, startSentenceIndex = startSentenceIndex.coerceAtLeast(0))
         return state.value !is TtsState.Error
     }
@@ -487,7 +508,7 @@ class TtsController internal constructor(
             closePaceGapOpener(chunk.index)
             if (timing != null) observeBootstrapPace(chunk, timing)
             if (rangeProbe.onUtteranceDone(chunk.answerableLength())) {
-                timingStore?.setRangeVerdict(engineKey, false)
+                timingStore?.setRangeVerdict(rangeVerdictKey, false)
             }
         }
         queue.onDone(utteranceId)
@@ -539,13 +560,15 @@ class TtsController internal constructor(
         // earning it. The snapshots are read before confirming, because
         // onRangeStart sets reportsRanges itself - guards evaluated afterwards
         // would always be false. A first proof retires the estimate and persists
-        // a newly learned verdict, but does not rewrite a restored true verdict.
+        // a newly learned verdict. A legacy engine-only true verdict is written
+        // once to this locale's key when the callback confirms it.
         val wasProven = rangeProbe.hasConfirmedRangeCapability
-        val wasCapable = rangeProbe.reportsRanges == true
         rangeProbe.onRangeStart()
         if (!wasProven) {
             wordTicker.stop()
-            if (!wasCapable) timingStore?.setRangeVerdict(engineKey, true)
+            if (timingStore?.rangeVerdict(rangeVerdictKey) != true) {
+                timingStore?.setRangeVerdict(rangeVerdictKey, true)
+            }
         }
     }
 
@@ -640,41 +663,6 @@ class TtsController internal constructor(
                 )
             }
         }
-
-    /**
-     * How much of a finished payload the engine could have named a visible word
-     * in. This is what the capability probe must count, never the payload's raw
-     * length.
-     *
-     * Only text INSIDE a visible span counts. A range that falls anywhere else
-     * cannot resolve to a word whatever the engine does - [TtsRangeTracker]
-     * needs contiguous span coverage and returns nothing otherwise - so silence
-     * over it is evidence about the surface, not about the engine, and
-     * crediting it lets one surface persist a verdict every other surface then
-     * inherits. That is not hypothetical: the plain speak overload and the text
-     * attachment reader carry no visible spans at all, so reading through them
-     * used to accumulate a full range-silent verdict against the engine
-     * package, which the conversation then read back.
-     *
-     * The sender announcement falls outside every span by construction (the
-     * queue shifts the spans past the prefix when it adds one), so it is
-     * excluded without a special case. Characters with no letter or digit are
-     * excluded too, which is how an emoji-only message stops counting as an
-     * unanswered question.
-     */
-    private fun TtsChunk.answerableLength(): Int {
-        var answerable = 0
-        for (span in visibleSpans) {
-            var offset = span.spoken.start.coerceIn(0, text.length)
-            val end = span.spoken.end.coerceIn(offset, text.length)
-            while (offset < end) {
-                val codePoint = text.codePointAt(offset)
-                if (Character.isLetterOrDigit(codePoint)) answerable++
-                offset += Character.charCount(codePoint)
-            }
-        }
-        return answerable
-    }
 
     private fun senderAnnouncementReserve(displayName: String): Int =
         displayName
