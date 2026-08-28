@@ -222,33 +222,43 @@ internal fun resolveTtsReadAloudHighlightStyle(
 
 /**
  * A sentence band has to satisfy two things at once: text stays readable on
- * it, and it is distinguishable from the bubble it sits on. Blending the
- * background away from the content satisfies only the first, and degenerates
- * whenever the background already is the extreme it moves toward - a true
- * black bubble with near-white text returns black at every strength, leaving
- * an invisible band.
+ * it, and it is distinguishable from the bubble under it. Neither direction
+ * alone manages both.
  *
- * Blending toward the content satisfies both from either direction. On black
- * with near-white text the starting ratio is about 21:1, so a small step
- * toward the content stays far above AA while the band becomes visible; a
- * light bubble behaves the same way in reverse. The weakest step that clears
- * both tests wins, keeping the treatment subtle.
+ * Moving away from the content protects text contrast, which is what a bubble
+ * with barely-readable text needs, but it degenerates when the background
+ * already is the extreme it moves toward - a true black bubble returns black
+ * at every strength and the band disappears. Moving toward the content always
+ * separates from the background but eats the very contrast a low-contrast
+ * bubble has none of.
+ *
+ * So try the safe direction first, weakest step upward, and fall through to
+ * the content direction only when the safe one cannot separate at all. Black
+ * with near-white text lands there and stays far above AA, because it starts
+ * near 21:1.
  */
 private fun visibleReadableSentenceFill(
     background: Long,
     content: Long,
-): Long =
-    TTS_SENTENCE_FILL_STRENGTHS
-        .map { strength -> blendOpaque(background, content, strength) }
-        .firstOrNull { fill ->
-            contrastRatio(fill, background) >= TTS_SENTENCE_FILL_MIN_SEPARATION &&
-                contrastRatio(content, fill) >= WCAG_AA_NORMAL_TEXT_CONTRAST &&
-                contrastRatio(
-                    content,
-                    blendOpaque(fill, content, TTS_INLINE_DECORATION_ALPHA),
-                ) >= WCAG_AA_NORMAL_TEXT_CONTRAST
+): Long {
+    val awayFromContent =
+        if (contrastRatio(content, OPAQUE_WHITE_ARGB) >= contrastRatio(content, OPAQUE_BLACK_ARGB)) {
+            OPAQUE_WHITE_ARGB
+        } else {
+            OPAQUE_BLACK_ARGB
         }
-        ?: background
+    val candidates =
+        TTS_SENTENCE_FILL_STRENGTHS.map { strength -> blendOpaque(background, awayFromContent, strength) } +
+            TTS_SENTENCE_FILL_STRENGTHS.map { strength -> blendOpaque(background, content, strength) }
+    return candidates.firstOrNull { fill ->
+        contrastRatio(fill, background) >= TTS_SENTENCE_FILL_MIN_SEPARATION &&
+            contrastRatio(content, fill) >= WCAG_AA_NORMAL_TEXT_CONTRAST &&
+            contrastRatio(
+                content,
+                blendOpaque(fill, content, TTS_INLINE_DECORATION_ALPHA),
+            ) >= WCAG_AA_NORMAL_TEXT_CONTRAST
+    } ?: background
+}
 
 private fun readableMarker(
     candidates: List<Long>,

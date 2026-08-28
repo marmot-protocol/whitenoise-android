@@ -94,12 +94,13 @@ class TtsReadAloudHighlightTest {
             assertTrue(contrastRatio(style.sentenceMarker, style.sentenceFill) >= WCAG_NON_TEXT_CONTRAST)
             assertTrue(contrastRatio(style.wordMarker, style.sentenceFill) >= WCAG_NON_TEXT_CONTRAST)
             assertTrue(contrastRatio(style.wordMarker, background) >= WCAG_NON_TEXT_CONTRAST)
+            // The band must be visible on every bubble, AMOLED included. It
+            // used to be assigned the background there, which made the rails
+            // the only cue; with the rails gone that left no cue at all.
+            assertTrue(style.sentenceFill != background)
             if (amoled) {
-                assertEquals(background, style.sentenceFill)
                 assertEquals(0L, style.sentenceMarker and 0xFFL)
                 assertEquals(0L, style.wordMarker and 0xFFL)
-            } else {
-                assertTrue(style.sentenceFill != background)
             }
         }
     }
