@@ -16,8 +16,8 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.core.graphics.Insets
@@ -109,6 +109,43 @@ class ComposerImeHandoffBackTest {
     }
 
     @Test
+    fun keyboardDictationFinishCommitAndImeReopenPreserveFocusDraftAndSelection() {
+        val harness = harness()
+
+        harness.focusComposer()
+        harness.dispatchImeBottom(300)
+        val registeredCallback = checkNotNull(harness.overlayCallback)
+
+        // Third-party keyboard dictation temporarily owns the bottom surface,
+        // then commits one large TextFieldValue update before reopening its IME.
+        harness.dispatchImeBottom(0)
+        composeRule.runOnIdle {
+            harness.value =
+                TextFieldValue(
+                    text = "draft dictated replacement text",
+                    selection = TextRange(16),
+                )
+        }
+        composeRule.waitForIdle()
+        harness.dispatchImeBottom(300)
+
+        val caret =
+            harness.composer
+                .fetchSemanticsNode()
+                .config
+                .getOrNull(TextSelectionRange)
+        harness.composer.assertIsFocused()
+        assertEquals(0, harness.backInvocations)
+        assertEquals(harness.value.selection, caret)
+        assertEquals("draft dictated replacement text", harness.value.text)
+        assertSame(
+            "keyboard-owned dictation must not churn the focused composer's Back owner",
+            registeredCallback,
+            harness.overlayCallback,
+        )
+    }
+
+    @Test
     fun overlayBackOwnerCanDeferFocusClearUntilTheImeInsetIsZero() {
         val harness = harness(clearFocusOnBack = false)
 
@@ -177,7 +214,7 @@ class ComposerImeHandoffBackTest {
         lateinit var view: View
 
         val composer: SemanticsNodeInteraction
-            get() = composeRule.onNodeWithText(DRAFT)
+            get() = composeRule.onNode(hasSetTextAction())
 
         fun focusComposer() {
             composeRule.runOnIdle { focusRequester.requestFocus() }

@@ -83,8 +83,12 @@ class MessageBubbleEditedMarkdownTest {
         )
         assertTrue(
             "active TTS must reuse the display parse instead of parsing an edit twice",
-            "if (!ttsSpeakableSource.useStoredContentTokens)" in source &&
+            "!ttsSpeakableSource.useStoredContentTokens" in source &&
                 "activeSpeakableDocument = editedMarkdownDocument" in source,
+        )
+        assertTrue(
+            "reusing the edited document requires one to exist, or the projection is lost",
+            "editedMarkdownDocument != null" in source,
         )
     }
 

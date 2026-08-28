@@ -417,6 +417,7 @@ internal fun ComposerBar(
     // the message id so a tap-Edit on a different message snapshots a fresh
     // baseline.
     var preEditFieldValue by textState.preEditState
+    var composerTextEditOwnerId by remember(draftKey) { mutableStateOf<String?>(null) }
     // Claim focus on edit-entry so the IME opens with the caret at the end
     // of the prefill, without making the user tap the field a second time.
     // `composerFocus` is now hoisted in via a parameter (#589) so the
@@ -435,6 +436,7 @@ internal fun ComposerBar(
             if (preEditFieldValue == null) preEditFieldValue = textFieldValue
             val prefill = editingInitialText.orEmpty()
             textFieldValue = TextFieldValue(text = prefill, selection = TextRange(prefill.length))
+            composerTextEditOwnerId = editingMessageId
             onBottomInputChanged()
             runCatching { composerFocus.requestFocus() }
         } else if (preEditFieldValue != null) {
@@ -442,6 +444,9 @@ internal fun ComposerBar(
             // been composing before they tapped Edit (text + original caret).
             textFieldValue = preEditFieldValue ?: TextFieldValue("")
             preEditFieldValue = null
+            composerTextEditOwnerId = null
+        } else {
+            composerTextEditOwnerId = null
         }
     }
     // #321: a just-created conversation opens directly with the composer ready.
@@ -982,11 +987,17 @@ internal fun ComposerBar(
                     )
                 }
                 // #414: live @-mention picker. Compute the open query from the current
-                // caret; suppressed entirely in DMs and while editing/recording or with
-                // no roster. Anchored directly above the composer input row, capped at
+                // caret; suppressed entirely in DMs or with no roster. Edit mode
+                // intentionally shares this exact query/insertion contract so
+                // canonical mention tokens survive save and reopen. The owner gate
+                // suppresses the one composition between an edit-session change and
+                // its LaunchedEffect prefill, when the field still belongs to the
+                // previous draft or edit target.
+                // Anchored directly above the composer input row, capped at
                 // ~50% of the viewport height.
+                val composerTextMatchesEditSession = composerTextEditOwnerId == editingMessageId
                 val mentionQuery =
-                    if (mentionPickerEnabled && editingMessageId == null) {
+                    if (mentionPickerEnabled && composerTextMatchesEditSession) {
                         MentionComposer
                             .activeMentionQuery(textFieldValue.text, textFieldValue.selection.start)
                             .takeIf { textFieldValue.selection.collapsed }

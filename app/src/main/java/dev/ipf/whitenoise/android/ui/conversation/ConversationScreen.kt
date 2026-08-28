@@ -2559,7 +2559,7 @@ internal fun ConversationScreen(
         }
     }
 
-    fun reanchorNewestAfterBottomInputChange(frameCount: Int = 24) {
+    fun reanchorNewestAfterBottomInputChange(frameCount: Int = 1) {
         if (!initialTimelineAnchored) return
         scope.launch {
             scrollCoordinator.followTailIfAllowed(

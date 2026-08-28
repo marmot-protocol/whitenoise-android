@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -41,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -50,6 +52,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.os.ConfigurationCompat
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.MessageStatusLabels
@@ -57,11 +60,15 @@ import dev.ipf.whitenoise.android.state.formatExactTimestamp
 import dev.ipf.whitenoise.android.state.labelFor
 import dev.ipf.whitenoise.android.state.shortHex
 import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
+import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingBottomSheet
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import java.time.ZoneId
 import java.util.Locale
+
+internal const val MESSAGE_FULL_SCREEN_TAG = "message-full-screen"
+internal const val MESSAGE_FULL_SCREEN_BODY_TAG = "message-full-screen-body"
 
 /**
  * Full-screen reader for a body too long to show inline. Reached from the
@@ -75,6 +82,11 @@ internal fun MessageFullScreenView(
     senderSeed: String,
     senderAvatarUrl: String?,
     body: String,
+    bodyMarkdownDocument: MarkdownDocumentFfi?,
+    mentionDisplayName: ((String) -> String?)?,
+    isGroupMember: ((String) -> Boolean)?,
+    onNostrProfileTap: ((String) -> Unit)?,
+    onCopyMarkdownLink: (String) -> Unit,
     timeText: String,
     showStatus: Boolean,
     status: MessageStatus,
@@ -99,6 +111,7 @@ internal fun MessageFullScreenView(
     ) {
         var overflowOpen by remember { mutableStateOf(false) }
         Scaffold(
+            modifier = Modifier.testTag(MESSAGE_FULL_SCREEN_TAG),
             topBar = {
                 TopAppBar(
                     title = {
@@ -224,13 +237,47 @@ internal fun MessageFullScreenView(
                     border = amoledSurfaceBorderStroke(),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(
-                        body,
-                        style = MaterialTheme.typography.bodyLarge,
+                    MessageFullScreenBody(
+                        body = body,
+                        markdownDocument = bodyMarkdownDocument,
+                        mentionDisplayName = mentionDisplayName,
+                        isGroupMember = isGroupMember,
+                        onNostrProfileTap = onNostrProfileTap,
+                        onCopyMarkdownLink = onCopyMarkdownLink,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+internal fun MessageFullScreenBody(
+    body: String,
+    markdownDocument: MarkdownDocumentFfi?,
+    mentionDisplayName: ((String) -> String?)?,
+    isGroupMember: ((String) -> Boolean)?,
+    onNostrProfileTap: ((String) -> Unit)?,
+    onCopyMarkdownLink: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SelectionContainer(modifier = modifier.testTag(MESSAGE_FULL_SCREEN_BODY_TAG)) {
+        if (markdownDocument != null) {
+            MarkdownMessageBody(
+                document = markdownDocument,
+                modifier = Modifier.fillMaxWidth(),
+                mentionDisplayName = mentionDisplayName,
+                isGroupMember = isGroupMember,
+                onNostrProfileTap = onNostrProfileTap,
+                onCopyLink = onCopyMarkdownLink,
+            )
+        } else {
+            Text(
+                body,
+                style = MaterialTheme.typography.bodyLarge,
+            )
         }
     }
 }

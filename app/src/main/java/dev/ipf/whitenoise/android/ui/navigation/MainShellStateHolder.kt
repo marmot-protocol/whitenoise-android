@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
+import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
@@ -163,6 +164,12 @@ internal class MainShellStateHolder(
     private val savedStateHandle: SavedStateHandle,
     private val processState: MainShellProcessState = MainShellProcessState(appState),
 ) : ViewModel() {
+    /**
+     * Activity-task-owned inbound share. Keeping this on the retained holder
+     * lets configuration recreation preserve the newest request without using
+     * process-global state to bridge separate tasks.
+     */
+    val inboundShareRequest = mutableStateOf<ShareRequest?>(null)
     val selectedChat = processState.selectedChat
     val selectedChatOpenContext = processState.selectedChatOpenContext
     val selectedChatJustCreated = processState.selectedChatJustCreated

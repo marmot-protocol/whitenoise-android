@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -89,6 +90,14 @@ class ComposerBarScreenshotTest {
     fun composerBarLongDraftLight() {
         renderLongComposer(darkTheme = false)
         composeRule.onNodeWithTag(LONG_TAG).captureRoboImage("src/test/snapshots/composer_bar_long_draft_light.png")
+    }
+
+    @Test
+    fun composerBarLongDraftEndSelectionLight() {
+        renderLongComposer(darkTheme = false, selectionAtEnd = true)
+        composeRule
+            .onNodeWithTag(LONG_TAG)
+            .captureRoboImage("src/test/snapshots/composer_bar_long_draft_end_selection_light.png")
     }
 
     @Test
@@ -356,13 +365,18 @@ class ComposerBarScreenshotTest {
         darkTheme: Boolean,
         amoled: Boolean = false,
         largeRtl: Boolean = false,
+        selectionAtEnd: Boolean = false,
     ) {
         val draft =
-            "A thoughtful long message starts here.\n" +
-                "It keeps growing naturally line by line.\n" +
-                "The controls remain easy to reach.\n" +
-                "Nothing in the draft is replaced.\n" +
-                "The final paragraph stays visible while editing."
+            if (selectionAtEnd) {
+                (1..16).joinToString("\n") { line -> "Composer caret regression line $line." }
+            } else {
+                "A thoughtful long message starts here.\n" +
+                    "It keeps growing naturally line by line.\n" +
+                    "The controls remain easy to reach.\n" +
+                    "Nothing in the draft is replaced.\n" +
+                    "The final paragraph stays visible while editing."
+            }
         composeRule.setContent {
             val baseDensity = LocalDensity.current
             CompositionLocalProvider(
@@ -379,7 +393,11 @@ class ComposerBarScreenshotTest {
                                 onSend = { _, _ -> },
                                 onPickFromGallery = {},
                                 onPickDocument = {},
-                                initialDraft = TextFieldValue(draft),
+                                initialDraft =
+                                    TextFieldValue(
+                                        text = draft,
+                                        selection = if (selectionAtEnd) TextRange(draft.length) else TextRange.Zero,
+                                    ),
                                 modifier = Modifier.testTag(LONG_TAG),
                             )
                         }

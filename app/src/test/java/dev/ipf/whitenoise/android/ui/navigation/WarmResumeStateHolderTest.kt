@@ -8,6 +8,8 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.share.SharePayload
+import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ChatsController
@@ -96,6 +98,26 @@ class WarmResumeStateHolderTest {
         assertSame(firstActivityHolder.selectedChat.value, freshActivityHolder.selectedChat.value)
         freshActivityHolder.release()
         snapshotController.onCleared()
+    }
+
+    @Test
+    fun freshActivityHolderDoesNotInheritAnotherTasksPendingShare() {
+        val state = appState()
+        val processState = MainShellProcessState(state)
+        val firstActivityHolder = MainShellStateHolder(state, SavedStateHandle(), processState)
+        val freshActivityHolder = MainShellStateHolder(state, SavedStateHandle(), processState)
+        val request =
+            ShareRequest(
+                payload = SharePayload("pending", emptyList(), "text/plain"),
+                shortcutId = null,
+                requestId = "pending-share",
+            )
+
+        firstActivityHolder.inboundShareRequest.value = request
+
+        assertSame(request, firstActivityHolder.inboundShareRequest.value)
+        assertNull(freshActivityHolder.inboundShareRequest.value)
+        freshActivityHolder.release()
     }
 
     @Test

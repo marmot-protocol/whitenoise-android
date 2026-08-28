@@ -199,12 +199,13 @@ internal fun ColumnScope.BubbleMediaBlocks(
             ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                     MediaVideoBubble(
-                        messageIdHex = record.messageIdHex,
+                        item = item,
                         attachmentIndex = entry.index,
                         reference = entry.value,
                         mine = mine,
                         controller = controller,
                         appState = appState,
+                        conversationVisualPages = conversationVisualPages,
                         onLongPress = onMediaLongPress,
                         attachedToCaption = attachedToCaption,
                     )
@@ -332,12 +333,13 @@ internal fun ColumnScope.BubbleMediaBlocks(
             ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                     MediaVideoBubble(
-                        messageIdHex = record.messageIdHex,
+                        item = item,
                         attachmentIndex = entry.index,
                         reference = entry.value,
                         mine = true,
                         controller = controller,
                         appState = appState,
+                        conversationVisualPages = conversationVisualPages,
                         onLongPress = onMediaLongPress,
                         uploading = !uploadFailed,
                         uploadFailed = uploadFailed,
@@ -488,12 +490,16 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     val readMoreLabel = stringResource(R.string.message_read_more)
     val readMoreStyle = SpanStyle(color = bubbleContentColor, fontWeight = FontWeight.Bold)
     if (bodyText != null) {
-        val markdownDocument = bodyMarkdownDocument ?: record.contentTokens
-        val renderMarkdownBody =
-            !deleted &&
-                !persistedFailure &&
-                markdownDocument.blocks.isNotEmpty() &&
-                (bodyText == record.plaintext || bodyMarkdownDocument != null)
+        val markdownDocument =
+            messageMarkdownDocumentForDisplayedBody(
+                bodyText = bodyText,
+                recordPlaintext = record.plaintext,
+                storedDocument = record.contentTokens,
+                overrideDocument = bodyMarkdownDocument,
+                deleted = deleted,
+                persistedFailure = persistedFailure,
+            )
+        val renderMarkdownBody = markdownDocument != null
         val eventReferences =
             remember(renderMarkdownBody, markdownDocument, eventCardResolver) {
                 if (renderMarkdownBody && eventCardResolver != null) {
@@ -575,7 +581,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                             }
                         }
                     MarkdownMessageBody(
-                        markdownDocument,
+                        checkNotNull(markdownDocument),
                         mentionDisplayName =
                             remember(appState) {
                                 { bech32: String -> appState.mentionDisplayName(bech32) }

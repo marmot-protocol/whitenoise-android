@@ -356,7 +356,7 @@ class NotificationRouteTimelinePresentationTest {
         failureMessage: (() -> String)? = null,
         condition: () -> Boolean,
     ) {
-        awaitConversationCondition(condition = condition)
+        awaitConversationCondition(timeoutMs = ROUTE_TIMEOUT_MILLIS, condition = condition)
         composeRule.waitForIdle()
         ShadowLooper.idleMainLooper()
         if (!condition()) {

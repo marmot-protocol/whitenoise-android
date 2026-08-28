@@ -613,17 +613,24 @@ internal suspend fun shareVideo(
     source: java.io.File,
     fileName: String,
     mediaType: String,
-) {
-    val uri =
-        withContext(Dispatchers.IO) {
-            runCatching {
+): Result<Unit> =
+    runCatchingCancellable {
+        val uri =
+            withContext(Dispatchers.IO) {
                 val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
                 val file = java.io.File.createTempFile("share_", "_" + MediaPipeline.safeDisplayName(fileName), dir)
                 writeSharedMediaFile(file, source)
                 fileProviderUri(context, file)
-            }.getOrNull()
-        } ?: return
-    runCatching {
+            }
+        launchVideoShare(context, uri, mediaType).getOrThrow()
+    }
+
+internal fun launchVideoShare(
+    context: android.content.Context,
+    uri: Uri,
+    mediaType: String,
+): Result<Unit> =
+    runCatchingCancellable {
         val intent =
             android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                 type = mediaType.ifBlank { "video/mp4" }
@@ -636,7 +643,6 @@ internal suspend fun shareVideo(
             },
         )
     }
-}
 
 /**
  * Share [bytes] via a FileProvider Uri using the system share sheet.

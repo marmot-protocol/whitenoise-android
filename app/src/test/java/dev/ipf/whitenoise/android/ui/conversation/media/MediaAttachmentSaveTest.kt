@@ -9,6 +9,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.provider.MediaStore
 import android.provider.Settings
+import androidx.core.content.IntentCompat
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -157,6 +158,73 @@ class MediaAttachmentSaveTest {
                 )
 
             assertSame(failure, result.exceptionOrNull())
+        }
+
+    @Test
+    fun videoShareUsesAReadOnlyContentIntentWithTheOriginalMimeType() =
+        runTest {
+            var launchedChooser: Intent? = null
+            val capturingContext =
+                object : ContextWrapper(context()) {
+                    override fun startActivity(intent: Intent) {
+                        launchedChooser = intent
+                    }
+                }
+            val uri = Uri.parse("content://dev.ipf.whitenoise.android.dev.fileprovider/shared_media/clip.webm")
+
+            val result = launchVideoShare(capturingContext, uri, "video/webm")
+
+            assertTrue(result.isSuccess)
+            val shareIntent =
+                IntentCompat.getParcelableExtra(
+                    checkNotNull(launchedChooser),
+                    Intent.EXTRA_INTENT,
+                    Intent::class.java,
+                ) ?: error("chooser did not contain a share intent")
+            assertEquals(Intent.ACTION_SEND, shareIntent.action)
+            assertEquals("video/webm", shareIntent.type)
+            assertEquals(uri, IntentCompat.getParcelableExtra(shareIntent, Intent.EXTRA_STREAM, Uri::class.java))
+            assertTrue(shareIntent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+        }
+
+    @Test
+    fun videoSharePreservesPlatformFailureForPresentation() =
+        runTest {
+            val failure = SecurityException("credential-bearing provider detail")
+            val failingContext =
+                object : ContextWrapper(context()) {
+                    override fun startActivity(intent: Intent): Unit = throw failure
+                }
+
+            val result =
+                launchVideoShare(
+                    failingContext,
+                    Uri.parse("content://dev.ipf.whitenoise.android.dev.fileprovider/shared_media/clip.mp4"),
+                    "video/mp4",
+                )
+
+            assertSame(failure, result.exceptionOrNull())
+        }
+
+    @Test
+    fun videoShareRethrowsCancellation() =
+        runTest {
+            val cancellation = CancellationException("screen closed")
+            val cancellingContext =
+                object : ContextWrapper(context()) {
+                    override fun startActivity(intent: Intent): Unit = throw cancellation
+                }
+
+            val observed =
+                runCatching {
+                    launchVideoShare(
+                        cancellingContext,
+                        Uri.parse("content://dev.ipf.whitenoise.android.dev.fileprovider/shared_media/clip.mp4"),
+                        "video/mp4",
+                    )
+                }.exceptionOrNull()
+
+            assertSame(cancellation, observed)
         }
 
     @Test

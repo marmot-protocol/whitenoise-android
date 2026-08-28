@@ -31,8 +31,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -230,9 +230,13 @@ class LocalNotificationPresenterConversationTest {
                 ),
             displayTitle = { it.group.name },
         )
-        assertSame(rich, synced)
-        assertTrue(conversationShortcutIsRich(checkNotNull(synced)))
-        assertTrue(synced.categories?.contains(CONVERSATION_SHARE_TARGET_CATEGORY) == true)
+        val ranked = checkNotNull(synced)
+        assertNotSame(rich, ranked)
+        assertEquals(0, ranked.rank)
+        assertEquals(rich.locusId, ranked.locusId)
+        assertEquals(rich.intent, ranked.intent)
+        assertTrue(conversationShortcutIsRich(ranked))
+        assertTrue(ranked.categories?.contains(CONVERSATION_SHARE_TARGET_CATEGORY) == true)
     }
 
     @Test
