@@ -1249,8 +1249,17 @@ private data class StartupUnreadRefresh(
 
 private data class AccountUnreadFoldResult(
     val accountRef: String,
-    val unreadCount: ULong,
-    val hasManualUnread: Boolean?,
+    val value: AccountUnreadValue,
+)
+
+private data class VersionedAccountUnreadValue(
+    val value: AccountUnreadValue,
+    val revision: Long?,
+)
+
+private data class AccountUnreadPublication(
+    val values: Map<String, VersionedAccountUnreadValue>,
+    val writtenRefs: Set<String>,
 )
 
 class WhiteNoiseAppState private constructor(
@@ -1793,8 +1802,14 @@ class WhiteNoiseAppState private constructor(
     var accounts by mutableStateOf(initialAccounts)
         private set
 
-    var accountUnreadCounts by mutableStateOf<Map<String, ULong>>(emptyMap())
-        private set
+    private var accountUnreadValues by mutableStateOf<Map<String, AccountUnreadValue>>(emptyMap())
+    private val accountUnreadLock = Any()
+    private var accountUnreadRevision = 0L
+    private val accountUnreadRevisions = mutableMapOf<String, Long>()
+    private var accountUnreadRefreshGeneration = 0L
+
+    val accountUnreadCounts: Map<String, ULong>
+        get() = accountUnreadValues.mapValues { (_, value) -> value.unreadCount }
 
     var activeAccountRef by mutableStateOf(initialActiveAccountRef ?: preferences.getString(ACTIVE_ACCOUNT_KEY, null))
         private set
@@ -4610,7 +4625,11 @@ class WhiteNoiseAppState private constructor(
         return latestAccounts
     }
 
-    fun unreadCountForAccount(accountRef: String): ULong = accountUnreadCounts[accountRef] ?: 0uL
+    /** Retained count for reconciliation and diagnostics, even while freshness is unknown. */
+    fun unreadCountForAccount(accountRef: String): ULong = accountUnreadValues[accountRef]?.unreadCount ?: 0uL
+
+    /** Count safe to render as current. Unknown retained values intentionally present as no badge. */
+    fun confirmedUnreadCountForAccount(accountRef: String): ULong = accountUnreadValues[accountRef].confirmedUnreadCount()
 
     /**
      * Whether [accountRef]'s avatar should light the unread dot, from that
@@ -4618,14 +4637,38 @@ class WhiteNoiseAppState private constructor(
      * the secondary top-bar avatars, and the account switcher so no avatar can
      * light for another account's unread.
      */
-    fun accountShowsUnreadDot(accountRef: String?): Boolean = accountShowsUnreadDot(accountRef, accountUnreadCounts) || accountRef in accountManualUnreadRefs
+    fun accountShowsUnreadDot(accountRef: String?): Boolean {
+        val ref = accountRef?.takeIf { it.isNotBlank() } ?: return false
+        return accountUnreadValues[ref].showsUnreadDot()
+    }
 
     internal fun updateAccountUnreadCount(
         accountRef: String?,
         unreadCount: ULong,
     ) {
         val ref = accountRef?.takeIf { it.isNotBlank() } ?: return
-        accountUnreadCounts = accountUnreadCounts + (ref to unreadCount)
+        updateAccountUnreadValue(ref) { previous ->
+            AccountUnreadValue(
+                unreadCount = unreadCount,
+                freshness = AccountUnreadFreshness.CONFIRMED,
+                hasManualUnread = previous?.hasManualUnread,
+            )
+        }
+    }
+
+    internal fun updateAccountUnreadProjection(
+        accountRef: String?,
+        unreadCount: ULong,
+        hasManualUnread: Boolean,
+    ) {
+        val ref = accountRef?.takeIf { it.isNotBlank() } ?: return
+        updateAccountUnreadValue(ref) {
+            AccountUnreadValue(
+                unreadCount = unreadCount,
+                freshness = AccountUnreadFreshness.CONFIRMED,
+                hasManualUnread = hasManualUnread,
+            )
+        }
     }
 
     /**
@@ -4633,41 +4676,134 @@ class WhiteNoiseAppState private constructor(
      * sidecar to [accountUnreadCounts]: the numeric map stays a real message
      * count (it feeds literal count badges), while this set only lights dots.
      */
-    internal var accountManualUnreadRefs by mutableStateOf<Set<String>>(emptySet())
-        private set
-
-    private val manualUnreadLock = Any()
-
-    // Accounts whose rows have actually been folded at least once this
-    // process (fold success or a live controller recompute). The cheap
-    // zero-count short-circuit is only trusted for these: the manual-unread
-    // flag lives in rows, so an account never yet folded — cold start, a
-    // fresh sign-in, or a transiently failed fold — must take the row fold.
-    private var manualUnreadFoldedRefs = setOf<String>()
+    internal val accountManualUnreadRefs: Set<String>
+        get() =
+            accountUnreadValues
+                .filterValues { it.hasManualUnread == true }
+                .keys
 
     internal fun updateAccountManualUnread(
         accountRef: String?,
         hasManualUnread: Boolean,
     ) {
         val ref = accountRef?.takeIf { it.isNotBlank() } ?: return
-        // Read-modify-write under a lock: writers race across the controller's
-        // main-thread recompute, the notification hot path, and the four-way
-        // concurrent bulk refresh.
-        synchronized(manualUnreadLock) {
-            manualUnreadFoldedRefs = manualUnreadFoldedRefs + ref
-            accountManualUnreadRefs =
-                if (hasManualUnread) accountManualUnreadRefs + ref else accountManualUnreadRefs - ref
+        updateAccountUnreadValue(ref) { previous ->
+            AccountUnreadValue(
+                unreadCount = previous?.unreadCount ?: 0uL,
+                freshness = previous?.freshness ?: AccountUnreadFreshness.UNKNOWN,
+                hasManualUnread = hasManualUnread,
+            )
         }
     }
 
-    private fun manualUnreadFolded(ref: String) = synchronized(manualUnreadLock) { ref in manualUnreadFoldedRefs }
-
-    private fun retainManualUnreadRefs(current: Set<String>) {
-        synchronized(manualUnreadLock) {
-            manualUnreadFoldedRefs = manualUnreadFoldedRefs.intersect(current)
-            accountManualUnreadRefs = accountManualUnreadRefs.intersect(current)
+    private fun updateAccountUnreadValue(
+        accountRef: String,
+        transform: (AccountUnreadValue?) -> AccountUnreadValue,
+    ) {
+        synchronized(accountUnreadLock) {
+            val previous = accountUnreadValues[accountRef]
+            val next = transform(previous)
+            accountUnreadRevision += 1L
+            accountUnreadRevisions[accountRef] = accountUnreadRevision
+            if (previous != next) accountUnreadValues = accountUnreadValues + (accountRef to next)
         }
     }
+
+    private fun accountUnreadSnapshotLocked(): Map<String, VersionedAccountUnreadValue> =
+        accountUnreadValues.mapValues { (ref, value) ->
+            VersionedAccountUnreadValue(
+                value = value,
+                revision = accountUnreadRevisions[ref],
+            )
+        }
+
+    private fun markAccountUnreadUnknown(accountRef: String) {
+        synchronized(accountUnreadLock) {
+            // This is presentation uncertainty rather than new unread evidence:
+            // cancel older bulk publications, but let an already-running exact
+            // single-account fold replace it when that authoritative read lands.
+            accountUnreadRefreshGeneration += 1L
+            val previous = accountUnreadValues[accountRef]
+            val unknown =
+                AccountUnreadValue(
+                    unreadCount = previous?.unreadCount ?: 0uL,
+                    freshness = AccountUnreadFreshness.UNKNOWN,
+                    hasManualUnread = previous?.hasManualUnread,
+                )
+            if (previous != unknown) accountUnreadValues = accountUnreadValues + (accountRef to unknown)
+        }
+    }
+
+    /**
+     * Publish a bulk refresh without overwriting a newer controller or
+     * notification-path update that landed while FFI work was suspended.
+     */
+    private fun publishAccountUnreadRefresh(
+        previous: Map<String, VersionedAccountUnreadValue>,
+        refreshed: List<AccountUnreadFoldResult>,
+        refreshGeneration: Long,
+    ): AccountUnreadPublication =
+        synchronized(accountUnreadLock) {
+            if (accountUnreadRefreshGeneration != refreshGeneration) {
+                return@synchronized AccountUnreadPublication(accountUnreadSnapshotLocked(), emptySet())
+            }
+            val current = accountUnreadSnapshotLocked()
+            val merged = linkedMapOf<String, VersionedAccountUnreadValue>()
+            val writtenRefs = mutableSetOf<String>()
+            refreshed.forEach { result ->
+                val ref = result.accountRef
+                val previousRevision = previous[ref]?.revision
+                val currentValue = current[ref]
+                if (currentValue?.revision != previousRevision) {
+                    currentValue?.let { merged[ref] = it }
+                } else if (currentValue?.value == result.value) {
+                    accountUnreadRevision += 1L
+                    merged[ref] = VersionedAccountUnreadValue(result.value, accountUnreadRevision)
+                    writtenRefs += ref
+                } else {
+                    accountUnreadRevision += 1L
+                    merged[ref] = VersionedAccountUnreadValue(result.value, accountUnreadRevision)
+                    writtenRefs += ref
+                }
+            }
+            // An overlapping newer account-list refresh may have added an
+            // account after this pass started. Preserve only genuinely new
+            // keys; old keys remain governed by this refresh so removals still
+            // drop them deterministically.
+            current.forEach { (ref, value) ->
+                if (ref !in previous && ref !in merged) merged[ref] = value
+            }
+            val mergedValues = merged.mapValues { (_, versioned) -> versioned.value }
+            if (accountUnreadValues != mergedValues) accountUnreadValues = mergedValues
+            accountUnreadRevisions.clear()
+            merged.forEach { (ref, versioned) ->
+                versioned.revision?.let { accountUnreadRevisions[ref] = it }
+            }
+            AccountUnreadPublication(merged, writtenRefs)
+        }
+
+    private fun beginAccountUnreadRefresh(): Long =
+        synchronized(accountUnreadLock) {
+            accountUnreadRefreshGeneration += 1L
+            accountUnreadRefreshGeneration
+        }
+
+    private fun isAccountUnreadRefreshCurrent(generation: Long): Boolean =
+        synchronized(accountUnreadLock) {
+            accountUnreadRefreshGeneration == generation
+        }
+
+    private fun accountUnreadExactBaseline(
+        original: Map<String, VersionedAccountUnreadValue>,
+        interim: AccountUnreadPublication,
+    ): Map<String, VersionedAccountUnreadValue> =
+        interim.values.toMutableMap().apply {
+            interim.values.keys.forEach { ref ->
+                if (ref !in interim.writtenRefs) {
+                    original[ref]?.let { this[ref] = it } ?: remove(ref)
+                }
+            }
+        }
 
     @Suppress(
         "ReturnCount", // Empty, stale-empty, and stale-in-flight snapshots each stop before publishing.
@@ -4678,27 +4814,46 @@ class WhiteNoiseAppState private constructor(
         loadMemberRosters: Boolean = true,
         stillCurrent: () -> Boolean = { true },
     ) {
+        if (!stillCurrent()) return
+        val accountListRevisionAtStart = accountListRevision
+        val refreshGeneration = beginAccountUnreadRefresh()
+
+        fun refreshIsCurrent(): Boolean =
+            stillCurrent() &&
+                accountListRevision == accountListRevisionAtStart &&
+                isAccountUnreadRefreshCurrent(refreshGeneration)
+
         val signingAccounts = accountSummaries.filter { it.isSignedInSigningAccount() }
         if (signingAccounts.isEmpty()) {
-            if (!stillCurrent()) return
-            accountUnreadCounts = emptyMap()
-            retainManualUnreadRefs(emptySet())
+            if (!refreshIsCurrent()) return
+            synchronized(accountUnreadLock) {
+                accountUnreadValues = emptyMap()
+                accountUnreadRevisions.clear()
+            }
             return
         }
 
-        val previous = accountUnreadCounts
+        val previous = synchronized(accountUnreadLock) { accountUnreadSnapshotLocked() }
+        val previousValues = previous.mapValues { (_, versioned) -> versioned.value }
         val rawCountsByHex =
             runCatchingCancellable {
                 marmotIo { accountUnreadSummary().associate { it.accountIdHex to it.unreadCount } }
-            }.onFailure {
-                appStateDebug(it) { "account unread summary refresh failed: ${it.readableMessage()}" }
-            }.getOrNull()
-        if (!loadMemberRosters) {
-            if (!stillCurrent()) return
-            accountUnreadCounts = rawAccountUnreadCounts(signingAccounts, rawCountsByHex, previous)
-            retainManualUnreadRefs(signingAccounts.mapTo(mutableSetOf(), AccountSummaryFfi::label))
-            return
-        }
+            }.onFailure { appStateDebug { "account unread summary refresh failed" } }
+                .getOrNull()
+        if (!refreshIsCurrent()) return
+        val rawValues = rawAccountUnreadValues(signingAccounts, rawCountsByHex, previousValues)
+        // Publish best-effort freshness before slower exact row folds: present
+        // summary rows are current, while omitted/failed rows immediately stop
+        // presenting their retained count as confirmed.
+        val interimPublication =
+            publishAccountUnreadRefresh(
+                previous = previous,
+                refreshed = rawValues.map { (ref, value) -> AccountUnreadFoldResult(ref, value) },
+                refreshGeneration = refreshGeneration,
+            )
+        if (!loadMemberRosters) return
+        if (!refreshIsCurrent()) return
+        val foldBaselineValues = interimPublication.values.mapValues { (_, versioned) -> versioned.value }
         val accountGate = Semaphore(ACCOUNT_UNREAD_ACCOUNT_FANOUT)
         // Share one roster gate across the whole bulk refresh so member FFI
         // fan-out stays bounded across all signed-in accounts, not per account.
@@ -4712,47 +4867,38 @@ class WhiteNoiseAppState private constructor(
                                 refreshAccountUnreadFold(
                                     summary = summary,
                                     rawCount = rawCountsByHex?.get(summary.accountIdHex),
-                                    previousCount = previous[summary.label],
+                                    previous = foldBaselineValues[summary.label],
                                     memberGate = memberGate,
                                 )
                             }
                         }
                     }.awaitAll()
             }
-        val refreshedCounts = linkedMapOf<String, ULong>()
-        refreshedPairs.forEach { refreshedCounts[it.accountRef] = it.unreadCount }
         // A sign-out/account refresh may have completed while the cold-start
         // fold was suspended. Discard that obsolete result rather than
         // resurrecting counts for an account no longer in the authoritative
         // list; the newer lifecycle operation owns convergence.
-        if (!stillCurrent()) return
-        refreshedPairs.forEach { result ->
-            result.hasManualUnread?.let { updateAccountManualUnread(result.accountRef, it) }
-        }
-        // Re-read after the FFI suspension: a single-key merge
-        // (updateAccountUnreadCount / refreshAccountUnreadCount) may have landed
-        // while we were suspended. Those values are fresher than our snapshot, so
-        // let them win for keys we still track; a wholesale assign would clobber
-        // them. Accounts absent from refreshedCounts (removed) are still dropped.
-        val merged = refreshedCounts.toMutableMap()
-        accountUnreadCounts.forEach { (ref, count) ->
-            if (previous[ref] != count && merged.containsKey(ref)) merged[ref] = count
-        }
-        accountUnreadCounts = merged
-        // Removed accounts drop their manual flag alongside their count.
-        retainManualUnreadRefs(refreshedCounts.keys)
+        if (!refreshIsCurrent()) return
+        // Our own interim freshness writes are valid baselines for the exact
+        // fold. Values preserved because a controller/notification writer won
+        // the race keep their original baseline, so this bulk pass cannot
+        // overwrite newer authoritative evidence.
+        publishAccountUnreadRefresh(
+            previous = accountUnreadExactBaseline(previous, interimPublication),
+            refreshed = refreshedPairs,
+            refreshGeneration = refreshGeneration,
+        )
     }
 
     private suspend fun refreshAccountUnreadFold(
         summary: AccountSummaryFfi,
         rawCount: ULong?,
-        previousCount: ULong?,
+        previous: AccountUnreadValue?,
         memberGate: Semaphore,
     ): AccountUnreadFoldResult {
         val cheapZero =
             rawCount == 0uL &&
-                manualUnreadFolded(summary.label) &&
-                summary.label !in accountManualUnreadRefs
+                previous?.hasManualUnread == false
         // The cheap engine total can't see the client's manual-unread flag, so
         // an account believed to be manually flagged still takes the row fold.
         if (!cheapZero) {
@@ -4760,8 +4906,13 @@ class WhiteNoiseAppState private constructor(
         }
         return AccountUnreadFoldResult(
             accountRef = summary.label,
-            unreadCount = if (cheapZero) 0uL else rawCount ?: previousCount ?: 0uL,
-            hasManualUnread = null,
+            value =
+                accountUnreadValueAfterRefresh(
+                    rawCount = rawCount,
+                    previous = previous,
+                    exactUnreadCount = if (cheapZero) 0uL else null,
+                    exactHasManualUnread = if (cheapZero) false else null,
+                ),
         )
     }
 
@@ -4785,25 +4936,22 @@ class WhiteNoiseAppState private constructor(
                     loadUnreadMemberRosters(
                         rows = rows,
                         gate = memberGate,
-                        onFailure = { groupIdHex, error ->
-                            appStateDebug(error) {
-                                "account unread member refresh failed " +
-                                    "account=${ref.take(8)} group=${groupIdHex.take(8)}: " +
-                                    error.readableMessage()
-                            }
-                        },
+                        onFailure = { _, _ -> appStateDebug { "account unread member refresh failed" } },
                     ) { groupIdHex ->
                         groupMembers(ref, groupIdHex)
                     }
                 AccountUnreadFoldResult(
                     accountRef = ref,
-                    unreadCount = accountUnreadCount(rows, summary.accountIdHex, membersByGroupId),
-                    hasManualUnread = accountHasManualUnread(rows, summary.accountIdHex, membersByGroupId),
+                    value =
+                        AccountUnreadValue(
+                            unreadCount = accountUnreadCount(rows, summary.accountIdHex, membersByGroupId),
+                            freshness = AccountUnreadFreshness.CONFIRMED,
+                            hasManualUnread = accountHasManualUnread(rows, summary.accountIdHex, membersByGroupId),
+                        ),
                 )
             }
-        }.onFailure {
-            appStateDebug(it) { "account unread refresh failed for ${ref.take(8)}: ${it.readableMessage()}" }
-        }.getOrNull()
+        }.onFailure { appStateDebug { "account unread refresh failed" } }
+            .getOrNull()
     }
 
     /**
@@ -4823,9 +4971,16 @@ class WhiteNoiseAppState private constructor(
         // skip refs we don't know about (matches refreshAccountUnreadCounts'
         // filter).
         val summary = accounts.firstOrNull { it.isSignedInSigningAccount() && it.label == ref } ?: return
+        val previous = synchronized(accountUnreadLock) { accountUnreadSnapshotLocked()[ref] }
         val result = refreshEffectiveAccountUnreadCount(summary) ?: return
-        result.hasManualUnread?.let { updateAccountManualUnread(result.accountRef, it) }
-        accountUnreadCounts = accountUnreadCounts + (ref to result.unreadCount)
+        synchronized(accountUnreadLock) {
+            if (accountUnreadRevisions[ref] != previous?.revision) return
+            accountUnreadRevision += 1L
+            accountUnreadRevisions[ref] = accountUnreadRevision
+            if (accountUnreadValues[ref] != result.value) {
+                accountUnreadValues = accountUnreadValues + (ref to result.value)
+            }
+        }
     }
 
     private fun isAccountSwitchCurrent(generation: Long) = accountSwitchHandoff.isCurrent(generation)
@@ -5003,6 +5158,32 @@ class WhiteNoiseAppState private constructor(
 
     internal fun consumeAccountSwitchLocalSnapshot(accountRef: String?) = accountSwitchHandoff.consume(accountRef)
 
+    private fun stageAccountSwitchLocalSnapshot(
+        label: String,
+        switchingAccounts: Boolean,
+        requestGeneration: Long,
+        localSnapshot: AccountSwitchLocalSnapshot?,
+    ) {
+        if (localSnapshot != null) {
+            // The target account's local SQLite rows are authoritative at the
+            // same generation boundary as the first target composition. Replace
+            // a stale/unknown picker value before activeAccountRef changes.
+            updateAccountUnreadValue(label) {
+                accountUnreadValueFromRows(
+                    rows = localSnapshot.rows,
+                    activeAccountIdHex = localSnapshot.activeAccountIdHex,
+                )
+            }
+            localSnapshot.profiles.forEach(::applyAccountSwitchProfileSeed)
+            accountSwitchHandoff.publish(requestGeneration, localSnapshot)
+        } else if (switchingAccounts) {
+            // A failed or intentionally deferred local snapshot cannot certify
+            // the previous aggregate. Retain it for reconciliation, but stop
+            // presenting it as current on the target account's first frame.
+            markAccountUnreadUnknown(label)
+        }
+    }
+
     private suspend fun restoreSignedOutAccountForActivation(
         target: AccountSummaryFfi?,
         label: String,
@@ -5080,10 +5261,7 @@ class WhiteNoiseAppState private constructor(
             clearCrossAccountCaches()
             hideConversationShortcutsFromDirectShare()
         }
-        if (localSnapshot != null) {
-            localSnapshot.profiles.forEach(::applyAccountSwitchProfileSeed)
-            accountSwitchHandoff.publish(requestGeneration, localSnapshot)
-        }
+        stageAccountSwitchLocalSnapshot(label, switchingAccounts, requestGeneration, localSnapshot)
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
         reloadMediaAutoDownloadMatrix()
