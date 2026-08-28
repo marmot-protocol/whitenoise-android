@@ -23,10 +23,28 @@ class AndroidReleaseRuntimeWorkflowCoverageTest {
         assertRuntimeVerifierResilience(verifierSource())
     }
 
+    @Test
+    fun productionFirebaseExemptionCannotAuthorizePlayPublication() {
+        val buildScript = appBuildScriptSource()
+
+        assertTrue(
+            "the Firebase exemption must require the disposable runtime workflow",
+            "System.getenv(\"GITHUB_WORKFLOW\") == \"Android Release Runtime Verify\"" in buildScript,
+        )
+        assertTrue(
+            "the Firebase exemption must allow only the production Zapstore assemble task",
+            "requestedTasks.all { it == \"assembleProductionZapstoreRelease\" }" in buildScript,
+        )
+    }
+
     private fun assertProductionCoverage(productionJob: String) {
         assertTrue(
             "production release verification must remain covered",
             "assembleProductionZapstoreRelease" in productionJob,
+        )
+        assertTrue(
+            "the disposable runtime APK must use the narrowly scoped Firebase exemption",
+            "-Pwhitenoise.allowUnconfiguredProductionFirebaseForReleaseRuntimeTest=true" in productionJob,
         )
     }
 
@@ -169,6 +187,13 @@ class AndroidReleaseRuntimeWorkflowCoverageTest {
             File("scripts/verify-release-runtime.sh"),
         ).firstOrNull(File::exists)?.readText()
             ?: error("Missing release runtime verifier script")
+
+    private fun appBuildScriptSource(): String =
+        listOf(
+            File("../app/build.gradle.kts"),
+            File("app/build.gradle.kts"),
+        ).firstOrNull(File::exists)?.readText()
+            ?: error("Missing app Gradle build script")
 
     private fun executableScriptExists(name: String): Boolean =
         listOf(File("../scripts/$name"), File("scripts/$name"))
