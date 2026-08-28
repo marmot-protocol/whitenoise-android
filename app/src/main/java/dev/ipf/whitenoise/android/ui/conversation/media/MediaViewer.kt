@@ -473,17 +473,19 @@ internal fun FullScreenMediaViewer(
                             }
                         }
                     }.onFailure { error ->
-                        val operationCode =
-                            if (MediaReferenceSupport.isVideoMedia(request.reference)) {
-                                "MEDIA_VIEWER_VIDEO_SHARE"
-                            } else {
-                                "MEDIA_VIEWER_IMAGE_SHARE"
-                            }
-                        appState.presentMediaLaunchFailure(
-                            R.string.media_couldnt_open,
-                            operationCode,
-                            error,
-                        )
+                        if (MediaReferenceSupport.isVideoMedia(request.reference)) {
+                            appState.presentMediaLaunchFailure(
+                                R.string.media_couldnt_open,
+                                "MEDIA_VIEWER_VIDEO_SHARE",
+                                error,
+                            )
+                        } else {
+                            appState.presentMediaLaunchFailure(
+                                R.string.media_couldnt_open,
+                                "MEDIA_VIEWER_IMAGE_SHARE",
+                                error,
+                            )
+                        }
                     }
                 }
             },
