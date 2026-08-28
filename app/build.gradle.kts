@@ -559,6 +559,12 @@ android {
             buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "true")
         }
     }
+    // Instrumented tests build against `debug`, which is never what ships.
+    // A minified pass is the only way to observe R8's output behaving, so the
+    // build type is selectable: `-PwhitenoiseTestBuildType=benchmarkRelease`
+    // runs connected tests against a minified, debug-signed build.
+    testBuildType = providers.gradleProperty("whitenoiseTestBuildType").getOrElse("debug")
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
