@@ -390,6 +390,51 @@ class MarkdownSpeakableTextTest {
     }
 
     @Test
+    fun singleWordLinesAndMentionOnlyLinesStaySpeakable() {
+        val unknown = "npub1" + "w".repeat(58)
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(
+                                MarkdownInlineFfi.Text("First line here"),
+                                MarkdownInlineFfi.SoftBreak,
+                                MarkdownInlineFfi.Text("Ok"),
+                                MarkdownInlineFfi.SoftBreak,
+                                MarkdownInlineFfi.Text("Last line here"),
+                            ),
+                        ),
+                    ),
+            )
+        // A line carrying one word is still a sentence and must be spoken.
+        assertEquals(
+            "First line here. Ok. Last line here.",
+            markdownDocumentToSpeakableText(document),
+        )
+
+        val mentionOnly =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(
+                                MarkdownInlineFfi.NostrMention(
+                                    MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, unknown),
+                                ),
+                            ),
+                        ),
+                    ),
+            )
+        // A message that is only an unresolved key has nothing readable in it.
+        assertEquals("", markdownDocumentToSpeakableText(mentionOnly))
+    }
+
+    @Test
     fun bareUrlsAreOmittedAndLineBreaksRemainSentenceBoundaries() {
         val document =
             MarkdownDocumentFfi(
