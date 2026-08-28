@@ -71,7 +71,7 @@
             android:exported="true"
             android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize|keyboardHidden"
             android:label="${appName}"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.WhiteNoise.Starting"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>

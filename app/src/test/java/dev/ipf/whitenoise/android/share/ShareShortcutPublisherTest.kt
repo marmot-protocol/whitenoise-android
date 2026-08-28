@@ -1,13 +1,19 @@
 package dev.ipf.whitenoise.android.share
 
+import androidx.core.app.Person
+import androidx.core.content.LocusIdCompat
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA
 import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountScope
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.state.ChatListItem
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -26,6 +32,11 @@ class ShareShortcutPublisherTest {
             groupOfPeopleFormat = "Group of %1\$d people",
             unknownTitle = "Unknown",
         )
+
+    @After
+    fun clearPlatformShortcuts() {
+        ShortcutManagerCompat.removeAllDynamicShortcuts(RuntimeEnvironment.getApplication())
+    }
 
     @Test
     fun buildShareShortcut_usesConversationShortcutIdCategoryAndNoGroupIdExtra() {
@@ -87,12 +98,12 @@ class ShareShortcutPublisherTest {
     @Test
     fun publish_usesSetDynamicShortcutsInRankOrder() {
         val context = RuntimeEnvironment.getApplication()
-        val publishedIds = mutableListOf<String>()
+        var published = emptyList<ShortcutInfoCompat>()
         val publisher =
             ShareShortcutPublisher(
                 context = context,
                 maxShortcutCount = { 2 },
-                setDynamicShortcuts = { shortcuts -> publishedIds += shortcuts.map { it.id } },
+                setDynamicShortcuts = { shortcuts -> published = shortcuts },
                 existingShortcuts = { emptyList() },
             )
         val chats =
@@ -106,9 +117,71 @@ class ShareShortcutPublisherTest {
             chats = chats,
             displayTitle = { item -> item.group.name },
         )
-        assertEquals(2, publishedIds.size)
-        assertEquals(conversationShortcutId("acct", "g1"), publishedIds[0])
-        assertEquals(conversationShortcutId("acct", "g2"), publishedIds[1])
+        assertEquals(2, published.size)
+        assertEquals(conversationShortcutId("acct", "g1"), published[0].id)
+        assertEquals(conversationShortcutId("acct", "g2"), published[1].id)
+        assertEquals(listOf(0, 1), published.map { it.rank })
+    }
+
+    @Test
+    fun publish_rebuildsRichShortcutWithItsCurrentRecencyRank() {
+        val context = RuntimeEnvironment.getApplication()
+        val shortcutId = checkNotNull(conversationShortcutId("acct", "g2"))
+        val person = Person.Builder().setName("Alice").build()
+        val rich =
+            ShortcutInfoCompat
+                .Builder(context, shortcutId)
+                .setShortLabel("Alice")
+                .setLongLabel("Alice")
+                .setIntent(buildShareShortcutIntent(context))
+                .setPerson(person)
+                .setLocusId(LocusIdCompat(shortcutId))
+                .setLongLived(true)
+                .build()
+        var published = emptyList<ShortcutInfoCompat>()
+        val publisher =
+            ShareShortcutPublisher(
+                context = context,
+                maxShortcutCount = { 2 },
+                setDynamicShortcuts = { shortcuts -> published = shortcuts },
+                existingShortcuts = { listOf(rich) },
+            )
+
+        publisher.publish(
+            accountRef = "acct",
+            chats = listOf(chat("g1", pending = false), chat("g2", pending = false)),
+            displayTitle = { item -> item.group.name },
+        )
+
+        val republished = published.single { it.id == shortcutId }
+        assertEquals(1, republished.rank)
+        assertEquals(rich.locusId, republished.locusId)
+        assertEquals(rich.intent, republished.intent)
+        assertEquals(
+            conversationShortcutAccountScope("acct"),
+            republished.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA),
+        )
+        assertTrue(republished.categories?.contains(CONVERSATION_SHARE_TARGET_CATEGORY) == true)
+    }
+
+    @Test
+    fun publish_platformReadbackPreservesExplicitRankOrder() {
+        val context = RuntimeEnvironment.getApplication()
+        val chats =
+            listOf(
+                chat("g1", pending = false),
+                chat("g2", pending = false),
+                chat("g3", pending = false),
+            )
+
+        ShareShortcutPublisher(context).publish("acct", chats) { item -> item.group.name }
+
+        val readBack = ShortcutManagerCompat.getDynamicShortcuts(context).sortedBy { it.rank }
+        assertEquals(listOf(0, 1, 2), readBack.map { it.rank })
+        assertEquals(
+            listOf("g1", "g2", "g3").map { groupId -> conversationShortcutId("acct", groupId) },
+            readBack.map { it.id },
+        )
     }
 
     @Test

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.share
 
 import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.XmlResourceParser
 import dev.ipf.whitenoise.android.MainActivity
@@ -20,6 +21,18 @@ import org.xmlpull.v1.XmlPullParser
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AndroidManifestShareTargetTest {
+    @Test
+    fun mainActivityUsesSingleTaskForExternalEntryPointReuse() {
+        val context = RuntimeEnvironment.getApplication()
+        val activityInfo =
+            context.packageManager.getActivityInfo(
+                ComponentName(context, MainActivity::class.java),
+                0,
+            )
+
+        assertEquals(ActivityInfo.LAUNCH_SINGLE_TASK, activityInfo.launchMode)
+    }
+
     @Test
     fun mainActivityDeclaresShortcutsMetadataAndShareTarget() {
         val context = RuntimeEnvironment.getApplication()
