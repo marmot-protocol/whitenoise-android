@@ -126,7 +126,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         )
         assertTrue(
             "a missing target snapshot must become unknown before account publication",
-            stageBody.indexOf("markAccountUnreadUnknown(label)", startIndex = handoff) > handoff,
+            stageBody.indexOf("accountUnreadStore.markUnknown(label)", startIndex = handoff) > handoff,
         )
     }
 

@@ -15,7 +15,7 @@ class AccountUnreadRefreshLifecycleTest {
         val exactFolds = body.indexOf("val refreshedPairs")
         val firstGuard = body.indexOf("if (!refreshIsCurrent()) return")
         val finalGuard = body.lastIndexOf("if (!refreshIsCurrent()) return")
-        val finalPublication = body.lastIndexOf("publishAccountUnreadRefresh(")
+        val finalPublication = body.lastIndexOf("accountUnreadStore.publishRefresh(")
 
         assertTrue(firstGuard in 0 until interim)
         assertTrue(interim in 0 until exactFolds)
@@ -23,7 +23,7 @@ class AccountUnreadRefreshLifecycleTest {
         assertTrue(finalPublication > finalGuard)
         assertTrue(
             "atomic publisher must receive the generation fence",
-            "refreshGeneration = refreshGeneration" in body,
+            "generation = refreshGeneration" in body,
         )
     }
 
@@ -43,13 +43,13 @@ class AccountUnreadRefreshLifecycleTest {
 
     @Test
     fun equalAuthoritativeEvidenceFencesStaleWorkWithoutMutatingComposeState() {
-        val source = appStateSource()
-        val directUpdate = source.functionBody("updateAccountUnreadValue")
-        val bulkPublication = source.functionBody("publishAccountUnreadRefresh")
+        val source = accountUnreadStoreSource()
+        val directUpdate = source.functionBody("updateValue")
+        val bulkPublication = source.functionBody("publishRefresh")
 
         assertTrue(
             "direct writers must revision-fence every authoritative update",
-            "accountUnreadRevision += 1L" in directUpdate,
+            "revision += 1L" in directUpdate,
         )
         assertTrue(
             "equal direct values must not invalidate Compose",
@@ -57,13 +57,19 @@ class AccountUnreadRefreshLifecycleTest {
         )
         assertTrue(
             "bulk writers must keep race revisions outside render state",
-            "accountUnreadRevisions" in bulkPublication,
+            "revisions" in bulkPublication,
         )
         assertTrue(
             "equal bulk values must not invalidate Compose",
-            "if (accountUnreadValues != mergedValues)" in bulkPublication,
+            "if (values != mergedValues)" in bulkPublication,
         )
     }
+
+    private fun accountUnreadStoreSource(): String =
+        sequenceOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AccountUnreadStore.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AccountUnreadStore.kt"),
+        ).first(File::exists).readText()
 
     @Test
     fun previousPositive_partialSummary_successfulZeroFoldConvergesWithoutFalseZeroState() {

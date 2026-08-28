@@ -20,7 +20,7 @@ class AppStartupReadinessTest {
         check(start >= 0 && end > start) { "Missing account unread refresh section" }
         val refresh = source.substring(start, end)
         val revisionGuard = refresh.lastIndexOf("if (!refreshIsCurrent()) return")
-        val atomicPublication = refresh.indexOf("publishAccountUnreadRefresh", startIndex = revisionGuard)
+        val atomicPublication = refresh.indexOf("accountUnreadStore.publishRefresh", startIndex = revisionGuard)
 
         assertTrue(revisionGuard >= 0)
         assertTrue(atomicPublication > revisionGuard)
