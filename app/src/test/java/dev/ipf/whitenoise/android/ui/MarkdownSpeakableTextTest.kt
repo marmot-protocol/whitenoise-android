@@ -340,7 +340,7 @@ class MarkdownSpeakableTextTest {
     }
 
     @Test
-    fun nostrEntitiesMatchBubbleNamesMembershipPrefixesAndShortening() {
+    fun namedMentionsAreSpokenAndUnresolvedKeysAreOmitted() {
         val alice = "npub1" + "q".repeat(58)
         val bob = "npub1" + "p".repeat(58)
         val unknownMember = "npub1" + "z".repeat(58)
@@ -373,8 +373,11 @@ class MarkdownSpeakableTextTest {
                     ),
             )
 
+        // A resolved mention is spoken by name. An unresolved key has no
+        // readable form, so speech omits it exactly as it omits a bare URL;
+        // the bubble still shows the shortened bech32, which is selectable.
         assertEquals(
-            "@Alice Bob @npub1zzzzzzz…zzzzzz npub1xxxxxxx…xxxxxx note1nnnnnnn…nnnnnn.",
+            "@Alice Bob.",
             markdownDocumentToSpeakableText(
                 document = document,
                 mentionDisplayName = {
