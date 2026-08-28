@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,10 +29,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
@@ -80,6 +83,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -105,8 +109,92 @@ import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOr
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.flow.first
+import kotlin.math.ceil
+import kotlin.math.floor
 
 internal const val COMPOSER_RESIZE_INDICATOR_TAG = "composer-resize-indicator"
+
+internal data class ComposerSelectionLayout(
+    val top: Float,
+    val bottom: Float,
+    val activeCaretTop: Float,
+    val activeCaretBottom: Float,
+)
+
+private data class ComposerTextLayoutSnapshot(
+    val sourceText: String,
+    val transformedText: TransformedText,
+    val result: TextLayoutResult,
+)
+
+/**
+ * Returns the smallest scroll offset that exposes the current selection. A
+ * selection that fits is kept wholly visible; a selection taller than the
+ * viewport follows its active edge instead of jumping to the end of the
+ * draft. Returning the current offset is intentional when no motion is
+ * needed, which keeps bulk IME commits from fighting the timeline re-anchor.
+ */
+internal fun composerCaretScrollTarget(
+    currentScroll: Int,
+    viewportHeight: Int,
+    maxScroll: Int,
+    selection: ComposerSelectionLayout,
+): Int {
+    if (viewportHeight <= 0 || maxScroll <= 0) return currentScroll.coerceIn(0, maxScroll.coerceAtLeast(0))
+
+    val viewportTop = currentScroll.toFloat()
+    val viewportBottom = viewportTop + viewportHeight
+    val selectionHeight = (selection.bottom - selection.top).coerceAtLeast(0f)
+    val desired =
+        if (selectionHeight <= viewportHeight) {
+            when {
+                selection.top < viewportTop -> floor(selection.top).toInt()
+                selection.bottom > viewportBottom -> ceil(selection.bottom - viewportHeight).toInt()
+                else -> currentScroll
+            }
+        } else {
+            when {
+                selection.activeCaretTop < viewportTop -> floor(selection.activeCaretTop).toInt()
+                selection.activeCaretBottom > viewportBottom ->
+                    ceil(selection.activeCaretBottom - viewportHeight).toInt()
+                else -> currentScroll
+            }
+        }
+    return desired.coerceIn(0, maxScroll)
+}
+
+private fun composerSelectionLayout(
+    layout: TextLayoutResult,
+    value: TextFieldValue,
+    transformedText: TransformedText,
+): ComposerSelectionLayout {
+    fun cursorRect(originalOffset: Int) =
+        layout.getCursorRect(
+            transformedText.offsetMapping
+                .originalToTransformed(originalOffset.coerceIn(0, value.text.length))
+                .coerceIn(0, transformedText.text.length),
+        )
+
+    val start = cursorRect(value.selection.start)
+    val active = cursorRect(value.selection.end)
+    return ComposerSelectionLayout(
+        top = minOf(start.top, active.top),
+        bottom = maxOf(start.bottom, active.bottom),
+        activeCaretTop = active.top,
+        activeCaretBottom = active.bottom,
+    )
+}
+
+private suspend fun ScrollState.keepComposerSelectionVisible(selection: ComposerSelectionLayout) {
+    val target =
+        composerCaretScrollTarget(
+            currentScroll = value,
+            viewportHeight = viewportSize,
+            maxScroll = maxValue,
+            selection = selection,
+        )
+    if (target != value) scrollTo(target)
+}
 
 // BasicTextField (not Material3 TextField) so the pill height isn't pinned
 // to the 56dp filled-textfield minimum.
@@ -260,6 +348,27 @@ internal fun ComposerPill(
                 }
             }
         }
+    val transformedText =
+        remember(textFieldValue.text, mentionVisualTransformation) {
+            mentionVisualTransformation.filter(AnnotatedString(textFieldValue.text))
+        }
+    val composerScrollState = rememberScrollState()
+    var textLayoutSnapshot by remember { mutableStateOf<ComposerTextLayoutSnapshot?>(null) }
+    val selectionLayout =
+        remember(textLayoutSnapshot, textFieldValue.text, textFieldValue.selection) {
+            textLayoutSnapshot
+                ?.takeIf { it.sourceText == textFieldValue.text }
+                ?.let { snapshot ->
+                    composerSelectionLayout(
+                        layout = snapshot.result,
+                        value = textFieldValue,
+                        transformedText = snapshot.transformedText,
+                    )
+                }
+        }
+    LaunchedEffect(selectionLayout, composerScrollState.viewportSize, composerScrollState.maxValue) {
+        selectionLayout?.let { composerScrollState.keepComposerSelectionVisible(it) }
+    }
     val hasAttachmentAction =
         onPickFromGallery != null ||
             onPickDocument != null ||
@@ -295,19 +404,14 @@ internal fun ComposerPill(
                         .roundToPx()
                 }
             remember(
-                textFieldValue.text,
-                mentionVisualTransformation,
+                transformedText.text,
                 composerTextStyle,
                 maxTextWidthPx,
                 textMeasurer,
             ) {
-                val visualText =
-                    mentionVisualTransformation
-                        .filter(AnnotatedString(textFieldValue.text))
-                        .text
                 textMeasurer
                     .measure(
-                        text = visualText,
+                        text = transformedText.text,
                         style = composerTextStyle,
                         constraints = Constraints(maxWidth = maxTextWidthPx),
                     ).lineCount
@@ -374,6 +478,12 @@ internal fun ComposerPill(
                         Modifier
                             .fillMaxWidth()
                             .then(expandedHeightModifier)
+                            // The automatic composer has a hard viewport ceiling.
+                            // Measure the editor at its natural height and own the
+                            // resulting scroll state here so programmatic bulk
+                            // commits can follow the real selection, not merely
+                            // the final text line or the conversation tail.
+                            .verticalScroll(composerScrollState)
                             .focusProperties { canFocus = inputFocusEnabled }
                             .contentReceiver(pasteImageReceiver)
                             .onPreInterceptKeyBeforeSoftKeyboard { event ->
@@ -441,6 +551,13 @@ internal fun ComposerPill(
                     maxLines = Int.MAX_VALUE,
                     onTextLayout = { layout ->
                         if (compactLineCount == null) updateMultilineControls(layout.lineCount)
+                        val nextSnapshot =
+                            ComposerTextLayoutSnapshot(
+                                sourceText = textFieldValue.text,
+                                transformedText = transformedText,
+                                result = layout,
+                            )
+                        if (textLayoutSnapshot != nextSnapshot) textLayoutSnapshot = nextSnapshot
                     },
                 )
                 if (textFieldValue.text.isEmpty()) {
