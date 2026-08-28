@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -22,6 +23,8 @@ import androidx.compose.foundation.content.consume
 import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.content.hasMediaType
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -66,7 +69,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -401,7 +407,7 @@ internal fun ComposerPill(
         )
     val borderHeaderInset by
         animateDpAsState(
-            targetValue = if (expandedLayout) 24.dp else 0.dp,
+            targetValue = if (expandedLayout) 28.dp else 0.dp,
             animationSpec = expansionAnimationSpec,
             label = "composer border header inset",
         )
@@ -413,7 +419,7 @@ internal fun ComposerPill(
         )
     val editorTopInset by
         animateDpAsState(
-            targetValue = if (expandedLayout) 24.dp else 10.dp,
+            targetValue = if (expandedLayout) 20.dp else 10.dp,
             animationSpec = expansionAnimationSpec,
             label = "composer editor top inset",
         )
@@ -440,7 +446,7 @@ internal fun ComposerPill(
     // Do not expose or draw that layer until the editor has cleared its full
     // 48dp target; otherwise a quick caret/selection gesture can resize the
     // composer during the transition.
-    val resizeTargetReady = borderHeaderInset == 24.dp && editorTopInset == 24.dp
+    val resizeTargetReady = borderHeaderInset == 28.dp && editorTopInset == 20.dp
     val composerTextStyle =
         LocalTextStyle.current.copy(
             color = MaterialTheme.colorScheme.onSurface,
@@ -702,9 +708,11 @@ internal fun ComposerPill(
         }
 
         if (expandedLayout && resizeTargetReady && inputContentVisible) {
-            // The target straddles the pill's top border: half of its 48dp
-            // height sits outside the surface, while the compact 24dp internal
-            // header keeps the first editable line below all resize gestures.
+            // Keep a transparent 96x48dp gesture target for accessibility, but
+            // draw feedback only on the visible handle. The surface starts at
+            // 28dp so the opaque 4dp handle sits wholly above its border while
+            // the editor starts exactly below the target with only 20dp of
+            // internal top padding.
             val toggleDescription =
                 stringResource(
                     if (expansionMode == ComposerExpansionMode.FullScreen) {
@@ -713,45 +721,96 @@ internal fun ComposerPill(
                         R.string.composer_expand_full_screen
                     },
                 )
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier =
-                    Modifier
-                        .align(Alignment.TopCenter)
-                        .width(96.dp)
-                        .height(48.dp)
-                        .pointerInput(Unit) {
-                            detectVerticalDragGestures(
-                                onDragStart = { latestOnHeightDragStarted() },
-                                onVerticalDrag = { change, dragAmount ->
-                                    change.consume()
-                                    latestOnHeightDrag(dragAmount)
-                                },
-                                onDragEnd = { latestOnHeightDragStopped() },
-                                onDragCancel = { latestOnHeightDragStopped() },
-                            )
-                        }.clickable(
-                            onClickLabel = toggleDescription,
-                            role = Role.Button,
-                            onClick = onExpansionToggle,
-                        ).semantics {
-                            contentDescription = resizeComposerDescription
-                        },
-            ) {
-                Box(
-                    Modifier
-                        .width(36.dp)
-                        .height(4.dp)
-                        .testTag(COMPOSER_RESIZE_INDICATOR_TAG)
-                        .background(
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                            RoundedCornerShape(2.dp),
-                        ),
-                )
-            }
+            ComposerResizeHandle(
+                toggleDescription = toggleDescription,
+                contentDescription = resizeComposerDescription,
+                onExpansionToggle = onExpansionToggle,
+                onHeightDragStarted = { latestOnHeightDragStarted() },
+                onHeightDrag = { latestOnHeightDrag(it) },
+                onHeightDragStopped = { latestOnHeightDragStopped() },
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         }
     }
 }
+
+@Composable
+@Suppress("FunctionNaming")
+private fun ComposerResizeHandle(
+    toggleDescription: String,
+    contentDescription: String,
+    onExpansionToggle: () -> Unit,
+    onHeightDragStarted: () -> Unit,
+    onHeightDrag: (Float) -> Unit,
+    onHeightDragStopped: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val latestOnHeightDragStarted by rememberUpdatedState(onHeightDragStarted)
+    val latestOnHeightDrag by rememberUpdatedState(onHeightDrag)
+    val latestOnHeightDragStopped by rememberUpdatedState(onHeightDragStopped)
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    var dragging by remember { mutableStateOf(false) }
+    val handleScale =
+        animateFloatAsState(
+            targetValue = if (pressed || dragging) 1.22f else 1f,
+            animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing),
+            label = "composer resize handle scale",
+        )
+    val handleColor = composerResizeHandleColor()
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier =
+            modifier
+                .width(96.dp)
+                .height(48.dp)
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onDragStart = {
+                            dragging = true
+                            latestOnHeightDragStarted()
+                        },
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            latestOnHeightDrag(dragAmount)
+                        },
+                        onDragEnd = {
+                            dragging = false
+                            latestOnHeightDragStopped()
+                        },
+                        onDragCancel = {
+                            dragging = false
+                            latestOnHeightDragStopped()
+                        },
+                    )
+                }.clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClickLabel = toggleDescription,
+                    role = Role.Button,
+                    onClick = onExpansionToggle,
+                ).semantics {
+                    this.contentDescription = contentDescription
+                },
+    ) {
+        Box(
+            Modifier
+                .width(36.dp)
+                .height(4.dp)
+                .testTag(COMPOSER_RESIZE_INDICATOR_TAG)
+                .graphicsLayer { scaleX = handleScale.value }
+                .background(handleColor, RoundedCornerShape(2.dp)),
+        )
+    }
+}
+
+@Composable
+private fun composerResizeHandleColor(): Color =
+    MaterialTheme.colorScheme.onSurfaceVariant
+        .copy(alpha = 0.45f)
+        .compositeOver(MaterialTheme.colorScheme.surfaceVariant)
+        .copy(alpha = 1f)
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable

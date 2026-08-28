@@ -916,6 +916,7 @@ internal fun ComposerBar(
                                     },
                                 easing = FastOutSlowInEasing,
                             ),
+                        alignment = Alignment.BottomStart,
                     ).then(
                         if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
                             Modifier.heightIn(max = automaticComposerCeiling)

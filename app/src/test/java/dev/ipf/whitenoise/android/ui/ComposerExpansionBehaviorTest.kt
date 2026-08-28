@@ -9,8 +9,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -110,16 +112,19 @@ class ComposerExpansionBehaviorTest {
         editor.performClick()
         editor.performTextInputSelection(selection)
         editor.assertIsFocused()
-        val automaticHeight = composerHeight()
+        val automaticBounds = composerBounds()
+        val automaticHeight = automaticBounds.height
+        val fixedBottom = automaticBounds.bottom
 
         val expansionFrames =
             withManualClock {
                 resizeHandle().performClick()
                 composeRule.runOnIdle { }
-                sampleComposerHeights()
+                sampleComposerHeights(expectedBottom = fixedBottom)
             }
         composeRule.waitForIdle()
         val fullHeight = composerHeight()
+        assertComposerBottom(fixedBottom)
 
         assertMonotonic(expansionFrames + fullHeight, increasing = true)
         assertTrue(
@@ -132,10 +137,11 @@ class ComposerExpansionBehaviorTest {
             withManualClock {
                 resizeHandle().performClick()
                 composeRule.runOnIdle { }
-                sampleComposerHeights()
+                sampleComposerHeights(expectedBottom = fixedBottom)
             }
         composeRule.waitForIdle()
         val collapsedHeight = composerHeight()
+        assertComposerBottom(fixedBottom)
 
         assertMonotonic(collapseFrames + collapsedHeight, increasing = false)
         assertTrue(
@@ -185,7 +191,7 @@ class ComposerExpansionBehaviorTest {
     }
 
     @Test
-    fun resizeTargetStraddlesThePillBorderWithoutOverlappingTheFirstLine() {
+    fun resizeHandleSitsAboveThePillBorderAndTheTargetStopsAtTheFirstLine() {
         val draft = longDraft()
         render(draft)
 
@@ -196,11 +202,16 @@ class ComposerExpansionBehaviorTest {
                 .fetchSemanticsNode()
                 .boundsInRoot
         val editor = composeRule.onNodeWithText(draft).fetchSemanticsNode().boundsInRoot
+        val indicator =
+            composeRule
+                .onNodeWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
 
         assertTrue("resize target must extend above the pill", target.top < surface.top)
         assertTrue("resize target must extend into the pill", target.bottom > surface.top)
-        assertTrue("the visible handle center must sit on the pill border", abs(target.center.y - surface.top) <= 1f)
-        assertTrue("expanded editor inset must be materially smaller than 48dp", editor.top - surface.top < 32f)
+        assertTrue("the visible handle must stay above the pill border", indicator.bottom < surface.top)
+        assertTrue("expanded editor top inset should be 20dp", abs(editor.top - surface.top - 20f) <= 1f)
         assertTrue("first-line gestures must start below the resize target", editor.top >= target.bottom - 1f)
     }
 
@@ -339,11 +350,8 @@ class ComposerExpansionBehaviorTest {
     @Test
     fun dragHandleContinuouslyAddsTheDraggedDistance() {
         render(longDraft())
-        val initialHeight =
-            composeRule
-                .onNodeWithTag(TAG)
-                .fetchSemanticsNode()
-                .boundsInRoot.height
+        val initialBounds = composerBounds()
+        val initialHeight = initialBounds.height
 
         composeRule
             .onNodeWithContentDescription(app.getString(R.string.composer_resize))
@@ -360,6 +368,7 @@ class ComposerExpansionBehaviorTest {
                 .boundsInRoot.height
         assertTrue("upward drag should grow the composer", draggedHeight > initialHeight + 64f)
         assertTrue("a short drag must not jump directly to full screen", draggedHeight < initialHeight + 140f)
+        assertComposerBottom(initialBounds.bottom)
         composeRule.onNodeWithText(longDraft()).assertExists()
     }
 
@@ -431,7 +440,7 @@ class ComposerExpansionBehaviorTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface(modifier = Modifier.width(width.dp).height(720.dp)) {
-                    Box {
+                    Box(contentAlignment = Alignment.BottomCenter) {
                         ComposerBar(
                             replyingTo = null,
                             messageTextCopy = MessageTextCopy.Default,
@@ -484,20 +493,40 @@ class ComposerExpansionBehaviorTest {
 
     private fun resizeHandle() = composeRule.onNodeWithContentDescription(app.getString(R.string.composer_resize))
 
-    private fun composerHeight() =
+    private fun composerHeight() = composerBounds().height
+
+    private fun composerBounds(): Rect =
         composeRule
             .onNodeWithTag(TAG)
             .fetchSemanticsNode()
-            .boundsInRoot.height
+            .boundsInRoot
 
-    private fun sampleComposerHeights(frameCount: Int = 20): List<Float> =
+    private fun sampleComposerHeights(
+        frameCount: Int = 20,
+        expectedBottom: Float? = null,
+    ): List<Float> =
         buildList {
             repeat(frameCount) {
                 composeRule.mainClock.advanceTimeByFrame()
                 composeRule.runOnIdle { }
-                add(composerHeight())
+                val bounds = composerBounds()
+                expectedBottom?.let { bottom ->
+                    assertTrue(
+                        "composer bottom must remain anchored during resize: $bottom -> ${bounds.bottom}",
+                        abs(bounds.bottom - bottom) <= 1f,
+                    )
+                }
+                add(bounds.height)
             }
         }
+
+    private fun assertComposerBottom(expectedBottom: Float) {
+        val actualBottom = composerBounds().bottom
+        assertTrue(
+            "composer bottom must remain anchored: $expectedBottom -> $actualBottom",
+            abs(actualBottom - expectedBottom) <= 1f,
+        )
+    }
 
     private fun <T> withManualClock(block: () -> T): T {
         composeRule.mainClock.autoAdvance = false
