@@ -1645,7 +1645,7 @@ class WhiteNoiseAppState private constructor(
                     editedText = controller.editsByTarget[record.messageIdHex]?.latestText,
                     senderDisplayName = displayName(record.sender),
                     parseMarkdown = { parseMarkdownOrEmpty(it) },
-                    mentionDisplayName = ::mentionDisplayName,
+                    mentionDisplayName = ::mentionSpeechName,
                     isGroupMember =
                         if (controller.membersLoaded) {
                             { bech32 -> isRosterMember(bech32, controller.members) }
@@ -8608,6 +8608,20 @@ class WhiteNoiseAppState private constructor(
         requestProfile(accountIdHex)
         return null
     }
+
+    /**
+     * Mention names for speech. A bubble can fall back to a shortened key
+     * because it is readable, selectable, and tappable; read aloud, that key is
+     * a minute of spelled base32. Naming the person generically keeps the
+     * mention audible without reciting it, and keeps the sentence intact - an
+     * omitted mention on a line of its own leaves nothing to speak.
+     *
+     * Both the speaking side and the bubble's projection must resolve names the
+     * same way, or their projection ids differ and the highlight is dropped.
+     */
+    val unknownMentionSpeech: String by lazy { appContext.getString(R.string.group_system_someone) }
+
+    fun mentionSpeechName(bech32: String): String? = mentionDisplayName(bech32) ?: unknownMentionSpeech
 
     /**
      * In-app route for a tapped nostr profile entity in a message body. The

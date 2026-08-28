@@ -624,7 +624,7 @@ internal fun MessageBubble(
                     messageSpeakableProjection(
                         bodyText = speakableIdentity.bodyText,
                         document = document,
-                        mentionDisplayName = appState::mentionDisplayName,
+                        mentionDisplayName = appState::mentionSpeechName,
                         isGroupMember =
                             if (controller.membersLoaded) {
                                 { bech32: String -> appState.isRosterMember(bech32, controller.members) }
@@ -898,7 +898,7 @@ internal fun MessageBubble(
             editedText = controller.editsByTarget[entryRecord.messageIdHex]?.latestText,
             senderDisplayName = appState.displayName(entryRecord.sender),
             parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
-            mentionDisplayName = appState::mentionDisplayName,
+            mentionDisplayName = appState::mentionSpeechName,
             isGroupMember =
                 if (controller.membersLoaded) {
                     { bech32 -> appState.isRosterMember(bech32, controller.members) }

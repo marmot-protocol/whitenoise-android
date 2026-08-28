@@ -390,7 +390,7 @@ private suspend fun projectConversationTtsEntry(
         editedText = controller.editsByTarget[record.messageIdHex]?.latestText,
         senderDisplayName = appState.displayName(record.sender),
         parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
-        mentionDisplayName = appState::mentionDisplayName,
+        mentionDisplayName = appState::mentionSpeechName,
         isGroupMember =
             if (controller.membersLoaded) {
                 { bech32 -> appState.isRosterMember(bech32, controller.members) }
