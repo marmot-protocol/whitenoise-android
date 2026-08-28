@@ -146,6 +146,14 @@ internal data class MediaViewerPage(
     val recordedAt: ULong,
 )
 
+/** Exact visible-page identity handed to the external Android sharing boundary. */
+internal data class MediaViewerShareRequest(
+    val messageIdHex: String,
+    val attachmentIndex: Int,
+    val reference: MediaAttachmentReferenceFfi,
+    val mine: Boolean,
+)
+
 internal data class MediaViewerGallery(
     val pages: List<MediaViewerPage>,
     val startIndex: Int,
@@ -304,6 +312,7 @@ internal fun ConversationMediaViewer(
     recordedAt: ULong,
     mine: Boolean,
     onDismiss: () -> Unit,
+    onShareRequest: (suspend (MediaViewerShareRequest) -> Result<Unit>)? = null,
 ) {
     val messagePages =
         remember(messageIdHex, attachments, mine, sender, recordedAt) {
@@ -321,6 +330,7 @@ internal fun ConversationMediaViewer(
         pages = gallery.pages,
         startIndex = gallery.startIndex,
         onDismiss = onDismiss,
+        onShareRequest = onShareRequest,
     )
 }
 
@@ -331,6 +341,7 @@ internal fun FullScreenMediaViewer(
     pages: List<MediaViewerPage>,
     startIndex: Int,
     onDismiss: () -> Unit,
+    onShareRequest: (suspend (MediaViewerShareRequest) -> Result<Unit>)? = null,
 ) {
     if (pages.isEmpty()) {
         // Defensive — callers shouldn't open an empty viewer, but guard so the
@@ -416,33 +427,63 @@ internal fun FullScreenMediaViewer(
                 }
             },
             onShare = {
-                val ref = currentReference
-                val attachmentIndex = currentAttachmentIndex
-                val msgId = currentMessageIdHex
-                val owned = currentMine
+                val request =
+                    MediaViewerShareRequest(
+                        messageIdHex = currentMessageIdHex,
+                        attachmentIndex = currentAttachmentIndex,
+                        reference = currentReference,
+                        mine = currentMine,
+                    )
                 scope.launch {
-                    if (MediaReferenceSupport.isVideoMedia(ref)) {
-                        runCatchingCancellable {
-                            val file = materializeVideoAttachment(context, controller, msgId, attachmentIndex, ref, owned)
-                            shareVideo(context, file, ref.fileName, ref.mediaType).getOrThrow()
-                        }.onFailure { error ->
-                            appState.presentMediaLaunchFailure(
-                                R.string.media_couldnt_open,
-                                "MEDIA_VIEWER_VIDEO_SHARE",
-                                error,
-                            )
+                    runCatchingCancellable {
+                        when {
+                            onShareRequest != null -> onShareRequest(request).getOrThrow()
+                            MediaReferenceSupport.isVideoMedia(request.reference) -> {
+                                val file =
+                                    materializeVideoAttachment(
+                                        context,
+                                        controller,
+                                        request.messageIdHex,
+                                        request.attachmentIndex,
+                                        request.reference,
+                                        request.mine,
+                                    )
+                                shareVideo(
+                                    context,
+                                    file,
+                                    request.reference.fileName,
+                                    request.reference.mediaType,
+                                ).getOrThrow()
+                            }
+                            else -> {
+                                attachmentBytes(
+                                    controller,
+                                    request.messageIdHex,
+                                    request.attachmentIndex,
+                                    request.reference,
+                                    request.mine,
+                                ).let {
+                                    shareImage(
+                                        context,
+                                        it,
+                                        request.reference.fileName,
+                                        request.reference.mediaType,
+                                    ).getOrThrow()
+                                }
+                            }
                         }
-                    } else {
-                        runCatchingCancellable {
-                            attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
-                                .let { shareImage(context, it, ref.fileName, ref.mediaType).getOrThrow() }
-                        }.onFailure { error ->
-                            appState.presentMediaLaunchFailure(
-                                R.string.media_couldnt_open,
-                                "MEDIA_VIEWER_IMAGE_SHARE",
-                                error,
-                            )
-                        }
+                    }.onFailure { error ->
+                        val operationCode =
+                            if (MediaReferenceSupport.isVideoMedia(request.reference)) {
+                                "MEDIA_VIEWER_VIDEO_SHARE"
+                            } else {
+                                "MEDIA_VIEWER_IMAGE_SHARE"
+                            }
+                        appState.presentMediaLaunchFailure(
+                            R.string.media_couldnt_open,
+                            operationCode,
+                            error,
+                        )
                     }
                 }
             },
