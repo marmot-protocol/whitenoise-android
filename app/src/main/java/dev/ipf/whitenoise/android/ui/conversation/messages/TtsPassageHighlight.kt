@@ -43,7 +43,6 @@ internal class TtsHighlightProjectionResolver(
             maxChunkLength = ttsHighlightMaxChunkLength(),
         )
     private val leafSpanCache = HashMap<Pair<String, String>, List<RenderedProjectionSpan>?>()
-    private val listItemPathsBySentence = HashMap<Int, Set<String>>()
 
     internal val cachedLeafCount: Int
         get() = leafSpanCache.size
@@ -51,12 +50,8 @@ internal class TtsHighlightProjectionResolver(
     internal fun resolverFor(
         passage: TtsPassage,
         messageIdHex: String,
-    ): (String, String) -> TtsLeafHighlight? {
-        val activeListItemPaths =
-            listItemPathsBySentence.getOrPut(passage.sentenceIndex) {
-                projection.activeListItemPaths(passage.sentenceIndex, sentenceChunks)
-            }
-        return { renderedLeafId, renderedText ->
+    ): (String, String) -> TtsLeafHighlight? =
+        { renderedLeafId, renderedText ->
             resolveTtsRenderedHighlights(
                 passage = passage,
                 messageIdHex = messageIdHex,
@@ -65,10 +60,8 @@ internal class TtsHighlightProjectionResolver(
                 renderedText = renderedText,
                 sentenceChunks = sentenceChunks,
                 leafSpanCache = leafSpanCache,
-                activeListItemPaths = activeListItemPaths,
             )
         }
-    }
 
     @Suppress("ReturnCount")
     internal fun sentenceLayoutFor(
@@ -138,10 +131,6 @@ internal fun resolveTtsRenderedHighlight(
         renderedText = renderedText,
         sentenceChunks = sentenceChunks,
         leafSpanCache = null,
-        activeListItemPaths =
-            passage
-                ?.let { projection.activeListItemPaths(it.sentenceIndex, sentenceChunks) }
-                .orEmpty(),
     )?.primaryRange
 }
 
@@ -154,7 +143,6 @@ private fun resolveTtsRenderedHighlights(
     renderedText: String,
     sentenceChunks: List<TtsChunk>,
     leafSpanCache: MutableMap<Pair<String, String>, List<RenderedProjectionSpan>?>?,
-    activeListItemPaths: Set<String>,
 ): TtsLeafHighlight? {
     if (passage == null || passage.messageIdHex != messageIdHex) return null
     if (passage.projectionId != projection.projectionId) return null
@@ -166,7 +154,7 @@ private fun resolveTtsRenderedHighlights(
             renderedText = renderedText,
             leafSpanCache = leafSpanCache,
         )
-            ?: return renderedListMarkerHighlight(renderedLeafId, renderedText, activeListItemPaths)
+            ?: return null
     // Every rendered range the sentence covers, not one contiguous span:
     // rendered content the projection never speaks - an omitted URL or
     // collapsed punctuation - legitimately splits one spoken sentence
@@ -183,53 +171,6 @@ private fun resolveTtsRenderedHighlights(
     return TtsLeafHighlight(sentenceRanges = sentenceRanges, word = word).takeIf {
         it.sentenceRanges.isNotEmpty() || it.word != null
     }
-}
-
-private fun SpeakableTextProjection.activeListItemPaths(
-    sentenceIndex: Int,
-    sentenceChunks: List<TtsChunk>,
-): Set<String> {
-    val sentence = sentenceSourceInterval(sentenceIndex, sentenceChunks) ?: return emptySet()
-    return spans
-        .asSequence()
-        .filter { span -> span.spokenStart < sentence.end && span.spokenEnd > sentence.start }
-        .mapNotNull { span -> span.leafId.innermostListItemPath() }
-        .toSet()
-}
-
-private fun renderedListMarkerHighlight(
-    renderedLeafId: String,
-    renderedText: String,
-    activeListItemPaths: Set<String>,
-): TtsLeafHighlight? {
-    val markerIsActive = renderedLeafId.listMarkerItemPath() in activeListItemPaths && renderedText.isNotEmpty()
-    return if (markerIsActive) {
-        TtsLeafHighlight(sentenceRanges = listOf(renderedText.indices), word = null)
-    } else {
-        null
-    }
-}
-
-private fun String.listMarkerItemPath(): String? {
-    val separator = lastIndexOf('/')
-    return if (separator in 1 until lastIndex) {
-        val segment = substring(separator + 1)
-        val itemIndex = segment.drop(1)
-        itemIndex
-            .takeIf { segment.firstOrNull() == 'm' && it.isNotEmpty() && it.all(Char::isDigit) }
-            ?.let { substring(0, separator) + "/i" + it }
-    } else {
-        null
-    }
-}
-
-private fun String.innermostListItemPath(): String? {
-    val segments = split('/')
-    val itemSegmentIndex =
-        segments.indexOfLast { segment ->
-            segment.length > 1 && segment[0] == 'i' && segment.substring(1).all(Char::isDigit)
-        }
-    return if (itemSegmentIndex < 0) null else segments.take(itemSegmentIndex + 1).joinToString("/")
 }
 
 private data class RenderedProjectionSpan(
