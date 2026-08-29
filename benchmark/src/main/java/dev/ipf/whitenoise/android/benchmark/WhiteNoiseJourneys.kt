@@ -146,6 +146,28 @@ internal class WhiteNoiseJourneys {
         device.waitForIdle()
     }
 
+    /**
+     * Scrolls the chat list down and back. Every pass republishes the visible
+     * row window, so this exercises row composition, avatar cache hits, and
+     * the folder-chip derivation that runs beside them.
+     */
+    fun scrollChatList() {
+        val x = device.displayWidth / 2
+        val top = device.displayHeight / 4
+        val bottom = device.displayHeight * 3 / 4
+        repeat(CHAT_LIST_SCROLL_PASSES) {
+            check(device.swipe(x, bottom, x, top, CHAT_LIST_SCROLL_STEPS)) {
+                "Failed to scroll toward older chats."
+            }
+        }
+        repeat(CHAT_LIST_SCROLL_PASSES) {
+            check(device.swipe(x, top, x, bottom, CHAT_LIST_SCROLL_STEPS)) {
+                "Failed to scroll back toward the most recent chats."
+            }
+        }
+        device.waitForIdle()
+    }
+
     fun openConversationVisible(groupName: String) {
         waitForText(groupName).click()
         waitForVisibleTag(PerformanceTags.CONVERSATION_TRANSCRIPT_VISIBLE)
@@ -469,5 +491,7 @@ internal class WhiteNoiseJourneys {
         const val SELECTOR_POLL_INTERVAL_MS = 50L
         const val CONVERSATION_SCROLL_PASSES = 4
         const val CONVERSATION_SCROLL_STEPS = 20
+        const val CHAT_LIST_SCROLL_PASSES = 4
+        const val CHAT_LIST_SCROLL_STEPS = 20
     }
 }

@@ -11,6 +11,8 @@ import android.util.Log
 import androidx.annotation.StringRes
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -147,7 +149,6 @@ import dev.ipf.whitenoise.android.share.ShareStagingStore
 import dev.ipf.whitenoise.android.share.shareResolveMime
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
-import dev.ipf.whitenoise.android.ui.chats.relaysConnectedOnNetworkChange
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateFlows
@@ -1881,7 +1882,7 @@ class WhiteNoiseAppState private constructor(
     var appUnlockError by mutableStateOf<AppText?>(null)
         private set
 
-    var appUnlockPromptRequestId by mutableStateOf(0)
+    var appUnlockPromptRequestId by mutableIntStateOf(0)
         private set
 
     // Populated by the off-main pre-warm (or the first unlock/background
@@ -1981,7 +1982,7 @@ class WhiteNoiseAppState private constructor(
     var pendingProfileFromDiscovery by mutableStateOf(false)
         private set
 
-    var relationshipRevision by mutableStateOf(0L)
+    var relationshipRevision by mutableLongStateOf(0L)
         private set
 
     var localNotificationSettings by mutableStateOf<NotificationSettingsFfi?>(null)
@@ -1993,7 +1994,7 @@ class WhiteNoiseAppState private constructor(
     var auditLogSettings by mutableStateOf<AuditLogSettingsFfi?>(null)
         private set
 
-    var runtimeGeneration by mutableStateOf(0)
+    var runtimeGeneration by mutableIntStateOf(0)
         private set
 
     var localNotificationPermissionGranted by mutableStateOf(localNotificationPresenter.canPostNotifications())
@@ -2025,9 +2026,9 @@ class WhiteNoiseAppState private constructor(
             registry = accountScopedCaches,
             maxEntries = BoundedNpubCache.DEFAULT_MAX_ENTRIES,
         )
-    private var profileRevision by mutableStateOf(0)
-    private var contactNicknameRevision by mutableStateOf(0)
-    private var profileAccountRevisionEpoch by mutableStateOf(0)
+    private var profileRevision by mutableIntStateOf(0)
+    private var contactNicknameRevision by mutableIntStateOf(0)
+    private var profileAccountRevisionEpoch by mutableIntStateOf(0)
     private var profileAccountRevisionSequence = 0
     private val profileAccountRevisions = mutableStateMapOf<String, Int>()
     private val profileAccountRevisionOrder = linkedSetOf<String>()
@@ -2182,13 +2183,11 @@ class WhiteNoiseAppState private constructor(
     // `failed` before the user has a chance to see the media.
     private val attachmentDownloadGate = AttachmentDownloadGate()
     private val attachmentDownloadIntents = AttachmentDownloadIntentStore(preferences)
-    private var attachmentDownloadPolicyRevision by mutableStateOf(0)
-    internal var attachmentOpenIntentRevision by mutableStateOf(0)
-        private set
+    private var attachmentDownloadPolicyRevision by mutableIntStateOf(0)
     private val conversationStateRetention = ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES)
 
     val shareStaging: ShareStagingStore = ShareStagingStore()
-    private var draftHydrationRevision by mutableStateOf(0)
+    private var draftHydrationRevision by mutableIntStateOf(0)
 
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
     val inboundShareRevision: Int
@@ -2235,6 +2234,21 @@ class WhiteNoiseAppState private constructor(
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
     private val mutationsScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    internal val attachmentOpens =
+        AttachmentOpenCoordinator(
+            intentStore = attachmentDownloadIntents,
+            scope = mutationsScope,
+            enqueue = ::enqueueAttachmentDownload,
+            visibility = { destination, request ->
+                attachmentOpenDestinationVisible(
+                    destination,
+                    request,
+                    appInForeground,
+                    activeConversationAccountRef,
+                    activeConversationGroupIdHex,
+                )
+            },
+        )
     private var forwardTerminalDismissGeneration = 0L
     private val forwardOperationOwner =
         ForwardOperationOwner(
@@ -2264,8 +2278,12 @@ class WhiteNoiseAppState private constructor(
         )
     private val notificationScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    private val notificationLocalIdentityReader =
+        NotificationLocalIdentityReader(notificationScope, notificationDispatcher) { senderIdHex ->
+            marmotIo { displayName(senderIdHex) }
+        }
     private val notificationEnrichmentGate = Semaphore(NOTIFICATION_ENRICHMENT_FANOUT)
-    private var accountCatchUpJob: Job? = null
+    private val accountCatchUpCoordinator = AccountCatchUpCoordinator(notificationScope)
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
     private val accountSwitchHandoff = AccountSwitchLocalSnapshotHandoff()
 
@@ -3679,13 +3697,6 @@ class WhiteNoiseAppState private constructor(
         chatsController?.resolveExistingDirectChat(targetReference, excludingGroupIdHex)
             ?: NewMessageDirectChatResolution(item = null, createRequired = false)
 
-    private fun isActiveConversation(
-        accountRef: String,
-        groupIdHex: String,
-    ): Boolean =
-        activeConversationAccountRef == accountRef &&
-            activeConversationGroupIdHex?.equals(groupIdHex, ignoreCase = true) == true
-
     private val marmotBridgeTracer = MarmotBridgeTracer()
 
     suspend fun <T> marmotIo(block: suspend MarmotInterface.() -> T): T =
@@ -3727,17 +3738,27 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Starts one process-lifetime catch-up after a chat list has rendered its
-     * local snapshot. A blocked relay call must not block that controller's live
-     * consumers, and rapid rebinds can share the same all-account catch-up.
+     * Starts a process-owned catch-up after a chat list has rendered its local
+     * snapshot. A blocked relay call must not block that controller's live
+     * consumers. Only callers with the same account, runtime, network, and
+     * readiness identity may share an in-flight result.
      */
-    internal fun launchCatchUpAccounts() {
-        if (accountCatchUpJob?.isActive == true) return
-        accountCatchUpJob =
-            notificationScope.launch {
-                if (catchUpAccountsBestEffort()) recordStartupRelayCatchUpReady()
+    internal fun launchCatchUpAccounts(readinessToken: ChatListConnectionEvidenceToken? = null): Deferred<Boolean> =
+        AccountCatchUpKey(
+            accountRef = activeAccountRef,
+            runtimeGeneration = runtimeGeneration,
+            networkGeneration = connectivityNetworkGeneration.get(),
+            readinessToken = readinessToken,
+        ).let { key ->
+            accountCatchUpCoordinator.launch(key) {
+                val succeeded = catchUpAccountsBestEffort()
+                if (succeeded) recordStartupRelayCatchUpReady()
+                succeeded &&
+                    activeAccountRef == key.accountRef &&
+                    runtimeGeneration == key.runtimeGeneration &&
+                    connectivityNetworkGeneration.get() == key.networkGeneration
             }
-    }
+        }
 
     private suspend fun catchUpAccountsBestEffort(): Boolean =
         runCatchingCancellable { marmotIo { catchUpAccounts() } }
@@ -3851,42 +3872,6 @@ class WhiteNoiseAppState private constructor(
             attachmentDownloadGate.promote(request.cacheKey())
         }
         AttachmentDownloadWorker.enqueue(appContext, request, priority)
-    }
-
-    internal fun requestAttachmentOpen(request: AttachmentTransferRequest) {
-        attachmentDownloadIntents.markOpenIntent(request)
-        enqueueAttachmentDownload(request, AttachmentDownloadPriority.Interactive)
-        attachmentOpenIntentRevision += 1
-    }
-
-    @Suppress("MaxLineLength") // Keep this single delegation in ktlint's required expression-body form.
-    internal fun hasAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean = attachmentDownloadIntents.hasDispatchableOpenIntent(request)
-
-    internal suspend fun claimAttachmentOpenIntent(request: AttachmentTransferRequest): AttachmentOpenIntentClaim? =
-        withContext(Dispatchers.IO) { attachmentDownloadIntents.claimOpenIntent(request) }
-
-    internal suspend fun consumeAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean {
-        val intents = attachmentDownloadIntents
-        return withContext(Dispatchers.IO) { intents.consumeOpenIntent(request) }
-    }
-
-    internal suspend fun beginAttachmentInstallPermissionRequest(request: AttachmentTransferRequest): Boolean =
-        withContext(Dispatchers.IO) { attachmentDownloadIntents.beginInstallPermissionRequest(request) }
-
-    internal suspend fun finishAttachmentInstallPermissionRequest(request: AttachmentTransferRequest): Boolean =
-        withContext(Dispatchers.IO) { attachmentDownloadIntents.finishInstallPermissionRequest(request) }
-
-    internal fun abandonAttachmentInstallPermissionRequest(request: AttachmentTransferRequest) {
-        attachmentDownloadIntents.abandonInstallPermissionRequest(request)
-        // A replacement composition may have checked while the former owner
-        // was still active. Re-run its effect after releasing that volatile
-        // owner so the durable recovery cannot remain asleep.
-        attachmentOpenIntentRevision += 1
-    }
-
-    /** Restores a failed dispatch without immediately looping the active effect. */
-    internal fun restoreAttachmentOpenIntent(request: AttachmentTransferRequest) {
-        attachmentDownloadIntents.restoreOpenIntent(request)
     }
 
     fun automaticAttachmentDownloadsPaused(): Boolean {
@@ -5257,19 +5242,14 @@ class WhiteNoiseAppState private constructor(
     private suspend fun <T> traceStartupStage(
         stage: String,
         block: suspend () -> T,
-    ): T {
-        val startedAtMs = SystemClock.elapsedRealtime()
-        return try {
-            block()
-        } finally {
-            val nowMs = SystemClock.elapsedRealtime()
+    ): T =
+        StartupStageTrace.trace(stage, block) { durationMs ->
             startupTiming(
                 stage = stage,
-                elapsedMs = nowMs - startupTraceStartedAtMs,
-                durationMs = nowMs - startedAtMs,
+                elapsedMs = SystemClock.elapsedRealtime() - startupTraceStartedAtMs,
+                durationMs = durationMs,
             )
         }
-    }
 
     /**
      * Wipe per-account in-memory media caches on account switch. The
@@ -6780,48 +6760,25 @@ class WhiteNoiseAppState private constructor(
     @Volatile
     private var hasActiveNetworkSnapshot = false
 
+    private val activeDefaultNetwork = ActiveDefaultNetworkTracker()
     private val validatedInternetNetworks = ValidatedInternetNetworkTracker()
 
     /**
-     * Reactive mirror of the two signals the chat-list connectivity banner
-     * consumes: device network presence (state 1 of the banner) and whether
-     * the engine's relay pool reports at least one connected relay. The pool
-     * counts come from [refreshRelayConnectivity] polls — the notification
-     * subscription cannot stand in for connectivity because it rides an
-     * in-process event bus and stays open with every relay down.
+     * Reactive Android-validated internet and aggregate relay fallback inputs
+     * for the chat-list connectivity banner. Active-account attempt and
+     * application-readiness phases live in [ChatsController]; neither a local
+     * subscription nor this device-wide relay count can mark that account
+     * ready. The pool count is retained only to trigger an active-account
+     * re-check when no relay is currently available.
      */
-    data class ConnectivitySignals(
-        val hasNetwork: Boolean = false,
-        val relaysConnected: Boolean = true,
-    )
-
-    private val _connectivitySignals = MutableStateFlow(ConnectivitySignals())
-    val connectivitySignals: StateFlow<ConnectivitySignals> = _connectivitySignals.asStateFlow()
-
-    // Bumped on every hasNetwork transition (callback or seed-observed) so a
-    // relay-health snapshot that was in flight across the transition can be
-    // recognized and discarded in [refreshRelayConnectivity].
-    private val connectivityNetworkGeneration = AtomicLong(0)
+    private val connectivitySignalOwner = ConnectivitySignalOwner()
+    val connectivitySignals = connectivitySignalOwner.signals
+    private val connectivityNetworkGeneration = connectivitySignalOwner.networkGeneration
 
     private fun updateConnectivitySignals(
-        hasNetwork: Boolean? = null,
+        hasValidatedInternet: Boolean? = null,
         relaysConnected: Boolean? = null,
-    ) {
-        _connectivitySignals.update { current ->
-            val nextHasNetwork = hasNetwork ?: current.hasNetwork
-            current.copy(
-                hasNetwork = nextHasNetwork,
-                // Structural invariant: no active network means no connected
-                // relays, whatever an optimistic seed default or a stale
-                // health snapshot claims. Every writer goes through this clamp.
-                relaysConnected =
-                    relaysConnectedOnNetworkChange(
-                        isOnline = nextHasNetwork,
-                        cached = relaysConnected ?: current.relaysConnected,
-                    ),
-            )
-        }
-    }
+    ) = connectivitySignalOwner.update(hasValidatedInternet, relaysConnected)
 
     /**
      * Refresh [connectivitySignals] from the engine's relay-health snapshot.
@@ -6833,7 +6790,7 @@ class WhiteNoiseAppState private constructor(
     suspend fun refreshRelayConnectivity() {
         // Offline needs no sample: the write clamp already pinned the signal
         // false, and pool counts read while offline are stale by definition.
-        if (!appInForeground || !_connectivitySignals.value.hasNetwork) return
+        if (!appInForeground || !connectivitySignals.value.hasValidatedInternet) return
         val generation = connectivityNetworkGeneration.get()
         val health = runCatchingCancellable { marmotIo { relayHealth() } }.getOrNull()
         // A snapshot that straddled a network transition describes the wrong
@@ -6864,8 +6821,8 @@ class WhiteNoiseAppState private constructor(
         // that dispatch then overwrites the seed with the same current state.
         runCatchingCancellable {
             val network = cm.activeNetwork
-            hasActiveNetworkSnapshot = network != null
-            updateConnectivitySignals(hasNetwork = network != null)
+            hasActiveNetworkSnapshot = activeDefaultNetwork.seed(network?.networkHandle)
+            updateConnectivitySignals(hasValidatedInternet = hasValidatedInternet())
             activeNetworkTypesSnapshot =
                 network?.let { cm.getNetworkCapabilities(it) }?.let(::networkTypesFor) ?: emptySet()
             if (network != null) schedulePendingPushWakeCatchUpDrain()
@@ -6882,6 +6839,8 @@ class WhiteNoiseAppState private constructor(
                         // Capabilities arrive in the onCapabilitiesChanged that
                         // follows; until then only the yes/no bit is known and
                         // the empty type set conservatively blocks auto-download.
+                        val update = activeDefaultNetwork.available(network.networkHandle)
+                        if (update.identityChanged) connectivitySignalOwner.noteNetworkIdentityChange()
                         noteActiveNetworkSnapshot(isOnline = true)
                     }
 
@@ -6889,6 +6848,7 @@ class WhiteNoiseAppState private constructor(
                         network: android.net.Network,
                         networkCapabilities: android.net.NetworkCapabilities,
                     ) {
+                        if (!activeDefaultNetwork.isCurrent(network.networkHandle)) return
                         noteActiveNetworkSnapshot(
                             isOnline = true,
                             networkTypes = networkTypesFor(networkCapabilities),
@@ -6896,7 +6856,14 @@ class WhiteNoiseAppState private constructor(
                     }
 
                     override fun onLost(network: android.net.Network) {
-                        noteActiveNetworkSnapshot(isOnline = false)
+                        val replacement = runCatching { cm.activeNetwork }.getOrNull()?.takeUnless { it == network }
+                        val update =
+                            activeDefaultNetwork.lost(
+                                networkHandle = network.networkHandle,
+                                replacementNetworkHandle = replacement?.networkHandle,
+                            ) ?: return
+                        if (update.identityChanged) connectivitySignalOwner.noteNetworkIdentityChange()
+                        noteActiveNetworkSnapshot(isOnline = update.hasActiveNetwork)
                     }
                 },
             )
@@ -6936,10 +6903,12 @@ class WhiteNoiseAppState private constructor(
                         networkHandle = network.networkHandle,
                         available = networkCapabilities.providesValidatedNonVpnInternet(),
                     )
+                    noteValidatedInternetSnapshot()
                 }
 
                 override fun onLost(network: android.net.Network) {
                     validatedInternetNetworks.remove(network.networkHandle)
+                    noteValidatedInternetSnapshot()
                 }
             }
         runCatchingCancellable {
@@ -6954,6 +6923,7 @@ class WhiteNoiseAppState private constructor(
                         (cm.getNetworkCapabilities(network)?.providesValidatedNonVpnInternet() == true)
                 }
             }
+            noteValidatedInternetSnapshot()
         }.onFailure {
             // Conservative failure mode: setup stays gated rather than treating
             // an unverified or VPN-only network as usable internet.
@@ -6966,19 +6936,23 @@ class WhiteNoiseAppState private constructor(
         networkTypes: Set<MediaAutoDownloadNetwork>? = null,
     ) {
         val wasOnline = hasActiveNetworkSnapshot
-        if (wasOnline != isOnline) connectivityNetworkGeneration.incrementAndGet()
-        updateConnectivitySignals(hasNetwork = isOnline)
         if (!isOnline) {
             hasActiveNetworkSnapshot = false
             activeNetworkTypesSnapshot = emptySet()
+            noteValidatedInternetSnapshot()
             return
         }
         hasActiveNetworkSnapshot = true
         activeNetworkTypesSnapshot = networkTypes ?: emptySet()
+        noteValidatedInternetSnapshot()
         if (shouldReconnectNotificationsOnNetworkRestore(wasOnline, isOnline = true)) {
             scheduleNotificationReconnectOnNetworkRestore()
         }
         schedulePendingPushWakeCatchUpDrain()
+    }
+
+    private fun noteValidatedInternetSnapshot() {
+        updateConnectivitySignals(hasValidatedInternet = hasValidatedInternet())
     }
 
     private fun scheduleNotificationReconnectOnNetworkRestore() {
@@ -8996,21 +8970,20 @@ class WhiteNoiseAppState private constructor(
         requestProfile(accountIdHex)
     }
 
-    // A notification renders once and never recomposes, so resolve the name via
-    // the awaited directory lookup (it spans every signed-in account) rather than
-    // the in-memory cache, which is cold right after an FCM wake.
-    private suspend fun notificationSenderName(update: NotificationUpdateFfi): String? {
+    private suspend fun notificationSenderName(
+        update: NotificationUpdateFfi,
+        firstPost: Boolean = false,
+    ): String? {
         val senderIdHex = update.sender.accountIdHex
         if (senderIdHex.isBlank()) return null
-        val contactNickname = contactNicknameFor(update.accountRef, senderIdHex)
+        val contactNickname = notificationSenderNameOverride(contactNicknameFor(update.accountRef, senderIdHex), null)
         val localProfileName =
-            runCatchingCancellable { marmotIo { displayName(senderIdHex) } }
-                .getOrNull()
-        // Leave an unresolved local name null: LocalNotificationFormatter can
-        // then use the sender name carried by the notification payload before
-        // applying its final short-npub fallback. Returning the npub here masked
-        // a usable payload name during cold profile-cache startup.
-        return notificationSenderNameOverride(contactNickname, localProfileName)
+            when {
+                contactNickname != null -> null
+                firstPost -> notificationLocalIdentityReader.read(senderIdHex)
+                else -> runCatchingCancellable { marmotIo { displayName(senderIdHex) } }.getOrNull()
+            }
+        return contactNickname ?: notificationSenderNameOverride(null, localProfileName)
             ?: notificationDisplayNameHints[senderIdHex]
     }
 
@@ -9427,11 +9400,10 @@ class WhiteNoiseAppState private constructor(
     private suspend fun enrichPostedNotificationUpdate(
         update: NotificationUpdateFfi,
         preWarmedAvatars: PreWarmedNotificationAvatars,
-        postEpoch: Long,
-        engineMuted: Boolean,
+        firstPost: NotificationFirstPost,
     ): Boolean {
-        if (!isNotificationEnrichmentAllowed(update, postEpoch, engineMuted)) return false
-        val senderNameOverride = notificationSenderName(update)
+        if (!isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted)) return false
+        val senderNameOverride = firstPost.senderName ?: notificationSenderName(update)
         val systemText = notificationGroupSystemText(update, senderNameOverride)
         val previewTextOverride =
             systemText?.body ?: if (LocalNotificationFormatter.needsPreviewTextResolution(update)) {
@@ -9454,7 +9426,7 @@ class WhiteNoiseAppState private constructor(
             notificationConversationAvatarUrl(update, senderAvatarUrl, preWarmedAvatars.groupAvatarUrl)
         // A lock can arrive during any suspending enrichment above. Re-check
         // after all app-state lookups so a silent update never reveals content.
-        return isNotificationEnrichmentAllowed(update, postEpoch, engineMuted) &&
+        return isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted) &&
             localNotificationPresenter.show(
                 update,
                 conversationTitle,
@@ -9474,36 +9446,35 @@ class WhiteNoiseAppState private constructor(
                 replaceCurrentMessage = true,
                 shortNpub = ::shortNpub,
                 isPostStillAllowed = {
-                    isNotificationEnrichmentAllowed(update, postEpoch, engineMuted)
+                    isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted)
                 },
             )
     }
 
     private suspend fun postInitialNotificationUpdate(
         update: NotificationUpdateFfi,
-        postEpoch: Long,
-        engineMuted: Boolean,
+        firstPost: NotificationFirstPost,
     ): Boolean {
-        val shouldPost = shouldPostNotification(update, engineMuted)
         appStateDebug {
-            "notification eligibility outcome=${if (shouldPost) "post" else "skip"} " +
-                "trigger=${update.trigger} app_lock=$appLockScreenVisible engine_muted=$engineMuted"
+            "notification eligibility outcome=${if (firstPost.shouldPost) "post" else "skip"} " +
+                "trigger=${update.trigger} app_lock=$appLockScreenVisible engine_muted=${firstPost.engineMuted}"
         }
-        if (!shouldPost) return false
+        if (!firstPost.shouldPost) return false
 
         val redactContent = appLockScreenVisible
 
         var posted =
             localNotificationPresenter.show(
                 update = update,
+                senderNameOverride = firstPost.senderName,
                 redactContent = redactContent,
                 directShareEligible = !redactContent && update.accountRef == activeAccountRef,
                 shortNpub = ::cachedShortNpubOrUnknown,
                 isPostStillAllowed = {
                     isNotificationGenerationPostAllowed(
                         update = update,
-                        postEpoch = postEpoch,
-                        engineMuted = engineMuted,
+                        postEpoch = firstPost.epoch,
+                        engineMuted = firstPost.engineMuted,
                         requireUnlocked = !redactContent,
                     )
                 },
@@ -9521,8 +9492,8 @@ class WhiteNoiseAppState private constructor(
                     isPostStillAllowed = {
                         isNotificationGenerationPostAllowed(
                             update = update,
-                            postEpoch = postEpoch,
-                            engineMuted = engineMuted,
+                            postEpoch = firstPost.epoch,
+                            engineMuted = firstPost.engineMuted,
                             requireUnlocked = false,
                         )
                     },
@@ -9544,17 +9515,16 @@ class WhiteNoiseAppState private constructor(
 
     private fun scheduleNotificationEnrichment(
         update: NotificationUpdateFfi,
-        postEpoch: Long,
-        engineMuted: Boolean,
+        firstPost: NotificationFirstPost,
         receivedAtElapsedMs: Long,
     ) {
         notificationScope.launch(notificationDispatcher) {
             notificationEnrichmentGate.withPermit {
-                if (!isNotificationEnrichmentAllowed(update, postEpoch, engineMuted)) {
+                if (!isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted)) {
                     return@withPermit
                 }
-                val avatars = preWarmNotificationAvatars(update, engineMuted)
-                val enriched = enrichPostedNotificationUpdate(update, avatars, postEpoch, engineMuted)
+                val avatars = preWarmNotificationAvatars(update, firstPost.engineMuted)
+                val enriched = enrichPostedNotificationUpdate(update, avatars, firstPost)
                 appStateDebug {
                     "notification timing stage=enrichment-complete " +
                         "elapsed_ms=${(SystemClock.elapsedRealtime() - receivedAtElapsedMs).coerceAtLeast(0L)} " +
@@ -9631,18 +9601,25 @@ class WhiteNoiseAppState private constructor(
         applyNotificationDisplayNameHint(update)
         scheduleIncomingDocumentDownloadMaintenance(update)
         val postEpoch = notificationPostEpoch.capture()
-        // One durable-mute read per update: the initial post, enrichment, and
-        // each synchronous post-time re-check reuse it.
         val engineMuted = engineNotificationMuted(update)
+        val shouldPost = shouldPostNotification(update, engineMuted)
+        val firstPost =
+            NotificationFirstPost(
+                epoch = postEpoch,
+                engineMuted = engineMuted,
+                shouldPost = shouldPost,
+                senderName =
+                    if (shouldPost && !appLockScreenVisible) notificationSenderName(update, firstPost = true) else null,
+            )
         appStateDebug {
             "notification timing stage=eligibility-complete " +
                 "elapsed_ms=${(SystemClock.elapsedRealtime() - receivedAtElapsedMs).coerceAtLeast(0L)} outcome=resolved"
         }
         val posted =
             postBeforeNotificationEnrichment(
-                post = { postInitialNotificationUpdate(update, postEpoch, engineMuted) },
+                post = { postInitialNotificationUpdate(update, firstPost) },
                 scheduleEnrichment = {
-                    scheduleNotificationEnrichment(update, postEpoch, engineMuted, receivedAtElapsedMs)
+                    scheduleNotificationEnrichment(update, firstPost, receivedAtElapsedMs)
                 },
             )
         appStateDebug {
@@ -9654,10 +9631,6 @@ class WhiteNoiseAppState private constructor(
     }
 
     private fun schedulePostNotificationMaintenance(update: NotificationUpdateFfi) {
-        // Coalesce the unread refresh across a burst instead of paying the
-        // chat-list + per-group roster cost once per update. The scheduler
-        // drains pending accounts off the subscription loop, so the loop stays
-        // free to process the next update (#729).
         if (networkNotificationRecoverySuppressed) return
         unreadRefreshScheduler.schedule(update.accountRef)
         signalNotificationDrain()

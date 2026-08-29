@@ -55,7 +55,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val memberProjection = body.indexOf("seedInitialMemberIdProjection(accountRef, bindEpoch)")
         val publishReady = body.indexOf("isLoading = false", startIndex = secondSnapshot)
         val renderFrame = body.indexOf("awaitRenderedChatListFrame()", startIndex = publishReady)
-        val catchUp = body.indexOf("appState.launchCatchUpAccounts()", startIndex = renderFrame)
+        val catchUp = body.indexOf("connectionOwner.launchCatchUp()", startIndex = renderFrame)
 
         assertTrue("a constructor seed must be detected before bind clears state", seededSnapshot >= 0)
         assertTrue("the seeded target list must draw before its catch-up starts", seededCatchUp > seededRenderFrame)
@@ -70,7 +70,10 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue("member-derived UI must be ready before the first visible frame", publishReady > memberProjection)
         assertTrue("the local snapshot must get a rendered frame before catch-up", renderFrame > publishReady)
         assertTrue("relay catch-up must start only after the rendered local frame", catchUp > renderFrame)
-        assertTrue("one bind must start catch-up only once", "if (!catchUpStarted)" in body)
+        assertTrue(
+            "a retry must be able to re-prove application readiness",
+            body.indexOf("pendingReadinessCatchUp", startIndex = catchUp) > catchUp,
+        )
         assertTrue(
             "live consumers must start after catch-up is launched",
             body.indexOf("runUntilFirstLiveSubscriptionEnds(") > catchUp,
@@ -273,12 +276,26 @@ class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun catchUpLaunchIsProcessScopedAndDeduplicated() {
         val body = appStateSource().readText().kotlinFunctionBody("launchCatchUpAccounts")
+        val coordinator = connectivityRuntimeSource().readText()
 
-        assertTrue("a blocked catch-up must run outside the controller bind job", "notificationScope.launch" in body)
-        assertTrue("rapid account rebinds must share an active catch-up", "accountCatchUpJob?.isActive == true" in body)
+        assertTrue(
+            "a blocked catch-up must run outside the controller bind job",
+            "accountCatchUpCoordinator.launch" in body,
+        )
+        assertTrue("readiness callers must be able to await the result", "scope.async" in coordinator)
+        assertTrue(
+            "only identity-matched callers may share an active catch-up",
+            "it.isActive && activeKey == key" in coordinator,
+        )
         assertTrue(
             "the background job must run the result-bearing best-effort catch-up",
             "catchUpAccountsBestEffort()" in body,
+        )
+        assertTrue(
+            "completion must be fenced by account, runtime, and network generation",
+            "activeAccountRef == key.accountRef" in body &&
+                "runtimeGeneration == key.runtimeGeneration" in body &&
+                "connectivityNetworkGeneration.get() == key.networkGeneration" in body,
         )
     }
 
@@ -433,6 +450,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
     private fun appStateSource(): File = source("state/AppState.kt")
 
     private fun accountSwitchSnapshotSource(): File = source("state/AccountSwitchLocalSnapshot.kt")
+
+    private fun connectivityRuntimeSource(): File = source("state/ChatListConnectivityRuntime.kt")
 
     private fun setActiveAccountSection(): String {
         val source = appStateSource().readText()

@@ -7,6 +7,7 @@ import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -60,6 +61,7 @@ import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
+import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
@@ -218,12 +220,7 @@ internal fun chatListItemFromProjection(
                     // ChatsController), not this synthesized record. Parsing
                     // here would force an FFI hop into a pure projection
                     // helper.
-                    contentTokens =
-                        MarkdownDocumentFfi(
-                            truncated = false,
-                            blocks = emptyList(),
-                            blankLinesBefore = ByteArray(0),
-                        ),
+                    contentTokens = EMPTY_MARKDOWN_DOCUMENT,
                     kind = preview.kind,
                     tags = emptyList(),
                     sourceEpoch = null,
@@ -1913,13 +1910,26 @@ private fun rememberAcceptedPendingTextOptimisticId(
     }
 }
 
+/**
+ * Total order for the rendered timeline: engine timestamp, then the local
+ * arrival order that breaks a same-second tie, then the message id.
+ *
+ * Written as an explicit chain rather than `compareValuesBy`. That helper
+ * takes its selectors as `vararg (T) -> Comparable<*>?`, so each call
+ * allocates a `Function1[3]` and boxes both `ULong` keys through
+ * `ULong.box-impl` to satisfy the `Comparable` return type. This runs once
+ * per comparison of an O(n log n) sort that re-runs on every timeline
+ * publish. `ULong.compareTo` compares the underlying longs directly.
+ */
 internal fun compareTimelineMessages(
     left: TimelineMessage,
     right: TimelineMessage,
-): Int =
-    compareValuesBy(left, right, {
-        it.record.recordedAt
-    }, { it.timelineOrder }, { it.id })
+): Int {
+    val byRecordedAt = left.record.recordedAt.compareTo(right.record.recordedAt)
+    if (byRecordedAt != 0) return byRecordedAt
+    val byTimelineOrder = left.timelineOrder.compareTo(right.timelineOrder)
+    return if (byTimelineOrder != 0) byTimelineOrder else left.id.compareTo(right.id)
+}
 
 /**
  * An optimistic-send position override (#1256) is a transient bridge: it pins a
@@ -3192,7 +3202,7 @@ class ChatsController private constructor(
         private set
 
     private val retryLoadSignal = Channel<Unit>(Channel.CONFLATED)
-    var retryGeneration by mutableStateOf(0L)
+    var retryGeneration by mutableLongStateOf(0L)
         private set
     private var terminalLoadFailure = false
 
@@ -3216,14 +3226,14 @@ class ChatsController private constructor(
      * row updates — so foreground provisional opens can reconcile against live
      * backing rows while [items] stays frozen behind an open conversation (#1729).
      */
-    var materializedGroupsRevision by mutableStateOf(0L)
+    var materializedGroupsRevision by mutableLongStateOf(0L)
         private set
 
     /** Complete observable revision for on-demand projections such as the forward picker. */
-    var forwardTargetsRevision by mutableStateOf(0L)
+    var forwardTargetsRevision by mutableLongStateOf(0L)
         private set
 
-    var memberSnapshotsRevision by mutableStateOf(0L)
+    var memberSnapshotsRevision by mutableLongStateOf(0L)
         private set
 
     private var accountRef: String? = initialLocalSnapshot?.accountRef ?: initialAccountRef
@@ -3658,6 +3668,20 @@ class ChatsController private constructor(
     private var activeChatListSubscription: ChatListSubscription? = null
     private var activeChatsSubscription: ChatsSubscription? = null
     private var bindJob: Job? = null
+    private val connectionOwner =
+        ChatListConnectionOwner(appState) {
+            synchronized(liveSubscriptionLock) {
+                activeChatListSubscription != null &&
+                    activeChatsSubscription != null &&
+                    accountRef == boundAccountRef &&
+                    accountRef == appState.activeAccountRef
+            }
+        }
+    internal val connectionState: ChatListConnectionState get() = connectionOwner.state
+
+    fun refreshConnectionReadiness() = connectionOwner.refresh()
+
+    fun invalidateConnectionReadiness() = connectionOwner.invalidate()
 
     suspend fun closeLiveSubscriptionsForAccountTeardown(accountRef: String) {
         val teardown =
@@ -3667,6 +3691,7 @@ class ChatsController private constructor(
                 } else {
                     this.accountRef = null
                     boundAccountRef = null
+                    invalidateConnectionReadiness()
                     val current = Triple(activeChatListSubscription, activeChatsSubscription, bindJob)
                     activeChatListSubscription = null
                     activeChatsSubscription = null
@@ -3708,6 +3733,7 @@ class ChatsController private constructor(
             resetBackingState()
         }
         bindEpoch += 1L
+        connectionOwner.reset(accountRef, bindEpoch)
         recompute(scheduleBackgroundEnrichment = seededLocalSnapshot == null)
         error = null
         terminalLoadFailure = false
@@ -3723,7 +3749,8 @@ class ChatsController private constructor(
         appState.refreshDraftSummaries(accountRef)
         try {
             var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
-            var catchUpStarted = preserveLoadedContent && seededLocalSnapshot == null && keepLoadedContent
+            var localFramePresented = preserveLoadedContent && seededLocalSnapshot == null && keepLoadedContent
+            var pendingReadinessCatchUp: Deferred<Boolean>? = null
             if (seededLocalSnapshot != null) {
                 // The one-shot MDK seed was installed synchronously during
                 // controller construction, before this LaunchedEffect began.
@@ -3733,8 +3760,8 @@ class ChatsController private constructor(
                 awaitRenderedChatListFrame()
                 if (shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
                     appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
-                    catchUpStarted = true
-                    appState.launchCatchUpAccounts()
+                    localFramePresented = true
+                    pendingReadinessCatchUp = appState.launchCatchUpAccounts()
                     // A performance-shaped handoff may contain only the
                     // rosters needed to render first-frame identity. Do not
                     // turn every deferred named-group roster into an N-call
@@ -3747,6 +3774,7 @@ class ChatsController private constructor(
                 var chatListSubscription: ChatListSubscription? = null
                 var chatsSubscription: ChatsSubscription? = null
                 var receivedLiveUpdate = false
+                val connectionAttempt = connectionOwner.beginSessionAttempt(accountRef, bindEpoch)
                 try {
                     val chatListStream =
                         appState.marmotIo { subscribeChatList(accountRef, includeArchived = true) }
@@ -3785,17 +3813,16 @@ class ChatsController private constructor(
                     recompute()
 
                     // The per-account SQLite projection is the local-ready
-                    // boundary. Give it one complete draw before asking relays
-                    // to converge the already-active subscriptions: offline or
-                    // slow catch-up must never hold a black switch screen. A
-                    // later stream update folds fresh rename/avatar/membership
-                    // state into these same maps (#252, #1698).
-                    if (!catchUpStarted) {
+                    // boundary. Draw it before relay catch-up; later stream updates fold fresh state (#252, #1698).
+                    if (!localFramePresented) {
                         awaitRenderedChatListFrame()
                         appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
-                        catchUpStarted = true
-                        appState.launchCatchUpAccounts()
+                        localFramePresented = true
+                        pendingReadinessCatchUp = connectionOwner.launchCatchUp()
                     }
+                    val readinessCatchUp = pendingReadinessCatchUp ?: connectionOwner.launchCatchUp()
+                    pendingReadinessCatchUp = null
+                    connectionOwner.observe(readinessCatchUp)
 
                     coroutineScope {
                         runUntilFirstLiveSubscriptionEnds(
@@ -3806,6 +3833,7 @@ class ChatsController private constructor(
                                             chatListStream.nextUpdate()
                                         } ?: break
                                     receivedLiveUpdate = true
+                                    connectionOwner.noteLiveUpdate(connectionAttempt)
                                     when (update) {
                                         is ChatListSubscriptionUpdateFfi.Row -> {
                                             val row = update.row
@@ -3842,6 +3870,7 @@ class ChatsController private constructor(
                                             chatStream.next()
                                         } ?: break
                                     receivedLiveUpdate = true
+                                    connectionOwner.noteLiveUpdate(connectionAttempt)
                                     requestGroupProfiles(update)
                                     chatsDebug { "chat update account=${accountRef.take(8)} ${update.debugSummary()}" }
                                     foldGroup(update)
@@ -3872,13 +3901,7 @@ class ChatsController private constructor(
                                 ),
                         )
                 } finally {
-                    // NonCancellable: a cancelled bind must still close subscriptions
-                    // so a retry loop or account switch cannot leak account-wide
-                    // chat-list/chats handles. (Originally surfaced in #270.)
-                    withContext(NonCancellable + Dispatchers.IO) {
-                        runCatching { chatListSubscription?.close() }
-                        runCatching { chatsSubscription?.close() }
-                    }
+                    pendingReadinessCatchUp = null
                     synchronized(liveSubscriptionLock) {
                         if (activeChatListSubscription === chatListSubscription) {
                             activeChatListSubscription = null
@@ -3886,6 +3909,13 @@ class ChatsController private constructor(
                         if (activeChatsSubscription === chatsSubscription) {
                             activeChatsSubscription = null
                         }
+                    }
+                    connectionOwner.finishSessionAttempt(connectionAttempt)
+                    // NonCancellable cleanup prevents a cancelled bind, retry, or account switch
+                    // from leaking account-wide chat-list/chats handles (#270).
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        runCatching { chatListSubscription?.close() }
+                        runCatching { chatsSubscription?.close() }
                     }
                 }
                 if (!coroutineContext.isActive || !shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) break
@@ -5753,6 +5783,7 @@ class ChatsController private constructor(
                 bindJob.also { bindJob = null }
             }
         jobToCancel?.cancel()
+        connectionOwner.clear()
         pendingInitialLocalSnapshot = null
         resetBackingState()
         items = emptyList()
@@ -6770,7 +6801,7 @@ class ConversationController(
     internal val errorEdge: ConversationLoadFailureEdge
         get() = conversationLoadFailureEdge(pageError != null, failedPageDirection)
     private val retryLoadSignal = Channel<Unit>(Channel.CONFLATED)
-    var retryGeneration by mutableStateOf(0L)
+    var retryGeneration by mutableLongStateOf(0L)
         private set
     private var terminalLoadFailure = false
     private var failedPageDirection: ConversationSearchPageDirection? = null
@@ -9183,9 +9214,19 @@ class ConversationController(
     internal fun requestAttachmentOpen(
         messageIdHex: String,
         attachmentIndex: Int,
-    ) {
-        val account = conversationAccountRef ?: return
-        appState.requestAttachmentOpen(
+    ): Boolean {
+        val account = conversationAccountRef ?: return false
+        return appState.attachmentOpens.requestOpen(
+            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+        )
+    }
+
+    internal fun attachmentOpenRequest(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): AttachmentOpenRequest? {
+        val account = conversationAccountRef ?: return null
+        return appState.attachmentOpens.openRequest(
             AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
         )
     }
@@ -9194,30 +9235,24 @@ class ConversationController(
         messageIdHex: String,
         attachmentIndex: Int,
     ): Boolean {
-        val account = conversationAccountRef ?: return false
-        return appState.hasAttachmentOpenIntent(
-            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
-        )
+        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return false
+        return appState.attachmentOpens.hasIntent(request)
     }
 
     internal suspend fun consumeAttachmentOpenIntent(
         messageIdHex: String,
         attachmentIndex: Int,
     ): Boolean {
-        val account = conversationAccountRef ?: return false
-        return appState.consumeAttachmentOpenIntent(
-            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
-        )
+        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return false
+        return appState.attachmentOpens.consume(request)
     }
 
     internal fun restoreAttachmentOpenIntent(
         messageIdHex: String,
         attachmentIndex: Int,
     ) {
-        val account = conversationAccountRef ?: return
-        appState.restoreAttachmentOpenIntent(
-            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
-        )
+        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return
+        appState.attachmentOpens.restore(request)
     }
 
     /** Upgrade an optimistic imeta fallback before download/save uses its epoch. */
@@ -12471,12 +12506,7 @@ class ConversationController(
                 groupIdHex = group.groupIdHex,
                 sender = inferStreamSender(streamId),
                 plaintext = event.detail,
-                contentTokens =
-                    MarkdownDocumentFfi(
-                        truncated = false,
-                        blocks = emptyList(),
-                        blankLinesBefore = ByteArray(0),
-                    ),
+                contentTokens = EMPTY_MARKDOWN_DOCUMENT,
                 kind = STREAM_DEBUG_KIND,
                 tags = listOf(MessageProjector.streamTag(streamId), MessageTagFfi(listOf("dbg", event.eventKind))),
                 sourceEpoch = null,
@@ -12546,12 +12576,7 @@ class ConversationController(
                     groupIdHex = group.groupIdHex,
                     sender = inferStreamSender(streamId),
                     plaintext = "",
-                    contentTokens =
-                        MarkdownDocumentFfi(
-                            truncated = false,
-                            blocks = emptyList(),
-                            blankLinesBefore = ByteArray(0),
-                        ),
+                    contentTokens = EMPTY_MARKDOWN_DOCUMENT,
                     kind = 1200uL,
                     tags = listOf(MessageProjector.streamTag(streamId)),
                     sourceEpoch = null,
@@ -12567,12 +12592,7 @@ class ConversationController(
                 // chunks, failure copy), reset to empty — carrying forward a
                 // previous revision's tokens would render stale markdown
                 // against the new text. Empty falls back to plain rendering.
-                contentTokens =
-                    tokens ?: MarkdownDocumentFfi(
-                        truncated = false,
-                        blocks = emptyList(),
-                        blankLinesBefore = ByteArray(0),
-                    ),
+                contentTokens = tokens ?: EMPTY_MARKDOWN_DOCUMENT,
             )
         val updated =
             TimelineMessage(

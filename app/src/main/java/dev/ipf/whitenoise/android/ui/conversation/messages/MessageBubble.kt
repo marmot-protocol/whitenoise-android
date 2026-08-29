@@ -32,6 +32,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -366,6 +367,7 @@ internal fun MessageBubble(
             customArgb = customBubbleArgb,
             persistedFailure = persistedFailure,
         )
+    val bubbleBackgroundColor = colorFromArgb(bubblePresentation.backgroundArgb)
     val bubbleContentColor = colorFromArgb(bubblePresentation.contentArgb)
     // #414: "you were mentioned" treatment. A received (not mine), live
     // message whose markdown body @-mentions the current
@@ -407,7 +409,7 @@ internal fun MessageBubble(
                     bottom = bounds.bottom.roundToInt(),
                 )
         }
-    var swipeDrag by remember(record.messageIdHex) { mutableStateOf(0f) }
+    var swipeDrag by remember(record.messageIdHex) { mutableFloatStateOf(0f) }
     val animatedSwipeOffset by animateFloatAsState(targetValue = swipeDrag, label = "replySwipeOffset")
     val clipboard = LocalClipboardManager.current
     val haptics = LocalHapticFeedback.current
@@ -1739,6 +1741,7 @@ internal fun MessageBubble(
                                     collapsible = collapsible,
                                     replyPreviewPresent = replyPreview != null,
                                     hasMedia = hasMedia,
+                                    bubbleBackgroundColor = bubbleBackgroundColor,
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
@@ -1806,6 +1809,7 @@ internal fun MessageBubble(
                                     collapsible = collapsible,
                                     replyPreviewPresent = replyPreview != null,
                                     hasMedia = hasMedia,
+                                    bubbleBackgroundColor = bubbleBackgroundColor,
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
@@ -1871,6 +1875,7 @@ internal fun MessageBubble(
                             collapsible = collapsible,
                             replyPreviewPresent = replyPreview != null,
                             hasMedia = hasMedia,
+                            bubbleBackgroundColor = bubbleBackgroundColor,
                             bubbleContentColor = bubbleContentColor,
                             timestampColor = timestampColor,
                             showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),

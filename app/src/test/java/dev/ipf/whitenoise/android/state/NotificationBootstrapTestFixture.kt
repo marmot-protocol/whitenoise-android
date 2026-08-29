@@ -46,6 +46,8 @@ internal class NotificationBootstrapTestFixture(
     delayFirstNotificationDispatchAfterRuntimeStart: Boolean = false,
     receiverTimeoutMillis: Long = 100L,
     notificationUsersHaveDisplayNames: Boolean = true,
+    private val localDisplayName: String? = "Alice",
+    isDm: Boolean = false,
     private val accounts: List<AccountSummaryFfi> = emptyList(),
     private val chatListRows: List<ChatListRowFfi> = emptyList(),
     private val chatGroups: List<AppGroupRecordFfi> = emptyList(),
@@ -80,6 +82,7 @@ internal class NotificationBootstrapTestFixture(
     val signerRegistrationCalls = AtomicInteger(0)
     val markReadCalls = AtomicInteger(0)
     val npubCalls = AtomicInteger(0)
+    val senderDisplayNameCalls = AtomicInteger(0)
 
     @Volatile
     var receiverWasAttachedAtPostStartEmission = false
@@ -98,8 +101,8 @@ internal class NotificationBootstrapTestFixture(
             accountRef = "account-a",
             accountIdHex = "account-a",
             groupIdHex = "group-a",
-            groupName = "General",
-            isDm = false,
+            groupName = "General".takeUnless { isDm },
+            isDm = isDm,
             isMention = false,
             messageIdHex = "message-a",
             sender =
@@ -180,7 +183,12 @@ internal class NotificationBootstrapTestFixture(
                     emptyList<Any>()
                 }
                 "userProfile" -> null
-                "displayName" -> "Alice"
+                "displayName" -> {
+                    if (arguments?.firstOrNull() == update.sender.accountIdHex) {
+                        senderDisplayNameCalls.incrementAndGet()
+                    }
+                    localDisplayName
+                }
                 "registerExternalSigner" -> {
                     signerRegistrationCalls.incrementAndGet()
                     Unit
@@ -283,6 +291,15 @@ internal class NotificationBootstrapTestFixture(
                 delay(1L)
             }
         }
+    }
+
+    fun warmNpubCache() {
+        appState.shortNpub(update.sender.accountIdHex)
+        npubCalls.set(0)
+    }
+
+    fun releaseNotificationDispatch() {
+        notificationDispatchGate?.release()
     }
 
     fun close() {

@@ -682,6 +682,14 @@ val enableComposeCompilerReports =
         .getOrElse(false)
 
 composeCompiler {
+    // MarmotKit's UniFFI records are `data class`es with `var` properties, so
+    // the compiler infers them Unstable and every Android projection that
+    // holds one inherits that. Under strong skipping an unstable parameter is
+    // compared by identity, so a value-identical row rebuilt by the next
+    // engine update recomposes instead of skipping. The app treats MDK records
+    // as immutable values (rebuilt with `copy`, never mutated in place), so
+    // declaring them stable restores structural-equality skipping.
+    stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("config/compose-stability.conf"))
     if (enableComposeCompilerReports) {
         metricsDestination = layout.buildDirectory.dir("compose-metrics")
         reportsDestination = layout.buildDirectory.dir("compose-reports")

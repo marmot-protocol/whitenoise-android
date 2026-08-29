@@ -32,7 +32,7 @@ class NotificationNetworkReconnectCoverageTest {
 
         assertTrue(
             "the one-shot seed must establish the current availability baseline directly",
-            "hasActiveNetworkSnapshot = network != null" in seed,
+            "hasActiveNetworkSnapshot = activeDefaultNetwork.seed(network?.networkHandle)" in seed,
         )
         assertFalse(
             "an initially online process must not be mistaken for an offline -> online transition",
@@ -210,7 +210,7 @@ class NotificationNetworkReconnectCoverageTest {
                 .substringBefore("/**")
         assertTrue(
             "a wipe that starts during notification enrichment must block the final presenter write",
-            "isNotificationEnrichmentAllowed(update, postEpoch, engineMuted)" in post &&
+            "isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted)" in post &&
                 "isNotificationGenerationPostAllowed(" in notificationGates &&
                 "!networkNotificationRecoverySuppressed" in notificationGates,
         )

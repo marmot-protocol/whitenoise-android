@@ -58,6 +58,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -311,7 +312,7 @@ internal fun ImageSearchSheet(
     // new view with stale thumbnails. `Job.cancel()` alone isn't enough
     // because cancellation is cooperative — a returning coroutine still
     // executes its tail past the suspension point.
-    var requestId by remember { mutableStateOf(0) }
+    var requestId by remember { mutableIntStateOf(0) }
     var searchJob by remember { mutableStateOf<Job?>(null) }
     val trimmedUrl = urlDraft.trim()
     val previewUrl =

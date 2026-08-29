@@ -96,7 +96,7 @@ class NotificationPushWakeDrainCoverageTest {
     }
 
     @Test
-    fun firstNotificationPostsBeforeBlockedOptionalEnrichmentIsScheduled() =
+    fun firstNotificationPostsBeforeOptionalEnrichmentIsScheduled() =
         runBlocking {
             val calls = mutableListOf<String>()
             var pendingResolver: (suspend () -> Unit)? = null
@@ -120,13 +120,15 @@ class NotificationPushWakeDrainCoverageTest {
             checkNotNull(pendingResolver).invoke()
             assertEquals(listOf("post", "schedule-enrichment", "resolver-finished"), calls)
             assertTrue(
-                "the subscription must post fallback content before scheduling optional resolver work",
+                "the subscription may resolve bounded local identity before posting, " +
+                    "but must schedule optional enrichment afterward",
                 "processNotificationUpdate(update)" in listener &&
                     "postBeforeNotificationEnrichment(" in updateProcessing &&
                     "val postEpoch = notificationPostEpoch.capture()" in updateProcessing &&
                     "val engineMuted = engineNotificationMuted(update)" in updateProcessing &&
-                    "post = { postInitialNotificationUpdate(update, postEpoch, engineMuted) }" in updateProcessing &&
-                    "scheduleNotificationEnrichment(update, postEpoch, engineMuted, receivedAtElapsedMs)" in
+                    "val firstPost" in updateProcessing &&
+                    "post = { postInitialNotificationUpdate(update, firstPost) }" in updateProcessing &&
+                    "scheduleNotificationEnrichment(update, firstPost, receivedAtElapsedMs)" in
                     updateProcessing,
             )
         }

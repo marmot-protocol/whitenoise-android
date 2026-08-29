@@ -52,6 +52,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -217,7 +219,7 @@ private class ConversationNavigationState(
     var seedTailAwaitingAuthoritative by mutableStateOf(initialSeedTailAwaitingAuthoritative)
     var initialTimelineLoadStarted by mutableStateOf(false)
     var initialTimelineBackfillNoProgress by mutableStateOf(false)
-    var initialTimelineBackfillRetryGeneration by mutableStateOf(0L)
+    var initialTimelineBackfillRetryGeneration by mutableLongStateOf(0L)
     val targetHighlight = MessageTargetHighlightLifecycle()
     val targetNavigation = MessageTargetNavigationOwner()
     var navigateReplyJob by mutableStateOf<Job?>(null)
@@ -929,9 +931,9 @@ internal fun ConversationScreen(
     val dragEdgeThresholdPx = with(dragSelectionDensity) { 56.dp.toPx() }
     val dragMaxScrollStepPx = with(dragSelectionDensity) { 18.dp.toPx() }
     var transcriptWindowTop by
-        remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(0f) }
+        remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableFloatStateOf(0f) }
     var transcriptHeightPx by
-        remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(0f) }
+        remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableFloatStateOf(0f) }
     var dragAnchorTimelineId by
         remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
     var dragPointerWindowY by

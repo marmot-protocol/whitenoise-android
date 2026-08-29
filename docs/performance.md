@@ -129,6 +129,23 @@ BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark
   scripts/run-performance-benchmarks.sh
 ```
 
+Run the two scroll journeys against the same cached fixture. Neither needs a
+group-name argument: the chat-list journey resumes to the list, and the
+conversation journey takes the group it opens from `$GROUP_NAME`.
+
+```bash
+BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.ChatListScrollBenchmark#chatListScrollBaselineProfile" \
+  scripts/run-performance-benchmarks.sh
+```
+
+Both scroll benchmarks report frame timing, a `journeyDurationMs` trace section,
+and peak process memory for the measured window: `memoryHeapSizeKb`,
+`memoryRssAnonKb`, and `memoryGpuKb`. Read the memory values as a budget rather
+than a target — decoded avatars, group images, and attachment buffers all grow
+while a long list scrolls, and a jump there with unchanged frame timing points
+at cache sizing rather than at rendering. Compare against the same fixture on
+the same device; the absolute values are not portable across devices.
+
 Invite acceptance consumes its fixture, so collect a ten-sample handoff set by
 running this command once for each of ten distinct prepared invitations and
 aggregate their `journeyDurationMs` values. Never reuse a consumed invite.
@@ -138,6 +155,20 @@ compilation and with the packaged Baseline Profile. `GroupFlowsBenchmark`
 reports `journeyDurationMs`, frame timing, and a Perfetto trace for group open →
 members visible, group creation → conversation ready, and invite acceptance →
 conversation ready.
+
+`StartupBenchmark` also reports one trace section per bootstrap stage, so a
+regression names the stage that moved instead of only the total:
+`client-construction`, `privacy-runtime-configuration`, `marmot-start`,
+`notification-platform-setup`, `notification-privacy-setup`, `account-refresh`,
+`account-activation`, `draft-reconciliation`, and
+`external-signer-registration`. Each is the summed time inside that stage for
+the iteration, so a bootstrap that retried counts every attempt.
+
+The underlying slices are named `WhiteNoise.startup.<stage>`; search the
+Perfetto slice table for `WhiteNoise.startup.` to see them beside the
+`WhiteNoise.marmot.*` bridge slices below. They are emitted only while a trace
+is active, and a section name is one of the fixed stage constants — never an
+account, group, or message identifier.
 
 `package-replacement-startup.json` is a separate one-shot device journey. Its
 `timeToFirstComposeUiMs` is the conservative later value of Android's Activity

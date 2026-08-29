@@ -32,12 +32,14 @@ import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.buildTtsLeafHighlightResolver
+import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlight
-import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlightColor
 import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -133,8 +135,8 @@ class MessageBubbleTtsHighlightScreenshotTest {
         val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
-                BubbleFixture(mine = mine, tag = TAG) {
-                    HighlightedPlainLeaf(text = "Hello bright world.", resolver = resolver)
+                BubbleFixture(mine = mine, tag = TAG) { style ->
+                    HighlightedPlainLeaf(text = "Hello bright world.", resolver = resolver, style = style)
                 }
             }
         }
@@ -155,8 +157,8 @@ class MessageBubbleTtsHighlightScreenshotTest {
         val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false, amoled = false) {
-                BubbleFixture(mine = false, tag = TAG) {
-                    HighlightedPlainLeaf(text = text, resolver = resolver)
+                BubbleFixture(mine = false, tag = TAG) { style ->
+                    HighlightedPlainLeaf(text = text, resolver = resolver, style = style)
                 }
             }
         }
@@ -182,8 +184,8 @@ class MessageBubbleTtsHighlightScreenshotTest {
         val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
-                BubbleFixture(mine = mine, tag = TAG) {
-                    HighlightedPlainLeaf(text = text, resolver = resolver)
+                BubbleFixture(mine = mine, tag = TAG) { style ->
+                    HighlightedPlainLeaf(text = text, resolver = resolver, style = style)
                 }
             }
         }
@@ -227,10 +229,11 @@ class MessageBubbleTtsHighlightScreenshotTest {
         val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = if (largeFont) 1.3f else 1f) {
-                BubbleFixture(mine = mine, tag = TAG) {
+                BubbleFixture(mine = mine, tag = TAG) { style ->
                     MarkdownMessageBody(
                         document,
                         ttsLeafHighlightResolver = resolver,
+                        ttsReadAloudHighlightStyle = style,
                     )
                 }
             }
@@ -268,10 +271,11 @@ class MessageBubbleTtsHighlightScreenshotTest {
         val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
-                BubbleFixture(mine = mine, tag = TAG) {
+                BubbleFixture(mine = mine, tag = TAG) { style ->
                     MarkdownMessageBody(
                         document,
                         ttsLeafHighlightResolver = resolver,
+                        ttsReadAloudHighlightStyle = style,
                     )
                 }
             }
@@ -339,8 +343,12 @@ class MessageBubbleTtsHighlightScreenshotTest {
                 amoled = amoled,
                 fontScale = if (largeFont) 1.3f else 1f,
             ) {
-                BubbleFixture(mine = mine, tag = TAG) {
-                    MarkdownMessageBody(document, ttsLeafHighlightResolver = resolver)
+                BubbleFixture(mine = mine, tag = TAG) { style ->
+                    MarkdownMessageBody(
+                        document,
+                        ttsLeafHighlightResolver = resolver,
+                        ttsReadAloudHighlightStyle = style,
+                    )
                 }
             }
         }
@@ -355,7 +363,7 @@ class MessageBubbleTtsHighlightScreenshotTest {
 private fun BubbleFixture(
     mine: Boolean,
     tag: String,
-    content: @Composable () -> Unit,
+    content: @Composable (TtsReadAloudHighlightStyle) -> Unit,
 ) {
     val bubbleColor =
         if (mine) {
@@ -369,6 +377,16 @@ private fun BubbleFixture(
         } else {
             MaterialTheme.colorScheme.background
         }
+    val bubbleContent =
+        if (mine) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    val highlightStyle =
+        rememberTtsReadAloudHighlightStyle(
+            background = bubbleColor,
+            content = bubbleContent,
+            sentenceAccent = MaterialTheme.colorScheme.outlineVariant,
+            wordAccent = MaterialTheme.colorScheme.tertiary,
+            amoled = isAmoledSurfaceTheme(),
+        )
     Surface(color = pageColor) {
         Column(
             modifier = Modifier.width(360.dp).padding(16.dp).testTag(tag),
@@ -384,7 +402,7 @@ private fun BubbleFixture(
                     modifier = Modifier.width(260.dp),
                 ) {
                     Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                        content()
+                        content(highlightStyle)
                     }
                 }
             }
@@ -396,13 +414,14 @@ private fun BubbleFixture(
 private fun HighlightedPlainLeaf(
     text: String,
     resolver: TtsLeafHighlightResolver?,
+    style: TtsReadAloudHighlightStyle,
 ) {
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val highlight = resolver?.invoke("plain", text)
     Text(
         text = text,
         style = MaterialTheme.typography.bodyLarge,
-        modifier = Modifier.ttsReadAloudHighlight(layout, highlight, ttsReadAloudHighlightColor()),
+        modifier = Modifier.ttsReadAloudHighlight(layout, highlight, style),
         onTextLayout = { layout = it },
     )
 }

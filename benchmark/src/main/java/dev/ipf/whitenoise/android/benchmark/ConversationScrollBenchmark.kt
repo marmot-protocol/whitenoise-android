@@ -19,7 +19,7 @@ class ConversationScrollBenchmark {
         val journeys = WhiteNoiseJourneys()
         benchmarkRule.measureRepeated(
             packageName = BenchmarkConfig.TARGET_PACKAGE,
-            metrics = journeyMetrics(SCROLL_CONVERSATION_TRACE),
+            metrics = scrollMetrics(SCROLL_CONVERSATION_TRACE),
             compilationMode = CompilationMode.Partial(BaselineProfileMode.Require),
             iterations = 10,
             setupBlock = {

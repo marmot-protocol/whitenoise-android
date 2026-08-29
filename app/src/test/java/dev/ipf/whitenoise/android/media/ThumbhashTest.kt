@@ -22,6 +22,48 @@ class ThumbhashTest {
         assertNull(Thumbhash.decodeRgba(byteArrayOf(0x00, 0x01, 0x02, 0x03)))
     }
 
+    @Test(timeout = ARBITRARY_BYTE_TIMEOUT_MS)
+    fun decodeRgba_neverThrowsOnArbitraryBytesOfAcceptedLength() {
+        // The length boundaries above are covered; the space between them is
+        // not. A thumbhash arrives on an imeta tag, so a peer chooses these
+        // bytes, and the header bits they carry drive the decoder's geometry:
+        // hasAlpha and isLandscape pick the lx/ly pair, lMaxBits widens one
+        // axis, and acStart shifts where coefficient nibbles are read from.
+        // This walks every accepted length across a deterministic body sweep
+        // so those combinations are exercised rather than assumed.
+        val random = java.util.Random(ARBITRARY_BYTE_SEED)
+        for (size in MIN_ACCEPTED_BYTES..MAX_ACCEPTED_BYTES) {
+            repeat(CASES_PER_LENGTH) { case ->
+                val hash = ByteArray(size).also(random::nextBytes)
+                val outcome = runCatching { Thumbhash.decodeRgba(hash) }
+                assertTrue(
+                    "size=$size case=$case threw ${outcome.exceptionOrNull()}",
+                    outcome.isSuccess,
+                )
+            }
+        }
+    }
+
+    @Test(timeout = ARBITRARY_BYTE_TIMEOUT_MS)
+    fun decodeRgba_pixelBufferAlwaysMatchesReportedDimensions() {
+        // A decode that returns a grid whose pixel count disagrees with its
+        // own width and height would hand Bitmap.createBitmap a mismatched
+        // array. Any accepted input must describe itself consistently.
+        val random = java.util.Random(ARBITRARY_BYTE_SEED)
+        for (size in MIN_ACCEPTED_BYTES..MAX_ACCEPTED_BYTES) {
+            repeat(CASES_PER_LENGTH) {
+                val decoded = Thumbhash.decodeRgba(ByteArray(size).also(random::nextBytes)) ?: return@repeat
+                assertTrue("non-positive width ${decoded.width}", decoded.width > 0)
+                assertTrue("non-positive height ${decoded.height}", decoded.height > 0)
+                assertEquals(
+                    "pixel count disagrees with ${decoded.width}x${decoded.height}",
+                    decoded.width * decoded.height,
+                    decoded.pixels.size,
+                )
+            }
+        }
+    }
+
     @Test
     fun decodeRgba_returnsNullOnOversizedInput() {
         // Defends against an attacker-supplied imeta `thumbhash` tag that's
@@ -197,5 +239,13 @@ class ThumbhashTest {
         for (px in decoded.pixels) {
             assertEquals(255, (px ushr 24) and 0xFF)
         }
+    }
+
+    private companion object {
+        const val ARBITRARY_BYTE_TIMEOUT_MS = 60_000L
+        const val ARBITRARY_BYTE_SEED = 0x5448_554d_4248L // "THUMBH"
+        const val MIN_ACCEPTED_BYTES = 5
+        const val MAX_ACCEPTED_BYTES = 64
+        const val CASES_PER_LENGTH = 40
     }
 }

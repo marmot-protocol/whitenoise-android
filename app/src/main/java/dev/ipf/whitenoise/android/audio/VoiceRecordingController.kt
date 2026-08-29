@@ -6,6 +6,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -85,9 +86,9 @@ class VoiceRecordingController internal constructor(
     private val _elapsedMs = mutableLongStateOf(0L)
     val elapsedMs: Long get() = _elapsedMs.longValue
 
-    var dragOffsetPx: Float by mutableStateOf(0f)
+    var dragOffsetPx: Float by mutableFloatStateOf(0f)
         private set
-    var verticalOffsetPx: Float by mutableStateOf(0f)
+    var verticalOffsetPx: Float by mutableFloatStateOf(0f)
         private set
     var willCancel: Boolean by mutableStateOf(false)
         private set

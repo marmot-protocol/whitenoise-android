@@ -39,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -121,7 +122,7 @@ internal fun AvatarFullScreenViewer(
 
     val fileName = remember(safePictureUrl) { safePictureUrl?.let(::avatarViewerFileName) ?: "avatar.jpg" }
     var menuOpen by remember { mutableStateOf(false) }
-    var scale by remember(safePictureUrl, picture) { mutableStateOf(1f) }
+    var scale by remember(safePictureUrl, picture) { mutableFloatStateOf(1f) }
     var offset by remember(safePictureUrl, picture) { mutableStateOf(Offset.Zero) }
     val dismissThresholdPx = with(LocalDensity.current) { 96.dp.toPx() }
 

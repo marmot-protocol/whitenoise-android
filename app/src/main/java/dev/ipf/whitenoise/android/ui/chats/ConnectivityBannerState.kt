@@ -20,48 +20,57 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ChatListConnectionPhase
+import dev.ipf.whitenoise.android.state.ChatListConnectionState
+import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** Banner states. Steady-state connected renders nothing — transient only. */
 internal enum class ConnectivityBannerState { Hidden, Offline, Connecting, JustConnected }
 
-/** Raw target from the two signals, before flash/debounce shaping. */
+internal enum class ConnectivityBannerTarget { Offline, NoAttempt, Connecting, Connected }
+
+internal data class ConnectivityBannerPresentation(
+    val displayed: ConnectivityBannerState,
+    val recoveryPending: Boolean,
+    val target: ConnectivityBannerTarget,
+)
+
+/** Raw target from independent internet, active-attempt, and application-ready inputs. */
 internal fun connectivityBannerTarget(
-    hasNetwork: Boolean,
-    relaysConnected: Boolean,
-): ConnectivityBannerState =
+    hasValidatedInternet: Boolean,
+    activeAccountRef: String?,
+    runtimeGeneration: Int,
+    connectionState: ChatListConnectionState,
+): ConnectivityBannerTarget =
     when {
-        !hasNetwork -> ConnectivityBannerState.Offline
-        !relaysConnected -> ConnectivityBannerState.Connecting
-        else -> ConnectivityBannerState.Hidden
+        activeAccountRef == null -> ConnectivityBannerTarget.NoAttempt
+        !hasValidatedInternet -> ConnectivityBannerTarget.Offline
+        connectionState.accountRef != activeAccountRef ||
+            connectionState.runtimeGeneration != runtimeGeneration -> ConnectivityBannerTarget.NoAttempt
+        connectionState.phase == ChatListConnectionPhase.Attempting -> ConnectivityBannerTarget.Connecting
+        connectionState.phase == ChatListConnectionPhase.Ready -> ConnectivityBannerTarget.Connected
+        else -> ConnectivityBannerTarget.NoAttempt
     }
 
 /**
@@ -75,8 +84,8 @@ internal fun relaysConnectedFromHealth(
 ): Boolean = totalRelays == 0 || connectedRelays > 0
 
 /**
- * The clamp applied to every relay-signal write: no active network means no
- * connected relays, whatever an optimistic default or a stale health snapshot
+ * The clamp applied to every relay-signal write: no validated internet means
+ * no connected relays, whatever an optimistic default or stale health snapshot
  * claims. A restore therefore keeps the signal false until a fresh
  * [relaysConnectedFromHealth] sample proves recovery — a quick offline/online
  * bounce, an offline startup seed, or a poll racing the transition can never
@@ -88,28 +97,75 @@ internal fun relaysConnectedOnNetworkChange(
 ): Boolean = isOnline && cached
 
 /**
- * Shapes the raw target into the displayed state: reaching connected FROM a
- * visible problem state flashes JustConnected (the caller times its dismissal);
- * connected while already hidden stays hidden — no steady-state chrome.
+ * Shapes the raw target into display state while remembering an unresolved
+ * problem across a no-attempt interval. Only explicit application readiness
+ * can consume that pending recovery and flash JustConnected; a failed attempt
+ * merely hides Connecting and cannot manufacture a success transition.
  */
 internal fun connectivityBannerNext(
-    previous: ConnectivityBannerState,
-    target: ConnectivityBannerState,
-): ConnectivityBannerState =
-    if (target == ConnectivityBannerState.Hidden &&
-        (previous == ConnectivityBannerState.Offline || previous == ConnectivityBannerState.Connecting)
-    ) {
-        ConnectivityBannerState.JustConnected
-    } else {
-        target
+    previous: ConnectivityBannerPresentation,
+    target: ConnectivityBannerTarget,
+): ConnectivityBannerPresentation =
+    when (target) {
+        ConnectivityBannerTarget.Offline ->
+            ConnectivityBannerPresentation(
+                ConnectivityBannerState.Offline,
+                recoveryPending = true,
+                target = target,
+            )
+        ConnectivityBannerTarget.Connecting ->
+            ConnectivityBannerPresentation(
+                ConnectivityBannerState.Connecting,
+                recoveryPending = true,
+                target = target,
+            )
+        ConnectivityBannerTarget.NoAttempt ->
+            previous.copy(
+                displayed = ConnectivityBannerState.Hidden,
+                target = target,
+            )
+        ConnectivityBannerTarget.Connected ->
+            if (previous.recoveryPending) {
+                ConnectivityBannerPresentation(
+                    ConnectivityBannerState.JustConnected,
+                    recoveryPending = false,
+                    target = target,
+                )
+            } else {
+                ConnectivityBannerPresentation(
+                    ConnectivityBannerState.Hidden,
+                    recoveryPending = false,
+                    target = target,
+                )
+            }
     }
 
-// Flapping callbacks (WiFi handoffs, brief socket drops) must not flicker the
-// banner: a problem state has to persist this long before it renders.
-internal const val CONNECTIVITY_BANNER_DEBOUNCE_MILLIS = 500L
+internal fun initialConnectivityBannerState(target: ConnectivityBannerTarget): ConnectivityBannerPresentation =
+    when (target) {
+        ConnectivityBannerTarget.Offline ->
+            ConnectivityBannerPresentation(
+                ConnectivityBannerState.Offline,
+                recoveryPending = true,
+                target = target,
+            )
+        ConnectivityBannerTarget.Connecting ->
+            ConnectivityBannerPresentation(
+                ConnectivityBannerState.Connecting,
+                recoveryPending = true,
+                target = target,
+            )
+        ConnectivityBannerTarget.NoAttempt,
+        ConnectivityBannerTarget.Connected,
+        ->
+            ConnectivityBannerPresentation(
+                ConnectivityBannerState.Hidden,
+                recoveryPending = false,
+                target = target,
+            )
+    }
 
 // How long the success flash stays before the bar returns to normal.
-internal const val CONNECTIVITY_BANNER_FLASH_MILLIS = 1_500L
+internal const val CONNECTIVITY_BANNER_FLASH_MILLIS = 800L
 
 // Relay health is a polled snapshot (the bindings expose no push stream for
 // pool state). The fast cadence runs only while the signal is banner-relevant,
@@ -162,60 +218,54 @@ internal const val CHAT_LIST_INLINE_CONNECTIVITY_TAG = "chat-list-inline-connect
 internal const val CHAT_LIST_OFFLINE_BANNER_TAG = "chat-list-offline-banner"
 
 /**
- * Owns relay polling and the debounced connectivity state machine for the
+ * Owns relay fallback polling and the connectivity state machine for the
  * chat list. Hoist once per screen and pass the displayed state to the inline
  * indicator and the offline strip.
  */
 @Composable
-internal fun rememberChatListConnectivityState(appState: WhiteNoiseAppState): ConnectivityBannerState {
-    var displayed by remember { mutableStateOf(ConnectivityBannerState.Hidden) }
-    val lifecycleOwner = LocalLifecycleOwner.current
-    var foregroundEpoch by remember { mutableIntStateOf(0) }
-    DisposableEffect(lifecycleOwner) {
-        val observer =
-            LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_START) foregroundEpoch++
-            }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+internal fun rememberChatListConnectivityState(
+    appState: WhiteNoiseAppState,
+    controller: ChatsController,
+): ConnectivityBannerState {
+    val signals by appState.connectivitySignals.collectAsState()
+    val activeAccountRef = appState.activeAccountRef
+    val runtimeGeneration = appState.runtimeGeneration
+    val target =
+        connectivityBannerTarget(
+            hasValidatedInternet = signals.hasValidatedInternet,
+            activeAccountRef = activeAccountRef,
+            runtimeGeneration = runtimeGeneration,
+            connectionState = controller.connectionState,
+        )
+    var presentation by
+        remember(controller, activeAccountRef, runtimeGeneration) {
+            mutableStateOf(initialConnectivityBannerState(target))
+        }
+    val renderedPresentation =
+        if (presentation.target == target) presentation else connectivityBannerNext(presentation, target)
+    SideEffect {
+        if (presentation != renderedPresentation) presentation = renderedPresentation
     }
-    LaunchedEffect(appState, lifecycleOwner) {
-        val wakeEvents =
-            relayPollWakeEvents(
-                displayedStates = snapshotFlow { displayed },
-                relaysConnected = appState.connectivitySignals.map { it.relaysConnected },
-                foregroundResumes = snapshotFlow { foregroundEpoch }.drop(1).map { },
-            )
-        while (true) {
-            appState.refreshRelayConnectivity()
-            val pollDelay = relayPollDelayMillis(displayed, appState.connectivitySignals.value.relaysConnected)
-            if (pollDelay == CONNECTIVITY_RELAY_POLL_MILLIS) {
-                delay(pollDelay)
-            } else {
-                // Sleep the backoff, but wake early on any event that needs
-                // the fast cadence back so recovery never waits out the
-                // remaining backoff window.
-                withTimeoutOrNull(pollDelay) { wakeEvents.first() }
+    val foregroundEpoch = rememberConnectivityForegroundEpoch()
+    RelayConnectivityPollingEffect(appState, controller, renderedPresentation.displayed, foregroundEpoch)
+    ValidatedInternetRefreshEffect(appState, controller, activeAccountRef, runtimeGeneration)
+    ConnectivityEdgeRefreshEffects(
+        controller = controller,
+        activeAccountRef = activeAccountRef,
+        runtimeGeneration = runtimeGeneration,
+        hasValidatedInternet = signals.hasValidatedInternet,
+        relaysConnected = signals.relaysConnected,
+        foregroundEpoch = foregroundEpoch,
+    )
+    LaunchedEffect(controller, activeAccountRef, runtimeGeneration, renderedPresentation) {
+        if (renderedPresentation.displayed == ConnectivityBannerState.JustConnected) {
+            delay(CONNECTIVITY_BANNER_FLASH_MILLIS)
+            if (presentation == renderedPresentation) {
+                presentation = renderedPresentation.copy(displayed = ConnectivityBannerState.Hidden)
             }
         }
     }
-    LaunchedEffect(appState) {
-        appState.connectivitySignals.collectLatest { signals ->
-            val target = connectivityBannerTarget(signals.hasNetwork, signals.relaysConnected)
-            // collectLatest cancels this block when the signals change, so a
-            // flap shorter than the debounce never becomes visible state.
-            if (target != ConnectivityBannerState.Hidden && displayed == ConnectivityBannerState.Hidden) {
-                delay(CONNECTIVITY_BANNER_DEBOUNCE_MILLIS)
-            }
-            val next = connectivityBannerNext(displayed, target)
-            displayed = next
-            if (next == ConnectivityBannerState.JustConnected) {
-                delay(CONNECTIVITY_BANNER_FLASH_MILLIS)
-                displayed = ConnectivityBannerState.Hidden
-            }
-        }
-    }
-    return displayed
+    return renderedPresentation.displayed
 }
 
 /**
