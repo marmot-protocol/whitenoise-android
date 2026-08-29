@@ -209,6 +209,10 @@ class TimelineRowTtsHighlightPaintTest {
         )
     }
 
+    /**
+     * Verifies that read-aloud paints a highlight after production reparses a
+     * legacy message that has no stored Markdown tokens.
+     */
     @Test
     fun speakingPassagePaintsHighlightWhenTheRecordHasNoStoredContentTokens() {
         val record = untokenizedRecord()
@@ -240,7 +244,7 @@ class TimelineRowTtsHighlightPaintTest {
         val idlePixels = renderedPixels()
 
         check(appState.ttsController.speak(listOf(entry), Locale.US))
-        composeRule.waitForIdle()
+        waitForRenderedHighlight()
         val speakingPixels = renderedPixels()
         val diagnostics = seamDiagnostics()
 
@@ -249,6 +253,22 @@ class TimelineRowTtsHighlightPaintTest {
                 "Seam state: $diagnostics",
             changedPixelCount(idlePixels, speakingPixels) > 0,
         )
+    }
+
+    /**
+     * Waits for the asynchronous Markdown projection to expose its highlight
+     * range before the test captures the rendered frame.
+     */
+    private fun waitForRenderedHighlight() {
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching {
+                composeRule
+                    .onNodeWithText("bright", substring = true, useUnmergedTree = true)
+                    .fetchSemanticsNode()
+                    .config
+                    .getOrNull(TtsReadAloudHighlightRangeKey)
+            }.getOrNull() != null
+        }
     }
 
     /**
