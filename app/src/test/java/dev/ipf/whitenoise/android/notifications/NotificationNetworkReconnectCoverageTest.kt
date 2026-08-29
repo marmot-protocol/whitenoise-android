@@ -210,7 +210,7 @@ class NotificationNetworkReconnectCoverageTest {
                 .substringBefore("/**")
         assertTrue(
             "a wipe that starts during notification enrichment must block the final presenter write",
-            "isNotificationEnrichmentAllowed(update, postEpoch, engineMuted)" in post &&
+            "isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted)" in post &&
                 "isNotificationGenerationPostAllowed(" in notificationGates &&
                 "!networkNotificationRecoverySuppressed" in notificationGates,
         )
