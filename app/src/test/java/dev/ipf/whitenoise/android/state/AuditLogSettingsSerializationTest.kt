@@ -7,8 +7,32 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.lang.reflect.Modifier
 
 class AuditLogSettingsSerializationTest {
+    /**
+     * MDK removed the sensitive/full-data audit mode in
+     * marmot-protocol/mdk#1580, so the pinned binding carries a single
+     * `enabled` switch and Android has no way to request or persist a mode.
+     * This asserts that structurally: a MarmotKit pin bump that reintroduces a
+     * second audit settings field fails here instead of silently reopening the
+     * sensitive-data surface removed by #1795.
+     */
+    @Test
+    fun auditLogSettingsCarryNothingBeyondTheEnabledSwitch() {
+        val fields =
+            AuditLogSettingsFfi::class.java.declaredFields
+                .filterNot { it.isSynthetic || Modifier.isStatic(it.modifiers) }
+                .map { it.name }
+                .toSet()
+
+        assertEquals(
+            "Audit log settings must stay an enabled-only record; a new field needs a privacy review",
+            setOf("enabled"),
+            fields,
+        )
+    }
+
     @Test
     fun concurrentUpdatesArePersistedInCallOrder() =
         runTest {
