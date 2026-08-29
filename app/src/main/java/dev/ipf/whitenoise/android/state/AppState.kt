@@ -9661,7 +9661,6 @@ class WhiteNoiseAppState private constructor(
     }
 
     private fun schedulePostNotificationMaintenance(update: NotificationUpdateFfi) {
-        // Coalesce burst refreshes and drain them off the subscription loop (#729).
         if (networkNotificationRecoverySuppressed) return
         unreadRefreshScheduler.schedule(update.accountRef)
         signalNotificationDrain()
