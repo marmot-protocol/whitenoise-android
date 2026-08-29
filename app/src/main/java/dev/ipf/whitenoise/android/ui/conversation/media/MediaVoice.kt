@@ -36,6 +36,8 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -112,7 +114,7 @@ internal fun MediaVoiceBubble(
         }
     val retainedPlaintextOnEntry =
         mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
-    var totalDurationMs by remember(pillKey, epoch) { mutableStateOf(0) }
+    var totalDurationMs by remember(pillKey, epoch) { mutableIntStateOf(0) }
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
     // Auto-download gate (#407): retained/cached own clips always materialize;
@@ -139,7 +141,7 @@ internal fun MediaVoiceBubble(
             policyAllowsMaterialization = policyAllowsMaterialization,
         )
     val startDownload = materializationIntent.shouldMaterialize
-    var reloadToken by remember(pillKey, epoch) { mutableStateOf(0) }
+    var reloadToken by remember(pillKey, epoch) { mutableIntStateOf(0) }
 
     val playback by remember(pillKey) {
         dev.ipf.whitenoise.android.audio.VoicePlaybackController.state
@@ -694,7 +696,7 @@ internal fun VoiceWaveform(
     modifier: Modifier = Modifier,
     onSeek: ((fraction: Float) -> Unit)? = null,
 ) {
-    var widthPx by remember { mutableStateOf(0f) }
+    var widthPx by remember { mutableFloatStateOf(0f) }
     val seekModifier =
         if (onSeek != null) {
             Modifier.pointerInput(Unit) {

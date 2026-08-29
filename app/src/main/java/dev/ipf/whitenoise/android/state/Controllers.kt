@@ -7,6 +7,7 @@ import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -3268,7 +3269,7 @@ class ChatsController private constructor(
         private set
 
     private val retryLoadSignal = Channel<Unit>(Channel.CONFLATED)
-    var retryGeneration by mutableStateOf(0L)
+    var retryGeneration by mutableLongStateOf(0L)
         private set
     private var terminalLoadFailure = false
 
@@ -3292,14 +3293,14 @@ class ChatsController private constructor(
      * row updates — so foreground provisional opens can reconcile against live
      * backing rows while [items] stays frozen behind an open conversation (#1729).
      */
-    var materializedGroupsRevision by mutableStateOf(0L)
+    var materializedGroupsRevision by mutableLongStateOf(0L)
         private set
 
     /** Complete observable revision for on-demand projections such as the forward picker. */
-    var forwardTargetsRevision by mutableStateOf(0L)
+    var forwardTargetsRevision by mutableLongStateOf(0L)
         private set
 
-    var memberSnapshotsRevision by mutableStateOf(0L)
+    var memberSnapshotsRevision by mutableLongStateOf(0L)
         private set
 
     private var accountRef: String? = initialLocalSnapshot?.accountRef ?: initialAccountRef
@@ -6867,7 +6868,7 @@ class ConversationController(
     internal val errorEdge: ConversationLoadFailureEdge
         get() = conversationLoadFailureEdge(pageError != null, failedPageDirection)
     private val retryLoadSignal = Channel<Unit>(Channel.CONFLATED)
-    var retryGeneration by mutableStateOf(0L)
+    var retryGeneration by mutableLongStateOf(0L)
         private set
     private var terminalLoadFailure = false
     private var failedPageDirection: ConversationSearchPageDirection? = null

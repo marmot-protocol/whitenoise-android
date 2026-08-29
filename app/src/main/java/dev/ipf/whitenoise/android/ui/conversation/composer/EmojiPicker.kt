@@ -60,6 +60,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -412,7 +413,7 @@ internal fun EmojiPickerContent(
     val recents = remember(recentEmojis) { recentEmojis.filter { it.isNotBlank() } }
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
-    var activeCategory by remember(recents.isNotEmpty()) { mutableStateOf(if (recents.isNotEmpty()) -1 else 0) }
+    var activeCategory by remember(recents.isNotEmpty()) { mutableIntStateOf(if (recents.isNotEmpty()) -1 else 0) }
     // Grid item index of each section's header, so a bottom category tab scrolls
     // straight to it. Layout: recents (header + cells) then each group (header +
     // cells); every header and every emoji counts as one grid item.

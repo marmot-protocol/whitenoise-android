@@ -55,6 +55,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
@@ -709,9 +710,9 @@ internal fun ChatsScreen(
     val dragEdgeThresholdPx = with(density) { 56.dp.toPx() }
     val dragMaxScrollStepPx = with(density) { 18.dp.toPx() }
     var chatListWindowTop by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(0f) }
+        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableFloatStateOf(0f) }
     var chatListHeightPx by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(0f) }
+        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableFloatStateOf(0f) }
     var dragAnchorChatId by
         remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
     var dragPointerWindowY by

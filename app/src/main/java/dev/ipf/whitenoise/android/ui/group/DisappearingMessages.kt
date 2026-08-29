@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -67,7 +68,7 @@ internal fun DisappearingMessagesPickerDialog(
     onDismiss: () -> Unit,
     onPick: (Long) -> Unit,
 ) {
-    var selected by remember(currentSecs) { mutableStateOf(currentSecs) }
+    var selected by remember(currentSecs) { mutableLongStateOf(currentSecs) }
     var showCustom by remember { mutableStateOf(false) }
     val isCustom = selected !in disappearingPresetSecs
 
