@@ -6552,7 +6552,7 @@ internal typealias MediaPublisher =
     suspend (String, String, List<MediaAttachmentReferenceFfi>, String?) -> SendSummaryFfi
 
 class ConversationController(
-    private val appState: WhiteNoiseAppState,
+    internal val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
     internal val initialMemberSnapshot: GroupMemberSnapshot? = null,
     initialChatListRow: ChatListRowFfi? = null,
@@ -6971,7 +6971,7 @@ class ConversationController(
         )
     private val inviteStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val attachmentTransferScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val attachmentTransfers = AttachmentTransferCoordinator(attachmentTransferScope)
+    internal val attachmentTransfers = AttachmentTransferCoordinator(attachmentTransferScope)
 
     // Cached at start() so `loadOlderPage` / `loadNewerPage` can drive
     // `paginate_backwards` / `paginate_forwards` on the subscription. Per
@@ -9125,15 +9125,6 @@ class ConversationController(
         return appState.diskMediaCache.contains(cacheKey)
     }
 
-    /** Main-safe L1 probe used to seed a returning file bubble without a frame gap. */
-    internal fun hasCachedAttachmentInMemory(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ): Boolean {
-        val account = conversationAccountRef ?: return false
-        return appState.cachedMediaPlaintext(mediaCacheKey(account, messageIdHex, attachmentIndex)) != null
-    }
-
     /** Resolve a cold disk-index state without performing main-thread I/O. */
     suspend fun hasCachedAttachmentAfterHydration(
         messageIdHex: String,
@@ -9162,20 +9153,6 @@ class ConversationController(
         attachmentIndex: Int,
     ) {
         attachmentTransfers.releaseState(attachmentTransferKey(messageIdHex, attachmentIndex))
-    }
-
-    /** Reconcile presentation state with the encrypted L1/L2 cache. */
-    internal suspend fun refreshAttachmentTransferState(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ) {
-        attachmentTransfers.refresh(attachmentTransferKey(messageIdHex, attachmentIndex)) {
-            val account = conversationAccountRef ?: return@refresh false
-            appState.hasCachedAttachmentAfterHydration(
-                AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
-                hydrateMemory = true,
-            )
-        }
     }
 
     /** Suspends until this attachment, rather than any process-wide cache key, becomes available. */
@@ -9283,7 +9260,7 @@ class ConversationController(
         throw AttachmentReferenceNotReadyException()
     }
 
-    private fun attachmentTransferKey(
+    internal fun attachmentTransferKey(
         messageIdHex: String,
         attachmentIndex: Int,
     ): String = "$messageIdHex#$attachmentIndex"

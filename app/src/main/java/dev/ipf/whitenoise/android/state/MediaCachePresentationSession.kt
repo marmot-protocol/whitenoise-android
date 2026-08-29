@@ -8,6 +8,31 @@ internal data class MediaCachePresentationSession(
     val epoch: Int,
 )
 
+/** Main-safe L1 probe used to seed a returning file bubble without a frame gap. */
+internal fun ConversationController.hasCachedAttachmentInMemory(
+    messageIdHex: String,
+    attachmentIndex: Int,
+): Boolean {
+    val account = boundAccountRef ?: return false
+    return appState.cachedMediaPlaintext(
+        mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex),
+    ) != null
+}
+
+/** Reconcile presentation state with the encrypted L1/L2 cache. */
+internal suspend fun ConversationController.refreshAttachmentTransferState(
+    messageIdHex: String,
+    attachmentIndex: Int,
+) {
+    attachmentTransfers.refresh(attachmentTransferKey(messageIdHex, attachmentIndex)) {
+        val account = boundAccountRef ?: return@refresh false
+        appState.hasCachedAttachmentAfterHydration(
+            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+            hydrateMemory = true,
+        )
+    }
+}
+
 /**
  * Probes retained attachment plaintext without publishing a stale account's
  * disk result. Hydrating presentation callers promote authenticated L2 bytes

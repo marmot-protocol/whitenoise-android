@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.hasCachedAttachmentInMemory
 import dev.ipf.whitenoise.android.state.mediaCacheKey
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
