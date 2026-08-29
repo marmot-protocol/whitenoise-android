@@ -487,6 +487,10 @@
     <string name="developer_mode_subtitle">Показывает диагностику и внутренние компоненты MLS.</string>
     <string name="diagnostics">Диагностика</string>
     <string name="diagnostics_settings_subtitle">Состояние реле и внутреннее устройство MLS</string>
+    <string name="performance_logs">Журналы производительности</string>
+    <string name="performance_logs_description">Временно записывает безопасные для конфиденциальности временные события в Logcat. Отключается через 30 минут или при перезапуске приложения.</string>
+    <string name="performance_logs_active">Активно · осталось %1$d мин</string>
+    <string name="performance_logs_inactive">Неактивно</string>
     <string name="group_system_show_details">Показать подробности</string>
     <string name="group_system_hide_details">Скрыть подробности</string>
     <string name="local_notifications">Уведомления</string>

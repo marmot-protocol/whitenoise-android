@@ -50,7 +50,11 @@ open class WhiteNoiseApplication : Application() {
             SupervisorJob() +
                 Dispatchers.Default +
                 CoroutineExceptionHandler { _, throwable ->
-                    Log.w("WhiteNoiseApplication", "unhandled applicationScope failure", throwable)
+                    if (BuildConfig.DEBUG) {
+                        Log.w("WhiteNoiseApplication", "unhandled applicationScope failure", throwable)
+                    } else {
+                        Log.w("WhiteNoiseApplication", "unhandled applicationScope failure")
+                    }
                 },
         )
 

@@ -10,7 +10,7 @@ internal inline fun notificationWarning(
     debugDetails: () -> String,
 ) {
     val rendered = notificationWarningMessage(message, BuildConfig.DEBUG, debugDetails)
-    if (throwable == null) {
+    if (throwable == null || !BuildConfig.DEBUG) {
         Log.w(tag, rendered)
     } else {
         Log.w(tag, rendered, throwable)

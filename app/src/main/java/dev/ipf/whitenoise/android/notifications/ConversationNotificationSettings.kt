@@ -175,8 +175,8 @@ private fun publishConversationSettingsShortcut(
         // If the UI briefly regressed to an npub fallback, preserve a
         // previously resolved shortcut name in the channel too.
         shortcut.longLabel.toString()
-    }.onFailure { exception ->
-        Log.w(TAG, "Failed to publish conversation shortcut", exception)
+    }.onFailure {
+        Log.w(TAG, "conversation_shortcut_publish_failed")
     }.getOrDefault(title)
 
 internal fun conversationSettingsShortcut(

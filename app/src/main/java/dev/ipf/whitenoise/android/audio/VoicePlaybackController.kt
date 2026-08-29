@@ -177,7 +177,7 @@ object VoicePlaybackController {
             // setPlaybackParams can flip the player into playing state on
             // some devices; force the caller's intent.
             if (!wasPlaying && mp.isPlaying) mp.pause()
-        }.onFailure { Log.w(TAG, "setSpeed($currentSpeed) failed", it) }
+        }.onFailure { Log.w(TAG, "voice_playback_speed_update_failed") }
     }
 
     /**
@@ -262,7 +262,7 @@ object VoicePlaybackController {
                         setDataSource(file.absolutePath)
                         prepare()
                     }
-                }.onFailure { Log.w(TAG, "MediaPlayer prepare failed", it) }
+                }.onFailure { Log.w(TAG, "voice_playback_prepare_failed") }
                     .getOrNull()
                     ?.also {
                         // If the caller was cancelled while prepare() ran (the
@@ -368,7 +368,7 @@ object VoicePlaybackController {
     ): Boolean =
         runCatching { mp.start() }
             .onFailure {
-                Log.w(TAG, failureMessage, it)
+                Log.w(TAG, failureMessage)
                 onFailure()
             }.isSuccess
 
@@ -397,14 +397,14 @@ object VoicePlaybackController {
     private fun pauseForTransientAudioFocusLoss() {
         val mp = player ?: return
         val wasPlaying =
-            runCatching { mp.isPlaying }.getOrElse { failure ->
-                releaseAfterPlayerControlFailure("MediaPlayer state query failed during transient focus loss", failure)
+            runCatching { mp.isPlaying }.getOrElse {
+                releaseAfterPlayerControlFailure("MediaPlayer state query failed during transient focus loss")
                 return
             }
         if (!wasPlaying) return
         val pauseFailure = runCatching { mp.pause() }.exceptionOrNull()
         if (pauseFailure != null) {
-            releaseAfterPlayerControlFailure("MediaPlayer transient pause failed", pauseFailure)
+            releaseAfterPlayerControlFailure("MediaPlayer transient pause failed")
             return
         }
         resumeOnAudioFocusGain = true
@@ -419,8 +419,8 @@ object VoicePlaybackController {
     private fun duckForTransientAudioFocusLoss() {
         val mp = player ?: return
         val wasPlaying =
-            runCatching { mp.isPlaying }.getOrElse { failure ->
-                releaseAfterPlayerControlFailure("MediaPlayer state query failed while ducking", failure)
+            runCatching { mp.isPlaying }.getOrElse {
+                releaseAfterPlayerControlFailure("MediaPlayer state query failed while ducking")
                 return
             }
         if (!wasPlaying) return
@@ -436,7 +436,7 @@ object VoicePlaybackController {
         if (duckedForAudioFocusLoss) {
             val restoreFailure = mp?.runCatching { setVolume(1f, 1f) }?.exceptionOrNull()
             if (restoreFailure != null) {
-                releaseAfterPlayerControlFailure("MediaPlayer volume restore failed", restoreFailure)
+                releaseAfterPlayerControlFailure("MediaPlayer volume restore failed")
                 return
             }
             duckedForAudioFocusLoss = false
@@ -456,7 +456,7 @@ object VoicePlaybackController {
         if (restoreVolume && duckedForAudioFocusLoss) {
             val restoreFailure = player?.runCatching { setVolume(1f, 1f) }?.exceptionOrNull()
             if (restoreFailure != null) {
-                releaseAfterPlayerControlFailure("MediaPlayer volume restore failed", restoreFailure)
+                releaseAfterPlayerControlFailure("MediaPlayer volume restore failed")
                 return
             }
         }
@@ -464,11 +464,8 @@ object VoicePlaybackController {
         duckedForAudioFocusLoss = false
     }
 
-    private fun releaseAfterPlayerControlFailure(
-        message: String,
-        failure: Throwable,
-    ) {
-        Log.w(TAG, message, failure)
+    private fun releaseAfterPlayerControlFailure(message: String) {
+        Log.w(TAG, message)
         releasePlayerInternal()
         _state.value = PlaybackState()
     }
@@ -485,14 +482,14 @@ object VoicePlaybackController {
                 return
             }
         val wasPlaying =
-            runCatching { mp.isPlaying }.getOrElse { failure ->
-                releaseAfterPlayerControlFailure("MediaPlayer state query failed while pausing", failure)
+            runCatching { mp.isPlaying }.getOrElse {
+                releaseAfterPlayerControlFailure("MediaPlayer state query failed while pausing")
                 return
             }
         if (wasPlaying) {
             val pauseFailure = runCatching { mp.pause() }.exceptionOrNull()
             if (pauseFailure != null) {
-                releaseAfterPlayerControlFailure("MediaPlayer pause failed", pauseFailure)
+                releaseAfterPlayerControlFailure("MediaPlayer pause failed")
                 return
             }
         }

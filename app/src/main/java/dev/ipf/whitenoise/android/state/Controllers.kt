@@ -81,6 +81,12 @@ import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
+import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
+import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
+import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
+import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.media.GroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.MediaPipeline
@@ -2305,10 +2311,11 @@ internal fun presentSendFailure(
     appState: WhiteNoiseAppState,
     throwable: Throwable,
 ) {
-    Log.w(
-        "DMSend",
-        "send failed type=${throwable.javaClass.simpleName} detail=${throwable.message}",
-    )
+    if (BuildConfig.DEBUG) {
+        Log.w("DMSend", "send failed", throwable)
+    } else {
+        Log.w("DMSend", "send_failed")
+    }
     val message = sendFailureMessageRes(throwable)
     when (throwable) {
         is MarmotKitException.GroupSendQueueFull,
@@ -5652,11 +5659,7 @@ class ChatsController private constructor(
             // in `adb logcat` when someone reports "mark read does
             // nothing". `take(8)` on the group id keeps the privacy
             // posture: no full ids in logs.
-            Log.w(
-                "DMChatsController",
-                "markAllRead failed for group=${item.group.groupIdHex.take(8)}",
-                it,
-            )
+            if (BuildConfig.DEBUG) Log.w("DMChatsController", "markAllRead failed", it)
         }.getOrDefault(false)
     }
 
@@ -5671,11 +5674,7 @@ class ChatsController private constructor(
             true
         }.onFailure {
             // Same quiet posture as markAllRead: log-only, no toast.
-            Log.w(
-                "DMChatsController",
-                "markUnread failed for group=${item.group.groupIdHex.take(8)}",
-                it,
-            )
+            if (BuildConfig.DEBUG) Log.w("DMChatsController", "markUnread failed", it)
         }.getOrDefault(false)
     }
 
@@ -5690,11 +5689,7 @@ class ChatsController private constructor(
             applyPinState(state)
             true
         }.onFailure {
-            Log.w(
-                "DMChatsController",
-                "setPinned failed for group=${item.group.groupIdHex.take(8)}",
-                it,
-            )
+            if (BuildConfig.DEBUG) Log.w("DMChatsController", "setPinned failed", it)
         }.getOrDefault(false)
     }
 
@@ -5706,7 +5701,7 @@ class ChatsController private constructor(
             applyPinState(state)
             true
         }.onFailure {
-            Log.w("DMChatsController", "setPinnedOrder failed", it)
+            if (BuildConfig.DEBUG) Log.w("DMChatsController", "setPinnedOrder failed", it)
         }.getOrDefault(false)
     }
 
@@ -6370,7 +6365,7 @@ private inline fun chatsDebug(
     if (BuildConfig.DEBUG) {
         Log.e("DMChats", message(), error)
     } else {
-        Log.e("DMChats", "operation failed: ${error.javaClass.simpleName}")
+        Log.e("DMChats", "operation_failed")
     }
 }
 
@@ -7040,7 +7035,7 @@ class ConversationController(
     // a burst of never-echoed sends can't grow it. Holds no protocol data (only
     // a local temp id, a one-run sequence string, and a monotonic long), so it
     // is not an Android-owned cache of White Noise data (AGENTS.md).
-    private val sendTraceByTempId = linkedMapOf<String, SendTraceEntry>()
+    private val sendTraceByTempId = linkedMapOf<String, PerformanceTrace>()
     private val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val initialTimelineSubscriptionRead =
         SingleFlightBoundedInitialResourceRead<ConversationTimelineSubscriptionHandle>(
@@ -7980,14 +7975,12 @@ class ConversationController(
         }
 
         val replyTarget = replyingTo?.messageIdHex?.takeIf { it.isNotBlank() }
-        // Per-send latency trace (issue #913). One-run-only sequence id + a
-        // monotonic start so the phases of THIS send are correlatable in logcat
-        // and back-to-back sends stay distinguishable, without any durable id.
-        val trace = SendTrace.nextSequence()
-        val traceStartMs = traceNowMs()
-        sendTrace(trace, "accepted", 0L, null, "reply" to (replyTarget != null))
+        // WNPerf assigns an opaque process-local operation id only while the
+        // user has explicitly enabled the bounded diagnostic session.
+        val trace = PerformanceDiagnostics.begin(PerformanceOperation.TEXT_SEND)
+        sendTrace(trace, PerformancePhase.ACCEPTED, elapsedMs = 0L, result = PerformanceResult.PENDING)
         val tempId = UUID.randomUUID().toString()
-        rememberSendTrace(tempId, trace, traceStartMs)
+        rememberSendTrace(tempId, trace)
         val now = nowSeconds()
         val retentionAtSendSeconds = rememberRetentionAtSend(tempId, group.disappearingMessageSecs)
         val optimistic =
@@ -8052,7 +8045,7 @@ class ConversationController(
             // No bound row to bump (pre-first-frame open, brand-new group,
             // account-pinned window) — the engine echo will still update the
             // list, but keep the drop visible in the send trace.
-            sendTrace(trace, "chatlist-preview-dropped", traceElapsedMs(traceStartMs))
+            sendTrace(trace, PerformancePhase.CHAT_LIST_PREVIEW_DROPPED, result = PerformanceResult.FAILURE)
         }
         replyingTo = null
         // The optimistic bubble is now in the projection and published — the
@@ -8064,7 +8057,7 @@ class ConversationController(
         // Optimistic bubble + chat-list preview are now published: the pending
         // clock is on screen. Everything after this is the "clock lingers"
         // window the issue is about.
-        sendTrace(trace, "optimistic-shown", traceElapsedMs(traceStartMs))
+        sendTrace(trace, PerformancePhase.OPTIMISTIC_SHOWN, result = PerformanceResult.PENDING)
         try {
             // Publish with a bounded retry sweep so a *transient* relay-pool gap
             // (socket teardown mid-reconnect, doze wake, network change) doesn't
@@ -8079,17 +8072,16 @@ class ConversationController(
             // prior send's full MLS-commit → relay round-trip returns. Timing the
             // lock-acquire separately from the FFI call makes that serialization
             // visible (issue #913 "back-to-back sends don't pipeline").
-            val lockWaitStartMs = traceNowMs()
+            val lockWaitStartMs = trace?.let { traceNowMs() }
             val summary =
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    val lockHeldAtMs = traceNowMs()
+                    val lockHeldAtMs = trace?.let { traceNowMs() }
                     sendTrace(
                         trace,
-                        "commit-lock-acquired",
-                        traceElapsedMs(traceStartMs),
-                        lockHeldAtMs - lockWaitStartMs,
+                        PerformancePhase.COMMIT_LOCK_ACQUIRED,
+                        durationMs = lockHeldAtMs?.minus(lockWaitStartMs ?: lockHeldAtMs) ?: 0L,
                     )
-                    publishTextWithRetry(replyTarget, account, trimmed, trace, traceStartMs)
+                    publishTextWithRetry(replyTarget, account, trimmed, trace)
                 }
             completeDurableAcceptance(optimisticKey)
             val reconciliation =
@@ -8125,13 +8117,7 @@ class ConversationController(
             // completion; don't label it as another `sent-flip`.
             sendTrace(
                 trace,
-                SendTrace.completionPhase(insertedSent),
-                traceElapsedMs(traceStartMs),
-                context =
-                    arrayOf(
-                        "bubble" to (if (insertedSent) "local" else "echoed"),
-                        "flip" to (if (insertedSent) null else "echo-reconcile"),
-                    ),
+                if (insertedSent) PerformancePhase.SENT_FLIP else PerformancePhase.SEND_COMPLETE,
             )
             // When we keep the temp bubble for echo reconciliation, leave the
             // trace entry so `echo-reconcile` can still be logged.
@@ -8177,9 +8163,8 @@ class ConversationController(
             publishTimelineFromIndexes()
             sendTrace(
                 trace,
-                "send-failed",
-                traceElapsedMs(traceStartMs),
-                context = arrayOf("error" to throwable.javaClass.simpleName),
+                PerformancePhase.SEND_FAILED,
+                result = PerformanceResult.FAILURE,
             )
             forgetSendTrace(tempId)
             presentSendFailure(appState, throwable)
@@ -8205,38 +8190,49 @@ class ConversationController(
         replyTarget: String?,
         account: String,
         trimmed: String,
-        trace: String,
-        traceStartMs: Long,
+        trace: PerformanceTrace?,
     ): dev.ipf.marmotkit.SendSummaryFfi =
         retryTransientRelaySend(
-            onTransientFailure = { attempt, throwable -> logSendRetry(attempt, throwable) },
+            onTransientFailure = { attempt, _ -> logSendRetry(trace, attempt) },
         ) { attempt ->
             // Time the FFI hop itself (App → engine `send_message`: MLS commit +
             // encrypt + publish + relay ack round-trip, all synchronous inside
             // this call). This is the primary "long pole" candidate the issue
             // asks to measure — how long the `sendText`/`replyToMessage` call
             // blocks before returning (issue #913).
-            val ffiStartMs = traceNowMs()
-            sendTrace(trace, "ffi-start", ffiStartMs - traceStartMs, context = arrayOf("attempt" to attempt))
+            val ffiStartMs = trace?.let { traceNowMs() }
+            sendTrace(
+                trace,
+                PerformancePhase.FFI_START,
+                result = PerformanceResult.PENDING,
+                layer = PerformanceLayer.FFI,
+                attempt = attempt,
+            )
             try {
                 val summary = textPublisher(replyTarget, account, group.groupIdHex, trimmed)
                 sendTrace(
                     trace,
-                    "ffi-return",
-                    traceElapsedMs(traceStartMs),
-                    traceNowMs() - ffiStartMs,
-                    "attempt" to attempt,
-                    "msgIds" to summary.messageIds.size,
+                    PerformancePhase.FFI_RETURN,
+                    durationMs = ffiStartMs?.let { traceNowMs() - it } ?: 0L,
+                    layer = PerformanceLayer.FFI,
+                    attempt = attempt,
+                    count = summary.messageIds.size,
+                )
+                sendTrace(
+                    trace,
+                    PerformancePhase.TRANSPORT_COMPLETE,
+                    layer = PerformanceLayer.TRANSPORT,
+                    count = summary.messageIds.size,
                 )
                 summary
             } catch (throwable: Throwable) {
                 sendTrace(
                     trace,
-                    "ffi-error",
-                    traceElapsedMs(traceStartMs),
-                    traceNowMs() - ffiStartMs,
-                    "attempt" to attempt,
-                    "error" to throwable.javaClass.simpleName,
+                    PerformancePhase.FFI_ERROR,
+                    durationMs = ffiStartMs?.let { traceNowMs() - it } ?: 0L,
+                    result = PerformanceResult.FAILURE,
+                    layer = PerformanceLayer.FFI,
+                    attempt = attempt,
                 )
                 throw throwable
             }
@@ -8250,20 +8246,18 @@ class ConversationController(
      * health must never escalate a send retry into an error.
      */
     private suspend fun logSendRetry(
+        trace: PerformanceTrace?,
         attempt: Int,
-        throwable: Throwable,
     ) {
-        if (!BuildConfig.DEBUG) return
+        if (trace == null) return
         val health = runCatchingCancellable { appState.marmotIo { relayHealth() } }.getOrNull()
-        val healthSummary =
-            health?.let {
-                "total=${it.totalRelays} connected=${it.connected} connecting=${it.connecting} " +
-                    "pending=${it.pending} disconnected=${it.disconnected} terminated=${it.terminated}"
-            } ?: "unavailable"
-        Log.d(
-            "ConversationController",
-            "transient send failure (attempt $attempt/$SEND_RETRY_ATTEMPTS): " +
-                "${throwable.javaClass.simpleName} relayHealth[$healthSummary]",
+        sendTrace(
+            trace,
+            PerformancePhase.TRANSIENT_RETRY,
+            result = PerformanceResult.FAILURE,
+            layer = PerformanceLayer.TRANSPORT,
+            attempt = attempt,
+            queueDepth = health?.let { it.totalRelays.toInt() - it.connected.toInt() },
         )
     }
 
@@ -8771,7 +8765,7 @@ class ConversationController(
                 // The key drains when the user retries (terminal performMediaUpload
                 // path runs) or explicitly discards.
                 publishTimelineFromIndexes()
-                Log.w("DMConversation", "media upload failed for ${group.groupIdHex.take(8)}", throwable)
+                if (BuildConfig.DEBUG) Log.w("DMConversation", "media upload failed", throwable)
                 presentSendFailure(appState, throwable)
             }
         } finally {
@@ -8885,7 +8879,7 @@ class ConversationController(
             // must not remove a reaction that has already been published.
             runCatchingCancellable { markReadUpTo(target) }
                 .onFailure {
-                    Log.w("DMConversation", "mark-read after reaction failed target=${target.take(8)}", it)
+                    if (BuildConfig.DEBUG) Log.w("DMConversation", "mark-read after reaction failed", it)
                 }
         }
     }
@@ -9652,10 +9646,14 @@ class ConversationController(
             }
             val summary =
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    val retryTrace = SendTrace.nextSequence()
-                    val retryTraceStartMs = traceNowMs()
-                    sendTrace(retryTrace, "manual-retry", 0L, context = arrayOf("reply" to (replyTarget != null)))
-                    publishTextWithRetry(replyTarget, account, text, retryTrace, retryTraceStartMs)
+                    val retryTrace = PerformanceDiagnostics.begin(PerformanceOperation.TEXT_SEND)
+                    sendTrace(
+                        retryTrace,
+                        PerformancePhase.MANUAL_RETRY,
+                        elapsedMs = 0L,
+                        result = PerformanceResult.PENDING,
+                    )
+                    publishTextWithRetry(replyTarget, account, text, retryTrace)
                 }
             completeDurableAcceptance(key)
             if (discardedDuringRetry.remove(key)) {
@@ -9694,11 +9692,7 @@ class ConversationController(
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
-            Log.w(
-                "DMConversation",
-                "retryFailedSend failed for ${group.groupIdHex.take(8)} key=${key.take(8)}",
-                throwable,
-            )
+            if (BuildConfig.DEBUG) Log.w("DMConversation", "retryFailedSend failed", throwable)
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; don't restore the Failed bubble.
                 optimisticMessages.remove(key)
@@ -9917,11 +9911,7 @@ class ConversationController(
                             "read-state" to { initializeReadState(account) },
                         ),
                     onFailure = { step, throwable ->
-                        Log.w(
-                            "DMConversation",
-                            "post-accept $step refresh failed for ${group.groupIdHex.take(8)}",
-                            throwable,
-                        )
+                        if (BuildConfig.DEBUG) Log.w("DMConversation", "post-accept $step refresh failed", throwable)
                     },
                 )
             }
@@ -10029,11 +10019,7 @@ class ConversationController(
                                     clearGroupImage(account, group.groupIdHex)
                                 }
                             }.onFailure {
-                                Log.w(
-                                    "DMConversation",
-                                    "encrypted avatar cleanup failed group=${group.groupIdHex.take(8)}",
-                                    it,
-                                )
+                                if (BuildConfig.DEBUG) Log.w("DMConversation", "encrypted avatar cleanup failed", it)
                             }.isSuccess
                     }
                 }
@@ -10382,7 +10368,7 @@ class ConversationController(
                 // failure toast — log it and fall back to an in-memory re-filter.
                 runCatchingCancellable { refreshCurrentTimeline(account) }
                     .onFailure { refreshError ->
-                        Log.w("DMConversation", "refresh after retention update failed for ${group.groupIdHex.take(8)}", refreshError)
+                        if (BuildConfig.DEBUG) Log.w("DMConversation", "retention refresh failed", refreshError)
                         publishTimelineFromIndexes()
                     }
                 presentConversationTransient(R.string.toast_disappearing_messages_updated)
@@ -10406,7 +10392,7 @@ class ConversationController(
             appState.marmotIo { groupManagementState(account, group.groupIdHex) }
         }.onSuccess { managementState = it }
             .onFailure {
-                Log.w("DMConversation", "management state refresh failed for ${group.groupIdHex.take(8)}", it)
+                if (BuildConfig.DEBUG) Log.w("DMConversation", "management state refresh failed", it)
             }
     }
 
@@ -10455,7 +10441,7 @@ class ConversationController(
                 refreshManagementState()
                 true
             }.onFailure {
-                Log.w("DMConversation", "acknowledge disband failure failed for ${group.groupIdHex.take(8)}", it)
+                if (BuildConfig.DEBUG) Log.w("DMConversation", "acknowledge disband failure failed", it)
             }.getOrDefault(false)
         }
 
@@ -10775,11 +10761,7 @@ class ConversationController(
                 appState.marmotIo { messages(account, group.groupIdHex, 120u, null) }
             }
         }.onFailure {
-            Log.w(
-                "DMConversation",
-                "lookup message failed for ${group.groupIdHex.take(8)} message=${messageIdHex.take(8)}",
-                it,
-            )
+            if (BuildConfig.DEBUG) Log.w("DMConversation", "lookup message failed", it)
         }.getOrNull()
             ?.firstOrNull { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
     }
@@ -11297,7 +11279,7 @@ class ConversationController(
         runCatchingCancellable {
             appState.marmotIo { initializeChatReadState(account, group.groupIdHex) }
         }.onFailure {
-            Log.w("DMConversation", "initialize read state failed for ${group.groupIdHex.take(8)}", it)
+            if (BuildConfig.DEBUG) Log.w("DMConversation", "initialize read state failed", it)
         }
     }
 
@@ -11329,11 +11311,7 @@ class ConversationController(
         if (markReadFailure != null) {
             if (lastReadMessageId == trimmed) lastReadMessageId = previous
             if (markReadFailure is CancellationException) throw markReadFailure
-            Log.w(
-                "DMConversation",
-                "mark read failed for ${group.groupIdHex.take(8)} message=${trimmed.take(8)}",
-                markReadFailure,
-            )
+            if (BuildConfig.DEBUG) Log.w("DMConversation", "mark read failed", markReadFailure)
             return
         }
         markReadResult.getOrNull()?.let { row ->
@@ -11349,7 +11327,7 @@ class ConversationController(
         runCatchingCancellable {
             appState.dismissConversationNotifications(account, group.groupIdHex)
         }.onFailure {
-            Log.w("DMConversation", "dismiss read notifications failed for ${group.groupIdHex.take(8)}", it)
+            if (BuildConfig.DEBUG) Log.w("DMConversation", "dismiss read notifications failed", it)
         }
     }
 
@@ -12283,11 +12261,7 @@ class ConversationController(
                     }
                     else -> {
                         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.FAILED)
-                        Log.w(
-                            "DMConversation",
-                            "refresh members failed for ${group.groupIdHex.take(8)}",
-                            throwable,
-                        )
+                        if (BuildConfig.DEBUG) Log.w("DMConversation", "refresh members failed", throwable)
                     }
                 }
             }
@@ -12714,39 +12688,43 @@ class ConversationController(
 
     private fun nowSeconds(): ULong = (System.currentTimeMillis() / 1000L).toULong()
 
-    // --- Send-latency trace (issue #913) -----------------------------------
-    // Monotonic clock (unaffected by wall-clock adjustments) for measuring the
-    // accepted → sent-flip window and the FFI hop inside it. All emission is
-    // DEBUG-only and privacy-safe (see SendTrace): phase, sequence id, ms, and
-    // small counts/booleans only.
+    // --- Send-latency trace (issues #913, #2224) -----------------------------
     private fun traceNowMs(): Long = SystemClock.elapsedRealtime()
 
-    private fun traceElapsedMs(startMs: Long): Long = traceNowMs() - startMs
-
     private fun sendTrace(
-        sequence: String,
-        phase: String,
-        sinceStartMs: Long,
-        spanMs: Long? = null,
-        vararg context: Pair<String, Any?>,
+        trace: PerformanceTrace?,
+        phase: PerformancePhase,
+        elapsedMs: Long? = null,
+        durationMs: Long = 0L,
+        result: PerformanceResult = PerformanceResult.SUCCESS,
+        layer: PerformanceLayer = PerformanceLayer.ANDROID,
+        attempt: Int? = null,
+        queueDepth: Int? = null,
+        count: Int? = null,
     ) {
-        if (!BuildConfig.DEBUG) return
-        Log.d(
-            "DMConversation",
-            "${SendTrace.TAG_PREFIX} ${SendTrace.line(sequence, phase, sinceStartMs, spanMs, *context)}",
+        if (trace == null) return
+        PerformanceDiagnostics.record(
+            trace = trace,
+            phase = phase,
+            elapsedMs = elapsedMs ?: (traceNowMs() - trace.startedAtMs),
+            durationMs = durationMs,
+            result = result,
+            layer = layer,
+            attempt = attempt,
+            queueDepth = queueDepth,
+            count = count,
         )
     }
 
-    // Record (DEBUG-only) the trace start for an optimistic text send so the
+    // Record the trace for an optimistic text send so the
     // engine-echo reconcile can time the accepted → echoed-reconcile flip.
     // Bounded so a burst of never-echoed sends can't grow the map.
     private fun rememberSendTrace(
         tempId: String,
-        sequence: String,
-        startMs: Long,
+        trace: PerformanceTrace?,
     ) {
-        if (!BuildConfig.DEBUG) return
-        sendTraceByTempId[tempId] = SendTraceEntry(sequence, startMs)
+        if (trace == null) return
+        sendTraceByTempId[tempId] = trace
         while (sendTraceByTempId.size > SEND_TRACE_MAX_TRACKED) {
             val oldest = sendTraceByTempId.keys.firstOrNull() ?: break
             sendTraceByTempId.remove(oldest)
@@ -12754,7 +12732,6 @@ class ConversationController(
     }
 
     private fun forgetSendTrace(tempId: String) {
-        if (!BuildConfig.DEBUG) return
         sendTraceByTempId.remove(tempId)
     }
 
@@ -12765,9 +12742,8 @@ class ConversationController(
     // success block, the "subscription churn / self-echo drives the flip"
     // candidate in issue #913.
     private fun traceEchoReconcile(optimisticId: String) {
-        if (!BuildConfig.DEBUG) return
-        val entry = sendTraceByTempId.remove(optimisticId) ?: return
-        sendTrace(entry.sequence, "echo-reconcile", traceElapsedMs(entry.startMs))
+        val trace = sendTraceByTempId.remove(optimisticId) ?: return
+        sendTrace(trace, PerformancePhase.ECHO_RECONCILE)
     }
 
     init {

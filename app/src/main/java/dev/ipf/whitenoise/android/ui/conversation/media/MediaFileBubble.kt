@@ -247,12 +247,8 @@ internal fun MediaFileBubble(
                                 ),
                             )
                     },
-                    onFailure = { failure ->
-                        Log.w(
-                            MEDIA_FILE_BUBBLE_TAG,
-                            "attachment viewer launch failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
-                            failure,
-                        )
+                    onFailure = {
+                        Log.w(MEDIA_FILE_BUBBLE_TAG, "attachment_viewer_launch_failed")
                         AttachmentOpenTrace.finish(request, "launch_failure")
                         appState.present(couldntOpenMessage, copyable = true)
                     },
@@ -265,8 +261,7 @@ internal fun MediaFileBubble(
             ) {
                 Log.w(
                     MEDIA_FILE_BUBBLE_TAG,
-                    "attachment open outcome=${resolvedOpenResult.name} " +
-                        "msg=${messageIdHex.take(8)}#$attachmentIndex",
+                    "attachment_open_outcome=${resolvedOpenResult.name}",
                 )
             }
             when (resolvedOpenResult) {

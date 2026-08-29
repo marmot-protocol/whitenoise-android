@@ -102,6 +102,8 @@ import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
+import dev.ipf.whitenoise.android.diagnostics.StartupPerformanceDiagnostics
 import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.DiskByteCache
@@ -1219,7 +1221,11 @@ private val processNotificationCardCancellationDispatcher: CoroutineDispatcher b
 
 internal fun appStateScopeExceptionHandler(
     report: (Throwable) -> Unit = { throwable ->
-        Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure", throwable)
+        if (BuildConfig.DEBUG) {
+            Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure", throwable)
+        } else {
+            Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure")
+        }
     },
 ): CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable -> report(throwable) }
 
@@ -1498,7 +1504,7 @@ class WhiteNoiseAppState private constructor(
 
     private val bootstrapAttempts = BootstrapAttemptCoordinator()
     private val bootstrapRuntime = BootstrapRuntimeCoordinator<AppMarmotRuntime>()
-    private val startupTraceStartedAtMs = SystemClock.elapsedRealtime()
+    private val startupPerformance = StartupPerformanceDiagnostics()
     private var startupSystemSplashHandoffRecorded = false
     private var startupLocalRowsRecorded = false
     private var startupMemberDerivedLocalRecorded = false
@@ -3368,12 +3374,8 @@ class WhiteNoiseAppState private constructor(
                 messages = messages,
                 targetGroupIds = targets,
                 transport = transport,
-                onFailure = { targetGroupIdHex, stage, throwable ->
-                    Log.w(
-                        "DMMessageForward",
-                        "forward failed stage=$stage target=${targetGroupIdHex?.take(8).orEmpty()}",
-                        throwable,
-                    )
+                onFailure = { _, stage, throwable ->
+                    if (BuildConfig.DEBUG) Log.w("DMMessageForward", "forward failed stage=$stage", throwable)
                 },
             )
         // The app-scoped owner mirrors live per-target state into the global
@@ -3980,7 +3982,7 @@ class WhiteNoiseAppState private constructor(
             runCatchingCancellable {
                 marmotIo { downloadMedia(request.accountRef, request.groupIdHex, reference) }
             }.onFailure { failure ->
-                logAttachmentDownloadFailure(request, reference, failure)
+                logAttachmentDownloadFailure(request, failure)
             }.getOrThrow()
         if (result.plaintext.isNotEmpty()) {
             cacheMediaPlaintext(cacheKey, result.plaintext)
@@ -3998,24 +4000,17 @@ class WhiteNoiseAppState private constructor(
 
     private fun logAttachmentDownloadFailure(
         request: AttachmentTransferRequest,
-        reference: MediaAttachmentReferenceFfi,
         failure: Throwable,
     ) {
-        val host =
-            reference.locators
-                .firstOrNull()
-                ?.value
-                ?.substringAfter("://", "")
-                ?.substringBefore('/')
-                ?.substringBefore('?')
-                ?.substringBefore('#')
-                .orEmpty()
-        Log.w(
-            "DMAttachmentDownload",
-            "download failed group=${request.groupIdHex.take(8)} " +
-                "message=${request.messageIdHex.take(8)} host=$host",
-            failure,
-        )
+        if (BuildConfig.DEBUG) {
+            Log.w(
+                "DMAttachmentDownload",
+                "download failed group=${request.groupIdHex.take(8)} message=${request.messageIdHex.take(8)}",
+                failure,
+            )
+        } else {
+            Log.w("DMAttachmentDownload", "attachment_download_failed")
+        }
     }
 
     internal suspend fun downloadAttachmentForDurableWork(
@@ -4062,7 +4057,7 @@ class WhiteNoiseAppState private constructor(
         phase = AppPhase.Bootstrapping
         try {
             if (resumeCompletedBootstrap()) return
-            traceStartupStage("notification-platform-setup") {
+            startupPerformance.stage(PerformancePhase.NOTIFICATION_PLATFORM_SETUP) {
                 // Tray readiness must precede Marmot.start(): the passive MDK
                 // broadcast has no replay once the startup receiver attaches.
                 withContext(Dispatchers.Default) {
@@ -4071,13 +4066,13 @@ class WhiteNoiseAppState private constructor(
                 refreshLocalNotificationPermission()
             }
             startBootstrapRuntime()
-            val refreshedAccounts = traceStartupStage("account-refresh") { refreshAccountSnapshot() }
+            val refreshedAccounts = startupPerformance.stage(PerformancePhase.ACCOUNT_REFRESH, ::refreshAccountSnapshot)
             prepareStartupUnreadRefresh(refreshedAccounts)
             migrateLegacyDrafts()
             migrateLegacyMutePreferences()
             // Resolve interrupted editor commits against MDK before any draft
             // is reopened, and reclaim encrypted sources with no live session.
-            traceStartupStage("draft-reconciliation") {
+            startupPerformance.stage(PerformancePhase.DRAFT_RECONCILIATION) {
                 messageDraftRepository.reconcileEditorState(editorSourceStore).onFailure {
                     appStateDebug(it) { "photo editor reconciliation deferred: ${it.readableMessage()}" }
                 }
@@ -4095,7 +4090,7 @@ class WhiteNoiseAppState private constructor(
                 // but signer callbacks are an account-readiness prerequisite:
                 // once Ready is visible, UI work may require signing even while
                 // receiver convergence continues in the background.
-                traceStartupStage("external-signer-registration") { reregisterExternalSigners() }
+                startupPerformance.stage(PerformancePhase.EXTERNAL_SIGNER_REGISTRATION) { reregisterExternalSigners() }
                 val targetAccount = startupAccount()
                 val target = targetAccount.label
                 if (targetAccount.signedOut) {
@@ -4105,7 +4100,7 @@ class WhiteNoiseAppState private constructor(
                     completeReceiverGatedStartup()
                 }
                 val activated =
-                    traceStartupStage("account-activation") {
+                    startupPerformance.stage(PerformancePhase.ACCOUNT_ACTIVATION) {
                         // The callback is the local-ready boundary. The shell mounts before
                         // profile/notification/push warmup and the cross-account unread fold.
                         setActiveAccount(
@@ -4146,14 +4141,14 @@ class WhiteNoiseAppState private constructor(
     private suspend fun completeReceiverGatedStartup() {
         val receiverReady = awaitNotificationReceiverForStartup()
         appStateDebug { "marmot started; notification receiver active=$receiverReady" }
-        traceStartupStage("notification-privacy-setup") { refreshSecurityPrivacySettings() }
+        startupPerformance.stage(PerformancePhase.NOTIFICATION_PRIVACY_SETUP) { refreshSecurityPrivacySettings() }
     }
 
     private suspend fun startBootstrapRuntime(): AppMarmotRuntime {
         val opened =
             bootstrapRuntime.open(
                 construct = {
-                    traceStartupStage("client-construction") {
+                    startupPerformance.stage(PerformancePhase.CLIENT_CONSTRUCTION) {
                         withContext(Dispatchers.IO) {
                             marmotRuntimeFactory(appContext).also { runtime ->
                                 // Publish before start so lifecycle consumers
@@ -4168,7 +4163,7 @@ class WhiteNoiseAppState private constructor(
                 },
                 configure = { runtime ->
                     appStateDebug { "bootstrap root=${runtime.rootPath}" }
-                    traceStartupStage("privacy-runtime-configuration") {
+                    startupPerformance.stage(PerformancePhase.PRIVACY_RUNTIME_CONFIGURATION) {
                         withContext(Dispatchers.IO) { runtime.marmot.configurePrivacyRuntime() }
                     }
                 },
@@ -4177,7 +4172,7 @@ class WhiteNoiseAppState private constructor(
                     appStateDebug { "marmot started" }
                 },
                 closeAfterFailure = { runtime ->
-                    traceStartupStage("failed-runtime-close") {
+                    startupPerformance.stage(PerformancePhase.FAILED_RUNTIME_CLOSE) {
                         withContext(Dispatchers.IO) { runtime.marmot.shutdownAndClose() }
                     }
                     if (marmotRuntime === runtime) marmotRuntime = null
@@ -4202,7 +4197,7 @@ class WhiteNoiseAppState private constructor(
                 installedStartupListener = true
                 notificationScope.launch(notificationDispatcher) {
                     try {
-                        traceStartupStage("marmot-start") { runtime.marmot.start() }
+                        startupPerformance.stage(PerformancePhase.MARMOT_START) { runtime.marmot.start() }
                         runtimeStartResult.complete(Result.success(Unit))
                         runNotificationListenerLoop(runtime.marmot)
                     } catch (cancel: CancellationException) {
@@ -5146,7 +5141,7 @@ class WhiteNoiseAppState private constructor(
         if (activeAccountRef != accountRef) return
         if (!startupLocalRowsRecorded) {
             startupLocalRowsRecorded = true
-            startupTiming("cached-chat-rows-ready", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+            startupPerformance.record(PerformancePhase.CACHED_CHAT_ROWS_READY)
         }
         recordPendingAccountSwitchStage(accountRef, "cached-chat-rows-ready", rowCount)
     }
@@ -5159,7 +5154,7 @@ class WhiteNoiseAppState private constructor(
         if (activeAccountRef != accountRef) return
         if (!startupMemberDerivedLocalRecorded) {
             startupMemberDerivedLocalRecorded = true
-            startupTiming("member-derived-local-ready", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+            startupPerformance.record(PerformancePhase.MEMBER_DERIVED_LOCAL_READY)
         }
         recordPendingAccountSwitchStage(accountRef, "member-derived-local-ready", rowCount)
     }
@@ -5208,7 +5203,7 @@ class WhiteNoiseAppState private constructor(
     private fun recordStartupLocalSnapshotRendered() {
         if (!startupFirstLocalFrameRecorded) {
             startupFirstLocalFrameRecorded = true
-            startupTiming("first-local-frame", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+            startupPerformance.record(PerformancePhase.FIRST_LOCAL_FRAME)
         }
         val pending = pendingStartupUnreadRefresh ?: return
         pendingStartupUnreadRefresh = null
@@ -5217,11 +5212,11 @@ class WhiteNoiseAppState private constructor(
                 accountListRevision
             }
         mutationsScope.launch {
-            traceStartupStage("unread-aggregate-refresh") {
+            startupPerformance.stage(PerformancePhase.UNREAD_AGGREGATE_REFRESH) {
                 refreshAccountUnreadCounts(pending.accounts, stillCurrent = revisionGuard::isCurrent)
             }
             if (revisionGuard.isCurrent()) {
-                startupTiming("unread-aggregate-ready", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+                startupPerformance.record(PerformancePhase.UNREAD_AGGREGATE_READY)
             }
         }
     }
@@ -5230,26 +5225,14 @@ class WhiteNoiseAppState private constructor(
     internal fun recordStartupSystemSplashHandoff() {
         if (startupSystemSplashHandoffRecorded) return
         startupSystemSplashHandoffRecorded = true
-        startupTiming("system-splash-handoff", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+        startupPerformance.record(PerformancePhase.SYSTEM_SPLASH_HANDOFF)
     }
 
     private fun recordStartupRelayCatchUpReady() {
         if (startupRelayCatchUpRecorded) return
         startupRelayCatchUpRecorded = true
-        startupTiming("relay-catch-up-ready", SystemClock.elapsedRealtime() - startupTraceStartedAtMs)
+        startupPerformance.record(PerformancePhase.RELAY_CATCH_UP_READY)
     }
-
-    private suspend fun <T> traceStartupStage(
-        stage: String,
-        block: suspend () -> T,
-    ): T =
-        StartupStageTrace.trace(stage, block) { durationMs ->
-            startupTiming(
-                stage = stage,
-                elapsedMs = SystemClock.elapsedRealtime() - startupTraceStartedAtMs,
-                durationMs = durationMs,
-            )
-        }
 
     /**
      * Wipe per-account in-memory media caches on account switch. The
@@ -7643,11 +7626,7 @@ class WhiteNoiseAppState private constructor(
             applyChatListRowFromMarkRead(account, row)
             true
         }.onFailure {
-            Log.w(
-                "DMAppState",
-                "notification mark read failed for group=${group.take(8)} message=${message.take(8)}",
-                it,
-            )
+            if (BuildConfig.DEBUG) Log.w("DMAppState", "notification mark read failed", it)
         }.getOrDefault(false)
     }
 
@@ -10048,7 +10027,7 @@ private inline fun appStateDebug(
     if (BuildConfig.DEBUG) {
         Log.e("DMAppState", message(), error)
     } else {
-        Log.e("DMAppState", "operation failed: ${error.javaClass.simpleName}")
+        Log.e("DMAppState", "operation_failed")
     }
 }
 
@@ -10065,25 +10044,6 @@ internal fun startupUnreadRefreshIsCurrent(
     expectedRevision: Long,
     currentRevision: Long,
 ): Boolean = expectedRevision == currentRevision
-
-private fun startupTiming(
-    stage: String,
-    elapsedMs: Long,
-    durationMs: Long? = null,
-) {
-    if (
-        BuildConfig.DEBUG ||
-        BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT == "staging" ||
-        BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS
-    ) {
-        val duration = durationMs?.let { " duration_ms=${it.coerceAtLeast(0L)}" }.orEmpty()
-        Log.i(
-            "WNStartup",
-            "stage=$stage elapsed_ms=${elapsedMs.coerceAtLeast(0L)} " +
-                "uptime_ms=${SystemClock.elapsedRealtime()}$duration",
-        )
-    }
-}
 
 private const val BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS = 15_000L
 

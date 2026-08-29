@@ -267,12 +267,8 @@ internal fun MediaImageBubble(
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             materializationIntent = materializationIntent.afterProducerCancellation(cancel)
-        } catch (t: Throwable) {
-            android.util.Log.w(
-                "MediaImageBubble",
-                "auto-download failed for msg=${key.take(8)} idx=$attachmentIndex",
-                t,
-            )
+        } catch (_: Throwable) {
+            android.util.Log.w("MediaImageBubble", "image_auto_download_failed")
             failed = true
         }
     }
@@ -666,12 +662,8 @@ internal fun MediaImageGridTile(
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             materializationIntent = materializationIntent.afterProducerCancellation(cancel)
-        } catch (t: Throwable) {
-            android.util.Log.w(
-                "MediaImageGridTile",
-                "tile auto-download failed for msg=${messageIdHex.take(8)} idx=$attachmentIndex",
-                t,
-            )
+        } catch (_: Throwable) {
+            android.util.Log.w("MediaImageGridTile", "image_tile_auto_download_failed")
             failed = true
         }
     }

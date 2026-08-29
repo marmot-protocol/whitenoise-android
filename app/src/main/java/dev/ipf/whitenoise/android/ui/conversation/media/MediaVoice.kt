@@ -183,10 +183,7 @@ internal fun MediaVoiceBubble(
     val waveform: FloatArray = realWaveform ?: pseudoWaveform
 
     suspend fun clearBadVoiceCache(reason: String) {
-        Log.w(
-            "MediaVoiceBubble",
-            "$reason for cached voice msg=${messageIdHex.take(8)}#$attachmentIndex; clearing cache",
-        )
+        Log.w("MediaVoiceBubble", "voice_cache_cleared reason=${reason.replace(' ', '_')}")
         clearVoiceAttachmentCacheAfterPlaybackFailure(
             context = context,
             controller = controller,
@@ -272,11 +269,7 @@ internal fun MediaVoiceBubble(
             if (it is kotlinx.coroutines.CancellationException) {
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
-                Log.w(
-                    "MediaVoiceBubble",
-                    "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
-                    it,
-                )
+                Log.w("MediaVoiceBubble", "voice_auto_materialize_failed")
                 failed = true
             }
         }

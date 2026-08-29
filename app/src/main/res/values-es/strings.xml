@@ -455,6 +455,10 @@
     <string name="developer_mode_subtitle">Muestra diagnósticos y elementos internos de MLS.</string>
     <string name="diagnostics">Diagnóstico</string>
     <string name="diagnostics_settings_subtitle">Estado del relé y elementos internos de MLS</string>
+    <string name="performance_logs">Registros de rendimiento</string>
+    <string name="performance_logs_description">Escribe temporalmente eventos de tiempo respetuosos con la privacidad en Logcat. Se detiene tras 30 minutos o al reiniciar la app.</string>
+    <string name="performance_logs_active">Activo · quedan %1$d min</string>
+    <string name="performance_logs_inactive">Inactivo</string>
     <string name="group_system_show_details">Mostrar detalles</string>
     <string name="group_system_hide_details">Ocultar detalles</string>
     <string name="local_notifications">Notificaciones</string>

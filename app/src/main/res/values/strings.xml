@@ -569,6 +569,10 @@
     <string name="developer_mode_subtitle">Shows diagnostics and MLS internals.</string>
     <string name="diagnostics">Diagnostics</string>
     <string name="diagnostics_settings_subtitle">Relay health and MLS internals</string>
+    <string name="performance_logs">Performance logs</string>
+    <string name="performance_logs_description">Temporarily write privacy-safe timing events to Logcat. Stops after 30 minutes or when White Noise restarts.</string>
+    <string name="performance_logs_active">Active · %1$d min remaining</string>
+    <string name="performance_logs_inactive">Inactive</string>
     <string name="streaming_debug" translatable="false">Streaming debug</string>
     <string name="streaming_debug_subtitle" translatable="false">Show agent-stream and MLS signaling events inline in conversations</string>
     <string name="device_privacy">Device privacy</string>

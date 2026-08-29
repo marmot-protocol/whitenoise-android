@@ -39,7 +39,7 @@ class AppUpdateWorker(
     }
 
     private fun logRefreshFailure() {
-        Log.w(TAG, repository.loadInfo().lastAttemptErrorReport ?: "Update check failed without a report")
+        Log.w(TAG, "update_check_failed")
     }
 
     companion object {

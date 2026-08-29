@@ -72,8 +72,8 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
         recordPendingPushWakeCatchUp()
         try {
             NotificationStreamForegroundService.start(applicationContext, ForegroundStartTrigger.PushWake)
-        } catch (error: Exception) {
-            Log.w(TAG, "Failed to start foreground stream from push wake", error)
+        } catch (_: Exception) {
+            Log.w(TAG, "push_wake_foreground_start_failed")
         }
     }
 
@@ -83,7 +83,7 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
                 PushTokenStore.create(applicationContext).recordPendingPushWakeCatchUp()
             }.exceptionOrNull()
         if (recordError != null) {
-            Log.w(TAG, "Failed to record durable push wake catch-up retry", recordError)
+            Log.w(TAG, "push_wake_catch_up_record_failed")
         }
     }
 

@@ -41,7 +41,7 @@ class AppStartupReadinessTest {
         val source = appStateSource()
         val bootstrap = source.functionBody("bootstrapLocked")
 
-        val snapshot = bootstrap.indexOf("refreshAccountSnapshot()")
+        val snapshot = bootstrap.indexOf("refreshAccountSnapshot")
         val signer = bootstrap.indexOf("reregisterExternalSigners()")
         val ready = bootstrap.indexOf("onActivated = { phase = AppPhase.Ready }")
         val blockingFold = bootstrap.indexOf("refreshAccountUnreadCounts")
@@ -59,26 +59,29 @@ class AppStartupReadinessTest {
         val runtimeStart = source.functionBody("startMarmotWithNotificationListener")
         val expectedStages =
             listOf(
-                "client-construction",
-                "privacy-runtime-configuration",
-                "marmot-start",
-                "notification-privacy-setup",
-                "account-refresh",
-                "draft-reconciliation",
-                "account-activation",
+                "CLIENT_CONSTRUCTION",
+                "PRIVACY_RUNTIME_CONFIGURATION",
+                "MARMOT_START",
+                "NOTIFICATION_PRIVACY_SETUP",
+                "ACCOUNT_REFRESH",
+                "DRAFT_RECONCILIATION",
+                "ACCOUNT_ACTIVATION",
             )
 
         expectedStages.forEach { stage ->
-            assertTrue("Missing privacy-safe startup timing for $stage", "traceStartupStage(\"$stage\")" in source)
+            assertTrue(
+                "Missing privacy-safe startup timing for $stage",
+                "startupPerformance.stage(PerformancePhase.$stage" in source,
+            )
         }
         assertTrue(
             "Privacy configuration must be distinguishable from engine start",
-            runtime.indexOf("privacy-runtime-configuration") in 0 until
+            runtime.indexOf("PerformancePhase.PRIVACY_RUNTIME_CONFIGURATION") in 0 until
                 runtime.indexOf("startMarmotWithNotificationListener"),
         )
         assertTrue(
             "Engine start must retain its dedicated timing",
-            "traceStartupStage(\"marmot-start\")" in runtimeStart,
+            "startupPerformance.stage(PerformancePhase.MARMOT_START)" in runtimeStart,
         )
     }
 

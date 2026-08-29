@@ -455,6 +455,10 @@
     <string name="developer_mode_subtitle">Affiche les diagnostics et les éléments internes MLS.</string>
     <string name="diagnostics">Diagnostic</string>
     <string name="diagnostics_settings_subtitle">État de santé du relais et composants internes MLS</string>
+    <string name="performance_logs">Journaux de performances</string>
+    <string name="performance_logs_description">Écrit temporairement des mesures respectueuses de la confidentialité dans Logcat. S’arrête après 30 minutes ou au redémarrage de l’application.</string>
+    <string name="performance_logs_active">Actif · %1$d min restantes</string>
+    <string name="performance_logs_inactive">Inactif</string>
     <string name="group_system_show_details">Afficher les détails</string>
     <string name="group_system_hide_details">Masquer les détails</string>
     <string name="local_notifications">Notifications</string>

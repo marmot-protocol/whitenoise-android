@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnosticStatus
 import dev.ipf.whitenoise.android.ui.settings.DIAGNOSTICS_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsContent
 import dev.ipf.whitenoise.android.ui.settings.diagnosticsState
@@ -39,12 +40,21 @@ class DiagnosticsScreenScreenshotTest {
                                 eventCount = 0,
                                 streaming = false,
                                 sendingPing = false,
+                                performanceStatus =
+                                    PerformanceDiagnosticStatus(
+                                        available = true,
+                                        active = false,
+                                        remainingMillis = 0L,
+                                        emittedCount = 0,
+                                        droppedCount = 0,
+                                    ),
                             ),
                         entries = emptyList(),
                         onBack = {},
                         onRefresh = {},
                         onSendToSelf = {},
                         onClear = {},
+                        onPerformanceEnabledChange = {},
                     )
                 }
             }
@@ -53,5 +63,45 @@ class DiagnosticsScreenScreenshotTest {
         composeRule
             .onNodeWithTag(DIAGNOSTICS_CONTENT_TAG)
             .captureRoboImage("src/test/snapshots/diagnostics_screen_default_dark.png")
+    }
+
+    @Test
+    fun diagnosticsScreenPerformanceActiveDark() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    DiagnosticsContent(
+                        state =
+                            diagnosticsState(
+                                relayHealth = null,
+                                activeAccountRef = null,
+                                accountCount = 0,
+                                bootstrapRelayCount = 0,
+                                eventCount = 0,
+                                streaming = false,
+                                sendingPing = false,
+                                performanceStatus =
+                                    PerformanceDiagnosticStatus(
+                                        available = true,
+                                        active = true,
+                                        remainingMillis = 29L * 60L * 1_000L,
+                                        emittedCount = 2,
+                                        droppedCount = 0,
+                                    ),
+                            ),
+                        entries = emptyList(),
+                        onBack = {},
+                        onRefresh = {},
+                        onSendToSelf = {},
+                        onClear = {},
+                        onPerformanceEnabledChange = {},
+                    )
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(DIAGNOSTICS_CONTENT_TAG)
+            .captureRoboImage("src/test/snapshots/diagnostics_screen_performance_active_dark.png")
     }
 }

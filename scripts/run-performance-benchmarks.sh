@@ -310,9 +310,9 @@ fi
 startup_log="$local_output/package-replacement-startup.log"
 startup_markers_ready=false
 for _ in {1..120}; do
-  adb_cmd logcat -d --pid="$preflight_pid" -v brief WNStartup:I '*:S' >"$startup_log"
-  if rg -q 'stage=system-splash-handoff elapsed_ms=[0-9]+' "$startup_log" &&
-    rg -q 'stage=first-local-frame elapsed_ms=[0-9]+' "$startup_log"; then
+  adb_cmd logcat -d --pid="$preflight_pid" -v brief WNPerf:I '*:S' >"$startup_log"
+  if rg -q 'op=app_start phase=system_splash_handoff elapsed_ms=[0-9]+' "$startup_log" &&
+    rg -q 'op=app_start phase=first_local_frame elapsed_ms=[0-9]+' "$startup_log"; then
     startup_markers_ready=true
     break
   fi

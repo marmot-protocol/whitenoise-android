@@ -15,7 +15,7 @@ class StartupUnreadHydrationCoverageTest {
 
         assertTrue(
             "bootstrap must load only the account snapshot on its critical path",
-            "refreshAccountSnapshot()" in bootstrap,
+            "refreshAccountSnapshot" in bootstrap,
         )
         assertTrue(
             "bootstrap must retain the snapshot for the post-frame unread pass",

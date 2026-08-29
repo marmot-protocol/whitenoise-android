@@ -148,6 +148,18 @@ class AndroidReleaseRuntimeWorkflowCoverageTest {
             "a not-yet-visible app process must not bypass the bounded PID readiness loop",
             "pidof \"\$application_id\" 2> /dev/null | tr -d '\\r' || true" in verifierScript,
         )
+        assertTrue(
+            "production runtime verification must reject WNPerf and dynamic app-log value shapes",
+            "production release emitted WNPerf diagnostics" in verifierScript &&
+                "dynamic_value_patterns" in verifierScript &&
+                "known dynamic identifier/error log pattern" in verifierScript,
+        )
+        val appLogTags = verifierScript.substringAfter("app_log_tags=\"").substringBefore('"')
+        val dynamicValuePatterns = verifierScript.substringAfter("dynamic_value_patterns=\"").substringBefore('"')
+        assertTrue(
+            "the release log guard must reject a standalone raw error field",
+            Regex("($appLogTags).*($dynamicValuePatterns)").containsMatchIn("DMSend: error=timeout"),
+        )
     }
 
     private fun assertRequiredCheckAggregation(aggregateJob: String) {

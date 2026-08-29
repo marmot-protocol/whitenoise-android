@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -28,6 +29,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -45,6 +47,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -56,17 +59,21 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.DiagnosticIdentityPresentation
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnosticStatus
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
 internal enum class DiagnosticsSection {
     Actions,
+    Performance,
     RelayHealth,
     Runtime,
     EventLog,
@@ -111,6 +118,7 @@ internal data class DiagnosticsState(
     val showEventLogEmptyState: Boolean,
     val sendToSelfEnabled: Boolean,
     val streamStatus: DiagnosticsStreamStatus,
+    val performanceStatus: PerformanceDiagnosticStatus,
 )
 
 internal fun diagnosticsState(
@@ -121,9 +129,13 @@ internal fun diagnosticsState(
     eventCount: Int,
     streaming: Boolean,
     sendingPing: Boolean,
+    performanceStatus: PerformanceDiagnosticStatus,
 ): DiagnosticsState =
     DiagnosticsState(
-        sections = DiagnosticsSection.entries,
+        sections =
+            DiagnosticsSection.entries.filter { section ->
+                section != DiagnosticsSection.Performance || performanceStatus.available
+            },
         relayHealthValues =
             relayHealth
                 ?.let {
@@ -146,6 +158,7 @@ internal fun diagnosticsState(
         showEventLogEmptyState = eventCount == 0,
         sendToSelfEnabled = !sendingPing && activeAccountRef != null,
         streamStatus = if (streaming) DiagnosticsStreamStatus.Live else DiagnosticsStreamStatus.Idle,
+        performanceStatus = performanceStatus,
     )
 
 internal data class DiagnosticLogEntry(
@@ -155,6 +168,7 @@ internal data class DiagnosticLogEntry(
 )
 
 internal const val DIAGNOSTICS_CONTENT_TAG = "diagnostics-content"
+private const val PERFORMANCE_STATUS_REFRESH_MILLIS = 1_000L
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -169,9 +183,17 @@ internal fun DiagnosticsScreen(
     var entries by remember { mutableStateOf<List<DiagnosticLogEntry>>(emptyList()) }
     var streaming by remember { mutableStateOf(false) }
     var sendingPing by remember { mutableStateOf(false) }
+    var performanceStatus by remember { mutableStateOf(PerformanceDiagnostics.status()) }
     val scope = rememberCoroutineScope()
     val sentPingFormat = stringResource(R.string.diagnostic_sent_ping_to_self)
     val sendToSelfFailedFormat = stringResource(R.string.diagnostic_send_to_self_failed)
+
+    LaunchedEffect(performanceStatus.active) {
+        while (performanceStatus.active) {
+            delay(PERFORMANCE_STATUS_REFRESH_MILLIS)
+            performanceStatus = PerformanceDiagnostics.status()
+        }
+    }
 
     fun appendLog(text: String) {
         entries = (entries + DiagnosticLogEntry(text = text)).takeLast(500)
@@ -238,6 +260,7 @@ internal fun DiagnosticsScreen(
                 eventCount = entries.size,
                 streaming = streaming,
                 sendingPing = sendingPing,
+                performanceStatus = performanceStatus,
             ),
         entries = entries,
         onBack = onBack,
@@ -276,6 +299,9 @@ internal fun DiagnosticsScreen(
             }
         },
         onClear = { entries = emptyList() },
+        onPerformanceEnabledChange = { enabled ->
+            performanceStatus = if (enabled) PerformanceDiagnostics.start() else PerformanceDiagnostics.stop()
+        },
     )
 }
 
@@ -289,6 +315,7 @@ internal fun DiagnosticsContent(
     onRefresh: () -> Unit,
     onSendToSelf: () -> Unit,
     onClear: () -> Unit,
+    onPerformanceEnabledChange: (Boolean) -> Unit,
 ) {
     Scaffold(
         modifier = Modifier.testTag(DIAGNOSTICS_CONTENT_TAG),
@@ -357,6 +384,15 @@ internal fun DiagnosticsContent(
                         }
                     }
 
+                    DiagnosticsSection.Performance -> {
+                        item {
+                            PerformanceDiagnosticsGroup(
+                                status = state.performanceStatus,
+                                onEnabledChange = onPerformanceEnabledChange,
+                            )
+                        }
+                    }
+
                     DiagnosticsSection.Runtime -> {
                         item {
                             SettingsGroup(title = stringResource(R.string.runtime), icon = Icons.Filled.Memory) {
@@ -411,6 +447,43 @@ internal fun DiagnosticsContent(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun PerformanceDiagnosticsGroup(
+    status: PerformanceDiagnosticStatus,
+    onEnabledChange: (Boolean) -> Unit,
+) {
+    val performanceLogsLabel = stringResource(R.string.performance_logs)
+    SettingsGroup(title = performanceLogsLabel, icon = Icons.Filled.Speed) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.performance_logs_description))
+                    Text(
+                        if (status.active) {
+                            val remainingMinutes = ((status.remainingMillis + 59_999L) / 60_000L).coerceAtLeast(1L)
+                            stringResource(R.string.performance_logs_active, remainingMinutes)
+                        } else {
+                            stringResource(R.string.performance_logs_inactive)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = status.active,
+                    onCheckedChange = onEnabledChange,
+                    modifier = Modifier.semantics { contentDescription = performanceLogsLabel },
+                )
             }
         }
     }

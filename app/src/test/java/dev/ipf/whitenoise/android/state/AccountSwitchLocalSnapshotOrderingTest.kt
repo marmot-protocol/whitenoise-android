@@ -429,14 +429,14 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
         listOf(localRows, memberDerived).forEach { recorder ->
             assertTrue("stale account stages must be rejected", "activeAccountRef != accountRef" in recorder)
-            assertTrue(
-                "stage records must use the monotonic startup clock",
-                "SystemClock.elapsedRealtime()" in recorder,
-            )
         }
         assertTrue(
             "switch stages must reject a superseded trace",
             "trace.accountRef != accountRef" in stageRecorder,
+        )
+        assertTrue(
+            "stage records must use the monotonic startup clock",
+            "SystemClock.elapsedRealtime()" in stageRecorder,
         )
         assertTrue(
             "stage output may contain only stage, elapsed time, and row count",

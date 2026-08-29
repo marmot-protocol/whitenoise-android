@@ -211,17 +211,18 @@ class NotificationStreamForegroundService : Service() {
         when (outcome) {
             is NotificationRuntimeSupervisionOutcome.Started ->
                 if (outcome.attempts > 1) {
-                    foregroundServiceDiagnostic("notification runtime recovered attempts=${outcome.attempts}")
+                    foregroundServiceDiagnostic(NotificationServiceDiagnostic.RUNTIME_RECOVERED, outcome.attempts)
                 }
             is NotificationRuntimeSupervisionOutcome.RecoveryBoundaryChanged -> {
                 foregroundServiceDiagnostic(
-                    "notification runtime retry cancelled boundary_changed attempts=${outcome.attempts}",
+                    NotificationServiceDiagnostic.RETRY_BOUNDARY_CHANGED,
+                    outcome.attempts,
                 )
             }
             is NotificationRuntimeSupervisionOutcome.Exhausted -> {
                 foregroundServiceDiagnostic(
-                    "notification runtime retries exhausted " +
-                        "attempts=${outcome.attempts} reason=${outcome.failureClass}",
+                    NotificationServiceDiagnostic.RETRIES_EXHAUSTED,
+                    outcome.attempts,
                 )
                 if (decision.reconcileUserOwnedFailure) {
                     appState.onBackgroundConnectionRuntimeExhausted()
@@ -250,11 +251,11 @@ class NotificationStreamForegroundService : Service() {
                     releaseWakeLock(wakeLock)
                 }
             },
-            onAttemptFailed = { attempt, retryDelayMillis, failureClass ->
-                val retrySummary = retryDelayMillis?.let { " retry_ms=$it" }.orEmpty()
+            onAttemptFailed = { attempt, retryDelayMillis, _ ->
                 foregroundServiceDiagnostic(
-                    "notification runtime attempt failed " +
-                        "attempt=$attempt$retrySummary reason=$failureClass",
+                    NotificationServiceDiagnostic.ATTEMPT_FAILED,
+                    attempt,
+                    retryDelayMillis,
                 )
             },
         )
@@ -526,7 +527,7 @@ private fun recordPendingPushWakeCatchUp(context: Context) {
         PushTokenStore.create(context).recordPendingPushWakeCatchUp()
     }.onFailure {
         foregroundServiceDiagnostic(
-            "pending push wake catch-up retry record failed reason=${it.javaClass.simpleName}",
+            NotificationServiceDiagnostic.CATCH_UP_RECORD_FAILED,
         )
     }
 }
@@ -597,11 +598,25 @@ private inline fun foregroundServiceDebug(
     error: Throwable,
     message: () -> String,
 ) {
-    Log.e("DMForegroundSvc", message(), error)
+    if (BuildConfig.DEBUG) Log.e("DMForegroundSvc", message(), error)
 }
 
-private fun foregroundServiceDiagnostic(message: String) {
-    // Aggregate lifecycle telemetry only: callers pass attempt counts, trigger
-    // classes, and exception class names — never account or protocol data.
-    Log.w("DMForegroundSvc", message)
+private enum class NotificationServiceDiagnostic(
+    val wireName: String,
+) {
+    RUNTIME_RECOVERED("runtime_recovered"),
+    RETRY_BOUNDARY_CHANGED("retry_boundary_changed"),
+    RETRIES_EXHAUSTED("retries_exhausted"),
+    ATTEMPT_FAILED("attempt_failed"),
+    CATCH_UP_RECORD_FAILED("catch_up_record_failed"),
+}
+
+private fun foregroundServiceDiagnostic(
+    event: NotificationServiceDiagnostic,
+    attempt: Int? = null,
+    retryDelayMillis: Long? = null,
+) {
+    val attemptField = attempt?.let { " attempt=${it.coerceIn(0, 100)}" }.orEmpty()
+    val retryField = retryDelayMillis?.let { " retry_ms=${it.coerceIn(0L, 1_800_000L)}" }.orEmpty()
+    Log.w("DMForegroundSvc", "event=${event.wireName}$attemptField$retryField")
 }
