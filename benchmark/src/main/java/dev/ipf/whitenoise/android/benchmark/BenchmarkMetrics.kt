@@ -27,6 +27,43 @@ private val notificationRoutePhaseSections =
         "WhiteNoise.notificationRoute.firstConversationFrame",
     )
 
+/**
+ * Cold-start stages, mirroring `StartupStageTraceSection` in the app module.
+ * Repeated here by convention for the same reason the notification-route
+ * sections above are: the benchmark module does not depend on app sources.
+ */
+private val startupStageSections =
+    listOf(
+        "WhiteNoise.startup.client-construction",
+        "WhiteNoise.startup.privacy-runtime-configuration",
+        "WhiteNoise.startup.marmot-start",
+        "WhiteNoise.startup.notification-platform-setup",
+        "WhiteNoise.startup.notification-privacy-setup",
+        "WhiteNoise.startup.account-refresh",
+        "WhiteNoise.startup.account-activation",
+        "WhiteNoise.startup.draft-reconciliation",
+        "WhiteNoise.startup.external-signer-registration",
+    )
+
+/**
+ * Startup timing and frame timing plus a slice per bootstrap stage, so a cold
+ * start that regresses names the stage that moved instead of only the total.
+ * `Mode.Sum` rather than `Mode.First`: a stage can run more than once in an
+ * iteration (a retried bootstrap), and the total time spent in it is the
+ * number worth comparing.
+ */
+@OptIn(ExperimentalMetricApi::class)
+internal fun startupMetrics(): List<Metric> =
+    listOf(StartupTimingMetric(), FrameTimingMetric()) +
+        startupStageSections.map { sectionName ->
+            TraceSectionMetric(
+                sectionName = sectionName,
+                mode = TraceSectionMetric.Mode.Sum,
+                label = sectionName.substringAfterLast('.'),
+                targetPackageOnly = true,
+            )
+        }
+
 @OptIn(ExperimentalMetricApi::class)
 internal fun journeyMetrics(sectionName: String): List<Metric> =
     listOf(

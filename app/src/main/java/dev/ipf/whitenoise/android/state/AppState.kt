@@ -5257,19 +5257,14 @@ class WhiteNoiseAppState private constructor(
     private suspend fun <T> traceStartupStage(
         stage: String,
         block: suspend () -> T,
-    ): T {
-        val startedAtMs = SystemClock.elapsedRealtime()
-        return try {
-            block()
-        } finally {
-            val nowMs = SystemClock.elapsedRealtime()
+    ): T =
+        StartupStageTrace.trace(stage, block) { durationMs ->
             startupTiming(
                 stage = stage,
-                elapsedMs = nowMs - startupTraceStartedAtMs,
-                durationMs = nowMs - startedAtMs,
+                elapsedMs = SystemClock.elapsedRealtime() - startupTraceStartedAtMs,
+                durationMs = durationMs,
             )
         }
-    }
 
     /**
      * Wipe per-account in-memory media caches on account switch. The
