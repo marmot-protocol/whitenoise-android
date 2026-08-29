@@ -154,6 +154,12 @@ class AndroidReleaseRuntimeWorkflowCoverageTest {
                 "dynamic_value_patterns" in verifierScript &&
                 "known dynamic identifier/error log pattern" in verifierScript,
         )
+        val appLogTags = verifierScript.substringAfter("app_log_tags=\"").substringBefore('"')
+        val dynamicValuePatterns = verifierScript.substringAfter("dynamic_value_patterns=\"").substringBefore('"')
+        assertTrue(
+            "the release log guard must reject a standalone raw error field",
+            Regex("($appLogTags).*($dynamicValuePatterns)").containsMatchIn("DMSend: error=timeout"),
+        )
     }
 
     private fun assertRequiredCheckAggregation(aggregateJob: String) {

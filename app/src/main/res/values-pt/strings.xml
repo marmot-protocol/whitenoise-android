@@ -456,7 +456,7 @@
     <string name="diagnostics">Diagnóstico</string>
     <string name="diagnostics_settings_subtitle">Integridade do relé e componentes internos do MLS</string>
     <string name="performance_logs">Registos de desempenho</string>
-    <string name="performance_logs_description">Escreve temporariamente eventos de tempo com privacidade no Logcat. Para após 30 minutos ou ao reiniciar a aplicação.</string>
+    <string name="performance_logs_description">Escreve temporariamente eventos de temporização que preservam a privacidade no Logcat. Para após 30 minutos ou ao reiniciar a aplicação.</string>
     <string name="performance_logs_active">Ativo · faltam %1$d min</string>
     <string name="performance_logs_inactive">Inativo</string>
     <string name="group_system_show_details">Mostrar detalhes</string>

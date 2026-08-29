@@ -83,6 +83,7 @@ internal enum class PerformanceLayer(
 
 internal class PerformanceTrace internal constructor(
     val operation: PerformanceOperation,
+    internal val sessionGeneration: Long,
     internal val operationId: Long,
     internal val startedAtMs: Long,
 )
@@ -115,6 +116,7 @@ internal class PerformanceDiagnosticEmitter(
     private var droppedCount = 0
     private var lastTrace: PerformanceTrace? = null
     private var droppedSummaryEmitted = false
+    private var sessionGeneration = 0L
     private val operationCounter = AtomicLong(0L)
 
     @Synchronized
@@ -122,6 +124,7 @@ internal class PerformanceDiagnosticEmitter(
         if (!available) return PerformanceDiagnosticStatus.Unavailable
         val now = nowMs()
         if (!isActiveAt(now)) {
+            sessionGeneration = nextCounter(sessionGeneration)
             activeUntilMs = now.coerceAtMost(Long.MAX_VALUE - SESSION_DURATION_MS) + SESSION_DURATION_MS
             sessionStartedAtMs = now
             emittedCount = 0
@@ -153,6 +156,7 @@ internal class PerformanceDiagnosticEmitter(
         if (!isActiveAt(now)) return null
         return PerformanceTrace(
             operation = operation,
+            sessionGeneration = sessionGeneration,
             operationId = operationCounter.updateAndGet(::nextCounter),
             startedAtMs = now,
         )
@@ -170,23 +174,25 @@ internal class PerformanceDiagnosticEmitter(
         queueDepth: Int? = null,
         count: Int? = null,
     ) {
-        if (trace == null) return
+        val currentTrace = trace ?: return
         val now = nowMs()
         expireIfNeeded(now)
+        val belongsToActiveSession =
+            currentTrace.sessionGeneration == sessionGeneration && currentTrace.operationId > 0L
         if (
             !isActiveAt(now) ||
-            trace.operationId <= 0L ||
+            !belongsToActiveSession ||
             durationMs.coerceAtLeast(0L) < phase.minimumDurationMs
         ) {
             return
         }
-        lastTrace = trace
+        lastTrace = currentTrace
         if (emittedCount >= DATA_EVENT_LIMIT) {
             droppedCount = (droppedCount + 1).coerceAtMost(NUMERIC_COUNT_LIMIT)
         } else {
             sink(
                 formatLine(
-                    trace = trace,
+                    trace = currentTrace,
                     phase = phase,
                     elapsedMs = elapsedMs,
                     durationMs = durationMs,

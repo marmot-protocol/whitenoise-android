@@ -275,7 +275,7 @@ fi
 # Reject the dynamic value shapes previously found by the source inventory:
 # protocol ids, URLs/paths, raw report/error fields, and Throwable text.
 app_log_tags="WhiteNoiseApplication|WhiteNoiseAppState|DMAppState|DMAttachmentDownload|DMSend|DMConversation|DMChats|DiskByteCache|AppUpdateWorker|DMForegroundSvc"
-dynamic_value_patterns="npub1|nsec1|https?://|/data/|[[:xdigit:]]{64}|detail=|group=|message=|filename=|path=|report=|reason=|Exception|Caused by:"
+dynamic_value_patterns="npub1|nsec1|https?://|/data/|[[:xdigit:]]{64}|detail=|group=|message=|filename=|path=|report=|error=|reason=|Exception|Caused by:"
 if grep -En "($app_log_tags).*($dynamic_value_patterns)" "$log_path"; then
   echo "error: production release emitted a known dynamic identifier/error log pattern" >&2
   exit 1

@@ -173,6 +173,23 @@ class PerformanceDiagnosticSchemaTest {
     }
 
     @Test
+    fun aTraceFromAnEndedSessionCannotEmitIntoANewSession() {
+        val lines = mutableListOf<String>()
+        val emitter = emitter(lines = lines)
+        emitter.start()
+        val staleTrace = assertNotNullTrace(emitter.begin(PerformanceOperation.TEXT_SEND))
+        emitter.stop()
+
+        emitter.start()
+        val currentTrace = assertNotNullTrace(emitter.begin(PerformanceOperation.CHAT_OPEN))
+        emitter.record(staleTrace, PerformancePhase.SEND_COMPLETE, elapsedMs = 1L)
+        emitter.record(currentTrace, PerformancePhase.FIRST_LOCAL_FRAME, elapsedMs = 1L)
+
+        assertEquals(1, lines.size)
+        assertTrue(lines.single().contains("session=p#2 op=chat_open"))
+    }
+
+    @Test
     fun sourceHasNoStringPayloadOrPersistentOrRemoteSink() {
         val source = source("src/main/java/dev/ipf/whitenoise/android/diagnostics/PerformanceDiagnostics.kt")
         val emitterApi = source.substringAfter("internal class PerformanceDiagnosticEmitter(")
