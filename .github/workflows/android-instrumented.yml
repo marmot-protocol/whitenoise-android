@@ -28,6 +28,7 @@ on:
       - 'scripts/prepare_marmotkit_artifact.py'
       - 'scripts/test_prepare_marmotkit_artifact.py'
       - 'scripts/run-android-instrumented-tests.sh'
+      - '.github/workflows/android-instrumented.yml'
 
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant (and expensive) emulator runs.
@@ -86,7 +87,10 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Run connected Android tests
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        # This pinned upstream release installs Build Tools 36.0.0. Do not move
+        # back to v2/current without reviewing and exercising its Build Tools
+        # 37.0.0 SDK change against this project's androidTest APK.
+        uses: reactivecircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a # v2.37.0, Build Tools 36.0.0
         with:
           api-level: 34
           target: google_apis

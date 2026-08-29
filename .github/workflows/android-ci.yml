@@ -47,6 +47,9 @@ jobs:
       - name: Test package-replacement startup reporter
         run: bash .github/scripts/test-package-replacement-startup-report.sh
 
+      - name: Test instrumented workflow SDK pin
+        run: bash .github/scripts/test-android-instrumented-workflow.sh
+
       - name: Test PR preview publisher
         run: bash .github/scripts/test-upload-pr-apk-to-blossom.sh
 
