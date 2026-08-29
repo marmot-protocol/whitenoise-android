@@ -75,6 +75,7 @@ internal fun MediaFileBubbleContent(
     reference: MediaAttachmentReferenceFfi,
     presentation: AttachmentPresentation,
     transferState: AttachmentTransferState,
+    openPending: Boolean = false,
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Received,
@@ -86,6 +87,7 @@ internal fun MediaFileBubbleContent(
         fileName = reference.fileName,
         presentation = presentation,
         transferState = transferState,
+        openPending = openPending,
         metadataText = attachmentTypeLabel(presentation),
         metadataIsError = transferState == AttachmentTransferState.Failed,
         trailingMetadataText = timestampText,
@@ -95,6 +97,7 @@ internal fun MediaFileBubbleContent(
         reserveRetentionSpace = reserveRetentionSpace,
         retentionClockMillis = retentionClockMillis,
         loadingDescription = stringResource(R.string.media_downloading),
+        openingDescription = stringResource(R.string.media_opening),
         transferDirection = FileTransferDirection.Download,
     )
 }
@@ -105,6 +108,7 @@ internal fun FileBubbleContent(
     fileName: String,
     presentation: AttachmentPresentation,
     transferState: AttachmentTransferState,
+    openPending: Boolean = false,
     metadataText: String,
     metadataIsError: Boolean,
     trailingMetadataText: String?,
@@ -114,6 +118,7 @@ internal fun FileBubbleContent(
     reserveRetentionSpace: Boolean = false,
     retentionClockMillis: () -> Long = System::currentTimeMillis,
     loadingDescription: String,
+    openingDescription: String = stringResource(R.string.media_opening),
     transferDirection: FileTransferDirection,
 ) {
     val retentionPresentation = rememberRetentionIndicatorPresentation(retention, retentionClockMillis)
@@ -122,7 +127,14 @@ internal fun FileBubbleContent(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
-        FileTransferControl(presentation, transferState, loadingDescription, transferDirection)
+        FileTransferControl(
+            presentation = presentation,
+            transferState = transferState,
+            loadingDescription = loadingDescription,
+            direction = transferDirection,
+            openPending = openPending,
+            openingDescription = openingDescription,
+        )
         Column(
             verticalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.weight(1f).heightIn(min = FileTransferControlSize),
@@ -248,9 +260,16 @@ internal fun FileTransferControl(
     transferState: AttachmentTransferState,
     loadingDescription: String = stringResource(R.string.media_downloading),
     direction: FileTransferDirection = FileTransferDirection.Download,
+    openPending: Boolean = false,
+    openingDescription: String = stringResource(R.string.media_opening),
 ) {
     val colors = fileTransferControlColors(transferState)
-    val stateDescription = fileTransferStateDescription(transferState, loadingDescription, presentation.iconCategory)
+    val stateDescription =
+        if (openPending) {
+            openingDescription
+        } else {
+            fileTransferStateDescription(transferState, loadingDescription, presentation.iconCategory)
+        }
     Box(
         contentAlignment = Alignment.Center,
         modifier =
@@ -266,7 +285,7 @@ internal fun FileTransferControl(
             modifier = Modifier.size(FileTransferControlSurfaceSize),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                FileTransferIcon(presentation, transferState, direction, colors.content)
+                FileTransferIcon(presentation, transferState, direction, colors.content, openPending)
             }
         }
     }
@@ -319,7 +338,21 @@ private fun FileTransferIcon(
     state: AttachmentTransferState,
     direction: FileTransferDirection,
     contentColor: Color,
+    openPending: Boolean,
 ) {
+    if (openPending) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(FileTransferControlSurfaceSize),
+            strokeWidth = 2.5.dp,
+            color = contentColor,
+        )
+        Icon(
+            imageVector = fileIconFor(presentation.iconCategory),
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        return
+    }
     when (state) {
         AttachmentTransferState.Resolving,
         AttachmentTransferState.Downloading,

@@ -17,7 +17,7 @@ import java.util.Locale
 
 class TtsPassageHighlightMappingTest {
     @Test
-    fun activeMixedMarkdownListRowHighlightsItsMarkerAndWordButNotSiblingMarker() {
+    fun activeMixedMarkdownListRowHighlightsItsWordAndNoMarker() {
         val document =
             MarkdownDocumentFfi(
                 truncated = false,
@@ -49,13 +49,15 @@ class TtsPassageHighlightMappingTest {
             )
         val resolver = createTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
 
+        // A marker is never spoken, so it never carries the cue for what is
+        // being read, neither its own row's nor a sibling's.
         assertNull(resolver("b0/m0", "•"))
-        assertEquals(listOf(0 until 1), resolver("b0/m1", "•")?.sentenceRanges)
+        assertNull(resolver("b0/m1", "•"))
         assertEquals(5 until 10, resolver("b0/i1/b0", "Read aloud now")?.word)
     }
 
     @Test
-    fun nestedListSentenceHighlightsOnlyItsOwnMarker() {
+    fun nestedListSentenceHighlightsItsTextAndNoMarker() {
         val nestedList =
             MarkdownBlockFfi.ListBlock(
                 kind = MarkdownListKindFfi.Bullet("-"),
@@ -93,7 +95,7 @@ class TtsPassageHighlightMappingTest {
         val resolver = createTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
 
         assertNull(resolver("b0/m0", "•"))
-        assertEquals(listOf(0 until 1), resolver("b0/i0/b1/m0", "•")?.sentenceRanges)
+        assertNull(resolver("b0/i0/b1/m0", "•"))
         assertEquals(listOf(0 until 10), resolver("b0/i0/b1/i0/b0", "Nested row")?.sentenceRanges)
     }
 

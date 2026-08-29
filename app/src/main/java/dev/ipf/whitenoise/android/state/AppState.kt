@@ -2185,8 +2185,6 @@ class WhiteNoiseAppState private constructor(
     private val attachmentDownloadGate = AttachmentDownloadGate()
     private val attachmentDownloadIntents = AttachmentDownloadIntentStore(preferences)
     private var attachmentDownloadPolicyRevision by mutableIntStateOf(0)
-    internal var attachmentOpenIntentRevision by mutableIntStateOf(0)
-        private set
     private val conversationStateRetention = ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES)
 
     val shareStaging: ShareStagingStore = ShareStagingStore()
@@ -2237,6 +2235,21 @@ class WhiteNoiseAppState private constructor(
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
     private val mutationsScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    internal val attachmentOpens =
+        AttachmentOpenCoordinator(
+            intentStore = attachmentDownloadIntents,
+            scope = mutationsScope,
+            enqueue = ::enqueueAttachmentDownload,
+            visibility = { destination, request ->
+                attachmentOpenDestinationVisible(
+                    destination,
+                    request,
+                    appInForeground,
+                    activeConversationAccountRef,
+                    activeConversationGroupIdHex,
+                )
+            },
+        )
     private var forwardTerminalDismissGeneration = 0L
     private val forwardOperationOwner =
         ForwardOperationOwner(
@@ -3681,13 +3694,6 @@ class WhiteNoiseAppState private constructor(
         chatsController?.resolveExistingDirectChat(targetReference, excludingGroupIdHex)
             ?: NewMessageDirectChatResolution(item = null, createRequired = false)
 
-    private fun isActiveConversation(
-        accountRef: String,
-        groupIdHex: String,
-    ): Boolean =
-        activeConversationAccountRef == accountRef &&
-            activeConversationGroupIdHex?.equals(groupIdHex, ignoreCase = true) == true
-
     private val marmotBridgeTracer = MarmotBridgeTracer()
 
     suspend fun <T> marmotIo(block: suspend MarmotInterface.() -> T): T =
@@ -3853,42 +3859,6 @@ class WhiteNoiseAppState private constructor(
             attachmentDownloadGate.promote(request.cacheKey())
         }
         AttachmentDownloadWorker.enqueue(appContext, request, priority)
-    }
-
-    internal fun requestAttachmentOpen(request: AttachmentTransferRequest) {
-        attachmentDownloadIntents.markOpenIntent(request)
-        enqueueAttachmentDownload(request, AttachmentDownloadPriority.Interactive)
-        attachmentOpenIntentRevision += 1
-    }
-
-    @Suppress("MaxLineLength") // Keep this single delegation in ktlint's required expression-body form.
-    internal fun hasAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean = attachmentDownloadIntents.hasDispatchableOpenIntent(request)
-
-    internal suspend fun claimAttachmentOpenIntent(request: AttachmentTransferRequest): AttachmentOpenIntentClaim? =
-        withContext(Dispatchers.IO) { attachmentDownloadIntents.claimOpenIntent(request) }
-
-    internal suspend fun consumeAttachmentOpenIntent(request: AttachmentTransferRequest): Boolean {
-        val intents = attachmentDownloadIntents
-        return withContext(Dispatchers.IO) { intents.consumeOpenIntent(request) }
-    }
-
-    internal suspend fun beginAttachmentInstallPermissionRequest(request: AttachmentTransferRequest): Boolean =
-        withContext(Dispatchers.IO) { attachmentDownloadIntents.beginInstallPermissionRequest(request) }
-
-    internal suspend fun finishAttachmentInstallPermissionRequest(request: AttachmentTransferRequest): Boolean =
-        withContext(Dispatchers.IO) { attachmentDownloadIntents.finishInstallPermissionRequest(request) }
-
-    internal fun abandonAttachmentInstallPermissionRequest(request: AttachmentTransferRequest) {
-        attachmentDownloadIntents.abandonInstallPermissionRequest(request)
-        // A replacement composition may have checked while the former owner
-        // was still active. Re-run its effect after releasing that volatile
-        // owner so the durable recovery cannot remain asleep.
-        attachmentOpenIntentRevision += 1
-    }
-
-    /** Restores a failed dispatch without immediately looping the active effect. */
-    internal fun restoreAttachmentOpenIntent(request: AttachmentTransferRequest) {
-        attachmentDownloadIntents.restoreOpenIntent(request)
     }
 
     fun automaticAttachmentDownloadsPaused(): Boolean {
