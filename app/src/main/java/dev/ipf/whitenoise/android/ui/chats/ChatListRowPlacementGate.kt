@@ -27,6 +27,7 @@ internal fun rememberChatListRowPlacementGate(
     orderedRowIds: List<String>,
     pinnedBoundaryIndex: Int?,
     leadingItemCount: Int,
+    placementDurationMillis: Int = CHAT_LIST_ROW_PLACEMENT_MILLIS,
 ): Boolean {
     var firstLayoutPublished by remember { mutableStateOf(false) }
     val layoutKey =
@@ -41,7 +42,7 @@ internal fun rememberChatListRowPlacementGate(
     SideEffect { firstLayoutPublished = true }
     LaunchedEffect(layoutKey) {
         if (!placementInProgress) return@LaunchedEffect
-        delay(CHAT_LIST_ROW_PLACEMENT_MILLIS.toLong())
+        delay(placementDurationMillis.toLong())
         placementInProgress = false
     }
     return placementInProgress

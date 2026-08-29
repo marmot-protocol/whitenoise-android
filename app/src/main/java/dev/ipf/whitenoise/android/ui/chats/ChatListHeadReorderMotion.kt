@@ -31,11 +31,14 @@ import kotlinx.coroutines.withContext
  * keeping an exiting item composed would also keep its stale pointer and
  * semantics nodes alive while another row moves into that slot (#1828).
  */
-internal fun LazyItemScope.chatListRowMotion(targetIndex: Int): Modifier =
+internal fun LazyItemScope.chatListRowMotion(
+    targetIndex: Int,
+    placementDurationMillis: Int = CHAT_LIST_ROW_PLACEMENT_MILLIS,
+): Modifier =
     Modifier
         .animateItem(
             fadeInSpec = tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS),
-            placementSpec = tween(CHAT_LIST_ROW_PLACEMENT_MILLIS),
+            placementSpec = tween(placementDurationMillis),
             fadeOutSpec = null,
         ).zIndex(chatListTargetZIndex(targetIndex))
 
@@ -66,10 +69,13 @@ internal data class ChatListDatasetKey(
     val runtimeGeneration: Int = 0,
 )
 
-/** Stable domain-row coordinate captured from the current lazy-list viewport. */
+/** Stable domain-row and scroll coordinates captured from the current lazy-list viewport. */
 internal data class ChatListViewportAnchor(
     val chatId: String,
     val scrollOffset: Int,
+    val itemIndex: Int,
+    val firstVisibleItemIndex: Int,
+    val firstVisibleItemScrollOffset: Int,
 )
 
 /** One user-requested departure of a pinned visible head. */
@@ -105,6 +111,9 @@ internal fun LazyListState.chatListViewportAnchor(visibleChatIds: Set<String>): 
                     // Positive scroll offsets place the item above the viewport start;
                     // negative offsets preserve a row below a visible synthetic item.
                     scrollOffset = layout.viewportStartOffset - item.offset,
+                    itemIndex = item.index,
+                    firstVisibleItemIndex = this.firstVisibleItemIndex,
+                    firstVisibleItemScrollOffset = this.firstVisibleItemScrollOffset,
                 )
             }
     }
@@ -142,10 +151,34 @@ private fun chatListViewportAnchorEffect(
                     demotion.viewportGeneration == viewportGeneration &&
                     !listState.isScrollInProgress
             if (viewportAuthorityIsCurrent) {
-                userHeadDemotionTargetIndex?.let { targetIndex ->
+                val demotedRowWasViewportAnchor = anchor.chatId == demotion.chatId
+                val restoreIndex =
+                    if (demotedRowWasViewportAnchor) {
+                        anchor.firstVisibleItemIndex
+                    } else {
+                        userHeadDemotionTargetIndex
+                    }
+                val restoreOffset =
+                    if (
+                        demotedRowWasViewportAnchor ||
+                        anchor.itemIndex == anchor.firstVisibleItemIndex
+                    ) {
+                        // Placement animation can temporarily change the
+                        // measured item offset. Prefer LazyListState's stable
+                        // scroll coordinate whenever this is the first item.
+                        anchor.firstVisibleItemScrollOffset
+                    } else {
+                        anchor.scrollOffset
+                    }
+                // Key-anchoring the row that is leaving the pinned head keeps
+                // that row motionless and hides its placement transition. Keep
+                // the viewport coordinate for that one case so the keyed row
+                // can visibly move into its unpinned slot. A different domain
+                // anchor still retains its exact key and pixel offset.
+                restoreIndex?.let { targetIndex ->
                     listState.requestScrollToItem(
                         index = targetIndex,
-                        scrollOffset = anchor.scrollOffset,
+                        scrollOffset = restoreOffset,
                     )
                 }
             }
