@@ -156,12 +156,14 @@ class PerformanceDiagnosticSchemaTest {
     }
 
     @Test
-    fun operationIdsRemainProcessLocalAcrossOptInSessions() {
+    fun sessionLabelsRemainStableWithinASessionAndAdvanceAcrossOptInSessions() {
         val lines = mutableListOf<String>()
         val emitter = emitter(lines = lines)
         emitter.start()
         val first = assertNotNullTrace(emitter.begin(PerformanceOperation.APP_START))
         emitter.record(first, PerformancePhase.FIRST_LOCAL_FRAME, elapsedMs = 1L)
+        val sameSession = assertNotNullTrace(emitter.begin(PerformanceOperation.TEXT_SEND))
+        emitter.record(sameSession, PerformancePhase.ACCEPTED, elapsedMs = 2L)
         emitter.stop()
 
         emitter.start()
@@ -169,7 +171,8 @@ class PerformanceDiagnosticSchemaTest {
         emitter.record(second, PerformancePhase.FIRST_LOCAL_FRAME, elapsedMs = 1L)
 
         assertTrue(lines[0].contains("session=p#1 op=app_start"))
-        assertTrue(lines[1].contains("session=p#2 op=chat_open"))
+        assertTrue(lines[1].contains("session=p#1 op=text_send"))
+        assertTrue(lines[2].contains("session=p#2 op=chat_open"))
     }
 
     @Test

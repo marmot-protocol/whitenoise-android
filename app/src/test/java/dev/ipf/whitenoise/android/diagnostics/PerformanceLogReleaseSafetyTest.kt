@@ -22,6 +22,8 @@ class PerformanceLogReleaseSafetyTest {
 
     @Test
     fun coveredJourneyLogsDoNotExposeKnownDynamicPayloadShapesInRelease() {
+        // This pins payload shapes removed by this migration. The exhaustive
+        // WNPerf ownership boundary is enforced separately above.
         val controllers = source("state/Controllers.kt")
         val appState = source("state/AppState.kt")
         val diskCache = source("media/DiskByteCache.kt")

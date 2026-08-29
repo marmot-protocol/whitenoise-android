@@ -220,7 +220,7 @@ internal class PerformanceDiagnosticEmitter(
     ): String =
         buildString {
             append("schema=1 session=p#")
-            append(trace.operationId)
+            append(trace.sessionGeneration)
             append(" op=")
             append(trace.operation.wireName)
             append(" phase=")

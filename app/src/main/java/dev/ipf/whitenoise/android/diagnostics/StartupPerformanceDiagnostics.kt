@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.diagnostics
 
 import android.os.SystemClock
+import dev.ipf.whitenoise.android.state.StartupStageTrace
+import dev.ipf.whitenoise.android.state.StartupStageTraceSection
 
 /** Process-local startup trace with no caller-controlled fields. */
 internal class StartupPerformanceDiagnostics(
@@ -13,11 +15,20 @@ internal class StartupPerformanceDiagnostics(
         phase: PerformancePhase,
         block: suspend () -> T,
     ): T {
-        val stageStartedAtMs = nowMs()
-        val outcome = runCatching { block() }
-        val result = if (outcome.isSuccess) PerformanceResult.SUCCESS else PerformanceResult.FAILURE
-        record(phase, nowMs() - stageStartedAtMs, result)
-        return outcome.getOrThrow()
+        val stageName =
+            requireNotNull(startupTraceStageFor(phase)) {
+                "No reserved startup trace section for ${phase.wireName}"
+            }
+        var result = PerformanceResult.SUCCESS
+        return StartupStageTrace.trace(
+            stage = stageName,
+            block = {
+                val outcome = runCatching { block() }
+                result = if (outcome.isSuccess) PerformanceResult.SUCCESS else PerformanceResult.FAILURE
+                outcome.getOrThrow()
+            },
+            onFinished = { durationMs -> record(phase, durationMs, result) },
+        )
     }
 
     fun record(
@@ -49,4 +60,10 @@ internal class StartupPerformanceDiagnostics(
             PerformancePhase.RELAY_CATCH_UP_READY -> PerformanceLayer.TRANSPORT
             else -> PerformanceLayer.ANDROID
         }
+}
+
+/** Maps the typed diagnostic phase onto the fixed Perfetto startup vocabulary. */
+internal fun startupTraceStageFor(phase: PerformancePhase): String? {
+    val stageName = phase.wireName.replace('_', '-')
+    return stageName.takeIf { StartupStageTraceSection.sectionFor(it) != null }
 }
