@@ -38,6 +38,8 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
+import dev.ipf.whitenoise.android.state.cancelAttachmentTransfer
 import dev.ipf.whitenoise.android.state.hasCachedAttachmentInMemory
 import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
 import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
@@ -149,12 +151,17 @@ internal fun MediaFileBubble(
     // un-fetched file. A tap bypasses this gate entirely, so manual fetch/open
     // stays available regardless of the policy.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    // A cancel is persisted per attachment, so recreating this card after
+    // navigation or process death cannot let the policy restart what the user
+    // stopped. Only an explicit tap clears it.
+    val cancelledByUser = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
     val autoDownloadAllowed =
-        shouldMaterializeAttachmentAutomatically(
-            mine = mine,
-            mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Document),
-            automaticDownloadsPaused = automaticDownloadsPaused,
-        )
+        !cancelledByUser &&
+            shouldMaterializeAttachmentAutomatically(
+                mine = mine,
+                mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Document),
+                automaticDownloadsPaused = automaticDownloadsPaused,
+            )
 
     // When the Documents policy allows auto-download, prefetch into encrypted
     // L2. Notification receipt now schedules the same durable work; this
@@ -353,6 +360,7 @@ internal fun MediaFileBubble(
             retention = retention,
             reserveRetentionSpace = reserveRetentionSpace,
             openPending = openRequested,
+            onCancelTransfer = { controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex) },
         )
     }
     if (readerOpen && textCandidate != null) {
@@ -420,6 +428,7 @@ internal fun canRequestAttachmentOpen(
         AttachmentTransferState.Available,
         AttachmentTransferState.NotRetained,
         AttachmentTransferState.Failed,
+        AttachmentTransferState.Cancelled,
         -> mine || sourceEpoch != 0uL
     }
 

@@ -917,6 +917,8 @@
     <string name="media_tap_to_download">Нажмите, чтобы скачать</string>
     <string name="media_preparing_download">Подготовка к скачиванию</string>
     <string name="media_downloading">Скачивание</string>
+    <string name="media_cancel_download">Отменить скачивание</string>
+    <string name="media_download_cancelled">Скачивание отменено. Нажмите, чтобы скачать снова</string>
     <string name="media_opening">Открытие</string>
     <string name="media_save">Сохранить</string>
     <string name="media_saved">Сохранено в галерею</string>

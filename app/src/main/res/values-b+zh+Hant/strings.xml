@@ -863,6 +863,8 @@
     <string name="media_tap_to_download">輕觸以下載</string>
     <string name="media_preparing_download">準備下載</string>
     <string name="media_downloading">正在下載</string>
+    <string name="media_cancel_download">取消下載</string>
+    <string name="media_download_cancelled">下載已取消。輕觸以重新下載</string>
     <string name="media_opening">正在開啟</string>
     <string name="media_save">儲存</string>
     <string name="media_saved">已儲存至相簿</string>

@@ -877,6 +877,8 @@
     <string name="media_tap_to_download">Appuyez pour télécharger</string>
     <string name="media_preparing_download">Préparation du téléchargement</string>
     <string name="media_downloading">Téléchargement</string>
+    <string name="media_cancel_download">Annuler le téléchargement</string>
+    <string name="media_download_cancelled">Téléchargement annulé. Appuyez pour télécharger à nouveau</string>
     <string name="media_opening">Ouverture</string>
     <string name="media_save">Enregistrer</string>
     <string name="media_saved">Enregistré dans la galerie</string>

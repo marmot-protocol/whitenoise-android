@@ -877,6 +877,8 @@
     <string name="media_tap_to_download">Toca para descargar</string>
     <string name="media_preparing_download">Preparando descarga</string>
     <string name="media_downloading">Descargando</string>
+    <string name="media_cancel_download">Cancelar la descarga</string>
+    <string name="media_download_cancelled">Descarga cancelada. Toca para descargar de nuevo</string>
     <string name="media_opening">Abriendo</string>
     <string name="media_save">Guardar</string>
     <string name="media_saved">Guardado en la galería</string>

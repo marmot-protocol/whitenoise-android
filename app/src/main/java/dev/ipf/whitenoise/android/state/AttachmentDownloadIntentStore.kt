@@ -39,6 +39,25 @@ internal class AttachmentDownloadIntentStore(
 
     fun containsInteractiveTag(tags: Set<String>): Boolean = tags.any(readSet(INTERACTIVE_IDENTITIES)::contains)
 
+    /**
+     * Records that the user cancelled this attachment, so the automatic path
+     * cannot restart it. Cancelling only the in-memory state would be undone the
+     * next time the card is recreated: its transfer state is retired with the
+     * composable, and a fresh cold cache probe resolves to a plain remote
+     * attachment that the auto-download policy immediately re-enqueues.
+     */
+    fun suppressAutomatic(request: AttachmentTransferRequest) = updateSet(CANCELLED) { it + requestToken(request) }
+
+    /** Explicit user intent outranks an earlier cancel and reopens the automatic path. */
+    fun restoreAutomatic(request: AttachmentTransferRequest) = updateSet(CANCELLED) { it - requestToken(request) }
+
+    fun isAutomaticSuppressed(request: AttachmentTransferRequest): Boolean = requestToken(request) in readSet(CANCELLED)
+
+    /** Restarting the whole automatic backlog is a resume-everything signal. */
+    fun clearSuppressedAutomatic() {
+        updateSet(CANCELLED) { emptySet() }
+    }
+
     fun markOpenIntent(request: AttachmentOpenRequest) {
         synchronized(LOCK) {
             val token = openRequestToken(request)
@@ -139,6 +158,20 @@ internal class AttachmentDownloadIntentStore(
         }
     }
 
+    /**
+     * Drops a cancelled viewer handoff unless [superseded] reports that a newer
+     * tap re-armed the same identity while this revocation was still reaching
+     * disk. Both halves run under the store lock, so a tap cannot slip between
+     * the check and the removal and lose its own fresh intent.
+     */
+    fun consumeOpenIntentUnlessSuperseded(
+        request: AttachmentOpenRequest,
+        superseded: () -> Boolean,
+    ): Boolean =
+        synchronized(LOCK) {
+            if (superseded()) false else consumeOpenIntent(request)
+        }
+
     /** Atomically fences repeated/late viewer dispatch before the external launch. */
     fun consumeOpenIntent(request: AttachmentOpenRequest): Boolean =
         synchronized(LOCK) {
@@ -218,6 +251,7 @@ internal class AttachmentDownloadIntentStore(
         val LOCK = Any()
         const val PAUSED_ACCOUNTS = "attachment_download_paused_accounts"
         const val INTERACTIVE_IDENTITIES = "attachment_download_interactive_identities"
+        const val CANCELLED = "attachment_download_cancelled_identities"
         const val OPEN_IDENTITIES = "attachment_download_open_identities"
         const val INSTALL_PERMISSION_IDENTITIES = "attachment_install_permission_identities"
         val ACTIVE_INSTALL_PERMISSION_IDENTITIES = mutableSetOf<String>()

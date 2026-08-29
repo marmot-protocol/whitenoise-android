@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
@@ -38,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -49,6 +52,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.isTransferInProgress
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageRetentionIndicatorSlot
 import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingMessageStatusIcon
 import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
@@ -82,6 +86,7 @@ internal fun MediaFileBubbleContent(
     retention: RetentionIndicatorInput? = null,
     reserveRetentionSpace: Boolean = false,
     retentionClockMillis: () -> Long = System::currentTimeMillis,
+    onCancelTransfer: (() -> Unit)? = null,
 ) {
     FileBubbleContent(
         fileName = reference.fileName,
@@ -99,6 +104,7 @@ internal fun MediaFileBubbleContent(
         loadingDescription = stringResource(R.string.media_downloading),
         openingDescription = stringResource(R.string.media_opening),
         transferDirection = FileTransferDirection.Download,
+        onCancelTransfer = onCancelTransfer,
     )
 }
 
@@ -120,6 +126,7 @@ internal fun FileBubbleContent(
     loadingDescription: String,
     openingDescription: String = stringResource(R.string.media_opening),
     transferDirection: FileTransferDirection,
+    onCancelTransfer: (() -> Unit)? = null,
 ) {
     val retentionPresentation = rememberRetentionIndicatorPresentation(retention, retentionClockMillis)
     Row(
@@ -134,6 +141,7 @@ internal fun FileBubbleContent(
             direction = transferDirection,
             openPending = openPending,
             openingDescription = openingDescription,
+            onCancelTransfer = onCancelTransfer,
         )
         Column(
             verticalArrangement = Arrangement.SpaceBetween,
@@ -253,7 +261,16 @@ private fun FileTrailingMetadata(
     }
 }
 
-/** One fixed control slot keeps every transfer state the same size and exposes one clear affordance. */
+/**
+ * One fixed control slot keeps every transfer state the same size and exposes
+ * one clear affordance.
+ *
+ * While a download is queued or running and [onCancelTransfer] is supplied, the
+ * slot becomes the cancel target: the whole 48 dp box takes the click, so a tap
+ * on the control cancels while a tap anywhere else on the card keeps its own
+ * open/download behavior. The node still describes the transfer state, and the
+ * click label names the cancel action for TalkBack.
+ */
 @Composable
 internal fun FileTransferControl(
     presentation: AttachmentPresentation,
@@ -262,8 +279,14 @@ internal fun FileTransferControl(
     direction: FileTransferDirection = FileTransferDirection.Download,
     openPending: Boolean = false,
     openingDescription: String = stringResource(R.string.media_opening),
+    onCancelTransfer: (() -> Unit)? = null,
 ) {
+    val cancelAction =
+        onCancelTransfer.takeIf {
+            direction == FileTransferDirection.Download && transferState.isTransferInProgress()
+        }
     val colors = fileTransferControlColors(transferState)
+    val cancelDescription = stringResource(R.string.media_cancel_download)
     val stateDescription =
         if (openPending) {
             openingDescription
@@ -273,9 +296,19 @@ internal fun FileTransferControl(
     Box(
         contentAlignment = Alignment.Center,
         modifier =
-            Modifier.size(FileTransferControlSize).semantics(mergeDescendants = true) {
-                contentDescription = stateDescription
-            },
+            Modifier
+                .size(FileTransferControlSize)
+                .then(
+                    if (cancelAction != null) {
+                        Modifier.clickable(
+                            onClickLabel = cancelDescription,
+                            role = Role.Button,
+                            onClick = cancelAction,
+                        )
+                    } else {
+                        Modifier
+                    },
+                ).semantics(mergeDescendants = true) { contentDescription = stateDescription },
     ) {
         Surface(
             shape = CircleShape,
@@ -285,7 +318,14 @@ internal fun FileTransferControl(
             modifier = Modifier.size(FileTransferControlSurfaceSize),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                FileTransferIcon(presentation, transferState, direction, colors.content, openPending)
+                FileTransferIcon(
+                    presentation = presentation,
+                    state = transferState,
+                    direction = direction,
+                    contentColor = colors.content,
+                    openPending = openPending,
+                    showCancelGlyph = cancelAction != null,
+                )
             }
         }
     }
@@ -326,6 +366,7 @@ private fun fileTransferStateDescription(
         AttachmentTransferState.Resolving -> stringResource(R.string.media_preparing_download)
         AttachmentTransferState.Downloading -> loadingDescription
         AttachmentTransferState.Failed -> stringResource(R.string.media_tap_to_retry)
+        AttachmentTransferState.Cancelled -> stringResource(R.string.media_download_cancelled)
         AttachmentTransferState.Remote,
         AttachmentTransferState.NotRetained,
         -> stringResource(R.string.media_tap_to_download)
@@ -339,8 +380,12 @@ private fun FileTransferIcon(
     direction: FileTransferDirection,
     contentColor: Color,
     openPending: Boolean,
+    showCancelGlyph: Boolean,
 ) {
-    if (openPending) {
+    // A tap-to-open download is the commonest cancellable case, so the cancel
+    // glyph must win over the generic opening chrome; without this the only
+    // discoverable affordance would be the TalkBack click label.
+    if (openPending && !showCancelGlyph) {
         CircularProgressIndicator(
             modifier = Modifier.size(FileTransferControlSurfaceSize),
             strokeWidth = 2.5.dp,
@@ -364,10 +409,10 @@ private fun FileTransferIcon(
             )
             Icon(
                 imageVector =
-                    if (direction == FileTransferDirection.Upload) {
-                        Icons.Default.ArrowUpward
-                    } else {
-                        Icons.Default.ArrowDownward
+                    when {
+                        showCancelGlyph -> Icons.Default.Close
+                        direction == FileTransferDirection.Upload -> Icons.Default.ArrowUpward
+                        else -> Icons.Default.ArrowDownward
                     },
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
@@ -377,6 +422,7 @@ private fun FileTransferIcon(
             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(21.dp))
         AttachmentTransferState.Remote,
         AttachmentTransferState.NotRetained,
+        AttachmentTransferState.Cancelled,
         -> Icon(Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(21.dp))
         AttachmentTransferState.Available ->
             Icon(fileIconFor(presentation.iconCategory), contentDescription = null, modifier = Modifier.size(24.dp))
