@@ -3,9 +3,7 @@ package dev.ipf.whitenoise.android.share
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.SystemClock
-import androidx.core.content.FileProvider
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -19,7 +17,6 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class InboundShareTaskReuseDeviceTest {
@@ -34,21 +31,24 @@ class InboundShareTaskReuseDeviceTest {
         val initial = awaitResumedMainActivity()
         val taskId = initial.taskId
 
-        val firstUri = externalFileUri("first.bin")
-        dispatchExternalShare(firstUri)
-        val firstDelivery = awaitPendingShare(firstUri)
+        dispatchExternalShare("first.bin")
+        val firstDelivery = awaitPendingShare("first.bin")
         val firstRequestId = checkNotNull(firstDelivery.pendingInboundShareRequestForTest).requestId
         assertEquals(taskId, firstDelivery.taskId)
         assertEquals(1, whiteNoiseTaskCount(targetContext))
 
         instrumentation.runOnMainSync { firstDelivery.moveTaskToBack(true) }
-        val secondUri = externalFileUri("second.bin")
-        dispatchExternalShare(secondUri)
-        val secondDelivery = awaitPendingShare(secondUri)
+        dispatchExternalShare("second.bin")
+        val secondDelivery = awaitPendingShare("second.bin")
         val secondRequest = checkNotNull(secondDelivery.pendingInboundShareRequestForTest)
         assertSame(firstDelivery, secondDelivery)
         assertTrue(secondRequest.requestId != firstRequestId)
-        assertEquals(listOf(secondUri), secondRequest.payload.streamUris)
+        val secondStreamUri = secondRequest.payload.streamUris.single()
+        assertEquals("second.bin", secondStreamUri.lastPathSegment)
+        assertEquals(
+            "${instrumentation.context.packageName}.external-share-test-files",
+            secondStreamUri.authority,
+        )
         assertEquals(1, whiteNoiseTaskCount(targetContext))
 
         instrumentation.runOnMainSync { secondDelivery.recreate() }
@@ -66,30 +66,23 @@ class InboundShareTaskReuseDeviceTest {
         assertEquals(1, whiteNoiseTaskCount(targetContext))
     }
 
-    private fun dispatchExternalShare(uri: Uri) {
+    private fun dispatchExternalShare(streamName: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.context.startActivity(
             Intent(instrumentation.context, ExternalShareDispatchActivity::class.java)
                 .putExtra(ExternalShareDispatchActivity.EXTRA_TARGET_PACKAGE, instrumentation.targetContext.packageName)
-                .putExtra(ExternalShareDispatchActivity.EXTRA_STREAM_URI, uri.toString())
+                .putExtra(ExternalShareDispatchActivity.EXTRA_STREAM_NAME, streamName)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
 
-    private fun externalFileUri(name: String): Uri {
-        val testContext = InstrumentationRegistry.getInstrumentation().context
-        val file = File(testContext.cacheDir, name)
-        file.writeBytes(byteArrayOf(1, 2, 3))
-        return FileProvider.getUriForFile(
-            testContext,
-            "${testContext.packageName}.external-share-test-files",
-            file,
-        )
-    }
-
-    private fun awaitPendingShare(uri: Uri): MainActivity =
+    private fun awaitPendingShare(streamName: String): MainActivity =
         awaitResumedMainActivity { activity ->
-            activity.pendingInboundShareRequestForTest?.payload?.streamUris == listOf(uri)
+            activity.pendingInboundShareRequestForTest
+                ?.payload
+                ?.streamUris
+                ?.singleOrNull()
+                ?.lastPathSegment == streamName
         }
 
     private fun awaitResumedMainActivity(
