@@ -11,7 +11,7 @@ highlight_class=dev.ipf.whitenoise.android.ui.conversation.TimelineRowTtsHighlig
 
 if [[ "$event_name" == "pull_request" ]]; then
   exec ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
-    -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.ProfileImageDialSafetyIntegrationTest,dev.ipf.whitenoise.android.core.ForwardMediaReferenceFfiIntegrationTest,dev.ipf.whitenoise.android.media.MediaReferenceSupportFuzzIntegrationTest,"$highlight_class" \
+    -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.WarmResumeFirstUsefulFrameTest,dev.ipf.whitenoise.android.core.ProfileImageDialSafetyIntegrationTest,dev.ipf.whitenoise.android.core.ForwardMediaReferenceFfiIntegrationTest,dev.ipf.whitenoise.android.media.MediaReferenceSupportFuzzIntegrationTest,dev.ipf.whitenoise.android.share.InboundShareTaskReuseDeviceTest,"$highlight_class" \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --no-daemon --stacktrace
 fi

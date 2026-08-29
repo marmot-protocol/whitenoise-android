@@ -15,9 +15,11 @@ on:
     branches: [master]
   pull_request:
     paths:
+      - '.github/workflows/android-instrumented.yml'
       - 'app/build.gradle.kts'
       - 'app/src/androidTest/AndroidManifest.xml'
       - 'app/src/main/marmotkit/**'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/WarmResumeFirstUsefulFrameTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/core/ForwardMediaReferenceFfiIntegrationTest.kt'
       # Read-aloud highlights are geometry over real font metrics, which
       # Robolectric only simulates. Device evidence must gate changes to them.
@@ -25,6 +27,9 @@ on:
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/TtsReadAloudHighlight.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaReferenceSupportFuzzIntegrationTest.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/media/MediaReferenceSupport.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/share/ExternalShareDispatchActivity.java'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/share/ExternalShareTestFileProvider.java'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/share/InboundShareTaskReuseDeviceTest.kt'
       - 'scripts/prepare_marmotkit_artifact.py'
       - 'scripts/test_prepare_marmotkit_artifact.py'
       - 'scripts/run-android-instrumented-tests.sh'
