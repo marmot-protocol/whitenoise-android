@@ -129,6 +129,23 @@ BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark
   scripts/run-performance-benchmarks.sh
 ```
 
+Run the two scroll journeys against the same cached fixture. Neither needs a
+group-name argument: the chat-list journey resumes to the list, and the
+conversation journey takes the group it opens from `$GROUP_NAME`.
+
+```bash
+BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.ChatListScrollBenchmark#chatListScrollBaselineProfile" \
+  scripts/run-performance-benchmarks.sh
+```
+
+Both scroll benchmarks report frame timing, a `journeyDurationMs` trace section,
+and peak process memory for the measured window: `memoryHeapSizeKb`,
+`memoryRssAnonKb`, and `memoryGpuKb`. Read the memory values as a budget rather
+than a target — decoded avatars, group images, and attachment buffers all grow
+while a long list scrolls, and a jump there with unchanged frame timing points
+at cache sizing rather than at rendering. Compare against the same fixture on
+the same device; the absolute values are not portable across devices.
+
 Invite acceptance consumes its fixture, so collect a ten-sample handoff set by
 running this command once for each of ten distinct prepared invitations and
 aggregate their `journeyDurationMs` values. Never reuse a consumed invite.
