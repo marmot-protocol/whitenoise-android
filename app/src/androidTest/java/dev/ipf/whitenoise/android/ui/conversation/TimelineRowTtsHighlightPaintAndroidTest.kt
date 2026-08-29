@@ -370,7 +370,7 @@ class TimelineRowTtsHighlightPaintAndroidTest {
     private fun renderedPixels(): IntArray {
         repeat(2) { attempt ->
             val pixels = capturedPixels()
-            if (pixels.toHashSet().size > 1) return pixels
+            if (pixels.any { it != pixels[0] }) return pixels
             if (attempt == 0) composeRule.waitForIdle()
         }
         throw AssertionError(
