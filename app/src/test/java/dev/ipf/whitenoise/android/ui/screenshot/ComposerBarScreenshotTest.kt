@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
@@ -90,6 +91,24 @@ class ComposerBarScreenshotTest {
     fun composerBarLongDraftLight() {
         renderLongComposer(darkTheme = false)
         composeRule.onNodeWithTag(LONG_TAG).captureRoboImage("src/test/snapshots/composer_bar_long_draft_light.png")
+    }
+
+    @Test
+    fun composerResizeHandlePressedLight() {
+        renderLongComposer(darkTheme = false)
+        val resizeHandle = composeRule.onNodeWithContentDescription(app.getString(R.string.composer_resize))
+        composeRule.mainClock.autoAdvance = false
+        try {
+            resizeHandle.performTouchInput { down(center) }
+            composeRule.mainClock.advanceTimeBy(150L)
+            composeRule.runOnIdle { }
+            composeRule
+                .onNodeWithTag(LONG_TAG)
+                .captureRoboImage("src/test/snapshots/composer_resize_handle_pressed_light.png")
+        } finally {
+            resizeHandle.performTouchInput { up() }
+            composeRule.mainClock.autoAdvance = true
+        }
     }
 
     @Test

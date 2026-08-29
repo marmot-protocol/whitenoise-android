@@ -49,6 +49,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -96,6 +98,9 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
+import kotlin.math.roundToInt
+
+private val ComposerManualMinimumHeight = 144.dp
 
 /**
  * Whether the composer bottom cluster (reply preview, edit banner, mention
@@ -370,6 +375,11 @@ internal fun ComposerBar(
     // Injectable only for deterministic pre-IME Back behavior tests; production
     // uses the view's platform dispatcher.
     overlayBackRegistrar: ComposerOverlayBackRegistrar? = null,
+    // The conversation Scaffold draws its top app bar above the bottom bar.
+    // Reserve that interactive region so a full-height composer handle cannot
+    // compete with the title/details action. Standalone readers default to no
+    // reserved chrome because their parent already constrains the bottom bar.
+    topInteractionClearance: Dp = 0.dp,
 ) {
     val actionColors = accountActionColors(appState)
     val configuration = LocalConfiguration.current
@@ -389,6 +399,11 @@ internal fun ComposerBar(
             mutableStateOf(ComposerExpansionState())
         }
     var dismissInputAfterCollapse by remember(draftKey) { mutableStateOf(false) }
+    var composerHeightDragActive by remember(draftKey) { mutableStateOf(false) }
+    var composerHeightTransitionEpoch by remember(draftKey) { mutableIntStateOf(0) }
+    var completedComposerHeightTransitionEpoch by remember(draftKey) { mutableIntStateOf(0) }
+    var composerHeightTransitionStartPx by remember(draftKey) { mutableFloatStateOf(0f) }
+    var visibleComposerHeightPx by remember(draftKey) { mutableFloatStateOf(0f) }
     var composerUsesMultilineControls by
         remember(draftKey, configuration.orientation, configuration.fontScale) {
             mutableStateOf(false)
@@ -398,6 +413,16 @@ internal fun ComposerBar(
             mutableFloatStateOf(0f)
         }
     var customInputPaneHeightPx by remember(configuration.orientation) { mutableFloatStateOf(0f) }
+
+    fun transitionComposerExpansion(next: ComposerExpansionState) {
+        if (next != composerExpansion) {
+            composerHeightTransitionStartPx =
+                visibleComposerHeightPx.takeIf { it > 0f }
+                    ?: automaticComposerHeightPx
+            composerHeightTransitionEpoch += 1
+            composerExpansion = next
+        }
+    }
     // Field state is a TextFieldValue (not a bare String) so the caret can
     // be positioned at the end of the prefilled body on edit-entry, and so
     // a re-tap on a different message rebases the caret too. Keyed on
@@ -859,13 +884,19 @@ internal fun ComposerBar(
             }
         val customInputPaneHeight = with(density) { customInputPaneHeightPx.toDp() }
         val maximumComposerHeight =
-            (boundedHeight - statusBarTop - bottomInset - customInputPaneHeight)
+            (boundedHeight - statusBarTop - topInteractionClearance - bottomInset - customInputPaneHeight)
                 .coerceAtLeast(44.dp)
         val automaticComposerCeiling =
             (maximumComposerHeight * 0.5f)
                 .coerceAtLeast(44.dp)
                 .coerceAtMost(maximumComposerHeight)
         val maximumComposerHeightPx = with(density) { maximumComposerHeight.toPx() }
+        val minimumManualComposerHeightPx =
+            with(density) {
+                ComposerManualMinimumHeight
+                    .coerceAtMost(maximumComposerHeight)
+                    .toPx()
+            }
         val automaticComposerCeilingPx = with(density) { automaticComposerCeiling.toPx() }
         val resolvedAutomaticHeightPx =
             (automaticComposerHeightPx.takeIf { it > 0f } ?: with(density) { 44.dp.toPx() })
@@ -875,11 +906,58 @@ internal fun ComposerBar(
                 composerHeightPx(
                     state = composerExpansion,
                     automaticHeightPx = resolvedAutomaticHeightPx,
+                    minimumManualHeightPx = minimumManualComposerHeightPx,
                     maximumHeightPx = maximumComposerHeightPx,
                 ).toDp()
             }
         val expandedControlLayout =
             composerUsesMultilineControls || composerExpansion.mode != ComposerExpansionMode.Automatic
+        val composerHeightTransitionActive =
+            composerHeightTransitionEpoch != completedComposerHeightTransitionEpoch
+        val transitionTargetHeightPx =
+            composerHeightPx(
+                state = composerExpansion,
+                automaticHeightPx = resolvedAutomaticHeightPx,
+                minimumManualHeightPx = minimumManualComposerHeightPx,
+                maximumHeightPx = maximumComposerHeightPx,
+            )
+        val composerHeightAnimation =
+            remember(composerHeightTransitionEpoch) {
+                Animatable(composerHeightTransitionStartPx)
+            }
+        // Read the animated value during measurement so height frames do not
+        // recompose BasicTextField or the rest of this large composer tree.
+        val animatedComposerHeightModifier =
+            Modifier.layout { measurable, constraints ->
+                val height =
+                    composerHeightAnimation.value
+                        .roundToInt()
+                        .coerceIn(constraints.minHeight, constraints.maxHeight)
+                val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                layout(placeable.width, height) {
+                    placeable.placeRelative(0, 0)
+                }
+            }
+        LaunchedEffect(
+            composerHeightTransitionEpoch,
+            transitionTargetHeightPx,
+        ) {
+            if (composerHeightTransitionActive) {
+                composerHeightAnimation.animateTo(
+                    transitionTargetHeightPx,
+                    tween(
+                        durationMillis =
+                            composerHeightAnimationDurationMillis(
+                                mode = composerExpansion.mode,
+                                dragActive = composerHeightDragActive,
+                                discreteTransitionActive = composerHeightTransitionActive,
+                            ),
+                        easing = FastOutSlowInEasing,
+                    ),
+                )
+                completedComposerHeightTransitionEpoch = composerHeightTransitionEpoch
+            }
+        }
 
         BackHandler(
             enabled =
@@ -887,7 +965,7 @@ internal fun ComposerBar(
                     !showEmojiPane &&
                     !showAttachmentPane,
         ) {
-            composerExpansion = collapseComposer(composerExpansion)
+            transitionComposerExpansion(collapseComposer(composerExpansion))
             onBottomInputChanged()
         }
 
@@ -903,10 +981,12 @@ internal fun ComposerBar(
                 Modifier
                     .fillMaxWidth()
                     .then(
-                        if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
-                            Modifier.heightIn(max = automaticComposerCeiling)
-                        } else {
-                            Modifier.height(resolvedComposerHeight)
+                        when {
+                            composerHeightDragActive -> Modifier.height(resolvedComposerHeight)
+                            composerHeightTransitionActive -> animatedComposerHeightModifier
+                            composerExpansion.mode == ComposerExpansionMode.Automatic ->
+                                Modifier.heightIn(max = automaticComposerCeiling)
+                            else -> Modifier.height(resolvedComposerHeight)
                         },
                     ).then(
                         if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
@@ -915,7 +995,11 @@ internal fun ComposerBar(
                             Modifier.background(MaterialTheme.colorScheme.background)
                         },
                     ).onSizeChanged { size ->
-                        if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
+                        visibleComposerHeightPx = size.height.toFloat()
+                        if (
+                            composerExpansion.mode == ComposerExpansionMode.Automatic &&
+                            !composerHeightTransitionActive
+                        ) {
                             automaticComposerHeightPx = size.height.toFloat()
                         }
                     }.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -1113,7 +1197,7 @@ internal fun ComposerBar(
                         preImeBackEnabled = !composerEmojiPickerOpen && !attachmentSheetState.isOpen,
                         onPreImeBack = {
                             if (composerExpansion.mode != ComposerExpansionMode.Automatic) {
-                                composerExpansion = collapseComposer(composerExpansion)
+                                transitionComposerExpansion(collapseComposer(composerExpansion))
                                 dismissInputAfterCollapse = true
                                 onBottomInputChanged()
                             } else if (onComposerPreImeBack != null) {
@@ -1142,54 +1226,47 @@ internal fun ComposerBar(
                         onImeSend = submitMessage,
                         expansionMode = composerExpansion.mode,
                         onExpansionToggle = {
-                            composerExpansion = toggleComposerFullScreen(composerExpansion)
+                            composerHeightDragActive = false
+                            transitionComposerExpansion(toggleComposerFullScreen(composerExpansion))
                             onBottomInputChanged()
                         },
+                        onHeightDragStarted = { composerHeightDragActive = true },
                         onHeightDrag = { dragAmount ->
                             composerExpansion =
                                 dragComposerHeight(
                                     state = composerExpansion,
                                     dragDeltaYPx = dragAmount,
                                     automaticHeightPx = resolvedAutomaticHeightPx,
+                                    minimumManualHeightPx = minimumManualComposerHeightPx,
                                     maximumHeightPx = maximumComposerHeightPx,
                                 )
                         },
                         onHeightDragStopped = {
-                            composerExpansion =
+                            composerHeightDragActive = false
+                            val settledExpansion =
                                 settleComposerHeight(
                                     state = composerExpansion,
                                     automaticHeightPx = resolvedAutomaticHeightPx,
+                                    minimumManualHeightPx = minimumManualComposerHeightPx,
                                     maximumHeightPx = maximumComposerHeightPx,
                                     deadbandPx = with(density) { 20.dp.toPx() },
                                 )
+                            transitionComposerExpansion(settledExpansion)
                             onBottomInputChanged()
                         },
                         overlayBackRegistrar = overlayBackRegistrar,
                         inputContentVisible = !isRecordingVoice && !dictationVisible,
                         inputFocusEnabled = !dismissInputAfterCollapse,
-                        trailingAction =
-                            if (expandedControlLayout) {
-                                {
-                                    Spacer(Modifier.width(trailingControlsWidth))
-                                }
-                            } else {
-                                null
-                            },
+                        expandedTrailingActionInset = trailingControlsWidth,
                         compactMeasurementWidth =
                             (maxWidth - trailingControlsWidth - 8.dp)
                                 .coerceAtLeast(1.dp),
                         compactMeasurementReservesTrailingAction = false,
+                        compactOuterEndInset = trailingControlsWidth + 8.dp,
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
                         modifier =
                             Modifier
-                                .padding(
-                                    end =
-                                        if (expandedControlLayout) {
-                                            0.dp
-                                        } else {
-                                            trailingControlsWidth + 8.dp
-                                        },
-                                ).fillMaxWidth()
+                                .fillMaxWidth()
                                 .then(
                                     if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
                                         Modifier
@@ -1204,13 +1281,8 @@ internal fun ComposerBar(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier =
                                 Modifier
-                                    .align(
-                                        if (expandedControlLayout) {
-                                            Alignment.BottomEnd
-                                        } else {
-                                            Alignment.CenterEnd
-                                        },
-                                    ).height(44.dp),
+                                    .align(Alignment.BottomEnd)
+                                    .height(44.dp),
                         ) {
                             if (dictationActiveElsewhere && dictationController != null) {
                                 ConversationDictationElsewhereAction(
