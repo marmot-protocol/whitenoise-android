@@ -393,6 +393,61 @@ class MarkdownSpeakableTextTest {
     }
 
     @Test
+    fun singleWordLinesSpeakAndAnUnknownMentionKeepsItsLine() {
+        val unknown = "npub1" + "w".repeat(58)
+        val lines =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(
+                                MarkdownInlineFfi.Text("First line here"),
+                                MarkdownInlineFfi.SoftBreak,
+                                MarkdownInlineFfi.Text("Ok"),
+                                MarkdownInlineFfi.SoftBreak,
+                                MarkdownInlineFfi.Text("Last line here"),
+                            ),
+                        ),
+                    ),
+            )
+        // A line carrying one word is still a sentence and must be spoken.
+        assertEquals(
+            "First line here. Ok. Last line here.",
+            markdownDocumentToSpeakableText(lines),
+        )
+
+        val mentionOnly =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(
+                                MarkdownInlineFfi.NostrMention(
+                                    MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, unknown),
+                                ),
+                            ),
+                        ),
+                    ),
+            )
+        // Omitting the key silences a line that holds nothing else, so read
+        // aloud simply pauses there. Naming the person generically keeps the
+        // line audible without reciting the key.
+        assertEquals("", markdownDocumentToSpeakableText(mentionOnly))
+        assertEquals(
+            "@Someone.",
+            markdownDocumentToSpeakableText(
+                document = mentionOnly,
+                mentionDisplayName = { "Someone" },
+                isGroupMember = { true },
+            ),
+        )
+    }
+
+    @Test
     fun bareUrlsAreOmittedAndLineBreaksRemainSentenceBoundaries() {
         val document =
             MarkdownDocumentFfi(

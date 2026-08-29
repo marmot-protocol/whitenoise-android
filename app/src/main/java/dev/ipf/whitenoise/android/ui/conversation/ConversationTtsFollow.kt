@@ -462,19 +462,13 @@ internal object TtsFollowViewport {
         if (!anchorAtTop && sentenceTop >= viewportStart && sentenceBottom <= viewportEnd) {
             return TtsFollowViewportDecision.Stay
         }
-        // New sessions, message jumps, oversized sentences, and top clipping
-        // establish a top anchor. A sentence that still fits but clips only at
-        // the bottom moves by that overflow instead of jumping to the top.
-        // Direction is intentionally irrelevant: reverse navigation should not
-        // revive the old bottom/middle-band contract.
-        val sentenceFitsViewport = sentenceBottom - sentenceTop <= viewportEnd - viewportStart
-        val targetOffset =
-            if (!anchorAtTop && sentenceTop >= viewportStart && sentenceFitsViewport) {
-                sentenceBottom - itemOffset - viewportEnd
-            } else {
-                sentenceTop - itemOffset - viewportStart
-            }
-        return TtsFollowViewportDecision.ScrollToItemOffset(targetOffset)
+        // A sentence that is not already fully visible goes to the top of the
+        // viewport, whatever clipped it. Moving by the bottom overflow instead
+        // leaves the sentence hugging the bottom edge, where the next few words
+        // clip again immediately and the reader chases the text down the
+        // screen. Direction is intentionally irrelevant: reverse navigation
+        // should not revive the old bottom/middle-band contract.
+        return TtsFollowViewportDecision.ScrollToItemOffset(sentenceTop - itemOffset - viewportStart)
     }
 
     /** Equal-fraction row estimate retained only for provisional remount positioning. */

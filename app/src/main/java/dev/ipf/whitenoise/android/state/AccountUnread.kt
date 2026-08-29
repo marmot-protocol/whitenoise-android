@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import kotlinx.coroutines.CancellationException
@@ -9,28 +8,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-
-/**
- * Seed per-account UI counts from Marmot's cheap aggregate projection.
- *
- * This deliberately does not inspect chat rows or member rosters. It is safe on
- * the cold-start path while MDK is still hydrating group state; the exact
- * removed-group suppression pass can replace these values after the first
- * local chat-list frame.
- */
-internal fun rawAccountUnreadCounts(
-    accounts: Iterable<AccountSummaryFfi>,
-    rawCountsByAccountId: Map<String, ULong>?,
-    previous: Map<String, ULong> = emptyMap(),
-): Map<String, ULong> =
-    accounts.associate { account ->
-        account.label to
-            (
-                rawCountsByAccountId?.get(account.accountIdHex)
-                    ?: previous[account.label]
-                    ?: 0uL
-            )
-    }
 
 /**
  * Aggregate unread messages for an account from durable chat-list rows.

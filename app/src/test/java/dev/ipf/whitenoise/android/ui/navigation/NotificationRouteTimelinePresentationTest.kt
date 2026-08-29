@@ -356,12 +356,14 @@ class NotificationRouteTimelinePresentationTest {
         failureMessage: (() -> String)? = null,
         condition: () -> Boolean,
     ) {
-        awaitConversationCondition(timeoutMs = ROUTE_TIMEOUT_MILLIS, condition = condition)
-        composeRule.waitForIdle()
-        ShadowLooper.idleMainLooper()
-        if (!condition()) {
-            throw AssertionError(failureMessage?.invoke() ?: "Condition not met after idle")
+        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(ROUTE_TIMEOUT_MILLIS)
+        while (System.nanoTime() <= deadlineNanos) {
+            composeRule.waitForIdle()
+            ShadowLooper.idleMainLooper()
+            if (condition()) return
+            Thread.sleep(10)
         }
+        throw AssertionError(failureMessage?.invoke() ?: "Condition not met after Compose and main-loop idle")
     }
 
     @Suppress("UNCHECKED_CAST")

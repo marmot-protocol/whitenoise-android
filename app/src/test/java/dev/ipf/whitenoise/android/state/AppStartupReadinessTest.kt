@@ -19,13 +19,11 @@ class AppStartupReadinessTest {
         val end = source.indexOf("private suspend fun refreshAccountUnreadFold(", startIndex = start)
         check(start >= 0 && end > start) { "Missing account unread refresh section" }
         val refresh = source.substring(start, end)
-        val revisionGuard = refresh.lastIndexOf("if (!stillCurrent()) return")
-        val manualUnreadPublication = refresh.indexOf("updateAccountManualUnread", startIndex = revisionGuard)
-        val countPublication = refresh.indexOf("accountUnreadCounts = merged", startIndex = revisionGuard)
+        val revisionGuard = refresh.lastIndexOf("if (!refreshIsCurrent()) return")
+        val atomicPublication = refresh.indexOf("accountUnreadStore.publishRefresh", startIndex = revisionGuard)
 
         assertTrue(revisionGuard >= 0)
-        assertTrue(manualUnreadPublication > revisionGuard)
-        assertTrue(countPublication > manualUnreadPublication)
+        assertTrue(atomicPublication > revisionGuard)
     }
 
     @Test
