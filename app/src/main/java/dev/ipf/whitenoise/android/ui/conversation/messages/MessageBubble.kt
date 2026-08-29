@@ -366,6 +366,7 @@ internal fun MessageBubble(
             customArgb = customBubbleArgb,
             persistedFailure = persistedFailure,
         )
+    val bubbleBackgroundColor = colorFromArgb(bubblePresentation.backgroundArgb)
     val bubbleContentColor = colorFromArgb(bubblePresentation.contentArgb)
     // #414: "you were mentioned" treatment. A received (not mine), live
     // message whose markdown body @-mentions the current
@@ -1739,6 +1740,7 @@ internal fun MessageBubble(
                                     collapsible = collapsible,
                                     replyPreviewPresent = replyPreview != null,
                                     hasMedia = hasMedia,
+                                    bubbleBackgroundColor = bubbleBackgroundColor,
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
@@ -1806,6 +1808,7 @@ internal fun MessageBubble(
                                     collapsible = collapsible,
                                     replyPreviewPresent = replyPreview != null,
                                     hasMedia = hasMedia,
+                                    bubbleBackgroundColor = bubbleBackgroundColor,
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
@@ -1871,6 +1874,7 @@ internal fun MessageBubble(
                             collapsible = collapsible,
                             replyPreviewPresent = replyPreview != null,
                             hasMedia = hasMedia,
+                            bubbleBackgroundColor = bubbleBackgroundColor,
                             bubbleContentColor = bubbleContentColor,
                             timestampColor = timestampColor,
                             showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),

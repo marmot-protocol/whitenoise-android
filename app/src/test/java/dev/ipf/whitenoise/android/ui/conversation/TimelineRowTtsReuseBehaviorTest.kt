@@ -3,15 +3,19 @@ package dev.ipf.whitenoise.android.ui.conversation
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -42,19 +46,27 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightRangeKey
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
+import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
+import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
 class TimelineRowTtsReuseBehaviorTest {
     @get:Rule
@@ -94,11 +106,21 @@ class TimelineRowTtsReuseBehaviorTest {
         engine.range(index = 0, start = 13, end = 19)
 
         var showOtherMessage by mutableStateOf(false)
+        lateinit var expectedPaint: TtsReadAloudHighlightStyle
 
         composeRule.setContent {
             val record = if (showOtherMessage) otherRecord else activeRecord
             val item = timelineMessage(record)
             WhiteNoiseTheme {
+                val presentation = messageBubblePresentation(deleted = false, mine = false)
+                expectedPaint =
+                    rememberTtsReadAloudHighlightStyle(
+                        background = colorFromArgb(presentation.backgroundArgb),
+                        content = colorFromArgb(presentation.contentArgb),
+                        sentenceAccent = MaterialTheme.colorScheme.outlineVariant,
+                        wordAccent = MaterialTheme.colorScheme.tertiary,
+                        amoled = isAmoledSurfaceTheme(),
+                    )
                 Box(Modifier.fillMaxWidth()) {
                     key(item.record.messageIdHex) {
                         TimelineRowMessageBubble(
@@ -145,6 +167,14 @@ class TimelineRowTtsReuseBehaviorTest {
 
         composeRule.waitForIdle()
         assertEquals(6 until 12, highlightRange("bright"))
+        val rendered =
+            composeRule
+                .onNodeWithText("bright", substring = true, useUnmergedTree = true)
+                .captureToImage()
+                .toPixelMap()
+        assertTrue(rendered.containsArgb(expectedPaint.sentenceFill.toArgb()))
+        assertTrue(rendered.containsArgb(expectedPaint.sentenceMarker.toArgb()))
+        assertTrue(rendered.containsArgbOutsideStartRail(expectedPaint.wordMarker.toArgb()))
         composeRule
             .onNodeWithTag("tts-read-aloud-progress")
             .assert(
@@ -177,6 +207,24 @@ class TimelineRowTtsReuseBehaviorTest {
             .fetchSemanticsNode()
             .config
             .getOrNull(TtsReadAloudHighlightRangeKey)
+
+    private fun androidx.compose.ui.graphics.PixelMap.containsArgb(expected: Int): Boolean {
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                if (this[x, y].toArgb() == expected) return true
+            }
+        }
+        return false
+    }
+
+    private fun androidx.compose.ui.graphics.PixelMap.containsArgbOutsideStartRail(expected: Int): Boolean {
+        for (y in (height / 2) until height) {
+            for (x in 6 until width) {
+                if (this[x, y].toArgb() == expected) return true
+            }
+        }
+        return false
+    }
 
     private fun timelineMessage(record: AppMessageRecordFfi) =
         TimelineMessage(
