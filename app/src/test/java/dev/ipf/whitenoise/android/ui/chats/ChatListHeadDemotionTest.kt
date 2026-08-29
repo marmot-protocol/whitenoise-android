@@ -83,7 +83,7 @@ class ChatListHeadDemotionTest {
 
     @Test
     @Suppress("LongMethod")
-    fun unpinVisibleHeadWithLeadingItemPreservesAnchorWithoutHeadScrollCorrection() {
+    fun unpinVisibleHeadWithLeadingItemPreservesViewportWithoutHeadScrollCorrection() {
         val tail = (0 until 20).map { "E$it" }
         var itemIds by mutableStateOf(listOf("A", "B", "C") + tail)
         var pinnedCount by mutableIntStateOf(2)
@@ -134,11 +134,12 @@ class ChatListHeadDemotionTest {
         composeRule.runOnIdle {
             val listState = listStateHolder[0]!!
             assertFalse("a user-requested unpin must not launch head scrolling", listState.isScrollInProgress)
+            assertEquals(1, listState.firstVisibleItemIndex)
             assertEquals(12, listState.firstVisibleItemScrollOffset)
             assertEquals(
-                "A",
+                "B",
                 listState.layoutInfo.visibleItemsInfo
-                    .first()
+                    .first { it.key is String && it.key in itemIds }
                     .key,
             )
             val rowKeys =
@@ -147,7 +148,7 @@ class ChatListHeadDemotionTest {
                     .filterIsInstance<String>()
             assertEquals(rowKeys.size, rowKeys.toSet().size)
         }
-        assertEquals(anchoredTop, rowTop("A"), 0.5f)
+        assertTrue(rowTop("A") >= anchoredTop)
         assertTrue("the first demotion composition must gate row input", interactionStates.last().not())
 
         composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
@@ -155,7 +156,7 @@ class ChatListHeadDemotionTest {
         assertEquals(listOf(transaction), consumed)
         assertTrue(correctionStarts.isEmpty())
         assertTrue("row input must reopen after the one placement transaction", interactionStates.last())
-        assertEquals(anchoredTop, rowTop("A"), 0.5f)
+        assertTrue("the unpinned row must settle below its former head slot", rowTop("A") > anchoredTop + 1f)
     }
 
     @Test
@@ -205,7 +206,10 @@ class ChatListHeadDemotionTest {
 
         assertEquals(1, consumedCount)
         assertEquals(0, correctionStarts)
-        assertEquals(anchoredTop, rowTop("A"), 0.5f)
+        val settledATop = rowTop("A")
+        assertTrue(settledATop > anchoredTop + 1f)
+        assertEquals(0, listStateHolder[0]!!.firstVisibleItemIndex)
+        assertEquals(9, listStateHolder[0]!!.firstVisibleItemScrollOffset)
 
         // Matching stream redelivery republishes content but not a second
         // normalized order or a second demotion transaction.
@@ -215,7 +219,7 @@ class ChatListHeadDemotionTest {
         assertEquals(1, consumedCount)
         assertEquals(0, correctionStarts)
         assertFalse(listStateHolder[0]!!.isScrollInProgress)
-        assertEquals(anchoredTop, rowTop("A"), 0.5f)
+        assertEquals(settledATop, rowTop("A"), 0.5f)
     }
 
     @Test
@@ -441,16 +445,16 @@ class ChatListHeadDemotionTest {
         }
         composeRule.waitForIdle()
         assertEquals(
-            "A",
+            "B",
             listStateHolder[0]!!
                 .layoutInfo.visibleItemsInfo
-                .first()
+                .first { it.key is String && it.key in itemIds }
                 .key,
         )
 
         // A failed engine mutation rolls the optimistic pin state back. The
-        // rollback keeps the same keyed anchor and must not start a competing
-        // head-to-zero correction.
+        // rollback restores the original item order while retaining the
+        // current viewport, without starting a competing head correction.
         composeRule.runOnUiThread {
             demotionApplied = false
             itemIds = listOf("A", "B", "C") + tail
@@ -461,13 +465,13 @@ class ChatListHeadDemotionTest {
         assertEquals(0, correctionStarts)
         assertFalse(listStateHolder[0]!!.isScrollInProgress)
         assertEquals(
-            "A",
+            "B",
             listStateHolder[0]!!
                 .layoutInfo.visibleItemsInfo
-                .first()
+                .first { it.key is String && it.key in itemIds }
                 .key,
         )
-        assertEquals(0f, rowTop("A"), 0.5f)
+        assertEquals(0f, rowTop("B"), 0.5f)
     }
 
     @Test
@@ -529,8 +533,10 @@ class ChatListHeadDemotionTest {
         }
         composeRule.runOnIdle { }
         composeRule.mainClock.advanceTimeByFrame()
+        lateinit var secondTransaction: ChatListHeadDemotion
         composeRule.runOnUiThread {
-            demotion = listStateHolder[0]!!.headDemotion("A", 2L, itemIds)
+            secondTransaction = listStateHolder[0]!!.headDemotion("A", 2L, itemIds)
+            demotion = secondTransaction
         }
         composeRule.runOnIdle { }
         composeRule.runOnUiThread {
@@ -550,13 +556,14 @@ class ChatListHeadDemotionTest {
         assertEquals(listOf(1L, 2L), consumedTransactions)
         assertEquals(0, correctionStarts)
         assertEquals(
-            "A",
-            listStateHolder[0]!!
-                .layoutInfo.visibleItemsInfo
-                .first()
-                .key,
+            secondTransaction.viewportAnchor?.firstVisibleItemIndex,
+            listStateHolder[0]!!.firstVisibleItemIndex,
         )
-        assertEquals(anchoredTop, rowTop("A"), 0.5f)
+        assertEquals(
+            secondTransaction.viewportAnchor?.firstVisibleItemScrollOffset,
+            listStateHolder[0]!!.firstVisibleItemScrollOffset,
+        )
+        assertTrue(rowTop("A") > anchoredTop + 1f)
         assertFalse(listStateHolder[0]!!.isScrollInProgress)
     }
 
