@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.state.ChatListConnectionPhase
+import dev.ipf.whitenoise.android.state.ChatListConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -11,38 +13,121 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatListConnectivityBannerTest {
     @Test
-    fun targetsMapTheTwoSignals() {
+    fun reducerKeepsInternetAttemptAndReadinessSeparate() {
+        val idle = connectionState(ChatListConnectionPhase.Idle)
+        val attempting = connectionState(ChatListConnectionPhase.Attempting)
+        val ready = connectionState(ChatListConnectionPhase.Ready)
+
+        assertEquals(
+            ConnectivityBannerTarget.Offline,
+            target(hasValidatedInternet = false, state = attempting),
+        )
+        assertEquals(
+            ConnectivityBannerTarget.NoAttempt,
+            target(hasValidatedInternet = true, state = idle),
+        )
+        assertEquals(
+            ConnectivityBannerTarget.Connecting,
+            target(hasValidatedInternet = true, state = attempting),
+        )
+        assertEquals(
+            ConnectivityBannerTarget.Connected,
+            target(hasValidatedInternet = true, state = ready),
+        )
+    }
+
+    @Test
+    fun inactiveAccountAndStaleRuntimeCannotSupplyStatus() {
+        val otherAccount = connectionState(ChatListConnectionPhase.Ready).copy(accountRef = "work")
+        val oldRuntime = connectionState(ChatListConnectionPhase.Ready).copy(runtimeGeneration = 8)
+
+        assertEquals(ConnectivityBannerTarget.NoAttempt, target(true, otherAccount))
+        assertEquals(ConnectivityBannerTarget.NoAttempt, target(true, oldRuntime))
+        assertEquals(ConnectivityBannerTarget.Offline, target(false, otherAccount))
+        assertEquals(ConnectivityBannerTarget.Offline, target(false, oldRuntime))
+        assertEquals(
+            ConnectivityBannerTarget.NoAttempt,
+            connectivityBannerTarget(
+                hasValidatedInternet = false,
+                activeAccountRef = null,
+                runtimeGeneration = RUNTIME_GENERATION,
+                connectionState = connectionState(ChatListConnectionPhase.Attempting),
+            ),
+        )
+    }
+
+    @Test
+    fun firstCollectedProblemFrameIsVisibleWithoutADebounce() {
         assertEquals(
             ConnectivityBannerState.Offline,
-            connectivityBannerTarget(hasNetwork = false, relaysConnected = false),
+            initialConnectivityBannerState(ConnectivityBannerTarget.Offline).displayed,
         )
-        // Network reported gone while relays still count as connected reads
-        // offline — the actionable state wins.
-        assertEquals(
-            ConnectivityBannerState.Offline,
-            connectivityBannerTarget(hasNetwork = false, relaysConnected = true),
-        )
-        // Device network up but zero relays reachable is the relay-outage
-        // case: the banner must say connecting, not hide.
         assertEquals(
             ConnectivityBannerState.Connecting,
-            connectivityBannerTarget(hasNetwork = true, relaysConnected = false),
+            initialConnectivityBannerState(ConnectivityBannerTarget.Connecting).displayed,
+        )
+    }
+
+    @Test
+    fun onlyExplicitReadinessEarnsAConnectedFlash() {
+        val waitingWithoutAnAttempt =
+            connectivityBannerNext(problemPresentation(), ConnectivityBannerTarget.NoAttempt)
+        assertEquals(
+            ConnectivityBannerState.Hidden,
+            waitingWithoutAnAttempt.displayed,
+        )
+        assertEquals(
+            ConnectivityBannerState.JustConnected,
+            connectivityBannerNext(waitingWithoutAnAttempt, ConnectivityBannerTarget.Connected).displayed,
+        )
+        assertEquals(
+            ConnectivityBannerState.JustConnected,
+            connectivityBannerNext(problemPresentation(), ConnectivityBannerTarget.Connected).displayed,
+        )
+        assertEquals(
+            ConnectivityBannerState.JustConnected,
+            connectivityBannerNext(
+                problemPresentation(ConnectivityBannerState.Offline),
+                ConnectivityBannerTarget.Connected,
+            ).displayed,
         )
         assertEquals(
             ConnectivityBannerState.Hidden,
-            connectivityBannerTarget(hasNetwork = true, relaysConnected = true),
+            connectivityBannerNext(
+                ConnectivityBannerPresentation(
+                    ConnectivityBannerState.Hidden,
+                    recoveryPending = false,
+                    target = ConnectivityBannerTarget.NoAttempt,
+                ),
+                ConnectivityBannerTarget.Connected,
+            ).displayed,
+        )
+        assertTrue(CONNECTIVITY_BANNER_FLASH_MILLIS <= 1_000L)
+    }
+
+    @Test
+    fun problemStatesSwitchDirectlyOnAuthoritativeEdges() {
+        assertEquals(
+            ConnectivityBannerState.Offline,
+            connectivityBannerNext(problemPresentation(), ConnectivityBannerTarget.Offline).displayed,
+        )
+        assertEquals(
+            ConnectivityBannerState.Connecting,
+            connectivityBannerNext(
+                problemPresentation(ConnectivityBannerState.Offline),
+                ConnectivityBannerTarget.Connecting,
+            ).displayed,
         )
     }
 
     @Test
     fun steadyStateConnectedNeverPollsOnTheFastCadence() {
-        // Steady state — banner hidden, relays connected — must back off, the
-        // idle chat list may not wake every two seconds.
         assertEquals(
             CONNECTIVITY_RELAY_STEADY_POLL_MILLIS,
             relayPollDelayMillis(ConnectivityBannerState.Hidden, relaysConnected = true),
@@ -50,21 +135,11 @@ class ChatListConnectivityBannerTest {
     }
 
     @Test
-    fun bannerRelevantStatesKeepTheFastPollCadence() {
-        assertEquals(
-            CONNECTIVITY_RELAY_POLL_MILLIS,
-            relayPollDelayMillis(ConnectivityBannerState.Offline, relaysConnected = false),
-        )
+    fun degradedStateKeepsTheFallbackPollResponsive() {
         assertEquals(
             CONNECTIVITY_RELAY_POLL_MILLIS,
             relayPollDelayMillis(ConnectivityBannerState.Connecting, relaysConnected = false),
         )
-        assertEquals(
-            CONNECTIVITY_RELAY_POLL_MILLIS,
-            relayPollDelayMillis(ConnectivityBannerState.JustConnected, relaysConnected = true),
-        )
-        // Hidden but relays down — the debounce window before the banner shows
-        // still needs the fast cadence to confirm or clear the problem.
         assertEquals(
             CONNECTIVITY_RELAY_POLL_MILLIS,
             relayPollDelayMillis(ConnectivityBannerState.Hidden, relaysConnected = false),
@@ -72,7 +147,7 @@ class ChatListConnectivityBannerTest {
     }
 
     @Test
-    fun steadyBackoffSleepRunsTheFullWindowWhenNothingChanges() =
+    fun steadyBackoffRunsTheFullWindowWithoutAnEdge() =
         runTest {
             val woke =
                 withTimeoutOrNull(CONNECTIVITY_RELAY_STEADY_POLL_MILLIS) {
@@ -87,10 +162,11 @@ class ChatListConnectivityBannerTest {
         }
 
     @Test
-    fun relayDegradationWakesTheBackoffSleepEarly() =
+    fun relayLossAndForegroundResumeWakeFallbackPolling() =
         runTest {
             val relays = MutableStateFlow(true)
-            val woke =
+            val resumes = MutableSharedFlow<Unit>()
+            val relayWake =
                 async {
                     withTimeoutOrNull(CONNECTIVITY_RELAY_STEADY_POLL_MILLIS) {
                         relayPollWakeEvents(
@@ -100,42 +176,7 @@ class ChatListConnectivityBannerTest {
                         ).first()
                     }
                 }
-            runCurrent()
-
-            relays.value = false
-
-            assertNotNull(woke.await())
-        }
-
-    @Test
-    fun bannerStateChangeWakesTheBackoffSleepEarly() =
-        runTest {
-            val displayed = MutableStateFlow(ConnectivityBannerState.Hidden)
-            val woke =
-                async {
-                    withTimeoutOrNull(CONNECTIVITY_RELAY_STEADY_POLL_MILLIS) {
-                        relayPollWakeEvents(
-                            displayedStates = displayed,
-                            relaysConnected = MutableStateFlow(true),
-                            foregroundResumes = MutableSharedFlow(),
-                        ).first()
-                    }
-                }
-            runCurrent()
-
-            displayed.value = ConnectivityBannerState.Offline
-
-            assertNotNull(woke.await())
-        }
-
-    @Test
-    fun foregroundResumeWakesTheBackoffSleepEarly() =
-        runTest {
-            // A sleep started before backgrounding must not be waited out on
-            // resume — the poll was a no-op the whole time, so the snapshot it
-            // was priced against is stale.
-            val resumes = MutableSharedFlow<Unit>()
-            val woke =
+            val resumeWake =
                 async {
                     withTimeoutOrNull(CONNECTIVITY_RELAY_STEADY_POLL_MILLIS) {
                         relayPollWakeEvents(
@@ -147,116 +188,56 @@ class ChatListConnectivityBannerTest {
                 }
             runCurrent()
 
+            relays.value = false
             resumes.emit(Unit)
 
-            assertNotNull(woke.await())
+            assertNotNull(relayWake.await())
+            assertNotNull(resumeWake.await())
         }
 
     @Test
-    fun relayHealthMapsToConnectivityByConnectedCount() {
+    fun relayHealthIsFallbackEvidenceOnly() {
         assertEquals(false, relaysConnectedFromHealth(connectedRelays = 0, totalRelays = 4))
         assertEquals(true, relaysConnectedFromHealth(connectedRelays = 1, totalRelays = 4))
-        assertEquals(true, relaysConnectedFromHealth(connectedRelays = 4, totalRelays = 4))
-        // No configured relays (signed out, bare runtime): nothing to connect
-        // to, so nothing to complain about.
         assertEquals(true, relaysConnectedFromHealth(connectedRelays = 0, totalRelays = 0))
-    }
-
-    @Test
-    fun networkLossInvalidatesTheCachedRelaySignal() {
         assertEquals(false, relaysConnectedOnNetworkChange(isOnline = false, cached = true))
-        assertEquals(false, relaysConnectedOnNetworkChange(isOnline = false, cached = false))
-        // A network event while online (capabilities change) keeps whatever
-        // the last health sample established.
-        assertEquals(true, relaysConnectedOnNetworkChange(isOnline = true, cached = true))
-        assertEquals(false, relaysConnectedOnNetworkChange(isOnline = true, cached = false))
     }
 
-    @Test
-    fun quickNetworkBounceMustEarnTheFlashWithAFreshHealthSample() {
-        // Steady connected, no chrome.
-        var relays = true
-        var displayed = ConnectivityBannerState.Hidden
-        // Network lost: the cached relay signal is invalidated with it.
-        relays = relaysConnectedOnNetworkChange(isOnline = false, cached = relays)
-        displayed =
-            connectivityBannerNext(displayed, connectivityBannerTarget(hasNetwork = false, relaysConnected = relays))
-        assertEquals(ConnectivityBannerState.Offline, displayed)
-        // Network restored before any relay-health poll ran: no premature
-        // success flash off the stale cache — the banner keeps working.
-        relays = relaysConnectedOnNetworkChange(isOnline = true, cached = relays)
-        displayed =
-            connectivityBannerNext(displayed, connectivityBannerTarget(hasNetwork = true, relaysConnected = relays))
-        assertEquals(ConnectivityBannerState.Connecting, displayed)
-        // A fresh post-restore sample proves a relay is back: flash once.
-        relays = relaysConnectedFromHealth(connectedRelays = 1, totalRelays = 4)
-        displayed =
-            connectivityBannerNext(displayed, connectivityBannerTarget(hasNetwork = true, relaysConnected = relays))
-        assertEquals(ConnectivityBannerState.JustConnected, displayed)
-    }
+    private fun target(
+        hasValidatedInternet: Boolean,
+        state: ChatListConnectionState,
+    ): ConnectivityBannerTarget =
+        connectivityBannerTarget(
+            hasValidatedInternet = hasValidatedInternet,
+            activeAccountRef = ACTIVE_ACCOUNT,
+            runtimeGeneration = RUNTIME_GENERATION,
+            connectionState = state,
+        )
 
-    @Test
-    fun offlineStartupClampsTheOptimisticRelayDefault() {
-        // The signals flow seeds relaysConnected optimistically; a device that
-        // starts offline must clamp it with the seed's hasNetwork=false write
-        // so the first onAvailable cannot flash success without evidence.
-        val seeded = relaysConnectedOnNetworkChange(isOnline = false, cached = true)
-        assertEquals(false, seeded)
-        assertEquals(
-            ConnectivityBannerState.Offline,
-            connectivityBannerTarget(hasNetwork = false, relaysConnected = seeded),
+    private fun connectionState(phase: ChatListConnectionPhase): ChatListConnectionState =
+        ChatListConnectionState(
+            accountRef = ACTIVE_ACCOUNT,
+            runtimeGeneration = RUNTIME_GENERATION,
+            bindEpoch = 3L,
+            sessionAttemptId = 5L,
+            evidenceEpoch = 7L,
+            phase = phase,
         )
-        val restored = relaysConnectedOnNetworkChange(isOnline = true, cached = seeded)
-        assertEquals(
-            ConnectivityBannerState.Connecting,
-            connectivityBannerTarget(hasNetwork = true, relaysConnected = restored),
-        )
-    }
 
-    @Test
-    fun offlinePollReportingConnectedRelaysCannotResurrectTheSignal() {
-        // Pool counts read while offline are stale by definition: even a
-        // snapshot claiming live relays stays clamped to false.
-        val stalePoll = relaysConnectedFromHealth(connectedRelays = 3, totalRelays = 4)
-        assertEquals(true, stalePoll)
-        assertEquals(false, relaysConnectedOnNetworkChange(isOnline = false, cached = stalePoll))
-    }
+    private fun problemPresentation(displayed: ConnectivityBannerState = ConnectivityBannerState.Connecting) =
+        ConnectivityBannerPresentation(
+            displayed = displayed,
+            recoveryPending = true,
+            target =
+                if (displayed == ConnectivityBannerState.Offline) {
+                    ConnectivityBannerTarget.Offline
+                } else {
+                    ConnectivityBannerTarget.Connecting
+                },
+        )
 
-    @Test
-    fun reachingConnectedFromAProblemStateFlashesOnce() {
-        assertEquals(
-            ConnectivityBannerState.JustConnected,
-            connectivityBannerNext(ConnectivityBannerState.Connecting, ConnectivityBannerState.Hidden),
-        )
-        assertEquals(
-            ConnectivityBannerState.JustConnected,
-            connectivityBannerNext(ConnectivityBannerState.Offline, ConnectivityBannerState.Hidden),
-        )
-        // Already hidden (steady-state connected) stays hidden: no chrome.
-        assertEquals(
-            ConnectivityBannerState.Hidden,
-            connectivityBannerNext(ConnectivityBannerState.Hidden, ConnectivityBannerState.Hidden),
-        )
-        // The flash itself decays to hidden, never re-flashes.
-        assertEquals(
-            ConnectivityBannerState.Hidden,
-            connectivityBannerNext(ConnectivityBannerState.JustConnected, ConnectivityBannerState.Hidden),
-        )
-    }
-
-    @Test
-    fun problemStatesPassThroughAndSwitchDirectly() {
-        assertEquals(
-            ConnectivityBannerState.Offline,
-            connectivityBannerNext(ConnectivityBannerState.Connecting, ConnectivityBannerState.Offline),
-        )
-        assertEquals(
-            ConnectivityBannerState.Connecting,
-            connectivityBannerNext(ConnectivityBannerState.Offline, ConnectivityBannerState.Connecting),
-        )
-        assertEquals(
-            ConnectivityBannerState.Connecting,
-            connectivityBannerNext(ConnectivityBannerState.JustConnected, ConnectivityBannerState.Connecting),
-        )
+    private companion object {
+        const val ACTIVE_ACCOUNT = "personal"
+        const val RUNTIME_GENERATION = 9
     }
 }

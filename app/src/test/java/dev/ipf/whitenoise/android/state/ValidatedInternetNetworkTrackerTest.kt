@@ -1,10 +1,59 @@
 package dev.ipf.whitenoise.android.state
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ValidatedInternetNetworkTrackerTest {
+    @Test
+    fun connectivitySignalGenerationChangesOnlyAtValidatedInternetEdges() {
+        val owner = ConnectivitySignalOwner()
+
+        owner.update(hasValidatedInternet = false)
+        assertEquals(0L, owner.networkGeneration.get())
+        owner.update(hasValidatedInternet = true)
+        assertEquals(1L, owner.networkGeneration.get())
+        owner.update(relaysConnected = false)
+        assertEquals(1L, owner.networkGeneration.get())
+        owner.update(hasValidatedInternet = false, relaysConnected = true)
+        assertEquals(2L, owner.networkGeneration.get())
+        assertFalse(owner.signals.value.relaysConnected)
+    }
+
+    @Test
+    fun defaultNetworkIdentityChangeAdvancesTheStaleCompletionFence() {
+        val owner = ConnectivitySignalOwner()
+
+        owner.update(hasValidatedInternet = true)
+        owner.noteNetworkIdentityChange()
+
+        assertEquals(2L, owner.networkGeneration.get())
+        assertTrue(owner.signals.value.hasValidatedInternet)
+    }
+
+    @Test
+    fun lateLossForOldDefaultCannotClearItsReplacement() {
+        val tracker = ActiveDefaultNetworkTracker()
+        tracker.seed(networkHandle = 1L)
+        assertTrue(tracker.available(networkHandle = 2L).identityChanged)
+
+        assertEquals(null, tracker.lost(networkHandle = 1L, replacementNetworkHandle = 2L))
+        assertTrue(tracker.isCurrent(networkHandle = 2L))
+    }
+
+    @Test
+    fun currentDefaultLossUsesAnAlreadyAvailableReplacement() {
+        val tracker = ActiveDefaultNetworkTracker()
+        tracker.seed(networkHandle = 1L)
+
+        val replacement = requireNotNull(tracker.lost(networkHandle = 1L, replacementNetworkHandle = 2L))
+        assertTrue(replacement.hasActiveNetwork)
+        assertTrue(replacement.identityChanged)
+        assertTrue(tracker.isCurrent(networkHandle = 2L))
+        assertFalse(requireNotNull(tracker.lost(networkHandle = 2L, replacementNetworkHandle = null)).hasActiveNetwork)
+    }
+
     @Test
     fun staleVpnCapabilitiesDoNotCountAsUsableInternet() {
         assertFalse(

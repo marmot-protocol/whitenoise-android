@@ -21,6 +21,53 @@ internal fun hasUsableValidatedInternet(
 ): Boolean = hasActiveDefaultNetwork && hasValidatedPhysicalNetwork
 
 /**
+ * Identity-aware mirror of Android's default-network callback. During a
+ * Wi-Fi/mobile handoff Android may announce the replacement before delivering
+ * the old network's onLost callback; that stale loss must not clear the new
+ * default and briefly report Offline.
+ */
+internal data class ActiveDefaultNetworkUpdate(
+    val hasActiveNetwork: Boolean,
+    val identityChanged: Boolean,
+)
+
+internal class ActiveDefaultNetworkTracker {
+    private var currentNetworkHandle: Long? = null
+
+    @Synchronized
+    fun seed(networkHandle: Long?): Boolean {
+        currentNetworkHandle = networkHandle
+        return currentNetworkHandle != null
+    }
+
+    @Synchronized
+    fun available(networkHandle: Long): ActiveDefaultNetworkUpdate {
+        val identityChanged = currentNetworkHandle != networkHandle
+        currentNetworkHandle = networkHandle
+        return ActiveDefaultNetworkUpdate(hasActiveNetwork = true, identityChanged = identityChanged)
+    }
+
+    @Synchronized
+    fun isCurrent(networkHandle: Long): Boolean = currentNetworkHandle == networkHandle
+
+    /** Returns null when [networkHandle] is a stale loss for an older default. */
+    @Synchronized
+    fun lost(
+        networkHandle: Long,
+        replacementNetworkHandle: Long?,
+    ): ActiveDefaultNetworkUpdate? {
+        if (currentNetworkHandle != networkHandle) return null
+        val replacement = replacementNetworkHandle?.takeUnless { it == networkHandle }
+        val identityChanged = currentNetworkHandle != replacement
+        currentNetworkHandle = replacement
+        return ActiveDefaultNetworkUpdate(
+            hasActiveNetwork = currentNetworkHandle != null,
+            identityChanged = identityChanged,
+        )
+    }
+}
+
+/**
  * Tracks every validated physical internet network Android currently exposes.
  * A set is required because a Wi-Fi/cellular handover briefly exposes both;
  * losing either network must not report offline while the other remains valid.

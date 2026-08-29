@@ -32,7 +32,7 @@ class NotificationNetworkReconnectCoverageTest {
 
         assertTrue(
             "the one-shot seed must establish the current availability baseline directly",
-            "hasActiveNetworkSnapshot = network != null" in seed,
+            "hasActiveNetworkSnapshot = activeDefaultNetwork.seed(network?.networkHandle)" in seed,
         )
         assertFalse(
             "an initially online process must not be mistaken for an offline -> online transition",

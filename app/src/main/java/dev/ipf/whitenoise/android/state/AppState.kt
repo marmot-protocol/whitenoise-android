@@ -147,7 +147,6 @@ import dev.ipf.whitenoise.android.share.ShareStagingStore
 import dev.ipf.whitenoise.android.share.shareResolveMime
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
-import dev.ipf.whitenoise.android.ui.chats.relaysConnectedOnNetworkChange
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateFlows
@@ -2282,7 +2281,7 @@ class WhiteNoiseAppState private constructor(
             marmotIo { displayName(senderIdHex) }
         }
     private val notificationEnrichmentGate = Semaphore(NOTIFICATION_ENRICHMENT_FANOUT)
-    private var accountCatchUpJob: Job? = null
+    private val accountCatchUpCoordinator = AccountCatchUpCoordinator(notificationScope)
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
     private val accountSwitchHandoff = AccountSwitchLocalSnapshotHandoff()
 
@@ -3737,17 +3736,27 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Starts one process-lifetime catch-up after a chat list has rendered its
-     * local snapshot. A blocked relay call must not block that controller's live
-     * consumers, and rapid rebinds can share the same all-account catch-up.
+     * Starts a process-owned catch-up after a chat list has rendered its local
+     * snapshot. A blocked relay call must not block that controller's live
+     * consumers. Only callers with the same account, runtime, network, and
+     * readiness identity may share an in-flight result.
      */
-    internal fun launchCatchUpAccounts() {
-        if (accountCatchUpJob?.isActive == true) return
-        accountCatchUpJob =
-            notificationScope.launch {
-                if (catchUpAccountsBestEffort()) recordStartupRelayCatchUpReady()
+    internal fun launchCatchUpAccounts(readinessToken: ChatListConnectionEvidenceToken? = null): Deferred<Boolean> =
+        AccountCatchUpKey(
+            accountRef = activeAccountRef,
+            runtimeGeneration = runtimeGeneration,
+            networkGeneration = connectivityNetworkGeneration.get(),
+            readinessToken = readinessToken,
+        ).let { key ->
+            accountCatchUpCoordinator.launch(key) {
+                val succeeded = catchUpAccountsBestEffort()
+                if (succeeded) recordStartupRelayCatchUpReady()
+                succeeded &&
+                    activeAccountRef == key.accountRef &&
+                    runtimeGeneration == key.runtimeGeneration &&
+                    connectivityNetworkGeneration.get() == key.networkGeneration
             }
-    }
+        }
 
     private suspend fun catchUpAccountsBestEffort(): Boolean =
         runCatchingCancellable { marmotIo { catchUpAccounts() } }
@@ -6754,48 +6763,25 @@ class WhiteNoiseAppState private constructor(
     @Volatile
     private var hasActiveNetworkSnapshot = false
 
+    private val activeDefaultNetwork = ActiveDefaultNetworkTracker()
     private val validatedInternetNetworks = ValidatedInternetNetworkTracker()
 
     /**
-     * Reactive mirror of the two signals the chat-list connectivity banner
-     * consumes: device network presence (state 1 of the banner) and whether
-     * the engine's relay pool reports at least one connected relay. The pool
-     * counts come from [refreshRelayConnectivity] polls — the notification
-     * subscription cannot stand in for connectivity because it rides an
-     * in-process event bus and stays open with every relay down.
+     * Reactive Android-validated internet and aggregate relay fallback inputs
+     * for the chat-list connectivity banner. Active-account attempt and
+     * application-readiness phases live in [ChatsController]; neither a local
+     * subscription nor this device-wide relay count can mark that account
+     * ready. The pool count is retained only to trigger an active-account
+     * re-check when no relay is currently available.
      */
-    data class ConnectivitySignals(
-        val hasNetwork: Boolean = false,
-        val relaysConnected: Boolean = true,
-    )
-
-    private val _connectivitySignals = MutableStateFlow(ConnectivitySignals())
-    val connectivitySignals: StateFlow<ConnectivitySignals> = _connectivitySignals.asStateFlow()
-
-    // Bumped on every hasNetwork transition (callback or seed-observed) so a
-    // relay-health snapshot that was in flight across the transition can be
-    // recognized and discarded in [refreshRelayConnectivity].
-    private val connectivityNetworkGeneration = AtomicLong(0)
+    private val connectivitySignalOwner = ConnectivitySignalOwner()
+    val connectivitySignals = connectivitySignalOwner.signals
+    private val connectivityNetworkGeneration = connectivitySignalOwner.networkGeneration
 
     private fun updateConnectivitySignals(
-        hasNetwork: Boolean? = null,
+        hasValidatedInternet: Boolean? = null,
         relaysConnected: Boolean? = null,
-    ) {
-        _connectivitySignals.update { current ->
-            val nextHasNetwork = hasNetwork ?: current.hasNetwork
-            current.copy(
-                hasNetwork = nextHasNetwork,
-                // Structural invariant: no active network means no connected
-                // relays, whatever an optimistic seed default or a stale
-                // health snapshot claims. Every writer goes through this clamp.
-                relaysConnected =
-                    relaysConnectedOnNetworkChange(
-                        isOnline = nextHasNetwork,
-                        cached = relaysConnected ?: current.relaysConnected,
-                    ),
-            )
-        }
-    }
+    ) = connectivitySignalOwner.update(hasValidatedInternet, relaysConnected)
 
     /**
      * Refresh [connectivitySignals] from the engine's relay-health snapshot.
@@ -6807,7 +6793,7 @@ class WhiteNoiseAppState private constructor(
     suspend fun refreshRelayConnectivity() {
         // Offline needs no sample: the write clamp already pinned the signal
         // false, and pool counts read while offline are stale by definition.
-        if (!appInForeground || !_connectivitySignals.value.hasNetwork) return
+        if (!appInForeground || !connectivitySignals.value.hasValidatedInternet) return
         val generation = connectivityNetworkGeneration.get()
         val health = runCatchingCancellable { marmotIo { relayHealth() } }.getOrNull()
         // A snapshot that straddled a network transition describes the wrong
@@ -6838,8 +6824,8 @@ class WhiteNoiseAppState private constructor(
         // that dispatch then overwrites the seed with the same current state.
         runCatchingCancellable {
             val network = cm.activeNetwork
-            hasActiveNetworkSnapshot = network != null
-            updateConnectivitySignals(hasNetwork = network != null)
+            hasActiveNetworkSnapshot = activeDefaultNetwork.seed(network?.networkHandle)
+            updateConnectivitySignals(hasValidatedInternet = hasValidatedInternet())
             activeNetworkTypesSnapshot =
                 network?.let { cm.getNetworkCapabilities(it) }?.let(::networkTypesFor) ?: emptySet()
             if (network != null) schedulePendingPushWakeCatchUpDrain()
@@ -6856,6 +6842,8 @@ class WhiteNoiseAppState private constructor(
                         // Capabilities arrive in the onCapabilitiesChanged that
                         // follows; until then only the yes/no bit is known and
                         // the empty type set conservatively blocks auto-download.
+                        val update = activeDefaultNetwork.available(network.networkHandle)
+                        if (update.identityChanged) connectivitySignalOwner.noteNetworkIdentityChange()
                         noteActiveNetworkSnapshot(isOnline = true)
                     }
 
@@ -6863,6 +6851,7 @@ class WhiteNoiseAppState private constructor(
                         network: android.net.Network,
                         networkCapabilities: android.net.NetworkCapabilities,
                     ) {
+                        if (!activeDefaultNetwork.isCurrent(network.networkHandle)) return
                         noteActiveNetworkSnapshot(
                             isOnline = true,
                             networkTypes = networkTypesFor(networkCapabilities),
@@ -6870,7 +6859,14 @@ class WhiteNoiseAppState private constructor(
                     }
 
                     override fun onLost(network: android.net.Network) {
-                        noteActiveNetworkSnapshot(isOnline = false)
+                        val replacement = runCatching { cm.activeNetwork }.getOrNull()?.takeUnless { it == network }
+                        val update =
+                            activeDefaultNetwork.lost(
+                                networkHandle = network.networkHandle,
+                                replacementNetworkHandle = replacement?.networkHandle,
+                            ) ?: return
+                        if (update.identityChanged) connectivitySignalOwner.noteNetworkIdentityChange()
+                        noteActiveNetworkSnapshot(isOnline = update.hasActiveNetwork)
                     }
                 },
             )
@@ -6910,10 +6906,12 @@ class WhiteNoiseAppState private constructor(
                         networkHandle = network.networkHandle,
                         available = networkCapabilities.providesValidatedNonVpnInternet(),
                     )
+                    noteValidatedInternetSnapshot()
                 }
 
                 override fun onLost(network: android.net.Network) {
                     validatedInternetNetworks.remove(network.networkHandle)
+                    noteValidatedInternetSnapshot()
                 }
             }
         runCatchingCancellable {
@@ -6928,6 +6926,7 @@ class WhiteNoiseAppState private constructor(
                         (cm.getNetworkCapabilities(network)?.providesValidatedNonVpnInternet() == true)
                 }
             }
+            noteValidatedInternetSnapshot()
         }.onFailure {
             // Conservative failure mode: setup stays gated rather than treating
             // an unverified or VPN-only network as usable internet.
@@ -6940,19 +6939,23 @@ class WhiteNoiseAppState private constructor(
         networkTypes: Set<MediaAutoDownloadNetwork>? = null,
     ) {
         val wasOnline = hasActiveNetworkSnapshot
-        if (wasOnline != isOnline) connectivityNetworkGeneration.incrementAndGet()
-        updateConnectivitySignals(hasNetwork = isOnline)
         if (!isOnline) {
             hasActiveNetworkSnapshot = false
             activeNetworkTypesSnapshot = emptySet()
+            noteValidatedInternetSnapshot()
             return
         }
         hasActiveNetworkSnapshot = true
         activeNetworkTypesSnapshot = networkTypes ?: emptySet()
+        noteValidatedInternetSnapshot()
         if (shouldReconnectNotificationsOnNetworkRestore(wasOnline, isOnline = true)) {
             scheduleNotificationReconnectOnNetworkRestore()
         }
         schedulePendingPushWakeCatchUpDrain()
+    }
+
+    private fun noteValidatedInternetSnapshot() {
+        updateConnectivitySignals(hasValidatedInternet = hasValidatedInternet())
     }
 
     private fun scheduleNotificationReconnectOnNetworkRestore() {
