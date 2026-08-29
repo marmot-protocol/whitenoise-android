@@ -139,6 +139,20 @@ reports `journeyDurationMs`, frame timing, and a Perfetto trace for group open �
 members visible, group creation → conversation ready, and invite acceptance →
 conversation ready.
 
+`StartupBenchmark` also reports one trace section per bootstrap stage, so a
+regression names the stage that moved instead of only the total:
+`client-construction`, `privacy-runtime-configuration`, `marmot-start`,
+`notification-platform-setup`, `notification-privacy-setup`, `account-refresh`,
+`account-activation`, `draft-reconciliation`, and
+`external-signer-registration`. Each is the summed time inside that stage for
+the iteration, so a bootstrap that retried counts every attempt.
+
+The underlying slices are named `WhiteNoise.startup.<stage>`; search the
+Perfetto slice table for `WhiteNoise.startup.` to see them beside the
+`WhiteNoise.marmot.*` bridge slices below. They are emitted only while a trace
+is active, and a section name is one of the fixed stage constants — never an
+account, group, or message identifier.
+
 `package-replacement-startup.json` is a separate one-shot device journey. Its
 `timeToFirstComposeUiMs` is the conservative later value of Android's Activity
 launch time and the monotonic system-splash handoff; this prevents Application
