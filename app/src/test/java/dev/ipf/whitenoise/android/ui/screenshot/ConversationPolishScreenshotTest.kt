@@ -242,6 +242,13 @@ class ConversationPolishScreenshotTest {
         composeRule.onNodeWithTag(ATTACHMENT_GALLERY_TAG).captureRoboImage("src/test/snapshots/$name.png")
     }
 
+    private data class AttachmentTransferRow(
+        val state: AttachmentTransferState,
+        val cancellable: Boolean = false,
+        val openPending: Boolean = false,
+        val label: String? = null,
+    )
+
     private fun captureAttachmentTransferStates(
         name: String,
         dark: Boolean,
@@ -256,23 +263,37 @@ class ConversationPolishScreenshotTest {
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         listOf(
-                            AttachmentTransferState.Remote,
-                            AttachmentTransferState.Downloading,
-                            AttachmentTransferState.Failed,
-                            AttachmentTransferState.Available,
-                        ).forEach { state ->
+                            AttachmentTransferRow(AttachmentTransferState.Remote),
+                            AttachmentTransferRow(AttachmentTransferState.Downloading),
+                            AttachmentTransferRow(
+                                AttachmentTransferState.Downloading,
+                                cancellable = true,
+                                label = "Downloading + cancel",
+                            ),
+                            AttachmentTransferRow(
+                                AttachmentTransferState.Downloading,
+                                cancellable = true,
+                                openPending = true,
+                                label = "Opening + cancel",
+                            ),
+                            AttachmentTransferRow(AttachmentTransferState.Cancelled),
+                            AttachmentTransferRow(AttachmentTransferState.Failed),
+                            AttachmentTransferRow(AttachmentTransferState.Available),
+                        ).forEach { row ->
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 Text(
-                                    text = state.name,
+                                    text = row.label ?: row.state.name,
                                     style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.weight(1f),
                                 )
                                 FileTransferControl(
                                     presentation = resolveAttachmentPresentation("application/pdf", "sample.pdf"),
-                                    transferState = state,
+                                    transferState = row.state,
+                                    openPending = row.openPending,
+                                    onCancelTransfer = if (row.cancellable) ({}) else null,
                                 )
                             }
                         }

@@ -24,7 +24,35 @@ internal enum class AttachmentTransferState {
     Available,
     NotRetained,
     Failed,
+    Cancelled,
 }
+
+/** True while a transfer is queued or running and can still be cancelled. */
+internal fun AttachmentTransferState.isTransferInProgress(): Boolean =
+    when (this) {
+        AttachmentTransferState.Resolving,
+        AttachmentTransferState.Downloading,
+        -> true
+        AttachmentTransferState.Remote,
+        AttachmentTransferState.Available,
+        AttachmentTransferState.NotRetained,
+        AttachmentTransferState.Failed,
+        AttachmentTransferState.Cancelled,
+        -> false
+    }
+
+/**
+ * Marks a cancellation the user asked for, so the transfer owner can publish
+ * [AttachmentTransferState.Cancelled] while scope teardown keeps restoring the
+ * pre-download state.
+ */
+internal class AttachmentTransferCancelledByUserException : CancellationException(CANCELLED_BY_USER)
+
+private const val CANCELLED_BY_USER = "attachment transfer cancelled by user"
+
+private fun cancelledByUser(cause: Throwable?): Boolean =
+    generateSequence(cause) { it.cause }
+        .any { it is AttachmentTransferCancelledByUserException }
 
 /**
  * Owns the UI-facing lifecycle of attachment downloads for one conversation.
@@ -35,6 +63,7 @@ internal enum class AttachmentTransferState {
  * owner; the underlying app-level download can still finish and publish to the
  * encrypted cache.
  */
+@Suppress("TooManyFunctions") // Cohesive single-flight owner for one attachment transfer lifecycle.
 internal class AttachmentTransferCoordinator(
     private val scope: CoroutineScope,
 ) {
@@ -151,11 +180,7 @@ internal class AttachmentTransferCoordinator(
                             publishTerminalState(
                                 key,
                                 state,
-                                if (stateBeforeDownload == AttachmentTransferState.Available) {
-                                    AttachmentTransferState.Available
-                                } else {
-                                    AttachmentTransferState.Remote
-                                },
+                                cancellationTerminalState(cancellation, stateBeforeDownload),
                             )
                             throw cancellation
                         } catch (exception: Exception) {
@@ -168,8 +193,17 @@ internal class AttachmentTransferCoordinator(
                     }
             }
         if (created) {
-            deferred.invokeOnCompletion {
+            deferred.invokeOnCompletion { cause ->
                 synchronized(lock) {
+                    // A user cancel that lands before the lazy owner body runs
+                    // never reaches the catch above, so publish here too. The
+                    // in-progress guard keeps this idempotent and stops it from
+                    // overwriting a terminal state the owner already published.
+                    if (cancelledByUser(cause)) {
+                        states[key]
+                            ?.takeIf { it.value.isTransferInProgress() }
+                            ?.let { publishTerminalState(key, it, AttachmentTransferState.Cancelled) }
+                    }
                     if (active[key] === deferred) {
                         active.remove(key)
                         retireStateIfUnused(key)
@@ -179,6 +213,34 @@ internal class AttachmentTransferCoordinator(
             deferred.start()
         }
         return deferred
+    }
+
+    /**
+     * Cancels the transfer for [key] on the user's behalf.
+     *
+     * A live owner is cancelled with the user marker so its cancellation branch
+     * publishes [AttachmentTransferState.Cancelled]; a key that is queued
+     * without a live owner is published directly so the fencing generation
+     * still advances and a late refresh cannot reopen it. A transfer that has
+     * already published a terminal state wins the race and is left alone.
+     *
+     * MDK's `download_media` is all-or-nothing today (marmot-protocol/mdk#1437),
+     * so this detaches the UI and the durable intent. A network fetch already in
+     * flight may still complete and publish to the encrypted cache, which
+     * [refresh] then surfaces as [AttachmentTransferState.Available].
+     */
+    fun cancel(key: String) {
+        val owner =
+            synchronized(lock) {
+                active[key]?.takeUnless { it.isCompleted }
+                    ?: run {
+                        states[key]
+                            ?.takeIf { it.value.isTransferInProgress() }
+                            ?.let { publishTerminalState(key, it, AttachmentTransferState.Cancelled) }
+                        return
+                    }
+            }
+        owner.cancel(AttachmentTransferCancelledByUserException())
     }
 
     private fun currentStateForRefresh(
@@ -314,16 +376,29 @@ private suspend fun probeForRefresh(probe: suspend () -> Boolean): Boolean? =
         null
     }
 
+private fun cancellationTerminalState(
+    cancellation: CancellationException,
+    stateBeforeDownload: AttachmentTransferState,
+): AttachmentTransferState =
+    when {
+        cancelledByUser(cancellation) -> AttachmentTransferState.Cancelled
+        stateBeforeDownload == AttachmentTransferState.Available -> AttachmentTransferState.Available
+        else -> AttachmentTransferState.Remote
+    }
+
 private fun refreshedState(
     previous: AttachmentTransferState,
     available: Boolean?,
 ): AttachmentTransferState =
     when {
+        // A verified cache publication that won the cancel race is still the
+        // truthful answer, and marmot-protocol/whitenoise-android#2045 allows it.
         available == true -> AttachmentTransferState.Available
         available == null && previous == AttachmentTransferState.Resolving -> AttachmentTransferState.Remote
         available == null -> previous
         previous == AttachmentTransferState.NotRetained -> AttachmentTransferState.NotRetained
         previous == AttachmentTransferState.Failed -> AttachmentTransferState.Failed
+        previous == AttachmentTransferState.Cancelled -> AttachmentTransferState.Cancelled
         else -> AttachmentTransferState.Remote
     }
 

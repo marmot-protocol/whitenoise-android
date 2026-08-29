@@ -156,7 +156,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
             val priority = intentStore.priorityFor(request)
             if (
                 priority == AttachmentDownloadPriority.Automatic &&
-                intentStore.isAutomaticPaused(request.accountRef)
+                (intentStore.isAutomaticPaused(request.accountRef) || intentStore.isAutomaticSuppressed(request))
             ) {
                 Result.success()
             } else {
@@ -221,11 +221,12 @@ class AttachmentDownloadWorker : CoroutineWorker {
             val intentStore = attachmentIntentStore(context.applicationContext)
             if (
                 priority == AttachmentDownloadPriority.Automatic &&
-                intentStore.isAutomaticPaused(request.accountRef)
+                (intentStore.isAutomaticPaused(request.accountRef) || intentStore.isAutomaticSuppressed(request))
             ) {
                 return
             }
             if (priority == AttachmentDownloadPriority.Interactive) {
+                intentStore.restoreAutomatic(request)
                 intentStore.setInteractive(request, interactive = true)
             }
             val work =
@@ -251,6 +252,27 @@ class AttachmentDownloadWorker : CoroutineWorker {
                     work,
                 )
             }.onFailure { Log.w(TAG, "attachment_download_enqueue_failed") }
+        }
+
+        /**
+         * Revokes one attachment's durable transfer.
+         *
+         * The interactive intent is cleared before the unique work is cancelled
+         * so a retry scheduled between the two steps cannot re-arm the identity,
+         * and so process restoration cannot resurrect a cancelled transfer.
+         */
+        internal fun cancelForRequest(
+            context: Context,
+            request: AttachmentTransferRequest,
+        ) {
+            val appContext = context.applicationContext
+            attachmentIntentStore(appContext).apply {
+                suppressAutomatic(request)
+                setInteractive(request, interactive = false)
+            }
+            runCatching {
+                WorkManager.getInstance(appContext).cancelUniqueWork(attachmentDownloadWorkName(request))
+            }.onFailure { Log.w(TAG, "attachment_download_cancel_failed") }
         }
 
         internal suspend fun cancelQueuedAutomatic(

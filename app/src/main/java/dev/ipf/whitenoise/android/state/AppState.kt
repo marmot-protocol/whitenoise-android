@@ -3870,10 +3870,32 @@ class WhiteNoiseAppState private constructor(
         priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
     ) {
         if (priority == AttachmentDownloadPriority.Interactive) {
+            // An explicit request outranks an earlier cancel of the same file.
+            attachmentDownloadIntents.restoreAutomatic(request)
             attachmentDownloadIntents.setInteractive(request, interactive = true)
             attachmentDownloadGate.promote(request.cacheKey())
+        } else if (attachmentDownloadIntents.isAutomaticSuppressed(request)) {
+            return
         }
         AttachmentDownloadWorker.enqueue(appContext, request, priority)
+    }
+
+    /**
+     * Revokes one attachment's durable download so a cancel survives both a
+     * worker retry and process death, and so recreating the card cannot let the
+     * automatic policy restart what the user just stopped.
+     */
+    internal fun cancelAttachmentDownload(request: AttachmentTransferRequest) {
+        attachmentDownloadIntents.suppressAutomatic(request)
+        attachmentDownloadIntents.setInteractive(request, interactive = false)
+        AttachmentDownloadWorker.cancelForRequest(appContext, request)
+        attachmentDownloadPolicyRevision += 1
+    }
+
+    /** True while the user's cancel of this exact attachment still blocks automatic work. */
+    internal fun automaticAttachmentDownloadSuppressed(request: AttachmentTransferRequest): Boolean {
+        attachmentDownloadPolicyRevision
+        return attachmentDownloadIntents.isAutomaticSuppressed(request)
     }
 
     fun automaticAttachmentDownloadsPaused(): Boolean {
@@ -3894,6 +3916,10 @@ class WhiteNoiseAppState private constructor(
     fun restartAutomaticAttachmentDownloads() {
         val accountRef = activeAccountRef ?: return
         attachmentDownloadIntents.restartAutomatic(accountRef)
+        // Resuming the backlog is a resume-everything signal, and it is the one
+        // point where per-file cancel records can be dropped in bulk instead of
+        // accumulating for attachments the user never opens again.
+        attachmentDownloadIntents.clearSuppressedAutomatic()
         attachmentDownloadPolicyRevision += 1
     }
 

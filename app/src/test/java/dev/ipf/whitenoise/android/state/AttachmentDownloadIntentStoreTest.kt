@@ -171,6 +171,46 @@ class AttachmentDownloadIntentStoreTest {
         assertFalse(AttachmentDownloadIntentStore(preferences).hasOpenIntent(OPEN_REQUEST_A))
     }
 
+    @Test
+    fun aCancelledAttachmentStaysSuppressedUntilItIsExplicitlyRequested() {
+        val store = AttachmentDownloadIntentStore(preferences)
+        store.suppressAutomatic(REQUEST_A)
+
+        val recreated = AttachmentDownloadIntentStore(preferences)
+        assertTrue(recreated.isAutomaticSuppressed(REQUEST_A))
+        assertFalse("suppression is per attachment", recreated.isAutomaticSuppressed(REQUEST_B))
+
+        recreated.restoreAutomatic(REQUEST_A)
+        assertFalse(AttachmentDownloadIntentStore(preferences).isAutomaticSuppressed(REQUEST_A))
+    }
+
+    @Test
+    fun restartingTheBacklogDropsEveryCancelRecord() {
+        val store = AttachmentDownloadIntentStore(preferences)
+        store.suppressAutomatic(REQUEST_A)
+        store.suppressAutomatic(REQUEST_B)
+
+        store.clearSuppressedAutomatic()
+
+        val recreated = AttachmentDownloadIntentStore(preferences)
+        assertFalse(recreated.isAutomaticSuppressed(REQUEST_A))
+        assertFalse(recreated.isAutomaticSuppressed(REQUEST_B))
+    }
+
+    @Test
+    fun aFreshTapSupersedesACancelWhoseRevocationHasNotLandedYet() {
+        val store = AttachmentDownloadIntentStore(preferences)
+        store.markOpenIntent(OPEN_REQUEST_A)
+
+        // The cancel's durable revocation is still in flight when the user taps
+        // again; it must not remove the intent that second tap just created.
+        assertFalse(store.consumeOpenIntentUnlessSuperseded(OPEN_REQUEST_A) { true })
+        assertTrue(store.hasOpenIntent(OPEN_REQUEST_A))
+
+        assertTrue(store.consumeOpenIntentUnlessSuperseded(OPEN_REQUEST_A) { false })
+        assertFalse(store.hasOpenIntent(OPEN_REQUEST_A))
+    }
+
     private companion object {
         const val ACCOUNT_A = "account-a"
         const val ACCOUNT_B = "account-b"
