@@ -1990,13 +1990,26 @@ private fun rememberAcceptedPendingTextOptimisticId(
     }
 }
 
+/**
+ * Total order for the rendered timeline: engine timestamp, then the local
+ * arrival order that breaks a same-second tie, then the message id.
+ *
+ * Written as an explicit chain rather than `compareValuesBy`. That helper
+ * takes its selectors as `vararg (T) -> Comparable<*>?`, so each call
+ * allocates a `Function1[3]` and boxes both `ULong` keys through
+ * `ULong.box-impl` to satisfy the `Comparable` return type. This runs once
+ * per comparison of an O(n log n) sort that re-runs on every timeline
+ * publish. `ULong.compareTo` compares the underlying longs directly.
+ */
 internal fun compareTimelineMessages(
     left: TimelineMessage,
     right: TimelineMessage,
-): Int =
-    compareValuesBy(left, right, {
-        it.record.recordedAt
-    }, { it.timelineOrder }, { it.id })
+): Int {
+    val byRecordedAt = left.record.recordedAt.compareTo(right.record.recordedAt)
+    if (byRecordedAt != 0) return byRecordedAt
+    val byTimelineOrder = left.timelineOrder.compareTo(right.timelineOrder)
+    return if (byTimelineOrder != 0) byTimelineOrder else left.id.compareTo(right.id)
+}
 
 /**
  * An optimistic-send position override (#1256) is a transient bridge: it pins a
