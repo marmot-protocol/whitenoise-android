@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.core
 
+import androidx.compose.runtime.Immutable
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -114,6 +115,13 @@ data class MessageTextCopy(
     }
 }
 
+/**
+ * `@Immutable` so the Compose compiler resolves this eagerly instead of
+ * deferring to a runtime stability check. Both properties are immutable value
+ * types, and every enclosing projection that holds one — `ChatListItem` above
+ * all — inherits the deferral otherwise.
+ */
+@Immutable
 data class MediaPreviewFallback(
     val filename: String? = null,
     val kind: ReplyMediaKind = ReplyMediaKind.None,
