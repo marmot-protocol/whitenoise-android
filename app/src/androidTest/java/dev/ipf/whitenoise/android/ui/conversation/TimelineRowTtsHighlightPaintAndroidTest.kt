@@ -360,7 +360,26 @@ class TimelineRowTtsHighlightPaintAndroidTest {
                 ),
         )
 
+    /**
+     * A frame with one colour in it is a broken capture, not a rendered row:
+     * the harness draws text on a bubble, so a real frame always holds several.
+     * Native capture can fail transiently under load, and reporting that as
+     * "painted nothing" would accuse the production code of this suite's own
+     * flakiness. Retry once, then say plainly which one happened.
+     */
     private fun renderedPixels(): IntArray {
+        repeat(2) { attempt ->
+            val pixels = capturedPixels()
+            if (pixels.toHashSet().size > 1) return pixels
+            if (attempt == 0) composeRule.waitForIdle()
+        }
+        throw AssertionError(
+            "Capture produced a uniform frame twice, so no rendering was observed at all. " +
+                "This is a capture failure, not a missing highlight.",
+        )
+    }
+
+    private fun capturedPixels(): IntArray {
         val pixelMap = composeRule.onRoot().captureToImage().toPixelMap()
         return IntArray(pixelMap.width * pixelMap.height) { index ->
             pixelMap[index % pixelMap.width, index / pixelMap.width].toArgb()
