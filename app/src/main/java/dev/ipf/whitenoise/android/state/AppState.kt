@@ -3897,27 +3897,11 @@ class WhiteNoiseAppState private constructor(
         attachmentDownloadPolicyRevision += 1
     }
 
-    /** True only when plaintext is retained in L1 or the encrypted L2 cache. */
-    internal suspend fun hasCachedAttachmentAfterHydration(request: AttachmentTransferRequest): Boolean {
-        val cacheKey =
-            mediaCacheKey(
-                request.accountRef,
-                request.groupIdHex,
-                request.messageIdHex,
-                request.attachmentIndex,
-            )
-        val initialMemoryHit =
-            withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) != null }
-        val diskHit =
-            initialMemoryHit ||
-                withContext(Dispatchers.IO) {
-                    diskMediaCache.containsAfterHydration(cacheKey)
-                }
-        return diskHit ||
-            withContext(Dispatchers.Main.immediate) {
-                cachedMediaPlaintext(cacheKey) != null
-            }
-    }
+    /** True for retained plaintext; [hydrateMemory] promotes authenticated L2 hits into L1. */
+    internal suspend fun hasCachedAttachmentAfterHydration(
+        request: AttachmentTransferRequest,
+        hydrateMemory: Boolean = false,
+    ): Boolean = hasCachedAttachmentForPresentation(request, hydrateMemory)
 
     /**
      * Shared download/cache implementation for UI controllers and durable work.

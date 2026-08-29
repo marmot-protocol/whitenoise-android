@@ -6552,7 +6552,7 @@ internal typealias MediaPublisher =
     suspend (String, String, List<MediaAttachmentReferenceFfi>, String?) -> SendSummaryFfi
 
 class ConversationController(
-    private val appState: WhiteNoiseAppState,
+    internal val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
     internal val initialMemberSnapshot: GroupMemberSnapshot? = null,
     initialChatListRow: ChatListRowFfi? = null,
@@ -6971,7 +6971,7 @@ class ConversationController(
         )
     private val inviteStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val attachmentTransferScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val attachmentTransfers = AttachmentTransferCoordinator(attachmentTransferScope)
+    internal val attachmentTransfers = AttachmentTransferCoordinator(attachmentTransferScope)
 
     // Cached at start() so `loadOlderPage` / `loadNewerPage` can drive
     // `paginate_backwards` / `paginate_forwards` on the subscription. Per
@@ -9155,16 +9155,6 @@ class ConversationController(
         attachmentTransfers.releaseState(attachmentTransferKey(messageIdHex, attachmentIndex))
     }
 
-    /** Reconcile presentation state with the encrypted L1/L2 cache. */
-    internal suspend fun refreshAttachmentTransferState(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ) {
-        attachmentTransfers.refresh(attachmentTransferKey(messageIdHex, attachmentIndex)) {
-            hasCachedAttachmentAfterHydration(messageIdHex, attachmentIndex)
-        }
-    }
-
     /** Suspends until this attachment, rather than any process-wide cache key, becomes available. */
     internal suspend fun awaitNextAttachmentAvailability(
         messageIdHex: String,
@@ -9270,7 +9260,7 @@ class ConversationController(
         throw AttachmentReferenceNotReadyException()
     }
 
-    private fun attachmentTransferKey(
+    internal fun attachmentTransferKey(
         messageIdHex: String,
         attachmentIndex: Int,
     ): String = "$messageIdHex#$attachmentIndex"

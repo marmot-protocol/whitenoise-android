@@ -2,13 +2,25 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -43,6 +55,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
+import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -55,7 +68,10 @@ import dev.ipf.whitenoise.android.state.mediaCacheKey
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.media.ANDROID_PACKAGE_MIME
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaFileBubbleContent
 import dev.ipf.whitenoise.android.ui.conversation.media.fileAttachmentCardTestTag
+import dev.ipf.whitenoise.android.ui.conversation.media.fileAttachmentFirstFrameVisibility
+import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
@@ -123,6 +139,44 @@ class MessageBubbleFileAttachmentScreenshotTest {
         // Capture the fixed-size root rather than a cropped semantics node. Cropped native-graphics
         // capture can fail in Skia's PNG stream encoder on Linux even after all layout assertions pass.
         composeRule.onRoot().captureRoboImage(SNAPSHOT_PATH)
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h112dp-mdpi")
+    fun receivedFileCardHasDeterministicUnresolvedAndResolvedFirstFrames() {
+        var resolved by mutableStateOf(false)
+        val reference = fileReference("cached-release.pdf", "application/pdf")
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(16.dp),
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .fileAttachmentFirstFrameVisibility(resolved)
+                                .testTag(FIRST_FRAME_CARD_TAG),
+                    ) {
+                        MediaFileBubbleContent(
+                            reference = reference,
+                            presentation = resolveAttachmentPresentation(reference.mediaType, reference.fileName),
+                            transferState = AttachmentTransferState.Remote,
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onRoot().captureRoboImage(FIRST_FRAME_UNRESOLVED_SNAPSHOT_PATH)
+        composeRule.runOnIdle { resolved = true }
+        composeRule.onNodeWithText("cached-release.pdf").assertExists()
+        composeRule.onRoot().captureRoboImage(FIRST_FRAME_RESOLVED_SNAPSHOT_PATH)
     }
 
     private fun assertFileGalleryStates(gallery: GalleryFixtures) {
@@ -596,5 +650,10 @@ class MessageBubbleFileAttachmentScreenshotTest {
         const val SELECTED_CAPTION = "Selected constrained attachment"
         const val RTL_FILE = "rtl-layout-document.pdf"
         const val SNAPSHOT_PATH = "src/test/snapshots/message_bubble_file_attachment_width.png"
+        const val FIRST_FRAME_CARD_TAG = "received-file-first-frame-card"
+        const val FIRST_FRAME_UNRESOLVED_SNAPSHOT_PATH =
+            "src/test/snapshots/received_file_first_frame_unresolved_light.png"
+        const val FIRST_FRAME_RESOLVED_SNAPSHOT_PATH =
+            "src/test/snapshots/received_file_first_frame_resolved_light.png"
     }
 }
