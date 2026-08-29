@@ -1,17 +1,15 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.speech.tts.TextToSpeech
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.AnnotatedString
@@ -27,7 +25,11 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
+import dev.ipf.marmotkit.MarkdownListItemFfi
+import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -50,16 +52,21 @@ import org.junit.Test
 import java.util.Locale
 
 /**
- * Placement, not merely presence.
+ * Placement where spoken and visible text diverge.
  *
- * `TimelineRowTtsHighlightPaintAndroidTest` proves the painter runs by counting
- * changed pixels, which stays green for a highlight drawn over the wrong word.
- * This drives known engine ranges through the production row on a device and
- * asserts where the highlight landed: that the word marker covers exactly the
- * spoken characters, that the sentence band stops at the sentence being spoken,
- * and that each word's marker occupies its own place under real font metrics.
+ * `TtsHighlightPlacementAndroidTest` uses one plain paragraph, where the spoken
+ * offset and the rendered offset happen to agree. The mapping that actually
+ * carries risk is the one that survives content the projection speaks
+ * differently from how the bubble draws it: several Markdown leaves in one
+ * message, and a bare URL that speech omits entirely while the bubble still
+ * shows it. In that case an engine range near the start of the spoken text
+ * addresses a word far along the rendered line, and an off-by-the-URL mapping
+ * is invisible to any presence-only assertion.
+ *
+ * Offsets are taken from the projection the app itself built, which is exactly
+ * the coordinate space engine callbacks arrive in.
  */
-class TtsHighlightPlacementAndroidTest {
+class TtsRichLeafPlacementAndroidTest {
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -77,145 +84,102 @@ class TtsHighlightPlacementAndroidTest {
     }
 
     @Test
-    fun eachEngineWordHighlightsExactlyThatWord() {
-        startSpeaking(BODY)
+    fun aWordAfterAnOmittedUrlIsHighlightedInItsRenderedPlace() {
+        val entry = startSpeaking(OMITTED_URL_BODY, omittedUrlDocument())
 
-        for (word in WORDS) {
-            rangeWithin(chunkIndex = 0, word = word)
+        // The URL is not spoken, so "details" sits far earlier in the spoken
+        // text than in the rendered line. That offset difference is the point.
+        val payload = engine.submitted.first()
+        val offset = payload.indexOf(WORD_AFTER_URL)
+        check(offset >= 0) { "fixture word missing from engine payload: '$payload'" }
+        engine.range(0, offset, offset + WORD_AFTER_URL.length)
+        composeRule.waitForIdle()
 
-            val leaf = leafCarryingHighlight()
-            assertNotNull("no rendered highlight for \"$word\"", leaf)
-            val rendered = leaf!!.text()
-            val range = leaf.config.getOrNull(TtsReadAloudHighlightRangeKey)
-            assertNotNull("word \"$word\" produced no word range", range)
+        assertEquals(
+            "the marker did not land on \"$WORD_AFTER_URL\"; engine payload was \"$payload\"",
+            WORD_AFTER_URL,
+            highlightedWord("payload=\"$payload\""),
+        )
+    }
+
+    @Test
+    fun everyRichLeafHighlightsItsOwnWord() {
+        val entry = startSpeaking(RICH_BODY, richDocument())
+        Log.i(TAG, "richSpokenText=\"${entry.text}\"")
+
+        for (word in RICH_WORDS) {
+            // Each of these words lives in a different sentence, so it belongs to
+            // a different utterance with its own offset space. The queue submits
+            // every chunk up front, so the one being spoken must be addressed by
+            // index and reached by completing the utterances before it.
+            val chunkIndex = engine.submitted.indexOfFirst { it.contains(word) }
+            check(chunkIndex >= 0) { "fixture word '$word' missing from ${engine.submitted}" }
+            val payload = engine.submitted[chunkIndex]
+            val offset = payload.indexOf(word)
+            engine.advanceTo(chunkIndex)
+            engine.range(chunkIndex, offset, offset + word.length)
+            composeRule.waitForIdle()
             assertEquals(
-                "word marker landed on the wrong characters for \"$word\"",
+                "the marker did not land on \"$word\" in its rendered leaf",
                 word,
-                rendered.substring(range!!.first, range.last + 1),
+                highlightedWord("word=\"$word\" chunk=$chunkIndex payload=\"$payload\" offset=$offset"),
             )
         }
     }
 
-    @Test
-    fun theSentenceBandFollowsTheSentenceBeingSpoken() {
-        startSpeaking(TWO_SENTENCES)
-
-        // Sentence boundaries make each sentence its own utterance, and the
-        // queue submits both up front. Address the one actually speaking.
-        rangeWithin(chunkIndex = 0, word = "first")
-        assertEquals(
-            "the band covers more than the sentence being spoken",
-            FIRST_SENTENCE,
-            renderedSentenceBand(),
-        )
-
-        engine.advanceTo(1)
-        rangeWithin(chunkIndex = 1, word = "second")
-        assertEquals(
-            "the band did not follow playback onto the second sentence",
-            SECOND_SENTENCE,
-            renderedSentenceBand(),
-        )
-    }
-
-    /** Reports [word] at its offset inside the exact payload of [chunkIndex]. */
-    private fun rangeWithin(
-        chunkIndex: Int,
-        word: String,
-    ) {
-        val payload = engine.submitted[chunkIndex]
-        val offset = payload.indexOf(word)
-        check(offset >= 0) { "'$word' is not in engine payload '$payload'" }
-        engine.range(chunkIndex, offset, offset + word.length)
-        composeRule.waitForIdle()
-    }
-
     /**
-     * The assertion real font metrics can fail and the JVM suite cannot make.
+     * The characters the rendered word marker currently covers.
      *
-     * The semantics range above is computed from the projection mapping and is
-     * layout-independent, so Robolectric already covers it. What only a device
-     * can answer is whether the paint lands under the word those coordinates
-     * name: the word marker is a 2dp underline positioned from
-     * `TextLayoutResult`, and a marker drawn at the wrong offset — or pinned to
-     * one position for every word — still changes pixels and still passes a
-     * `changedPixelCount > 0` check.
+     * The primary range a leaf publishes is `word ?: sentence`, so in a
+     * multi-leaf message every leaf carrying the sentence band also carries a
+     * primary range. Only the leaf whose primary range differs from its own
+     * sentence range is the one holding the word.
      */
-    @Test
-    fun eachWordMarkerIsPaintedInItsOwnPlace() {
-        startSpeaking(BODY)
-        val baseline = renderedPixels()
-
-        // Bounding box, not just the horizontal span: a wrapped line legitimately
-        // restarts at the same left margin, so x alone cannot tell "moved to the
-        // next line" from "never moved".
-        val boxes = WORDS.associateWith { word -> markerBoxAfterSpeaking(word, baseline) }
-        boxes.forEach { (word, box) ->
-            assertNotNull("highlighting \"$word\" painted nothing", box)
-        }
-        assertEquals(
-            "distinct words share a marker box, so the paint is not following the word: $boxes",
-            WORDS.size,
-            boxes.values.toSet().size,
-        )
-    }
-
-    /** Bounding box of the pixels this word's marker changed, or null. */
-    private fun markerBoxAfterSpeaking(
-        word: String,
-        baseline: IntArray,
-    ): MarkerBox? {
-        rangeWithin(chunkIndex = 0, word = word)
-        val pixelMap = composeRule.onRoot(useUnmergedTree = true).captureToImage().toPixelMap()
-        var left = Int.MAX_VALUE
-        var right = Int.MIN_VALUE
-        var top = Int.MAX_VALUE
-        var bottom = Int.MIN_VALUE
-        for (index in baseline.indices) {
-            val x = index % pixelMap.width
-            val y = index / pixelMap.width
-            if (baseline[index] != pixelMap[x, y].toArgb()) {
-                if (x < left) left = x
-                if (x > right) right = x
-                if (y < top) top = y
-                if (y > bottom) bottom = y
+    private fun highlightedWord(diagnostic: String = ""): String {
+        val candidates =
+            composeRule
+                .onRoot(useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .descendants()
+                .filter { it.config.getOrNull(TtsReadAloudHighlightRangeKey) != null }
+        val leaf =
+            candidates.firstOrNull { node ->
+                node.config.getOrNull(TtsReadAloudHighlightRangeKey) !=
+                    node.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey)
             }
-        }
-        return if (left <= right) MarkerBox(left, right, top, bottom) else null
+        assertNotNull(
+            "no leaf carried a word range distinct from its sentence band; $diagnostic candidates=" +
+                candidates.joinToString { node ->
+                    val primary = node.config.getOrNull(TtsReadAloudHighlightRangeKey)
+                    val sentence = node.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey)
+                    "\"${node.text()}\" primary=$primary sentence=$sentence"
+                },
+            leaf,
+        )
+        val range = checkNotNull(leaf!!.config.getOrNull(TtsReadAloudHighlightRangeKey))
+        return leaf.text().substring(range.first, range.last + 1)
     }
 
-    private data class MarkerBox(
-        val left: Int,
-        val right: Int,
-        val top: Int,
-        val bottom: Int,
-    )
+    private fun SemanticsNode.descendants(): List<SemanticsNode> = children + children.flatMap { it.descendants() }
 
-    private fun renderedPixels(): IntArray {
-        val pixelMap = composeRule.onRoot(useUnmergedTree = true).captureToImage().toPixelMap()
-        return IntArray(pixelMap.width * pixelMap.height) { index ->
-            pixelMap[index % pixelMap.width, index / pixelMap.width].toArgb()
-        }
-    }
+    private fun SemanticsNode.text(): String =
+        config
+            .getOrNull(SemanticsProperties.Text)
+            .orEmpty()
+            .joinToString("") { annotated: AnnotatedString -> annotated.text }
 
-    private fun renderedSentenceBand(): String {
-        val leaf = leafCarryingHighlight()
-        assertNotNull("no rendered highlight", leaf)
-        val rendered = leaf!!.text()
-        val sentence = leaf.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey)
-        assertNotNull("no sentence range was rendered", sentence)
-        return rendered.substring(sentence!!.first, sentence.last + 1)
-    }
-
-    private fun startSpeaking(body: String) {
-        val record = speakableRecord(body)
+    private fun startSpeaking(
+        body: String,
+        document: MarkdownDocumentFfi,
+    ): TtsSpeakableEntry {
+        val record = speakableRecord(body, document)
         val entry =
             runBlocking {
                 projectTtsSpeakableEntry(
                     message = record,
                     editedText = null,
                     senderDisplayName = SENDER_NAME,
-                    parseMarkdown = { plainTextDocument(body) },
+                    parseMarkdown = { document },
                 )!!
             }
         composeRule.setContent {
@@ -229,25 +193,87 @@ class TtsHighlightPlacementAndroidTest {
         composeRule.waitForIdle()
         check(appState.ttsController.speak(listOf(entry), Locale.US))
         composeRule.waitForIdle()
+        return entry
     }
 
-    private fun leafCarryingHighlight(): SemanticsNode? =
-        composeRule
-            .onRoot(useUnmergedTree = true)
-            .fetchSemanticsNode()
-            .descendants()
-            .firstOrNull { node ->
-                node.config.getOrNull(TtsReadAloudHighlightRangeKey) != null ||
-                    node.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey) != null
-            }
+    /** "See <url> for details." with the URL as its own autolink label. */
+    private fun omittedUrlDocument() =
+        MarkdownDocumentFfi(
+            truncated = false,
+            blankLinesBefore = byteArrayOf(),
+            blocks =
+                listOf(
+                    MarkdownBlockFfi.Paragraph(
+                        inlines =
+                            listOf(
+                                MarkdownInlineFfi.Text("See "),
+                                MarkdownInlineFfi.Link(
+                                    dest = OMITTED_URL,
+                                    title = null,
+                                    children = listOf(MarkdownInlineFfi.Text(OMITTED_URL)),
+                                    classification = MarkdownLinkDestinationKindFfi.WEB,
+                                ),
+                                MarkdownInlineFfi.Text(" for $WORD_AFTER_URL."),
+                            ),
+                    ),
+                ),
+        )
 
-    private fun SemanticsNode.descendants(): List<SemanticsNode> = children + children.flatMap { it.descendants() }
-
-    private fun SemanticsNode.text(): String =
-        config
-            .getOrNull(SemanticsProperties.Text)
-            .orEmpty()
-            .joinToString("") { annotated: AnnotatedString -> annotated.text }
+    private fun richDocument() =
+        MarkdownDocumentFfi(
+            truncated = false,
+            blankLinesBefore = byteArrayOf(0, 0, 0, 0),
+            blocks =
+                listOf(
+                    MarkdownBlockFfi.Heading(
+                        level = 1u,
+                        inlines = listOf(MarkdownInlineFfi.Text("Release notes")),
+                    ),
+                    MarkdownBlockFfi.Paragraph(
+                        inlines =
+                            listOf(
+                                MarkdownInlineFfi.Text("Important "),
+                                MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("bright"))),
+                                MarkdownInlineFfi.Text(" details with "),
+                                MarkdownInlineFfi.Code("code"),
+                                MarkdownInlineFfi.Text(" and "),
+                                MarkdownInlineFfi.Link(
+                                    dest = "https://example.com/docs",
+                                    title = null,
+                                    children = listOf(MarkdownInlineFfi.Text("a link")),
+                                    classification = MarkdownLinkDestinationKindFfi.WEB,
+                                ),
+                                MarkdownInlineFfi.Text("."),
+                            ),
+                    ),
+                    MarkdownBlockFfi.ListBlock(
+                        kind = MarkdownListKindFfi.Bullet("-"),
+                        tight = true,
+                        items =
+                            listOf(
+                                MarkdownListItemFfi(
+                                    blocks =
+                                        listOf(
+                                            MarkdownBlockFfi.Paragraph(
+                                                inlines = listOf(MarkdownInlineFfi.Text("First item.")),
+                                            ),
+                                        ),
+                                    checked = null,
+                                    blankLinesBefore = byteArrayOf(0),
+                                ),
+                            ),
+                    ),
+                    MarkdownBlockFfi.BlockQuote(
+                        blocks =
+                            listOf(
+                                MarkdownBlockFfi.Paragraph(
+                                    inlines = listOf(MarkdownInlineFfi.Text("A quoted line.")),
+                                ),
+                            ),
+                        blankLinesBefore = byteArrayOf(0),
+                    ),
+                ),
+        )
 
     @Composable
     @Suppress("FunctionNaming", "LongMethod")
@@ -294,29 +320,24 @@ class TtsHighlightPlacementAndroidTest {
     private fun timelineMessage(record: AppMessageRecordFfi) =
         TimelineMessage(id = "msg:${record.messageIdHex}", record = record, status = MessageStatus.Received)
 
-    private fun speakableRecord(plaintext: String) =
-        AppMessageRecordFfi(
-            messageIdHex = MESSAGE_ID,
-            direction = "received",
-            groupIdHex = GROUP_ID,
-            sender = SENDER_ID,
-            plaintext = plaintext,
-            contentTokens = plainTextDocument(plaintext),
-            kind = 9uL,
-            tags = emptyList(),
-            sourceEpoch = null,
-            retentionSeconds = null,
-            retentionExpiresAt = null,
-            recordedAt = 1uL,
-            receivedAt = 1uL,
-        )
-
-    private fun plainTextDocument(text: String) =
-        MarkdownDocumentFfi(
-            truncated = false,
-            blankLinesBefore = byteArrayOf(),
-            blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = listOf(MarkdownInlineFfi.Text(text)))),
-        )
+    private fun speakableRecord(
+        plaintext: String,
+        document: MarkdownDocumentFfi,
+    ) = AppMessageRecordFfi(
+        messageIdHex = MESSAGE_ID,
+        direction = "received",
+        groupIdHex = GROUP_ID,
+        sender = SENDER_ID,
+        plaintext = plaintext,
+        contentTokens = document,
+        kind = 9uL,
+        tags = emptyList(),
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
+        recordedAt = 1uL,
+        receivedAt = 1uL,
+    )
 
     private fun appState() =
         WhiteNoiseAppState(
@@ -343,7 +364,7 @@ class TtsHighlightPlacementAndroidTest {
             protocolProfile = AppProtocolProfileFfi.LEGACY,
             endpoint = "wss://relay.example",
             profilePresent = true,
-            name = "Read-aloud placement group",
+            name = "Rich leaf placement group",
             description = "",
             admins = listOf(ACCOUNT_ID),
             relays = emptyList(),
@@ -442,9 +463,8 @@ class TtsHighlightPlacementAndroidTest {
         override fun stop() = Unit
 
         /**
-         * The queue submits every chunk up front, so the utterance being spoken
-         * is not the last one submitted. Addressing the wrong one is silently
-         * rejected as stale, which looks exactly like a passing test.
+         * The queue pre-buffers every chunk up front, so the utterance being
+         * spoken is not the last one submitted. Address it by index.
          */
         fun range(
             chunkIndex: Int,
@@ -456,19 +476,22 @@ class TtsHighlightPlacementAndroidTest {
     }
 
     private companion object {
+        const val TAG = "WnTtsRich"
         const val SENDER_NAME = "Alice"
         const val PREFIX = "$SENDER_NAME: "
         const val ACCOUNT_REF = "personal"
         val ACCOUNT_ID = "01" + "00".repeat(31)
         val SENDER_ID = "02" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
-        val MESSAGE_ID = "09" + "00".repeat(31)
+        val MESSAGE_ID = "0a" + "00".repeat(31)
 
-        const val BODY = "Hello bright world of steady careful reading."
-        val WORDS = listOf("Hello", "bright", "world", "steady", "careful", "reading")
+        const val OMITTED_URL = "https://example.com/a/rather/long/path/that/is/never/spoken"
+        const val WORD_AFTER_URL = "details"
+        const val OMITTED_URL_BODY = "See $OMITTED_URL for $WORD_AFTER_URL."
 
-        const val FIRST_SENTENCE = "The first sentence sits here."
-        const val SECOND_SENTENCE = "The second one follows it."
-        const val TWO_SENTENCES = "$FIRST_SENTENCE $SECOND_SENTENCE"
+        const val RICH_BODY =
+            "# Release notes\n\nImportant **bright** details with `code` and " +
+                "[a link](https://example.com/docs).\n\n- First item.\n\n> A quoted line."
+        val RICH_WORDS = listOf("Release", "bright", "code", "link", "First", "quoted")
     }
 }
