@@ -4088,8 +4088,7 @@ class ChatsController private constructor(
                     recompute()
 
                     // The per-account SQLite projection is the local-ready
-                    // boundary. Draw it before relay catch-up; later stream
-                    // updates fold fresh state into these maps (#252, #1698).
+                    // boundary. Draw it before relay catch-up; later stream updates fold fresh state (#252, #1698).
                     if (!localFramePresented) {
                         awaitRenderedChatListFrame()
                         appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
@@ -4187,9 +4186,8 @@ class ChatsController private constructor(
                         }
                     }
                     connectionOwner.finishSessionAttempt(connectionAttempt)
-                    // NonCancellable: a cancelled bind must still close subscriptions
-                    // so a retry loop or account switch cannot leak account-wide
-                    // chat-list/chats handles. (Originally surfaced in #270.)
+                    // NonCancellable cleanup prevents a cancelled bind, retry, or account switch
+                    // from leaking account-wide chat-list/chats handles (#270).
                     withContext(NonCancellable + Dispatchers.IO) {
                         runCatching { chatListSubscription?.close() }
                         runCatching { chatsSubscription?.close() }
