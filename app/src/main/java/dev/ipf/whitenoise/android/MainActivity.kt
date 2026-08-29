@@ -18,6 +18,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -54,8 +56,8 @@ import dev.ipf.whitenoise.android.updates.AppUpdateNavigation
 class MainActivity : AppCompatActivity() {
     private var inboundProfilePayload by mutableStateOf<String?>(null)
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
-    private var inboundNotificationRequestId by mutableStateOf(0L)
-    private var inboundAppUpdateTap by mutableStateOf(0)
+    private var inboundNotificationRequestId by mutableLongStateOf(0L)
+    private var inboundAppUpdateTap by mutableIntStateOf(0)
     private var appUnlockPromptActive = false
     private var appLockBackgroundSecureFlagRetained = false
     private var recentsPreferenceSecureFlagRetained = false
@@ -67,7 +69,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appState: WhiteNoiseAppState
     private lateinit var amberSignerLauncher: ActivityResultLauncher<Intent>
     private var warmResumeTraceToken = 0
-    private var warmResumeEpoch by mutableStateOf(0)
+    private var warmResumeEpoch by mutableIntStateOf(0)
     private var warmResumeLifecycleClass = WarmResumeLifecycleClass.ColdProcessStart
     private var mainShellHolderCreatedForActivity = false
     private val mainShellStateHolder: MainShellStateHolder by viewModels {

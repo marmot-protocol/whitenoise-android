@@ -29,6 +29,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -139,7 +141,7 @@ internal fun MediaVideoGridTile(
             policyAllowsMaterialization = policyAllowsMaterialization,
         )
     val startDownload = materializationIntent.shouldMaterialize
-    var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(0) }
+    var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableIntStateOf(0) }
 
     LaunchedEffect(
         messageIdHex,
@@ -409,7 +411,7 @@ internal fun MediaVideoBubble(
     var posterBitmap by remember(pillKey, epoch) {
         mutableStateOf(cachedThumbnail?.asImageBitmap())
     }
-    var durationMs by remember(pillKey, epoch) { mutableStateOf(0L) }
+    var durationMs by remember(pillKey, epoch) { mutableLongStateOf(0L) }
     var viewerOpen by remember(pillKey) { mutableStateOf(false) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     // Mirrors the image bubble's auto-download gate, but already-local bytes
@@ -434,7 +436,7 @@ internal fun MediaVideoBubble(
             policyAllowsMaterialization = policyAllowsMaterialization,
         )
     val startDownload = materializationIntent.shouldMaterialize
-    var reloadToken by remember(pillKey, epoch) { mutableStateOf(0) }
+    var reloadToken by remember(pillKey, epoch) { mutableIntStateOf(0) }
 
     LaunchedEffect(
         pillKey,
@@ -1016,7 +1018,7 @@ internal fun VideoViewerPage(
         mutableStateOf(false)
     }
     var loadFailed by remember(messageIdHex, attachmentIndex, reference.sourceEpoch) { mutableStateOf(false) }
-    var reloadToken by remember(messageIdHex, attachmentIndex, reference.sourceEpoch) { mutableStateOf(0) }
+    var reloadToken by remember(messageIdHex, attachmentIndex, reference.sourceEpoch) { mutableIntStateOf(0) }
     LaunchedEffect(messageIdHex, attachmentIndex, reference.sourceEpoch, isCurrent, reloadToken) {
         if (!isCurrent) return@LaunchedEffect
         if (localFile != null) return@LaunchedEffect

@@ -11,6 +11,8 @@ import android.util.Log
 import androidx.annotation.StringRes
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -1881,7 +1883,7 @@ class WhiteNoiseAppState private constructor(
     var appUnlockError by mutableStateOf<AppText?>(null)
         private set
 
-    var appUnlockPromptRequestId by mutableStateOf(0)
+    var appUnlockPromptRequestId by mutableIntStateOf(0)
         private set
 
     // Populated by the off-main pre-warm (or the first unlock/background
@@ -1981,7 +1983,7 @@ class WhiteNoiseAppState private constructor(
     var pendingProfileFromDiscovery by mutableStateOf(false)
         private set
 
-    var relationshipRevision by mutableStateOf(0L)
+    var relationshipRevision by mutableLongStateOf(0L)
         private set
 
     var localNotificationSettings by mutableStateOf<NotificationSettingsFfi?>(null)
@@ -1993,7 +1995,7 @@ class WhiteNoiseAppState private constructor(
     var auditLogSettings by mutableStateOf<AuditLogSettingsFfi?>(null)
         private set
 
-    var runtimeGeneration by mutableStateOf(0)
+    var runtimeGeneration by mutableIntStateOf(0)
         private set
 
     var localNotificationPermissionGranted by mutableStateOf(localNotificationPresenter.canPostNotifications())
@@ -2025,9 +2027,9 @@ class WhiteNoiseAppState private constructor(
             registry = accountScopedCaches,
             maxEntries = BoundedNpubCache.DEFAULT_MAX_ENTRIES,
         )
-    private var profileRevision by mutableStateOf(0)
-    private var contactNicknameRevision by mutableStateOf(0)
-    private var profileAccountRevisionEpoch by mutableStateOf(0)
+    private var profileRevision by mutableIntStateOf(0)
+    private var contactNicknameRevision by mutableIntStateOf(0)
+    private var profileAccountRevisionEpoch by mutableIntStateOf(0)
     private var profileAccountRevisionSequence = 0
     private val profileAccountRevisions = mutableStateMapOf<String, Int>()
     private val profileAccountRevisionOrder = linkedSetOf<String>()
@@ -2182,13 +2184,13 @@ class WhiteNoiseAppState private constructor(
     // `failed` before the user has a chance to see the media.
     private val attachmentDownloadGate = AttachmentDownloadGate()
     private val attachmentDownloadIntents = AttachmentDownloadIntentStore(preferences)
-    private var attachmentDownloadPolicyRevision by mutableStateOf(0)
-    internal var attachmentOpenIntentRevision by mutableStateOf(0)
+    private var attachmentDownloadPolicyRevision by mutableIntStateOf(0)
+    internal var attachmentOpenIntentRevision by mutableIntStateOf(0)
         private set
     private val conversationStateRetention = ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES)
 
     val shareStaging: ShareStagingStore = ShareStagingStore()
-    private var draftHydrationRevision by mutableStateOf(0)
+    private var draftHydrationRevision by mutableIntStateOf(0)
 
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
     val inboundShareRevision: Int

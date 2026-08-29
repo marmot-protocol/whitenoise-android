@@ -41,6 +41,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -370,7 +371,7 @@ internal fun FullScreenMediaViewer(
     // can read it to gate horizontal swipe. Without this gate, the page's
     // `detectTransformGestures` claims every horizontal drag and the pager
     // never moves. Page change resets to identity below.
-    var scale by remember { mutableStateOf(1f) }
+    var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     LaunchedEffect(currentPage.messageIdHex, currentPage.attachmentIndex) {
         val reset = resetViewerTransform()
@@ -637,7 +638,7 @@ internal fun ViewerPage(
     val pageKey = "$messageIdHex#$attachmentIndex#${reference.sourceEpoch}"
     var presentation by remember(pageKey) { mutableStateOf<DecodedAttachmentPresentation?>(null) }
     var viewerFailed by remember(pageKey) { mutableStateOf(false) }
-    var viewerReloadToken by remember(pageKey) { mutableStateOf(0) }
+    var viewerReloadToken by remember(pageKey) { mutableIntStateOf(0) }
     val imageWidth =
         when (val current = presentation) {
             is DecodedAttachmentPresentation.Static -> current.bitmap.width

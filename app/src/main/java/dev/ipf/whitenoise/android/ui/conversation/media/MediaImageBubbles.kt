@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -210,7 +211,7 @@ internal fun MediaImageBubble(
     }
     var failed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
     var viewerOpen by remember(key, attachmentIndex) { mutableStateOf(false) }
-    var reloadToken by remember(key, attachmentIndex, epoch) { mutableStateOf(0) }
+    var reloadToken by remember(key, attachmentIndex, epoch) { mutableIntStateOf(0) }
     val cachedPlaintextOnEntry =
         remember(controller, key, attachmentIndex, epoch) {
             controller.hasCachedAttachment(key, attachmentIndex)
@@ -608,7 +609,7 @@ internal fun MediaImageGridTile(
         )
     }
     var failed by remember(decodeKey) { mutableStateOf(false) }
-    var reloadToken by remember(decodeKey) { mutableStateOf(0) }
+    var reloadToken by remember(decodeKey) { mutableIntStateOf(0) }
     val cachedPlaintextOnEntry =
         remember(controller, decodeKey) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
