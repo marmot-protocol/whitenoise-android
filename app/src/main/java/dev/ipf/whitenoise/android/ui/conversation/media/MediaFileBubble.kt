@@ -385,6 +385,8 @@ internal fun MediaFileBubble(
  * Holds a received file card behind one definitive off-main cache result.
  * Resolving remains usable by transfer orchestration, but is never committed
  * as that card's first user-visible frame.
+ * [resolve] must return normally for non-cancellation probe failures so the
+ * card cannot remain hidden; only lifecycle cancellation may escape.
  */
 @Composable
 internal fun rememberAttachmentFirstFrameCacheResolution(
