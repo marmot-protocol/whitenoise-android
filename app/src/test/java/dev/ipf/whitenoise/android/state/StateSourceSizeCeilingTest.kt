@@ -7,7 +7,7 @@ import java.io.File
 
 /**
  * Growth ceiling for the two largest state sources. The ceilings exist because
- * [Controllers.kt] (13,031 lines) and [AppState.kt] (10,185 lines) are already
+ * [Controllers.kt] (12,825 lines) and [AppState.kt] (10,185 lines) are already
  * hard to navigate; new work should land in smaller units unless a Kover report
  * justifies a deliberate, reviewed raise of these limits. Lowering a ceiling
  * after a refactor is routine; raising one requires an intentional edit here
@@ -37,7 +37,8 @@ class StateSourceSizeCeilingTest {
     private fun sourceLineCount(name: String): Int = sourceLineCount(sourceFile(name))
 
     internal companion object {
-        const val CONTROLLERS_MAX_LINES = 13031
+        // Lowered after `ChatListItem` moved to its own same-package file.
+        const val CONTROLLERS_MAX_LINES = 12825
         const val APP_STATE_MAX_LINES = 10185
 
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }

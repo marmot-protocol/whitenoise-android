@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 /**
@@ -81,6 +82,27 @@ class ChatListSortKeyTest {
             )
 
         assertEquals("peer", chatListItemSortKey(item))
+    }
+
+    @Test
+    fun theSortKeyAndSanitizedTitleAreComputedOncePerRow() {
+        // The comparator asks its last key for both operands of every tied
+        // comparison, so an unmemoized key costs O(n log n) sanitizations per
+        // rebuild. Identity is the deterministic way to assert the value is
+        // computed once: a recomputing getter would return a fresh String.
+        val item = item(groupId = "aaaa", groupName = "MiXeD Case Name")
+
+        assertSame(item.sanitizedNamedTitle, item.sanitizedNamedTitle)
+        assertSame(item.sortTitleKey, item.sortTitleKey)
+        assertSame(item.sortTitleKey, chatListItemSortKey(item))
+    }
+
+    @Test
+    fun theFoldedGroupIdIsComputedOncePerRow() {
+        val item = item(groupId = "AAAA", groupName = "Name")
+
+        assertSame(item.foldedId, item.foldedId)
+        assertEquals("aaaa", item.foldedId)
     }
 
     @Test
