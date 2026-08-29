@@ -873,6 +873,7 @@
     <string name="media_tap_to_download">Tocca per scaricare</string>
     <string name="media_preparing_download">Preparazione del download</string>
     <string name="media_downloading">Download in corso</string>
+    <string name="media_opening">Apertura</string>
     <string name="media_save">Salva</string>
     <string name="media_saved">Salvato nella galleria</string>
     <string name="media_save_failed">Impossibile salvare l\'immagine</string>

@@ -28,6 +28,7 @@ import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 
 internal enum class OpenAttachmentResult {
     Opened,
+    DestinationNotVisible,
     InstallPermissionRequired,
     InstallPermissionDenied,
     InstallPermissionUnavailable,

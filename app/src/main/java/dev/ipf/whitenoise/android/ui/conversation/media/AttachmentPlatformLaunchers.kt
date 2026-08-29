@@ -29,7 +29,7 @@ import kotlin.coroutines.resumeWithException
 internal typealias DocumentSaveFallback = suspend (source: File, fileName: String, mediaType: String) -> Unit
 private typealias ExternalAttachmentOpen = suspend (File, String, String) -> OpenAttachmentResult
 internal typealias AttachmentOpener =
-    suspend (File, String, String, InstallerPermissionPersistence?) -> OpenAttachmentResult
+    suspend (File, String, String, InstallerPermissionPersistence?, AttachmentDispatchGuard?) -> OpenAttachmentResult
 private typealias InstallPermissionRequester = suspend () -> Boolean
 
 internal data class InstallerPermissionPersistence(
@@ -37,6 +37,13 @@ internal data class InstallerPermissionPersistence(
     val begin: suspend () -> Boolean,
     val finish: suspend () -> Boolean,
     val abandon: () -> Unit,
+)
+
+/** Rechecks the originating UI at the exact platform-activity dispatch boundary. */
+internal data class AttachmentDispatchGuard(
+    val canDispatch: () -> Boolean,
+    val onPlatformDispatchStarted: () -> Unit = {},
+    val onPlatformDispatchResult: (OpenAttachmentResult) -> Unit = {},
 )
 
 /** User dismissed the destination picker; unlike parent cancellation, a batch may continue. */
@@ -54,9 +61,15 @@ internal fun rememberAttachmentOpener(): AttachmentOpener {
             runCatching { context.packageManager.canRequestPackageInstalls() }.getOrDefault(false)
         }
     return remember(context, requestInstallPermission) {
-        { source, mediaType, fileName, persistence ->
+        { source, mediaType, fileName, persistence, dispatchGuard ->
             val open: ExternalAttachmentOpen = { requestedSource, requestedMediaType, requestedFileName ->
-                openAttachmentExternally(context, requestedSource, requestedMediaType, requestedFileName)
+                openAttachmentExternally(
+                    context,
+                    requestedSource,
+                    requestedMediaType,
+                    requestedFileName,
+                    dispatchGuard = dispatchGuard,
+                )
             }
             val requestPermission: InstallPermissionRequester = {
                 requestInstallPermission(androidPackageInstallPermissionIntent(context))

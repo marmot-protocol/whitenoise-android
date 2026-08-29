@@ -9468,9 +9468,19 @@ class ConversationController(
     internal fun requestAttachmentOpen(
         messageIdHex: String,
         attachmentIndex: Int,
-    ) {
-        val account = conversationAccountRef ?: return
-        appState.requestAttachmentOpen(
+    ): Boolean {
+        val account = conversationAccountRef ?: return false
+        return appState.attachmentOpens.requestOpen(
+            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+        )
+    }
+
+    internal fun attachmentOpenRequest(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): AttachmentOpenRequest? {
+        val account = conversationAccountRef ?: return null
+        return appState.attachmentOpens.openRequest(
             AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
         )
     }
@@ -9479,30 +9489,24 @@ class ConversationController(
         messageIdHex: String,
         attachmentIndex: Int,
     ): Boolean {
-        val account = conversationAccountRef ?: return false
-        return appState.hasAttachmentOpenIntent(
-            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
-        )
+        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return false
+        return appState.attachmentOpens.hasIntent(request)
     }
 
     internal suspend fun consumeAttachmentOpenIntent(
         messageIdHex: String,
         attachmentIndex: Int,
     ): Boolean {
-        val account = conversationAccountRef ?: return false
-        return appState.consumeAttachmentOpenIntent(
-            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
-        )
+        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return false
+        return appState.attachmentOpens.consume(request)
     }
 
     internal fun restoreAttachmentOpenIntent(
         messageIdHex: String,
         attachmentIndex: Int,
     ) {
-        val account = conversationAccountRef ?: return
-        appState.restoreAttachmentOpenIntent(
-            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
-        )
+        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return
+        appState.attachmentOpens.restore(request)
     }
 
     /** Upgrade an optimistic imeta fallback before download/save uses its epoch. */

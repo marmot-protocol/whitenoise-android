@@ -54,10 +54,10 @@ class AttachmentDownloadProductionWiringTest {
 
         assertTrue(
             "LaunchedEffect( controller, pillKey, reference.sourceEpoch, " +
-                "appState.attachmentOpenIntentRevision, lifecycleOwner," in file,
+                "appState.attachmentOpens.revision, lifecycleOwner," in file,
         )
         assertFalse(
-            "appState.attachmentOpenIntentRevision, cacheRevision" in file,
+            "appState.attachmentOpens.revision, cacheRevision" in file,
         )
     }
 

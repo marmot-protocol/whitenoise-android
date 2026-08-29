@@ -46,7 +46,7 @@ internal fun persistedAttachmentOpenEffect(
         messageIdHex,
         attachmentIndex,
         sourceEpoch,
-        appState.attachmentOpenIntentRevision,
+        appState.attachmentOpens.revision,
         lifecycleOwner,
     ) {
         if (!controller.hasAttachmentOpenIntent(messageIdHex, attachmentIndex)) {

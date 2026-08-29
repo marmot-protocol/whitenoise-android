@@ -873,6 +873,7 @@
     <string name="media_tap_to_download">İndirmek için dokunun</string>
     <string name="media_preparing_download">İndirme hazırlanıyor</string>
     <string name="media_downloading">İndiriliyor</string>
+    <string name="media_opening">Açılıyor</string>
     <string name="media_save">Kaydet</string>
     <string name="media_saved">Galeriye kaydedildi</string>
     <string name="media_save_failed">Görüntü kaydedilemedi</string>
