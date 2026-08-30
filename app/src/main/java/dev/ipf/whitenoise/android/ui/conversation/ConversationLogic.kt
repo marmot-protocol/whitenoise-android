@@ -29,6 +29,18 @@ internal fun shouldShowConversationMembersSubtitle(
         !GroupProjector.isDm(memberCount, groupName) &&
         !(openedAsDmHint && GroupProjector.isUnnamed(groupName) && memberCount < 2)
 
+internal fun conversationMemberCountLabel(
+    count: Int,
+    justYou: String,
+    oneMember: String,
+    membersFormat: String,
+): String =
+    when (count) {
+        0 -> justYou
+        1 -> oneMember
+        else -> String.format(membersFormat, count)
+    }
+
 /** UI-only scroll anchor for a conversation the user left while reading history. */
 internal data class ConversationScrollSnapshot(
     val firstVisibleItemIndex: Int,

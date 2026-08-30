@@ -3222,6 +3222,14 @@ class ChatsController private constructor(
         }
     }
 
+    @VisibleForTesting
+    internal fun publishInitialLoadFailureForTest(failure: ErrorPresentation) {
+        check(!hasLoadedLocalSnapshot) { "Only the no-snapshot fallback may publish an initial load failure" }
+        isLoading = false
+        error = failure
+        terminalLoadFailure = true
+    }
+
     /** The account this controller is currently bound to (observable so
      *  notification routing can tell when the right account's list is ready). */
     var boundAccountRef by mutableStateOf<String?>(initialLocalSnapshot?.accountRef ?: initialAccountRef)

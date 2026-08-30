@@ -482,6 +482,7 @@
     <string name="toast_notification_scope_update_failed">No se pudo actualizar este ajuste de notificaciones</string>
     <string name="toast_notification_settings_unavailable">No se pudieron abrir los ajustes de notificaciones</string>
     <string name="switch_account">Cambiar perfil</string>
+    <string name="switching_to_account">Cambiando a %1$s</string>
     <string name="my_qr_code">Mi código QR</string>
     <string name="read_only">La llave privada está almacenada en un firmante externo</string>
     <string name="active">Activo</string>

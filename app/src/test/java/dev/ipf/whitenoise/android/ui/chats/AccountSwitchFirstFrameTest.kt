@@ -22,9 +22,11 @@ import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
 import dev.ipf.whitenoise.android.state.AccountSwitchProfileSeed
+import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.emptyGroupRecord
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -142,6 +144,53 @@ class AccountSwitchFirstFrameTest {
 
             controller.onCleared()
         }
+
+    @Test
+    fun missingTargetSnapshotShowsRealLoadingThenErrorFallbacks() {
+        val appState = testAppState()
+        val controller =
+            ChatsController(
+                appState = appState,
+                initialAccountRef = TARGET_ACCOUNT,
+                memberSnapshotLoader = { _, _ -> emptyList() },
+            )
+        appState.attachChatsController(controller)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    ChatsScreen(
+                        appState = appState,
+                        controller = controller,
+                        onOpenSettings = {},
+                        onOpenGroup = { _, _, _, _ -> },
+                    )
+                }
+            }
+        }
+
+        composeRule
+            .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+            .assertCountEquals(1)
+        composeRule.onNodeWithText(context.getString(R.string.no_chats_yet)).assertDoesNotExist()
+
+        composeRule.runOnIdle {
+            controller.publishInitialLoadFailureForTest(
+                ErrorPresentation(
+                    message = AppText.Resource(R.string.error_try_again),
+                    report = "Operation: TEST_CHAT_LIST_LOAD",
+                ),
+            )
+        }
+
+        composeRule.onNodeWithText(context.getString(R.string.couldnt_load_chats)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.error_try_again)).assertIsDisplayed()
+        composeRule
+            .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+            .assertCountEquals(0)
+        composeRule.onNodeWithText(context.getString(R.string.no_chats_yet)).assertDoesNotExist()
+
+        controller.onCleared()
+    }
 
     private fun completeIdentitySnapshot(): AccountSwitchLocalSnapshot {
         val named =

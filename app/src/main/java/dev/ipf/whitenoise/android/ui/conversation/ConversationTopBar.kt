@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
@@ -70,6 +71,8 @@ internal fun ConversationTopBar(
     controller: ConversationController,
     groupTitleCopy: GroupTitleCopy,
     openedAsDmHint: Boolean,
+    firstFrameAvatar: ChatListAvatarSeed? = null,
+    freezeRoutePresentation: Boolean = false,
     openDetailsDescription: String,
     onOpenDetails: () -> Unit,
     onBack: () -> Unit,
@@ -81,6 +84,21 @@ internal fun ConversationTopBar(
     onTtsTransportBodyClick: (() -> Unit)? = null,
     performanceSelectorsEnabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS,
 ) {
+    val liveTitle = controller.title(groupTitleCopy)
+    val liveGroup = controller.group
+    val liveAvatarAccount = controller.avatarAccount
+    val liveMembersLoaded = controller.membersLoaded
+    val liveMemberCount = controller.memberCount
+    val routeTitle = remember(controller) { liveTitle }
+    val routeGroup = remember(controller) { liveGroup }
+    val routeAvatarAccount = remember(controller) { liveAvatarAccount }
+    val routeMembersLoaded = remember(controller) { liveMembersLoaded }
+    val routeMemberCount = remember(controller) { liveMemberCount }
+    val presentedTitle = if (freezeRoutePresentation) routeTitle else liveTitle
+    val presentedGroup = if (freezeRoutePresentation) routeGroup else liveGroup
+    val presentedAvatarAccount = if (freezeRoutePresentation) routeAvatarAccount else liveAvatarAccount
+    val presentedMembersLoaded = if (freezeRoutePresentation) routeMembersLoaded else liveMembersLoaded
+    val presentedMemberCount = if (freezeRoutePresentation) routeMemberCount else liveMemberCount
     Column {
         if (selectionMode) {
             MessageSelectionBar(
@@ -117,15 +135,16 @@ internal fun ConversationTopBar(
                     ) {
                         GroupAvatar(
                             appState = appState,
-                            group = controller.group,
-                            title = controller.title(groupTitleCopy),
-                            seed = controller.avatarAccount ?: controller.group.groupIdHex,
+                            group = presentedGroup,
+                            title = presentedTitle,
+                            seed = presentedAvatarAccount ?: presentedGroup.groupIdHex,
                             size = 36.dp,
-                            fallbackPictureUrl = controller.avatarAccount?.let(appState::avatarUrl),
+                            fallbackPictureUrl = presentedAvatarAccount?.let(appState::avatarUrl),
+                            firstFrameAvatar = firstFrameAvatar,
                         )
                         Column {
                             Text(
-                                controller.title(groupTitleCopy),
+                                presentedTitle,
                                 style = MaterialTheme.typography.titleMedium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -133,13 +152,14 @@ internal fun ConversationTopBar(
                             val membersSubtitle =
                                 if (
                                     shouldShowConversationMembersSubtitle(
-                                        membersLoaded = controller.membersLoaded,
+                                        membersLoaded = presentedMembersLoaded,
                                         openedAsDmHint = openedAsDmHint,
-                                        groupName = controller.group.name,
-                                        memberCount = controller.memberCount,
+                                        groupName = presentedGroup.name,
+                                        memberCount = presentedMemberCount,
                                     )
                                 ) {
-                                    controller.subtitle(
+                                    conversationMemberCountLabel(
+                                        count = presentedMemberCount,
                                         justYou = stringResource(R.string.just_you),
                                         oneMember = stringResource(R.string.one_member),
                                         membersFormat = stringResource(R.string.members_count),
@@ -147,7 +167,7 @@ internal fun ConversationTopBar(
                                 } else {
                                     null
                                 }
-                            val disappearingSecs = controller.group.disappearingMessageSecs.toLong()
+                            val disappearingSecs = presentedGroup.disappearingMessageSecs.toLong()
                             val showTimer = disappearingSecs > 0L
                             if (membersSubtitle != null || showTimer) {
                                 val labelStyle = MaterialTheme.typography.labelSmall

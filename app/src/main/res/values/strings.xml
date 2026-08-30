@@ -641,6 +641,7 @@
     <string name="toast_notification_scope_update_failed">Couldn\'t update this notification setting</string>
     <string name="toast_notification_settings_unavailable">Couldn\'t open notification settings</string>
     <string name="switch_account">Switch Account</string>
+    <string name="switching_to_account">Switching to %1$s</string>
     <string name="my_qr_code">My QR code</string>
     <string name="read_only">Read-only</string>
     <string name="active">Active</string>

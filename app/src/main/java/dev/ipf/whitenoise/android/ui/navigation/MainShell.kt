@@ -2,16 +2,10 @@
 
 package dev.ipf.whitenoise.android.ui.navigation
 
+import android.animation.ValueAnimator
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.filled.Settings
@@ -362,6 +356,82 @@ internal fun MainShell(
             accountRef = appState.activeAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
         )
+    var quickAccountSwitchTransition by remember {
+        mutableStateOf<QuickAccountSwitchTransition?>(null)
+    }
+    var nextQuickAccountSwitchRequestId by remember { mutableLongStateOf(0L) }
+
+    fun cancelPendingQuickAccountSwitchTo(targetAccountRef: String) {
+        // A→B→A can arrive while A is still the published active ref.
+        // Invalidate B's shouldActivate token now, then queue a guarded
+        // restoration in case B crossed its activation boundary first.
+        nextQuickAccountSwitchRequestId += 1L
+        val cancellationRequestId = nextQuickAccountSwitchRequestId
+        quickAccountSwitchTransition = null
+        appState.launchMutation {
+            if (appState.activeAccountRef != targetAccountRef) {
+                appState.setActiveAccount(
+                    label = targetAccountRef,
+                    shouldActivate = {
+                        nextQuickAccountSwitchRequestId == cancellationRequestId &&
+                            quickAccountSwitchTransition == null
+                    },
+                )
+            }
+        }
+    }
+
+    fun requestQuickAccountSwitch(targetAccountRef: String) {
+        val sourceAccountRef = appState.activeAccountRef ?: return
+        when (
+            quickAccountSwitchRequestDisposition(
+                activeAccountRef = sourceAccountRef,
+                pending = quickAccountSwitchTransition,
+                targetAccountRef = targetAccountRef,
+            )
+        ) {
+            QuickAccountSwitchRequestDisposition.Ignore -> return
+            QuickAccountSwitchRequestDisposition.CancelPendingToCurrent -> {
+                cancelPendingQuickAccountSwitchTo(targetAccountRef)
+                return
+            }
+            QuickAccountSwitchRequestDisposition.Start -> Unit
+        }
+        val target = appState.accounts.firstOrNull { it.label == targetAccountRef } ?: return
+        nextQuickAccountSwitchRequestId += 1L
+        val requestId = nextQuickAccountSwitchRequestId
+        quickAccountSwitchTransition =
+            QuickAccountSwitchTransition(
+                requestId = requestId,
+                sourceAccountRef = sourceAccountRef,
+                targetAccountRef = targetAccountRef,
+                targetTitle = appState.accountDisplayNameCached(target.accountIdHex),
+                targetSeed = target.accountIdHex,
+                targetPictureUrl = appState.avatarUrl(target.accountIdHex),
+                motion =
+                    if (ValueAnimator.areAnimatorsEnabled()) {
+                        QuickAccountSwitchMotion.Animated
+                    } else {
+                        QuickAccountSwitchMotion.Reduced
+                    },
+            )
+        appState.launchMutation {
+            val activated =
+                appState.setActiveAccount(
+                    label = targetAccountRef,
+                    shouldActivate = {
+                        quickAccountSwitchRequestIsCurrent(
+                            transition = quickAccountSwitchTransition,
+                            requestId = requestId,
+                            targetAccountRef = targetAccountRef,
+                        )
+                    },
+                )
+            if (!activated && quickAccountSwitchTransition?.requestId == requestId) {
+                quickAccountSwitchTransition = null
+            }
+        }
+    }
     shellStateHolder.restoreConversationIfReady(chatsController, appState.activeAccountRef)
     var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
     var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
@@ -1609,6 +1679,57 @@ internal fun MainShell(
     val navAccountStable =
         mainShellAccountContentOwned(previousActiveAccountRef, appState.activeAccountRef) ||
             earlyOpenLandsPinnedAccount
+    // A completed local snapshot is immediately useful even while the
+    // controller is refreshing or retaining a non-fatal refresh error. Only a
+    // genuinely absent snapshot falls through to the truthful loading/error
+    // surface below.
+    val quickSwitchTargetLocallyReady =
+        quickAccountSwitchTargetLocallyReady(
+            controllerAccountRef = chatsController.boundAccountRef,
+            activeAccountRef = appState.activeAccountRef,
+            hasLoadedLocalSnapshot = chatsController.hasLoadedLocalSnapshot,
+        )
+    val quickSwitchOwnsTargetFrame =
+        quickAccountSwitchOwnsTargetFrame(
+            transition = quickAccountSwitchTransition,
+            activeAccountRef = appState.activeAccountRef,
+            targetLocallyReady = quickSwitchTargetLocallyReady,
+        )
+    LaunchedEffect(
+        quickAccountSwitchTransition?.requestId,
+        appState.activeAccountRef,
+        quickSwitchTargetLocallyReady,
+        navAccountStable,
+    ) {
+        val request = quickAccountSwitchTransition ?: return@LaunchedEffect
+        when {
+            appState.activeAccountRef == request.targetAccountRef && !quickSwitchTargetLocallyReady ->
+                // A missing local snapshot owns the existing truthful
+                // loading/error surface, never the decorative cue.
+                quickAccountSwitchTransition = null
+            appState.activeAccountRef == request.targetAccountRef &&
+                request.motion == QuickAccountSwitchMotion.Animated &&
+                request.phase == QuickAccountSwitchPhase.AwaitingTarget -> {
+                // Commit one complete target-identity frame, then reveal the
+                // already-composed local target beneath the bounded fade.
+                withFrameNanos { }
+                if (quickAccountSwitchTransition?.requestId == request.requestId) {
+                    quickAccountSwitchTransition = request.copy(phase = QuickAccountSwitchPhase.RevealingTarget)
+                }
+            }
+            appState.activeAccountRef == request.targetAccountRef &&
+                request.motion == QuickAccountSwitchMotion.Reduced &&
+                navAccountStable ->
+                quickAccountSwitchTransition = null
+            appState.activeAccountRef == request.targetAccountRef &&
+                request.phase == QuickAccountSwitchPhase.RevealComplete &&
+                navAccountStable ->
+                quickAccountSwitchTransition = null
+            appState.activeAccountRef != request.sourceAccountRef &&
+                appState.activeAccountRef != request.targetAccountRef ->
+                quickAccountSwitchTransition = null
+        }
+    }
     // Activity recreation reads the live selection synchronously from the
     // holder. Process restoration keeps only lightweight route keys. Persist
     // only after account ownership is stable so an account-switch frame cannot
@@ -1838,7 +1959,7 @@ internal fun MainShell(
             pendingConversationOpen = null
         }
     }
-    if (!navAccountStable) {
+    if (!navAccountStable && !quickSwitchOwnsTargetFrame) {
         // Account invalidation is a privacy boundary, not an ordinary Back
         // navigation. Remove the AnimatedContent subtree immediately so its
         // outgoing slot cannot retain a decrypted route for the exit tween.
@@ -1917,34 +2038,14 @@ internal fun MainShell(
             withFrameNanos { }
             if (selectedChat?.id != exiting.chat.id) exitingConversationContent = null
         }
-        routeTransition.AnimatedContent(
-            transitionSpec = {
-                when {
-                    routingNotification ||
-                        routingShare ||
-                        routingAppUpdate ||
-                        pendingTtsDestinationNavigation != null ->
-                        EnterTransition.None togetherWith ExitTransition.None
-                    targetState != null ->
-                        slideInHorizontally(
-                            animationSpec = tween(CONVERSATION_ROUTE_TRANSITION_MILLIS),
-                            initialOffsetX = { width -> width * routeForwardDirection },
-                        ) togetherWith
-                            slideOutHorizontally(
-                                animationSpec = tween(CONVERSATION_ROUTE_TRANSITION_MILLIS),
-                                targetOffsetX = { width -> -(width / 4) * routeForwardDirection },
-                            )
-                    else ->
-                        slideInHorizontally(
-                            animationSpec = tween(CONVERSATION_ROUTE_TRANSITION_MILLIS),
-                            initialOffsetX = { width -> -(width / 4) * routeForwardDirection },
-                        ) togetherWith
-                            slideOutHorizontally(
-                                animationSpec = tween(CONVERSATION_ROUTE_TRANSITION_MILLIS),
-                                targetOffsetX = { width -> width * routeForwardDirection },
-                            )
-                }
-            },
+        ConversationRouteAnimatedContent(
+            transition = routeTransition,
+            routeForwardDirection = routeForwardDirection,
+            suppressMotion =
+                routingNotification ||
+                    routingShare ||
+                    routingAppUpdate ||
+                    pendingTtsDestinationNavigation != null,
             contentKey = { content -> content?.chat?.id ?: MAIN_SHELL_ROUTE_KEY },
         ) { animatedConversation ->
             when (
@@ -2025,6 +2126,7 @@ internal fun MainShell(
                         },
                         justCreated = content.justCreated,
                         openedAsDmHint = content.openedAsDmHint,
+                        routeTransitionInProgress = routeTransition.isRunning,
                         restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
                         onOpenConversation = openGroupFromProfile,
                         onGroupCreateSubmitted = onGroupCreateSubmitted,
@@ -2102,6 +2204,7 @@ internal fun MainShell(
                                 selectedFolderId = selectedChatListFolderId,
                                 onSelectFolder = { selectedChatListFolderId = it },
                                 onTtsTransportBodyClick = requestTtsDestinationOpen,
+                                onQuickSwitchAccount = ::requestQuickAccountSwitch,
                                 onGroupCreateSubmitted = onGroupCreateSubmitted,
                                 onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
                                 onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
@@ -2202,6 +2305,26 @@ internal fun MainShell(
                 ),
         )
     }
+    val showQuickAccountSwitchCue =
+        quickAccountSwitchShouldShowCue(
+            transition = quickAccountSwitchTransition,
+            activeAccountRef = appState.activeAccountRef,
+            targetLocallyReady = quickSwitchTargetLocallyReady,
+        )
+    QuickAccountSwitchTransitionOverlay(
+        transition = quickAccountSwitchTransition.takeIf { quickSwitchOwnsTargetFrame },
+        visible = showQuickAccountSwitchCue,
+        onFinished = { requestId ->
+            quickAccountSwitchTransition?.takeIf { it.requestId == requestId }?.let { request ->
+                quickAccountSwitchTransition =
+                    if (navAccountStable) {
+                        null
+                    } else {
+                        request.copy(phase = QuickAccountSwitchPhase.RevealComplete)
+                    }
+            }
+        },
+    )
 
     // Compose after every shell/profile/new-group surface. The full-screen
     // Dialog owns pointer and accessibility focus while preserving the route

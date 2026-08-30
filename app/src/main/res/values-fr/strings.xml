@@ -482,6 +482,7 @@
     <string name="toast_notification_scope_update_failed">Impossible de mettre à jour ce réglage de notification</string>
     <string name="toast_notification_settings_unavailable">Impossible d’ouvrir les réglages de notifications</string>
     <string name="switch_account">Changer de profil</string>
+    <string name="switching_to_account">Passage à %1$s</string>
     <string name="my_qr_code">Mon code QR</string>
     <string name="read_only">La clé privée est stockée dans un signataire externe</string>
     <string name="active">Actif</string>

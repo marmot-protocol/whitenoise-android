@@ -524,6 +524,9 @@ internal fun ConversationScreen(
     // keep that transient state in the DM presentation instead of falling into
     // the group subtitle branch (#998).
     openedAsDmHint: Boolean = false,
+    // Route-owned presentation changes stay frozen through the first settled
+    // frame so late top/bottom chrome hydration cannot retarget the slide.
+    routeTransitionInProgress: Boolean = false,
     // Scroll position captured when the user last left this chat while reading
     // history (issue #1107). Null when none was saved or they left near-bottom.
     restoredScrollSnapshot: ConversationScrollSnapshot? = null,
@@ -695,6 +698,9 @@ internal fun ConversationScreen(
         remember(chat.id) {
             ConversationBottomChromeHeightObserver()
         }
+    var routePresentationFrozen by
+        remember(controller) { mutableStateOf(routeTransitionInProgress) }
+    var bottomChromeReanchorPending by remember(controller) { mutableStateOf(false) }
     // Single conversation-level owner of which message's action menu is open, so
     // only one popover can be open at a time. With the keyboard up the menu is
     // non-focusable (#284), so long-pressing several bubbles would otherwise
@@ -2571,6 +2577,21 @@ internal fun ConversationScreen(
             )
         }
     }
+    LaunchedEffect(routeTransitionInProgress, bottomChromeReanchorPending) {
+        if (routeTransitionInProgress) {
+            routePresentationFrozen = true
+            return@LaunchedEffect
+        }
+        if (!routePresentationFrozen) return@LaunchedEffect
+        // Keep the terminal frame and the first post-settle frame identical.
+        withFrameNanos { }
+        routePresentationFrozen = false
+        if (bottomChromeReanchorPending) {
+            bottomChromeReanchorPending = false
+            withFrameNanos { }
+            reanchorNewestAfterBottomInputChange(frameCount = 0)
+        }
+    }
 
     // Scroll-to-message for a chat-list message-body search hit (issue #290).
     // Waits for the first-open anchor to settle, then pages the local timeline
@@ -2887,6 +2908,8 @@ internal fun ConversationScreen(
                 controller = controller,
                 groupTitleCopy = groupTitleCopy,
                 openedAsDmHint = openedAsDmHint,
+                firstFrameAvatar = chat.firstFrameAvatar,
+                freezeRoutePresentation = routePresentationFrozen,
                 openDetailsDescription = openDetailsDescription,
                 onOpenDetails = { showDetails = true },
                 onBack = exitConversation,
@@ -3131,7 +3154,11 @@ internal fun ConversationScreen(
                         bottomChromeHeightObserver.onMeasured(heightPx) &&
                         !scrollCoordinator.foregroundRestoreInProgress
                     ) {
-                        reanchorNewestAfterBottomInputChange(frameCount = 1)
+                        if (routePresentationFrozen) {
+                            bottomChromeReanchorPending = true
+                        } else {
+                            reanchorNewestAfterBottomInputChange(frameCount = 1)
+                        }
                     }
                     snackbarBottomInset.value =
                         with(density) { (heightPx - chromeBottomPx).coerceAtLeast(0).toDp() }

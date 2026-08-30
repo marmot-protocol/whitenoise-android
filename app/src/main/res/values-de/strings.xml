@@ -482,6 +482,7 @@
     <string name="toast_notification_scope_update_failed">Diese Benachrichtigungseinstellung konnte nicht aktualisiert werden</string>
     <string name="toast_notification_settings_unavailable">Benachrichtigungseinstellungen konnten nicht geöffnet werden</string>
     <string name="switch_account">Profil wechseln</string>
+    <string name="switching_to_account">Wechsel zu %1$s</string>
     <string name="my_qr_code">Mein QR-Code</string>
     <string name="read_only">Privater Schlüssel ist im externen Signer gespeichert</string>
     <string name="active">Aktiv</string>
