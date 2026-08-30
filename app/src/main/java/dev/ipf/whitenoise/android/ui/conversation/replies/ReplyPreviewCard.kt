@@ -42,6 +42,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentPresentation
+import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
+import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
+import dev.ipf.whitenoise.android.ui.conversation.media.safeAttachmentDisplayName
 import dev.ipf.whitenoise.android.ui.resolveMentionsInPlaintext
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
@@ -65,6 +69,9 @@ internal fun ReplyPreviewCard(
     body: String,
     warning: String? = null,
     mediaKind: dev.ipf.whitenoise.android.core.ReplyMediaKind,
+    mediaFileName: String? = null,
+    mediaType: String? = null,
+    originalUnavailable: Boolean = false,
     onClick: (() -> Unit)?,
     onDismiss: (() -> Unit)?,
     // The composer banner spans the input row, so it fills its width. The
@@ -77,22 +84,51 @@ internal fun ReplyPreviewCard(
     contentColor: Color? = null,
     accentColor: Color? = null,
 ) {
-    val title = if (isOwn) stringResource(R.string.reply_you) else senderTitle
+    val title =
+        when {
+            originalUnavailable -> stringResource(R.string.reply)
+            isOwn -> stringResource(R.string.reply_you)
+            else -> senderTitle
+        }
+    val attachmentPresentation =
+        remember(mediaKind, mediaFileName, mediaType) {
+            if (
+                mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Document &&
+                (!mediaFileName.isNullOrBlank() || !mediaType.isNullOrBlank())
+            ) {
+                resolveAttachmentPresentation(mediaType.orEmpty(), mediaFileName.orEmpty())
+            } else {
+                null
+            }
+        }
     val mediaLabel =
-        when (mediaKind) {
-            dev.ipf.whitenoise.android.core.ReplyMediaKind.Photo -> stringResource(R.string.reply_media_photo)
-            dev.ipf.whitenoise.android.core.ReplyMediaKind.Video -> stringResource(R.string.reply_media_video)
-            dev.ipf.whitenoise.android.core.ReplyMediaKind.Voice -> stringResource(R.string.reply_media_voice)
-            dev.ipf.whitenoise.android.core.ReplyMediaKind.Document -> stringResource(R.string.reply_media_document)
-            dev.ipf.whitenoise.android.core.ReplyMediaKind.None -> null
+        when {
+            originalUnavailable -> stringResource(R.string.toast_original_message_unavailable)
+            attachmentPresentation != null ->
+                replyAttachmentPreviewText(mediaFileName.orEmpty(), attachmentPresentation)
+                    ?: stringResource(R.string.reply_media_document)
+            mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Photo ->
+                stringResource(R.string.reply_media_photo)
+            mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Video ->
+                stringResource(R.string.reply_media_video)
+            mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Voice ->
+                stringResource(R.string.reply_media_voice)
+            mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Document ->
+                stringResource(R.string.reply_media_document)
+            else -> null
         }
     val mediaIcon =
-        when (mediaKind) {
-            dev.ipf.whitenoise.android.core.ReplyMediaKind.Photo -> Icons.Default.Image
-            dev.ipf.whitenoise.android.core.ReplyMediaKind.Video -> Icons.Default.Movie
-            dev.ipf.whitenoise.android.core.ReplyMediaKind.Voice -> Icons.Default.Mic
-            dev.ipf.whitenoise.android.core.ReplyMediaKind.Document -> Icons.Default.Description
-            dev.ipf.whitenoise.android.core.ReplyMediaKind.None -> null
+        if (originalUnavailable) {
+            null
+        } else {
+            attachmentPresentation?.let { fileIconFor(it.iconCategory) }
+                ?: when (mediaKind) {
+                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Photo -> Icons.Default.Image
+                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Video -> Icons.Default.Movie
+                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Voice -> Icons.Default.Mic
+                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Document -> Icons.Default.Description
+                    dev.ipf.whitenoise.android.core.ReplyMediaKind.None -> null
+                }
         }
     // Media path shows a label; only the plaintext body carries raw profile
     // mention runs, so resolve them to match the bubble's rendering (#615/#1090).
@@ -190,4 +226,12 @@ internal fun ReplyPreviewCard(
             }
         }
     }
+}
+
+internal fun replyAttachmentPreviewText(
+    fileName: String,
+    presentation: AttachmentPresentation,
+): String? {
+    val displayName = safeAttachmentDisplayName(fileName) ?: return presentation.formatLabel
+    return presentation.formatLabel?.let { "$displayName · $it" } ?: displayName
 }

@@ -9,6 +9,9 @@ data class TimelineReplyDisplay(
     val sender: String,
     val body: String,
     val mediaKind: ReplyMediaKind = ReplyMediaKind.None,
+    val mediaFileName: String? = null,
+    val mediaType: String? = null,
+    val originalUnavailable: Boolean = false,
     val warning: String? = null,
 )
 
@@ -29,6 +32,7 @@ fun typedReplyMediaFallback(media: List<MediaAttachmentReferenceFfi>): MediaPrev
         MediaPreviewFallback(
             filename = attachment.fileName.trim().takeIf { it.isNotEmpty() },
             kind = replyMediaKindFromMime(attachment.mediaType),
+            mediaType = attachment.mediaType.trim().takeIf { it.isNotEmpty() },
         )
     }
 
@@ -163,12 +167,25 @@ object TimelineProjector {
         record: TimelineMessageRecordFfi,
         copy: MessageTextCopy = MessageTextCopy.Default,
     ): TimelineReplyDisplay? {
-        val preview = record.replyPreview ?: return null
+        val preview = record.replyPreview
+        if (preview == null) {
+            return record.replyToMessageIdHex
+                ?.takeIf(String::isNotBlank)
+                ?.let {
+                    TimelineReplyDisplay(
+                        sender = "",
+                        body = "",
+                        originalUnavailable = true,
+                    )
+                }
+        }
         val mediaFallback = if (preview.deleted) null else typedReplyMediaFallback(preview.media)
         return TimelineReplyDisplay(
             sender = preview.sender,
             body = preview.displayBody(copy, mediaFallback),
             mediaKind = replyPreviewMediaKind(preview.deleted, mediaFallback, preview.mediaJson),
+            mediaFileName = mediaFallback?.filename,
+            mediaType = mediaFallback?.mediaType,
             warning = if (preview.deleted) null else invalidationWarning(preview.invalidationStatus, copy),
         )
     }
@@ -190,6 +207,8 @@ object TimelineProjector {
                     copy = copy,
                 ),
             mediaKind = replyPreviewMediaKind(record.deleted, visibleMediaFallback, record.mediaJson),
+            mediaFileName = visibleMediaFallback?.filename,
+            mediaType = visibleMediaFallback?.mediaType,
             warning = invalidationWarning(record, copy),
         )
     }

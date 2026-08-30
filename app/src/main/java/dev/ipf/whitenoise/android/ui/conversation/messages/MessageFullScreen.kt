@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -99,16 +101,24 @@ internal fun MessageFullScreenView(
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
     bottomBar: @Composable () -> Unit,
+    selectionController: ReaderTextSelectionController? = null,
 ) {
+    val selectionKey = remember(body, bodyMarkdownDocument) { Any() }
+    val selection = rememberReaderTextSelectionController(selectionKey, selectionController)
     Dialog(
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(
                 usePlatformDefaultWidth = false,
-                dismissOnBackPress = true,
+                // The first Back press exits an active native selection; only
+                // the next one dismisses the reader.
+                dismissOnBackPress = false,
                 decorFitsSystemWindows = false,
             ),
     ) {
+        BackHandler {
+            if (selection.active) selection.reset() else onDismiss()
+        }
         var overflowOpen by remember { mutableStateOf(false) }
         Scaffold(
             modifier = Modifier.testTag(MESSAGE_FULL_SCREEN_TAG),
@@ -148,7 +158,11 @@ internal fun MessageFullScreenView(
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = onDismiss) {
+                        IconButton(
+                            onClick = {
+                                if (selection.active) selection.reset() else onDismiss()
+                            },
+                        ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = stringResource(R.string.back),
@@ -244,6 +258,7 @@ internal fun MessageFullScreenView(
                         isGroupMember = isGroupMember,
                         onNostrProfileTap = onNostrProfileTap,
                         onCopyMarkdownLink = onCopyMarkdownLink,
+                        selectionController = selection,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     )
                 }
@@ -261,23 +276,42 @@ internal fun MessageFullScreenBody(
     isGroupMember: ((String) -> Boolean)?,
     onNostrProfileTap: ((String) -> Unit)?,
     onCopyMarkdownLink: (String) -> Unit,
+    selectionController: ReaderTextSelectionController? = null,
     modifier: Modifier = Modifier,
 ) {
-    SelectionContainer(modifier = modifier.testTag(MESSAGE_FULL_SCREEN_BODY_TAG)) {
-        if (markdownDocument != null) {
+    val selectionKey = remember(body, markdownDocument) { Any() }
+    val selection = rememberReaderTextSelectionController(selectionKey, selectionController)
+    val content: @Composable () -> Unit = {
+        markdownDocument?.let { document ->
             MarkdownMessageBody(
-                document = markdownDocument,
+                document = document,
                 modifier = Modifier.fillMaxWidth(),
                 mentionDisplayName = mentionDisplayName,
                 isGroupMember = isGroupMember,
                 onNostrProfileTap = onNostrProfileTap,
+                onSelectableTextLayoutChanged = selection.selectableTextLayoutReporter,
+                onLinkTextLayoutChanged = selection.markdownLinkLayoutReporter,
                 onCopyLink = onCopyMarkdownLink,
             )
+        } ?: ReaderSelectablePlainText(
+            text = body,
+            onSelectableTextLayoutChanged = selection.selectableTextLayoutReporter,
+        )
+    }
+    Box(
+        modifier =
+            modifier
+                .testTag(MESSAGE_FULL_SCREEN_BODY_TAG)
+                .readerTextSelectionLongPress(selection) { position ->
+                    selection.requestSelection(position)
+                },
+    ) {
+        if (selection.active) {
+            SelectionContainer(state = selection.selectionState) {
+                content()
+            }
         } else {
-            Text(
-                body,
-                style = MaterialTheme.typography.bodyLarge,
-            )
+            content()
         }
     }
 }

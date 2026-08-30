@@ -125,6 +125,7 @@ data class MessageTextCopy(
 data class MediaPreviewFallback(
     val filename: String? = null,
     val kind: ReplyMediaKind = ReplyMediaKind.None,
+    val mediaType: String? = null,
 ) {
     // Photo/Video/Voice filenames are auto-generated (voice-<ms>ms.m4a, swapped
     // numeric .jpg) and never user-meaningful — prefer the typed label. Only a

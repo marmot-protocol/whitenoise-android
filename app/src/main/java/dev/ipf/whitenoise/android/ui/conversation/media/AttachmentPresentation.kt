@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import java.util.Locale
 
 internal enum class AttachmentIconCategory {
@@ -130,6 +131,12 @@ internal fun resolveAttachmentPresentation(
         ?: byExtension
         ?: AttachmentPresentation(extension?.uppercase(Locale.ROOT), AttachmentIconCategory.Generic)
 }
+
+/** A remote attachment name reduced to a non-spoofing, display-only basename. */
+internal fun safeAttachmentDisplayName(fileName: String): String? =
+    ProfileSanitizer
+        .displayName(fileName.replace('\\', '/').substringAfterLast('/'))
+        ?.takeIf { it != "." && it != ".." }
 
 private fun mimeFamilyCategory(mime: String): AttachmentIconCategory? =
     when {

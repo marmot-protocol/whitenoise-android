@@ -3,8 +3,10 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import dev.ipf.marmotkit.MarkdownAutolinkKindFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -14,6 +16,8 @@ import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,6 +58,61 @@ class MessageFullScreenMarkdownTest {
         render(body = raw, document = null)
 
         composeRule.onNodeWithText(raw).assertIsDisplayed()
+    }
+
+    @Test
+    fun plainTextLongPressActivatesNativeSelectionForOnlyThePressedWord() {
+        val fullText = "ordinary full screen selection words"
+        var selection: ReaderTextSelectionController? = null
+        render(
+            body = fullText,
+            document = null,
+            onSelectionReady = { selection = it },
+        )
+
+        composeRule.onNodeWithText(fullText).performTouchInput { longClick() }
+        composeRule.runOnIdle {
+            val activeSelection = requireNotNull(selection)
+            assertTrue(activeSelection.active)
+            val selected = activeSelection.selectedText(fullText)
+            assertTrue(selected.isNotBlank())
+            assertTrue(fullText.contains(selected))
+            assertFalse(selected == fullText)
+        }
+    }
+
+    @Test
+    fun markdownLongPressSelectsRenderedTextWithoutActivatingTheLink() {
+        val label = "ordinary label"
+        val destination = "https://example.com/private"
+        var copiedLink: String? = null
+        var selection: ReaderTextSelectionController? = null
+        render(
+            body = "[$label]($destination)",
+            document =
+                document(
+                    MarkdownBlockFfi.Paragraph(
+                        listOf(
+                            MarkdownInlineFfi.Link(
+                                dest = destination,
+                                title = null,
+                                children = listOf(MarkdownInlineFfi.Text(label)),
+                                classification = MarkdownLinkDestinationKindFfi.WEB,
+                            ),
+                        ),
+                    ),
+                ),
+            onCopyLink = { copiedLink = it },
+            onSelectionReady = { selection = it },
+        )
+
+        composeRule.onNodeWithText(label).performTouchInput { longClick() }
+        composeRule.runOnIdle {
+            val activeSelection = requireNotNull(selection)
+            assertTrue(activeSelection.active)
+            assertTrue(label.contains(activeSelection.selectedText(label)))
+            assertEquals(null, copiedLink)
+        }
     }
 
     @Test
@@ -142,9 +201,12 @@ class MessageFullScreenMarkdownTest {
         isGroupMember: ((String) -> Boolean)? = null,
         onNostrProfileTap: ((String) -> Unit)? = null,
         onCopyLink: (String) -> Unit = {},
+        onSelectionReady: (ReaderTextSelectionController) -> Unit = {},
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
+                val selection = rememberReaderTextSelectionController(body to document)
+                onSelectionReady(selection)
                 MessageFullScreenBody(
                     body = body,
                     markdownDocument = document,
@@ -152,6 +214,7 @@ class MessageFullScreenMarkdownTest {
                     isGroupMember = isGroupMember,
                     onNostrProfileTap = onNostrProfileTap,
                     onCopyMarkdownLink = onCopyLink,
+                    selectionController = selection,
                 )
             }
         }

@@ -233,7 +233,7 @@ private fun TextAttachmentReaderTopBar(
             actions = {
                 TextAttachmentReaderActions(
                     preview = preview,
-                    copyText = selection::copyText,
+                    copyText = selection::selectedText,
                     onCopy = onCopy,
                     onReadAloud = onReadAloud,
                     onOpenExternal = onOpenExternal,

@@ -1611,10 +1611,23 @@ internal fun MessageBubble(
                                 presentation = bubblePresentation,
                             )
                         ReplyPreviewCard(
-                            senderTitle = senderTitleForReply(preview.sender, appState),
-                            isOwn = isOwnReplySender(preview.sender, appState),
+                            senderTitle =
+                                if (preview.originalUnavailable) {
+                                    ""
+                                } else {
+                                    senderTitleForReply(preview.sender, appState)
+                                },
+                            isOwn =
+                                if (preview.originalUnavailable) {
+                                    mine
+                                } else {
+                                    isOwnReplySender(preview.sender, appState)
+                                },
                             body = preview.body,
                             mediaKind = preview.mediaKind,
+                            mediaFileName = preview.mediaFileName,
+                            mediaType = preview.mediaType,
+                            originalUnavailable = preview.originalUnavailable,
                             warning = preview.warning,
                             onClick = {
                                 if (!textSelectionMode) onReplyPreviewClick(item)
