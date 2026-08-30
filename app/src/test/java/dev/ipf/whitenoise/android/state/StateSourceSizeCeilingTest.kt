@@ -42,6 +42,7 @@ class StateSourceSizeCeilingTest {
         const val CONTROLLERS_MAX_LINES = 12759
         const val APP_STATE_MAX_LINES = 10185
 
+        /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }
 
         private fun sourceFile(name: String): File =
