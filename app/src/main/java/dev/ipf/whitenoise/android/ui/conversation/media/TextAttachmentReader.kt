@@ -207,6 +207,7 @@ internal fun TextAttachmentReaderScreen(
     }
 }
 
+/** Renders reader navigation and actions against the current native selection. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TextAttachmentReaderTopBar(
@@ -233,7 +234,7 @@ private fun TextAttachmentReaderTopBar(
             actions = {
                 TextAttachmentReaderActions(
                     preview = preview,
-                    copyText = selection::copyText,
+                    copyText = selection::selectedText,
                     onCopy = onCopy,
                     onReadAloud = onReadAloud,
                     onOpenExternal = onOpenExternal,

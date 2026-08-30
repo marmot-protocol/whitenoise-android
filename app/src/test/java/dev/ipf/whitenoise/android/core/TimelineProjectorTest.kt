@@ -319,6 +319,34 @@ class TimelineProjectorTest {
         )
     }
 
+    /** A referenced but unhydrated parent remains a visible unavailable quote. */
+    @Test
+    fun missingReplyPreviewStillProjectsAnUnavailableQuoteWithoutInventingIdentity() {
+        val record =
+            timelineRecord(
+                plaintext = "Reply body",
+                replyPreview = null,
+                replyToMessageIdHex = "missing-parent-id",
+            )
+
+        assertEquals(
+            TimelineReplyDisplay(
+                sender = "",
+                body = "",
+                originalUnavailable = true,
+            ),
+            TimelineProjector.replyPreview(record),
+        )
+    }
+
+    /** Messages without a usable parent identifier do not grow a synthetic quote. */
+    @Test
+    fun recordWithoutAReplyReferenceStillHasNoQuote() {
+        assertNull(TimelineProjector.replyPreview(timelineRecord(replyToMessageIdHex = null)))
+        assertNull(TimelineProjector.replyPreview(timelineRecord(replyToMessageIdHex = "  ")))
+    }
+
+    /** Typed reply attachments preserve filename and MIME metadata through projection. */
     @Test
     fun replyPreviewUsesTypedAttachmentForDocumentIconAndFilename() {
         val attachment = mediaAttachment(fileName = "archive.zip", mediaType = "application/zip")
@@ -337,11 +365,17 @@ class TimelineProjectorTest {
                 sender = "alice",
                 body = "archive.zip",
                 mediaKind = ReplyMediaKind.Document,
+                mediaFileName = "archive.zip",
+                mediaType = "application/zip",
             ),
             TimelineProjector.replyPreview(record),
         )
         assertEquals(
-            MediaPreviewFallback(filename = "archive.zip", kind = ReplyMediaKind.Document),
+            MediaPreviewFallback(
+                filename = "archive.zip",
+                kind = ReplyMediaKind.Document,
+                mediaType = "application/zip",
+            ),
             typedReplyMediaFallback(listOf(attachment)),
         )
         assertEquals(
@@ -385,6 +419,43 @@ class TimelineProjectorTest {
         )
     }
 
+    /** Typed APK metadata stays precise while legacy JSON retains its coarse fallback. */
+    @Test
+    fun typedApkReplyRetainsSafePresentationInputsWhileLegacyJsonStaysCoarse() {
+        val typed =
+            timelineRecord(
+                replyPreview =
+                    replyPreview(
+                        plaintext = "",
+                        media =
+                            listOf(
+                                mediaAttachment(
+                                    fileName = "release.apk",
+                                    mediaType = "application/vnd.android.package-archive",
+                                ),
+                            ),
+                    ),
+            )
+        val legacy =
+            timelineRecord(
+                replyPreview =
+                    replyPreview(
+                        plaintext = "",
+                        mediaJson = """{"media_type":"application/pdf"}""",
+                    ),
+            )
+
+        val typedDisplay = TimelineProjector.replyPreview(typed)
+        assertEquals("release.apk", typedDisplay?.mediaFileName)
+        assertEquals("application/vnd.android.package-archive", typedDisplay?.mediaType)
+        assertEquals(ReplyMediaKind.Document, typedDisplay?.mediaKind)
+
+        val legacyDisplay = TimelineProjector.replyPreview(legacy)
+        assertEquals(ReplyMediaKind.Document, legacyDisplay?.mediaKind)
+        assertNull(legacyDisplay?.mediaFileName)
+        assertNull(legacyDisplay?.mediaType)
+    }
+
     private fun replyPreview(
         plaintext: String,
         kind: ULong = 9uL,
@@ -422,6 +493,7 @@ class TimelineProjectorTest {
         thumbhash = null,
     )
 
+    /** Builds a projected timeline record with independently controllable reply identity. */
     private fun timelineRecord(
         id: String = "message",
         plaintext: String = "hello",
@@ -434,6 +506,7 @@ class TimelineProjectorTest {
         direction: String = "received",
         mediaJson: String? = null,
         tags: List<MessageTagFfi> = emptyList(),
+        replyToMessageIdHex: String? = replyPreview?.messageIdHex,
     ) = TimelineMessageRecordFfi(
         messageIdHex = id,
         sourceMessageIdHex = null,
@@ -446,7 +519,7 @@ class TimelineProjectorTest {
         tags = tags,
         timelineAt = timelineAt,
         receivedAt = timelineAt,
-        replyToMessageIdHex = replyPreview?.messageIdHex,
+        replyToMessageIdHex = replyToMessageIdHex,
         replyPreview = replyPreview,
         mediaJson = mediaJson,
         media = emptyList(),

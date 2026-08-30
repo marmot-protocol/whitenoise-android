@@ -1074,6 +1074,8 @@ internal fun ComposerBar(
                         isOwn = replyingTo.direction == "sent",
                         body = replyBody,
                         mediaKind = mediaKind,
+                        mediaFileName = replyingToDisplay?.mediaFileName ?: mediaFallback?.filename,
+                        mediaType = replyingToDisplay?.mediaType ?: mediaFallback?.mediaType,
                         warning = replyingToDisplay?.warning,
                         onClick = null,
                         onDismiss = onCancelReply,

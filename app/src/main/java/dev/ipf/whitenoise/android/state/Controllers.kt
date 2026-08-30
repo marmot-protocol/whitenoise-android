@@ -10890,14 +10890,14 @@ class ConversationController(
         item: TimelineMessage,
         copy: MessageTextCopy = MessageTextCopy.Default,
     ): TimelineReplyDisplay? {
-        item.projected?.let { record ->
-            TimelineProjector.replyPreview(record, copy)?.let { preview -> return preview }
-        }
-        val targetMessageId = MessageProjector.replyTargetMessageId(item.record) ?: return null
-        val target = messageById[targetMessageId] ?: return null
+        val projectedPreview = item.projected?.let { record -> TimelineProjector.replyPreview(record, copy) }
+        if (projectedPreview != null && !projectedPreview.originalUnavailable) return projectedPreview
+        val targetMessageId = MessageProjector.replyTargetMessageId(item.record) ?: return projectedPreview
+        val target = messageById[targetMessageId] ?: return projectedPreview
         return replyTargetPreview(target, copy)
     }
 
+    /** Resolves a live target into the same typed preview model used by projected replies. */
     fun replyTargetPreview(
         target: AppMessageRecordFfi,
         copy: MessageTextCopy = MessageTextCopy.Default,
@@ -10921,6 +10921,8 @@ class ConversationController(
                     copy = copy,
                 ),
             mediaKind = mediaKind,
+            mediaFileName = mediaFallback?.filename,
+            mediaType = mediaFallback?.mediaType,
         )
     }
 

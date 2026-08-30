@@ -3,8 +3,12 @@ package dev.ipf.whitenoise.android.ui.screenshot
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -18,6 +22,8 @@ import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_FULL_SCREEN_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageFullScreenView
+import dev.ipf.whitenoise.android.ui.conversation.messages.ReaderTextSelectionController
+import dev.ipf.whitenoise.android.ui.conversation.messages.rememberReaderTextSelectionController
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -32,6 +38,8 @@ import org.robolectric.annotation.GraphicsMode
 class MessageFullScreenMarkdownScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    private lateinit var selectionController: ReaderTextSelectionController
 
     @Test
     fun richReaderLight() {
@@ -51,6 +59,19 @@ class MessageFullScreenMarkdownScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_full_screen_markdown_dark_large_rtl.png")
     }
 
+    /** Captures a native Markdown selection in the full-screen reader. */
+    @Test
+    fun richReaderNativeSelection() {
+        render(darkTheme = false, fontScale = 1f, layoutDirection = LayoutDirection.Ltr)
+
+        composeRule.onNodeWithText("Release notes").performTouchInput { longClick() }
+        composeRule.runOnIdle(::hideSelectionToolbar)
+        composeRule
+            .onNodeWithTag(MESSAGE_FULL_SCREEN_TAG)
+            .captureRoboImage("src/test/snapshots/message_full_screen_markdown_selection.png")
+    }
+
+    /** Renders the production full-screen Markdown reader under a chosen environment. */
     private fun render(
         darkTheme: Boolean,
         fontScale: Float,
@@ -63,6 +84,8 @@ class MessageFullScreenMarkdownScreenshotTest {
                 LocalLayoutDirection provides layoutDirection,
             ) {
                 WhiteNoiseTheme(darkTheme = darkTheme) {
+                    val controller = rememberReaderTextSelectionController(RAW_MARKDOWN)
+                    selectionController = controller
                     MessageFullScreenView(
                         senderDisplayName = "Wise Bee",
                         senderSeed = "wise-bee",
@@ -85,11 +108,25 @@ class MessageFullScreenMarkdownScreenshotTest {
                         onDelete = {},
                         onDismiss = {},
                         bottomBar = {},
+                        selectionController = controller,
                     )
                 }
             }
         }
         composeRule.waitForIdle()
+    }
+
+    /** Hides host-owned contextual chrome so the baseline keeps only app-owned selection paint. */
+    private fun hideSelectionToolbar() {
+        val selectionState = selectionController.selectionState
+        val manager =
+            selectionState.javaClass
+                .getMethod("getManager\$foundation")
+                .invoke(selectionState) ?: return
+        manager.javaClass
+            .getMethod("setShowToolbar\$foundation", Boolean::class.javaPrimitiveType)
+            .invoke(manager, false)
+        (manager.javaClass.getMethod("getTextToolbar").invoke(manager) as? TextToolbar)?.hide()
     }
 
     private fun richDocument() =

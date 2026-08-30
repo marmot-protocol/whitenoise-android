@@ -275,6 +275,90 @@ class MessageBubbleChromeScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_bubble_retention_amoled_large_rtl.png")
     }
 
+    /** Captures sent and received unavailable quotes in the same deterministic frame. */
+    @Test
+    fun unavailableReplyQuotesSentAndReceived() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface {
+                    Column(
+                        modifier = Modifier.width(360.dp).padding(16.dp).testTag(TAG),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        ReplyQuoteBubble(mine = false, originalUnavailable = true)
+                        ReplyQuoteBubble(mine = true, originalUnavailable = true)
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/message_reply_unavailable_sent_received.png")
+    }
+
+    /** Captures typed reply attachments in a constrained dark layout. */
+    @Test
+    fun typedReplyAttachmentsNormalAndNarrow() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface {
+                    Column(
+                        modifier = Modifier.width(280.dp).padding(12.dp).testTag(TAG),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        ReplyQuoteBubble(
+                            mine = false,
+                            fileName = "release.apk",
+                            mediaType = "application/vnd.android.package-archive",
+                        )
+                        ReplyQuoteBubble(
+                            mine = true,
+                            fileName = "board.pcb",
+                            mediaType = "application/vnd.acme.machine-part",
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/message_reply_attachments_narrow_dark.png")
+    }
+
+    /** Captures typed attachment labels under large-font RTL pressure. */
+    @Test
+    fun typedReplyAttachmentsLargeFontRtl() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false, fontScale = 1.6f) {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                    Surface {
+                        Column(
+                            modifier = Modifier.width(320.dp).padding(12.dp).testTag(TAG),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            ReplyQuoteBubble(
+                                mine = false,
+                                fileName = "release.apk",
+                                mediaType = "application/vnd.android.package-archive",
+                            )
+                            ReplyQuoteBubble(
+                                mine = true,
+                                fileName = "README.md",
+                                mediaType = "text/markdown",
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/message_reply_attachments_large_rtl.png")
+    }
+
     private fun render(darkTheme: Boolean) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme) {
@@ -325,6 +409,54 @@ class MessageBubbleChromeScreenshotTest {
 
     private companion object {
         const val TAG = "bubble-chrome"
+    }
+}
+
+/** Screenshot fixture for production reply-quote combinations. */
+@Composable
+private fun ReplyQuoteBubble(
+    mine: Boolean,
+    originalUnavailable: Boolean = false,
+    fileName: String? = null,
+    mediaType: String? = null,
+) {
+    val presentation = messageBubblePresentation(deleted = false, mine = mine, customArgb = null)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
+    ) {
+        MessageBubbleFrame(
+            presentation = presentation,
+            highlighted = false,
+            mine = mine,
+            mentionedSelf = false,
+            mentionedYouLabel = "Mentioned you",
+            modifier = Modifier.widthIn(max = 290.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                ReplyPreviewCard(
+                    senderTitle = if (mine) "You" else "Alice",
+                    isOwn = mine,
+                    body = "Original message",
+                    mediaKind = if (fileName == null) ReplyMediaKind.None else ReplyMediaKind.Document,
+                    mediaFileName = fileName,
+                    mediaType = mediaType,
+                    originalUnavailable = originalUnavailable,
+                    onClick = {},
+                    onDismiss = null,
+                )
+                Text(if (mine) "Outgoing reply" else "Incoming reply")
+                Text(
+                    text = if (mine) "12:35" else "12:34",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = messageBubbleTimestampColor(mine = mine, deleted = false),
+                    modifier = Modifier.align(Alignment.End),
+                )
+            }
+        }
     }
 }
 
