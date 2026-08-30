@@ -1531,7 +1531,7 @@
     <string name="tts_rate_custom">Настраиваемая</string>
     <string name="tts_rate_custom_error">Введите скорость от 0,1× до 10,0×.</string>
     <string name="tts_rate_apply">Применить</string>
-    <string name="connectivity_offline">Нет интернета — включите Wi-Fi или мобильные данные</string>
+    <string name="connectivity_offline">Не в сети</string>
     <string name="connectivity_connecting">Подключение…</string>
     <string name="connectivity_connected">Подключено</string>
     <string name="amber_signin_waiting_request">Подтвердите запрос личности в подписывающем приложении (шаг 1 из 2)…</string>

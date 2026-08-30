@@ -46,20 +46,20 @@ class ChatListConnectionStateTest {
 
     @Test
     fun subscriptionLifecycleCoversDropRetryAndRecovery() {
-        val firstAttempt =
-            ChatListConnectionState().beginSessionAttempt(
+        val firstValidation =
+            ChatListConnectionState().beginSubscriptionValidation(
                 accountRef = "personal",
                 runtimeGeneration = 4,
                 bindEpoch = 7,
             )
         val firstReady =
-            firstAttempt.readyFromCatchUp(requireNotNull(firstAttempt.evidenceTokenOrNull()))
+            firstValidation.readyFromCatchUp(requireNotNull(firstValidation.evidenceTokenOrNull()))
         val dropped =
             firstReady.finishSessionAttempt(
                 accountRef = "personal",
                 runtimeGeneration = 4,
                 bindEpoch = 7,
-                sessionAttemptId = firstAttempt.sessionAttemptId,
+                sessionAttemptId = firstValidation.sessionAttemptId,
             )
         val retry =
             dropped.beginSessionAttempt(
@@ -76,10 +76,44 @@ class ChatListConnectionStateTest {
                 hasValidatedInternet = true,
             )
 
-        assertEquals(ChatListConnectionPhase.Attempting, firstAttempt.phase)
+        assertEquals(ChatListConnectionPhase.Validating, firstValidation.phase)
         assertEquals(ChatListConnectionPhase.Ready, firstReady.phase)
         assertEquals(ChatListConnectionPhase.Idle, dropped.phase)
         assertEquals(ChatListConnectionPhase.Attempting, retry.phase)
+        assertEquals(ChatListConnectionPhase.Ready, recovered.phase)
+    }
+
+    @Test
+    fun healthyRevalidationDoesNotPublishAnAttemptingPhase() {
+        val ready =
+            ChatListConnectionState()
+                .beginSubscriptionValidation(
+                    accountRef = "personal",
+                    runtimeGeneration = 4,
+                    bindEpoch = 7,
+                ).let { it.readyFromCatchUp(requireNotNull(it.evidenceTokenOrNull())) }
+
+        val validating = ready.beginReadinessRefresh(presentAttempt = false)
+        val refreshed = validating.readyFromCatchUp(requireNotNull(validating.evidenceTokenOrNull()))
+
+        assertEquals(ChatListConnectionPhase.Validating, validating.phase)
+        assertEquals(ChatListConnectionPhase.Ready, refreshed.phase)
+    }
+
+    @Test
+    fun explicitLossRecoveryStillPublishesAttemptingThenReady() {
+        val ready =
+            ChatListConnectionState()
+                .beginSubscriptionValidation(
+                    accountRef = "personal",
+                    runtimeGeneration = 4,
+                    bindEpoch = 7,
+                ).let { it.readyFromCatchUp(requireNotNull(it.evidenceTokenOrNull())) }
+
+        val attempting = ready.beginReadinessRefresh(presentAttempt = true)
+        val recovered = attempting.readyFromCatchUp(requireNotNull(attempting.evidenceTokenOrNull()))
+
+        assertEquals(ChatListConnectionPhase.Attempting, attempting.phase)
         assertEquals(ChatListConnectionPhase.Ready, recovered.phase)
     }
 
@@ -92,7 +126,7 @@ class ChatListConnectionStateTest {
                 bindEpoch = 7,
             )
         val staleCatchUp = requireNotNull(firstAttempt.evidenceTokenOrNull())
-        val refreshed = firstAttempt.beginReadinessRefresh()
+        val refreshed = firstAttempt.beginReadinessRefresh(presentAttempt = false)
 
         assertEquals(refreshed, refreshed.readyFromCatchUp(staleCatchUp))
 

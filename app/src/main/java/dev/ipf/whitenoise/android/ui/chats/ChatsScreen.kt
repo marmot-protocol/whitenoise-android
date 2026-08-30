@@ -1143,9 +1143,6 @@ internal fun ChatsScreen(
                         connectivityState = connectivityState,
                     )
                 }
-                // Offline is a full-width actionable strip; connecting and the
-                // brief connected flash render inline in the top bar.
-                ChatListConnectivityBanner(displayed = connectivityState)
             }
         },
         floatingActionButton = {

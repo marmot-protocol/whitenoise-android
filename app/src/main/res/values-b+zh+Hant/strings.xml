@@ -1442,7 +1442,7 @@
     <string name="tts_rate_custom">自訂</string>
     <string name="tts_rate_custom_error">請輸入 0.1× 到 10.0× 之間的語速。</string>
     <string name="tts_rate_apply">套用</string>
-    <string name="connectivity_offline">無網路連線 — 請開啟 Wi-Fi 或行動數據</string>
+    <string name="connectivity_offline">離線</string>
     <string name="connectivity_connecting">連線中…</string>
     <string name="connectivity_connected">已連線</string>
     <string name="amber_signin_waiting_request">請在簽名應用中核准身分請求（第 1 步，共 2 步）…</string>

@@ -1,13 +1,10 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -17,7 +14,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +27,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -68,6 +67,7 @@ internal fun connectivityBannerTarget(
         !hasValidatedInternet -> ConnectivityBannerTarget.Offline
         connectionState.accountRef != activeAccountRef ||
             connectionState.runtimeGeneration != runtimeGeneration -> ConnectivityBannerTarget.NoAttempt
+        connectionState.phase == ChatListConnectionPhase.Validating -> ConnectivityBannerTarget.NoAttempt
         connectionState.phase == ChatListConnectionPhase.Attempting -> ConnectivityBannerTarget.Connecting
         connectionState.phase == ChatListConnectionPhase.Ready -> ConnectivityBannerTarget.Connected
         else -> ConnectivityBannerTarget.NoAttempt
@@ -215,12 +215,10 @@ internal fun relayPollWakeEvents(
 
 internal const val CHAT_LIST_INLINE_CONNECTIVITY_TAG = "chat-list-inline-connectivity"
 
-internal const val CHAT_LIST_OFFLINE_BANNER_TAG = "chat-list-offline-banner"
-
 /**
  * Owns relay fallback polling and the connectivity state machine for the
  * chat list. Hoist once per screen and pass the displayed state to the inline
- * indicator and the offline strip.
+ * indicator.
  */
 @Composable
 internal fun rememberChatListConnectivityState(
@@ -250,12 +248,14 @@ internal fun rememberChatListConnectivityState(
     RelayConnectivityPollingEffect(appState, controller, renderedPresentation.displayed, foregroundEpoch)
     ValidatedInternetRefreshEffect(appState, controller, activeAccountRef, runtimeGeneration)
     ConnectivityEdgeRefreshEffects(
-        controller = controller,
+        effectOwner = controller,
         activeAccountRef = activeAccountRef,
         runtimeGeneration = runtimeGeneration,
         hasValidatedInternet = signals.hasValidatedInternet,
         relaysConnected = signals.relaysConnected,
         foregroundEpoch = foregroundEpoch,
+        revalidateConnectionReadiness = controller::revalidateConnectionReadiness,
+        retryConnectionReadiness = controller::refreshConnectionReadiness,
     )
     LaunchedEffect(controller, activeAccountRef, runtimeGeneration, renderedPresentation) {
         if (renderedPresentation.displayed == ConnectivityBannerState.JustConnected) {
@@ -269,8 +269,8 @@ internal fun rememberChatListConnectivityState(
 }
 
 /**
- * Connecting and JustConnected render inline beside the active account avatar;
- * steady-state connected and offline render nothing here.
+ * All transient connectivity states render in one stable slot beside the
+ * active account avatar; steady-state connected renders nothing.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Suppress("FunctionNaming")
@@ -280,7 +280,7 @@ internal fun ChatListInlineConnectivityIndicator(
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
-        visible = state == ConnectivityBannerState.Connecting || state == ConnectivityBannerState.JustConnected,
+        visible = state != ConnectivityBannerState.Hidden,
         enter = fadeIn(),
         exit = fadeOut(),
         modifier = modifier.testTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG),
@@ -288,9 +288,19 @@ internal fun ChatListInlineConnectivityIndicator(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.padding(end = 8.dp),
+            modifier =
+                Modifier
+                    .padding(end = 8.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite },
         ) {
             when (state) {
+                ConnectivityBannerState.Offline ->
+                    Icon(
+                        Icons.Default.CloudOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp),
+                    )
                 ConnectivityBannerState.Connecting ->
                     LoadingIndicator(modifier = Modifier.size(18.dp))
                 ConnectivityBannerState.JustConnected ->
@@ -300,62 +310,21 @@ internal fun ChatListInlineConnectivityIndicator(
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp),
                     )
-                ConnectivityBannerState.Hidden,
-                ConnectivityBannerState.Offline,
-                -> Unit
+                ConnectivityBannerState.Hidden -> Unit
             }
             Text(
                 text =
                     when (state) {
                         ConnectivityBannerState.Connecting -> stringResource(R.string.connectivity_connecting)
                         ConnectivityBannerState.JustConnected -> stringResource(R.string.connectivity_connected)
-                        ConnectivityBannerState.Hidden,
-                        ConnectivityBannerState.Offline,
-                        -> ""
+                        ConnectivityBannerState.Offline -> stringResource(R.string.connectivity_offline)
+                        ConnectivityBannerState.Hidden -> ""
                     },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        }
-    }
-}
-
-/**
- * Actionable full-width offline strip under the chat-list top bar. Connecting
- * and JustConnected render inline in [ChatListTopBar] instead.
- */
-@Suppress("FunctionNaming")
-@Composable
-internal fun ChatListConnectivityBanner(
-    displayed: ConnectivityBannerState,
-    modifier: Modifier = Modifier,
-) {
-    AnimatedVisibility(
-        visible = displayed == ConnectivityBannerState.Offline,
-        enter = expandVertically(),
-        exit = shrinkVertically(),
-        modifier = modifier.testTag(CHAT_LIST_OFFLINE_BANNER_TAG),
-    ) {
-        Surface(tonalElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-            ) {
-                Icon(
-                    Icons.Default.CloudOff,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(16.dp),
-                )
-                Text(
-                    text = stringResource(R.string.connectivity_offline),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
     }
 }

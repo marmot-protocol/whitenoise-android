@@ -97,17 +97,19 @@ internal fun ValidatedInternetRefreshEffect(
 @Composable
 @Suppress("FunctionNaming")
 internal fun ConnectivityEdgeRefreshEffects(
-    controller: ChatsController,
+    effectOwner: Any,
     activeAccountRef: String?,
     runtimeGeneration: Int,
     hasValidatedInternet: Boolean,
     relaysConnected: Boolean,
     foregroundEpoch: Int,
+    revalidateConnectionReadiness: () -> Unit,
+    retryConnectionReadiness: () -> Unit,
 ) {
-    LaunchedEffect(controller, activeAccountRef, runtimeGeneration, foregroundEpoch) {
-        if (foregroundEpoch > 0 && hasValidatedInternet) controller.refreshConnectionReadiness()
+    LaunchedEffect(effectOwner, activeAccountRef, runtimeGeneration, foregroundEpoch) {
+        if (foregroundEpoch > 0 && hasValidatedInternet) revalidateConnectionReadiness()
     }
-    LaunchedEffect(controller, activeAccountRef, runtimeGeneration, relaysConnected) {
-        if (hasValidatedInternet && !relaysConnected) controller.refreshConnectionReadiness()
+    LaunchedEffect(effectOwner, activeAccountRef, runtimeGeneration, relaysConnected) {
+        if (hasValidatedInternet && !relaysConnected) retryConnectionReadiness()
     }
 }

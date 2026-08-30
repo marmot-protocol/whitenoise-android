@@ -21,6 +21,7 @@ class ChatListConnectivityBannerTest {
     @Test
     fun reducerKeepsInternetAttemptAndReadinessSeparate() {
         val idle = connectionState(ChatListConnectionPhase.Idle)
+        val validating = connectionState(ChatListConnectionPhase.Validating)
         val attempting = connectionState(ChatListConnectionPhase.Attempting)
         val ready = connectionState(ChatListConnectionPhase.Ready)
 
@@ -31,6 +32,10 @@ class ChatListConnectivityBannerTest {
         assertEquals(
             ConnectivityBannerTarget.NoAttempt,
             target(hasValidatedInternet = true, state = idle),
+        )
+        assertEquals(
+            ConnectivityBannerTarget.NoAttempt,
+            target(hasValidatedInternet = true, state = validating),
         )
         assertEquals(
             ConnectivityBannerTarget.Connecting,
@@ -124,6 +129,25 @@ class ChatListConnectivityBannerTest {
                 ConnectivityBannerTarget.Connecting,
             ).displayed,
         )
+    }
+
+    @Test
+    fun genuineDisconnectRetryStillShowsConnectingAndBoundedRecoveryConfirmation() {
+        val steady =
+            ConnectivityBannerPresentation(
+                displayed = ConnectivityBannerState.Hidden,
+                recoveryPending = false,
+                target = ConnectivityBannerTarget.Connected,
+            )
+
+        val retrying = connectivityBannerNext(steady, ConnectivityBannerTarget.Connecting)
+        val recovered = connectivityBannerNext(retrying, ConnectivityBannerTarget.Connected)
+
+        assertEquals(ConnectivityBannerState.Connecting, retrying.displayed)
+        assertTrue(retrying.recoveryPending)
+        assertEquals(ConnectivityBannerState.JustConnected, recovered.displayed)
+        assertEquals(false, recovered.recoveryPending)
+        assertTrue(CONNECTIVITY_BANNER_FLASH_MILLIS <= 1_000L)
     }
 
     @Test

@@ -1467,7 +1467,7 @@
     <string name="tts_rate_custom">Özel</string>
     <string name="tts_rate_custom_error">0,1× ile 10,0× arasında bir hız girin.</string>
     <string name="tts_rate_apply">Uygula</string>
-    <string name="connectivity_offline">İnternet yok — Wi-Fi veya mobil veriyi açın</string>
+    <string name="connectivity_offline">Çevrimdışı</string>
     <string name="connectivity_connecting">Bağlanıyor…</string>
     <string name="connectivity_connected">Bağlandı</string>
     <string name="amber_signin_waiting_request">İmzalayıcıda kimlik isteğini onaylayın (adım 1/2)…</string>

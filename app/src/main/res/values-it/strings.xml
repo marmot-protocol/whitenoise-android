@@ -1469,7 +1469,7 @@
     <string name="tts_rate_custom">Personalizzata</string>
     <string name="tts_rate_custom_error">Inserisci una velocità da 0,1× a 10,0×.</string>
     <string name="tts_rate_apply">Applica</string>
-    <string name="connectivity_offline">Nessuna connessione: attiva il Wi-Fi o i dati mobili</string>
+    <string name="connectivity_offline">Offline</string>
     <string name="connectivity_connecting">Connessione…</string>
     <string name="connectivity_connected">Connesso</string>
     <string name="amber_signin_waiting_request">Approva la richiesta di identità nel tuo signer (passaggio 1 di 2)…</string>

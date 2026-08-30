@@ -3686,7 +3686,9 @@ class ChatsController private constructor(
         }
     internal val connectionState: ChatListConnectionState get() = connectionOwner.state
 
-    fun refreshConnectionReadiness() = connectionOwner.refresh()
+    fun refreshConnectionReadiness() = connectionOwner.refresh(presentAttempt = true)
+
+    fun revalidateConnectionReadiness() = connectionOwner.refresh(presentAttempt = false)
 
     fun invalidateConnectionReadiness() = connectionOwner.invalidate()
 
@@ -3758,6 +3760,7 @@ class ChatsController private constructor(
             var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
             var localFramePresented = preserveLoadedContent && seededLocalSnapshot == null && keepLoadedContent
             var pendingReadinessCatchUp: Deferred<Boolean>? = null
+            var initialSubscriptionProjection = true
             if (seededLocalSnapshot != null) {
                 // The one-shot MDK seed was installed synchronously during
                 // controller construction, before this LaunchedEffect began.
@@ -3781,7 +3784,13 @@ class ChatsController private constructor(
                 var chatListSubscription: ChatListSubscription? = null
                 var chatsSubscription: ChatsSubscription? = null
                 var receivedLiveUpdate = false
-                val connectionAttempt = connectionOwner.beginSessionAttempt(accountRef, bindEpoch)
+                val connectionAttempt =
+                    if (initialSubscriptionProjection) {
+                        initialSubscriptionProjection = false
+                        connectionOwner.beginSubscriptionValidation(accountRef, bindEpoch)
+                    } else {
+                        connectionOwner.beginSessionAttempt(accountRef, bindEpoch)
+                    }
                 try {
                     val chatListStream =
                         appState.marmotIo { subscribeChatList(accountRef, includeArchived = true) }
