@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -318,6 +319,15 @@ class MessageActionMenuLayoutTest {
         assertEquals(save.top, info.top, 0.5f)
         assertTrue(delete.top > info.top)
         assertEquals(reply.width, delete.width, 0.5f)
+    }
+
+    @Test
+    fun shareActionHasDeterministicMenuPresentation() {
+        renderMenu(fontScale = 1f)
+
+        composeRule
+            .onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/message_action_menu_share_light.png")
     }
 
     @Test

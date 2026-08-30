@@ -112,6 +112,7 @@ class OutboundShareTest {
     fun malformedRemoteMimeFallsBackToBinaryInsteadOfEscapingIntentType() {
         assertEquals("application/octet-stream", normalizedOutboundMediaType("not a mime"))
         assertEquals("application/octet-stream", normalizedOutboundMediaType("image/"))
+        assertEquals("application/octet-stream", normalizedOutboundMediaType("image/png/extra"))
         assertEquals("image/jpeg", normalizedOutboundMediaType(" Image/JPEG "))
     }
 

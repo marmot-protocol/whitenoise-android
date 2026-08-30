@@ -67,6 +67,7 @@ internal fun normalizedOutboundMediaType(mediaType: String): String {
     return normalized.takeIf {
         slash > 0 &&
             slash < normalized.lastIndex &&
+            slash == normalized.lastIndexOf('/') &&
             normalized.none(Char::isWhitespace) &&
             normalized.all { character -> character.code in MIN_PRINTABLE_ASCII..MAX_PRINTABLE_ASCII }
     } ?: "application/octet-stream"

@@ -87,7 +87,8 @@ class MessageOutboundShareTest {
                 )
             val expected = mapOf(0 to "pdf bytes".encodeToByteArray(), 1 to "notes".encodeToByteArray())
 
-            val streams = stageMessageShareStreams(context, sources) { expected.getValue(it.attachmentIndex) }
+            val staged = stageMessageShareStreams(context, sources) { expected.getValue(it.attachmentIndex) }
+            val streams = staged.streams
 
             assertEquals(2, streams.size)
             streams.forEachIndexed { index, stream ->
@@ -142,6 +143,51 @@ class MessageOutboundShareTest {
                     stageMessageShareStreams(context, sources) {
                         if (it.attachmentIndex == 0) "one".encodeToByteArray() else throw cancellation
                     }
+                }.exceptionOrNull()
+
+            assertTrue(observed === cancellation)
+            assertTrue(sharedFiles().isEmpty())
+        }
+
+    @Test
+    fun launchFailureDeletesCompletedPlaintextSet() =
+        runTest {
+            clearSharedFiles()
+            val staged =
+                stageMessageShareStreams(
+                    context,
+                    messageShareAttachmentSources(
+                        references = listOf(reference("one.txt", "text/plain")),
+                        retained = emptyList(),
+                    ),
+                ) { "one".encodeToByteArray() }
+
+            val failure =
+                runCatching {
+                    launchStagedMessageShare(staged) { Result.failure(IOException("chooser launch failed")) }
+                }.exceptionOrNull()
+
+            assertTrue(failure is IOException)
+            assertTrue(sharedFiles().isEmpty())
+        }
+
+    @Test
+    fun launchCancellationDeletesCompletedPlaintextSet() =
+        runTest {
+            clearSharedFiles()
+            val staged =
+                stageMessageShareStreams(
+                    context,
+                    messageShareAttachmentSources(
+                        references = listOf(reference("one.txt", "text/plain")),
+                        retained = emptyList(),
+                    ),
+                ) { "one".encodeToByteArray() }
+            val cancellation = CancellationException("screen closed")
+
+            val observed =
+                runCatching {
+                    launchStagedMessageShare(staged) { throw cancellation }
                 }.exceptionOrNull()
 
             assertTrue(observed === cancellation)

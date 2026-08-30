@@ -103,7 +103,7 @@ internal suspend fun shareMessageExternally(
             },
         )
     outboundShareChooser(context, shareProbe, chooserTitle)
-    val streams =
+    val staged =
         stageMessageShareStreams(context, sources) { source ->
             when (source) {
                 is MessageShareAttachmentSource.Confirmed ->
@@ -117,8 +117,34 @@ internal suspend fun shareMessageExternally(
                 is MessageShareAttachmentSource.Retained -> source.attachment.plaintextBytes
             }
         }
-    currentCoroutineContext().ensureActive()
-    launchOutboundShare(context, outboundShareIntent(text, streams), chooserTitle).getOrThrow()
+    launchStagedMessageShare(staged) { streams ->
+        launchOutboundShare(context, outboundShareIntent(text, streams), chooserTitle)
+    }
+}
+
+internal class StagedMessageShareStreams(
+    val streams: List<OutboundShareStream>,
+    private val plaintextFiles: List<File>,
+) {
+    suspend fun deletePlaintext() {
+        withContext(NonCancellable + Dispatchers.IO) {
+            plaintextFiles.forEach { file -> runCatching { file.delete() } }
+        }
+    }
+}
+
+/** Delete the staged set if cancellation or chooser launch interrupts publication. */
+internal suspend fun launchStagedMessageShare(
+    staged: StagedMessageShareStreams,
+    launch: (List<OutboundShareStream>) -> Result<Unit>,
+) {
+    try {
+        currentCoroutineContext().ensureActive()
+        launch(staged.streams).getOrThrow()
+    } catch (failure: Throwable) {
+        staged.deletePlaintext()
+        throw failure
+    }
 }
 
 /**
@@ -130,8 +156,8 @@ internal suspend fun stageMessageShareStreams(
     context: Context,
     sources: List<MessageShareAttachmentSource>,
     resolveBytes: suspend (MessageShareAttachmentSource) -> ByteArray,
-): List<OutboundShareStream> {
-    if (sources.isEmpty()) return emptyList()
+): StagedMessageShareStreams {
+    if (sources.isEmpty()) return StagedMessageShareStreams(emptyList(), emptyList())
     val protectedFiles = mutableListOf<File>()
     var totalBytes = 0L
     try {
@@ -159,11 +185,12 @@ internal suspend fun stageMessageShareStreams(
                     }
                 }
             }
+        val stagedFiles = protectedFiles.toList()
         withContext(NonCancellable + Dispatchers.IO) {
             protectedFiles.forEach(AttachmentPlaintextCache::finishPublication)
             protectedFiles.clear()
         }
-        return streams
+        return StagedMessageShareStreams(streams, stagedFiles)
     } catch (failure: Throwable) {
         withContext(NonCancellable + Dispatchers.IO) {
             protectedFiles.forEach { file ->
