@@ -36,6 +36,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -87,6 +88,7 @@ import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.timelineInvalidationPresentation
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
+import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -96,6 +98,7 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
@@ -117,8 +120,10 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNo
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
+import dev.ipf.whitenoise.android.ui.conversation.media.messageHasShareablePayload
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
+import dev.ipf.whitenoise.android.ui.conversation.media.shareMessageExternally
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.reactions.CustomizeReactionsDialog
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionDetailsSheet
@@ -134,9 +139,11 @@ import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
@@ -781,6 +788,9 @@ internal fun MessageBubble(
     var deleteDialogOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var deleteInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     var attachmentSaveInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
+    var messageShareInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
+    var messageShareJob by remember(record.messageIdHex) { mutableStateOf<Job?>(null) }
+    val messageShareScope = rememberCoroutineScope()
     key(record.messageIdHex) {
         val currentActionMenuOpen by rememberUpdatedState(isActionMenuOpen)
         val currentActionMenuOpenChange by rememberUpdatedState(onActionMenuOpenChange)
@@ -799,6 +809,8 @@ internal fun MessageBubble(
     // message is deleted out from under it (optimistic or remote delete).
     LaunchedEffect(deleted) {
         if (deleted) {
+            messageShareJob?.cancel()
+            messageShareJob = null
             onActionMenuOpenChange(false)
             onTextSelectionModeChange(false)
             emojiPickerOpen = false
@@ -810,6 +822,7 @@ internal fun MessageBubble(
             customizeReactionsOpen = false
             restoreReactionPickerExpanded = false
             deleteDialogOpen = false
+            messageShareInFlight = false
         }
     }
     LaunchedEffect(deleteCapability.canDeleteAtAll) {
@@ -1019,6 +1032,25 @@ internal fun MessageBubble(
             message = record,
             body = editState?.latestText ?: record.plaintext,
         )
+    val outboundShareText =
+        when {
+            mediaReferences.isNotEmpty() || pendingAttachmentsForRecord.isNotEmpty() -> mediaCaption
+            record.kind == 9uL -> editState?.latestText ?: record.plaintext
+            else -> null
+        }?.takeIf { it.isNotBlank() }
+    val protocolAttachmentCount = remember(record.tags) { record.tags.count { it.values.firstOrNull() == "imeta" } }
+    val canShareMessage =
+        !deleted &&
+            !invalidated &&
+            !persistedFailure &&
+            !messageShareInFlight &&
+            messageHasShareablePayload(
+                text = outboundShareText,
+                references = mediaReferences,
+                retained = pendingAttachmentsForRecord,
+                protocolAttachmentCount = protocolAttachmentCount,
+            )
+    val messageShareTitle = stringResource(R.string.shared_media_share)
     val mediaPendingName =
         remember(record.tags) {
             record.tags
@@ -1387,6 +1419,32 @@ internal fun MessageBubble(
                             attachmentSaveInFlight = false
                         }
                     }
+                }
+
+                fun shareMessage() {
+                    if (!canShareMessage) return
+                    onActionMenuOpenChange(false)
+                    messageShareInFlight = true
+                    messageShareJob =
+                        messageShareScope.launch {
+                            try {
+                                runCatchingCancellable {
+                                    shareMessageExternally(
+                                        context = context,
+                                        controller = controller,
+                                        messageIdHex = record.messageIdHex,
+                                        references = mediaReferences,
+                                        protocolAttachmentCount = protocolAttachmentCount,
+                                        mine = mine,
+                                        text = outboundShareText,
+                                        chooserTitle = messageShareTitle,
+                                    )
+                                }.onFailure { appState.presentOutboundShareFailure("MESSAGE_SHARE", it) }
+                            } finally {
+                                messageShareInFlight = false
+                                messageShareJob = null
+                            }
+                        }
                 }
                 // An uncaptioned visual message carries the footer over the
                 // bottom-right media tile. For an album that is the last visible
@@ -1919,6 +1977,7 @@ internal fun MessageBubble(
                     // reactions, system copy).
                     canSpeak = !deleted && canSpeakAloud,
                     canSelectText = !deleted && !bodyTextToRender.isNullOrBlank(),
+                    canShare = canShareMessage,
                     canSave = !deleted && mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
                     canInfo = !deleted,
                     quickReactionEmojis = quickReactionEmojis,
@@ -1952,6 +2011,7 @@ internal fun MessageBubble(
                         speakFromHere()
                         onActionMenuOpenChange(false)
                     },
+                    onShare = ::shareMessage,
                     onSave = ::saveAttachments,
                     onSelectText = ::beginTextSelection,
                     onForward = ::beginForward,

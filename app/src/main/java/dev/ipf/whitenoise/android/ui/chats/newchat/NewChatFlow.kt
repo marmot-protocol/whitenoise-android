@@ -18,9 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -49,6 +46,8 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.share.launchInviteShare
+import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -65,8 +64,6 @@ import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
-import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
-import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 internal enum class NewGroupCreateStage {
@@ -272,9 +269,8 @@ internal suspend fun attemptOpenOrStartProfileChat(
 }
 
 internal fun inviteShareIntent(message: String): Intent =
-    Intent(Intent.ACTION_SEND)
-        .setType("text/plain")
-        .putExtra(Intent.EXTRA_TEXT, message)
+    dev.ipf.whitenoise.android.share
+        .inviteShareIntent(message)
 
 /**
  * Full-screen New Message flow: pick a person to open/start a direct chat, or
@@ -371,6 +367,11 @@ private fun NewMessageScreen(
     val showMyQrLabel = stringResource(R.string.show_my_qr_code)
     val inviteTitle = stringResource(R.string.invite_to_white_noise)
     val inviteMessage = stringResource(R.string.invite_message)
+
+    fun shareInvite() {
+        launchInviteShare(context, inviteMessage, inviteTitle)
+            .onFailure { appState.presentOutboundShareFailure("INVITE_SHARE", it) }
+    }
 
     // Back must stay installed (a disabled handler lets the event fall through
     // to the Activity) but no-op while a tapped person's chat is being created;
@@ -496,30 +497,16 @@ private fun NewMessageScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = Dimens.spaceXl),
             ) {
-                if (query.isBlank()) {
-                    item {
-                        FlowQuickActionRow(
-                            icon = Icons.Default.Group,
-                            title = stringResource(R.string.new_group),
-                            onClick = onNewGroup,
-                            modifier = Modifier.performanceTestTag(PerformanceTestTags.NEW_GROUP),
-                        )
-                    }
-                    item {
-                        FlowQuickActionRow(
-                            icon = Icons.Default.QrCodeScanner,
-                            title = stringResource(R.string.scan_qr_code),
-                            onClick = { showScanner = true },
-                        )
-                    }
-                    item {
-                        FlowQuickActionRow(
-                            icon = Icons.Default.QrCode,
-                            title = showMyQrLabel,
-                            onClick = { showMyQr = true },
-                            enabled = myQrContent != null,
-                        )
-                    }
+                item {
+                    NewMessageQuickActions(
+                        query = query,
+                        showMyQrLabel = showMyQrLabel,
+                        showMyQrEnabled = myQrContent != null,
+                        onNewGroup = onNewGroup,
+                        onScanQr = { showScanner = true },
+                        onShowMyQr = { showMyQr = true },
+                        onInviteFriends = ::shareInvite,
+                    )
                 }
                 startChatError?.let { error ->
                     item {
@@ -533,9 +520,7 @@ private fun NewMessageScreen(
                                     retryGroupIdHex = error.retryGroupIdHex,
                                 )
                             },
-                            onInvite = {
-                                context.startActivity(Intent.createChooser(inviteShareIntent(inviteMessage), inviteTitle))
-                            },
+                            onInvite = ::shareInvite,
                             onCopy = { detail ->
                                 clipboard.setText(AnnotatedString(detail))
                             },

@@ -148,6 +148,7 @@
     <string name="error_missing_key_package">Этот человек ещё не настроил зашифрованные сообщения. Попросите его установить White Noise и один раз открыть приложение, затем попробуйте снова.</string>
     <string name="error_missing_key_package_for">%1$s ещё не настроил(а) зашифрованные сообщения. Попросите этого человека установить White Noise и один раз открыть приложение, затем попробуйте снова.</string>
     <string name="invite_to_white_noise">Пригласить в White Noise</string>
+    <string name="invite_friends">Пригласить друзей</string>
     <string name="invite_to_white_noise_description">%1$s ещё не в White Noise. Поделитесь приложением, чтобы начать безопасный чат.</string>
     <string name="unknown_invite_to_white_noise_description">Этот пользователь ещё не в White Noise. Поделитесь приложением, чтобы начать безопасный чат.</string>
     <string name="invite_message">Присоединяйтесь ко мне в White Noise. Без номера телефона. Без слежки. Только настоящая приватность. Скачайте здесь: https://www.whitenoise.chat/download</string>
@@ -257,6 +258,7 @@
     <string name="export_conversation_transcript">Экспортировать стенограмму беседы</string>
     <string name="toast_couldnt_export_transcript">Не удалось экспортировать стенограмму</string>
     <string name="no_share_target_available">Нет доступной цели для отправки</string>
+    <string name="outbound_share_failed">Не удалось открыть меню отправки</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">Загрузка состояния MLS...</string>
     <string name="mls_state_unavailable">Состояние MLS недоступно.</string>

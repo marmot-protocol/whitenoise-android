@@ -14,6 +14,7 @@ internal enum class MessageActionKind {
     CopyText,
     Speak,
     Forward,
+    Share,
     Save,
     Info,
 }
@@ -31,6 +32,7 @@ internal fun messageActionKinds(
     canCopyText: Boolean,
     canSpeak: Boolean,
     canForward: Boolean,
+    canShare: Boolean = false,
     canSave: Boolean,
     canInfo: Boolean = true,
 ): List<MessageActionKind> =
@@ -42,6 +44,7 @@ internal fun messageActionKinds(
         if (canCopyText) add(MessageActionKind.CopyText)
         if (canSpeak) add(MessageActionKind.Speak)
         if (canForward) add(MessageActionKind.Forward)
+        if (canShare) add(MessageActionKind.Share)
         if (canSave) add(MessageActionKind.Save)
         if (canInfo) add(MessageActionKind.Info)
     }
@@ -81,6 +84,7 @@ internal fun messageActionLabel(kind: MessageActionKind): String =
         MessageActionKind.CopyText -> stringResource(R.string.copy_text)
         MessageActionKind.Speak -> stringResource(R.string.speak_aloud)
         MessageActionKind.Forward -> stringResource(R.string.forward)
+        MessageActionKind.Share -> stringResource(R.string.shared_media_share)
         MessageActionKind.Save -> stringResource(R.string.shared_media_save)
         MessageActionKind.Info -> stringResource(R.string.message_info)
     }

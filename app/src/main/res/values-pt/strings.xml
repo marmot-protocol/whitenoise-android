@@ -132,6 +132,7 @@
     <string name="error_missing_key_package">Esta pessoa ainda não configurou mensagens criptografadas. Peça para ela instalar o White Noise e abrir o app uma vez; depois tente novamente.</string>
     <string name="error_missing_key_package_for">%1$s ainda não configurou mensagens criptografadas. Peça para ela instalar o White Noise e abrir o app uma vez; depois tente novamente.</string>
     <string name="invite_to_white_noise">Convidar para o White Noise</string>
+    <string name="invite_friends">Convidar amigos</string>
     <string name="invite_to_white_noise_description">%1$s ainda não está no White Noise. Compartilhe o app para iniciar uma conversa segura.</string>
     <string name="unknown_invite_to_white_noise_description">Este usuário ainda não está no White Noise. Compartilhe o app para iniciar uma conversa segura.</string>
     <string name="invite_message">Junte-se a mim no White Noise. Sem número de telefone. Sem vigilância. Apenas privacidade real. Baixe aqui: https://www.whitenoise.chat/download</string>
@@ -239,6 +240,7 @@
     <string name="export_conversation_transcript">Exportar transcrição da conversa</string>
     <string name="toast_couldnt_export_transcript">Não foi possível exportar a transcrição</string>
     <string name="no_share_target_available">Nenhum destino de compartilhamento disponível</string>
+    <string name="outbound_share_failed">Não foi possível abrir o compartilhamento</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">Carregando estado MLS...</string>
     <string name="mls_state_unavailable">Estado MLS indisponível.</string>

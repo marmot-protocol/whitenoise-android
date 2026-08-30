@@ -43,6 +43,7 @@ class MessageActionMenuLayoutTest {
                 MessageActionKind.CopyText,
                 MessageActionKind.Speak,
                 MessageActionKind.Forward,
+                MessageActionKind.Share,
                 MessageActionKind.Save,
                 MessageActionKind.Info,
             ),
@@ -54,6 +55,7 @@ class MessageActionMenuLayoutTest {
                 canCopyText = true,
                 canSpeak = true,
                 canForward = true,
+                canShare = true,
                 canSave = true,
             ),
         )
@@ -81,8 +83,8 @@ class MessageActionMenuLayoutTest {
     fun columnAndHeightEstimatesTrackGridRowsWithIntegratedDelete() {
         assertEquals(2, messageActionColumnCount(312.dp, 136.dp))
         assertEquals(1, messageActionColumnCount(260.dp, 136.dp))
-        assertEquals(329.dp, estimatedMessageActionMenuHeight(9, 2, canReact = true, canDelete = true))
-        assertEquals(579.dp, estimatedMessageActionMenuHeight(9, 1, canReact = true, canDelete = true))
+        assertEquals(379.dp, estimatedMessageActionMenuHeight(10, 2, canReact = true, canDelete = true))
+        assertEquals(629.dp, estimatedMessageActionMenuHeight(10, 1, canReact = true, canDelete = true))
     }
 
     @Test
@@ -100,6 +102,7 @@ class MessageActionMenuLayoutTest {
                     canCopyText = true,
                     canSpeak = false,
                     canForward = false,
+                    canShare = true,
                     canSave = canSave,
                 )
             assertEquals(
@@ -107,6 +110,7 @@ class MessageActionMenuLayoutTest {
                     add(MessageActionKind.Reply)
                     add(MessageActionKind.Select)
                     add(MessageActionKind.CopyText)
+                    add(MessageActionKind.Share)
                     if (canSave) add(MessageActionKind.Save)
                     add(MessageActionKind.Info)
                 },
@@ -309,9 +313,10 @@ class MessageActionMenuLayoutTest {
         assertTrue(reply.left < edit.left)
         assertEquals(select.top, selectText.top, 0.5f)
         assertTrue(select.top > reply.top)
+        val save = bounds("Save")
         val info = bounds("Message info")
-        assertEquals(info.top, delete.top, 0.5f)
-        assertTrue(info.left < delete.left)
+        assertEquals(save.top, info.top, 0.5f)
+        assertTrue(delete.top > info.top)
         assertEquals(reply.width, delete.width, 0.5f)
     }
 
@@ -345,13 +350,26 @@ class MessageActionMenuLayoutTest {
             "Copy text",
             "Speak aloud",
             "Forward",
+            "Share",
             "Save",
             "Message info",
             "Delete",
         ).forEach { composeRule.onNodeWithText(it, substring = false).performClick() }
 
         assertEquals(
-            listOf("reply", "edit", "select", "selectText", "copy", "speak", "forward", "save", "info", "delete"),
+            listOf(
+                "reply",
+                "edit",
+                "select",
+                "selectText",
+                "copy",
+                "speak",
+                "forward",
+                "share",
+                "save",
+                "info",
+                "delete",
+            ),
             callbacks,
         )
     }
@@ -433,6 +451,7 @@ class MessageActionMenuLayoutTest {
                         canCopyText = true,
                         canSpeak = true,
                         canSelectText = true,
+                        canShare = true,
                         canSave = true,
                         quickReactionEmojis = quickReactionEmojis,
                         onDismissRequest = {},
@@ -445,6 +464,7 @@ class MessageActionMenuLayoutTest {
                         onSelectText = { callbacks += "selectText" },
                         onCopyText = { callbacks += "copy" },
                         onSpeak = { callbacks += "speak" },
+                        onShare = { callbacks += "share" },
                         onSave = { callbacks += "save" },
                         onInfo = { callbacks += "info" },
                         onDelete = { callbacks += "delete" },

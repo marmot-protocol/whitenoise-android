@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -123,6 +124,7 @@ internal fun MessageActionMenu(
     canCopyText: Boolean,
     canSpeak: Boolean,
     canSelectText: Boolean,
+    canShare: Boolean = false,
     canSave: Boolean,
     canInfo: Boolean = true,
     quickReactionEmojis: List<String>,
@@ -136,6 +138,7 @@ internal fun MessageActionMenu(
     onSelectText: () -> Unit,
     onCopyText: () -> Unit,
     onSpeak: () -> Unit,
+    onShare: () -> Unit = {},
     onSave: () -> Unit,
     onInfo: () -> Unit,
     onDelete: () -> Unit,
@@ -154,6 +157,7 @@ internal fun MessageActionMenu(
             canCopyText,
             canSpeak,
             showForwardAction,
+            canShare,
             canSave,
             canInfo,
         ) {
@@ -165,6 +169,7 @@ internal fun MessageActionMenu(
                 canCopyText = canCopyText,
                 canSpeak = canSpeak,
                 canForward = showForwardAction,
+                canShare = canShare,
                 canSave = canSave,
                 canInfo = canInfo,
             )
@@ -403,6 +408,7 @@ internal fun MessageActionMenu(
                                                     MessageActionKind.CopyText -> onCopyText()
                                                     MessageActionKind.Speak -> onSpeak()
                                                     MessageActionKind.Forward -> onForward()
+                                                    MessageActionKind.Share -> onShare()
                                                     MessageActionKind.Save -> onSave()
                                                     MessageActionKind.Info -> onInfo()
                                                     null -> onDelete()
@@ -451,6 +457,7 @@ private fun MessageActionIcon(kind: MessageActionKind) {
             MessageActionKind.CopyText -> Icons.Default.ContentCopy
             MessageActionKind.Speak -> Icons.AutoMirrored.Filled.VolumeUp
             MessageActionKind.Forward -> Icons.AutoMirrored.Filled.Forward
+            MessageActionKind.Share -> Icons.Default.Share
             MessageActionKind.Save -> Icons.Default.Download
             MessageActionKind.Info -> Icons.Default.Info
         }
