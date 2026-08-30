@@ -65,20 +65,30 @@ class MessageFullScreenSelectionBackTest {
     @Test
     fun reopeningTheReaderStartsWithASeparateCleanSelectionSession() {
         val firstBody = "first reader selection"
-        val body = mutableStateOf(firstBody)
+        val readerOpen = mutableStateOf(true)
         var selection: ReaderTextSelectionController? = null
         composeRule.setContent {
             WhiteNoiseTheme {
-                val controller = rememberReaderTextSelectionController(body.value)
-                selection = controller
-                reader(body = body.value, selection = controller)
+                if (readerOpen.value) {
+                    val controller = rememberReaderTextSelectionController(firstBody)
+                    selection = controller
+                    reader(
+                        body = firstBody,
+                        selection = controller,
+                        onDismiss = { readerOpen.value = false },
+                    )
+                }
             }
         }
 
         composeRule.onNodeWithText(firstBody).performTouchInput { longClick() }
         val first = composeRule.runOnIdle { requireNotNull(selection).also { assertTrue(it.active) } }
 
-        composeRule.runOnIdle { body.value = "reopened reader is clean" }
+        pressBack()
+        pressBack()
+        composeRule.runOnIdle { assertFalse(readerOpen.value) }
+
+        composeRule.runOnIdle { readerOpen.value = true }
         composeRule.waitForIdle()
 
         composeRule.runOnIdle {
