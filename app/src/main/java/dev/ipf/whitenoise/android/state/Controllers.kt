@@ -3117,10 +3117,7 @@ private class OptimisticArchiveIntent(
     val archived: Boolean,
 )
 
-/**
- * Owns the active account's chat-list projection and live subscription
- * lifecycle, including transient connection presentation state.
- */
+/** Owns the active account's chat-list projection and live subscription lifecycle. */
 class ChatsController private constructor(
     private val appState: WhiteNoiseAppState,
     private val memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
@@ -3743,10 +3740,7 @@ class ChatsController private constructor(
         }
     }
 
-    /**
-     * Binds the controller to [accountRef], preserving any requested local
-     * projection while establishing and retrying the live subscriptions.
-     */
+    /** Binds [accountRef] while preserving local projection and retrying live subscriptions. */
     suspend fun bind(
         accountRef: String?,
         preserveLoadedContent: Boolean = false,
