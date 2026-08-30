@@ -1668,6 +1668,9 @@
     <string name="dictate_text">Продиктовать текст</string>
     <string name="dictation_in_use_other_chat">Диктовка активна в другом чате</string>
     <string name="dictation_preparing">Подготовка диктовки…</string>
+    <string name="dictation_checking_service">Проверка службы распознавания речи…</string>
+    <string name="dictation_opening_service">Открытие службы распознавания речи…</string>
+    <string name="dictation_service_open">Служба распознавания речи открыта</string>
     <string name="dictation_starting">Запуск диктовки…</string>
     <string name="dictation_listening">Диктовка…</string>
     <string name="dictation_processing">Расшифровка…</string>

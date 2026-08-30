@@ -1604,6 +1604,9 @@
     <string name="dictate_text">Metni dikte et</string>
     <string name="dictation_in_use_other_chat">Dikte başka bir sohbette etkin</string>
     <string name="dictation_preparing">Dikte hazırlanıyor…</string>
+    <string name="dictation_checking_service">Konuşma hizmeti kontrol ediliyor…</string>
+    <string name="dictation_opening_service">Konuşma hizmeti açılıyor…</string>
+    <string name="dictation_service_open">Konuşma hizmeti açık</string>
     <string name="dictation_starting">Dikte başlatılıyor…</string>
     <string name="dictation_listening">Dikte ediliyor…</string>
     <string name="dictation_processing">Metne dönüştürülüyor…</string>

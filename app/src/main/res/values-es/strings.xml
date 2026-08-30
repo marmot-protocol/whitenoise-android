@@ -1606,6 +1606,9 @@
     <string name="dictate_text">Dictar texto</string>
     <string name="dictation_in_use_other_chat">El dictado está activo en otro chat</string>
     <string name="dictation_preparing">Preparando el dictado…</string>
+    <string name="dictation_checking_service">Comprobando el servicio de voz…</string>
+    <string name="dictation_opening_service">Abriendo el servicio de voz…</string>
+    <string name="dictation_service_open">Servicio de voz abierto</string>
     <string name="dictation_starting">Iniciando el dictado…</string>
     <string name="dictation_listening">Dictando…</string>
     <string name="dictation_processing">Transcribiendo…</string>

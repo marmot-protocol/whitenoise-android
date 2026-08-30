@@ -1579,6 +1579,9 @@
     <string name="dictate_text">聽寫文字</string>
     <string name="dictation_in_use_other_chat">正在另一個聊天中聽寫</string>
     <string name="dictation_preparing">正在準備聽寫…</string>
+    <string name="dictation_checking_service">正在檢查語音服務…</string>
+    <string name="dictation_opening_service">正在開啟語音服務…</string>
+    <string name="dictation_service_open">語音服務已開啟</string>
     <string name="dictation_starting">正在啟動聽寫…</string>
     <string name="dictation_listening">正在聽寫…</string>
     <string name="dictation_processing">正在轉寫…</string>

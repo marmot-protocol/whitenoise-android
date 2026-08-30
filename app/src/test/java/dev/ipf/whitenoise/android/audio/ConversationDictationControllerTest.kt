@@ -16,6 +16,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
+@Suppress("LargeClass")
 class ConversationDictationControllerTest {
     @Test
     fun resultPopulatesAnEmptyDraftAndLeavesItEditable() {
@@ -333,6 +334,84 @@ class ConversationDictationControllerTest {
             ConversationDictationFailure.NoSpeech,
             (empty.controller.state as ConversationDictationState.Failed).reason,
         )
+    }
+
+    @Test
+    fun providerActivityReadinessIsBoundedAndNeverAcquiresTheMicrophone() {
+        val platform = FakePlatform(deferActivityReadiness = true)
+        val events = mutableListOf<ConversationDictationReadinessEvent>()
+        var microphoneAcquireCalls = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Keep"),
+                platform = platform,
+                tryAcquireMicrophone = {
+                    microphoneAcquireCalls += 1
+                    true
+                },
+                onReadinessEvent = events::add,
+            )
+
+        fixture.controller.requestProviderActivityStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertTrue(fixture.controller.state is ConversationDictationState.CheckingProvider)
+        assertEquals(0L, fixture.controller.providerActivityRequestId)
+        assertEquals(0, microphoneAcquireCalls)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertEquals(ConversationDictationReadinessPhase.CheckingService, events.single().phase)
+
+        fixture.scheduler.runLatest()
+
+        assertEquals(
+            ConversationDictationFailure.TimedOut,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertEquals(ConversationDictationReadinessPhase.TimedOut, events.last().phase)
+        assertTrue(platform.readinessCancelled)
+        assertEquals(0, microphoneAcquireCalls)
+    }
+
+    @Test
+    fun cancelledAndStaleProviderReadinessCallbacksCannotLaunch() {
+        val platform = FakePlatform(deferActivityReadiness = true)
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+
+        fixture.controller.requestProviderActivityStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val staleCallback = platform.activityReadinessCallback
+        fixture.controller.cancel()
+        staleCallback(true)
+
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertEquals(0L, fixture.controller.providerActivityRequestId)
+        assertTrue(platform.readinessCancelled)
+    }
+
+    @Test
+    fun providerReadinessTransitionsToLaunchExactlyOnce() {
+        val platform = FakePlatform(deferActivityReadiness = true)
+        val events = mutableListOf<ConversationDictationReadinessEvent>()
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Keep"),
+                platform = platform,
+                onReadinessEvent = events::add,
+            )
+
+        fixture.controller.requestProviderActivityStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val callback = platform.activityReadinessCallback
+        callback(true)
+        callback(true)
+
+        assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
+        assertEquals(1L, fixture.controller.providerActivityRequestId)
+        assertEquals(
+            listOf(
+                ConversationDictationReadinessPhase.CheckingService,
+                ConversationDictationReadinessPhase.ServiceReady,
+            ),
+            events.map { it.phase },
+        )
+        assertFalse(fixture.controller.ownsMicrophone)
     }
 
     @Test
@@ -661,6 +740,7 @@ class ConversationDictationControllerTest {
         platform: FakePlatform = FakePlatform(),
         tryAcquireMicrophone: () -> Boolean = { true },
         releaseMicrophone: () -> Unit = {},
+        onReadinessEvent: (ConversationDictationReadinessEvent) -> Unit = {},
     ): Fixture {
         val scheduler = FakeTimeoutScheduler()
         val drafts = mutableMapOf(key() to draft)
@@ -696,6 +776,7 @@ class ConversationDictationControllerTest {
                 markDisclosureAccepted = {},
                 elapsedRealtime = { 100L },
                 scheduleTimeout = scheduler::schedule,
+                onReadinessEvent = onReadinessEvent,
             )
         return Fixture(controller, platform, scheduler, drafts, revisions) { writes }
     }
@@ -725,15 +806,26 @@ class ConversationDictationControllerTest {
         var hasPermission: Boolean = true,
         var available: Boolean = true,
         var activityAvailable: Boolean = true,
+        private val deferActivityReadiness: Boolean = false,
     ) : ConversationDictationPlatform {
         lateinit var listener: ConversationDictationRecognitionListener
         var session = FakeSession()
+        var readinessCancelled = false
+            private set
+        lateinit var activityReadinessCallback: (Boolean) -> Unit
+            private set
 
         override fun hasRecordAudioPermission(): Boolean = hasPermission
 
         override fun recognitionAvailable(): Boolean = available
 
         override fun recognitionActivityAvailable(): Boolean = activityAvailable
+
+        override fun checkRecognitionActivity(callback: (Boolean) -> Unit): ConversationDictationTimeoutHandle {
+            activityReadinessCallback = callback
+            if (!deferActivityReadiness) callback(activityAvailable)
+            return ConversationDictationTimeoutHandle { readinessCancelled = true }
+        }
 
         override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
             this.listener = listener

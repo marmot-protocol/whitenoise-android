@@ -324,15 +324,15 @@ internal fun WhiteNoiseApp(
         }
     }
     LaunchedEffect(dictationProviderActivityRequestId, dictationImeVisible) {
-        if (
-            dictationProviderActivityRequestId > 0L &&
-            !dictationImeVisible &&
-            dictation.beginProviderActivityLaunch(dictationProviderActivityRequestId)
-        ) {
-            runCatching {
-                dictationProviderActivityLauncher.launch(conversationDictationRecognitionActivityIntent())
-            }.onFailure {
-                dictation.onProviderActivityLaunchFailed()
+        if (dictationProviderActivityRequestId > 0L && !dictationImeVisible) {
+            // Let the bounded readiness state draw before provider UI backgrounds White Noise.
+            withFrameNanos { }
+            if (dictation.beginProviderActivityLaunch(dictationProviderActivityRequestId)) {
+                runCatching {
+                    dictationProviderActivityLauncher.launch(conversationDictationRecognitionActivityIntent())
+                }.onFailure {
+                    dictation.onProviderActivityLaunchFailed()
+                }
             }
         }
     }

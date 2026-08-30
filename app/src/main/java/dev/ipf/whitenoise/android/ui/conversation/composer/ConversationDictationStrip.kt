@@ -7,7 +7,6 @@ import android.net.Uri
 import android.os.SystemClock
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -110,7 +109,10 @@ internal fun ConversationDictationStrip(
                     )
                 else ->
                     CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
+                        modifier =
+                            Modifier
+                                .size(18.dp)
+                                .semantics { contentDescription = status },
                         strokeWidth = 2.dp,
                     )
             }
@@ -125,8 +127,8 @@ internal fun ConversationDictationStrip(
                     },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.weight(1f))
             when (state) {
                 is ConversationDictationState.Starting,
                 is ConversationDictationState.Listening,
@@ -422,9 +424,10 @@ private fun dictationStatusLabel(state: ConversationDictationState): String =
     when (state) {
         is ConversationDictationState.DisclosureRequired,
         is ConversationDictationState.PermissionRequired,
-        is ConversationDictationState.ProviderActivityRequired,
-        is ConversationDictationState.ProviderActivityActive,
         -> stringResource(R.string.dictation_preparing)
+        is ConversationDictationState.CheckingProvider -> stringResource(R.string.dictation_checking_service)
+        is ConversationDictationState.ProviderActivityRequired -> stringResource(R.string.dictation_opening_service)
+        is ConversationDictationState.ProviderActivityActive -> stringResource(R.string.dictation_service_open)
         is ConversationDictationState.Starting -> stringResource(R.string.dictation_starting)
         is ConversationDictationState.Listening -> stringResource(R.string.dictation_listening)
         is ConversationDictationState.Processing -> stringResource(R.string.dictation_processing)

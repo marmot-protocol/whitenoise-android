@@ -10,6 +10,15 @@ recognizer. This product decision supersedes the attachment-sheet entry point in
 those trackers need an explicit scope update before the PR can claim to close
 them.
 
+The provider-Activity contract exposes availability and launch, but not model
+load progress or a microphone-free warm-up API. White Noise therefore performs
+a cancellable, 1.5-second availability check after an explicit dictation tap,
+shows **Checking speech service…** before launch, and then truthfully reports
+**Opening speech service…**. It does not claim that a model is loading or ready
+to listen; those phases remain provider-owned. No lazy prewarm is implemented:
+there is no safe way to prewarm this path without launching provider UI, and
+White Noise never opens the microphone while idle or in the background.
+
 ## Safety rules
 
 - Never uninstall White Noise from a physical device. Install the debug APK in
@@ -24,11 +33,11 @@ them.
 
 ## Evidence record
 
-| Date | Configuration | Device | Result | Evidence |
-|---|---|---|---|---|
-| 2026-08-16 | Previous split implementation | Pixel 9 Pro XL (device A) | Superseded evidence | The attachment-sheet provider Activity returned editable text successfully, but the composer still used the now-removed in-app recognizer. Do not treat this row as verification of the unified-provider composer shortcut. |
-| 2026-08-16 | Provider unavailable | Disposable API 36 Google Play emulator | Automated fallback pass | With no recognition Activity available, the provider path returned `ProviderUnavailable`, preserved the draft, and performed no White Noise microphone capture or provider download. |
-| Pending | Provider configured | Pixel 9 Pro XL (device A) | Not run on composer-only head | Verify that the composer waveform launches the provider experience and returns text safely. |
+| Date | Configuration | Provider package | Device | Cold tap → provider UI | Warm tap → provider UI | Readiness before launch | Result | Evidence |
+|---|---|---|---|---:|---:|---|---|---|
+| 2026-08-16 | Previous split implementation | Not recorded | Pixel 9 Pro XL (device A) | Not recorded | Not recorded | Superseded UI | Superseded evidence | The attachment-sheet provider Activity returned editable text successfully, but the composer still used the now-removed in-app recognizer. Do not treat this row as verification of the unified-provider composer shortcut. |
+| 2026-08-16 | Provider unavailable | None | Disposable API 36 Google Play emulator | N/A | N/A | Automated fallback | Pass | With no recognition Activity available, the provider path returned `ProviderUnavailable`, preserved the draft, and performed no White Noise microphone capture or provider download. |
+| Pending | GrapheneOS provider configured | `app.grapheneos.speechservices` | Pixel 6a | Pending | Pending | Pending | Not run on issue #2275 head | Record both timings from tap until provider UI is visibly interactive, and confirm **Checking speech service…** appears before launch. Do not infer `RecognitionService` support solely from package installation. |
 
 ## Build and install without data loss
 
@@ -74,8 +83,11 @@ alpha". Do not use a production message that might be sent accidentally.
 2. Test blank and nonblank drafts. **Dictate text** must remain reachable, and a
    nonblank draft must still show **Send**.
 3. Tap the composer waveform. The IME must fully close before the installed
-   provider's UI appears. White Noise must not show `Preparing dictation…`, a
-   blank keyboard-sized gap, or its voice-note recording UI.
+   provider's UI appears. White Noise must show **Checking speech service…**
+   without expanding the compact composer, followed by **Opening speech
+   service…** when the provider is available. It must not claim **Loading
+   model** or **Ready to listen**, show a blank keyboard-sized gap, or show its
+   voice-note recording UI.
 4. Cancel from the provider. The composer must remain usable, preserve the
    draft, and receive no late text.
 5. Complete provider recognition. The phrase must enter the editable draft at
@@ -96,6 +108,9 @@ alpha". Do not use a production message that might be sent accidentally.
     the immutable origin. Disable **Don't keep activities** immediately after.
 12. Confirm chat-list voice search still launches its existing provider flow and
     fills search without affecting a conversation draft.
+13. After a provider update or long idle, record cold tap-to-provider-UI time;
+    cancel, retry immediately, and record the warm time. Record the provider
+    package and whether readiness feedback rendered before each launch.
 
 ## Provider-unavailable physical journey
 
