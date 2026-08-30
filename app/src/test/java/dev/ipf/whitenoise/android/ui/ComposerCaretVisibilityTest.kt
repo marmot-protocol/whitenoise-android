@@ -7,10 +7,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -66,6 +68,44 @@ class ComposerCaretVisibilityTest {
         assertTrue("a clipped bulk replacement must scroll to its end caret", scroll.value() > 0f)
         assertEquals(scroll.maxValue(), scroll.value(), 1f)
         assertEquals(TextRange(harness.value.text.length), harness.value.selection)
+    }
+
+    /** Proves a bulk replacement keeps its terminal caret visible on every resize frame. */
+    @Test
+    fun clipboardBulkReplacementKeepsSelectionAndCaretVisibleOnEveryExpansionFrame() {
+        val harness = renderComposerBar(TextFieldValue("Short"))
+        val field = composeRule.onNode(hasSetTextAction())
+        val replacement = longDraft()
+
+        field.performClick()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            field.performTextReplacement(replacement)
+            repeat(20) { frame ->
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.runOnIdle { }
+
+                field.assertIsFocused()
+                assertEquals(
+                    "replacement changed at frame $frame",
+                    replacement,
+                    field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text,
+                )
+                assertEquals(
+                    "selection changed at frame $frame",
+                    TextRange(replacement.length),
+                    field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange],
+                )
+                field.assertActiveCaretVisible()
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(replacement, harness.value.text)
+        assertEquals(TextRange(replacement.length), harness.value.selection)
+        field.assertActiveCaretVisible()
     }
 
     @Test
@@ -199,6 +239,30 @@ class ComposerCaretVisibilityTest {
         return harness
     }
 
+    /** Renders the production composer in a fixed phone viewport for frame-controlled assertions. */
+    private fun renderComposerBar(initial: TextFieldValue): Harness {
+        val harness = Harness(initial)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(360.dp).height(720.dp)) {
+                    Box(contentAlignment = Alignment.BottomCenter) {
+                        ComposerBar(
+                            replyingTo = null,
+                            messageTextCopy = MessageTextCopy.Default,
+                            onCancelReply = {},
+                            onSend = { _, _ -> },
+                            initialDraft = harness.value,
+                            onDraftChange = { harness.value = it },
+                            composerFocus = harness.focusRequester,
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        return harness
+    }
+
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.verticalScroll() = fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
 
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertActiveCaretVisible() {
@@ -209,8 +273,14 @@ class ComposerCaretVisibilityTest {
         val caret = layouts.single().getCursorRect(selection.end)
         val scrollTop = verticalScroll().value()
         val scrollBottom = scrollTop + node.boundsInRoot.height
-        assertTrue("active caret top must stay inside the editor viewport", caret.top >= scrollTop - 1f)
-        assertTrue("active caret bottom must stay inside the editor viewport", caret.bottom <= scrollBottom + 1f)
+        assertTrue(
+            "active caret top ${caret.top} must stay below viewport top $scrollTop",
+            caret.top >= scrollTop - 1f,
+        )
+        assertTrue(
+            "active caret bottom ${caret.bottom} must stay above viewport bottom $scrollBottom",
+            caret.bottom <= scrollBottom + 1f,
+        )
     }
 
     private fun replyRecord() =

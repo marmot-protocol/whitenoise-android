@@ -256,6 +256,34 @@ private suspend fun ScrollState.keepComposerSelectionVisible(selection: Composer
     if (target != value) scrollTo(target)
 }
 
+/**
+ * Reanchors the scroll before the measured editor is placed. The ordinary
+ * effect remains the fallback for a layout result delivered after measure,
+ * while this path prevents a newly pasted end caret from being painted off
+ * screen for the first frame of a composer resize.
+ */
+private fun Modifier.keepComposerSelectionVisibleDuringLayout(
+    scrollState: ScrollState,
+    selectionLayout: () -> ComposerSelectionLayout?,
+): Modifier =
+    layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        selectionLayout()?.let { selection ->
+            val target =
+                composerCaretScrollTarget(
+                    currentScroll = scrollState.value,
+                    viewportHeight = scrollState.viewportSize,
+                    maxScroll = scrollState.maxValue,
+                    selection = selection,
+                )
+            val delta = target - scrollState.value
+            if (delta != 0) scrollState.dispatchRawDelta(delta.toFloat())
+        }
+        layout(placeable.width, placeable.height) {
+            placeable.placeRelative(0, 0)
+        }
+    }
+
 // BasicTextField (not Material3 TextField) so the pill height isn't pinned
 // to the 56dp filled-textfield minimum.
 @OptIn(ExperimentalFoundationApi::class)
@@ -617,6 +645,17 @@ internal fun ComposerPill(
                             Modifier
                                 .fillMaxWidth()
                                 .then(expandedHeightModifier)
+                                .keepComposerSelectionVisibleDuringLayout(composerScrollState) {
+                                    textLayoutSnapshot
+                                        ?.takeIf { it.sourceText == textFieldValue.text }
+                                        ?.let { snapshot ->
+                                            composerSelectionLayout(
+                                                layout = snapshot.result,
+                                                value = textFieldValue,
+                                                transformedText = snapshot.transformedText,
+                                            )
+                                        }
+                                }
                                 // The automatic composer has a hard viewport ceiling.
                                 // Measure the editor at its natural height and own the
                                 // resulting scroll state here so programmatic bulk
