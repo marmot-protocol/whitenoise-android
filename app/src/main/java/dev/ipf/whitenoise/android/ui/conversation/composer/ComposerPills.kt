@@ -284,8 +284,11 @@ private fun Modifier.keepComposerSelectionVisibleDuringLayout(
         }
     }
 
-// BasicTextField (not Material3 TextField) so the pill height isn't pinned
-// to the 56dp filled-textfield minimum.
+/**
+ * Renders the editable composer pill and coordinates its compact, multiline,
+ * and manually expanded geometry. BasicTextField keeps the pill independent
+ * of Material's 56dp filled-field minimum.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ComposerPill(
@@ -517,9 +520,10 @@ internal fun ComposerPill(
             }
         } ?: multilineControls
     val expandedLayout = visualMultilineControls || expansionMode != ComposerExpansionMode.Automatic
-    // One progress value owns every moving edge. Reading it in deferred layout
-    // modifiers avoids recomposing BasicTextField on each animation frame and
-    // keeps the pill, editor, controls, and outer reservation in lockstep.
+    // One progress value owns the moving editor and action edges. The handle's
+    // 24dp border reservation is installed atomically when expansion starts;
+    // animating that constraint made the already-expanded pill lose 24dp of
+    // viewport height while a bulk replacement was settling.
     val expansionProgress =
         animateFloatAsState(
             targetValue = if (expandedLayout) 1f else 0f,
@@ -585,11 +589,11 @@ internal fun ComposerPill(
                 Modifier
                     .deferredPadding(
                         top = {
-                            interpolateDp(
-                                0.dp,
-                                ExpandedBorderHeaderInset,
-                                expansionProgress.value,
-                            )
+                            if (expandedLayout || expansionProgress.value > 0f) {
+                                ExpandedBorderHeaderInset
+                            } else {
+                                0.dp
+                            }
                         },
                     ).fillMaxWidth()
                     .then(expandedHeightModifier)

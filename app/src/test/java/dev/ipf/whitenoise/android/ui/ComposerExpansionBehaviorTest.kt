@@ -359,10 +359,11 @@ class ComposerExpansionBehaviorTest {
         )
     }
 
+    /** A wrapping bulk replacement keeps both outer and pill heights monotonic on every frame. */
     @Test
     fun bulkReplacementKeepsEveryFrameVisibleAndHeightMonotonic() {
         val initialDraft = "Short draft"
-        val replacement = (1..24).joinToString("\n") { "Bulk line $it remains visible" }
+        val replacement = (1..24).joinToString("\n") { "Bulk paste caret frame $it stays visible." }
         render(initialDraft)
         val editor = composeRule.onNode(hasSetTextAction())
         editor.performClick()
@@ -392,6 +393,7 @@ class ComposerExpansionBehaviorTest {
             assertTextFitsInsidePill(geometry)
         }
         assertMonotonic(allFrames.map { it.composer.height }, increasing = true)
+        assertMonotonic(allFrames.map { it.pill.height }, increasing = true)
         assertEditorState(editor, replacement, TextRange(replacement.length))
     }
 
