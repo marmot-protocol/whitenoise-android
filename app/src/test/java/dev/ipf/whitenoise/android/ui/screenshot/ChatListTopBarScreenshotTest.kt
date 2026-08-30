@@ -60,6 +60,20 @@ class ChatListTopBarScreenshotTest {
 
     @Test
     @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+    fun oneAccountOfflineDark() {
+        render(
+            accountCount = 1,
+            dark = true,
+            amoled = false,
+            connectivityState = ConnectivityBannerState.Offline,
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/chat_list_top_bar_one_account_offline_dark.png")
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
     fun threeAccountsConnectingDark() {
         render(accountCount = 3, dark = true, amoled = false)
         composeRule
@@ -238,6 +252,7 @@ class ChatListTopBarScreenshotTest {
         accountCount: Int,
         dark: Boolean,
         amoled: Boolean,
+        connectivityState: ConnectivityBannerState = ConnectivityBannerState.Connecting,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
@@ -259,7 +274,7 @@ class ChatListTopBarScreenshotTest {
                             onMic = {},
                             onOpenSettings = {},
                             onSwitchAccount = {},
-                            connectivityState = ConnectivityBannerState.Connecting,
+                            connectivityState = connectivityState,
                         )
                     }
                 }

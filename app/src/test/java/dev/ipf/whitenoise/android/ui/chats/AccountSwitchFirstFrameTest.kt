@@ -72,6 +72,8 @@ class AccountSwitchFirstFrameTest {
         }
 
         composeRule.onNodeWithText(CACHED_TITLE).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.connectivity_connecting)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.connectivity_connected)).assertDoesNotExist()
         composeRule.onNodeWithText(context.getString(R.string.no_chats_yet)).assertDoesNotExist()
         composeRule
             .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))

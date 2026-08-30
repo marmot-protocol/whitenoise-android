@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -197,28 +199,74 @@ class ChatListInlineConnectivityLayoutTest {
     }
 
     @Test
-    fun offlineStateRendersFullWidthBannerBelowTopBar() {
+    fun offlineStateRendersInlineWithoutShiftingContentBelowTopBar() {
+        val connectivityState = mutableStateOf(ConnectivityBannerState.Hidden)
         composeRule.setContent {
             WhiteNoiseTheme {
                 ChatListTopBarConnectivityHarness(
-                    connectivityState = ConnectivityBannerState.Offline,
+                    connectivityState = connectivityState.value,
                     appState = remember { testAppState() },
                 )
             }
         }
         composeRule.waitForIdle()
-        composeRule.mainClock.advanceTimeBy(500)
+        val hiddenY = contentAnchorTop()
+
+        composeRule.runOnUiThread {
+            connectivityState.value = ConnectivityBannerState.Offline
+        }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag(CHAT_LIST_OFFLINE_BANNER_TAG).assertIsDisplayed()
+        val offlineY = contentAnchorTop()
+        assertEquals(hiddenY, offlineY, POSITION_TOLERANCE)
+        composeRule.onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.connectivity_offline)).assertIsDisplayed()
         val topBarBounds = composeRule.onNodeWithTag(CHAT_LIST_TOP_BAR_TAG).fetchSemanticsNode().boundsInRoot
         val offlineBounds =
             composeRule
-                .onNodeWithTag(CHAT_LIST_OFFLINE_BANNER_TAG)
+                .onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot
-        assertTrue(offlineBounds.top >= topBarBounds.bottom - POSITION_TOLERANCE)
+        assertTrue(offlineBounds.top >= topBarBounds.top - POSITION_TOLERANCE)
+        assertTrue(offlineBounds.bottom <= topBarBounds.bottom + POSITION_TOLERANCE)
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w320dp-h780dp-mdpi")
+    fun compactLargeTextRtlKeepsOfflineAndSearchUsable() {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalDensity provides Density(density = 1f, fontScale = 2f),
+                LocalLayoutDirection provides LayoutDirection.Rtl,
+            ) {
+                WhiteNoiseTheme {
+                    ChatListTopBarConnectivityHarness(
+                        connectivityState = ConnectivityBannerState.Offline,
+                        appState = remember { testAppState(accountCount = 5) },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val offlineBounds =
+            composeRule
+                .onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG)
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val searchBounds =
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.chat_list_search_open))
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
+
+        composeRule.onNodeWithText(context.getString(R.string.connectivity_offline)).assertIsDisplayed()
+        val indicatorsAreDisjoint =
+            offlineBounds.right <= searchBounds.left ||
+                offlineBounds.left >= searchBounds.right
+        assertTrue("offline status must not overlap search", indicatorsAreDisjoint)
     }
 
     private fun renderConnectingTopBar(accountCount: Int) {
@@ -311,7 +359,6 @@ private fun ChatListTopBarConnectivityHarness(
                 connectivityState = connectivityState,
             )
         }
-        ChatListConnectivityBanner(displayed = connectivityState)
         Box(
             Modifier
                 .testTag(CHAT_LIST_CONTENT_ANCHOR_TAG)
