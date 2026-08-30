@@ -412,6 +412,25 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun materialize_allocationFailureIsRecoverableAndPreservesEncryptedEnvelope() {
+        val payload = ByteArray(1024 * 1024 + 37) { 5 }
+        val cache =
+            largeCache(
+                afterLeasePlaintextWritten = {
+                    throw OutOfMemoryError("simulated allocation failure")
+                },
+            )
+        cache.put("large", payload)
+        val envelope = File(dir, sha256Hex("large") + ".enc")
+
+        assertNull(cache.materialize("large"))
+
+        assertTrue(envelope.isFile)
+        assertTrue(cache.contains("large"))
+        assertTrue(dir.listFiles()?.none { it.name.contains("lease") } ?: true)
+    }
+
+    @Test
     fun clearDeletesAlreadyIssuedPlaintextLease() {
         val cache = largeCache()
         cache.put("large", ByteArray(1024 * 1024 + 37) { 8 })

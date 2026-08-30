@@ -329,6 +329,11 @@ internal class DiskByteCache(
             return null
         } catch (_: ProviderException) {
             return null
+        } catch (_: OutOfMemoryError) {
+            // Cache materialization is optional. Preserve the encrypted envelope
+            // and delete the partial plaintext lease in finally so the caller can
+            // continue through its miss path.
+            return null
         } finally {
             if (!leased) runCatching { tmp.delete() }
         }
