@@ -5,12 +5,10 @@ import java.io.File
 import java.io.OutputStream
 
 /** Plaintext attachment data that may be memory-backed or an authenticated private-file lease. */
-internal sealed interface AttachmentPlaintext : Closeable {
+internal interface AttachmentPlaintext : Closeable {
     val size: Long
 
     fun copyTo(output: OutputStream)
-
-    fun readBytes(): ByteArray
 
     class Bytes(
         val bytes: ByteArray,
@@ -20,8 +18,6 @@ internal sealed interface AttachmentPlaintext : Closeable {
         override fun copyTo(output: OutputStream) {
             output.write(bytes)
         }
-
-        override fun readBytes(): ByteArray = bytes
 
         override fun close() = Unit
     }
@@ -38,8 +34,6 @@ internal sealed interface AttachmentPlaintext : Closeable {
         override fun copyTo(output: OutputStream) {
             file.inputStream().use { it.copyTo(output) }
         }
-
-        override fun readBytes(): ByteArray = file.readBytes()
 
         override fun close() = lease.close()
     }

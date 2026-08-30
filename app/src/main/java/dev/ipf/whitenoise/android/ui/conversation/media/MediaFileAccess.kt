@@ -29,13 +29,24 @@ internal suspend fun materializeMediaFile(
             attachmentIndex = attachmentIndex,
             reference = reference,
             resolveSource = {
-                retained?.let(AttachmentPlaintext::Bytes)
-                    ?: controller.downloadAttachmentSource(
+                if (retained != null) {
+                    AttachmentPlaintext.Bytes(
+                        controller
+                            .requestAttachmentTransfer(
+                                messageIdHex = messageIdHex,
+                                attachmentIndex = attachmentIndex,
+                                reference = reference,
+                                retainedPlaintext = retained,
+                            ).await(),
+                    )
+                } else {
+                    controller.downloadAttachmentSource(
                         messageIdHex,
                         attachmentIndex,
                         reference,
                         AttachmentDownloadPriority.Interactive,
                     )
+                }
             },
         )
     }.onFailure {

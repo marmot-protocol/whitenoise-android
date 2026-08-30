@@ -5,6 +5,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicLong
 
@@ -307,7 +308,13 @@ internal object AttachmentCachePublication {
         val tmp = File(parent, "${finalFile.name}.cache-${tmpCounter.incrementAndGet()}-${System.nanoTime()}.tmp")
         AttachmentPlaintextCache.protectPublicationFile(tmp)
         return try {
-            tmp.outputStream().use(source::copyTo)
+            FileOutputStream(tmp).use { output ->
+                source.copyTo(output)
+                output.fd.sync()
+            }
+            if (tmp.length() != source.size) {
+                throw IOException("attachment cache source length changed while publishing ${finalFile.name}")
+            }
             tmp
         } catch (throwable: Throwable) {
             runCatching { tmp.delete() }

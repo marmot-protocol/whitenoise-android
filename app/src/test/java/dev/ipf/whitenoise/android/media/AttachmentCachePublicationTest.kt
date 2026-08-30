@@ -11,6 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.io.IOException
+import java.io.OutputStream
 import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -109,6 +110,21 @@ class AttachmentCachePublicationTest {
         }
 
     @Test
+    fun publishSourceAfterLoad_rejectsChangedSourceLength() =
+        runBlocking {
+            dir = Files.createTempDirectory("attachment-source-length").toFile()
+            val finalFile = File(dir, "final.apk")
+            val key = AttachmentCachePublication.attachmentKey("msg-length", 0, 1uL)
+            val source = ChangedLengthPlaintext(size = 4L, bytes = byteArrayOf(1, 2, 3))
+
+            val published = AttachmentCachePublication.publishSourceAfterLoad(key, finalFile) { source }
+
+            assertFalse(published)
+            assertFalse(finalFile.exists())
+            assertTrue(dir.listFiles()?.none { it.name.endsWith(".tmp") } ?: true)
+        }
+
+    @Test
     fun publishWithPermit_doesNotPublishWhenRenameFails() {
         dir = Files.createTempDirectory("attachment-cache-io").toFile()
         val finalFile = File(dir, "msg-2.mp4")
@@ -131,6 +147,15 @@ class AttachmentCachePublicationTest {
         assertTrue("final path must remain the blocking directory", finalFile.isDirectory)
         val tmpFiles = dir.listFiles()?.filter { it.name.endsWith(".tmp") }.orEmpty()
         assertTrue("failed publish must not leave orphan temp files", tmpFiles.isEmpty())
+    }
+
+    private class ChangedLengthPlaintext(
+        override val size: Long,
+        private val bytes: ByteArray,
+    ) : AttachmentPlaintext {
+        override fun copyTo(output: OutputStream) = output.write(bytes)
+
+        override fun close() = Unit
     }
 
     @Test

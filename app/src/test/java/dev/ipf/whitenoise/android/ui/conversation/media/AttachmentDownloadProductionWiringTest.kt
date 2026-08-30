@@ -99,6 +99,20 @@ class AttachmentDownloadProductionWiringTest {
         )
     }
 
+    @Test
+    fun retainedDocumentOpenStillUsesTransferCoordinator() {
+        val access = source("MediaFileAccess.kt").normalized()
+        val retainedBranch =
+            access
+                .substringAfter("if (retained != null)")
+                .substringBefore("} else {")
+
+        assertTrue(
+            "Retained outgoing documents must preserve transfer state and encrypted-cache seeding",
+            "requestAttachmentTransfer(" in retainedBranch && "retainedPlaintext = retained" in retainedBranch,
+        )
+    }
+
     private fun occurrences(
         source: String,
         needle: String,

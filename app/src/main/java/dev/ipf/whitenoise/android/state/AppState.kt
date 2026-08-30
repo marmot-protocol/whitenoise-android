@@ -10111,7 +10111,9 @@ class WhiteNoiseAppState private constructor(
         // 24 MiB cap on decrypted attachment bytes resident in memory —
         // roughly ten 1920px JPEGs. Persists across conversation re-entry.
         private const val MEDIA_PLAINTEXT_CACHE_MAX_BYTES: Long = 24L * 1024L * 1024L
-        private const val MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES: Long = 1024L * 1024L
+        // Admit ordinary photos while keeping large documents on the file-lease path.
+
+        private const val MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES: Long = 8L * 1024L * 1024L
 
         // ~48 MiB of decoded thumbnails (sampled to <=1280px). Enough to keep
         // visible bubbles spinner-free; bounded so it can't grow unbounded.
