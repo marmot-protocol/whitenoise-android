@@ -76,6 +76,7 @@ internal class ReaderTextSelectionController(
             if (active && pendingPosition != null) layoutRevision++
         }
 
+    /** Activates selection only when the press intersects selectable text or a link label. */
     fun requestSelection(position: Offset): Boolean {
         val hasText = textSelectionSeedRange(selectableLayouts.values, position) != null
         val hasLink = markdownLinkDestinationAt(markdownLinkLayouts.values, position) != null
@@ -85,6 +86,7 @@ internal class ReaderTextSelectionController(
         return true
     }
 
+    /** Seeds Compose's native range after selectable children register. */
     fun seedPendingSelection() {
         val position = pendingPosition ?: return
         textSelectionSeedRange(selectableLayouts.values, position)?.let { range ->
@@ -93,6 +95,7 @@ internal class ReaderTextSelectionController(
         }
     }
 
+    /** Returns native selected fragments, falling back to the full reader text. */
     fun selectedText(fullText: String): String =
         if (active) {
             selectionState.selectedTexts
@@ -102,12 +105,14 @@ internal class ReaderTextSelectionController(
             fullText
         }
 
+    /** Ends the current native selection session without dismissing the reader. */
     fun reset() {
         active = false
         pendingPosition = null
     }
 }
 
+/** Remembers or adopts the selection owner for one reader content identity. */
 @Composable
 internal fun rememberReaderTextSelectionController(
     contentKey: Any,
@@ -137,6 +142,7 @@ internal fun rememberReaderTextSelectionController(
     return controller
 }
 
+/** Converts a reader long press from local coordinates into the shared selection request. */
 @Composable
 internal fun Modifier.readerTextSelectionLongPress(
     contentKey: Any,
@@ -157,6 +163,7 @@ internal fun Modifier.readerTextSelectionLongPress(
         }
 }
 
+/** Reports a plain-text layout so native selection can seed the pressed word. */
 @Composable
 internal fun ReaderSelectablePlainText(
     text: String,
@@ -166,6 +173,7 @@ internal fun ReaderSelectablePlainText(
     var layoutResult by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
     var coordinates by remember(text) { mutableStateOf<LayoutCoordinates?>(null) }
 
+    /** Publishes only after both text layout and window coordinates are available. */
     fun reportIfReady() {
         val layout = layoutResult ?: return
         val layoutCoordinates = coordinates ?: return

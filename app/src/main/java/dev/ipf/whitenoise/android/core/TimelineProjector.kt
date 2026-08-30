@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
 
+/** Complete display projection for an available or unavailable reply target. */
 data class TimelineReplyDisplay(
     val sender: String,
     val body: String,
@@ -15,8 +16,10 @@ data class TimelineReplyDisplay(
     val warning: String? = null,
 )
 
+/** Stable media categories used by reply previews across typed and legacy records. */
 enum class ReplyMediaKind { None, Photo, Video, Voice, Document }
 
+/** Maps a typed MIME value to the reply-preview media category. */
 fun replyMediaKindFromMime(mime: String?): ReplyMediaKind {
     if (mime.isNullOrBlank()) return ReplyMediaKind.None
     return when {
@@ -27,6 +30,7 @@ fun replyMediaKindFromMime(mime: String?): ReplyMediaKind {
     }
 }
 
+/** Preserves the first typed attachment's safe reply-preview inputs. */
 fun typedReplyMediaFallback(media: List<MediaAttachmentReferenceFfi>): MediaPreviewFallback? =
     media.firstOrNull()?.let { attachment ->
         MediaPreviewFallback(
@@ -36,6 +40,7 @@ fun typedReplyMediaFallback(media: List<MediaAttachmentReferenceFfi>): MediaPrev
         )
     }
 
+/** Uses typed media copy only when the reply target has no textual body. */
 fun replyBodyWithTypedMediaFallback(
     plaintext: String,
     projectedBody: String,
@@ -48,8 +53,7 @@ fun replyBodyWithTypedMediaFallback(
         projectedBody
     }
 
-// Heuristic on the FFI's reply preview mediaJson (opaque JSON; just looks
-// for the MIME tree prefix). Cheap and good enough for "what icon to show".
+/** Provides a coarse category by finding MIME-family markers in legacy opaque media JSON. */
 fun replyMediaKindFromJson(mediaJson: String?): ReplyMediaKind {
     if (mediaJson.isNullOrBlank()) return ReplyMediaKind.None
     val lower = localeInvariantFold(mediaJson)
@@ -163,6 +167,7 @@ object TimelineProjector {
         )
     }
 
+    /** Projects a persisted reply, including a truthful unavailable-target state. */
     fun replyPreview(
         record: TimelineMessageRecordFfi,
         copy: MessageTextCopy = MessageTextCopy.Default,
@@ -190,6 +195,7 @@ object TimelineProjector {
         )
     }
 
+    /** Builds the preview shown when the target record itself is still available. */
     fun replyTargetPreview(
         record: TimelineMessageRecordFfi,
         mediaFallback: MediaPreviewFallback? = typedReplyMediaFallback(record.media),

@@ -22,6 +22,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+/** Regression coverage for unavailable and typed-attachment reply cards. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ReplyPreviewCardTest {
@@ -30,6 +31,7 @@ class ReplyPreviewCardTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    /** An unavailable quote stays actionable without exposing fabricated identity. */
     @Test
     fun unavailableOriginalIsPersistentClickableAndDoesNotExposeAnIdentity() {
         var clicks = 0
@@ -57,6 +59,7 @@ class ReplyPreviewCardTest {
         composeRule.runOnIdle { assertEquals(1, clicks) }
     }
 
+    /** Typed document replies share the production format resolver and filename priority. */
     @Test
     fun typedDocumentsUseTheSharedResolverAndKeepTheFilenamePrimary() {
         render(
@@ -71,6 +74,7 @@ class ReplyPreviewCardTest {
         composeRule.onNodeWithText(context.getString(R.string.reply_media_document)).assertDoesNotExist()
     }
 
+    /** Legacy opaque documents retain the localized generic label. */
     @Test
     fun legacyOpaqueDocumentKeepsTheLocalizedCoarseFallback() {
         render(
@@ -82,6 +86,7 @@ class ReplyPreviewCardTest {
         composeRule.onNodeWithText(context.getString(R.string.reply_media_document)).assertIsDisplayed()
     }
 
+    /** Existing photo, video, and voice labels remain unchanged. */
     @Test
     fun establishedPhotoVideoAndVoiceLabelsRemainUnchanged() {
         val cases =
@@ -113,6 +118,7 @@ class ReplyPreviewCardTest {
         }
     }
 
+    /** Safe filename and MIME combinations cover known and unknown document types. */
     @Test
     fun safeExtensionAndMimeResolutionCoverPdfMarkdownAndUnknownFiles() {
         val cases =
@@ -137,6 +143,7 @@ class ReplyPreviewCardTest {
         assertFalse(hostile.orEmpty().contains(".."))
     }
 
+    /** Renders a production reply card with overridable attachment metadata. */
     private fun render(
         senderTitle: String,
         body: String,

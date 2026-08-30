@@ -10851,6 +10851,7 @@ class ConversationController(
         return replyTargetPreview(target, copy)
     }
 
+    /** Resolves a live target into the same typed preview model used by projected replies. */
     fun replyTargetPreview(
         target: AppMessageRecordFfi,
         copy: MessageTextCopy = MessageTextCopy.Default,

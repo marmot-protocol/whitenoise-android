@@ -60,6 +60,7 @@ class MessageFullScreenMarkdownTest {
         composeRule.onNodeWithText(raw).assertIsDisplayed()
     }
 
+    /** A plain-text long press creates a non-empty native word selection. */
     @Test
     fun plainTextLongPressActivatesNativeSelectionForOnlyThePressedWord() {
         val fullText = "ordinary full screen selection words"
@@ -81,6 +82,7 @@ class MessageFullScreenMarkdownTest {
         }
     }
 
+    /** Selecting a Markdown label never activates its destination link. */
     @Test
     fun markdownLongPressSelectsRenderedTextWithoutActivatingTheLink() {
         val label = "ordinary label"
@@ -110,6 +112,7 @@ class MessageFullScreenMarkdownTest {
         composeRule.runOnIdle {
             val activeSelection = requireNotNull(selection)
             assertTrue(activeSelection.active)
+            assertTrue(activeSelection.selectionState.selectedTexts.isNotEmpty())
             assertTrue(label.contains(activeSelection.selectedText(label)))
             assertEquals(null, copiedLink)
         }
@@ -194,6 +197,7 @@ class MessageFullScreenMarkdownTest {
         composeRule.onNodeWithText(destination).assertIsDisplayed()
     }
 
+    /** Renders the shared reader body while exposing its native selection owner. */
     private fun render(
         body: String,
         document: MarkdownDocumentFfi?,

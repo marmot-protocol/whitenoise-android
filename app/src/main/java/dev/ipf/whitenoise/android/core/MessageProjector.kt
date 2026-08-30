@@ -117,7 +117,7 @@ data class MessageTextCopy(
 
 /**
  * `@Immutable` so the Compose compiler resolves this eagerly instead of
- * deferring to a runtime stability check. Both properties are immutable value
+ * deferring to a runtime stability check. Its fields are immutable value
  * types, and every enclosing projection that holds one — `ChatListItem` above
  * all — inherits the deferral otherwise.
  */
@@ -127,9 +127,11 @@ data class MediaPreviewFallback(
     val kind: ReplyMediaKind = ReplyMediaKind.None,
     val mediaType: String? = null,
 ) {
-    // Photo/Video/Voice filenames are auto-generated (voice-<ms>ms.m4a, swapped
-    // numeric .jpg) and never user-meaningful — prefer the typed label. Only a
-    // document filename is worth showing; None keeps the filename fallback.
+    /**
+     * Chooses the user-facing typed-media fallback. Photo, video, and voice
+     * filenames are generated and not user-meaningful, so only documents use
+     * their filename as primary copy.
+     */
     fun text(copy: MessageTextCopy): String =
         when (kind) {
             ReplyMediaKind.Photo,

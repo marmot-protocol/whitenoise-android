@@ -49,11 +49,13 @@ import dev.ipf.whitenoise.android.ui.conversation.media.safeAttachmentDisplayNam
 import dev.ipf.whitenoise.android.ui.resolveMentionsInPlaintext
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
+/** Resolves the current profile title for a reply sender. */
 internal fun senderTitleForReply(
     senderPubkey: String,
     appState: WhiteNoiseAppState,
 ): String = appState.displayName(senderPubkey)
 
+/** Compares a reply sender with the active account without crossing account scope. */
 internal fun isOwnReplySender(
     senderPubkey: String,
     appState: WhiteNoiseAppState,
@@ -62,7 +64,9 @@ internal fun isOwnReplySender(
     return senderPubkey.equals(active, ignoreCase = true)
 }
 
+/** Renders a compact reply quote with truthful unavailable and typed-attachment states. */
 @Composable
+@Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun ReplyPreviewCard(
     senderTitle: String,
     isOwn: Boolean,
@@ -228,6 +232,7 @@ internal fun ReplyPreviewCard(
     }
 }
 
+/** Combines a sanitized basename with the resolved attachment format label. */
 internal fun replyAttachmentPreviewText(
     fileName: String,
     presentation: AttachmentPresentation,

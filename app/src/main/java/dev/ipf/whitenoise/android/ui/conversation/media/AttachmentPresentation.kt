@@ -108,6 +108,7 @@ private val videoExtensions = setOf("mp4", "m4v", "webm", "mkv", "mov", "avi")
 private val compoundExtensions = listOf("tar.gz", "tar.bz2", "tar.xz")
 private val safeSimpleExtension = Regex("^[a-z0-9]{1,8}$")
 
+/** Resolves a display label and icon without overriding the attachment's real MIME type. */
 internal fun resolveAttachmentPresentation(
     mediaType: String,
     fileName: String,

@@ -275,6 +275,7 @@ class MessageBubbleChromeScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_bubble_retention_amoled_large_rtl.png")
     }
 
+    /** Captures sent and received unavailable quotes in the same deterministic frame. */
     @Test
     fun unavailableReplyQuotesSentAndReceived() {
         composeRule.setContent {
@@ -296,6 +297,7 @@ class MessageBubbleChromeScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_reply_unavailable_sent_received.png")
     }
 
+    /** Captures typed reply attachments in a constrained dark layout. */
     @Test
     fun typedReplyAttachmentsNormalAndNarrow() {
         composeRule.setContent {
@@ -325,6 +327,7 @@ class MessageBubbleChromeScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_reply_attachments_narrow_dark.png")
     }
 
+    /** Captures typed attachment labels under large-font RTL pressure. */
     @Test
     fun typedReplyAttachmentsLargeFontRtl() {
         composeRule.setContent {
@@ -409,6 +412,7 @@ class MessageBubbleChromeScreenshotTest {
     }
 }
 
+/** Screenshot fixture for production reply-quote combinations. */
 @Composable
 private fun ReplyQuoteBubble(
     mine: Boolean,

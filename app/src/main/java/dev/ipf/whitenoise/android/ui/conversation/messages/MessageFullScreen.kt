@@ -75,10 +75,12 @@ internal const val MESSAGE_FULL_SCREEN_BODY_TAG = "message-full-screen-body"
 /**
  * Full-screen reader for a body too long to show inline. Reached from the
  * collapsed bubble's Read More; Back returns to the conversation unchanged
- * (#325). A full-bleed Dialog avoids touching the existing nav backstack.
+ * (#325). A full-bleed Dialog avoids touching the existing nav backstack while
+ * preserving native selection and link gestures.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("FunctionNaming", "LongMethod")
 internal fun MessageFullScreenView(
     senderDisplayName: String,
     senderSeed: String,
@@ -267,6 +269,7 @@ internal fun MessageFullScreenView(
     }
 }
 
+/** Renders selectable plain text or Markdown while preserving link gestures. */
 @Composable
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 internal fun MessageFullScreenBody(

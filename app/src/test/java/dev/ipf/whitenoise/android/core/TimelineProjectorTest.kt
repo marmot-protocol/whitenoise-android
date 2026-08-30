@@ -319,6 +319,7 @@ class TimelineProjectorTest {
         )
     }
 
+    /** A referenced but unhydrated parent remains a visible unavailable quote. */
     @Test
     fun missingReplyPreviewStillProjectsAnUnavailableQuoteWithoutInventingIdentity() {
         val record =
@@ -338,12 +339,14 @@ class TimelineProjectorTest {
         )
     }
 
+    /** Messages without a usable parent identifier do not grow a synthetic quote. */
     @Test
     fun recordWithoutAReplyReferenceStillHasNoQuote() {
         assertNull(TimelineProjector.replyPreview(timelineRecord(replyToMessageIdHex = null)))
         assertNull(TimelineProjector.replyPreview(timelineRecord(replyToMessageIdHex = "  ")))
     }
 
+    /** Typed reply attachments preserve filename and MIME metadata through projection. */
     @Test
     fun replyPreviewUsesTypedAttachmentForDocumentIconAndFilename() {
         val attachment = mediaAttachment(fileName = "archive.zip", mediaType = "application/zip")
@@ -416,6 +419,7 @@ class TimelineProjectorTest {
         )
     }
 
+    /** Typed APK metadata stays precise while legacy JSON retains its coarse fallback. */
     @Test
     fun typedApkReplyRetainsSafePresentationInputsWhileLegacyJsonStaysCoarse() {
         val typed =
@@ -489,6 +493,7 @@ class TimelineProjectorTest {
         thumbhash = null,
     )
 
+    /** Builds a projected timeline record with independently controllable reply identity. */
     private fun timelineRecord(
         id: String = "message",
         plaintext: String = "hello",

@@ -17,6 +17,7 @@ import java.io.File
 import java.nio.file.Files
 
 class AttachmentPresentationTest {
+    /** Remote reply filenames cannot expose paths, controls, or bidi spoofing. */
     @Test
     fun replyDisplayNameRemovesPathsAndDirectionalSpoofing() {
         assertEquals("release.apk", safeAttachmentDisplayName("../../release.apk"))

@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.rememberReaderTextSel
 
 internal typealias TextAttachmentSelectionController = ReaderTextSelectionController
 
+/** Keeps one selection session scoped to a single attachment candidate. */
 @Composable
 internal fun rememberTextAttachmentSelectionController(
     candidate: TextAttachmentCandidate,
@@ -32,12 +33,14 @@ internal fun rememberTextAttachmentSelectionController(
     return controller
 }
 
+/** Adds long-press selection without stealing ordinary reader scrolling. */
 @Composable
 internal fun Modifier.textAttachmentSelectionLongPress(
     preview: TextAttachmentPreview,
     onLongPress: (Offset) -> Boolean,
 ): Modifier = readerTextSelectionLongPress(preview, onLongPress)
 
+/** Renders plain or Markdown attachment text under the shared selection controller. */
 @Composable
 internal fun TextAttachmentSelectableContent(
     preview: TextAttachmentPreview,

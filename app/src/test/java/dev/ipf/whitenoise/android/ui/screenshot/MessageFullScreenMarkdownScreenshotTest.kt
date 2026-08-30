@@ -59,6 +59,7 @@ class MessageFullScreenMarkdownScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_full_screen_markdown_dark_large_rtl.png")
     }
 
+    /** Captures a native Markdown selection in the full-screen reader. */
     @Test
     fun richReaderNativeSelection() {
         render(darkTheme = false, fontScale = 1f, layoutDirection = LayoutDirection.Ltr)
@@ -70,6 +71,7 @@ class MessageFullScreenMarkdownScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_full_screen_markdown_selection.png")
     }
 
+    /** Renders the production full-screen Markdown reader under a chosen environment. */
     private fun render(
         darkTheme: Boolean,
         fontScale: Float,
@@ -114,7 +116,7 @@ class MessageFullScreenMarkdownScreenshotTest {
         composeRule.waitForIdle()
     }
 
-    /** Keep the screenshot on app-owned selection paint, excluding host-owned contextual chrome. */
+    /** Hides host-owned contextual chrome so the baseline keeps only app-owned selection paint. */
     private fun hideSelectionToolbar() {
         val selectionState = selectionController.selectionState
         val manager =

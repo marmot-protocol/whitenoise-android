@@ -22,6 +22,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
+/** Regression coverage for native selection ownership across scroll, Back, and reopen. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
@@ -29,6 +30,7 @@ class MessageFullScreenSelectionBackTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
+    /** Back clears an active native range before it dismisses the reader. */
     @Test
     fun backClearsSelectionBeforeDismissingTheReader() {
         val body = "select this word before closing the reader"
@@ -59,6 +61,7 @@ class MessageFullScreenSelectionBackTest {
         composeRule.runOnIdle { assertEquals(1, dismissCount) }
     }
 
+    /** Reopening content cannot inherit the prior reader's native selection. */
     @Test
     fun reopeningTheReaderStartsWithASeparateCleanSelectionSession() {
         val firstBody = "first reader selection"
@@ -85,6 +88,7 @@ class MessageFullScreenSelectionBackTest {
         }
     }
 
+    /** Selection coordinates stay correct after the reader has scrolled. */
     @Test
     fun longPressStillSelectsAfterTheReaderHasScrolled() {
         val body = (1..80).joinToString("\n") { index -> "Reader line $index has selectable words" }
@@ -112,6 +116,7 @@ class MessageFullScreenSelectionBackTest {
         }
     }
 
+    /** Mounts one full-screen reader and returns its selection controller. */
     @androidx.compose.runtime.Composable
     private fun reader(
         body: String,
@@ -144,6 +149,7 @@ class MessageFullScreenSelectionBackTest {
         )
     }
 
+    /** Dispatches platform Back through the active reader dialog. */
     private fun pressBack() {
         composeRule.waitForIdle()
         Espresso.pressBack()
