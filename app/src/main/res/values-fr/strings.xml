@@ -345,6 +345,7 @@
     <string name="forward_cancelled">Annulé</string>
     <string name="forward_cancelling">Annulation…</string>
     <string name="forward_failed_preparing">Impossible de préparer les pièces jointes</string>
+    <string name="forward_failed_preparation_timeout">La préparation a expiré. Réessayez ou fermez l’opération pour arrêter le transfert.</string>
     <string name="forward_failed_upload">Impossible de téléverser les pièces jointes</string>
     <string name="forward_failed_publish">Impossible d’envoyer les messages</string>
     <string name="forward_payload_too_large">Ces pièces jointes sont trop volumineuses pour être transférées ensemble</string>

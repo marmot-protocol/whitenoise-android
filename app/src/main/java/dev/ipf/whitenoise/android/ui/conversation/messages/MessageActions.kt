@@ -640,9 +640,9 @@ internal fun ForwardProgressContent(
     }
 }
 
+/** Projects a destination's transfer phase and actionable failure reason into one accessible row. */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
-// The exhaustive phase projection keeps icon, label, and accessibility state synchronized.
 private fun ForwardTargetProgressRow(
     progress: ForwardTargetProgress,
     title: String,
@@ -682,6 +682,8 @@ private fun ForwardTargetProgressRow(
                         ForwardFailureStage.PayloadTooLarge -> stringResource(R.string.forward_payload_too_large)
                         ForwardFailureStage.Expired -> stringResource(R.string.forward_failed_expired)
                         ForwardFailureStage.SessionChanged -> stringResource(R.string.forward_failed_session_changed)
+                        ForwardFailureStage.PreparationTimeout ->
+                            stringResource(R.string.forward_failed_preparation_timeout)
                         ForwardFailureStage.Materialize,
                         null,
                         -> stringResource(R.string.forward_failed_preparing)

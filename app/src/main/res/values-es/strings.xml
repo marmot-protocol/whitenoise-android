@@ -345,6 +345,7 @@
     <string name="forward_cancelled">Cancelado</string>
     <string name="forward_cancelling">Cancelando…</string>
     <string name="forward_failed_preparing">No se pudieron preparar los archivos adjuntos</string>
+    <string name="forward_failed_preparation_timeout">La preparación agotó el tiempo. Reinténtalo o descarta la operación para detener el reenvío.</string>
     <string name="forward_failed_upload">No se pudieron subir los archivos adjuntos</string>
     <string name="forward_failed_publish">No se pudieron enviar los mensajes</string>
     <string name="forward_payload_too_large">Estos archivos adjuntos son demasiado grandes para reenviarlos juntos</string>

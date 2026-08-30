@@ -3106,6 +3106,19 @@ class WhiteNoiseAppState private constructor(
         val account = activeAccountRef?.takeIf(String::isNotBlank)
         if (account == null || messages.isEmpty() || targets.isEmpty()) return false
         val sessionEpoch = mediaUploadSessionEpoch()
+        val materializationRequests =
+            messages
+                .filterIsInstance<ForwardMessagePayload.Media>()
+                .flatMap { message ->
+                    message.attachments.map { source ->
+                        AttachmentTransferRequest(
+                            accountRef = account,
+                            groupIdHex = message.sourceGroupIdHex,
+                            messageIdHex = message.sourceMessageIdHex,
+                            attachmentIndex = source.attachmentIndex,
+                        )
+                    }
+                }.distinct()
 
         fun requireCurrentAccount() {
             if (activeAccountRef != account || mediaUploadSessionEpoch() != sessionEpoch) {
@@ -3146,6 +3159,11 @@ class WhiteNoiseAppState private constructor(
                             ).also { requireCurrentAccount() }
                         },
                     )
+                }
+
+                /** Stops stale shared source attempts so an explicit retry creates fresh work. */
+                override fun cancelStalledMaterialization() {
+                    materializationRequests.forEach(::cancelMemoizedAttachmentDownload)
                 }
 
                 override suspend fun upload(
@@ -3851,6 +3869,27 @@ class WhiteNoiseAppState private constructor(
             }
             return deferred
         }
+    }
+
+    /**
+     * Cancels one account-scoped memoized source attempt after its forwarding
+     * owner times out or is cancelled. The identity-safe completion hook leaves
+     * any newer retry registered under the same cache key intact.
+     */
+    internal fun cancelMemoizedAttachmentDownload(request: AttachmentTransferRequest): Boolean {
+        val cacheKey =
+            mediaCacheKey(
+                request.accountRef,
+                request.groupIdHex,
+                request.messageIdHex,
+                request.attachmentIndex,
+            )
+        val active =
+            synchronized(inFlightDownloadsLock) {
+                inFlightDownloads[cacheKey]?.takeIf { it.isActive }
+            }
+        active?.cancel(CancellationException("forward attachment preparation stopped"))
+        return active != null
     }
 
     /**

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import dev.ipf.whitenoise.android.state.ForwardFailureStage
 import dev.ipf.whitenoise.android.state.ForwardOperationPhase
 import dev.ipf.whitenoise.android.state.ForwardOperationSnapshot
 import dev.ipf.whitenoise.android.state.ForwardTargetPhase
@@ -117,6 +118,54 @@ class ForwardOperationStatusInteractionTest {
         }
 
         composeRule.onNodeWithText("Cancel").assertDoesNotExist()
+        composeRule.onNodeWithText("Retry").assertIsDisplayed().performClick()
+        composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed().performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, retries)
+            assertEquals(1, dismissals)
+        }
+    }
+
+    /** A preparation deadline explains the failure and keeps explicit retry and dismissal available. */
+    @Test
+    fun preparationTimeoutExposesActionableDetails() {
+        var retries = 0
+        var dismissals = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    ForwardOperationStatus(
+                        snapshot =
+                            ForwardOperationSnapshot(
+                                phase = ForwardOperationPhase.Failed,
+                                preparedAttachments = 0,
+                                totalAttachments = 1,
+                                targets =
+                                    listOf(
+                                        ForwardTargetProgress(
+                                            groupIdHex = "family",
+                                            phase = ForwardTargetPhase.Failed,
+                                            totalAttachments = 1,
+                                            totalMessages = 1,
+                                            failureStage = ForwardFailureStage.PreparationTimeout,
+                                        ),
+                                    ),
+                            ),
+                        targetTitles = mapOf("family" to "Family"),
+                        onCancel = {},
+                        onRetry = { retries += 1 },
+                        onDismiss = { dismissals += 1 },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(FORWARD_OPERATION_STATUS_TEST_TAG).performClick()
+        composeRule
+            .onNodeWithText("Preparation timed out. Retry, or dismiss to stop forwarding.")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Cancel").assertDoesNotExist()
+        composeRule.onNodeWithText("Close").assertIsDisplayed().performClick()
         composeRule.onNodeWithText("Retry").assertIsDisplayed().performClick()
         composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed().performClick()
         composeRule.runOnIdle {

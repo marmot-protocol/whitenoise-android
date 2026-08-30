@@ -345,6 +345,7 @@
     <string name="forward_cancelled">Cancelado</string>
     <string name="forward_cancelling">Cancelando…</string>
     <string name="forward_failed_preparing">Não foi possível preparar os anexos</string>
+    <string name="forward_failed_preparation_timeout">O tempo de preparação esgotou. Tente novamente ou dispense para parar o encaminhamento.</string>
     <string name="forward_failed_upload">Não foi possível carregar os anexos</string>
     <string name="forward_failed_publish">Não foi possível enviar as mensagens</string>
     <string name="forward_payload_too_large">Estes anexos são grandes demais para serem encaminhados juntos</string>
