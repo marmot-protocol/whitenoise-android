@@ -28,12 +28,11 @@ internal data class ConversationForegroundSettleState(
 }
 
 /**
- * Waits for the requested IME state, then relaxes only that request after the
- * liveness timeout. Transient inset or unmeasured chrome geometry never passes.
- * The relaxed geometry wait is bounded by the same timeout, so the draw gate is
- * never held longer than twice the liveness window — when that deadline expires
- * [onSettleDeadlineExpired] must open the gate, and the wait keeps the captured
- * snapshot armed until settled geometry arrives to apply the one correction.
+ * Waits for the requested IME state for one bounded liveness window. When that
+ * deadline expires, [onSettleDeadlineExpired] must open the draw gate and
+ * schedule a frame immediately. Coherent geometry can then complete at once;
+ * otherwise the captured snapshot remains armed until later settled geometry
+ * arrives to apply the one deferred correction without blocking presentation.
  */
 internal suspend fun awaitConversationForegroundPresentation(
     preDrawSignals: ReceiveChannel<Unit>,
@@ -50,16 +49,15 @@ internal suspend fun awaitConversationForegroundPresentation(
         }
     }
 
-    return withTimeoutOrNull(expectedVisibilityTimeoutMillis) {
-        awaitState { it.isSettled(expectedImeVisible) }
-    } ?: currentState().takeIf { it.isGeometrySettled() }
-        ?: withTimeoutOrNull(expectedVisibilityTimeoutMillis) {
-            awaitState { it.isGeometrySettled() }
+    val requestedPresentation =
+        withTimeoutOrNull(expectedVisibilityTimeoutMillis) {
+            awaitState { it.isSettled(expectedImeVisible) }
         }
-        ?: run {
-            onSettleDeadlineExpired()
-            awaitState { it.isGeometrySettled() }
-        }
+    if (requestedPresentation != null) return requestedPresentation
+
+    onSettleDeadlineExpired()
+    return currentState().takeIf { it.isGeometrySettled() }
+        ?: awaitState { it.isGeometrySettled() }
 }
 
 /**
@@ -82,7 +80,7 @@ internal class ConversationForegroundDrawGate(
 @Suppress("FunctionNaming")
 @Composable
 internal fun ConversationForegroundDrawGateEffect(
-    isBlocked: () -> Boolean,
+    isBlocked: Boolean,
     onPreDraw: () -> Unit,
 ) {
     val view = LocalView.current
@@ -93,7 +91,7 @@ internal fun ConversationForegroundDrawGateEffect(
         val observer = view.viewTreeObserver
         val gate =
             ConversationForegroundDrawGate(
-                isBlocked = { currentIsBlocked() },
+                isBlocked = { currentIsBlocked },
                 onPreDrawSignal = { currentOnPreDraw() },
             )
         observer.addOnPreDrawListener(gate)
@@ -101,4 +99,9 @@ internal fun ConversationForegroundDrawGateEffect(
             if (observer.isAlive) observer.removeOnPreDrawListener(gate)
         }
     }
+}
+
+/** Schedules the first root draw after the foreground gate opens. */
+internal fun requestConversationForegroundFrame(view: android.view.View) {
+    view.postInvalidateOnAnimation()
 }

@@ -123,10 +123,12 @@ class ConversationForegroundPresentationTest {
         assertFalse(animatingIme.isGeometrySettled())
     }
 
+    /** A denied IME request releases the gate once coherent geometry exists. */
     @Test
     fun imeVisibilityTimeoutCommitsASettledDeniedImeRequest() =
         runTest {
             val signals = Channel<Unit>(capacity = Channel.CONFLATED)
+            var deadlineExpirations = 0
             val deniedImeRequest =
                 ConversationForegroundSettleState(
                     geometry = ConversationForegroundGeometry(720, 0, 96),
@@ -140,15 +142,19 @@ class ConversationForegroundPresentationTest {
                     currentState = { deniedImeRequest },
                     expectedImeVisible = true,
                     expectedVisibilityTimeoutMillis = 0,
+                    onSettleDeadlineExpired = { deadlineExpirations++ },
                 )
 
             assertEquals(deniedImeRequest, result)
+            assertEquals(1, deadlineExpirations)
         }
 
+    /** A released gate leaves transient geometry armed for its late settle. */
     @Test
-    fun imeVisibilityTimeoutKeepsPresentationBlockedUntilGeometrySettles() =
+    fun imeVisibilityTimeoutKeepsCorrectionArmedUntilGeometrySettles() =
         runTest {
             val signals = Channel<Unit>(capacity = Channel.CONFLATED)
+            var deadlineExpirations = 0
             var current =
                 ConversationForegroundSettleState(
                     geometry = ConversationForegroundGeometry(520, 200, 296),
@@ -169,6 +175,7 @@ class ConversationForegroundPresentationTest {
                         currentState = { current },
                         expectedImeVisible = false,
                         expectedVisibilityTimeoutMillis = 1_000,
+                        onSettleDeadlineExpired = { deadlineExpirations++ },
                     )
                 }
             yield()
@@ -178,8 +185,10 @@ class ConversationForegroundPresentationTest {
             signals.trySend(Unit)
 
             assertEquals(settled, result.await())
+            assertEquals(1, deadlineExpirations)
         }
 
+    /** One liveness window opens the gate while preserving a deferred correction. */
     @Test
     fun settleDeadlineOpensTheGateAndKeepsTheCorrectionArmed() =
         runTest {
@@ -208,7 +217,7 @@ class ConversationForegroundPresentationTest {
                         onSettleDeadlineExpired = { deadlineExpirations++ },
                     )
                 }
-            advanceTimeBy(2_001)
+            advanceTimeBy(1_001)
             runCurrent()
 
             assertEquals(1, deadlineExpirations)
