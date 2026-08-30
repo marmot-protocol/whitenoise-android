@@ -82,6 +82,14 @@ class AttachmentDownloadProductionWiringTest {
                 "appState.enqueueAttachmentDownload(request, priority) } " +
                 "return appState.downloadAttachmentPlaintext(" in controller,
         )
+        val sourceDownload =
+            controller
+                .substringAfter("internal suspend fun downloadAttachmentSource(")
+                .substringBefore("internal suspend fun downloadAttachment(")
+        assertTrue(
+            "File-backed cache misses must retain controller single-flight and transfer-state bookkeeping",
+            "onCacheMiss = { requestAttachmentTransfer(" in sourceDownload,
+        )
         val retryDecision = worker.indexOf("if (shouldRetryAttachmentDownloadWork(")
         val terminalCleanup = worker.indexOf("intentStore.setInteractive(request, interactive = false)", retryDecision)
         val terminalFailure = worker.indexOf("Result.failure()", terminalCleanup)

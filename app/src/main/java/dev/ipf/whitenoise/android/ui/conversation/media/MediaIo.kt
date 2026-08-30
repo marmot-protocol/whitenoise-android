@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.core.DiagnosticErrorMetadata
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
@@ -142,6 +143,30 @@ internal suspend fun materializeDocumentAttachment(
             if (!published) {
                 throw java.io.IOException("attachment cache publication aborted for ${file.name}")
             }
+            file
+        }
+    }
+}
+
+internal suspend fun materializeDocumentAttachmentSource(
+    context: Context,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: dev.ipf.marmotkit.MediaAttachmentReferenceFfi,
+    resolveSource: suspend () -> AttachmentPlaintext,
+): java.io.File {
+    val file = documentAttachmentCacheFile(context, messageIdHex, attachmentIndex, reference)
+    val attachmentKey =
+        AttachmentCachePublication.attachmentKey(messageIdHex, attachmentIndex, reference.sourceEpoch)
+    return documentMaterializations.run(file.absolutePath) {
+        withContext(Dispatchers.IO) { validatedAttachmentCacheFile(file) } ?: run {
+            val published =
+                AttachmentCachePublication.publishSourceAfterLoad(
+                    attachmentKey = attachmentKey,
+                    finalFile = file,
+                    loadSource = resolveSource,
+                )
+            if (!published) throw java.io.IOException("attachment cache publication aborted for ${file.name}")
             file
         }
     }

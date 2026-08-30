@@ -87,6 +87,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.GroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.MediaPipeline
@@ -9283,6 +9284,29 @@ class ConversationController(
      * so re-opening a conversation doesn't re-download media already fetched
      * this session. Throws on download/decrypt failure — the caller surfaces it.
      */
+    internal suspend fun downloadAttachmentSource(
+        messageIdHex: String,
+        attachmentIndex: Int,
+        reference: MediaAttachmentReferenceFfi,
+        priority: AttachmentDownloadPriority,
+    ): AttachmentPlaintext {
+        val account = conversationAccountRef ?: error("no active account")
+        val request = AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex)
+        return appState.downloadAttachmentPlaintextSource(
+            request = request,
+            reference = reference,
+            priority = priority,
+            onCacheMiss = {
+                requestAttachmentTransfer(
+                    messageIdHex = messageIdHex,
+                    attachmentIndex = attachmentIndex,
+                    reference = reference,
+                    priority = priority,
+                ).await()
+            },
+        )
+    }
+
     internal suspend fun downloadAttachment(
         messageIdHex: String,
         attachmentIndex: Int,

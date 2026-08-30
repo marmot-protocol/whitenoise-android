@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.content.Context
 import android.util.Log
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.CoroutineStart
@@ -21,19 +23,19 @@ internal suspend fun materializeMediaFile(
 ): File? {
     val retained = retainedMediaFileBytes(controller, messageIdHex, attachmentIndex, mine)
     return runCatchingCancellable {
-        materializeDocumentAttachment(
+        materializeDocumentAttachmentSource(
             context = context,
             messageIdHex = messageIdHex,
             attachmentIndex = attachmentIndex,
             reference = reference,
-            resolveBytes = {
-                controller
-                    .requestAttachmentTransfer(
-                        messageIdHex = messageIdHex,
-                        attachmentIndex = attachmentIndex,
-                        reference = reference,
-                        retainedPlaintext = retained,
-                    ).await()
+            resolveSource = {
+                retained?.let(AttachmentPlaintext::Bytes)
+                    ?: controller.downloadAttachmentSource(
+                        messageIdHex,
+                        attachmentIndex,
+                        reference,
+                        AttachmentDownloadPriority.Interactive,
+                    )
             },
         )
     }.onFailure {

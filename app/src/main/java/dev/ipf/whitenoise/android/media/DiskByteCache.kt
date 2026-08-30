@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
+import java.io.Closeable
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -27,6 +28,22 @@ internal data class DiskByteCachePublicationToken(
     val generation: Int,
     val expirySweepEpoch: Int,
 )
+
+/** Owner-private authenticated plaintext materialization. Closing deletes it. */
+internal class DiskByteCacheLease internal constructor(
+    val file: File,
+) : Closeable {
+    @Throws(IOException::class)
+    override fun close() {
+        val deleted =
+            try {
+                file.delete() || !file.exists()
+            } catch (security: SecurityException) {
+                throw IOException("failed to delete plaintext cache lease ${file.absolutePath}", security)
+            }
+        if (!deleted) throw IOException("failed to delete plaintext cache lease ${file.absolutePath}")
+    }
+}
 
 /**
  * On-disk byte cache, bounded by total size. Persists across process
@@ -57,6 +74,20 @@ internal data class DiskByteCachePublicationToken(
  * During preparation, the directory is scanned and the in-memory index is
  * repopulated using file `lastModified` as the proxy for recency.
  */
+internal fun plaintextAllocationBudget(
+    availableBytes: Long,
+    maxMemoryBytes: Long,
+): Long {
+    val available = availableBytes.coerceAtLeast(0L)
+    val reserve =
+        minOf(
+            32L * 1024L * 1024L,
+            maxMemoryBytes.coerceAtLeast(0L) / 8L,
+            available / 4L,
+        )
+    return (available - reserve).coerceAtLeast(0L)
+}
+
 internal class DiskByteCache(
     private val cacheDir: File,
     private val maxBytes: Long,
@@ -79,6 +110,8 @@ internal class DiskByteCache(
     private val onMutation: () -> Unit = {},
     private val availablePlaintextAllocationBytes: () -> Long = ::defaultAvailablePlaintextAllocationBytes,
     private val plaintextAllocator: (Int) -> ByteArray = { ByteArray(it) },
+    private val maxInMemoryEntryBytes: Long = LEGACY_SINGLE_PAYLOAD_MAX_BYTES.toLong(),
+    private val afterLeasePlaintextWritten: () -> Unit = {},
 ) {
     // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
     private val index = LinkedHashMap<String, Entry>(8, 0.75f, true)
@@ -162,7 +195,16 @@ internal class DiskByteCache(
         return contains(key)
     }
 
-    fun get(key: String): ByteArray? {
+    fun get(key: String): ByteArray? = getInternal(key, smallOnly = false)
+
+    /** Returns only entries that are safe to promote into the bounded plaintext L1. */
+    fun getIfSmall(key: String): ByteArray? = getInternal(key, smallOnly = true)
+
+    @Suppress("CyclomaticComplexMethod", "ReturnCount")
+    private fun getInternal(
+        key: String,
+        smallOnly: Boolean,
+    ): ByteArray? {
         val hashed = fileNameFor(key)
         // Look up (and LRU-promote) the entry under the lock, then read the
         // file OUTSIDE it. Holding the monitor across decryption serialized
@@ -173,6 +215,7 @@ internal class DiskByteCache(
             synchronized(this) {
                 (index[hashed] ?: return null) to generation
             }
+        if (smallOnly && entry.plaintextSize > maxInMemoryEntryBytes) return null
         return try {
             val bytes = readEncrypted(entry.file, hashed)
             synchronized(this) {
@@ -222,6 +265,77 @@ internal class DiskByteCache(
             // plaintext result array, preserve the authenticated envelope for a
             // later attempt and let the caller continue through its miss path.
             null
+        }
+    }
+
+    /** Authenticates a cache entry into an owner-private temporary file. */
+    @Suppress("CyclomaticComplexMethod", "ReturnCount", "ThrowsCount")
+    fun materialize(
+        key: String,
+        cancellationCheck: () -> Unit = {},
+    ): DiskByteCacheLease? {
+        val hashed = fileNameFor(key)
+        ensureHydrated()
+        val (entry, generationAtLookup) =
+            synchronized(this) {
+                (index[hashed] ?: return null) to generation
+            }
+        val tmp = uniqueTmpFile(hashed, "lease")
+        var leased = false
+        try {
+            cancellationCheck()
+            cacheDir.mkdirs()
+            if (!tmp.createNewFile()) throw IOException("failed to create private cache lease")
+            val revokedForAll =
+                tmp.setReadable(false, false) &&
+                    tmp.setWritable(false, false) &&
+                    tmp.setExecutable(false, false)
+            val grantedToOwner = tmp.setReadable(true, true) && tmp.setWritable(true, true)
+            if (!revokedForAll || !grantedToOwner || tmp.canExecute()) {
+                throw IOException("failed to restrict cache lease permissions")
+            }
+            FileOutputStream(tmp).use { output ->
+                readEncryptedTo(entry.file, hashed, output, cancellationCheck)
+                output.fd.sync()
+            }
+            afterLeasePlaintextWritten()
+            cancellationCheck()
+            synchronized(this) {
+                if (generation != generationAtLookup || index[hashed] !== entry) return null
+            }
+            entry.file.setLastModified(System.currentTimeMillis())
+            leased = true
+            return DiskByteCacheLease(tmp)
+        } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
+            throw cancelled
+        } catch (error: IOException) {
+            if (error.isAuthenticationFailure() || error.isMalformedEnvelope()) {
+                evictPoisonedEntry(hashed, entry, generationAtLookup)
+            } else if (!entry.file.isFile) {
+                dropMissingEntry(hashed, entry)
+            }
+            return null
+        } catch (error: GeneralSecurityException) {
+            if (error.isAuthenticationFailure()) {
+                evictPoisonedEntry(hashed, entry, generationAtLookup)
+            }
+            return null
+        } catch (_: ProviderException) {
+            return null
+        } finally {
+            if (!leased) runCatching { tmp.delete() }
+        }
+    }
+
+    private fun dropMissingEntry(
+        hashed: String,
+        entry: Entry,
+    ) {
+        synchronized(this) {
+            if (index[hashed] === entry) {
+                index.remove(hashed)
+                residentBytes -= entry.size
+            }
         }
     }
 
@@ -318,7 +432,7 @@ internal class DiskByteCache(
                 return
             }
             val size = fileLength.toInt()
-            index[hashed] = Entry(file, size, ciphertextTag)
+            index[hashed] = Entry(file, size, bytes.size.toLong(), ciphertextTag)
             residentBytes += size
             evicted += evictedEntryFiles()
         }
@@ -587,7 +701,7 @@ internal class DiskByteCache(
                         )
                         continue
                     }
-                    hydratedIndex[file.name] = Entry(file, size.toInt(), envelope.ciphertextTag)
+                    hydratedIndex[file.name] = Entry(file, size.toInt(), plaintextSize, envelope.ciphertextTag)
                     hydratedBytes += size
                 }
                 EnvelopeHeaderOutcome.CORRUPT -> {
@@ -931,6 +1045,94 @@ internal class DiskByteCache(
             }
         }
 
+    @Throws(GeneralSecurityException::class, IOException::class)
+    private fun readEncryptedTo(
+        file: File,
+        fileName: String,
+        output: FileOutputStream,
+        cancellationCheck: () -> Unit,
+    ) {
+        FileInputStream(file).use { input ->
+            val authenticated = readAndAuthenticateMetadata(input, fileName)
+            val payloadAad =
+                buildPayloadAad(
+                    fileName,
+                    authenticated.envelope.bytes,
+                    authenticated.metadataIv,
+                    authenticated.metadataAuthTag,
+                )
+            when (authenticated.envelope.version) {
+                CHUNKED_ENVELOPE_VERSION ->
+                    readChunkedPayloadTo(
+                        input,
+                        output,
+                        authenticated.envelope.plaintextBytes!!,
+                        payloadAad,
+                        cancellationCheck,
+                    )
+                else ->
+                    readLegacyPayloadTo(
+                        input,
+                        output,
+                        file.length(),
+                        authenticated.envelope.headerBytes,
+                        payloadAad,
+                        cancellationCheck,
+                    )
+            }
+        }
+    }
+
+    private fun readChunkedPayloadTo(
+        input: InputStream,
+        output: FileOutputStream,
+        plaintextBytes: Long,
+        payloadAad: ByteArray,
+        cancellationCheck: () -> Unit,
+    ) {
+        var written = 0L
+        var chunkIndex = 0
+        while (written < plaintextBytes) {
+            cancellationCheck()
+            val chunkBytes = minOf(ENCRYPTION_CHUNK_BYTES.toLong(), plaintextBytes - written).toInt()
+            val payloadIv = input.readExactly(IV_BYTES)
+            val ciphertext = input.readExactly(chunkBytes + GCM_TAG_BYTES)
+            val decrypted =
+                newPayloadCipher(
+                    Cipher.DECRYPT_MODE,
+                    buildChunkAad(payloadAad, chunkIndex, chunkBytes),
+                    payloadIv,
+                ).doFinal(ciphertext)
+            if (decrypted.size != chunkBytes) throw IOException("invalid decrypted cache chunk length")
+            output.write(decrypted)
+            written += decrypted.size
+            chunkIndex += 1
+        }
+        requirePayloadExhausted(input)
+        if (written != plaintextBytes) throw IOException("invalid decrypted cache payload length")
+    }
+
+    private fun readLegacyPayloadTo(
+        input: InputStream,
+        output: FileOutputStream,
+        fileBytes: Long,
+        headerBytes: Int,
+        payloadAad: ByteArray,
+        cancellationCheck: () -> Unit,
+    ) {
+        val ciphertextBytes = fileBytes - headerBytes - METADATA_AUTH_BYTES - IV_BYTES
+        val plaintextBytes = validateLegacyPayloadSize(ciphertextBytes)
+        val payloadIv = input.readExactly(IV_BYTES)
+        cancellationCheck()
+        val ciphertext = input.readExactly(ciphertextBytes.toInt())
+        requirePayloadExhausted(input)
+        cancellationCheck()
+        val plaintext = newPayloadCipher(Cipher.DECRYPT_MODE, payloadAad, payloadIv).doFinal(ciphertext)
+        validatePlaintext(plaintext)
+        if (plaintext.size.toLong() != plaintextBytes) throw IOException("invalid decrypted cache payload length")
+        output.write(plaintext)
+    }
+
     private fun readLegacyPayload(
         input: InputStream,
         fileBytes: Long,
@@ -1028,7 +1230,6 @@ internal class DiskByteCache(
             message == "truncated encrypted cache payload" ||
             message == "empty decrypted cache payload" ||
             message == "decrypted cache payload exceeds entry limit" ||
-            message == "legacy encrypted cache payload exceeds safe limit" ||
             message == "invalid decrypted cache chunk length" ||
             message == "encrypted cache payload exceeds entry limit"
 
@@ -1102,6 +1303,7 @@ internal class DiskByteCache(
     private data class Entry(
         val file: File,
         val size: Int,
+        val plaintextSize: Long,
         val tag: String? = null,
     )
 
@@ -1143,9 +1345,8 @@ internal class DiskByteCache(
 
         fun defaultAvailablePlaintextAllocationBytes(): Long {
             val runtime = Runtime.getRuntime()
-            val available = (runtime.maxMemory() - runtime.totalMemory() + runtime.freeMemory()).coerceAtLeast(0L)
-            val reserve = minOf(32L * 1024L * 1024L, runtime.maxMemory() / 8L)
-            return (available - reserve).coerceAtLeast(0L)
+            val available = runtime.maxMemory() - runtime.totalMemory() + runtime.freeMemory()
+            return plaintextAllocationBudget(available, runtime.maxMemory())
         }
 
         val HEX =

@@ -106,6 +106,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.StartupPerformanceDiagnostics
 import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
@@ -1408,7 +1409,7 @@ class WhiteNoiseAppState private constructor(
     private val mediaPlaintextCache =
         dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, ByteArray>(
             maxBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
-            maxEntryBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
+            maxEntryBytes = MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES,
             sizeOf = { it.size },
         )
 
@@ -3985,6 +3986,72 @@ class WhiteNoiseAppState private constructor(
             withContext(Dispatchers.Main.immediate) {
                 cachedMediaPlaintext(cacheKey) != null
             }
+    }
+
+    /**
+     * Resolves plaintext without forcing a large cache hit through a whole-file
+     * ByteArray. The returned private-file lease must be closed by the caller.
+     */
+    internal suspend fun downloadAttachmentPlaintextSource(
+        request: AttachmentTransferRequest,
+        reference: MediaAttachmentReferenceFfi,
+        priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
+        persistInteractiveIntent: Boolean = true,
+        onCacheMiss: (suspend () -> ByteArray)? = null,
+    ): AttachmentPlaintext {
+        val cacheKey =
+            mediaCacheKey(
+                request.accountRef,
+                request.groupIdHex,
+                request.messageIdHex,
+                request.attachmentIndex,
+            )
+        val memory = withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }
+        val callerContext = currentCoroutineContext()
+        var source: AttachmentPlaintext? = null
+        var pendingSource: AttachmentPlaintext? = null
+        try {
+            source =
+                if (memory != null) {
+                    AttachmentPlaintext.Bytes(memory)
+                } else {
+                    withContext(Dispatchers.IO) {
+                        val loaded =
+                            diskMediaCache
+                                .getIfSmall(cacheKey)
+                                ?.let(AttachmentPlaintext::Bytes)
+                                ?: diskMediaCache
+                                    .materialize(cacheKey) {
+                                        callerContext.ensureActive()
+                                    }?.let(AttachmentPlaintext::Lease)
+                        pendingSource = loaded
+                        loaded
+                    }
+                }
+            pendingSource = null
+            val resolved = source
+            if (resolved != null) {
+                if (resolved is AttachmentPlaintext.Bytes && memory == null) {
+                    withContext(Dispatchers.Main.immediate) {
+                        cacheMediaPlaintext(cacheKey, resolved.bytes)
+                    }
+                }
+                if (priority == AttachmentDownloadPriority.Interactive && persistInteractiveIntent) {
+                    attachmentDownloadIntents.setInteractive(request, interactive = false)
+                }
+                return resolved
+            }
+        } catch (cancellation: CancellationException) {
+            (source ?: pendingSource)?.close()
+            throw cancellation
+        } catch (error: Throwable) {
+            (source ?: pendingSource)?.close()
+            throw error
+        }
+        return AttachmentPlaintext.Bytes(
+            onCacheMiss?.invoke()
+                ?: downloadAttachmentPlaintext(request, reference, priority, persistInteractiveIntent),
+        )
     }
 
     /**
@@ -10044,6 +10111,7 @@ class WhiteNoiseAppState private constructor(
         // 24 MiB cap on decrypted attachment bytes resident in memory —
         // roughly ten 1920px JPEGs. Persists across conversation re-entry.
         private const val MEDIA_PLAINTEXT_CACHE_MAX_BYTES: Long = 24L * 1024L * 1024L
+        private const val MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES: Long = 1024L * 1024L
 
         // ~48 MiB of decoded thumbnails (sampled to <=1280px). Enough to keep
         // visible bubbles spinner-free; bounded so it can't grow unbounded.

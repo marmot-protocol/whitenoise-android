@@ -1,24 +1,30 @@
 package dev.ipf.whitenoise.android.media
 
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.lang.reflect.Modifier
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
+import java.nio.file.attribute.PosixFilePermission
 import java.security.ProviderException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
+import kotlin.coroutines.cancellation.CancellationException
 
 class DiskByteCacheTest {
     private lateinit var dir: File
@@ -133,6 +139,20 @@ class DiskByteCacheTest {
 
         assertEquals(0, reopened.size())
         assertFalse(file.exists())
+    }
+
+    @Test
+    fun leaseCloseReportsPlaintextDeletionFailure() {
+        val backing = File(dir, "undeletable.lease").apply { writeBytes(byteArrayOf(1)) }
+        val undeletable =
+            object : File(backing.absolutePath) {
+                override fun delete(): Boolean = false
+            }
+
+        assertThrows(IOException::class.java) {
+            DiskByteCacheLease(undeletable).close()
+        }
+        assertTrue(backing.exists())
     }
 
     @Test
@@ -298,9 +318,135 @@ class DiskByteCacheTest {
                 maxBytes = 2L * 1024L * 1024L,
                 maxEntryBytes = nearLimit,
                 availablePlaintextAllocationBytes = { Long.MAX_VALUE },
+                plaintextAllocator = {
+                    throw AssertionError("materialization must not allocate a whole plaintext result")
+                },
             )
+        assertNull("large entries must never allocate through getIfSmall()", reopened.getIfSmall("large"))
+        reopened.materialize("large").use { lease ->
+            assertNotNull(lease)
+            assertEquals(
+                setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE),
+                Files.getPosixFilePermissions(lease!!.file.toPath()),
+            )
+            assertTrue(payload.contentEquals(lease.file.readBytes()))
+        }
+    }
+
+    @Test
+    fun get_largeEntryStillSupportsByteOrientedCallers() {
+        val payload = ByteArray(1024 * 1024 + 37) { 6 }
+        largeCache().put("large", payload)
+        val reopened = largeCache()
+
         assertTrue(payload.contentEquals(reopened.get("large")))
     }
+
+    @Test
+    fun materialize_rejectsTamperedLargeEntryAndDeletesPartialPlaintext() {
+        val payload = ByteArray(1024 * 1024 + 37) { 7 }
+        val cache = largeCache()
+        cache.put("large", payload)
+        val envelope = File(dir, sha256Hex("large") + ".enc")
+        val bytes = envelope.readBytes()
+        bytes[bytes.lastIndex] = (bytes.last().toInt() xor 0x01).toByte()
+        envelope.writeBytes(bytes)
+
+        assertNull(cache.materialize("large"))
+        assertFalse(envelope.exists())
+        assertTrue(dir.listFiles()?.none { it.name.contains("lease") } ?: true)
+    }
+
+    @Test
+    fun materialize_dropsStaleIndexWhenBackingFileIsMissing() {
+        val cache = largeCache()
+        cache.put("large", ByteArray(1024 * 1024 + 37) { 3 })
+        File(dir, sha256Hex("large") + ".enc").delete()
+
+        assertNull(cache.materialize("large"))
+        assertFalse(cache.contains("large"))
+        assertEquals(0L, cache.residentBytes())
+    }
+
+    @Test
+    fun materialize_generationFenceRejectsPlaintextCompletedAcrossClear() {
+        val plaintextCompleted = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val cache =
+            largeCache(
+                afterLeasePlaintextWritten = {
+                    plaintextCompleted.countDown()
+                    release.await(5, TimeUnit.SECONDS)
+                },
+            )
+        cache.put("large", ByteArray(1024 * 1024 + 37) { 4 })
+        var lease: DiskByteCacheLease? = null
+        val reader = Thread { lease = cache.materialize("large") }
+        reader.start()
+        assertTrue(plaintextCompleted.await(5, TimeUnit.SECONDS))
+        cache.clear()
+        release.countDown()
+        reader.join(5_000)
+
+        assertNull(lease)
+        assertTrue(dir.listFiles()?.none { it.name.contains("lease") } ?: true)
+    }
+
+    @Test
+    fun materialize_cancellationDeletesPartialPlaintext() {
+        val cache = largeCache()
+        cache.put("large", ByteArray(1024 * 1024 + 37) { 5 })
+        var checks = 0
+
+        try {
+            cache.materialize("large") {
+                checks += 1
+                if (checks >= 3) throw CancellationException("test cancellation")
+            }
+            throw AssertionError("expected cancellation")
+        } catch (_: CancellationException) {
+            // Expected.
+        }
+
+        assertTrue(dir.listFiles()?.none { it.name.contains("lease") } ?: true)
+        assertTrue(cache.contains("large"))
+    }
+
+    @Test
+    fun clearDeletesAlreadyIssuedPlaintextLease() {
+        val cache = largeCache()
+        cache.put("large", ByteArray(1024 * 1024 + 37) { 8 })
+        val lease = requireNotNull(cache.materialize("large"))
+        assertTrue(lease.file.isFile)
+
+        cache.clear()
+
+        assertFalse(lease.file.exists())
+        lease.close()
+    }
+
+    @Test
+    fun hydrationSweepsOrphanedPlaintextLeaseAfterProcessRestart() {
+        val cache = largeCache()
+        cache.put("large", ByteArray(1024 * 1024 + 37) { 9 })
+        val lease = requireNotNull(cache.materialize("large"))
+        assertTrue(lease.file.isFile)
+
+        largeCache().size()
+
+        assertFalse(lease.file.exists())
+        lease.close()
+    }
+
+    private fun largeCache(afterLeasePlaintextWritten: () -> Unit = {}): DiskByteCache =
+        DiskByteCache(
+            dir,
+            keyProvider = keyProvider,
+            maxBytes = 2L * 1024L * 1024L,
+            maxEntryBytes = 2L * 1024L * 1024L,
+            availablePlaintextAllocationBytes = { Long.MAX_VALUE },
+            afterLeasePlaintextWritten = afterLeasePlaintextWritten,
+        )
 
     @Test
     fun chunkAuthenticationFailure_isRejectedAndEvicted() {
@@ -326,8 +472,59 @@ class DiskByteCacheTest {
                 availablePlaintextAllocationBytes = { Long.MAX_VALUE },
             )
 
-        assertNull(reopened.get("large"))
+        assertNull(reopened.materialize("large"))
         assertFalse(envelope.exists())
+    }
+
+    @Test
+    fun legacyAuthenticationFailure_isRejectedBeforePlaintextPublication() {
+        val payload = ByteArray(512 * 1024) { 4 }
+        DiskByteCache(
+            dir,
+            keyProvider = keyProvider,
+            maxBytes = 2L * 1024L * 1024L,
+            maxEntryBytes = 2L * 1024L * 1024L,
+        ).put("legacy", payload)
+        val envelope = File(dir, sha256Hex("legacy") + ".enc")
+        val bytes = envelope.readBytes()
+        bytes[bytes.lastIndex] = (bytes.last().toInt() xor 0x01).toByte()
+        envelope.writeBytes(bytes)
+        val reopened = largeCache()
+
+        assertNull(reopened.materialize("legacy"))
+        assertFalse(envelope.exists())
+        assertTrue(dir.listFiles()?.none { it.name.contains("lease") } ?: true)
+    }
+
+    @Test
+    fun oversizedLegacyEnvelope_isRecoverableNonDestructiveMiss() {
+        val payload = ByteArray(1024 * 1024 + 37) { 2 }
+        val envelope = writeLegacyEnvelope("legacy-large", payload)
+        val reopened = largeCache()
+
+        assertNull(reopened.get("legacy-large"))
+        assertTrue(envelope.isFile)
+        assertNull(reopened.materialize("legacy-large"))
+        assertTrue(envelope.isFile)
+    }
+
+    @Test
+    fun proportionalReserve_preservesTinyEntriesUnderLowHeadroom() {
+        val budget = plaintextAllocationBudget(256L * 1024L, 256L * 1024L * 1024L)
+        val cache =
+            DiskByteCache(
+                cacheDir = dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = 2L * 1024L * 1024L,
+                availablePlaintextAllocationBytes = { budget },
+            )
+        val payload = ByteArray(64 * 1024) { 9 }
+
+        cache.put("tiny-pending-share", payload)
+
+        assertEquals(192L * 1024L, budget)
+        assertArrayEquals(payload, cache.get("tiny-pending-share"))
     }
 
     @Test
@@ -1562,6 +1759,50 @@ class DiskByteCacheTest {
         cache.put("bob|group|msg-1", ByteArray(30))
         assertEquals(2, cache.size())
         assertEquals(174L, cache.residentBytes())
+    }
+
+    private fun writeLegacyEnvelope(
+        key: String,
+        plaintext: ByteArray,
+    ): File {
+        val cache = largeCache()
+        val fileName = sha256Hex(key) + ".enc"
+        val header =
+            DiskByteCache::class.java
+                .getDeclaredMethod("envelopeHeaderBytes", String::class.java, Int::class.javaPrimitiveType)
+                .apply { isAccessible = true }
+                .invoke(cache, null, 1) as ByteArray
+        val metadataAad =
+            DiskByteCache::class.java
+                .getDeclaredMethod("buildMetadataAad", String::class.java, ByteArray::class.java)
+                .apply { isAccessible = true }
+                .invoke(cache, fileName, header) as ByteArray
+        val metadataCipher = Cipher.getInstance("AES/GCM/NoPadding")
+        metadataCipher.init(Cipher.ENCRYPT_MODE, keyProvider.getOrCreate())
+        metadataCipher.updateAAD(metadataAad)
+        val metadataTag = metadataCipher.doFinal()
+        val payloadAad =
+            DiskByteCache::class.java
+                .getDeclaredMethod(
+                    "buildPayloadAad",
+                    String::class.java,
+                    ByteArray::class.java,
+                    ByteArray::class.java,
+                    ByteArray::class.java,
+                ).apply { isAccessible = true }
+                .invoke(cache, fileName, header, metadataCipher.iv, metadataTag) as ByteArray
+        val payloadCipher = Cipher.getInstance("AES/GCM/NoPadding")
+        payloadCipher.init(Cipher.ENCRYPT_MODE, keyProvider.getOrCreate())
+        payloadCipher.updateAAD(payloadAad)
+        val envelope = File(dir, fileName)
+        FileOutputStream(envelope).use { output ->
+            output.write(header)
+            output.write(metadataCipher.iv)
+            output.write(metadataTag)
+            output.write(payloadCipher.iv)
+            output.write(payloadCipher.doFinal(plaintext))
+        }
+        return envelope
     }
 
     private fun sha256Hex(value: String): String {

@@ -52,6 +52,63 @@ class AttachmentCachePublicationTest {
     }
 
     @Test
+    fun publishSourceAfterLoad_streamsAndClosesPrivateLease() =
+        runBlocking {
+            dir = Files.createTempDirectory("attachment-source").toFile()
+            val source = File(dir, "source.lease").apply { writeBytes(byteArrayOf(4, 5, 6)) }
+            val finalFile = File(dir, "final.apk")
+            val key = AttachmentCachePublication.attachmentKey("msg-source", 0, 1uL)
+
+            val published =
+                AttachmentCachePublication.publishSourceAfterLoad(key, finalFile) {
+                    AttachmentPlaintext.Lease(DiskByteCacheLease(source))
+                }
+
+            assertTrue(published)
+            assertArrayEquals(byteArrayOf(4, 5, 6), finalFile.readBytes())
+            assertFalse("closing the source lease must delete its plaintext file", source.exists())
+        }
+
+    @Test
+    fun publishSourceAfterLoad_rejectsSourceLoadedAcrossWipe() =
+        runBlocking {
+            dir = Files.createTempDirectory("attachment-source-wipe").toFile()
+            val source = File(dir, "source.lease").apply { writeBytes(byteArrayOf(7, 8, 9)) }
+            val finalFile = File(dir, "final.apk")
+            val key = AttachmentCachePublication.attachmentKey("msg-wipe", 0, 1uL)
+
+            val published =
+                AttachmentCachePublication.publishSourceAfterLoad(key, finalFile) {
+                    AttachmentCachePublication.onWipeStarted()
+                    AttachmentCachePublication.onWipeFinished()
+                    AttachmentPlaintext.Lease(DiskByteCacheLease(source))
+                }
+
+            assertFalse(published)
+            assertFalse(finalFile.exists())
+            assertFalse(source.exists())
+        }
+
+    @Test
+    fun publishSourceAfterLoad_destinationFailureStillClosesLease() =
+        runBlocking {
+            dir = Files.createTempDirectory("attachment-source-failure").toFile()
+            val source = File(dir, "source.lease").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val blockingParent = File(dir, "not-a-directory").apply { writeText("block") }
+            val finalFile = File(blockingParent, "final.apk")
+            val key = AttachmentCachePublication.attachmentKey("msg-failure", 0, 1uL)
+
+            val published =
+                AttachmentCachePublication.publishSourceAfterLoad(key, finalFile) {
+                    AttachmentPlaintext.Lease(DiskByteCacheLease(source))
+                }
+
+            assertFalse(published)
+            assertFalse(source.exists())
+            assertFalse(finalFile.exists())
+        }
+
+    @Test
     fun publishWithPermit_doesNotPublishWhenRenameFails() {
         dir = Files.createTempDirectory("attachment-cache-io").toFile()
         val finalFile = File(dir, "msg-2.mp4")

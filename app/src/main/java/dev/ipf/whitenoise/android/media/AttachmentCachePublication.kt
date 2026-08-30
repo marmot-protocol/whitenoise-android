@@ -103,6 +103,65 @@ internal object AttachmentCachePublication {
     }
 
     @Throws(IOException::class)
+    suspend fun publishSourceAfterLoad(
+        attachmentKey: String,
+        finalFile: File,
+        loadSource: suspend () -> AttachmentPlaintext,
+    ): Boolean {
+        val permit = capturePermit(attachmentKey) ?: return false
+        return withContext(Dispatchers.IO) {
+            loadSource().use { source -> publishSourceWithPermit(attachmentKey, finalFile, source, permit) }
+        }
+    }
+
+    @Suppress("ReturnCount", "ThrowsCount")
+    private fun publishSourceWithPermit(
+        attachmentKey: String,
+        finalFile: File,
+        source: AttachmentPlaintext,
+        permit: Permit,
+    ): Boolean {
+        if (source.size <= 0L) throw IOException("refusing to publish an empty attachment cache ${finalFile.name}")
+        AttachmentPlaintextCache.requireEntryWithinLimit(finalFile, source.size)
+        if (!prepareParentForTempWrite(attachmentKey, finalFile, permit)) return false
+        val tmp = writeTempFile(finalFile, source) ?: return false
+        AttachmentPlaintextCache.protectPublicationFile(finalFile)
+        return try {
+            commitAwaiterForTests?.invoke()
+            val stripe = stripeFor(attachmentKey)
+            val published =
+                synchronized(stripe) {
+                    if (!permitStillValid(stripe, permit)) {
+                        runCatching { tmp.delete() }
+                        return@synchronized false
+                    }
+                    val renamed =
+                        try {
+                            renameFileForTests?.invoke(tmp, finalFile) ?: tmp.renameTo(finalFile)
+                        } catch (throwable: Throwable) {
+                            runCatching { tmp.delete() }
+                            throw IOException("failed to publish attachment cache ${finalFile.name}", throwable)
+                        }
+                    if (!renamed) {
+                        runCatching { tmp.delete() }
+                        if (!permitStillValid(stripe, permit)) return@synchronized false
+                        throw IOException("failed to publish attachment cache ${finalFile.name}")
+                    }
+                    if (!permitStillValid(stripe, permit)) {
+                        deleteFinalFile(finalFile)
+                        return@synchronized false
+                    }
+                    true
+                }
+            if (published) AttachmentPlaintextCache.onPublished(finalFile)
+            published
+        } finally {
+            AttachmentPlaintextCache.unprotectPublicationFile(tmp)
+            AttachmentPlaintextCache.unprotectPublicationFile(finalFile)
+        }
+    }
+
+    @Throws(IOException::class)
     fun publishWithPermit(
         attachmentKey: String,
         finalFile: File,
@@ -239,6 +298,23 @@ internal object AttachmentCachePublication {
     internal fun stripeIndex(attachmentKey: String): Int = attachmentKey.hashCode() and (STRIPE_COUNT - 1)
 
     private fun stripeFor(attachmentKey: String): Stripe = stripes[stripeIndex(attachmentKey)]
+
+    private fun writeTempFile(
+        finalFile: File,
+        source: AttachmentPlaintext,
+    ): File? {
+        val parent = finalFile.parentFile ?: return null
+        val tmp = File(parent, "${finalFile.name}.cache-${tmpCounter.incrementAndGet()}-${System.nanoTime()}.tmp")
+        AttachmentPlaintextCache.protectPublicationFile(tmp)
+        return try {
+            tmp.outputStream().use(source::copyTo)
+            tmp
+        } catch (throwable: Throwable) {
+            runCatching { tmp.delete() }
+            AttachmentPlaintextCache.unprotectPublicationFile(tmp)
+            if (throwable is IOException) null else throw throwable
+        }
+    }
 
     private fun writeTempFile(
         finalFile: File,

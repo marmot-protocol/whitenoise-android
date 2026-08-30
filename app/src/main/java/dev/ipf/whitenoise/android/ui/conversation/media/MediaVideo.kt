@@ -50,6 +50,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
@@ -750,12 +751,12 @@ internal suspend fun materializeVideoAttachment(
         authoritativeVisualMediaReference(reference, mine) {
             controller.authoritativeAttachmentReference(messageIdHex, attachmentIndex, reference)
         }
-    return materializeVideoAttachment(
+    return materializeVideoAttachmentSource(
         context = context,
         messageIdHex = messageIdHex,
         attachmentIndex = attachmentIndex,
         reference = resolvedReference,
-        resolveBytes = {
+        resolveSource = {
             val retained =
                 if (mine) {
                     controller
@@ -765,9 +766,35 @@ internal suspend fun materializeVideoAttachment(
                 } else {
                     null
                 }
-            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, resolvedReference, priority)
+            retained?.let(AttachmentPlaintext::Bytes)
+                ?: controller.downloadAttachmentSource(
+                    messageIdHex,
+                    attachmentIndex,
+                    resolvedReference,
+                    priority,
+                )
         },
     )
+}
+
+private suspend fun materializeVideoAttachmentSource(
+    context: android.content.Context,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    resolveSource: suspend () -> AttachmentPlaintext,
+): java.io.File {
+    val file = videoAttachmentCacheFile(context, messageIdHex, attachmentIndex, reference)
+    val attachmentKey = AttachmentCachePublication.attachmentKey(messageIdHex, attachmentIndex, reference.sourceEpoch)
+    return videoMaterializations.run(file.absolutePath) {
+        withContext(Dispatchers.IO) {
+            file.takeIf { it.isFile && it.length() > 0L }?.also(AttachmentPlaintextCache::touch)
+        } ?: run {
+            val published = AttachmentCachePublication.publishSourceAfterLoad(attachmentKey, file, resolveSource)
+            if (!published) throw IOException("attachment cache publication aborted for ${file.name}")
+            file
+        }
+    }
 }
 
 private suspend fun materializeVideoAttachmentOnce(
