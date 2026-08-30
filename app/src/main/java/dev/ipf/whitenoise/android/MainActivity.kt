@@ -271,7 +271,10 @@ class MainActivity : AppCompatActivity() {
                     firstUsefulFrameReady = firstUsefulFrameReady,
                     pendingShareFirstFrameReady = pendingShareFirstFrameReady,
                 )
-            if (!retain) appState.recordStartupSystemSplashHandoff()
+            if (!retain) {
+                appState.recordStartupSystemSplashHandoff()
+                (application as WhiteNoiseApplication).ensurePeriodicWorkScheduled()
+            }
             retain
         }
     }

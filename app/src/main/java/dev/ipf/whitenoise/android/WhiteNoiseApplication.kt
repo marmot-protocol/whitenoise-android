@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android
 import android.app.Application
 import android.util.Log
 import androidx.work.Configuration
+import androidx.work.Operation
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -88,26 +89,32 @@ open class WhiteNoiseApplication :
         // onCreate on API 32 and lower so it can wrap the Activity context.
         applyApplicationLanguageTag(persistedApplicationLanguageTag(this))
         VoicePlaybackController.attach(this)
-        // Coarse background prune of expired disappearing messages in closed
-        // conversations (#745). KEEP-policy unique work, so this just ensures
-        // the schedule exists without resetting an already-running cadence.
-        ensurePeriodicWorkScheduled()
     }
 
+    @Suppress("TooGenericExceptionCaught")
     internal fun ensurePeriodicWorkScheduled(
-        schedule: () -> Unit = {
-            DisappearingMessageSweepWorker.schedule(this)
-            AppUpdateWorker.schedule(this)
+        scope: CoroutineScope = applicationScope,
+        schedule: () -> List<Operation> = {
+            buildList {
+                add(DisappearingMessageSweepWorker.schedule(this@WhiteNoiseApplication))
+                AppUpdateWorker.schedule(this@WhiteNoiseApplication)?.let(::add)
+            }
         },
     ) {
         backgroundWorkSchedulingGate.start {
-            applicationScope.launch(Dispatchers.Default) {
-                var completed = false
+            scope.launch {
                 try {
-                    schedule()
-                    completed = true
-                } finally {
-                    if (!completed) backgroundWorkSchedulingGate.resetAfterFailure()
+                    schedule().forEach { operation -> operation.result.get() }
+                } catch (cancellation: kotlin.coroutines.cancellation.CancellationException) {
+                    backgroundWorkSchedulingGate.resetAfterFailure()
+                    throw cancellation
+                } catch (error: Exception) {
+                    backgroundWorkSchedulingGate.resetAfterFailure()
+                    if (BuildConfig.DEBUG) {
+                        Log.w("WhiteNoiseApplication", "periodic work scheduling failed", error)
+                    } else {
+                        Log.w("WhiteNoiseApplication", "periodic work scheduling failed")
+                    }
                 }
             }
         }

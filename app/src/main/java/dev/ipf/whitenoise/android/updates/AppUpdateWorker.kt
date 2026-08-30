@@ -7,6 +7,7 @@ import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.Operation
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -54,10 +55,10 @@ class AppUpdateWorker(
                 else -> Result.failure()
             }
 
-        fun schedule(context: Context) {
+        fun schedule(context: Context): Operation? {
             // No update polling on builds that don't self-update — the
             // distributing store (e.g. Google Play) owns updates there.
-            if (!BuildConfig.SELF_UPDATE_ENABLED) return
+            if (!BuildConfig.SELF_UPDATE_ENABLED) return null
             val request =
                 PeriodicWorkRequestBuilder<AppUpdateWorker>(24, TimeUnit.HOURS)
                     .setConstraints(
@@ -66,15 +67,7 @@ class AppUpdateWorker(
                             .setRequiredNetworkType(NetworkType.CONNECTED)
                             .build(),
                     ).build()
-            val workManager =
-                try {
-                    WorkManager.getInstance(context.applicationContext)
-                } catch (_: IllegalStateException) {
-                    // Robolectric/unit-test application contexts may not install WorkManager's
-                    // initializer. The real app process gets it from the manifest provider.
-                    return
-                }
-            workManager.enqueueUniquePeriodicWork(
+            return WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(
                 UNIQUE_WORK_NAME,
                 ExistingPeriodicWorkPolicy.UPDATE,
                 request,

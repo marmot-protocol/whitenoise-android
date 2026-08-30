@@ -6,6 +6,13 @@ import android.content.pm.PackageManager
 import androidx.startup.InitializationProvider
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Configuration
+import androidx.work.WorkManager
+import androidx.work.testing.SynchronousExecutor
+import androidx.work.testing.WorkManagerTestInitHelper
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -16,6 +23,7 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
+@OptIn(ExperimentalCoroutinesApi::class)
 class WorkManagerStartupInitializationTest {
     @Test
     fun applicationProvidesOnDemandWorkManagerConfiguration() {
@@ -42,17 +50,16 @@ class WorkManagerStartupInitializationTest {
     }
 
     @Test
-    fun periodicWorkSchedulingLeavesTheStartupThread() {
-        val source = projectFile("src/main/java/dev/ipf/whitenoise/android/WhiteNoiseApplication.kt").readText()
-        val onCreate = source.functionBody("onCreate")
-        val scheduling = source.substringAfter("internal fun ensurePeriodicWorkScheduled(")
+    fun periodicWorkSchedulingStartsAtTheSplashHandoff() {
+        val application = projectFile("src/main/java/dev/ipf/whitenoise/android/WhiteNoiseApplication.kt").readText()
+        val activity = projectFile("src/main/java/dev/ipf/whitenoise/android/MainActivity.kt").readText()
 
-        assertTrue(onCreate.contains("ensurePeriodicWorkScheduled()"))
-        assertTrue(scheduling.contains("backgroundWorkSchedulingGate.start"))
-        assertTrue(scheduling.contains("applicationScope.launch(Dispatchers.Default)"))
-        assertTrue(scheduling.contains("DisappearingMessageSweepWorker.schedule(this)"))
-        assertTrue(scheduling.contains("AppUpdateWorker.schedule(this)"))
-        assertFalse(onCreate.contains("Worker.schedule("))
+        assertFalse(application.functionBody("onCreate").contains("ensurePeriodicWorkScheduled()"))
+        assertTrue(
+            activity
+                .substringAfter("private fun holdSplashThroughBootstrap(")
+                .contains("(application as WhiteNoiseApplication).ensurePeriodicWorkScheduled()"),
+        )
     }
 
     @Test
@@ -68,27 +75,43 @@ class WorkManagerStartupInitializationTest {
     }
 
     @Test
-    fun periodicWorkInitializationCanRetryAfterFailure() {
-        val gate = BackgroundWorkSchedulingGate()
+    fun periodicWorkInitializationCanRetryAfterSchedulingFailure() {
+        val application = ApplicationProvider.getApplicationContext<WhiteNoiseApplication>()
+        val dispatcher = StandardTestDispatcher()
+        val scope = TestScope(dispatcher)
         val invocations = AtomicInteger()
 
-        assertTrue(gate.start { invocations.incrementAndGet() })
-        gate.resetAfterFailure()
-        assertTrue(gate.start { invocations.incrementAndGet() })
+        application.ensurePeriodicWorkScheduled(scope) {
+            invocations.incrementAndGet()
+            throw IllegalStateException("enqueue failed")
+        }
+        scope.advanceUntilIdle()
+        application.ensurePeriodicWorkScheduled(scope) {
+            invocations.incrementAndGet()
+            emptyList()
+        }
+        scope.advanceUntilIdle()
 
         assertEquals(2, invocations.get())
     }
 
     @Test
-    fun periodicWorkIdentityAndPoliciesStayStable() {
-        val disappearing =
-            projectFile("src/main/java/dev/ipf/whitenoise/android/state/DisappearingMessageSweepWorker.kt").readText()
-        val updates = projectFile("src/main/java/dev/ipf/whitenoise/android/updates/AppUpdateWorker.kt").readText()
+    fun periodicWorkInitializationRegistersBothUniqueWorks() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        WorkManagerTestInitHelper.initializeTestWorkManager(
+            context,
+            Configuration.Builder().setExecutor(SynchronousExecutor()).build(),
+        )
+        val application = context.applicationContext as WhiteNoiseApplication
+        val dispatcher = StandardTestDispatcher()
+        val scope = TestScope(dispatcher)
 
-        assertTrue(disappearing.contains("private const val UNIQUE_WORK_NAME = \"disappearing_message_sweep\""))
-        assertTrue(disappearing.contains("ExistingPeriodicWorkPolicy.KEEP"))
-        assertTrue(updates.contains("private const val UNIQUE_WORK_NAME = \"darkmatter-zapstore-update-check\""))
-        assertTrue(updates.contains("ExistingPeriodicWorkPolicy.UPDATE"))
+        application.ensurePeriodicWorkScheduled(scope)
+        scope.advanceUntilIdle()
+
+        val workManager = WorkManager.getInstance(context)
+        assertEquals(1, workManager.getWorkInfosForUniqueWork("disappearing_message_sweep").get().size)
+        assertEquals(1, workManager.getWorkInfosForUniqueWork("darkmatter-zapstore-update-check").get().size)
     }
 
     private fun projectFile(relativePath: String): File =
