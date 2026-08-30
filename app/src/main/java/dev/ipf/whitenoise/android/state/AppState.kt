@@ -3989,10 +3989,7 @@ class WhiteNoiseAppState private constructor(
             }
     }
 
-    /**
-     * Resolves plaintext without forcing a large cache hit through a whole-file
-     * ByteArray. The returned private-file lease must be closed by the caller.
-     */
+    /** Returns bounded memory or an owner-private file lease that the caller must close. */
     internal suspend fun downloadAttachmentPlaintextSource(
         request: AttachmentTransferRequest,
         reference: MediaAttachmentReferenceFfi,
@@ -4001,57 +3998,32 @@ class WhiteNoiseAppState private constructor(
         onCacheMiss: (suspend () -> ByteArray)? = null,
     ): AttachmentPlaintext {
         val cacheKey =
-            mediaCacheKey(
-                request.accountRef,
-                request.groupIdHex,
-                request.messageIdHex,
-                request.attachmentIndex,
-            )
-        val memory = withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }
-        val callerContext = currentCoroutineContext()
-        var source: AttachmentPlaintext? = null
-        var pendingSource: AttachmentPlaintext? = null
-        try {
-            source =
-                if (memory != null) {
-                    AttachmentPlaintext.Bytes(memory)
-                } else {
-                    withContext(Dispatchers.IO) {
-                        val loaded =
-                            diskMediaCache
-                                .getIfSmall(cacheKey)
-                                ?.let(AttachmentPlaintext::Bytes)
-                                ?: diskMediaCache
-                                    .materialize(cacheKey) {
-                                        callerContext.ensureActive()
-                                    }?.let(AttachmentPlaintext::Lease)
-                        pendingSource = loaded
-                        loaded
-                    }
+            request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) }
+        return resolveAttachmentPlaintext(
+            loadMemory = { withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) } },
+            loadDisk = { cancellationCheck, onAcquired ->
+                withContext(Dispatchers.IO) {
+                    val loaded =
+                        diskMediaCache.getIfSmall(cacheKey)?.let(AttachmentPlaintext::Bytes)
+                            ?: diskMediaCache
+                                .materialize(cacheKey, cancellationCheck)
+                                ?.let(AttachmentPlaintext::Lease)
+                    onAcquired(loaded)
+                    loaded
                 }
-            pendingSource = null
-            val resolved = source
-            if (resolved != null) {
-                if (resolved is AttachmentPlaintext.Bytes && memory == null) {
-                    withContext(Dispatchers.Main.immediate) {
-                        cacheMediaPlaintext(cacheKey, resolved.bytes)
-                    }
-                }
+            },
+            cacheMemory = { bytes ->
+                withContext(Dispatchers.Main.immediate) { cacheMediaPlaintext(cacheKey, bytes) }
+            },
+            clearInteractiveIntent = {
                 if (priority == AttachmentDownloadPriority.Interactive && persistInteractiveIntent) {
                     attachmentDownloadIntents.setInteractive(request, interactive = false)
                 }
-                return resolved
-            }
-        } catch (cancellation: CancellationException) {
-            (source ?: pendingSource)?.close()
-            throw cancellation
-        } catch (error: Throwable) {
-            (source ?: pendingSource)?.close()
-            throw error
-        }
-        return AttachmentPlaintext.Bytes(
-            onCacheMiss?.invoke()
-                ?: downloadAttachmentPlaintext(request, reference, priority, persistInteractiveIntent),
+            },
+            loadMiss = {
+                onCacheMiss?.invoke()
+                    ?: downloadAttachmentPlaintext(request, reference, priority, persistInteractiveIntent)
+            },
         )
     }
 
