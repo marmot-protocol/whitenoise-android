@@ -8,6 +8,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -44,6 +46,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -149,14 +152,22 @@ class TtsHighlightPlacementAndroidTest {
         // Bounding box, not just the horizontal span: a wrapped line legitimately
         // restarts at the same left margin, so x alone cannot tell "moved to the
         // next line" from "never moved".
-        val boxes = WORDS.associateWith { word -> markerBoxAfterSpeaking(word, baseline) }
-        boxes.forEach { (word, box) ->
-            assertNotNull("highlighting \"$word\" painted nothing", box)
+        val placements =
+            WORDS.associateWith { word ->
+                val marker = markerBoxAfterSpeaking(word, baseline)
+                MarkerPlacement(marker = marker, expected = expectedWordBounds(word))
+            }
+        placements.forEach { (word, placement) ->
+            assertNotNull("highlighting \"$word\" painted nothing", placement.marker)
+            assertMarkerInsideExpectedWord(word, placement.marker!!, placement.expected)
         }
         assertEquals(
-            "distinct words share a marker box, so the paint is not following the word: $boxes",
+            "distinct words share a marker box, so the paint is not following the word: $placements",
             WORDS.size,
-            boxes.values.toSet().size,
+            placements.values
+                .map { it.marker }
+                .toSet()
+                .size,
         )
     }
 
@@ -190,6 +201,61 @@ class TtsHighlightPlacementAndroidTest {
         val top: Int,
         val bottom: Int,
     )
+
+    private data class MarkerPlacement(
+        val marker: MarkerBox?,
+        val expected: androidx.compose.ui.geometry.Rect,
+    )
+
+    private fun expectedWordBounds(word: String): androidx.compose.ui.geometry.Rect {
+        val leaf = checkNotNull(leafCarryingHighlight()) { "no highlighted leaf for '$word'" }
+        val range = checkNotNull(leaf.config.getOrNull(TtsReadAloudHighlightRangeKey))
+        val layouts = mutableListOf<TextLayoutResult>()
+        val getLayout =
+            checkNotNull(leaf.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action) {
+                "highlighted leaf for '$word' exposes no text layout"
+            }
+        assertTrue("text layout action failed for '$word'", getLayout(layouts))
+        val layout = layouts.single()
+        val localBounds =
+            range
+                .map(layout::getBoundingBox)
+                .reduce { accumulated, character ->
+                    androidx.compose.ui.geometry.Rect(
+                        left = minOf(accumulated.left, character.left),
+                        top = minOf(accumulated.top, character.top),
+                        right = maxOf(accumulated.right, character.right),
+                        bottom = maxOf(accumulated.bottom, character.bottom),
+                    )
+                }
+        val leafBounds = leaf.boundsInRoot
+        return androidx.compose.ui.geometry.Rect(
+            left = leafBounds.left + localBounds.left,
+            top = leafBounds.top + localBounds.top,
+            right = leafBounds.left + localBounds.right,
+            bottom = leafBounds.top + localBounds.bottom,
+        )
+    }
+
+    private fun assertMarkerInsideExpectedWord(
+        word: String,
+        marker: MarkerBox,
+        expected: androidx.compose.ui.geometry.Rect,
+    ) {
+        val tolerance = 1f
+        assertTrue(
+            "marker for '$word' does not intersect its rendered glyph bounds: marker=$marker expected=$expected",
+            marker.right >= expected.left - tolerance &&
+                marker.left <= expected.right + tolerance &&
+                marker.bottom >= expected.top - tolerance &&
+                marker.top <= expected.bottom + tolerance,
+        )
+        assertTrue(
+            "marker for '$word' is not horizontally contained by its rendered glyph bounds: " +
+                "marker=$marker expected=$expected",
+            marker.left >= expected.left - tolerance && marker.right <= expected.right + tolerance,
+        )
+    }
 
     private fun renderedPixels(): IntArray {
         val pixelMap = composeRule.onRoot(useUnmergedTree = true).captureToImage().toPixelMap()
