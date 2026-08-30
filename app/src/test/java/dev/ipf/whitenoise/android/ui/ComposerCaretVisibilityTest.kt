@@ -29,6 +29,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
@@ -106,6 +107,126 @@ class ComposerCaretVisibilityTest {
         assertEquals(replacement, harness.value.text)
         assertEquals(TextRange(replacement.length), harness.value.selection)
         field.assertActiveCaretVisible()
+    }
+
+    /** Proves profile hydration cannot reuse caret geometry from an older mention transformation. */
+    @Test
+    fun mentionTransformationChangeWithUnchangedDraftKeepsTheTerminalCaretVisible() {
+        val npub = "npub1" + "q".repeat(58)
+        val draft = longDraft() + "\n@$npub"
+        val focusRequester = FocusRequester()
+        var value by mutableStateOf(TextFieldValue(draft, TextRange(draft.length)))
+        var candidate by
+            mutableStateOf(
+                MentionComposer.Candidate(
+                    accountIdHex = "aa".repeat(32),
+                    npub = npub,
+                    displayName = "A",
+                    nip05 = null,
+                ),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    Box(Modifier.width(300.dp).height(140.dp)) {
+                        ComposerPill(
+                            textFieldValue = value,
+                            composerFocus = focusRequester,
+                            emojiPickerOpen = false,
+                            onValueChange = { value = it },
+                            onEmojiPickerToggle = {},
+                            onAttachmentsToggle = {},
+                            attachmentSheetOpen = false,
+                            onPickFromGallery = null,
+                            onPickDocument = null,
+                            highlightMentionChips = true,
+                            mentionCandidates = listOf(candidate),
+                            expansionMode = ComposerExpansionMode.Manual,
+                            modifier = Modifier.height(140.dp),
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val field = composeRule.onNode(hasSetTextAction())
+        composeRule.runOnIdle { focusRequester.requestFocus() }
+        field.assertActiveCaretVisible()
+
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.runOnIdle {
+                candidate =
+                    candidate.copy(
+                        displayName = "Alice Long Profile Name Reflowing The Mention Across Multiple Visual Lines",
+                    )
+            }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.runOnIdle { }
+
+            composeRule.runOnIdle { assertEquals(TextRange(draft.length), value.selection) }
+            field.assertActiveCaretVisible()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    /** A conversation-key draft restore cancels the prior bulk edit's layout and scroll work. */
+    @Test
+    fun conversationDraftRestoreSupersedesAnUnsettledBulkReplacement() {
+        val focusRequester = FocusRequester()
+        val restored = TextFieldValue("Restored\nconversation draft", TextRange(3))
+        var draftKey by mutableStateOf("first-conversation")
+        var initialDraft by mutableStateOf(TextFieldValue("Short"))
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(360.dp).height(720.dp)) {
+                    Box(contentAlignment = Alignment.BottomCenter) {
+                        ComposerBar(
+                            replyingTo = null,
+                            messageTextCopy = MessageTextCopy.Default,
+                            onCancelReply = {},
+                            onSend = { _, _ -> },
+                            initialDraft = initialDraft,
+                            onDraftChange = { initialDraft = it },
+                            draftKey = draftKey,
+                            composerFocus = focusRequester,
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val field = composeRule.onNode(hasSetTextAction())
+        field.performClick()
+
+        composeRule.mainClock.autoAdvance = false
+        try {
+            field.performTextReplacement(longDraft())
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.runOnIdle { }
+            composeRule.runOnIdle {
+                initialDraft = restored
+                draftKey = "second-conversation"
+            }
+            repeat(3) {
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.runOnIdle { }
+                assertEquals(
+                    restored.text,
+                    field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text,
+                )
+                assertEquals(
+                    restored.selection,
+                    field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange],
+                )
+                field.assertActiveCaretVisible()
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+
+        assertEquals(0f, field.verticalScroll().value(), 0f)
     }
 
     @Test
@@ -265,6 +386,7 @@ class ComposerCaretVisibilityTest {
 
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.verticalScroll() = fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
 
+    /** Asserts that the active caret is inside the editor's current scroll viewport. */
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertActiveCaretVisible() {
         val node = fetchSemanticsNode()
         val selection = node.config[SemanticsProperties.TextSelectionRange]

@@ -134,6 +134,7 @@ private val ExpandedEditorTopInset = 24.dp
 private val CompactEditorBottomInset = 8.dp
 private val ExpandedEditorBottomInset = 48.dp
 
+/** Interpolates one layout-space distance without allocating an animation object. */
 private fun interpolateDp(
     start: Dp,
     end: Dp,
@@ -223,11 +224,13 @@ internal fun composerCaretScrollTarget(
     return desired.coerceIn(0, maxScroll)
 }
 
+/** Maps the original selection into the current transformed text layout. */
 private fun composerSelectionLayout(
     layout: TextLayoutResult,
     value: TextFieldValue,
     transformedText: TransformedText,
 ): ComposerSelectionLayout {
+    /** Returns a cursor rectangle after clamping and transforming the original offset. */
     fun cursorRect(originalOffset: Int) =
         layout.getCursorRect(
             transformedText.offsetMapping
@@ -245,6 +248,7 @@ private fun composerSelectionLayout(
     )
 }
 
+/** Applies the smallest scroll correction needed to expose [selection]. */
 private suspend fun ScrollState.keepComposerSelectionVisible(selection: ComposerSelectionLayout) {
     val target =
         composerCaretScrollTarget(
@@ -450,10 +454,12 @@ internal fun ComposerPill(
     val composerScrollState = rememberScrollState()
     var textLayoutSnapshot by remember { mutableStateOf<ComposerTextLayoutSnapshot?>(null) }
     val selectionLayout =
-        remember(textLayoutSnapshot, textFieldValue.text, textFieldValue.selection) {
+        remember(textLayoutSnapshot, textFieldValue.text, textFieldValue.selection, transformedText) {
             textLayoutSnapshot
-                ?.takeIf { it.sourceText == textFieldValue.text }
-                ?.let { snapshot ->
+                ?.takeIf {
+                    it.sourceText == textFieldValue.text &&
+                        it.transformedText == transformedText
+                }?.let { snapshot ->
                     composerSelectionLayout(
                         layout = snapshot.result,
                         value = textFieldValue,
@@ -549,6 +555,7 @@ internal fun ComposerPill(
             Modifier.fillMaxHeight()
         }
 
+    /** Applies the one-line/three-line hysteresis to the measured editor line count. */
     fun updateMultilineControls(lineCount: Int) {
         val nextMultilineControls =
             when {
@@ -651,8 +658,10 @@ internal fun ComposerPill(
                                 .then(expandedHeightModifier)
                                 .keepComposerSelectionVisibleDuringLayout(composerScrollState) {
                                     textLayoutSnapshot
-                                        ?.takeIf { it.sourceText == textFieldValue.text }
-                                        ?.let { snapshot ->
+                                        ?.takeIf {
+                                            it.sourceText == textFieldValue.text &&
+                                                it.transformedText == transformedText
+                                        }?.let { snapshot ->
                                             composerSelectionLayout(
                                                 layout = snapshot.result,
                                                 value = textFieldValue,
@@ -870,6 +879,7 @@ internal fun ComposerPill(
     }
 }
 
+/** Renders the accessible resize gesture target and its border-mounted visual handle. */
 @Composable
 @Suppress("FunctionNaming")
 private fun ComposerResizeHandle(
@@ -941,6 +951,7 @@ private fun ComposerResizeHandle(
     }
 }
 
+/** Resolves an opaque handle color against the current composer surface. */
 @Composable
 private fun composerResizeHandleColor(): Color =
     MaterialTheme.colorScheme.onSurfaceVariant
@@ -948,6 +959,7 @@ private fun composerResizeHandleColor(): Color =
         .compositeOver(MaterialTheme.colorScheme.surfaceVariant)
         .copy(alpha = 1f)
 
+/** Registers the focused composer ahead of the IME for Android predictive/system Back. */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
 @Suppress("FunctionNaming")
