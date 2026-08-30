@@ -240,6 +240,15 @@ private fun selectionOrderedTextPrefixLength(
     selectionOrderedTexts: List<AnnotatedString>,
 ): Int? {
     val targetText = target.layoutResult.layoutInput.text
+    val targetIdentityIndex = selectionOrderedTexts.indexOfFirst { it === targetText }
+    if (targetIdentityIndex >= 0) {
+        return selectionOrderedTexts.take(targetIdentityIndex).sumOf(AnnotatedString::length)
+    }
+
+    // Retain a value-based fallback for alternate SelectionState
+    // implementations that copy their AnnotatedString values. Occurrence
+    // matching is necessarily weaker when multiple copied leaves are equal,
+    // whereas Compose 1.12's registrar returns each layout's exact text object.
     val candidateIndices = selectionOrderedTexts.indices.filter { selectionOrderedTexts[it] == targetText }
     val targetOccurrence =
         orderedLayouts

@@ -221,6 +221,36 @@ class MessageTextSelectionTest {
         )
     }
 
+    /** Identical leaves use registrar identity instead of selecting the first equal value. */
+    @Test
+    fun selectionSeedDisambiguatesRepeatedSelectableTextByIdentity() {
+        val targetKey = Any()
+        val layouts = mutableMapOf<Any, SelectableTextLayout>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                CaptureSelectableText(targetKey, "repeat target") { layouts[targetKey] = it }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val target = checkNotNull(layouts[targetKey])
+        val targetText = target.layoutResult.layoutInput.text
+        val press = target.coordinates.localToWindow(target.layoutResult.getBoundingBox(7).center)
+
+        assertEquals(
+            TextRange(20, 26),
+            textSelectionSeedRange(
+                layouts = layouts.values,
+                pressInWindow = press,
+                selectionOrderedTexts =
+                    listOf(
+                        AnnotatedString("repeat target"),
+                        targetText,
+                    ),
+            ),
+        )
+    }
+
     @Test
     fun actionMenuPressMapsToGlobalOffsetAcrossTextNodes() {
         val firstKey = Any()
