@@ -29,10 +29,14 @@ import androidx.compose.ui.input.pointer.pointerInput
  * anything. Waiting for the commit lets the list scroll a few pixels and then
  * stop, which reads as the app twitching rather than obeying.
  *
- * A single finger is never consumed, so ordinary scrolling is untouched, and a
- * gesture that drops back to one finger releases its claim and starts measuring
- * again if a second finger returns. Once committed the remaining pointers stay
- * consumed even down to one, so lifting one finger cannot hand the list a jump.
+ * A single finger is never consumed, so ordinary scrolling is untouched. At
+ * second contact [viewportLock] snapshots the list's current index and offset,
+ * cancels the parent drag, and holds that exact viewport until the whole pointer
+ * sequence ends. If an uncommitted gesture drops back to one finger, the row
+ * stops consuming and starts measuring again if a second finger returns, but
+ * the transcript remains anchored so the surviving pointer cannot restart a
+ * parent drag partway through the same sequence. Once committed the remaining
+ * pointers stay consumed even down to one.
  *
  * **The node stays mounted whether or not it is listening**, and [enabled] is
  * read inside the loop rather than deciding whether the modifier exists. That
@@ -54,38 +58,51 @@ import androidx.compose.ui.input.pointer.pointerInput
 @Composable
 internal fun Modifier.twoFingerSwipeDown(
     enabled: Boolean,
+    viewportLock: TtsQuickTransportViewportLock? = null,
     onSwipe: () -> Unit,
 ): Modifier {
     val swipe by rememberUpdatedState(onSwipe)
     val listening by rememberUpdatedState(enabled)
+    val currentViewportLock by rememberUpdatedState(viewportLock)
     return this.pointerInput(Unit) {
         val commitDistance = viewConfiguration.touchSlop * TWO_FINGER_COMMIT_SLOP
         awaitEachGesture {
-            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-            val origins = mutableMapOf<PointerId, Float>()
-            var committed = false
-            while (true) {
-                val pressed = awaitPointerEvent(pass = PointerEventPass.Initial).changes.filter { it.pressed }
-                if (pressed.isEmpty()) break
-                when {
-                    !listening -> Unit
+            var claimedViewport: TtsQuickTransportViewportLock? = null
+            var viewportClaimAttempted = false
+            try {
+                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                val origins = mutableMapOf<PointerId, Float>()
+                var committed = false
+                while (true) {
+                    val pressed = awaitPointerEvent(pass = PointerEventPass.Initial).changes.filter { it.pressed }
+                    if (pressed.isEmpty()) break
+                    when {
+                        !listening -> Unit
 
-                    committed -> pressed.forEach { it.consume() }
+                        committed -> pressed.forEach { it.consume() }
 
-                    // One finger is a scroll, and a second finger arriving later
-                    // measures from where it arrives rather than inheriting a
-                    // stale origin from the finger that lifted.
-                    pressed.size < TWO_FINGERS -> origins.clear()
+                        // One finger is a scroll, and a second finger arriving later
+                        // measures from where it arrives rather than inheriting a
+                        // stale origin from the finger that lifted.
+                        pressed.size < TWO_FINGERS -> origins.clear()
 
-                    else -> {
-                        pressed.forEach { it.consume() }
-                        pressed.forEach { change -> origins.getOrPut(change.id) { change.position.y } }
-                        if (hasSwipedDown(pressed, origins, commitDistance)) {
-                            committed = true
-                            swipe()
+                        else -> {
+                            if (!viewportClaimAttempted) {
+                                viewportClaimAttempted = true
+                                claimedViewport = currentViewportLock
+                                claimedViewport?.claim()
+                            }
+                            pressed.forEach { it.consume() }
+                            pressed.forEach { change -> origins.getOrPut(change.id) { change.position.y } }
+                            if (hasSwipedDown(pressed, origins, commitDistance)) {
+                                committed = true
+                                swipe()
+                            }
                         }
                     }
                 }
+            } finally {
+                claimedViewport?.release()
             }
         }
     }

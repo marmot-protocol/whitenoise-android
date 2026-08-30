@@ -275,6 +275,7 @@ internal enum class MessageAttachmentSaveOutcome {
     }
 }
 
+/** Renders one message bubble and arbitrates its overlapping row-level interactions. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun MessageBubble(
@@ -322,6 +323,7 @@ internal fun MessageBubble(
     ttsHighlightPassage: TtsPassage? = null,
     ttsReadAloudProgress: TtsReadAloudProgress? = null,
     ttsFollowTarget: ConversationTtsFollowTarget? = null,
+    ttsQuickTransportViewportLock: TtsQuickTransportViewportLock? = null,
     ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
     ttsRowInstance: Any? = null,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
@@ -1157,6 +1159,7 @@ internal fun MessageBubble(
                         // already playing does not need this message to have
                         // anything to say.
                         enabled = !selectionMode && !textSelectionMode && !deleted,
+                        viewportLock = ttsQuickTransportViewportLock,
                         onSwipe = ::quickTransportFromTwoFingerSwipe,
                     ).then(
                         // A deleted or selection-mode message has no actionable
