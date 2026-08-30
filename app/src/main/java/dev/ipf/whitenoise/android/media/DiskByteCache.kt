@@ -1,11 +1,11 @@
 package dev.ipf.whitenoise.android.media
 
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.StandardOpenOption
 import java.security.GeneralSecurityException
@@ -77,6 +77,8 @@ internal class DiskByteCache(
     private val afterOrphanTmpSweep: () -> Unit = {},
     private val beforeHydrationDestructiveDelete: () -> Unit = {},
     private val onMutation: () -> Unit = {},
+    private val availablePlaintextAllocationBytes: () -> Long = ::defaultAvailablePlaintextAllocationBytes,
+    private val plaintextAllocator: (Int) -> ByteArray = { ByteArray(it) },
 ) {
     // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
     private val index = LinkedHashMap<String, Entry>(8, 0.75f, true)
@@ -214,6 +216,11 @@ internal class DiskByteCache(
             // writing or returning plaintext when encryption is unavailable.
             null
         } catch (_: ProviderException) {
+            null
+        } catch (_: OutOfMemoryError) {
+            // A cache hit is optional. If the process cannot reserve the single
+            // plaintext result array, preserve the authenticated envelope for a
+            // later attempt and let the caller continue through its miss path.
             null
         }
     }
@@ -569,8 +576,10 @@ internal class DiskByteCache(
             when (envelopeRead.outcome) {
                 EnvelopeHeaderOutcome.VALID -> {
                     val envelope = envelopeRead.header ?: continue
-                    val plaintextSize = size - envelope.headerBytes - ENVELOPE_CRYPTO_OVERHEAD_BYTES
-                    if (plaintextSize <= 0 || size > Int.MAX_VALUE || plaintextSize > entryByteLimit) {
+                    val plaintextSize =
+                        envelope.plaintextBytes
+                            ?: (size - envelope.headerBytes - ENVELOPE_CRYPTO_OVERHEAD_BYTES)
+                    if (isInvalidEnvelopeSize(envelope, size, plaintextSize)) {
                         deleteHydrationArtifactsIfGenerationMatches(
                             generationAtStart,
                             listOf(file, legacyTagFileFor(file, SUFFIX)),
@@ -619,6 +628,26 @@ internal class DiskByteCache(
         return HydratedIndex(hydratedIndex, hydratedBytes, unresolvedDuringHydration)
     }
 
+    private fun expectedEnvelopeBytes(
+        envelope: EnvelopeHeader,
+        plaintextBytes: Long,
+    ): Long =
+        if (envelope.version == CHUNKED_ENVELOPE_VERSION) {
+            val chunkCount = (plaintextBytes + ENCRYPTION_CHUNK_BYTES - 1L) / ENCRYPTION_CHUNK_BYTES
+            envelope.headerBytes + METADATA_AUTH_BYTES + plaintextBytes + chunkCount * PAYLOAD_CRYPTO_OVERHEAD_BYTES
+        } else {
+            envelope.headerBytes + ENVELOPE_CRYPTO_OVERHEAD_BYTES + plaintextBytes
+        }
+
+    private fun isInvalidEnvelopeSize(
+        envelope: EnvelopeHeader,
+        fileBytes: Long,
+        plaintextBytes: Long,
+    ): Boolean =
+        fileBytes > Int.MAX_VALUE ||
+            plaintextBytes !in 1L..entryByteLimit ||
+            fileBytes != expectedEnvelopeBytes(envelope, plaintextBytes)
+
     // Legacy sibling sidecar from the pre-#1373 two-file layout.
     private fun legacyTagFileFor(
         dataFile: File,
@@ -628,20 +657,35 @@ internal class DiskByteCache(
     private data class EnvelopeHeader(
         val ciphertextTag: String?,
         val bytes: ByteArray,
+        val version: Byte,
+        val plaintextBytes: Long?,
     ) {
         val headerBytes: Int
             get() = bytes.size
     }
 
-    private fun envelopeHeaderBytes(ciphertextTag: String?): ByteArray {
+    private fun envelopeHeaderBytes(
+        ciphertextTag: String?,
+        plaintextBytes: Int,
+    ): ByteArray {
         val tagBytes = ciphertextTag?.toByteArray(Charsets.UTF_8) ?: byteArrayOf()
         require(tagBytes.size <= MAX_TAG_BYTES) { "ciphertext tag exceeds $MAX_TAG_BYTES bytes" }
-        val header = ByteArray(FIXED_ENVELOPE_HEADER_BYTES + tagBytes.size)
+        val version =
+            if (plaintextBytes > LEGACY_SINGLE_PAYLOAD_MAX_BYTES) {
+                CHUNKED_ENVELOPE_VERSION
+            } else {
+                LEGACY_ENVELOPE_VERSION
+            }
+        val plaintextLengthBytes = if (version == CHUNKED_ENVELOPE_VERSION) Long.SIZE_BYTES else 0
+        val header = ByteArray(FIXED_ENVELOPE_HEADER_BYTES + plaintextLengthBytes + tagBytes.size)
         System.arraycopy(ENVELOPE_MAGIC, 0, header, 0, ENVELOPE_MAGIC.size)
-        header[ENVELOPE_MAGIC.size] = ENVELOPE_VERSION
+        header[ENVELOPE_MAGIC.size] = version
         header[ENVELOPE_MAGIC.size + 1] = tagBytes.size.toByte()
+        if (version == CHUNKED_ENVELOPE_VERSION) {
+            ByteBuffer.wrap(header, FIXED_ENVELOPE_HEADER_BYTES, Long.SIZE_BYTES).putLong(plaintextBytes.toLong())
+        }
         if (tagBytes.isNotEmpty()) {
-            System.arraycopy(tagBytes, 0, header, FIXED_ENVELOPE_HEADER_BYTES, tagBytes.size)
+            System.arraycopy(tagBytes, 0, header, FIXED_ENVELOPE_HEADER_BYTES + plaintextLengthBytes, tagBytes.size)
         }
         return header
     }
@@ -694,19 +738,43 @@ internal class DiskByteCache(
     @Throws(IOException::class)
     private fun readEnvelopeHeader(input: InputStream): EnvelopeHeader {
         val fixedHeader = input.readExactly(FIXED_ENVELOPE_HEADER_BYTES)
-        if (!fixedHeader.copyOfRange(0, ENVELOPE_MAGIC.size).contentEquals(ENVELOPE_MAGIC)) {
-            throw IOException("invalid cache envelope magic")
-        }
-        if (fixedHeader[ENVELOPE_MAGIC.size] != ENVELOPE_VERSION) {
-            throw IOException("unsupported cache envelope version")
-        }
+        val version = fixedHeader[ENVELOPE_MAGIC.size]
+        validateEnvelopePrefix(fixedHeader, version)
         val tagLength = fixedHeader[ENVELOPE_MAGIC.size + 1].toInt() and 0xFF
+        val plaintextLengthBytes =
+            if (version == CHUNKED_ENVELOPE_VERSION) {
+                input.readExactly(Long.SIZE_BYTES)
+            } else {
+                byteArrayOf()
+            }
+        val plaintextBytes = plaintextLengthBytes.takeIf { it.isNotEmpty() }?.let { ByteBuffer.wrap(it).long }
+        validateDeclaredPlaintextBytes(plaintextBytes)
         val tagBytes = if (tagLength == 0) byteArrayOf() else input.readExactly(tagLength)
-        val header = fixedHeader + tagBytes
+        val header = fixedHeader + plaintextLengthBytes + tagBytes
         return EnvelopeHeader(
             ciphertextTag = tagBytes.toString(Charsets.UTF_8).takeIf { it.isNotBlank() },
             bytes = header,
+            version = version,
+            plaintextBytes = plaintextBytes,
         )
+    }
+
+    private fun validateEnvelopePrefix(
+        fixedHeader: ByteArray,
+        version: Byte,
+    ) {
+        if (!fixedHeader.copyOfRange(0, ENVELOPE_MAGIC.size).contentEquals(ENVELOPE_MAGIC)) {
+            throw IOException("invalid cache envelope magic")
+        }
+        if (version != LEGACY_ENVELOPE_VERSION && version != CHUNKED_ENVELOPE_VERSION) {
+            throw IOException("unsupported cache envelope version")
+        }
+    }
+
+    private fun validateDeclaredPlaintextBytes(plaintextBytes: Long?) {
+        if (plaintextBytes != null && plaintextBytes !in 1L..entryByteLimit) {
+            throw IOException("decrypted cache payload exceeds entry limit")
+        }
     }
 
     @Throws(GeneralSecurityException::class, IOException::class)
@@ -757,7 +825,7 @@ internal class DiskByteCache(
         plaintext: ByteArray,
         ciphertextTag: String?,
     ) {
-        val header = envelopeHeaderBytes(ciphertextTag)
+        val header = envelopeHeaderBytes(ciphertextTag, plaintext.size)
         val metadataAad = buildMetadataAad(fileName, header)
         val metadataCipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
         metadataCipher.init(Cipher.ENCRYPT_MODE, keyProvider.getOrCreate())
@@ -771,31 +839,76 @@ internal class DiskByteCache(
             throw GeneralSecurityException("AES-GCM provider returned a ${metadataAuthTag.size}-byte metadata tag")
         }
 
-        val payloadAad = buildPayloadAad(fileName, header, metadataIv, metadataAuthTag)
-        val payloadCipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
-        payloadCipher.init(Cipher.ENCRYPT_MODE, keyProvider.getOrCreate())
-        val payloadIv = payloadCipher.iv
-        if (payloadIv.size != IV_BYTES) {
-            throw GeneralSecurityException("AES-GCM provider returned a ${payloadIv.size}-byte payload IV")
-        }
-        payloadCipher.updateAAD(payloadAad)
         output.write(header)
         output.write(metadataIv)
         output.write(metadataAuthTag)
-        output.write(payloadIv)
-        var offset = 0
-        while (offset < plaintext.size) {
-            val chunkBytes = minOf(ENCRYPTION_CHUNK_BYTES, plaintext.size - offset)
-            val encrypted = payloadCipher.update(plaintext, offset, chunkBytes)
-            if (encrypted != null && encrypted.isNotEmpty()) output.write(encrypted)
-            offset += chunkBytes
+        val payloadAad = buildPayloadAad(fileName, header, metadataIv, metadataAuthTag)
+        if (header[ENVELOPE_MAGIC.size] == CHUNKED_ENVELOPE_VERSION) {
+            writeChunkedPayload(output, plaintext, payloadAad)
+        } else {
+            writeLegacyPayload(output, plaintext, payloadAad)
         }
-        output.write(payloadCipher.doFinal())
         // Make the complete envelope durable before the single publication
         // rename. If the rename itself is lost in a power failure, recovery
         // sees the old envelope; if it lands, the new envelope is complete.
         output.fd.sync()
     }
+
+    private fun writeLegacyPayload(
+        output: FileOutputStream,
+        plaintext: ByteArray,
+        payloadAad: ByteArray,
+    ) {
+        val cipher = newPayloadCipher(Cipher.ENCRYPT_MODE, payloadAad)
+        output.write(cipher.iv)
+        output.write(cipher.doFinal(plaintext))
+    }
+
+    private fun writeChunkedPayload(
+        output: FileOutputStream,
+        plaintext: ByteArray,
+        payloadAad: ByteArray,
+    ) {
+        var offset = 0
+        var chunkIndex = 0
+        while (offset < plaintext.size) {
+            val chunkBytes = minOf(ENCRYPTION_CHUNK_BYTES, plaintext.size - offset)
+            val cipher = newPayloadCipher(Cipher.ENCRYPT_MODE, buildChunkAad(payloadAad, chunkIndex, chunkBytes))
+            output.write(cipher.iv)
+            output.write(cipher.doFinal(plaintext, offset, chunkBytes))
+            offset += chunkBytes
+            chunkIndex += 1
+        }
+    }
+
+    private fun newPayloadCipher(
+        mode: Int,
+        aad: ByteArray,
+        iv: ByteArray? = null,
+    ): Cipher =
+        Cipher.getInstance(CIPHER_TRANSFORMATION).also { cipher ->
+            if (iv == null) {
+                cipher.init(mode, keyProvider.getOrCreate())
+                if (cipher.iv.size != IV_BYTES) {
+                    throw GeneralSecurityException("AES-GCM provider returned a ${cipher.iv.size}-byte payload IV")
+                }
+            } else {
+                cipher.init(mode, keyProvider.getOrCreate(), GCMParameterSpec(TAG_BITS, iv))
+            }
+            cipher.updateAAD(aad)
+        }
+
+    private fun buildChunkAad(
+        payloadAad: ByteArray,
+        chunkIndex: Int,
+        plaintextBytes: Int,
+    ): ByteArray =
+        payloadAad +
+            ByteBuffer
+                .allocate(Int.SIZE_BYTES * 2)
+                .putInt(chunkIndex)
+                .putInt(plaintextBytes)
+                .array()
 
     @Throws(GeneralSecurityException::class, IOException::class)
     private fun readEncrypted(
@@ -804,7 +917,6 @@ internal class DiskByteCache(
     ): ByteArray =
         FileInputStream(file).use { input ->
             val authenticated = readAndAuthenticateMetadata(input, fileName)
-            val payloadIv = input.readExactly(IV_BYTES)
             val payloadAad =
                 buildPayloadAad(
                     fileName,
@@ -812,37 +924,85 @@ internal class DiskByteCache(
                     authenticated.metadataIv,
                     authenticated.metadataAuthTag,
                 )
-            val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
-            cipher.init(Cipher.DECRYPT_MODE, keyProvider.getOrCreate(), GCMParameterSpec(TAG_BITS, payloadIv))
-            cipher.updateAAD(payloadAad)
-            val ciphertext = input.readBoundedPayloadCiphertext()
-            if (ciphertext.size < GCM_TAG_BYTES) throw IOException("truncated encrypted cache payload")
-            cipher.doFinal(ciphertext).also { plaintext ->
-                if (plaintext.isEmpty()) throw IOException("empty decrypted cache payload")
-                if (plaintext.size.toLong() > entryByteLimit) throw IOException("decrypted cache payload exceeds entry limit")
+            when (authenticated.envelope.version) {
+                CHUNKED_ENVELOPE_VERSION ->
+                    readChunkedPayload(input, authenticated.envelope.plaintextBytes!!, payloadAad)
+                else -> readLegacyPayload(input, file.length(), authenticated.envelope.headerBytes, payloadAad)
             }
         }
 
-    @Throws(IOException::class)
-    private fun InputStream.readBoundedPayloadCiphertext(): ByteArray {
-        val maxCiphertextBytes =
-            minOf(
-                entryByteLimit.coerceAtMost(Int.MAX_VALUE.toLong() - GCM_TAG_BYTES) + GCM_TAG_BYTES,
-                Int.MAX_VALUE.toLong(),
-            )
-        val output = ByteArrayOutputStream(minOf(maxCiphertextBytes, ENCRYPTION_CHUNK_BYTES.toLong()).toInt())
-        val buffer = ByteArray(ENCRYPTION_CHUNK_BYTES)
-        var total = 0L
-        while (true) {
-            val bytesUntilOverflow = maxCiphertextBytes - total + 1L
-            val read = read(buffer, 0, minOf(buffer.size.toLong(), bytesUntilOverflow).toInt())
-            if (read < 0) break
-            if (read == 0) continue
-            total += read
-            if (total > maxCiphertextBytes) throw IOException("encrypted cache payload exceeds entry limit")
-            output.write(buffer, 0, read)
+    private fun readLegacyPayload(
+        input: InputStream,
+        fileBytes: Long,
+        headerBytes: Int,
+        payloadAad: ByteArray,
+    ): ByteArray {
+        val ciphertextBytes = fileBytes - headerBytes - METADATA_AUTH_BYTES - IV_BYTES
+        val plaintextBytes = validateLegacyPayloadSize(ciphertextBytes)
+        ensurePlaintextAllocationFits(plaintextBytes)
+        val payloadIv = input.readExactly(IV_BYTES)
+        val ciphertext = input.readExactly(ciphertextBytes.toInt())
+        requirePayloadExhausted(input)
+        return newPayloadCipher(Cipher.DECRYPT_MODE, payloadAad, payloadIv)
+            .doFinal(ciphertext)
+            .also(::validatePlaintext)
+    }
+
+    private fun validateLegacyPayloadSize(ciphertextBytes: Long): Long {
+        if (ciphertextBytes < GCM_TAG_BYTES) throw IOException("truncated encrypted cache payload")
+        val plaintextBytes = ciphertextBytes - GCM_TAG_BYTES
+        if (plaintextBytes > minOf(LEGACY_SINGLE_PAYLOAD_MAX_BYTES.toLong(), entryByteLimit)) {
+            throw IOException("legacy encrypted cache payload exceeds safe limit")
         }
-        return output.toByteArray()
+        return plaintextBytes
+    }
+
+    private fun readChunkedPayload(
+        input: InputStream,
+        plaintextBytes: Long,
+        payloadAad: ByteArray,
+    ): ByteArray {
+        ensurePlaintextAllocationFits(plaintextBytes)
+        val plaintext = plaintextAllocator(plaintextBytes.toInt())
+        var offset = 0
+        var chunkIndex = 0
+        while (offset < plaintext.size) {
+            val chunkBytes = minOf(ENCRYPTION_CHUNK_BYTES, plaintext.size - offset)
+            val payloadIv = input.readExactly(IV_BYTES)
+            val ciphertext = input.readExactly(chunkBytes + GCM_TAG_BYTES)
+            val decrypted =
+                newPayloadCipher(
+                    Cipher.DECRYPT_MODE,
+                    buildChunkAad(payloadAad, chunkIndex, chunkBytes),
+                    payloadIv,
+                ).doFinal(ciphertext)
+            if (decrypted.size != chunkBytes) throw IOException("invalid decrypted cache chunk length")
+            System.arraycopy(decrypted, 0, plaintext, offset, chunkBytes)
+            offset += chunkBytes
+            chunkIndex += 1
+        }
+        requirePayloadExhausted(input)
+        validatePlaintext(plaintext)
+        return plaintext
+    }
+
+    private fun requirePayloadExhausted(input: InputStream) {
+        if (input.read() >= 0) throw IOException("encrypted cache payload exceeds entry limit")
+    }
+
+    private fun ensurePlaintextAllocationFits(plaintextBytes: Long) {
+        val allocationLimit = minOf(entryByteLimit, Int.MAX_VALUE.toLong())
+        if (plaintextBytes !in 1L..allocationLimit) {
+            throw IOException("decrypted cache payload exceeds entry limit")
+        }
+        if (plaintextBytes > availablePlaintextAllocationBytes()) {
+            throw IOException("decrypted cache payload exceeds memory budget")
+        }
+    }
+
+    private fun validatePlaintext(plaintext: ByteArray) {
+        if (plaintext.isEmpty()) throw IOException("empty decrypted cache payload")
+        if (plaintext.size.toLong() > entryByteLimit) throw IOException("decrypted cache payload exceeds entry limit")
     }
 
     @Throws(IOException::class)
@@ -868,6 +1028,8 @@ internal class DiskByteCache(
             message == "truncated encrypted cache payload" ||
             message == "empty decrypted cache payload" ||
             message == "decrypted cache payload exceeds entry limit" ||
+            message == "legacy encrypted cache payload exceeds safe limit" ||
+            message == "invalid decrypted cache chunk length" ||
             message == "encrypted cache payload exceeds entry limit"
 
     private fun evictPoisonedEntry(
@@ -954,7 +1116,8 @@ internal class DiskByteCache(
         const val LEGACY_SUFFIX = ".bin"
         const val TMP_SUFFIX = ".tmp"
         const val TAG_SUFFIX = ".tag"
-        const val ENVELOPE_VERSION: Byte = 2
+        const val LEGACY_ENVELOPE_VERSION: Byte = 2
+        const val CHUNKED_ENVELOPE_VERSION: Byte = 3
         const val MAX_TAG_BYTES = 255
         const val CIPHER_TRANSFORMATION = "AES/GCM/NoPadding"
         const val IV_BYTES = 12
@@ -965,13 +1128,26 @@ internal class DiskByteCache(
         const val ENVELOPE_CRYPTO_OVERHEAD_BYTES = METADATA_AUTH_BYTES + PAYLOAD_CRYPTO_OVERHEAD_BYTES
         const val FIXED_ENVELOPE_HEADER_BYTES = 6
         const val MIN_ENVELOPE_BYTES = FIXED_ENVELOPE_HEADER_BYTES + ENVELOPE_CRYPTO_OVERHEAD_BYTES + 1L
-        const val ENCRYPTION_CHUNK_BYTES = 8 * 1024
+
+        // Large entries use independently authenticated chunks. This keeps
+        // read-time crypto scratch bounded without paying thousands of
+        // provider initializations for a supported 64 MiB attachment.
+        const val ENCRYPTION_CHUNK_BYTES = 256 * 1024
+        const val LEGACY_SINGLE_PAYLOAD_MAX_BYTES = 1024 * 1024
         const val DEFAULT_MAX_ENTRY_BYTES: Long = 16L * 1024L * 1024L
         const val FILE_NAME_MEMO_MAX_KEYS = 512
         val ENVELOPE_MAGIC = byteArrayOf('W'.code.toByte(), 'N'.code.toByte(), 'D'.code.toByte(), 'C'.code.toByte())
         val METADATA_AAD_DOMAIN = "WN-DC-META".toByteArray(Charsets.UTF_8)
         val PAYLOAD_AAD_DOMAIN = "WN-DC-PAY".toByteArray(Charsets.UTF_8)
         val TMP_COUNTER = AtomicLong()
+
+        fun defaultAvailablePlaintextAllocationBytes(): Long {
+            val runtime = Runtime.getRuntime()
+            val available = (runtime.maxMemory() - runtime.totalMemory() + runtime.freeMemory()).coerceAtLeast(0L)
+            val reserve = minOf(32L * 1024L * 1024L, runtime.maxMemory() / 8L)
+            return (available - reserve).coerceAtLeast(0L)
+        }
+
         val HEX =
             charArrayOf(
                 '0',

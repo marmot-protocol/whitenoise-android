@@ -275,6 +275,108 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun largeEntry_usesChunkAuthenticatedEnvelopeAndRoundTrips() {
+        val payload = ByteArray(1024 * 1024 + 37) { index -> (index * 31).toByte() }
+        val nearLimit = payload.size.toLong() + 1L
+        val cache =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = nearLimit,
+                availablePlaintextAllocationBytes = { Long.MAX_VALUE },
+            )
+
+        cache.put("large", payload)
+
+        val envelope = File(dir, sha256Hex("large") + ".enc")
+        assertEquals("large entries must use the bounded chunked format", 3, envelope.readBytes()[4].toInt())
+        val reopened =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = nearLimit,
+                availablePlaintextAllocationBytes = { Long.MAX_VALUE },
+            )
+        assertTrue(payload.contentEquals(reopened.get("large")))
+    }
+
+    @Test
+    fun chunkAuthenticationFailure_isRejectedAndEvicted() {
+        val payload = ByteArray(1024 * 1024 + 37) { 7 }
+        val writer =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = 2L * 1024L * 1024L,
+            )
+        writer.put("large", payload)
+        val envelope = File(dir, sha256Hex("large") + ".enc")
+        val bytes = envelope.readBytes()
+        bytes[bytes.lastIndex] = (bytes.last().toInt() xor 0x01).toByte()
+        envelope.writeBytes(bytes)
+        val reopened =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = 2L * 1024L * 1024L,
+                availablePlaintextAllocationBytes = { Long.MAX_VALUE },
+            )
+
+        assertNull(reopened.get("large"))
+        assertFalse(envelope.exists())
+    }
+
+    @Test
+    fun insufficientHeapHeadroom_isRecoverableMissWithoutEvictingValidEntry() {
+        val payload = ByteArray(1024 * 1024 + 1) { 5 }
+        DiskByteCache(
+            dir,
+            keyProvider = keyProvider,
+            maxBytes = 2L * 1024L * 1024L,
+            maxEntryBytes = 2L * 1024L * 1024L,
+        ).put("large", payload)
+        val constrained =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = 2L * 1024L * 1024L,
+                availablePlaintextAllocationBytes = { payload.size.toLong() - 1L },
+            )
+
+        assertNull(constrained.get("large"))
+        assertTrue(constrained.contains("large"))
+        assertTrue(File(dir, sha256Hex("large") + ".enc").exists())
+    }
+
+    @Test
+    fun plaintextAllocationFailure_isRecoverableMiss() {
+        val payload = ByteArray(1024 * 1024 + 1) { 9 }
+        DiskByteCache(
+            dir,
+            keyProvider = keyProvider,
+            maxBytes = 2L * 1024L * 1024L,
+            maxEntryBytes = 2L * 1024L * 1024L,
+        ).put("large", payload)
+        val constrained =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = 2L * 1024L * 1024L,
+                availablePlaintextAllocationBytes = { Long.MAX_VALUE },
+                plaintextAllocator = { throw OutOfMemoryError("injected") },
+            )
+
+        assertNull(constrained.get("large"))
+        assertTrue(constrained.contains("large"))
+    }
+
+    @Test
     fun put_withStaleGeneration_isRejectedAfterClear() {
         val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         // Capture the generation a deferred write would have grabbed at
