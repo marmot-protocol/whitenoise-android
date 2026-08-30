@@ -2577,7 +2577,7 @@ internal fun ConversationScreen(
             )
         }
     }
-    LaunchedEffect(routeTransitionInProgress, bottomChromeReanchorPending) {
+    LaunchedEffect(routeTransitionInProgress) {
         if (routeTransitionInProgress) {
             routePresentationFrozen = true
             return@LaunchedEffect

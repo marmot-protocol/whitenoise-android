@@ -10,6 +10,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberIdsFfi
@@ -31,6 +32,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.emptyGroupRecord
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
@@ -191,6 +193,45 @@ class AccountSwitchFirstFrameTest {
 
         controller.onCleared()
     }
+
+    @Test
+    fun homeQuickToggleDelegatesToTheRequestOwnedTransitionHandoff() =
+        runBlocking {
+            val appState = identityAppState()
+            val snapshot = completeIdentitySnapshot()
+            snapshot.profiles.forEach(appState::applyAccountSwitchProfileSeed)
+            val controller =
+                ChatsController(
+                    appState = appState,
+                    initialAccountRef = TARGET_ACCOUNT,
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                    initialLocalSnapshot = snapshot,
+                )
+            appState.attachChatsController(controller)
+            var requestedAccount: String? = null
+
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    Surface {
+                        ChatsScreen(
+                            appState = appState,
+                            controller = controller,
+                            onOpenSettings = {},
+                            onOpenGroup = { _, _, _, _ -> },
+                            onQuickSwitchAccount = { requestedAccount = it },
+                        )
+                    }
+                }
+            }
+
+            composeRule.onNodeWithContentDescription(WORK_ACCOUNT_NAME, substring = true).performClick()
+            composeRule.runOnIdle {
+                assertEquals(WORK_ACCOUNT, requestedAccount)
+                assertEquals(TARGET_ACCOUNT, appState.activeAccountRef)
+            }
+
+            controller.onCleared()
+        }
 
     private fun completeIdentitySnapshot(): AccountSwitchLocalSnapshot {
         val named =

@@ -46,18 +46,81 @@ class ConversationRouteFrameStabilityTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun cachedDmConvergesMonotonicallyWhenFinalFramesHydrateInLtr() {
-        verifyForwardRoute(LayoutDirection.Ltr, "Cached DM")
+    fun cachedDmConvergesMonotonicallyWhenFinalFramesHydrateAt60HzInLtr() {
+        verifyForwardRoute(LayoutDirection.Ltr, "Cached DM", frameMillis = 16L)
     }
 
     @Test
-    fun cachedGroupConvergesMonotonicallyWhenFinalFramesHydrateInRtl() {
-        verifyForwardRoute(LayoutDirection.Rtl, "Cached group")
+    fun cachedGroupConvergesMonotonicallyWhenFinalFramesHydrateAt90HzInRtl() {
+        verifyForwardRoute(LayoutDirection.Rtl, "Cached group", frameMillis = 11L)
+    }
+
+    @Test
+    fun cachedDmConvergesMonotonicallyWhenFinalFramesHydrateAt120HzInLtr() {
+        verifyForwardRoute(LayoutDirection.Ltr, "Cached DM", frameMillis = 8L)
+    }
+
+    @Test
+    fun rapidBackReversalDoesNotSnapReturningChatListLayerAt120Hz() {
+        val state = RouteHarnessState()
+        composeRule.setContent {
+            RouteHarness(state, LayoutDirection.Ltr, "Cached DM")
+        }
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnUiThread { state.route = "Cached DM" }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(1L)
+        composeRule.runOnIdle { }
+        repeat(8) {
+            composeRule.mainClock.advanceTimeBy(8L)
+            composeRule.runOnIdle { }
+        }
+        val sourceBefore = composeRule.onNodeWithTag(SOURCE_TAG).getUnclippedBoundsInRoot()
+        composeRule.onNodeWithTag(DESTINATION_TAG).assertExists()
+
+        composeRule.runOnUiThread { state.route = null }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(1L)
+        composeRule.runOnIdle { }
+        composeRule.mainClock.advanceTimeBy(8L)
+        composeRule.runOnIdle { }
+        val sourceAfter = composeRule.onNodeWithTag(SOURCE_TAG).getUnclippedBoundsInRoot()
+
+        assertContinuousReversalStep("source", sourceBefore.left.value, sourceAfter.left.value)
+        assertTrue(kotlin.math.abs(sourceAfter.left.value) <= CONVERSATION_ROUTE_LAYER_TRAVEL.value)
+    }
+
+    @Test
+    fun reducedMotionNeverTranslatesOrFadesEitherLayer() {
+        listOf(0f, 0.5f, 1f).forEach { progress ->
+            listOf(false, true).forEach { conversationRoute ->
+                assertEquals(
+                    0f,
+                    conversationRouteLayerTranslation(progress, conversationRoute, suppressMotion = true),
+                )
+                assertEquals(
+                    1f,
+                    conversationRouteLayerAlpha(progress, conversationRoute, suppressMotion = true),
+                )
+            }
+        }
+    }
+
+    private fun assertContinuousReversalStep(
+        label: String,
+        before: Float,
+        after: Float,
+    ) {
+        assertTrue(
+            "$label snapped when Back interrupted enter: $before -> $after",
+            kotlin.math.abs(after - before) <= MAX_120_HZ_REVERSAL_STEP_DP,
+        )
     }
 
     private fun verifyForwardRoute(
         layoutDirection: LayoutDirection,
         destinationLabel: String,
+        frameMillis: Long,
     ) {
         val state = RouteHarnessState()
         composeRule.setContent {
@@ -65,13 +128,15 @@ class ConversationRouteFrameStabilityTest {
         }
         composeRule.mainClock.autoAdvance = false
         val outgoingBounds = mutableListOf<DpRect>()
-        val forward = captureForwardFrames(state, destinationLabel, outgoingBounds)
+        val forward = captureForwardFrames(state, destinationLabel, outgoingBounds, frameMillis)
         assertStableOuterBounds(outgoingBounds)
         assertConverges(forward, "forward destination")
+        assertAlphaConverges(forward, conversationRoute = true, label = "forward destination")
         composeRule.onNodeWithTag(DESTINATION_TAG).assertIsDisplayed()
 
-        val back = captureBackFrames(state)
+        val back = captureBackFrames(state, frameMillis)
         assertConverges(back, "back destination")
+        assertAlphaConverges(back, conversationRoute = false, label = "back destination")
         composeRule.onNodeWithTag(SOURCE_TAG).assertIsDisplayed()
     }
 
@@ -149,38 +214,68 @@ class ConversationRouteFrameStabilityTest {
         state: RouteHarnessState,
         destinationLabel: String,
         outgoingBounds: MutableList<DpRect>,
+        frameMillis: Long,
     ): RouteFrameSamples {
         composeRule.runOnUiThread { state.route = destinationLabel }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(1L)
         composeRule.runOnIdle { }
         val samples = RouteFrameSamples()
-        repeat(20) { frame ->
-            if (frame == 13) composeRule.runOnUiThread { state.hydrationStage = 1 }
-            if (frame == 14) composeRule.runOnUiThread { state.hydrationStage = 2 }
-            composeRule.mainClock.advanceTimeByFrame()
+        val animationFrames = animationFrameCount(frameMillis)
+        repeat(animationFrames + POST_SETTLE_FRAMES) { frame ->
+            if (frame == animationFrames - 2) composeRule.runOnUiThread { state.hydrationStage = 1 }
+            if (frame == animationFrames - 1) composeRule.runOnUiThread { state.hydrationStage = 2 }
+            composeRule.mainClock.advanceTimeBy(frameMillis)
             composeRule.runOnIdle { }
-            composeRule.onNodeWithTag(DESTINATION_TAG).assertExists()
-            if (composeRule.onAllNodesWithTag(SOURCE_TAG).fetchSemanticsNodes().isNotEmpty()) {
-                outgoingBounds.add(composeRule.onNodeWithTag(SOURCE_TAG).getUnclippedBoundsInRoot())
-            }
-            samples.bounds.add(composeRule.onNodeWithTag(DESTINATION_TAG).getUnclippedBoundsInRoot())
-            samples.running.add(state.transitionRunning)
+            captureRouteFrame(state, samples, outgoingBounds)
         }
         return samples
     }
 
-    private fun captureBackFrames(state: RouteHarnessState): RouteFrameSamples {
+    private fun captureRouteFrame(
+        state: RouteHarnessState,
+        samples: RouteFrameSamples,
+        outgoingBounds: MutableList<DpRect>,
+    ) {
+        composeRule.onNodeWithTag(DESTINATION_TAG).assertExists()
+        if (composeRule.onAllNodesWithTag(SOURCE_TAG).fetchSemanticsNodes().isNotEmpty()) {
+            outgoingBounds.add(composeRule.onNodeWithTag(SOURCE_TAG).getUnclippedBoundsInRoot())
+        }
+        samples.bounds.add(composeRule.onNodeWithTag(DESTINATION_TAG).getUnclippedBoundsInRoot())
+        samples.running.add(state.transitionRunning)
+    }
+
+    private fun captureBackFrames(
+        state: RouteHarnessState,
+        frameMillis: Long,
+    ): RouteFrameSamples {
         composeRule.runOnUiThread { state.route = null }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(1L)
         composeRule.runOnIdle { }
         val samples = RouteFrameSamples()
-        repeat(20) {
-            composeRule.mainClock.advanceTimeByFrame()
+        repeat(animationFrameCount(frameMillis) + POST_SETTLE_FRAMES) {
+            composeRule.mainClock.advanceTimeBy(frameMillis)
             composeRule.runOnIdle { }
-            composeRule.onNodeWithTag(SOURCE_TAG).assertExists()
-            samples.bounds.add(composeRule.onNodeWithTag(SOURCE_TAG).getUnclippedBoundsInRoot())
-            samples.running.add(state.transitionRunning)
+            captureBackFrame(state, samples)
         }
         return samples
     }
+
+    private fun captureBackFrame(
+        state: RouteHarnessState,
+        samples: RouteFrameSamples,
+    ) {
+        composeRule.onNodeWithTag(SOURCE_TAG).assertExists()
+        samples.bounds.add(composeRule.onNodeWithTag(SOURCE_TAG).getUnclippedBoundsInRoot())
+        samples.running.add(state.transitionRunning)
+    }
+
+    private fun animationFrameCount(frameMillis: Long): Int =
+        (
+            (CONVERSATION_ROUTE_TRANSITION_MILLIS + frameMillis - 1L) /
+                frameMillis
+        ).toInt()
 
     private fun assertConverges(
         samples: RouteFrameSamples,
@@ -202,6 +297,42 @@ class ConversationRouteFrameStabilityTest {
         assertEquals(terminal, samples.bounds[settledFrame + 1])
     }
 
+    private fun assertAlphaConverges(
+        samples: RouteFrameSamples,
+        conversationRoute: Boolean,
+        label: String,
+    ) {
+        val travel = CONVERSATION_ROUTE_LAYER_TRAVEL.value
+        val alphas =
+            samples.bounds.map { bounds ->
+                val hiddenFraction = kotlin.math.abs(bounds.left.value) / travel
+                val conversationVisibility =
+                    if (conversationRoute) 1f - hiddenFraction else hiddenFraction
+                conversationRouteLayerAlpha(
+                    conversationVisibility = conversationVisibility,
+                    conversationRoute = conversationRoute,
+                    suppressMotion = false,
+                )
+            }
+        alphas
+            .zipWithNext()
+            .forEachIndexed { frame, (before, after) ->
+                assertTrue(
+                    "$label alpha reversed between frames $frame and ${frame + 1}: $before -> $after",
+                    after + ALPHA_TOLERANCE >= before,
+                )
+            }
+        val settledFrame =
+            samples.running.indices.first { frame ->
+                !samples.running[frame] && samples.running.take(frame).any { it }
+            }
+        assertTrue(
+            "$label did not reach an opaque terminal frame: ${alphas[settledFrame]}",
+            alphas[settledFrame] >= OPAQUE_CHANNEL_MINIMUM,
+        )
+        assertEquals(alphas[settledFrame], alphas[settledFrame + 1])
+    }
+
     private fun assertStableOuterBounds(samples: List<DpRect>) {
         val first = samples.first()
         samples.forEachIndexed { frame, sample ->
@@ -215,6 +346,10 @@ class ConversationRouteFrameStabilityTest {
         const val DESTINATION_TAG = "conversation-route-destination"
         const val TOP_CHROME_TAG = "conversation-route-top-chrome"
         const val BOTTOM_CHROME_TAG = "conversation-route-bottom-chrome"
+        const val POST_SETTLE_FRAMES = 3
+        const val ALPHA_TOLERANCE = 0.005f
+        const val OPAQUE_CHANNEL_MINIMUM = 0.99f
+        const val MAX_120_HZ_REVERSAL_STEP_DP = 8f
     }
 
     private class RouteHarnessState {
