@@ -6,7 +6,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -142,17 +141,17 @@ class DiskByteCacheTest {
     }
 
     @Test
-    fun leaseCloseReportsPlaintextDeletionFailure() {
+    fun leaseCloseDoesNotMaskCompletedPublicationWhenDeletionFails() {
         val backing = File(dir, "undeletable.lease").apply { writeBytes(byteArrayOf(1)) }
         val undeletable =
             object : File(backing.absolutePath) {
                 override fun delete(): Boolean = false
             }
 
-        assertThrows(IOException::class.java) {
-            DiskByteCacheLease(undeletable).close()
-        }
+        var diagnostic: String? = null
+        DiskByteCacheLease(undeletable) { diagnostic = it }.close()
         assertTrue(backing.exists())
+        assertTrue(diagnostic?.contains("failed to delete plaintext cache lease") == true)
     }
 
     @Test
@@ -505,6 +504,23 @@ class DiskByteCacheTest {
         assertNull(reopened.get("legacy-large"))
         assertTrue(envelope.isFile)
         assertNull(reopened.materialize("legacy-large"))
+        assertTrue(envelope.isFile)
+    }
+
+    @Test
+    fun legacyMaterializationHonorsHeapBudgetWithoutEviction() {
+        val payload = ByteArray(512 * 1024) { 5 }
+        val envelope = writeLegacyEnvelope("legacy-budget", payload)
+        val reopened =
+            DiskByteCache(
+                cacheDir = dir,
+                keyProvider = keyProvider,
+                maxBytes = 128L * 1024L * 1024L,
+                maxEntryBytes = 64L * 1024L * 1024L,
+                availablePlaintextAllocationBytes = { 0L },
+            )
+
+        assertNull(reopened.materialize("legacy-budget"))
         assertTrue(envelope.isFile)
     }
 

@@ -103,6 +103,10 @@ internal object AttachmentCachePublication {
         }
     }
 
+    /**
+     * Loads and consumes exactly one source. File-backed leases may be moved into the
+     * publication directory; callers must not reuse the source after returning it.
+     */
     @Throws(IOException::class)
     suspend fun publishSourceAfterLoad(
         attachmentKey: String,
@@ -306,13 +310,20 @@ internal object AttachmentCachePublication {
     ): File? {
         val parent = finalFile.parentFile ?: return null
         val tmp = File(parent, "${finalFile.name}.cache-${tmpCounter.incrementAndGet()}-${System.nanoTime()}.tmp")
+        val expectedSize = source.size
         AttachmentPlaintextCache.protectPublicationFile(tmp)
         return try {
-            FileOutputStream(tmp).use { output ->
-                source.copyTo(output)
-                output.fd.sync()
+            // Publication protection is path-based (trim exclusion), so it remains
+            // valid when the lease inode is moved onto this already-protected path.
+            if (source is AttachmentPlaintext.Lease && source.file.renameTo(tmp)) {
+                FileOutputStream(tmp, true).use { output -> output.fd.sync() }
+            } else {
+                FileOutputStream(tmp).use { output ->
+                    source.copyTo(output)
+                    output.fd.sync()
+                }
             }
-            if (tmp.length() != source.size) {
+            if (tmp.length() != expectedSize) {
                 throw IOException("attachment cache source length changed while publishing ${finalFile.name}")
             }
             tmp

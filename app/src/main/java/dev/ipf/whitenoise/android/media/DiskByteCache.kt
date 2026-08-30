@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
+import android.util.Log
 import java.io.Closeable
 import java.io.File
 import java.io.FileInputStream
@@ -32,16 +33,19 @@ internal data class DiskByteCachePublicationToken(
 /** Owner-private authenticated plaintext materialization. Closing deletes it. */
 internal class DiskByteCacheLease internal constructor(
     val file: File,
+    private val onDeleteFailure: (String) -> Unit = { message -> Log.w("DiskByteCacheLease", message) },
 ) : Closeable {
-    @Throws(IOException::class)
     override fun close() {
-        val deleted =
-            try {
-                file.delete() || !file.exists()
-            } catch (security: SecurityException) {
-                throw IOException("failed to delete plaintext cache lease ${file.absolutePath}", security)
-            }
-        if (!deleted) throw IOException("failed to delete plaintext cache lease ${file.absolutePath}")
+        val failure =
+            runCatching { file.delete() || !file.exists() }
+                .fold(
+                    onSuccess = { deleted -> if (deleted) null else "delete returned false" },
+                    onFailure = { error -> error.message ?: error::class.java.simpleName },
+                )
+        if (failure != null) {
+            // Orphan lease files are retried by the next hydration sweep or clear().
+            onDeleteFailure("failed to delete plaintext cache lease ${file.absolutePath}: $failure")
+        }
     }
 }
 
@@ -294,9 +298,10 @@ internal class DiskByteCache(
             if (!revokedForAll || !grantedToOwner || tmp.canExecute()) {
                 throw IOException("failed to restrict cache lease permissions")
             }
+            // Leases are ephemeral; publication performs the durability fsync once,
+            // after moving or copying the plaintext into its presentation directory.
             FileOutputStream(tmp).use { output ->
                 readEncryptedTo(entry.file, hashed, output, cancellationCheck)
-                output.fd.sync()
             }
             afterLeasePlaintextWritten()
             cancellationCheck()
@@ -1122,6 +1127,7 @@ internal class DiskByteCache(
     ) {
         val ciphertextBytes = fileBytes - headerBytes - METADATA_AUTH_BYTES - IV_BYTES
         val plaintextBytes = validateLegacyPayloadSize(ciphertextBytes)
+        ensurePlaintextAllocationFits(plaintextBytes)
         val payloadIv = input.readExactly(IV_BYTES)
         cancellationCheck()
         val ciphertext = input.readExactly(ciphertextBytes.toInt())

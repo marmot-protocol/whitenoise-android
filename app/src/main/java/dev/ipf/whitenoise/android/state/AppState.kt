@@ -1496,6 +1496,7 @@ class WhiteNoiseAppState private constructor(
             cacheDir = java.io.File(appContext.cacheDir, "decrypted-media"),
             maxBytes = DISK_MEDIA_CACHE_MAX_BYTES,
             maxEntryBytes = DISK_MEDIA_CACHE_MAX_ENTRY_BYTES,
+            maxInMemoryEntryBytes = MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES,
             keyProvider = AndroidKeystoreDiskByteCacheKeyProvider(),
             onMutation = ::bumpMediaCacheRevision,
         )
