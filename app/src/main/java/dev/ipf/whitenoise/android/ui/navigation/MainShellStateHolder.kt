@@ -36,8 +36,13 @@ internal class MainShellProcessState(
     val conversationScrollSnapshots = mutableStateMapOf<String, ConversationScrollSnapshot>()
 
     private var chatsEntry by mutableStateOf<RetainedChatsController?>(null)
+    private var initialConnectionPresentationAvailable = true
     private val conversationControllers = linkedMapOf<ConversationControllerKey, ConversationController>()
 
+    /**
+     * Returns the retained controller for this account/runtime, or replaces it
+     * while carrying the process-scoped cold-start presentation claim forward.
+     */
     fun chatsController(
         accountRef: String?,
         runtimeGeneration: Int,
@@ -52,7 +57,11 @@ internal class MainShellProcessState(
         }
         clearRetainedRoute()
         clearConversationControllers()
-        val controller = ChatsController(appState)
+        val controller =
+            ChatsController(
+                appState = appState,
+                initialConnectionAttemptClaim = ::claimInitialConnectionPresentation,
+            )
         chatsEntry =
             RetainedChatsController(
                 accountRef = accountRef,
@@ -61,6 +70,13 @@ internal class MainShellProcessState(
             )
         appState.attachChatsController(controller)
         return controller
+    }
+
+    /** Grants the cold-process connection presentation exactly once. */
+    private fun claimInitialConnectionPresentation(): Boolean {
+        if (!initialConnectionPresentationAvailable) return false
+        initialConnectionPresentationAvailable = false
+        return true
     }
 
     fun conversationController(

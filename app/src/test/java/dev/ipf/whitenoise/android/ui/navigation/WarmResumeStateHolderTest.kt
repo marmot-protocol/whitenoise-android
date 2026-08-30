@@ -30,6 +30,35 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class WarmResumeStateHolderTest {
+    /** Verifies that account replacement cannot replay the cold-process indicator. */
+    @Test
+    fun onlyTheFirstAccountControllerInAProcessPresentsItsInitialConnectionAttempt() {
+        val state = appState()
+        val processState = MainShellProcessState(state)
+
+        val coldController = processState.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
+
+        assertTrue(coldController.claimInitialConnectionPresentation())
+        val warmController = processState.chatsController("second-account", runtimeGeneration = 4)
+        assertFalse(warmController.claimInitialConnectionPresentation())
+        processState.release()
+    }
+
+    /** Verifies that releasing shell state does not recreate a consumed cold-start claim. */
+    @Test
+    fun releasingTheShellDoesNotRearmColdConnectionPresentationInTheSameProcess() {
+        val state = appState()
+        val processState = MainShellProcessState(state)
+        val first = processState.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
+        assertTrue(first.claimInitialConnectionPresentation())
+
+        processState.release()
+        val replacement = processState.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
+
+        assertFalse(replacement.claimInitialConnectionPresentation())
+        processState.release()
+    }
+
     @Test
     fun terminalNonAuthenticatedPhaseDropsTheProcessRetainedShell() {
         val state = appState()
