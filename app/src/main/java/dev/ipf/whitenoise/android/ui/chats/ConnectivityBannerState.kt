@@ -255,7 +255,6 @@ internal fun rememberChatListConnectivityState(
         relaysConnected = signals.relaysConnected,
         foregroundEpoch = foregroundEpoch,
         revalidateConnectionReadiness = controller::revalidateConnectionReadiness,
-        retryConnectionReadiness = controller::refreshConnectionReadiness,
     )
     LaunchedEffect(controller, activeAccountRef, runtimeGeneration, renderedPresentation) {
         if (renderedPresentation.displayed == ConnectivityBannerState.JustConnected) {

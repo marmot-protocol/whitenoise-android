@@ -32,7 +32,7 @@ class ChatListConnectivityLifecycleTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
     @Test
-    fun healthyStopStartRevalidatesWithoutRenderingAConnectivityTransition() {
+    fun healthyStopStartWithZeroRelaySampleRevalidatesWithoutRenderingAConnectivityTransition() {
         val lifecycleOwner = StartedLifecycleOwner()
         val connectionState =
             mutableStateOf(
@@ -46,7 +46,6 @@ class ChatListConnectivityLifecycleTest {
                 ),
             )
         var revalidationCount = 0
-        var retryCount = 0
 
         composeRule.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
@@ -56,13 +55,12 @@ class ChatListConnectivityLifecycleTest {
                     activeAccountRef = ACCOUNT,
                     runtimeGeneration = RUNTIME_GENERATION,
                     hasValidatedInternet = true,
-                    relaysConnected = true,
+                    relaysConnected = false,
                     foregroundEpoch = foregroundEpoch,
                     revalidateConnectionReadiness = {
                         revalidationCount += 1
                         connectionState.value = connectionState.value.beginReadinessRefresh(presentAttempt = false)
                     },
-                    retryConnectionReadiness = { retryCount += 1 },
                 )
                 val target =
                     connectivityBannerTarget(
@@ -88,7 +86,6 @@ class ChatListConnectivityLifecycleTest {
         composeRule.waitForIdle()
 
         assertEquals(revalidationsBeforeResume + 1, revalidationCount)
-        assertEquals(0, retryCount)
         assertEquals(ChatListConnectionPhase.Validating, connectionState.value.phase)
         composeRule.onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG).assertIsNotDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.connectivity_connecting)).assertDoesNotExist()

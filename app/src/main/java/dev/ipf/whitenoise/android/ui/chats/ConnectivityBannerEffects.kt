@@ -57,7 +57,9 @@ internal fun RelayConnectivityPollingEffect(
         while (true) {
             appState.refreshRelayConnectivity()
             val signals = appState.connectivitySignals.value
-            if (signals.hasValidatedInternet && !signals.relaysConnected) controller.refreshConnectionReadiness()
+            if (signals.hasValidatedInternet && !signals.relaysConnected) {
+                controller.revalidateConnectionReadiness()
+            }
             val pollDelay = relayPollDelayMillis(currentDisplayed, signals.relaysConnected)
             if (pollDelay == CONNECTIVITY_RELAY_POLL_MILLIS) {
                 delay(pollDelay)
@@ -104,12 +106,11 @@ internal fun ConnectivityEdgeRefreshEffects(
     relaysConnected: Boolean,
     foregroundEpoch: Int,
     revalidateConnectionReadiness: () -> Unit,
-    retryConnectionReadiness: () -> Unit,
 ) {
     LaunchedEffect(effectOwner, activeAccountRef, runtimeGeneration, foregroundEpoch) {
         if (foregroundEpoch > 0 && hasValidatedInternet) revalidateConnectionReadiness()
     }
     LaunchedEffect(effectOwner, activeAccountRef, runtimeGeneration, relaysConnected) {
-        if (hasValidatedInternet && !relaysConnected) retryConnectionReadiness()
+        if (hasValidatedInternet && !relaysConnected) revalidateConnectionReadiness()
     }
 }
