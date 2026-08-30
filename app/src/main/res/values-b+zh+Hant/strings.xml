@@ -473,6 +473,7 @@
     <string name="toast_notification_scope_update_failed">無法更新此通知設定</string>
     <string name="toast_notification_settings_unavailable">無法開啟通知設定</string>
     <string name="switch_account">切換帳號</string>
+    <string name="switching_to_account">正在切換到%1$s</string>
     <string name="my_qr_code">我的 QR 代碼</string>
     <string name="read_only">私鑰儲存在外部簽署器中</string>
     <string name="active">活躍</string>

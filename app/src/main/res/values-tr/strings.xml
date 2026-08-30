@@ -484,6 +484,7 @@
     <string name="toast_notification_scope_update_failed">Bu bildirim ayarı güncellenemedi</string>
     <string name="toast_notification_settings_unavailable">Bildirim ayarları açılamadı</string>
     <string name="switch_account">Profil değiştir</string>
+    <string name="switching_to_account">%1$s profiline geçiliyor</string>
     <string name="my_qr_code">QR kodum</string>
     <string name="read_only">Özel anahtar harici bir imzalayıcıda saklanıyor</string>
     <string name="active">Aktif</string>

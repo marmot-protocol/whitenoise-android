@@ -29,6 +29,25 @@ internal fun shouldShowConversationMembersSubtitle(
         !GroupProjector.isDm(memberCount, groupName) &&
         !(openedAsDmHint && GroupProjector.isUnnamed(groupName) && memberCount < 2)
 
+/** Formats the stable group-member subtitle, including the self-only case. */
+internal fun conversationMemberCountLabel(
+    count: Int,
+    justYou: String,
+    oneMember: String,
+    membersFormat: String,
+): String =
+    when (count) {
+        0 -> justYou
+        1 -> oneMember
+        else -> String.format(membersFormat, count)
+    }
+
+/** Freezes transition consumers immediately and through the retained terminal-frame hold. */
+internal fun conversationRoutePresentationShouldFreeze(
+    routeTransitionInProgress: Boolean,
+    retainedPresentationFreeze: Boolean,
+): Boolean = routeTransitionInProgress || retainedPresentationFreeze
+
 /** UI-only scroll anchor for a conversation the user left while reading history. */
 internal data class ConversationScrollSnapshot(
     val firstVisibleItemIndex: Int,

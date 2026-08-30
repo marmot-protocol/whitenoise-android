@@ -147,6 +147,7 @@ internal fun ChatListBodyFrame(
     }
 }
 
+/** Renders the active account's authoritative chat-list projection and actions. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ChatsScreen(
@@ -159,6 +160,9 @@ internal fun ChatsScreen(
     // was just created by the New Chat / Create Group flow (issue #321), which
     // opens it with the composer focused + keyboard up.
     onOpenGroup: (ChatListItem, String?, Boolean, visibleActiveListHeadId: String?) -> Unit,
+    // MainShell supplies the request-owned presentation handoff for the
+    // home-screen quick toggle. Isolated screens keep the legacy direct path.
+    onQuickSwitchAccount: ((String) -> Unit)? = null,
     // Head row id captured when the shell opened a conversation from this list.
     // Compared once on re-entry so a background reorder while away can snap to
     // item 0 without yanking an active on-list reader (issue #1313).
@@ -277,6 +281,12 @@ internal fun ChatsScreen(
     val showArchived = selectedFolderRule?.archivedOnly == true
     val searchFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
+
+    /** Preserves the legacy direct-switch behavior for isolated screen owners. */
+    fun switchAccountDirectly(label: String) {
+        scope.launch { appState.setActiveAccount(label) }
+    }
+    val switchAccount: (String) -> Unit = onQuickSwitchAccount ?: ::switchAccountDirectly
     val context = LocalContext.current
 
     fun clearSelection() {
@@ -1120,7 +1130,7 @@ internal fun ChatsScreen(
                         onSearchClose = {
                             onGlobalSearchStateChange(GlobalSearchTransitions::closeSearch)
                         },
-                        onSwitchAccount = { label -> scope.launch { appState.setActiveAccount(label) } },
+                        onSwitchAccount = switchAccount,
                         onMic = {
                             val intent =
                                 android.content
