@@ -26,68 +26,33 @@ internal suspend fun ConversationController.refreshAttachmentTransferState(
 ) {
     attachmentTransfers.refresh(attachmentTransferKey(messageIdHex, attachmentIndex)) {
         val account = boundAccountRef ?: return@refresh false
-        appState.hasCachedAttachmentAfterHydration(
+        appState.isAttachmentCachedForPresentation(
             AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
-            hydrateMemory = true,
         )
     }
 }
 
 /**
- * Probes retained attachment plaintext without publishing a stale account's
- * disk result. Hydrating presentation callers promote authenticated L2 bytes
- * into L1 so the next composition can render them without another frame gap.
+ * Probes retained attachment availability without decrypting L2 bytes or
+ * publishing a stale account's result after an account/session change.
  */
-internal suspend fun WhiteNoiseAppState.hasCachedAttachmentForPresentation(
-    request: AttachmentTransferRequest,
-    hydrateMemory: Boolean,
-): Boolean {
+internal suspend fun WhiteNoiseAppState.isAttachmentCachedForPresentation(request: AttachmentTransferRequest): Boolean {
     val presentationSession =
-        if (hydrateMemory) {
-            MediaCachePresentationSession(request.accountRef, mediaUploadSessionEpoch())
-        } else {
-            null
-        }
-    val cacheKey =
-        mediaCacheKey(
-            request.accountRef,
-            request.groupIdHex,
-            request.messageIdHex,
-            request.attachmentIndex,
-        )
-    val (presentationCurrentAtStart, initialMemoryHit) =
         withContext(Dispatchers.Main.immediate) {
-            val presentationCurrent = mediaCachePresentationSessionCurrent(presentationSession)
-            presentationCurrent to (presentationCurrent && cachedMediaPlaintext(cacheKey) != null)
+            MediaCachePresentationSession(request.accountRef, mediaUploadSessionEpoch())
         }
-    val diskBytes =
-        if (!initialMemoryHit && hydrateMemory && presentationCurrentAtStart) {
-            withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
-        } else {
-            null
+    val presentationCurrentAtStart =
+        withContext(Dispatchers.Main.immediate) {
+            mediaCachePresentationSessionCurrent(presentationSession)
         }
-    val diskHit =
-        when {
-            diskBytes != null ->
-                withContext(Dispatchers.Main.immediate) {
-                    val presentationCurrent = mediaCachePresentationSessionCurrent(presentationSession)
-                    if (presentationCurrent) cacheMediaPlaintext(cacheKey, diskBytes)
-                    presentationCurrent
-                }
-            !hydrateMemory && !initialMemoryHit ->
-                withContext(Dispatchers.IO) {
-                    diskMediaCache.containsAfterHydration(cacheKey)
-                }
-            else -> false
-        }
+    if (!presentationCurrentAtStart) return false
+    val cached = hasCachedAttachmentAfterHydration(request)
     return withContext(Dispatchers.Main.immediate) {
-        mediaCachePresentationSessionCurrent(presentationSession) &&
-            (initialMemoryHit || diskHit || cachedMediaPlaintext(cacheKey) != null)
+        mediaCachePresentationSessionCurrent(presentationSession) && cached
     }
 }
 
-private fun WhiteNoiseAppState.mediaCachePresentationSessionCurrent(session: MediaCachePresentationSession?): Boolean {
+private fun WhiteNoiseAppState.mediaCachePresentationSessionCurrent(session: MediaCachePresentationSession): Boolean {
     assertMainThread { "mediaCachePresentationSessionCurrent" }
-    return session == null ||
-        (activeAccountRef == session.accountRef && mediaUploadSessionEpoch() == session.epoch)
+    return activeAccountRef == session.accountRef && mediaUploadSessionEpoch() == session.epoch
 }
