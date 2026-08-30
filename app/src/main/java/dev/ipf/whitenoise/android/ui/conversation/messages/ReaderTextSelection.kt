@@ -89,7 +89,11 @@ internal class ReaderTextSelectionController(
     /** Seeds Compose's native range after selectable children register. */
     fun seedPendingSelection() {
         val position = pendingPosition ?: return
-        textSelectionSeedRange(selectableLayouts.values, position)?.let { range ->
+        textSelectionSeedRange(
+            layouts = selectableLayouts.values,
+            pressInWindow = position,
+            selectionOrderedTexts = selectionState.getSelectableTexts(),
+        )?.let { range ->
             selectionState.select(range)
             pendingPosition = null
         }

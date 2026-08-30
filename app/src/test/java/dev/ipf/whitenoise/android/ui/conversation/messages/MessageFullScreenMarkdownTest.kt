@@ -1,12 +1,19 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarkdownAutolinkKindFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -118,6 +125,24 @@ class MessageFullScreenMarkdownTest {
         }
     }
 
+    /** A top-of-reader Markdown leaf seeds the exact pressed word before scrolling. */
+    @Test
+    fun markdownLongPressKeepsExactCoordinateFidelityAtTheTop() {
+        assertExactMarkdownLeafSelection(target = "Toptarget", scrollToTarget = false)
+    }
+
+    /** A middle Markdown leaf seeds the exact pressed word after reader scrolling. */
+    @Test
+    fun markdownLongPressKeepsExactCoordinateFidelityInTheMiddleAfterScroll() {
+        assertExactMarkdownLeafSelection(target = "Middletarget", scrollToTarget = true)
+    }
+
+    /** A lower Markdown leaf seeds the exact pressed word after deeper reader scrolling. */
+    @Test
+    fun markdownLongPressKeepsExactCoordinateFidelityAtTheBottomAfterScroll() {
+        assertExactMarkdownLeafSelection(target = "Lowertarget", scrollToTarget = true)
+    }
+
     @Test
     fun sharedLinkConfirmationAndAccessibilityCopyRemainAvailable() {
         val destination = "https://example.com/private/path"
@@ -224,6 +249,62 @@ class MessageFullScreenMarkdownTest {
         }
     }
 
+    /** Renders a constrained production body and verifies one known pressed leaf exactly. */
+    private fun assertExactMarkdownLeafSelection(
+        target: String,
+        scrollToTarget: Boolean,
+    ) {
+        val words =
+            listOf(
+                "Toptarget",
+                "Fillerone",
+                "Fillertwo",
+                "Fillerthree",
+                "Fillerfour",
+                "Middletarget",
+                "Fillerfive",
+                "Fillersix",
+                "Fillerseven",
+                "Fillereight",
+                "Lowertarget",
+            )
+        val markdown = document(*words.map(::paragraph).toTypedArray())
+        var selection: ReaderTextSelectionController? = null
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                val controller = rememberReaderTextSelectionController(target to markdown)
+                selection = controller
+                Box(
+                    Modifier
+                        .height(180.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    MessageFullScreenBody(
+                        body = words.joinToString("\n"),
+                        markdownDocument = markdown,
+                        mentionDisplayName = null,
+                        isGroupMember = null,
+                        onNostrProfileTap = null,
+                        onCopyMarkdownLink = {},
+                        selectionController = controller,
+                    )
+                }
+            }
+        }
+
+        val targetNode = composeRule.onNodeWithText(target)
+        if (scrollToTarget) targetNode.performScrollTo()
+        targetNode.performTouchInput { longClick() }
+        composeRule.runOnIdle {
+            val selected = requireNotNull(selection).selectionState.selectedTexts
+            assertEquals(target, selected.joinToString(separator = "", transform = { it.text }))
+        }
+    }
+
+    /** Builds one single-word paragraph so a centered press has an unambiguous expected range. */
+    private fun paragraph(text: String) = MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text(text)))
+
+    /** Builds a deterministic Markdown document for reader interaction coverage. */
     private fun document(vararg blocks: MarkdownBlockFfi) =
         MarkdownDocumentFfi(
             truncated = false,

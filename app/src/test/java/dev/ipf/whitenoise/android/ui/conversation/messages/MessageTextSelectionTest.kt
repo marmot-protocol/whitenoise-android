@@ -186,6 +186,41 @@ class MessageTextSelectionTest {
         assertEquals(TextRange(10, 15), textSelectionSeedRange(layouts.values, press))
     }
 
+    /** Compose's registered text sequence, including unreported leaves, owns the global range. */
+    @Test
+    fun selectionSeedUsesTheAuthoritativeComposeSelectableOrder() {
+        val firstKey = Any()
+        val targetKey = Any()
+        val layouts = mutableMapOf<Any, SelectableTextLayout>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Row {
+                    CaptureSelectableText(firstKey, "alpha") { layouts[firstKey] = it }
+                    Spacer(Modifier.width(12.dp))
+                    CaptureSelectableText(targetKey, "beta gamma") { layouts[targetKey] = it }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val target = checkNotNull(layouts[targetKey])
+        val press = target.coordinates.localToWindow(target.layoutResult.getBoundingBox(6).center)
+
+        assertEquals(
+            TextRange(16, 21),
+            textSelectionSeedRange(
+                layouts = layouts.values,
+                pressInWindow = press,
+                selectionOrderedTexts =
+                    listOf(
+                        AnnotatedString("marker"),
+                        AnnotatedString("alpha"),
+                        AnnotatedString("beta gamma"),
+                    ),
+            ),
+        )
+    }
+
     @Test
     fun actionMenuPressMapsToGlobalOffsetAcrossTextNodes() {
         val firstKey = Any()

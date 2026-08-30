@@ -22,6 +22,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import kotlin.math.max
@@ -148,6 +149,7 @@ internal fun nearestNonWhitespaceOffset(
 internal fun textSelectionSeedRange(
     layouts: Collection<SelectableTextLayout>,
     pressInWindow: Offset?,
+    selectionOrderedTexts: List<AnnotatedString>? = null,
 ): TextRange? {
     val ordered =
         layouts
@@ -196,13 +198,56 @@ internal fun textSelectionSeedRange(
     val wordOffset = nearestNonWhitespaceOffset(text, rawOffset) ?: return null
     val localRange = target.layoutResult.getWordBoundary(wordOffset)
     val precedingLength =
-        ordered
-            .takeWhile { it.key !== target.key }
-            .sumOf { it.layoutResult.layoutInput.text.length }
+        selectionTextPrefixLength(
+            orderedLayouts = ordered,
+            target = target,
+            selectionOrderedTexts = selectionOrderedTexts,
+        ) ?: return null
     return TextRange(
         start = precedingLength + localRange.start,
         end = precedingLength + localRange.end,
     )
+}
+
+/** Uses Compose's registered order when available and reporter geometry otherwise. */
+private fun selectionTextPrefixLength(
+    orderedLayouts: List<SelectableTextLayout>,
+    target: SelectableTextLayout,
+    selectionOrderedTexts: List<AnnotatedString>?,
+): Int? =
+    if (selectionOrderedTexts == null) {
+        orderedLayouts.takeWhile { it.key !== target.key }.sumOf { it.layoutResult.layoutInput.text.length }
+    } else {
+        selectionOrderedTextPrefixLength(
+            orderedLayouts = orderedLayouts,
+            target = target,
+            selectionOrderedTexts = selectionOrderedTexts,
+        )
+    }
+
+/**
+ * Maps a reported target leaf into Compose's authoritative registrar order.
+ *
+ * A Markdown renderer can contain selectable text that is not part of the
+ * reader's hit-test registry. Summing only reported leaves therefore produces
+ * a valid global range at the wrong visual leaf. Compose exposes the exact
+ * sequence consumed by [androidx.compose.foundation.text.selection.SelectionState.select];
+ * use it for the prefix while retaining reporter geometry only for hit testing.
+ */
+private fun selectionOrderedTextPrefixLength(
+    orderedLayouts: List<SelectableTextLayout>,
+    target: SelectableTextLayout,
+    selectionOrderedTexts: List<AnnotatedString>,
+): Int? {
+    val targetText = target.layoutResult.layoutInput.text
+    val candidateIndices = selectionOrderedTexts.indices.filter { selectionOrderedTexts[it] == targetText }
+    val targetOccurrence =
+        orderedLayouts
+            .asSequence()
+            .filter { it.layoutResult.layoutInput.text == targetText }
+            .indexOfFirst { it.key === target.key }
+    val targetIndex = targetOccurrence.takeIf { it >= 0 }?.let(candidateIndices::getOrNull)
+    return targetIndex?.let { selectionOrderedTexts.take(it).sumOf(AnnotatedString::length) }
 }
 
 internal fun compareSelectableTextLayouts(
