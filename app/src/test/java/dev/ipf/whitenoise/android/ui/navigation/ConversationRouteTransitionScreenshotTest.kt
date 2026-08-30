@@ -44,16 +44,19 @@ class ConversationRouteTransitionScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Captures midpoint and terminal route frames in the light theme. */
     @Test
     fun midpointAndTerminalFramesLight() {
         captureFrames(darkTheme = false, amoled = false, themeName = "light")
     }
 
+    /** Captures midpoint and terminal route frames on an AMOLED surface. */
     @Test
     fun midpointAndTerminalFramesAmoled() {
         captureFrames(darkTheme = true, amoled = true, themeName = "amoled")
     }
 
+    /** Drives the production route through deterministic visual checkpoints. */
     private fun captureFrames(
         darkTheme: Boolean,
         amoled: Boolean,
@@ -95,12 +98,14 @@ class ConversationRouteTransitionScreenshotTest {
         capture("conversation_route_terminal_$themeName.png")
     }
 
+    /** Writes one root-surface Roborazzi baseline. */
     private fun capture(fileName: String) {
         composeRule
             .onNodeWithTag(ROOT_TAG)
             .captureRoboImage("src/test/snapshots/$fileName")
     }
 
+    /** Renders the stable chat-list source used by the transition baseline. */
     @androidx.compose.runtime.Composable
     private fun ChatListFrame() {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -116,6 +121,7 @@ class ConversationRouteTransitionScreenshotTest {
         }
     }
 
+    /** Renders one deterministic source-list row. */
     @androidx.compose.runtime.Composable
     private fun ChatRow(
         title: String,
@@ -156,6 +162,7 @@ class ConversationRouteTransitionScreenshotTest {
         }
     }
 
+    /** Renders the stable conversation destination used by the baseline. */
     @androidx.compose.runtime.Composable
     private fun ConversationFrame() {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -200,6 +207,7 @@ class ConversationRouteTransitionScreenshotTest {
         }
     }
 
+    /** Renders one deterministic destination message bubble. */
     @androidx.compose.runtime.Composable
     private fun MessageBubble(
         text: String,

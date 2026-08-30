@@ -28,6 +28,7 @@ class QuickAccountSwitchTransitionTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** A populated local target reveals from its identity cue within 180 ms. */
     @Test
     fun locallyReadyTargetOwnsTheFirstFrameAndRevealsWithinTheBound() {
         var transition by mutableStateOf<QuickAccountSwitchTransition?>(animatedRequest(1L, ACCOUNT_B))
@@ -73,6 +74,7 @@ class QuickAccountSwitchTransitionTest {
         )
     }
 
+    /** Animation scale zero presents the target without decorative duration. */
     @Test
     fun reducedMotionCommitsTargetWithoutDecorativeDuration() {
         var transition by
@@ -100,6 +102,7 @@ class QuickAccountSwitchTransitionTest {
         assertTrue(transition?.motion == QuickAccountSwitchMotion.Reduced)
     }
 
+    /** A rapid A-to-B-to-A sequence rejects superseded activation and cue state. */
     @Test
     fun rapidAtoBtoARejectsTheSupersededBActivationAndCue() {
         val staleB = animatedRequest(3L, ACCOUNT_B)
@@ -118,12 +121,64 @@ class QuickAccountSwitchTransitionTest {
         assertTrue(quickAccountSwitchRequestIsCurrent(currentA, 4L, ACCOUNT_A))
         assertFalse(quickAccountSwitchOwnsTargetFrame(currentA, ACCOUNT_B, targetLocallyReady = true))
         assertTrue(quickAccountSwitchOwnsTargetFrame(currentA, ACCOUNT_A, targetLocallyReady = true))
-        assertFalse(quickAccountSwitchShouldShowCue(currentA, ACCOUNT_A, targetLocallyReady = false))
+        assertFalse(
+            quickAccountSwitchShouldShowCue(
+                currentA,
+                ACCOUNT_A,
+                targetLocallyReady = false,
+                targetHasAnyChats = true,
+            ),
+        )
         val revealComplete = currentA.copy(phase = QuickAccountSwitchPhase.RevealComplete)
         assertTrue(quickAccountSwitchOwnsTargetFrame(revealComplete, ACCOUNT_A, targetLocallyReady = true))
-        assertFalse(quickAccountSwitchShouldShowCue(revealComplete, ACCOUNT_A, targetLocallyReady = true))
+        assertFalse(
+            quickAccountSwitchShouldShowCue(
+                revealComplete,
+                ACCOUNT_A,
+                targetLocallyReady = true,
+                targetHasAnyChats = true,
+            ),
+        )
     }
 
+    /** A ready empty target renders its destination state without an account-switch interstitial. */
+    @Test
+    fun locallyReadyEmptyTargetSkipsTheDecorativeCue() {
+        val request = animatedRequest(5L, ACCOUNT_B)
+        val showCue =
+            quickAccountSwitchShouldShowCue(
+                transition = request,
+                activeAccountRef = ACCOUNT_B,
+                targetLocallyReady = true,
+                targetHasAnyChats = false,
+            )
+
+        assertFalse(showCue)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxSize()) {
+                    Text(TARGET_EMPTY_STATE)
+                    QuickAccountSwitchTransitionOverlay(
+                        transition = request.takeIf { showCue },
+                        visible = showCue,
+                        onFinished = {},
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithText(TARGET_EMPTY_STATE).assertIsDisplayed()
+        composeRule.onNodeWithTag(QUICK_ACCOUNT_SWITCH_CUE_TAG).assertDoesNotExist()
+        assertTrue(
+            quickAccountSwitchShouldShowCue(
+                transition = request,
+                activeAccountRef = ACCOUNT_B,
+                targetLocallyReady = true,
+                targetHasAnyChats = true,
+            ),
+        )
+    }
+
+    /** Decorative presentation requires a completed snapshot owned by the active account. */
     @Test
     fun onlyAnAccountOwnedCompletedLocalSnapshotCanUseTheDecorativeTransition() {
         assertTrue(
@@ -149,6 +204,7 @@ class QuickAccountSwitchTransitionTest {
         )
     }
 
+    /** Creates a deterministic animated account-switch request. */
     private fun animatedRequest(
         requestId: Long,
         target: String,
@@ -166,6 +222,7 @@ class QuickAccountSwitchTransitionTest {
         const val ACCOUNT_A = "account-a"
         const val ACCOUNT_B = "account-b"
         const val TARGET_PRIVATE_CHAT = "Target work private chat"
+        const val TARGET_EMPTY_STATE = "No target chats yet"
         const val TEST_FRAME_MILLIS = 16
     }
 }

@@ -488,6 +488,7 @@ private fun rememberConversationReadAnchor(
     return readAnchor
 }
 
+/** Renders one account-owned conversation and coordinates its route-stable presentation. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ConversationScreen(
@@ -3123,8 +3124,10 @@ internal fun ConversationScreen(
                 voiceRecordingController = voiceRecordingController,
                 mentionCandidates = mentionPicker.candidates,
                 mentionPickerEnabled = mentionPicker.enabled,
-                autoFocusOnEnter = justCreated,
-                autoFocusOnDraftRestore = shouldFocusComposerOnDraftRestore(restoredDraftSnapshot),
+                autoFocusOnEnter = justCreated && !routePresentationFrozen,
+                autoFocusOnDraftRestore =
+                    shouldFocusComposerOnDraftRestore(restoredDraftSnapshot) &&
+                        !routePresentationFrozen,
                 autoFocusConsumedState = composerAutoFocusConsumed,
                 composerFocus = composerFocus,
                 onComposerFocusChanged = { focused ->

@@ -53,6 +53,7 @@ import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 
 internal const val CONVERSATION_TOP_BAR_TAG = "conversation-top-bar"
 
+/** Renders frozen route-owned conversation identity and the active top-bar mode. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")

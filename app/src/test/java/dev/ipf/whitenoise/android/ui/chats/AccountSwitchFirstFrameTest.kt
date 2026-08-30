@@ -49,6 +49,7 @@ class AccountSwitchFirstFrameTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** A populated local snapshot is visible before live convergence replaces its row. */
     @Test
     fun targetSnapshotIsTheFirstFrameAndLiveConvergenceUpdatesItInPlace() {
         val appState = testAppState()
@@ -96,6 +97,7 @@ class AccountSwitchFirstFrameTest {
         controller.onCleared()
     }
 
+    /** The target account's complete cached identity owns its first composition. */
     @Test
     fun completeTargetIdentitySnapshotOwnsTheFirstComposition() =
         runBlocking {
@@ -147,6 +149,7 @@ class AccountSwitchFirstFrameTest {
             controller.onCleared()
         }
 
+    /** A missing snapshot keeps truthful loading and error states instead of a false empty list. */
     @Test
     fun missingTargetSnapshotShowsRealLoadingThenErrorFallbacks() {
         val appState = testAppState()
@@ -194,6 +197,56 @@ class AccountSwitchFirstFrameTest {
         controller.onCleared()
     }
 
+    /** A completed zero-row snapshot paints the target empty state on its first composition. */
+    @Test
+    fun locallyReadyEmptyTargetOwnsTheFirstFrameWithoutLoadingOrSourceRows() {
+        val appState = testAppState()
+        val emptyTarget =
+            AccountSwitchLocalSnapshot(
+                accountRef = TARGET_ACCOUNT,
+                activeAccountIdHex = TARGET_ACCOUNT_HEX,
+                rows = emptyList(),
+                groups = emptyList(),
+                memberIds = emptyList(),
+                profiles = emptyList(),
+            )
+        val controller =
+            ChatsController(
+                appState = appState,
+                initialAccountRef = TARGET_ACCOUNT,
+                memberSnapshotLoader = { _, _ -> emptyList() },
+                initialLocalSnapshot = emptyTarget,
+            )
+        appState.attachChatsController(controller)
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    ChatsScreen(
+                        appState = appState,
+                        controller = controller,
+                        onOpenSettings = {},
+                        onOpenGroup = { _, _, _, _ -> },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText(context.getString(R.string.no_chats_yet)).assertIsDisplayed()
+        composeRule.onNodeWithText(OLD_ACCOUNT_CHAT_TITLE).assertDoesNotExist()
+        composeRule
+            .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+            .assertCountEquals(0)
+        composeRule.runOnIdle {
+            assertEquals(TARGET_ACCOUNT, controller.boundAccountRef)
+            assertEquals(true, controller.hasLoadedLocalSnapshot)
+            assertEquals(0, controller.items.size)
+        }
+
+        controller.onCleared()
+    }
+
+    /** The chat-list toggle delegates to the shell's request-owned account handoff. */
     @Test
     fun homeQuickToggleDelegatesToTheRequestOwnedTransitionHandoff() =
         runBlocking {

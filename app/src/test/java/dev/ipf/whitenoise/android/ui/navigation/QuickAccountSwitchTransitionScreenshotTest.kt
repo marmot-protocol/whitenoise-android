@@ -42,16 +42,19 @@ class QuickAccountSwitchTransitionScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Captures the light first and midpoint account-switch frames. */
     @Test
     fun firstAndMidpointFramesLight() {
         captureFrames(darkTheme = false, amoled = false, themeName = "light")
     }
 
+    /** Captures the AMOLED first and midpoint account-switch frames. */
     @Test
     fun firstAndMidpointFramesAmoled() {
         captureFrames(darkTheme = true, amoled = true, themeName = "amoled")
     }
 
+    /** Drives the account cue through deterministic first and midpoint captures. */
     private fun captureFrames(
         darkTheme: Boolean,
         amoled: Boolean,
@@ -95,6 +98,7 @@ class QuickAccountSwitchTransitionScreenshotTest {
             .captureRoboImage("src/test/snapshots/account_switch_transition_midpoint_$themeName.png")
     }
 
+    /** Creates the deterministic target identity used by screenshot coverage. */
     private fun request() =
         QuickAccountSwitchTransition(
             requestId = 1L,
@@ -106,6 +110,7 @@ class QuickAccountSwitchTransitionScreenshotTest {
             motion = QuickAccountSwitchMotion.Animated,
         )
 
+    /** Renders the already-composed target list behind the account cue. */
     @androidx.compose.runtime.Composable
     private fun TargetAccountChatList() {
         Column(Modifier.fillMaxSize()) {
@@ -127,6 +132,7 @@ class QuickAccountSwitchTransitionScreenshotTest {
         }
     }
 
+    /** Renders one deterministic target-account row. */
     @androidx.compose.runtime.Composable
     private fun ChatPreview(
         title: String,

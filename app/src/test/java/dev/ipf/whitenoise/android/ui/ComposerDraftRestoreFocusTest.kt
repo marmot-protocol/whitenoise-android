@@ -106,4 +106,38 @@ class ComposerDraftRestoreFocusTest {
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(2, focusGainCount) }
     }
+
+    /** Restored-draft focus waits until route presentation has released its terminal frame. */
+    @Test
+    fun restoredDraftFocusWaitsForRouteSettlement() {
+        var routePresentationFrozen by mutableStateOf(true)
+        var focusGainCount = 0
+
+        composeRule.setContent {
+            val autoFocusConsumed = remember { mutableStateOf(false) }
+            WhiteNoiseTheme {
+                Surface {
+                    ComposerBar(
+                        replyingTo = null,
+                        messageTextCopy = MessageTextCopy.Default,
+                        onCancelReply = {},
+                        onSend = { _, _ -> },
+                        initialDraft = TextFieldValue("saved draft"),
+                        draftKey = "conversation-1",
+                        autoFocusOnDraftRestore = !routePresentationFrozen,
+                        autoFocusConsumedState = autoFocusConsumed,
+                        onComposerFocusChanged = { focused ->
+                            if (focused) focusGainCount += 1
+                        },
+                    )
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals(0, focusGainCount) }
+        composeRule.runOnIdle { routePresentationFrozen = false }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals(1, focusGainCount) }
+    }
 }

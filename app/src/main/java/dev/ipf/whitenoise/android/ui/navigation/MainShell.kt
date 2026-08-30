@@ -317,6 +317,7 @@ internal enum class MainShellContentRoute {
     Main,
 }
 
+/** Selects the single shell surface that owns the current navigation frame. */
 internal fun resolveMainShellContentRoute(
     conversationOpen: Boolean,
     routingNotification: Boolean,
@@ -329,6 +330,7 @@ internal fun resolveMainShellContentRoute(
         else -> MainShellContentRoute.Main
     }
 
+/** Coordinates account-owned chat-list and conversation routes for the main app surface. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MainShell(
@@ -361,6 +363,7 @@ internal fun MainShell(
     }
     var nextQuickAccountSwitchRequestId by remember { mutableLongStateOf(0L) }
 
+    /** Invalidates an in-flight quick switch and restores the account the user chose most recently. */
     fun cancelPendingQuickAccountSwitchTo(targetAccountRef: String) {
         // A→B→A can arrive while A is still the published active ref.
         // Invalidate B's shouldActivate token now, then queue a guarded
@@ -381,6 +384,7 @@ internal fun MainShell(
         }
     }
 
+    /** Starts a generation-owned home-screen quick switch without delaying account activation. */
     fun requestQuickAccountSwitch(targetAccountRef: String) {
         val sourceAccountRef = appState.activeAccountRef ?: return
         when (
@@ -1689,6 +1693,8 @@ internal fun MainShell(
             activeAccountRef = appState.activeAccountRef,
             hasLoadedLocalSnapshot = chatsController.hasLoadedLocalSnapshot,
         )
+    val quickSwitchTargetHasAnyChats =
+        chatsController.items.isNotEmpty() || chatsController.archivedItems.isNotEmpty()
     val quickSwitchOwnsTargetFrame =
         quickAccountSwitchOwnsTargetFrame(
             transition = quickAccountSwitchTransition,
@@ -1699,6 +1705,7 @@ internal fun MainShell(
         quickAccountSwitchTransition?.requestId,
         appState.activeAccountRef,
         quickSwitchTargetLocallyReady,
+        quickSwitchTargetHasAnyChats,
         navAccountStable,
     ) {
         val request = quickAccountSwitchTransition ?: return@LaunchedEffect
@@ -1706,6 +1713,11 @@ internal fun MainShell(
             appState.activeAccountRef == request.targetAccountRef && !quickSwitchTargetLocallyReady ->
                 // A missing local snapshot owns the existing truthful
                 // loading/error surface, never the decorative cue.
+                quickAccountSwitchTransition = null
+            appState.activeAccountRef == request.targetAccountRef && !quickSwitchTargetHasAnyChats ->
+                // The authoritative destination-owned empty state is already
+                // the useful first frame; do not insert or later resurrect an
+                // account-identity interstitial over it.
                 quickAccountSwitchTransition = null
             appState.activeAccountRef == request.targetAccountRef &&
                 request.motion == QuickAccountSwitchMotion.Animated &&
@@ -2126,7 +2138,12 @@ internal fun MainShell(
                         },
                         justCreated = content.justCreated,
                         openedAsDmHint = content.openedAsDmHint,
-                        routeTransitionInProgress = routeTransition.isRunning,
+                        routeTransitionInProgress =
+                            !conversationRouteTransitionComplete(
+                                currentStateMatchesTarget =
+                                    routeTransition.currentState == routeTransition.targetState,
+                                transitionRunning = routeTransition.isRunning,
+                            ),
                         restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
                         onOpenConversation = openGroupFromProfile,
                         onGroupCreateSubmitted = onGroupCreateSubmitted,
@@ -2310,9 +2327,13 @@ internal fun MainShell(
             transition = quickAccountSwitchTransition,
             activeAccountRef = appState.activeAccountRef,
             targetLocallyReady = quickSwitchTargetLocallyReady,
+            targetHasAnyChats = quickSwitchTargetHasAnyChats,
         )
     QuickAccountSwitchTransitionOverlay(
-        transition = quickAccountSwitchTransition.takeIf { quickSwitchOwnsTargetFrame },
+        transition =
+            quickAccountSwitchTransition.takeIf {
+                quickSwitchOwnsTargetFrame && quickSwitchTargetHasAnyChats
+            },
         visible = showQuickAccountSwitchCue,
         onFinished = { requestId ->
             quickAccountSwitchTransition?.takeIf { it.requestId == requestId }?.let { request ->

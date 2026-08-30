@@ -147,6 +147,7 @@ internal fun ChatListBodyFrame(
     }
 }
 
+/** Renders the active account's authoritative chat-list projection and actions. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ChatsScreen(
@@ -280,6 +281,7 @@ internal fun ChatsScreen(
     val searchFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
 
+    /** Preserves the legacy direct-switch behavior for isolated screen owners. */
     fun switchAccountDirectly(label: String) {
         scope.launch { appState.setActiveAccount(label) }
     }

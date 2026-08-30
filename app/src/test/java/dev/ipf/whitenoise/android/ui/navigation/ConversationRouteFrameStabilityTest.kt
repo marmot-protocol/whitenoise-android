@@ -51,21 +51,25 @@ class ConversationRouteFrameStabilityTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Samples a cached DM at 60 Hz while late chrome hydration lands near settlement. */
     @Test
     fun cachedDmConvergesMonotonicallyWhenFinalFramesHydrateAt60HzInLtr() {
         verifyForwardRoute(LayoutDirection.Ltr, "Cached DM", frameMillis = 16L)
     }
 
+    /** Samples an RTL cached group at 90 Hz while late chrome hydration lands. */
     @Test
     fun cachedGroupConvergesMonotonicallyWhenFinalFramesHydrateAt90HzInRtl() {
         verifyForwardRoute(LayoutDirection.Rtl, "Cached group", frameMillis = 11L)
     }
 
+    /** Samples a cached DM at 120 Hz to expose single-frame terminal reversals. */
     @Test
     fun cachedDmConvergesMonotonicallyWhenFinalFramesHydrateAt120HzInLtr() {
         verifyForwardRoute(LayoutDirection.Ltr, "Cached DM", frameMillis = 8L)
     }
 
+    /** A Back interruption continues from the exact current draw-layer position. */
     @Test
     fun rapidBackReversalDoesNotSnapReturningChatListLayerAt120Hz() {
         val progressBefore =
@@ -94,6 +98,7 @@ class ConversationRouteFrameStabilityTest {
         assertTrue(kotlin.math.abs(sourceAfter) <= CONVERSATION_ROUTE_LAYER_TRAVEL.value)
     }
 
+    /** Reduced motion keeps both route layers fully opaque and untranslated. */
     @Test
     fun reducedMotionNeverTranslatesOrFadesEitherLayer() {
         listOf(0f, 0.5f, 1f).forEach { progress ->
@@ -110,6 +115,7 @@ class ConversationRouteFrameStabilityTest {
         }
     }
 
+    /** Bounds the first reverse step to one physically plausible 120 Hz frame. */
     private fun assertContinuousReversalStep(
         label: String,
         before: Float,
@@ -121,6 +127,7 @@ class ConversationRouteFrameStabilityTest {
         )
     }
 
+    /** Exercises forward, settled, and reversed route samples for one device shape. */
     private fun verifyForwardRoute(
         layoutDirection: LayoutDirection,
         destinationLabel: String,
@@ -145,6 +152,7 @@ class ConversationRouteFrameStabilityTest {
         composeRule.onNodeWithTag(SOURCE_TAG).assertIsDisplayed()
     }
 
+    /** Owns the seekable transition and exposes its coroutine scope to the frame driver. */
     @Composable
     @Suppress("FunctionNaming")
     private fun SeekableRouteHarness(
@@ -163,6 +171,7 @@ class ConversationRouteFrameStabilityTest {
         )
     }
 
+    /** Renders stable full-screen source and destination slots for manual seeking. */
     @Composable
     @Suppress("FunctionNaming")
     private fun RouteHarnessContent(
@@ -203,6 +212,7 @@ class ConversationRouteFrameStabilityTest {
         }
     }
 
+    /** Injects deliberately late top, avatar, timeline, and bottom-chrome changes. */
     @Composable
     @Suppress("FunctionNaming")
     private fun ColumnScope.HydratingRouteChrome(
@@ -231,6 +241,7 @@ class ConversationRouteFrameStabilityTest {
         )
     }
 
+    /** Captures every forward fraction and injects hydration on the final running frames. */
     private fun captureSeekableForwardFrames(
         state: SeekableRouteHarnessState,
         destinationLabel: String,
@@ -255,6 +266,7 @@ class ConversationRouteFrameStabilityTest {
         return samples
     }
 
+    /** Records destination bounds and outgoing-slot retention for one forward frame. */
     private fun captureRouteFrame(
         samples: RouteFrameSamples,
         outgoingBounds: MutableList<DpRect>,
@@ -268,6 +280,7 @@ class ConversationRouteFrameStabilityTest {
         samples.running.add(running)
     }
 
+    /** Captures each reverse fraction through the first post-settle frames. */
     private fun captureSeekableBackFrames(
         state: SeekableRouteHarnessState,
         frameMillis: Long,
@@ -280,6 +293,7 @@ class ConversationRouteFrameStabilityTest {
         return samples
     }
 
+    /** Records the returning chat-list bounds for one reverse frame. */
     private fun captureBackFrame(
         samples: RouteFrameSamples,
         running: Boolean,
@@ -289,6 +303,7 @@ class ConversationRouteFrameStabilityTest {
         samples.running.add(running)
     }
 
+    /** Produces refresh-rate-shaped fractions plus terminal stability samples. */
     private fun routeFrameFractions(frameMillis: Long): List<Float> =
         buildList {
             var playTimeMillis = 0L
@@ -299,6 +314,7 @@ class ConversationRouteFrameStabilityTest {
             repeat(POST_SETTLE_FRAMES) { add(1f) }
         }
 
+    /** Seeks the transition and waits until Compose commits the requested fraction. */
     private fun seekRoute(
         state: SeekableRouteHarnessState,
         fraction: Float,
@@ -308,6 +324,7 @@ class ConversationRouteFrameStabilityTest {
         awaitSeekableOperation(job)
     }
 
+    /** Snaps the harness to a known endpoint before testing an interruption. */
     private fun snapSeekableRoute(
         state: SeekableRouteHarnessState,
         target: String?,
@@ -316,6 +333,7 @@ class ConversationRouteFrameStabilityTest {
         awaitSeekableOperation(job)
     }
 
+    /** Launches transition-state mutation on the Compose UI thread. */
     private fun launchSeekableOperation(
         state: SeekableRouteHarnessState,
         operation: suspend () -> Unit,
@@ -327,6 +345,7 @@ class ConversationRouteFrameStabilityTest {
         return job
     }
 
+    /** Advances bounded presentation frames until the seek operation commits. */
     private fun awaitSeekableOperation(job: Job) {
         repeat(MAX_SEEK_COMMIT_FRAMES) {
             if (job.isCompleted) return
@@ -337,6 +356,7 @@ class ConversationRouteFrameStabilityTest {
         assertTrue("seekable transition was cancelled", !job.isCancelled)
     }
 
+    /** Requires monotonic position and identical terminal/post-settle geometry. */
     private fun assertConverges(
         samples: RouteFrameSamples,
         label: String,
@@ -357,6 +377,7 @@ class ConversationRouteFrameStabilityTest {
         assertEquals(terminal, samples.bounds[settledFrame + 1])
     }
 
+    /** Requires monotonic opacity and an opaque, stable terminal frame. */
     private fun assertAlphaConverges(
         samples: RouteFrameSamples,
         conversationRoute: Boolean,
@@ -393,6 +414,7 @@ class ConversationRouteFrameStabilityTest {
         assertEquals(alphas[settledFrame], alphas[settledFrame + 1])
     }
 
+    /** Requires every sampled full-screen layer to retain its original size. */
     private fun assertStableOuterBounds(samples: List<DpRect>) {
         val first = samples.first()
         samples.forEachIndexed { frame, sample ->

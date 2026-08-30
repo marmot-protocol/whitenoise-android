@@ -99,6 +99,7 @@ internal fun <T> ConversationRouteAnimatedContent(
     }
 }
 
+/** Retains both full-screen slots while draw-layer progress owns visible motion. */
 private fun <T> AnimatedContentTransitionScope<T>.routeContentTransform(suppressMotion: Boolean): ContentTransform {
     if (suppressMotion) return EnterTransition.None togetherWith ExitTransition.None
     val animationSpec =
@@ -120,6 +121,7 @@ private fun <T> AnimatedContentTransitionScope<T>.routeContentTransform(suppress
     ).using(SizeTransform(clip = false))
 }
 
+/** Resolves one route layer's alpha from the shared intrinsic conversation visibility. */
 internal fun conversationRouteLayerAlpha(
     conversationVisibility: Float,
     conversationRoute: Boolean,
@@ -130,6 +132,7 @@ internal fun conversationRouteLayerAlpha(
     return if (conversationRoute) boundedProgress else 1f - boundedProgress
 }
 
+/** Resolves one route layer's bounded travel fraction from shared visibility. */
 internal fun conversationRouteLayerTranslation(
     conversationVisibility: Float,
     conversationRoute: Boolean,
@@ -168,6 +171,7 @@ internal data class QuickAccountSwitchTransition(
     val phase: QuickAccountSwitchPhase = QuickAccountSwitchPhase.AwaitingTarget,
 )
 
+/** Returns whether an activation callback still belongs to the latest quick-switch request. */
 internal fun quickAccountSwitchRequestIsCurrent(
     transition: QuickAccountSwitchTransition?,
     requestId: Long,
@@ -176,6 +180,7 @@ internal fun quickAccountSwitchRequestIsCurrent(
     transition?.requestId == requestId &&
         transition.targetAccountRef == targetAccountRef
 
+/** Classifies a quick-switch tap against the active account and pending request. */
 internal fun quickAccountSwitchRequestDisposition(
     activeAccountRef: String?,
     pending: QuickAccountSwitchTransition?,
@@ -189,6 +194,7 @@ internal fun quickAccountSwitchRequestDisposition(
         else -> QuickAccountSwitchRequestDisposition.Start
     }
 
+/** Requires both target-account ownership and a completed local projection. */
 internal fun quickAccountSwitchOwnsTargetFrame(
     transition: QuickAccountSwitchTransition?,
     activeAccountRef: String?,
@@ -198,6 +204,7 @@ internal fun quickAccountSwitchOwnsTargetFrame(
         transition.targetAccountRef == activeAccountRef &&
         targetLocallyReady
 
+/** Treats authoritative empty and populated local snapshots as equally ready. */
 internal fun quickAccountSwitchTargetLocallyReady(
     controllerAccountRef: String?,
     activeAccountRef: String?,
@@ -206,12 +213,15 @@ internal fun quickAccountSwitchTargetLocallyReady(
     controllerAccountRef == activeAccountRef &&
         hasLoadedLocalSnapshot
 
+/** Shows the decorative cue only while a populated, ready target waits to reveal. */
 internal fun quickAccountSwitchShouldShowCue(
     transition: QuickAccountSwitchTransition?,
     activeAccountRef: String?,
     targetLocallyReady: Boolean,
+    targetHasAnyChats: Boolean,
 ): Boolean =
     quickAccountSwitchOwnsTargetFrame(transition, activeAccountRef, targetLocallyReady) &&
+        targetHasAnyChats &&
         transition?.motion == QuickAccountSwitchMotion.Animated &&
         transition.phase == QuickAccountSwitchPhase.AwaitingTarget
 
@@ -259,6 +269,7 @@ internal fun QuickAccountSwitchTransitionOverlay(
     }
 }
 
+/** Draws the full-surface target identity used during the bounded reveal. */
 @Composable
 @Suppress("FunctionNaming")
 private fun QuickAccountSwitchCue(cue: QuickAccountSwitchTransition) {

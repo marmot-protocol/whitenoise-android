@@ -29,6 +29,7 @@ internal fun shouldShowConversationMembersSubtitle(
         !GroupProjector.isDm(memberCount, groupName) &&
         !(openedAsDmHint && GroupProjector.isUnnamed(groupName) && memberCount < 2)
 
+/** Formats the stable group-member subtitle, including the self-only case. */
 internal fun conversationMemberCountLabel(
     count: Int,
     justYou: String,

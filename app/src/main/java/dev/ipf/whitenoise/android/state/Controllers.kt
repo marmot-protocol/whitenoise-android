@@ -3222,6 +3222,7 @@ class ChatsController private constructor(
         }
     }
 
+    /** Publishes the terminal no-snapshot failure used by first-frame screen coverage. */
     @VisibleForTesting
     internal fun publishInitialLoadFailureForTest(failure: ErrorPresentation) {
         check(!hasLoadedLocalSnapshot) { "Only the no-snapshot fallback may publish an initial load failure" }
