@@ -3117,6 +3117,7 @@ private class OptimisticArchiveIntent(
     val archived: Boolean,
 )
 
+/** Owns the active account's chat-list projection and live subscription lifecycle. */
 class ChatsController private constructor(
     private val appState: WhiteNoiseAppState,
     private val memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
@@ -3124,8 +3125,20 @@ class ChatsController private constructor(
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi,
     initialAccountRef: String?,
     initialLocalSnapshot: AccountSwitchLocalSnapshot?,
+    private val initialConnectionAttemptClaim: () -> Boolean,
 ) {
+    /** Creates a standalone controller whose initial subscription validation stays silent. */
     constructor(appState: WhiteNoiseAppState) :
+        this(appState = appState, initialConnectionAttemptClaim = { false })
+
+    /**
+     * Creates the process-shell controller whose first live subscription may
+     * claim the one cold-start connection presentation owned by that process.
+     */
+    internal constructor(
+        appState: WhiteNoiseAppState,
+        initialConnectionAttemptClaim: () -> Boolean,
+    ) :
         this(
             appState = appState,
             memberSnapshotLoader = { accountRef, groupIdHex ->
@@ -3137,8 +3150,10 @@ class ChatsController private constructor(
             },
             initialAccountRef = null,
             initialLocalSnapshot = appState.consumeAccountSwitchLocalSnapshot(appState.activeAccountRef),
+            initialConnectionAttemptClaim = initialConnectionAttemptClaim,
         )
 
+    /** Creates a test controller with injected member loading and no retained local snapshot. */
     internal constructor(
         appState: WhiteNoiseAppState,
         initialAccountRef: String,
@@ -3153,8 +3168,10 @@ class ChatsController private constructor(
         },
         initialAccountRef,
         null,
+        { false },
     )
 
+    /** Creates a test controller seeded with an account-switch local projection. */
     internal constructor(
         appState: WhiteNoiseAppState,
         initialAccountRef: String,
@@ -3170,8 +3187,10 @@ class ChatsController private constructor(
         },
         initialAccountRef,
         initialLocalSnapshot,
+        { false },
     )
 
+    /** Creates a test controller with injected member loading and archive mutation behavior. */
     internal constructor(
         appState: WhiteNoiseAppState,
         initialAccountRef: String,
@@ -3185,7 +3204,11 @@ class ChatsController private constructor(
         groupArchivedUpdater,
         initialAccountRef,
         null,
+        { false },
     )
+
+    /** Consumes the process-scoped right to present the initial connection attempt. */
+    internal fun claimInitialConnectionPresentation(): Boolean = initialConnectionAttemptClaim()
 
     var items by mutableStateOf<List<ChatListItem>>(emptyList())
         private set
@@ -3717,6 +3740,7 @@ class ChatsController private constructor(
         }
     }
 
+    /** Binds [accountRef] while preserving local projection and retrying live subscriptions. */
     suspend fun bind(
         accountRef: String?,
         preserveLoadedContent: Boolean = false,
@@ -3787,7 +3811,11 @@ class ChatsController private constructor(
                 val connectionAttempt =
                     if (initialSubscriptionProjection) {
                         initialSubscriptionProjection = false
-                        connectionOwner.beginSubscriptionValidation(accountRef, bindEpoch)
+                        if (claimInitialConnectionPresentation()) {
+                            connectionOwner.beginSessionAttempt(accountRef, bindEpoch)
+                        } else {
+                            connectionOwner.beginSubscriptionValidation(accountRef, bindEpoch)
+                        }
                     } else {
                         connectionOwner.beginSessionAttempt(accountRef, bindEpoch)
                     }
