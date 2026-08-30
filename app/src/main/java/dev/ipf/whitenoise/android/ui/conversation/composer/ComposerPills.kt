@@ -55,6 +55,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -125,11 +126,11 @@ import kotlin.math.floor
 internal const val COMPOSER_RESIZE_INDICATOR_TAG = "composer-resize-indicator"
 internal const val COMPOSER_PILL_SURFACE_TAG = "composer-pill-surface"
 
-private val ExpandedBorderHeaderInset = 28.dp
+private val ExpandedBorderHeaderInset = 24.dp
 private val CompactEditorStartInset = 52.dp
 private val ExpandedEditorEndInset = 12.dp
 private val CompactEditorTopInset = 12.dp
-private val ExpandedEditorTopInset = 20.dp
+private val ExpandedEditorTopInset = 24.dp
 private val CompactEditorBottomInset = 8.dp
 private val ExpandedEditorBottomInset = 48.dp
 
@@ -440,7 +441,6 @@ internal fun ComposerPill(
             hasUserShare ||
             hasContactShare
     var multilineControls by remember { mutableStateOf(false) }
-    val expandedLayout = multilineControls || expansionMode != ComposerExpansionMode.Automatic
     val compactTrailingReserve =
         4.dp +
             (if (onDictation != null) 48.dp else 0.dp) +
@@ -451,27 +451,6 @@ internal fun ComposerPill(
             (if (onDictation != null) 48.dp else 0.dp) +
             (if (hasAttachmentAction) 36.dp else 0.dp) +
             (if (compactMeasurementReservesTrailingAction) 44.dp else 0.dp)
-    // One progress value owns every moving edge. Reading it in deferred layout
-    // modifiers avoids recomposing BasicTextField on each animation frame and
-    // keeps the pill, editor, controls, and outer reservation in lockstep.
-    val expansionProgress =
-        animateFloatAsState(
-            targetValue = if (expandedLayout) 1f else 0f,
-            animationSpec =
-                tween(
-                    durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
-                    easing = FastOutSlowInEasing,
-                ),
-            label = "composer layout progress",
-        )
-    var resizeTargetReady by remember { mutableStateOf(false) }
-    LaunchedEffect(expandedLayout) {
-        resizeTargetReady = false
-        if (expandedLayout) {
-            delay(COMPOSER_EXPANSION_ANIMATION_MILLIS.toLong())
-            resizeTargetReady = true
-        }
-    }
     val composerTextStyle =
         LocalTextStyle.current.copy(
             color = MaterialTheme.colorScheme.onSurface,
@@ -501,6 +480,36 @@ internal fun ComposerPill(
                     ).lineCount
             }
         }
+    val visualMultilineControls =
+        compactLineCount?.let { lineCount ->
+            when {
+                multilineControls && lineCount <= 1 -> false
+                !multilineControls && lineCount >= 3 -> true
+                else -> multilineControls
+            }
+        } ?: multilineControls
+    val expandedLayout = visualMultilineControls || expansionMode != ComposerExpansionMode.Automatic
+    // One progress value owns every moving edge. Reading it in deferred layout
+    // modifiers avoids recomposing BasicTextField on each animation frame and
+    // keeps the pill, editor, controls, and outer reservation in lockstep.
+    val expansionProgress =
+        animateFloatAsState(
+            targetValue = if (expandedLayout) 1f else 0f,
+            animationSpec =
+                tween(
+                    durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
+                    easing = FastOutSlowInEasing,
+                ),
+            label = "composer layout progress",
+        )
+    var resizeTargetReady by remember { mutableStateOf(false) }
+    LaunchedEffect(expandedLayout) {
+        resizeTargetReady = false
+        if (expandedLayout) {
+            delay(COMPOSER_EXPANSION_ANIMATION_MILLIS.toLong())
+            resizeTargetReady = true
+        }
+    }
     val expandedHeightModifier =
         if (expansionMode == ComposerExpansionMode.Automatic) {
             Modifier
@@ -521,9 +530,10 @@ internal fun ComposerPill(
         }
     }
 
-    if (compactLineCount != null) {
-        LaunchedEffect(compactLineCount) {
-            updateMultilineControls(compactLineCount)
+    SideEffect {
+        if (compactLineCount != null && visualMultilineControls != multilineControls) {
+            multilineControls = visualMultilineControls
+            onMultilineControlsChanged(visualMultilineControls)
         }
     }
 
@@ -793,9 +803,9 @@ internal fun ComposerPill(
         if (expandedLayout && resizeTargetReady && inputContentVisible) {
             // Keep a transparent 96x48dp gesture target for accessibility, but
             // draw feedback only on the visible handle. The surface starts at
-            // 28dp so the opaque 4dp handle sits wholly above its border while
-            // the editor starts exactly below the target with only 20dp of
-            // internal top padding.
+            // 24dp so the accessible target straddles the border evenly. The
+            // first editable line starts exactly at the target's lower edge;
+            // no decorative header space sits between the two.
             val toggleDescription =
                 stringResource(
                     if (expansionMode == ComposerExpansionMode.FullScreen) {

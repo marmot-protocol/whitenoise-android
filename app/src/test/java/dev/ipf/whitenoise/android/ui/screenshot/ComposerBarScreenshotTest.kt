@@ -88,9 +88,21 @@ class ComposerBarScreenshotTest {
     }
 
     @Test
+    fun composerBarDraftRtl() {
+        render(darkTheme = false, amoled = false, draft = "Draft message text", rtl = true)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_bar_draft_rtl.png")
+    }
+
+    @Test
     fun composerBarLongDraftLight() {
         renderLongComposer(darkTheme = false)
         composeRule.onNodeWithTag(LONG_TAG).captureRoboImage("src/test/snapshots/composer_bar_long_draft_light.png")
+    }
+
+    @Test
+    fun composerBarLongDraftRtl() {
+        renderLongComposer(darkTheme = false, rtl = true)
+        composeRule.onNodeWithTag(LONG_TAG).captureRoboImage("src/test/snapshots/composer_bar_long_draft_rtl.png")
     }
 
     @Test
@@ -384,6 +396,7 @@ class ComposerBarScreenshotTest {
         darkTheme: Boolean,
         amoled: Boolean = false,
         largeRtl: Boolean = false,
+        rtl: Boolean = false,
         selectionAtEnd: Boolean = false,
     ) {
         val draft =
@@ -400,7 +413,7 @@ class ComposerBarScreenshotTest {
             val baseDensity = LocalDensity.current
             CompositionLocalProvider(
                 LocalDensity provides Density(baseDensity.density, if (largeRtl) 1.45f else 1f),
-                LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalLayoutDirection provides if (largeRtl || rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                     Surface(modifier = Modifier.width(360.dp).height(720.dp)) {
