@@ -179,6 +179,64 @@ class ConversationSendRetryIntegrationTest {
         }
 
     @Test
+    fun ambiguousManualRetryStaysPendingAndCannotMintAnotherEvent() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        when (attempts) {
+                            1 -> throw MarmotKitException.Publish("relay rejected event")
+                            else -> throw MarmotKitException.Publish("send event timed out")
+                        }
+                    },
+                )
+
+            appState.sendConversationText(controller, "retry once")
+            controller.retryFailedSend(controller.timeline.single())
+
+            assertEquals(2, attempts)
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+
+            controller.retryFailedSend(controller.timeline.single())
+
+            assertEquals("a pending ambiguous retry must not publish again", 2, attempts)
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+        }
+
+    @Test
+    fun evictionDuringManualRetryRemovesTheBubbleAndMembership() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        if (attempts == 1) {
+                            throw MarmotKitException.Publish("relay rejected event")
+                        }
+                        throw IllegalStateException("GroupStateError::UseAfterEviction")
+                    },
+                )
+
+            appState.sendConversationText(controller, "cannot retry")
+            controller.retryFailedSend(controller.timeline.single())
+
+            assertEquals(2, attempts)
+            assertTrue(controller.timeline.isEmpty())
+            assertFalse(controller.isSelfMember)
+        }
+
+    @Test
     fun successfulRetryFromReplacementControllerClearsTheInitiallyCapturedDraft() =
         runTest {
             val appState = appState()

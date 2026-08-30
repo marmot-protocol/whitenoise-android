@@ -547,21 +547,17 @@ internal suspend fun dismissConversationNotificationsOnOpen(
     }
 }
 
-/** Whether connectivity restoration should restart the UI-independent notification runtime. */
-internal fun shouldReconnectNotificationsOnNetworkRestore(
-    wasOnline: Boolean,
-    isOnline: Boolean,
-): Boolean = !wasOnline && isOnline
-
 /**
- * Offline -> online notification recovery without a push-wake marker.
- * [subscribeNotifications] is a passive broadcast with no replay, so account
- * catch-up must run only after a receiver is listening.
+ * Offline-to-online recovery shared by durable outbound work and notifications.
+ * Outbound work is woken first; [subscribeNotifications] is a passive broadcast
+ * with no replay, so account catch-up still waits until a receiver is listening.
  */
 internal suspend fun runNotificationReconnectOnNetworkRestore(
+    wakeDurableOutbound: suspend () -> Unit,
     ensureNotificationReceiverActive: suspend () -> Boolean,
     catchUpAccounts: suspend () -> Unit,
 ) {
+    wakeDurableOutbound()
     if (ensureNotificationReceiverActive()) {
         catchUpAccounts()
     }
@@ -3777,6 +3773,14 @@ class WhiteNoiseAppState private constructor(
         }
         isForegroundCatchUpRunning = true
         try {
+            if (hasValidatedInternet()) {
+                runCatchingCancellable { marmotIo { notifyConnectivityRestored() } }
+                    .onFailure { throwable ->
+                        appStateDebug(throwable) {
+                            "foreground connectivity wake failed: ${throwable.readableMessage()}"
+                        }
+                    }
+            }
             val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
             if (catchUpAccountsBestEffort()) {
                 clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
@@ -6777,6 +6781,12 @@ class WhiteNoiseAppState private constructor(
 
     private val activeDefaultNetwork = ActiveDefaultNetworkTracker()
     private val validatedInternetNetworks = ValidatedInternetNetworkTracker()
+    private val usableValidatedInternetRecovery = UsableValidatedInternetRecoveryTracker()
+    private val validatedConnectivityRecoveryGenerationMutable = MutableStateFlow(0L)
+
+    /** Monotonic usable-internet recovery edge consumed by pending foreground sends. */
+    internal val validatedConnectivityRecoveryGeneration: StateFlow<Long> =
+        validatedConnectivityRecoveryGenerationMutable.asStateFlow()
 
     /**
      * Reactive Android-validated internet and aggregate relay fallback inputs
@@ -6918,12 +6928,12 @@ class WhiteNoiseAppState private constructor(
                         networkHandle = network.networkHandle,
                         available = networkCapabilities.providesValidatedNonVpnInternet(),
                     )
-                    noteValidatedInternetSnapshot()
+                    noteUsableValidatedInternetSnapshot()
                 }
 
                 override fun onLost(network: android.net.Network) {
                     validatedInternetNetworks.remove(network.networkHandle)
-                    noteValidatedInternetSnapshot()
+                    noteUsableValidatedInternetSnapshot()
                 }
             }
         runCatchingCancellable {
@@ -6938,7 +6948,11 @@ class WhiteNoiseAppState private constructor(
                         (cm.getNetworkCapabilities(network)?.providesValidatedNonVpnInternet() == true)
                 }
             }
-            noteValidatedInternetSnapshot()
+            usableValidatedInternetRecovery.seed(
+                hasActiveDefaultNetwork = hasActiveNetworkSnapshot,
+                hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet(),
+            )
+            noteUsableValidatedInternetSnapshot()
         }.onFailure {
             // Conservative failure mode: setup stays gated rather than treating
             // an unverified or VPN-only network as usable internet.
@@ -6950,24 +6964,29 @@ class WhiteNoiseAppState private constructor(
         isOnline: Boolean,
         networkTypes: Set<MediaAutoDownloadNetwork>? = null,
     ) {
-        val wasOnline = hasActiveNetworkSnapshot
         if (!isOnline) {
             hasActiveNetworkSnapshot = false
             activeNetworkTypesSnapshot = emptySet()
-            noteValidatedInternetSnapshot()
+            noteUsableValidatedInternetSnapshot()
             return
         }
         hasActiveNetworkSnapshot = true
         activeNetworkTypesSnapshot = networkTypes ?: emptySet()
-        noteValidatedInternetSnapshot()
-        if (shouldReconnectNotificationsOnNetworkRestore(wasOnline, isOnline = true)) {
-            scheduleNotificationReconnectOnNetworkRestore()
-        }
+        noteUsableValidatedInternetSnapshot()
         schedulePendingPushWakeCatchUpDrain()
     }
 
-    private fun noteValidatedInternetSnapshot() {
-        updateConnectivitySignals(hasValidatedInternet = hasValidatedInternet())
+    /** Publish aggregate connectivity and wake retry owners on a genuine recovery edge. */
+    private fun noteUsableValidatedInternetSnapshot() {
+        val recovery =
+            usableValidatedInternetRecovery.update(
+                hasActiveDefaultNetwork = hasActiveNetworkSnapshot,
+                hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet(),
+            )
+        updateConnectivitySignals(hasValidatedInternet = recovery.hasUsableInternet)
+        if (!recovery.restored) return
+        validatedConnectivityRecoveryGenerationMutable.update { generation -> generation + 1 }
+        scheduleNotificationReconnectOnNetworkRestore()
     }
 
     private fun scheduleNotificationReconnectOnNetworkRestore() {
@@ -6981,6 +7000,14 @@ class WhiteNoiseAppState private constructor(
                     // (the wipe sets the flag before sweeping the slots).
                     if (networkNotificationRecoverySuppressed) return@launch
                     runNotificationReconnectOnNetworkRestore(
+                        wakeDurableOutbound = {
+                            runCatchingCancellable { marmotIo { notifyConnectivityRestored() } }
+                                .onFailure { throwable ->
+                                    appStateDebug(throwable) {
+                                        "durable outbound connectivity wake failed: ${throwable.readableMessage()}"
+                                    }
+                                }
+                        },
                         ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
                         catchUpAccounts = {
                             val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()

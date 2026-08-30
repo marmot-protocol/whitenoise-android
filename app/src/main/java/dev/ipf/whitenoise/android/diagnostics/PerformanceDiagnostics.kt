@@ -54,6 +54,7 @@ internal enum class PerformancePhase(
     TRANSPORT_COMPLETE("transport_complete"),
     FFI_ERROR("ffi_error"),
     TRANSIENT_RETRY("transient_retry"),
+    DELIVERY_UNCERTAIN("delivery_uncertain"),
     SENT_FLIP("sent_flip"),
     SEND_COMPLETE("send_complete"),
     SEND_FAILED("send_failed"),

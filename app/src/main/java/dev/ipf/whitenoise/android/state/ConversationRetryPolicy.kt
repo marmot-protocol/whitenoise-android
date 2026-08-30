@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotKitException
+import kotlinx.coroutines.flow.StateFlow
 
 /** Short retry budget for background operations and base foreground backoff. */
 internal const val SEND_RETRY_ATTEMPTS: Int = 3
@@ -21,6 +22,7 @@ internal fun isTransientRelaySendError(throwable: Throwable): Boolean {
     val text = throwable.causeChainText()
     if (
         listOf(
+            "connection reset",
             "send event failed",
             "send event timed out",
             "relay did not acknowledge event",
@@ -49,6 +51,7 @@ internal fun isAmbiguousRelayDeliveryError(throwable: Throwable): Boolean {
     val explicitRejection = "relay rejected event" in text
     val ambiguousPublish =
         listOf(
+            "connection reset",
             "send event failed",
             "send event timed out",
             "relay did not acknowledge event",
@@ -93,22 +96,38 @@ internal fun pendingSendRetryBackoffMs(failedAttempt: Int): Long {
  * Keep a foreground send pending across proven pre-publish connectivity
  * failures. Coroutine cancellation is the lifecycle boundary. [sendAttempt]
  * must acquire and release any shared commit lock within one invocation; the
- * retry loop deliberately owns no lock while it waits between attempts.
+ * retry loop deliberately owns no lock while it waits between attempts. A
+ * newer [connectivityRecoveryGeneration] interrupts that wait and resets the
+ * backoff so Android does not sleep through restored validated internet.
  */
 @Suppress("TooGenericExceptionCaught") // Every non-cancellation gateway failure must be classified before retry.
 internal suspend fun <T> retryPendingConversationSend(
+    connectivityRecoveryGeneration: StateFlow<Long>? = null,
     onTransientFailure: suspend (attempt: Int, throwable: Throwable) -> Unit = { _, _ -> },
     sendAttempt: suspend (attempt: Int) -> T,
 ): T {
     var attempt = 1
+    var backoffAttempt = 1
     while (true) {
+        val recoveryGenerationBeforeAttempt = connectivityRecoveryGeneration?.value
         try {
             return sendAttempt(attempt)
         } catch (throwable: Throwable) {
             rethrowIfCancellation(throwable)
             if (!isTransientRelaySendError(throwable)) throw throwable
             onTransientFailure(attempt, throwable)
-            kotlinx.coroutines.delay(pendingSendRetryBackoffMs(attempt))
+            val wokeForConnectivity =
+                awaitPendingSendRetryWindow(
+                    connectivityRecoveryGeneration = connectivityRecoveryGeneration,
+                    observedGeneration = recoveryGenerationBeforeAttempt,
+                    backoffMs = pendingSendRetryBackoffMs(backoffAttempt),
+                )
+            backoffAttempt =
+                when {
+                    wokeForConnectivity -> 1
+                    backoffAttempt < Int.MAX_VALUE -> backoffAttempt + 1
+                    else -> Int.MAX_VALUE
+                }
             if (attempt < Int.MAX_VALUE) attempt += 1
         }
     }

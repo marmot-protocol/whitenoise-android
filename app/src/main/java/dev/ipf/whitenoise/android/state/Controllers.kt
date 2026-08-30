@@ -7932,9 +7932,9 @@ class ConversationController(
                 // Calling textPublisher again here could mint a duplicate.
                 sendTrace(
                     trace,
-                    "send-pending-ambiguous",
-                    traceElapsedMs(traceStartMs),
-                    context = arrayOf("error" to throwable.javaClass.simpleName),
+                    PerformancePhase.DELIVERY_UNCERTAIN,
+                    result = PerformanceResult.PENDING,
+                    layer = PerformanceLayer.TRANSPORT,
                 )
                 Log.w(
                     "ConversationController",
@@ -7995,6 +7995,7 @@ class ConversationController(
     ): dev.ipf.marmotkit.SendSummaryFfi =
         appState.withConversationTextSendOrder(account, group.groupIdHex) {
             retryPendingConversationSend(
+                connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
                 onTransientFailure = { attempt, _ -> logSendRetry(trace, attempt) },
             ) { attempt ->
                 // Serialize only this commit-producing FFI attempt. Releasing the
@@ -9386,6 +9387,7 @@ class ConversationController(
             group.groupIdHex,
             retryPreview(tempId, refreshedRecord),
         )
+        var retryTrace: PerformanceTrace? = null
         try {
             val activeAccountIdHex = conversationAccountIdHex
             val committedProjection =
@@ -9424,7 +9426,7 @@ class ConversationController(
                 publishTimelineFromIndexes()
                 return
             }
-            val retryTrace = PerformanceDiagnostics.begin(PerformanceOperation.TEXT_SEND)
+            retryTrace = PerformanceDiagnostics.begin(PerformanceOperation.TEXT_SEND)
             sendTrace(
                 retryTrace,
                 PerformancePhase.MANUAL_RETRY,
@@ -9468,9 +9470,34 @@ class ConversationController(
             }
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
-            throwable.rethrowIfCancellation()
-            if (BuildConfig.DEBUG) Log.w("DMConversation", "retryFailedSend failed", throwable)
-            if (discardedDuringRetry.remove(key)) {
+            handleFailedSendRetryFailure(
+                throwable = throwable,
+                key = key,
+                tempId = tempId,
+                current = current,
+                refreshedRecord = refreshedRecord,
+                order = order,
+                account = account,
+                retryTrace = retryTrace,
+            )
+        }
+    }
+
+    /** Settle a manual text retry without republishing an uncertain delivery. */
+    private fun handleFailedSendRetryFailure(
+        throwable: Throwable,
+        key: String,
+        tempId: String,
+        current: TimelineMessage,
+        refreshedRecord: AppMessageRecordFfi,
+        order: ULong,
+        account: String,
+        retryTrace: PerformanceTrace?,
+    ) {
+        throwable.rethrowIfCancellation()
+        if (BuildConfig.DEBUG) Log.w("DMConversation", "retryFailedSend failed", throwable)
+        when {
+            discardedDuringRetry.remove(key) -> {
                 // User discarded mid-flight; don't restore the Failed bubble.
                 optimisticMessages.remove(key)
                 durableAcceptanceCallbacks.remove(key)
@@ -9478,24 +9505,46 @@ class ConversationController(
                 retentionAtSendByMessageId.remove(tempId)
                 rollbackOptimisticChatListPreview(tempId)
                 publishTimelineFromIndexes()
-                return
             }
-            optimisticMessages[key] =
-                current.copy(
-                    record = refreshedRecord,
-                    status = MessageStatus.Failed,
-                    timelineOrder = order,
+            throwable.isUseAfterEviction() -> {
+                rollbackOptimisticChatListPreview(tempId)
+                optimisticMessages.remove(key)
+                durableAcceptanceCallbacks.remove(key)
+                messageById.remove(tempId)
+                retentionAtSendByMessageId.remove(tempId)
+                publishTimelineFromIndexes()
+                markActiveAccountRemovedFromMembers(account)
+            }
+            isAmbiguousRelayDeliveryError(throwable) -> {
+                // Publication may already have reached a relay. Keep the
+                // existing row Pending; another high-level send could mint a
+                // duplicate event.
+                sendTrace(
+                    retryTrace,
+                    PerformancePhase.DELIVERY_UNCERTAIN,
+                    result = PerformanceResult.PENDING,
+                    layer = PerformanceLayer.TRANSPORT,
                 )
-            failOptimisticChatListPreview(tempId)
-            suppressProjectedTimelineItems(
-                unpublishedProjectionIdsMatchingMessage(
-                    timelineRecords = timelineRecords,
-                    message = refreshedRecord,
-                    activeAccountIdHex = conversationAccountIdHex,
-                ),
-            )
-            publishTimelineFromIndexes()
-            presentSendFailure(appState, throwable)
+                publishTimelineFromIndexes()
+            }
+            else -> {
+                optimisticMessages[key] =
+                    current.copy(
+                        record = refreshedRecord,
+                        status = MessageStatus.Failed,
+                        timelineOrder = order,
+                    )
+                failOptimisticChatListPreview(tempId)
+                suppressProjectedTimelineItems(
+                    unpublishedProjectionIdsMatchingMessage(
+                        timelineRecords = timelineRecords,
+                        message = refreshedRecord,
+                        activeAccountIdHex = conversationAccountIdHex,
+                    ),
+                )
+                publishTimelineFromIndexes()
+                presentSendFailure(appState, throwable)
+            }
         }
     }
 
