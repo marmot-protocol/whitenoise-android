@@ -4,7 +4,10 @@ import android.content.Context
 import android.net.Uri
 import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.DiskByteCache
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -27,11 +30,54 @@ internal interface PendingShareRequestStore {
     fun clear()
 }
 
+/**
+ * Serializes the single-entry store before dispatching blocking encryption and
+ * disk work. Acquiring the mutex on the caller preserves intent order: a newer
+ * request waits for an already-running cancelled write, then becomes the final
+ * durable entry instead of being overwritten by stale work.
+ */
+internal class SerializedPendingShareRequestStore(
+    private val delegate: PendingShareRequestStore,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
+    /** Persists one request, clearing any superseded entry when the replacement cannot be retained. */
+    suspend fun save(request: ShareRequest): Boolean =
+        processMutex.withLock {
+            withContext(ioDispatcher) {
+                delegate.save(request).also { saved ->
+                    if (!saved) delegate.clear()
+                }
+            }
+        }
+
+    /** Loads one request without racing a newer replacement or dismissal. */
+    suspend fun load(requestId: String): ShareRequest? =
+        processMutex.withLock {
+            withContext(ioDispatcher) { delegate.load(requestId) }
+        }
+
+    /** Removes only the matching request after prior replacements settle. */
+    suspend fun remove(requestId: String) {
+        processMutex.withLock { withContext(ioDispatcher) { delegate.remove(requestId) } }
+    }
+
+    /** Clears unresolved encrypted state after every earlier operation settles. */
+    suspend fun clear() {
+        processMutex.withLock { withContext(ioDispatcher) { delegate.clear() } }
+    }
+
+    private companion object {
+        /** Shared across Activity recreation because old cancelled I/O can outlive its wrapper. */
+        val processMutex = Mutex()
+    }
+}
+
 internal class EncryptedPendingShareRequestStore(
     private val cache: DiskByteCache,
 ) : PendingShareRequestStore {
+    /** Rejects unsupported requests before replacing the one recoverable encrypted entry. */
     override fun save(request: ShareRequest): Boolean =
-        if (request.requestId.isBlank()) {
+        if (request.requestId.isBlank() || request.payload.streamUris.size > MAX_PENDING_SHARE_URIS) {
             false
         } else {
             val encoded = encodePendingShareRequest(request)
@@ -86,7 +132,7 @@ internal suspend fun createPendingShareRequestStore(
 private const val PENDING_SHARE_REQUEST_VERSION = 1
 internal const val MAX_PENDING_SHARE_REQUEST_BYTES = 4 * 1024 * 1024
 internal const val PENDING_SHARE_REQUEST_CACHE_BYTES = MAX_PENDING_SHARE_REQUEST_BYTES + (64 * 1024)
-private const val MAX_PENDING_SHARE_URIS = 1_000
+internal const val MAX_PENDING_SHARE_URIS = 1_000
 private const val KEY_VERSION = "version"
 private const val KEY_REQUEST_ID = "request_id"
 private const val KEY_TEXT = "text"

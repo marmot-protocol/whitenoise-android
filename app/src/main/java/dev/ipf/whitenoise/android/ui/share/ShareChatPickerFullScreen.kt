@@ -3,7 +3,6 @@
 package dev.ipf.whitenoise.android.ui.share
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -71,21 +70,21 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
-import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetAvatarAccount
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetMembersPreview
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.launch
 
-internal const val SHARE_CHAT_PICKER_SCREEN_TEST_TAG = "share_chat_picker_full_screen"
+internal const val SHARE_CHAT_PICKER_SCREEN_TEST_TAG = PerformanceTestTags.SHARE_PICKER
 internal const val SHARE_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG = "share_chat_picker_account_row"
 internal const val SHARE_CHAT_PICKER_ACCOUNT_SHEET_TEST_TAG = "share_chat_picker_account_sheet"
 
@@ -168,6 +167,7 @@ private data class ShareChatPickerScaffoldActions(
     val stage: () -> Unit,
 )
 
+/** Builds the edge-to-edge modal surface and exports its first-frame benchmark selector. */
 @Composable
 private fun ShareChatPickerScaffold(
     pickerState: ShareChatPickerState,
@@ -191,10 +191,14 @@ private fun ShareChatPickerScaffold(
     ) {
         Scaffold(
             modifier =
-                Modifier.fillMaxSize().testTag(SHARE_CHAT_PICKER_SCREEN_TEST_TAG).semantics {
-                    isTraversalGroup = true
-                    paneTitle = shareToTitle
-                },
+                Modifier
+                    .fillMaxSize()
+                    .testTag(SHARE_CHAT_PICKER_SCREEN_TEST_TAG)
+                    .exposePerformanceTestTags()
+                    .semantics {
+                        isTraversalGroup = true
+                        paneTitle = shareToTitle
+                    },
             containerColor = amoledSheetContainerColor(),
             snackbarHost = { WhiteNoiseSnackbarHost(snackbarHostState) },
             topBar = {
@@ -343,6 +347,7 @@ private fun ShareChatPickerContent(
     }
 }
 
+/** Presents cached recipients immediately, including direct empty and inline failure states. */
 @Composable
 private fun ShareChatPickerTargetList(
     pickerState: ShareChatPickerState,
@@ -355,28 +360,24 @@ private fun ShareChatPickerTargetList(
         state = listState,
         contentPadding = PaddingValues(bottom = Dimens.spaceLg),
     ) {
-        if (pickerState.isLoading && pickerState.targets.isEmpty()) {
-            item {
-                Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                    LoadingScreen()
+        if (pickerState.targets.isEmpty()) {
+            pickerState.error?.let { failure ->
+                item(key = "share-picker-load-error") {
+                    InlineErrorBanner(error = failure, onRetry = pickerState::retryLoad)
                 }
             }
-        } else if (pickerState.error != null && pickerState.targets.isEmpty()) {
-            item {
-                Box(Modifier.fillParentMaxSize()) {
-                    ErrorContent(
-                        title = stringResource(R.string.couldnt_load_chats),
-                        error = pickerState.error,
-                        onRetry = pickerState::retryLoad,
-                    )
-                }
-            }
-        } else if (pickerState.targets.isEmpty() || filteredTargets.isEmpty()) {
             item {
                 Text(
-                    stringResource(
-                        if (pickerState.targets.isEmpty()) R.string.share_no_chats else R.string.share_no_matches,
-                    ),
+                    stringResource(R.string.share_no_chats),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                )
+            }
+        } else if (filteredTargets.isEmpty()) {
+            item {
+                Text(
+                    stringResource(R.string.share_no_matches),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),

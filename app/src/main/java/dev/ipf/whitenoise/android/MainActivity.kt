@@ -82,16 +82,16 @@ class MainActivity : AppCompatActivity() {
     private var inboundShareRequest: ShareRequest?
         get() = mainShellStateHolder.inboundShareRequest.value
         set(value) {
-            mainShellStateHolder.inboundShareRequest.value = value
+            mainShellStateHolder.acceptInboundShareRequest(value)
         }
 
+    /** Exposes the route-owning request to lifecycle instrumentation without exposing its payload to saved state. */
     internal val pendingInboundShareRequestForTest: ShareRequest?
-        get() = inboundShareRequest
+        get() = mainShellStateHolder.visibleShareRequest
 
+    /** Simulates the route acknowledgement used by lifecycle instrumentation. */
     internal fun acknowledgeInboundShareForTest(requestId: String) {
-        inboundShareRequest
-            ?.takeIf { it.requestId == requestId }
-            ?.let(::handleShareRequest)
+        mainShellStateHolder.clearPendingShareRequest(requestId)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -225,25 +225,51 @@ class MainActivity : AppCompatActivity() {
         AmberActivityCoordinator.attach(amberSignerLauncher)
     }
 
-    // Keep the system splash (icon on the themed window background) up until
-    // engine bootstrap flips the phase, instead of a bare spinner mid-boot.
-    // Installed before super.onCreate, held from here once appState exists.
+    /**
+     * Keeps the themed system splash until ordinary bootstrap hands off or an
+     * inbound share has a renderable local-first picker frame. Installed before
+     * `super.onCreate`; this predicate takes ownership once [appState] exists.
+     */
     private fun holdSplashThroughBootstrap(
         splashScreen: androidx.core.splashscreen.SplashScreen,
         installedAtMs: Long,
     ) {
         splashScreen.setKeepOnScreenCondition {
+            val firstUsefulFrameReady =
+                mainShellStateHolder.prepareFirstUsefulFrame(
+                    phase = appState.phase,
+                    activeAccountRef = appState.activeAccountRef,
+                    runtimeGeneration = appState.runtimeGeneration,
+                    appLockScreenVisible = appState.appLockScreenVisible,
+                )
+            val pendingShareFirstFrameReady =
+                if (mainShellStateHolder.hasPendingShareRoute && !appState.appLockScreenVisible) {
+                    val directGroupId =
+                        if (appState.phase == AppPhase.Ready) {
+                            mainShellStateHolder.visibleShareDirectGroupId(
+                                activeAccountRef = appState.activeAccountRef,
+                                runtimeGeneration = appState.runtimeGeneration,
+                            )
+                        } else {
+                            null
+                        }
+                    directGroupId == null &&
+                        mainShellStateHolder.visibleShareRequest != null &&
+                        mainShellStateHolder.prepareSharePickerFirstFrame(
+                            phase = appState.phase,
+                            activeAccountRef = appState.activeAccountRef,
+                            runtimeGeneration = appState.runtimeGeneration,
+                            appLockScreenVisible = false,
+                        )
+                } else {
+                    null
+                }
             val retain =
                 shouldRetainSystemSplash(
                     phase = appState.phase,
                     elapsedMs = SystemClock.elapsedRealtime() - installedAtMs,
-                    firstUsefulFrameReady =
-                        mainShellStateHolder.prepareFirstUsefulFrame(
-                            phase = appState.phase,
-                            activeAccountRef = appState.activeAccountRef,
-                            runtimeGeneration = appState.runtimeGeneration,
-                            appLockScreenVisible = appState.appLockScreenVisible,
-                        ),
+                    firstUsefulFrameReady = firstUsefulFrameReady,
+                    pendingShareFirstFrameReady = pendingShareFirstFrameReady,
                 )
             if (!retain) appState.recordStartupSystemSplashHandoff()
             retain
@@ -306,9 +332,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Acknowledges the Activity-delivered intent without clearing a promoted picker route. */
     private fun handleShareRequest(handled: ShareRequest) {
-        if (inboundShareRequest != handled) return
-        inboundShareRequest = null
+        mainShellStateHolder.acknowledgeInboundShareRequest(handled.requestId)
     }
 
     override fun onStart() {
@@ -545,17 +571,24 @@ internal class ForegroundConversationDismissalCoordinator {
 internal const val MAX_RETAINED_SYSTEM_SPLASH_MILLIS = 1_500L
 
 /**
- * The platform splash is deliberately brief. A slow engine handoff continues
- * on the branded Compose startup surface instead of looking like a frozen,
- * featureless window.
+ * The platform splash is deliberately brief for ordinary startup. An unresolved
+ * inbound share instead remains protected until its picker request and local
+ * recipient projection can own the first app-rendered frame. App lock,
+ * onboarding, and failure phases still release to their explicit gate surface.
  */
 internal fun shouldRetainSystemSplash(
     phase: AppPhase,
     elapsedMs: Long,
     firstUsefulFrameReady: Boolean = true,
+    pendingShareFirstFrameReady: Boolean? = null,
 ): Boolean =
-    elapsedMs < MAX_RETAINED_SYSTEM_SPLASH_MILLIS &&
-        (phase == AppPhase.Bootstrapping || (phase == AppPhase.Ready && !firstUsefulFrameReady))
+    when {
+        pendingShareFirstFrameReady != null && phase == AppPhase.Bootstrapping -> true
+        pendingShareFirstFrameReady != null && phase == AppPhase.Ready -> !pendingShareFirstFrameReady
+        else ->
+            elapsedMs < MAX_RETAINED_SYSTEM_SPLASH_MILLIS &&
+                (phase == AppPhase.Bootstrapping || (phase == AppPhase.Ready && !firstUsefulFrameReady))
+    }
 
 internal fun preComposeThemeFor(
     themeMode: AppThemeMode,

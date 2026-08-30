@@ -19,6 +19,55 @@ class BootstrapSplashHandoffTest {
         assertTrue(MAX_RETAINED_SYSTEM_SPLASH_MILLIS < 2_000L)
     }
 
+    /** A share launch never hands off to the ordinary startup surface or an unseeded picker. */
+    @Test
+    fun pendingShareKeepsSystemSplashUntilItsLocalPickerFrameIsReady() {
+        assertTrue(
+            shouldRetainSystemSplash(
+                phase = AppPhase.Bootstrapping,
+                elapsedMs = MAX_RETAINED_SYSTEM_SPLASH_MILLIS * 4,
+                pendingShareFirstFrameReady = false,
+            ),
+        )
+        assertTrue(
+            shouldRetainSystemSplash(
+                phase = AppPhase.Ready,
+                elapsedMs = MAX_RETAINED_SYSTEM_SPLASH_MILLIS * 4,
+                firstUsefulFrameReady = true,
+                pendingShareFirstFrameReady = false,
+            ),
+        )
+        assertFalse(
+            shouldRetainSystemSplash(
+                phase = AppPhase.Ready,
+                elapsedMs = MAX_RETAINED_SYSTEM_SPLASH_MILLIS * 4,
+                firstUsefulFrameReady = true,
+                pendingShareFirstFrameReady = true,
+            ),
+        )
+    }
+
+    /** Account setup and recovery remain explicit surfaces rather than frozen share splashes. */
+    @Test
+    fun pendingShareDoesNotHideOnboardingOrFailureBehindSystemSplash() {
+        val failure = AppPhase.Failed(ErrorPresentation(AppText.Plain("safe"), "operation=TEST"))
+
+        assertFalse(
+            shouldRetainSystemSplash(
+                phase = AppPhase.Onboarding,
+                elapsedMs = 0L,
+                pendingShareFirstFrameReady = false,
+            ),
+        )
+        assertFalse(
+            shouldRetainSystemSplash(
+                phase = failure,
+                elapsedMs = 0L,
+                pendingShareFirstFrameReady = false,
+            ),
+        )
+    }
+
     @Test
     fun splashDeadlineStartsBeforeActivityAndApplicationSetup() {
         val source = mainActivitySource()

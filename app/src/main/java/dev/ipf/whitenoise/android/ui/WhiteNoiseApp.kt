@@ -144,6 +144,7 @@ internal fun ShellTransientNoticeLayout(
     }
 }
 
+/** Owns top-level privacy gates and records the first app-rendered useful surface. */
 @Composable
 @Suppress(
     "CyclomaticComplexMethod",
@@ -188,10 +189,21 @@ internal fun WhiteNoiseApp(
     val dictationProviderActivityRequestId = dictation.providerActivityRequestId
     val density = LocalDensity.current
     var firstUsefulFrameRecorded by remember(warmResumeTraceToken, warmResumeEpoch) { mutableStateOf(false) }
+    val visibleShareRequest = mainShellStateHolder.visibleShareRequest
+    val visibleShareDirectGroupId =
+        if (appState.phase == AppPhase.Ready && visibleShareRequest != null) {
+            mainShellStateHolder.visibleShareDirectGroupId(
+                activeAccountRef = appState.activeAccountRef,
+                runtimeGeneration = appState.runtimeGeneration,
+            )
+        } else {
+            null
+        }
+    val visiblePickerRequest = visibleShareRequest.takeUnless { visibleShareDirectGroupId != null }
     val inboundRoutePending =
         inboundNotificationTarget != null ||
             inboundProfilePayload != null ||
-            inboundShareRequest != null ||
+            mainShellStateHolder.hasPendingShareRoute ||
             inboundAppUpdateTap != 0
     val dictationImeVisible =
         WindowInsets.ime.getBottom(density) > WindowInsets.navigationBars.getBottom(density)
@@ -419,9 +431,11 @@ internal fun WhiteNoiseApp(
                                 LaunchedEffect(firstUsefulSurface, warmResumeTraceToken, warmResumeEpoch) {
                                     val foregroundCanRecord =
                                         !firstUsefulFrameRecorded && warmResumeEpoch > 0
+                                    val inboundFrameCanRecord =
+                                        !inboundRoutePending || visibleShareRequest != null
                                     if (
                                         foregroundCanRecord &&
-                                        !inboundRoutePending &&
+                                        inboundFrameCanRecord &&
                                         firstUsefulSurface != WarmResumeFirstUsefulSurface.Startup
                                     ) {
                                         withFrameNanos { }
@@ -455,6 +469,7 @@ internal fun WhiteNoiseApp(
                                 } else {
                                     val renderedSurface =
                                         when {
+                                            visiblePickerRequest != null -> WarmResumeRenderedSurface.SharePicker
                                             inboundRoutePending -> WarmResumeRenderedSurface.InboundRoute
                                             mainShellStateHolder.selectedChat.value != null ->
                                                 WarmResumeRenderedSurface.Conversation

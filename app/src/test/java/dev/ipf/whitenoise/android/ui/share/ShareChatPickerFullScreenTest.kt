@@ -6,6 +6,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotFocused
@@ -34,7 +35,9 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
+import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -95,8 +98,9 @@ class ShareChatPickerFullScreenTest {
         composeRule.onNodeWithText("Person 5").assertIsDisplayed()
     }
 
+    /** A not-yet-loaded local projection renders an honest empty state without a progress gate. */
     @Test
-    fun activeAccountLoadingStateIsVisible() {
+    fun activeAccountWithoutALocalSnapshotShowsTheDirectEmptyState() {
         val appState = emptyAppState()
         appState.attachChatsController(ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() })
 
@@ -111,7 +115,65 @@ class ShareChatPickerFullScreenTest {
             }
         }
 
-        composeRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.share_no_chats)).assertIsDisplayed()
+        composeRule
+            .onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate))
+            .assertCountEquals(0)
+    }
+
+    /** Local rows remain usable while live subscription and enrichment work is still delayed. */
+    @Test
+    fun cachedRowsReplaceTheEmptyStateBeforeTheLiveBindCompletes() {
+        val appState = emptyAppState(profiles = mutableMapOf(PEER_A to profile(displayName = "Cached person")))
+        val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
+        appState.attachChatsController(controller)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerFullScreenContent(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = { _, _ -> true },
+                )
+            }
+        }
+        composeRule.onNodeWithText(app.getString(R.string.share_no_chats)).assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            controller.applyChatListRow(chatRow(GROUP_A))
+            controller.applyLocalGroupDetails(
+                record = group(GROUP_A).copy(name = "Cached chat"),
+                members = listOf(member(ACCOUNT_HEX, local = true), member(PEER_A, local = false)),
+            )
+        }
+
+        composeRule.onNodeWithText("Cached person").assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.share_no_chats)).assertDoesNotExist()
+    }
+
+    /** Offline refresh failure is actionable without replacing the local-first empty picker. */
+    @Test
+    fun failedRefreshKeepsEmptyPickerAndShowsInlineRetryError() {
+        val appState = emptyAppState()
+        val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
+        controller.publishInitialLoadFailureForTest(
+            ErrorPresentation(AppText.Plain("Offline refresh failed"), "operation=SHARE_PICKER"),
+        )
+        appState.attachChatsController(controller)
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerFullScreenContent(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = { _, _ -> true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Offline refresh failed").assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.share_no_chats)).assertIsDisplayed()
     }
 
     @Test

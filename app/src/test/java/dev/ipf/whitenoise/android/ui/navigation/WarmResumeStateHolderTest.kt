@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
@@ -147,6 +148,108 @@ class WarmResumeStateHolderTest {
         assertSame(request, firstActivityHolder.inboundShareRequest.value)
         assertNull(freshActivityHolder.inboundShareRequest.value)
         freshActivityHolder.release()
+    }
+
+    /** Promotion keeps one stable visible request while acknowledging its one-shot intent. */
+    @Test
+    fun inboundSharePromotionKeepsThePickerRouteAndPersistsOnlyItsToken() {
+        val savedState = SavedStateHandle()
+        val holder = MainShellStateHolder(appState(), savedState)
+        val request = shareRequest("pending-share")
+
+        holder.acceptInboundShareRequest(request)
+        assertSame(request, holder.visibleShareRequest)
+
+        assertTrue(holder.promoteInboundShareRequest(request, persisted = true))
+
+        assertNull(holder.inboundShareRequest.value)
+        assertSame(request, holder.pendingShareRequest.value)
+        assertSame(request, holder.visibleShareRequest)
+        assertEquals(request.requestId, savedState.get<String>("main_shell_pending_share_request_id"))
+        assertFalse(savedState.keys().any { key -> savedState.get<Any>(key) is SharePayload })
+        holder.release()
+    }
+
+    /** Persistence before Direct Share resolution survives recreation without promoting a picker prematurely. */
+    @Test
+    fun persistedInboundShareCanRestoreAfterProcessDeathBeforePromotion() {
+        val savedState = SavedStateHandle()
+        val request = shareRequest("persisted-direct")
+        val holder = MainShellStateHolder(appState(), savedState)
+        holder.acceptInboundShareRequest(request)
+
+        assertTrue(holder.markInboundSharePersisted(request.requestId))
+        assertNull(holder.pendingShareRequest.value)
+        assertEquals(request.requestId, holder.pendingShareRequestId)
+
+        val restoredHolder =
+            MainShellStateHolder(
+                appState(),
+                SavedStateHandle(mapOf("main_shell_pending_share_request_id" to request.requestId)),
+            )
+        assertTrue(restoredHolder.restorePendingShareRequest(request.requestId, request))
+        assertSame(request, restoredHolder.visibleShareRequest)
+        holder.release()
+        restoredHolder.release()
+    }
+
+    /** An in-memory picker without encrypted persistence never advertises a process-restore token. */
+    @Test
+    fun unpersistedPickerDoesNotExposeAProcessRestoreToken() {
+        val holder = MainShellStateHolder(appState(), SavedStateHandle())
+        val request = shareRequest("memory-only")
+        holder.acceptInboundShareRequest(request)
+
+        assertTrue(holder.promoteInboundShareRequest(request, persisted = false))
+
+        assertSame(request, holder.visibleShareRequest)
+        assertNull(holder.pendingShareRequestId)
+        holder.release()
+    }
+
+    /** Process restoration accepts only the request named by the saved encrypted-store token. */
+    @Test
+    fun processRestorationRejectsMismatchedShareAndRestoresTheExpectedRequestOnce() {
+        val expected = shareRequest("expected")
+        val holder =
+            MainShellStateHolder(
+                appState(),
+                SavedStateHandle(mapOf("main_shell_pending_share_request_id" to expected.requestId)),
+            )
+
+        assertFalse(holder.restorePendingShareRequest(expected.requestId, shareRequest("wrong")))
+        assertFalse(holder.hasPendingShareRoute)
+
+        val restoredHolder =
+            MainShellStateHolder(
+                appState(),
+                SavedStateHandle(mapOf("main_shell_pending_share_request_id" to expected.requestId)),
+            )
+        assertTrue(restoredHolder.restorePendingShareRequest(expected.requestId, expected))
+        assertSame(expected, restoredHolder.visibleShareRequest)
+        assertFalse(restoredHolder.restorePendingShareRequest(expected.requestId, expected.copy()))
+        restoredHolder.clearPendingShareRequest(expected.requestId)
+        assertFalse(restoredHolder.hasPendingShareRoute)
+        holder.release()
+        restoredHolder.release()
+    }
+
+    /** A newer system intent replaces picker state without retaining the previous identity. */
+    @Test
+    fun newerInboundShareSupersedesPromotedRequestAndClearsItsRestoreToken() {
+        val savedState = SavedStateHandle()
+        val holder = MainShellStateHolder(appState(), savedState)
+        val first = shareRequest("first")
+        val second = shareRequest("second")
+        holder.acceptInboundShareRequest(first)
+        assertTrue(holder.promoteInboundShareRequest(first, persisted = true))
+
+        holder.acceptInboundShareRequest(second)
+
+        assertSame(second, holder.visibleShareRequest)
+        assertNull(holder.pendingShareRequest.value)
+        assertNull(savedState.get<String>("main_shell_pending_share_request_id"))
+        holder.release()
     }
 
     @Test
@@ -308,6 +411,14 @@ class WarmResumeStateHolderTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+        )
+
+    /** Creates one identity-distinct text request for lifecycle ownership tests. */
+    private fun shareRequest(requestId: String) =
+        ShareRequest(
+            payload = SharePayload("pending", emptyList(), "text/plain"),
+            shortcutId = null,
+            requestId = requestId,
         )
 
     private fun localSnapshot() =

@@ -79,6 +79,26 @@ class ShareInboundStagerTest {
         assertEquals(listOf(doc), staged?.documentUris)
         assertNull(draftStore.get("acct", "g1"))
     }
+
+    /** Provider preparation is side-effect free until the Main-thread apply boundary. */
+    @Test
+    fun preparedStreamsDoNotMutateDraftOrComposerStateBeforeApply() {
+        val context = RuntimeEnvironment.getApplication()
+        val image = Uri.parse("content://example/photo.jpg")
+
+        val prepared = stager.prepare(context, SharePayload("caption", listOf(image), "image/*"))
+
+        assertNull(draftStore.get("acct", "g1"))
+        assertNull(shareStaging.consume("acct", "g1"))
+        stager.stagePreparedToChats(
+            accountIdHex = "acct",
+            groupIds = listOf("g1"),
+            prepared = prepared,
+            draftAccountRef = "acct",
+        )
+        assertEquals("caption", draftStore.get("acct", "g1"))
+        assertEquals(listOf(image), shareStaging.consume("acct", "g1")?.mediaUris)
+    }
 }
 
 private class InMemoryDraftPersistence : DraftPersistence {

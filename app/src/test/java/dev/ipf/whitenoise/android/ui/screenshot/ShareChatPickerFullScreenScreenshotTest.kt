@@ -8,6 +8,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Density
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.share.SharePayload
+import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
 import dev.ipf.whitenoise.android.ui.share.SHARE_CHAT_PICKER_ACCOUNT_SHEET_TEST_TAG
@@ -41,6 +44,44 @@ class ShareChatPickerFullScreenScreenshotTest {
         composeRule
             .onNodeWithTag(SHARE_CHAT_PICKER_SCREEN_TEST_TAG)
             .captureRoboImage("src/test/snapshots/share_chat_picker_full_screen_dark.png")
+    }
+
+    /** Captures the actual recipient picker at the supported maximum app font scale. */
+    @Test
+    fun populatedPickerDarkLargeFont() {
+        renderMultiAccountPicker(fontScale = 2f)
+
+        composeRule
+            .onNodeWithTag(SHARE_CHAT_PICKER_SCREEN_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/share_chat_picker_full_screen_dark_large.png")
+    }
+
+    /** Captures the local-first empty route with its non-destructive offline error. */
+    @Test
+    fun emptyOfflinePickerDark() {
+        val appState = emptyAppState()
+        val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
+        controller.publishInitialLoadFailureForTest(
+            ErrorPresentation(AppText.Plain("Offline — showing chats on this device"), "operation=SHARE_PICKER"),
+        )
+        appState.attachChatsController(controller)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface {
+                    ShareChatPickerFullScreenContent(
+                        appState = appState,
+                        requestId = "empty-offline-screenshot",
+                        payload = SharePayload("Local-first share", emptyList(), "text/plain"),
+                        onDismiss = {},
+                        onStage = { _, _ -> true },
+                    )
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(SHARE_CHAT_PICKER_SCREEN_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/share_chat_picker_full_screen_empty_offline_dark.png")
     }
 
     @Test
@@ -97,7 +138,8 @@ class ShareChatPickerFullScreenScreenshotTest {
             .captureRoboImage("src/test/snapshots/share_chat_picker_account_sheet_dark_large.png")
     }
 
-    private fun renderMultiAccountPicker() {
+    /** Renders the populated multi-account surface at one deterministic density. */
+    private fun renderMultiAccountPicker(fontScale: Float = 1f) {
         val chats =
             (0 until 10).map { index ->
                 hexId(0x20 + index) to hexId(0x40 + index)
@@ -119,20 +161,22 @@ class ShareChatPickerFullScreenScreenshotTest {
             )
 
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true) {
-                Surface {
-                    ShareChatPickerFullScreenContent(
-                        appState = appState,
-                        requestId = "screenshot-request",
-                        payload =
-                            SharePayload(
-                                text = "Planning notes for tomorrow",
-                                streamUris = emptyList(),
-                                intentMimeType = "text/plain",
-                            ),
-                        onDismiss = {},
-                        onStage = { _, _ -> true },
-                    )
+            CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = fontScale)) {
+                WhiteNoiseTheme(darkTheme = true) {
+                    Surface {
+                        ShareChatPickerFullScreenContent(
+                            appState = appState,
+                            requestId = "screenshot-request",
+                            payload =
+                                SharePayload(
+                                    text = "Planning notes for tomorrow",
+                                    streamUris = emptyList(),
+                                    intentMimeType = "text/plain",
+                                ),
+                            onDismiss = {},
+                            onStage = { _, _ -> true },
+                        )
+                    }
                 }
             }
         }

@@ -167,6 +167,7 @@ internal enum class WarmResumeRenderedSurface {
     FullScreenLoading,
     ChatList,
     Conversation,
+    SharePicker,
     InboundRoute,
     Error,
 }
