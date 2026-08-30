@@ -89,11 +89,13 @@ internal fun ConversationTopBar(
     val liveAvatarAccount = controller.avatarAccount
     val liveMembersLoaded = controller.membersLoaded
     val liveMemberCount = controller.memberCount
-    val routeTitle = remember(controller) { liveTitle }
-    val routeGroup = remember(controller) { liveGroup }
-    val routeAvatarAccount = remember(controller) { liveAvatarAccount }
-    val routeMembersLoaded = remember(controller) { liveMembersLoaded }
-    val routeMemberCount = remember(controller) { liveMemberCount }
+    // Re-snapshot when a reused controller enters a new route transition. The
+    // stable `true` key then keeps late hydration frozen for that transition.
+    val routeTitle = remember(controller, freezeRoutePresentation) { liveTitle }
+    val routeGroup = remember(controller, freezeRoutePresentation) { liveGroup }
+    val routeAvatarAccount = remember(controller, freezeRoutePresentation) { liveAvatarAccount }
+    val routeMembersLoaded = remember(controller, freezeRoutePresentation) { liveMembersLoaded }
+    val routeMemberCount = remember(controller, freezeRoutePresentation) { liveMemberCount }
     val presentedTitle = if (freezeRoutePresentation) routeTitle else liveTitle
     val presentedGroup = if (freezeRoutePresentation) routeGroup else liveGroup
     val presentedAvatarAccount = if (freezeRoutePresentation) routeAvatarAccount else liveAvatarAccount

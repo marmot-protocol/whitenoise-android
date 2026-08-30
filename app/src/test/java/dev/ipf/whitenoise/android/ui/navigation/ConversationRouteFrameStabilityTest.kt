@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
-import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.Transition
+import androidx.compose.animation.core.rememberTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +20,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -31,6 +34,9 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -62,32 +68,30 @@ class ConversationRouteFrameStabilityTest {
 
     @Test
     fun rapidBackReversalDoesNotSnapReturningChatListLayerAt120Hz() {
-        val state = RouteHarnessState()
-        composeRule.setContent {
-            RouteHarness(state, LayoutDirection.Ltr, "Cached DM")
-        }
-        composeRule.mainClock.autoAdvance = false
-        composeRule.runOnUiThread { state.route = "Cached DM" }
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(1L)
-        composeRule.runOnIdle { }
-        repeat(8) {
-            composeRule.mainClock.advanceTimeBy(8L)
-            composeRule.runOnIdle { }
-        }
-        val sourceBefore = composeRule.onNodeWithTag(SOURCE_TAG).getUnclippedBoundsInRoot()
-        composeRule.onNodeWithTag(DESTINATION_TAG).assertExists()
+        val progressBefore =
+            FastOutSlowInEasing.transform(
+                EIGHT_FORWARD_120_HZ_FRAMES_MILLIS.toFloat() / CONVERSATION_ROUTE_TRANSITION_MILLIS,
+            )
+        val firstReverseFraction =
+            FastOutSlowInEasing.transform(
+                FRAME_120_HZ_MILLIS.toFloat() / CONVERSATION_ROUTE_TRANSITION_MILLIS,
+            )
+        val progressAfter = progressBefore * (1f - firstReverseFraction)
+        val sourceBefore =
+            conversationRouteLayerTranslation(
+                conversationVisibility = progressBefore,
+                conversationRoute = false,
+                suppressMotion = false,
+            )
+        val sourceAfter =
+            conversationRouteLayerTranslation(
+                conversationVisibility = progressAfter,
+                conversationRoute = false,
+                suppressMotion = false,
+            )
 
-        composeRule.runOnUiThread { state.route = null }
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(1L)
-        composeRule.runOnIdle { }
-        composeRule.mainClock.advanceTimeBy(8L)
-        composeRule.runOnIdle { }
-        val sourceAfter = composeRule.onNodeWithTag(SOURCE_TAG).getUnclippedBoundsInRoot()
-
-        assertContinuousReversalStep("source", sourceBefore.left.value, sourceAfter.left.value)
-        assertTrue(kotlin.math.abs(sourceAfter.left.value) <= CONVERSATION_ROUTE_LAYER_TRAVEL.value)
+        assertContinuousReversalStep("source", sourceBefore, sourceAfter)
+        assertTrue(kotlin.math.abs(sourceAfter) <= CONVERSATION_ROUTE_LAYER_TRAVEL.value)
     }
 
     @Test
@@ -122,19 +126,20 @@ class ConversationRouteFrameStabilityTest {
         destinationLabel: String,
         frameMillis: Long,
     ) {
-        val state = RouteHarnessState()
+        val state = SeekableRouteHarnessState()
         composeRule.setContent {
-            RouteHarness(state, layoutDirection, destinationLabel)
+            SeekableRouteHarness(state, layoutDirection, destinationLabel)
         }
         composeRule.mainClock.autoAdvance = false
         val outgoingBounds = mutableListOf<DpRect>()
-        val forward = captureForwardFrames(state, destinationLabel, outgoingBounds, frameMillis)
+        val forward = captureSeekableForwardFrames(state, destinationLabel, outgoingBounds, frameMillis)
         assertStableOuterBounds(outgoingBounds)
         assertConverges(forward, "forward destination")
         assertAlphaConverges(forward, conversationRoute = true, label = "forward destination")
         composeRule.onNodeWithTag(DESTINATION_TAG).assertIsDisplayed()
 
-        val back = captureBackFrames(state, frameMillis)
+        snapSeekableRoute(state, destinationLabel)
+        val back = captureSeekableBackFrames(state, frameMillis)
         assertConverges(back, "back destination")
         assertAlphaConverges(back, conversationRoute = false, label = "back destination")
         composeRule.onNodeWithTag(SOURCE_TAG).assertIsDisplayed()
@@ -142,17 +147,33 @@ class ConversationRouteFrameStabilityTest {
 
     @Composable
     @Suppress("FunctionNaming")
-    private fun RouteHarness(
-        state: RouteHarnessState,
+    private fun SeekableRouteHarness(
+        state: SeekableRouteHarnessState,
+        layoutDirection: LayoutDirection,
+        destinationLabel: String,
+    ) {
+        val coroutineScope = rememberCoroutineScope()
+        val transition = rememberTransition(state.transitionState, label = "seekable conversation route test")
+        SideEffect { state.coroutineScope = coroutineScope }
+        RouteHarnessContent(
+            transition = transition,
+            hydrationStage = state.hydrationStage,
+            layoutDirection = layoutDirection,
+            destinationLabel = destinationLabel,
+        )
+    }
+
+    @Composable
+    @Suppress("FunctionNaming")
+    private fun RouteHarnessContent(
+        transition: Transition<String?>,
+        hydrationStage: Int,
         layoutDirection: LayoutDirection,
         destinationLabel: String,
     ) {
         CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
             WhiteNoiseTheme {
                 Surface(Modifier.requiredSize(360.dp, 640.dp)) {
-                    val transition = updateTransition(state.route, label = "conversation route test")
-                    val isRunning = transition.isRunning
-                    SideEffect { state.transitionRunning = isRunning }
                     ConversationRouteAnimatedContent(
                         transition = transition,
                         routeForwardDirection = conversationRouteForwardDirection(layoutDirection),
@@ -173,7 +194,7 @@ class ConversationRouteFrameStabilityTest {
                                     .background(MaterialTheme.colorScheme.surface)
                                     .testTag(DESTINATION_TAG),
                             ) {
-                                HydratingRouteChrome(state.hydrationStage, destinationLabel)
+                                HydratingRouteChrome(hydrationStage, destinationLabel)
                             }
                         }
                     }
@@ -210,72 +231,111 @@ class ConversationRouteFrameStabilityTest {
         )
     }
 
-    private fun captureForwardFrames(
-        state: RouteHarnessState,
+    private fun captureSeekableForwardFrames(
+        state: SeekableRouteHarnessState,
         destinationLabel: String,
         outgoingBounds: MutableList<DpRect>,
         frameMillis: Long,
     ): RouteFrameSamples {
-        composeRule.runOnUiThread { state.route = destinationLabel }
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(1L)
-        composeRule.runOnIdle { }
         val samples = RouteFrameSamples()
-        val animationFrames = animationFrameCount(frameMillis)
-        repeat(animationFrames + POST_SETTLE_FRAMES) { frame ->
-            if (frame == animationFrames - 2) composeRule.runOnUiThread { state.hydrationStage = 1 }
-            if (frame == animationFrames - 1) composeRule.runOnUiThread { state.hydrationStage = 2 }
-            composeRule.mainClock.advanceTimeBy(frameMillis)
-            composeRule.runOnIdle { }
-            captureRouteFrame(state, samples, outgoingBounds)
+        val fractions = routeFrameFractions(frameMillis)
+        val runningFrames = fractions.count { it < 1f }
+        val firstHydrationFrame = runningFrames - 2
+        val secondHydrationFrame = runningFrames - 1
+        fractions.forEachIndexed { frame, fraction ->
+            if (frame == firstHydrationFrame || frame == secondHydrationFrame) {
+                assertTrue("hydration stage $frame is not a running frame", fraction < 1f)
+                composeRule.runOnUiThread {
+                    state.hydrationStage = if (frame == firstHydrationFrame) 1 else 2
+                }
+            }
+            seekRoute(state, fraction, destinationLabel)
+            captureRouteFrame(samples, outgoingBounds, running = fraction < 1f)
         }
         return samples
     }
 
     private fun captureRouteFrame(
-        state: RouteHarnessState,
         samples: RouteFrameSamples,
         outgoingBounds: MutableList<DpRect>,
+        running: Boolean,
     ) {
         composeRule.onNodeWithTag(DESTINATION_TAG).assertExists()
         if (composeRule.onAllNodesWithTag(SOURCE_TAG).fetchSemanticsNodes().isNotEmpty()) {
             outgoingBounds.add(composeRule.onNodeWithTag(SOURCE_TAG).getUnclippedBoundsInRoot())
         }
         samples.bounds.add(composeRule.onNodeWithTag(DESTINATION_TAG).getUnclippedBoundsInRoot())
-        samples.running.add(state.transitionRunning)
+        samples.running.add(running)
     }
 
-    private fun captureBackFrames(
-        state: RouteHarnessState,
+    private fun captureSeekableBackFrames(
+        state: SeekableRouteHarnessState,
         frameMillis: Long,
     ): RouteFrameSamples {
-        composeRule.runOnUiThread { state.route = null }
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(1L)
-        composeRule.runOnIdle { }
         val samples = RouteFrameSamples()
-        repeat(animationFrameCount(frameMillis) + POST_SETTLE_FRAMES) {
-            composeRule.mainClock.advanceTimeBy(frameMillis)
-            composeRule.runOnIdle { }
-            captureBackFrame(state, samples)
+        routeFrameFractions(frameMillis).forEach { fraction ->
+            seekRoute(state, fraction, null)
+            captureBackFrame(samples, running = fraction < 1f)
         }
         return samples
     }
 
     private fun captureBackFrame(
-        state: RouteHarnessState,
         samples: RouteFrameSamples,
+        running: Boolean,
     ) {
         composeRule.onNodeWithTag(SOURCE_TAG).assertExists()
         samples.bounds.add(composeRule.onNodeWithTag(SOURCE_TAG).getUnclippedBoundsInRoot())
-        samples.running.add(state.transitionRunning)
+        samples.running.add(running)
     }
 
-    private fun animationFrameCount(frameMillis: Long): Int =
-        (
-            (CONVERSATION_ROUTE_TRANSITION_MILLIS + frameMillis - 1L) /
-                frameMillis
-        ).toInt()
+    private fun routeFrameFractions(frameMillis: Long): List<Float> =
+        buildList {
+            var playTimeMillis = 0L
+            while (playTimeMillis < CONVERSATION_ROUTE_TRANSITION_MILLIS) {
+                add(playTimeMillis.toFloat() / CONVERSATION_ROUTE_TRANSITION_MILLIS)
+                playTimeMillis += frameMillis
+            }
+            repeat(POST_SETTLE_FRAMES) { add(1f) }
+        }
+
+    private fun seekRoute(
+        state: SeekableRouteHarnessState,
+        fraction: Float,
+        target: String?,
+    ) {
+        val job = launchSeekableOperation(state) { state.transitionState.seekTo(fraction, target) }
+        awaitSeekableOperation(job)
+    }
+
+    private fun snapSeekableRoute(
+        state: SeekableRouteHarnessState,
+        target: String?,
+    ) {
+        val job = launchSeekableOperation(state) { state.transitionState.snapTo(target) }
+        awaitSeekableOperation(job)
+    }
+
+    private fun launchSeekableOperation(
+        state: SeekableRouteHarnessState,
+        operation: suspend () -> Unit,
+    ): Job {
+        lateinit var job: Job
+        composeRule.runOnUiThread {
+            job = state.coroutineScope.launch { operation() }
+        }
+        return job
+    }
+
+    private fun awaitSeekableOperation(job: Job) {
+        repeat(MAX_SEEK_COMMIT_FRAMES) {
+            if (job.isCompleted) return
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.runOnIdle { }
+        }
+        assertTrue("seekable transition did not commit", job.isCompleted)
+        assertTrue("seekable transition was cancelled", !job.isCancelled)
+    }
 
     private fun assertConverges(
         samples: RouteFrameSamples,
@@ -347,15 +407,18 @@ class ConversationRouteFrameStabilityTest {
         const val TOP_CHROME_TAG = "conversation-route-top-chrome"
         const val BOTTOM_CHROME_TAG = "conversation-route-bottom-chrome"
         const val POST_SETTLE_FRAMES = 3
+        const val MAX_SEEK_COMMIT_FRAMES = 4
+        const val FRAME_120_HZ_MILLIS = 8L
+        const val EIGHT_FORWARD_120_HZ_FRAMES_MILLIS = FRAME_120_HZ_MILLIS * 8L
         const val ALPHA_TOLERANCE = 0.005f
         const val OPAQUE_CHANNEL_MINIMUM = 0.99f
         const val MAX_120_HZ_REVERSAL_STEP_DP = 8f
     }
 
-    private class RouteHarnessState {
-        var route by mutableStateOf<String?>(null)
+    private class SeekableRouteHarnessState {
+        val transitionState = SeekableTransitionState<String?>(null)
         var hydrationStage by mutableIntStateOf(0)
-        var transitionRunning = false
+        lateinit var coroutineScope: CoroutineScope
     }
 
     private data class RouteFrameSamples(
