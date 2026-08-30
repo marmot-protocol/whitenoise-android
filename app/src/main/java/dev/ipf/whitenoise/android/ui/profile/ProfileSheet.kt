@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.profile
 
-import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
@@ -100,6 +99,8 @@ import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.share.launchInviteShare
+import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
@@ -117,7 +118,6 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorCard
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
 import dev.ipf.whitenoise.android.ui.chats.newchat.attemptOpenOrStartProfileChat
-import dev.ipf.whitenoise.android.ui.chats.newchat.inviteShareIntent
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
@@ -713,12 +713,8 @@ internal fun ProfileSheet(
                     error = error,
                     onRetry = { openOrCreateProfileChat(error.retryGroupIdHex) },
                     onInvite = {
-                        context.startActivity(
-                            Intent.createChooser(
-                                inviteShareIntent(inviteMessage),
-                                inviteTitle,
-                            ),
-                        )
+                        launchInviteShare(context, inviteMessage, inviteTitle)
+                            .onFailure { appState.presentOutboundShareFailure("PROFILE_INVITE_SHARE", it) }
                     },
                     onCopy = { detail -> clipboard.setText(AnnotatedString(detail)) },
                 )

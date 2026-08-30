@@ -185,6 +185,7 @@ internal fun ChatsScreen(
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
+    val openNewMessageFlow = { showNewChatFlow = true }
     var pendingBulkDelete by remember { mutableStateOf<List<ChatListItem>?>(null) }
     var actionSheetChatId by
         remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
@@ -1152,7 +1153,7 @@ internal fun ChatsScreen(
             if (!searchOpen && !selectionMode) {
                 val actionColors = accountActionColors(appState)
                 FloatingActionButton(
-                    onClick = { showNewChatFlow = true },
+                    onClick = openNewMessageFlow,
                     modifier = Modifier.performanceTestTag(PerformanceTestTags.NEW_MESSAGE),
                     containerColor = actionColors.container,
                     contentColor = actionColors.content,
@@ -1266,7 +1267,7 @@ internal fun ChatsScreen(
                             )
                         }
                     sourceList.isEmpty() ->
-                        EmptyChats(onCreate = { showNewChatFlow = true })
+                        EmptyChats(onCreate = openNewMessageFlow)
                     visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                         controller.error
                             ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }

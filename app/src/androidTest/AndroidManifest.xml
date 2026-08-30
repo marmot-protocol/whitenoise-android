@@ -11,5 +11,16 @@
             android:name="dev.ipf.whitenoise.android.share.ExternalShareDispatchActivity"
             android:excludeFromRecents="true"
             android:exported="true" />
+
+        <activity
+            android:name="dev.ipf.whitenoise.android.share.OutboundShareTestTargetActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>

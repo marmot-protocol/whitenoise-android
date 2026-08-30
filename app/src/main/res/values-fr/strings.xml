@@ -132,6 +132,7 @@
     <string name="error_missing_key_package">Cette personne n’a pas encore configuré la messagerie chiffrée. Demandez-lui d’installer White Noise et d’ouvrir l’app une fois, puis réessayez.</string>
     <string name="error_missing_key_package_for">%1$s n’a pas encore configuré la messagerie chiffrée. Demandez-lui d’installer White Noise et d’ouvrir l’app une fois, puis réessayez.</string>
     <string name="invite_to_white_noise">Inviter sur White Noise</string>
+    <string name="invite_friends">Inviter des amis</string>
     <string name="invite_to_white_noise_description">%1$s n\'est pas encore sur White Noise. Partagez l\'application pour démarrer une discussion sécurisée.</string>
     <string name="unknown_invite_to_white_noise_description">Cet utilisateur n\'est pas encore sur White Noise. Partagez l\'application pour démarrer une discussion sécurisée.</string>
     <string name="invite_message">Rejoignez-moi sur White Noise. Pas de numéro de téléphone. Pas de surveillance. Juste une vraie confidentialité. Téléchargez ici : https://www.whitenoise.chat/download</string>
@@ -239,6 +240,7 @@
     <string name="export_conversation_transcript">Exporter le transcript de la conversation</string>
     <string name="toast_couldnt_export_transcript">Impossible d’exporter le transcript</string>
     <string name="no_share_target_available">Aucune cible de partage disponible</string>
+    <string name="outbound_share_failed">Impossible d’ouvrir le partage</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">Chargement de l’état MLS...</string>
     <string name="mls_state_unavailable">État MLS indisponible.</string>

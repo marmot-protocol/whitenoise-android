@@ -16,9 +16,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -49,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.onboarding.PublicIdentifierFieldTrailingAction
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
@@ -425,4 +430,40 @@ internal fun FlowQuickActionRow(
         }
         Text(title, style = MaterialTheme.typography.bodyLarge)
     }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+internal fun NewMessageQuickActions(
+    query: String,
+    showMyQrLabel: String,
+    showMyQrEnabled: Boolean,
+    onNewGroup: () -> Unit,
+    onScanQr: () -> Unit,
+    onShowMyQr: () -> Unit,
+    onInviteFriends: () -> Unit,
+) {
+    if (query.isNotBlank()) return
+    FlowQuickActionRow(
+        icon = Icons.Default.Group,
+        title = stringResource(R.string.new_group),
+        onClick = onNewGroup,
+        modifier = Modifier.performanceTestTag(PerformanceTestTags.NEW_GROUP),
+    )
+    FlowQuickActionRow(
+        icon = Icons.Default.Share,
+        title = stringResource(R.string.invite_friends),
+        onClick = onInviteFriends,
+    )
+    FlowQuickActionRow(
+        icon = Icons.Default.QrCodeScanner,
+        title = stringResource(R.string.scan_qr_code),
+        onClick = onScanQr,
+    )
+    FlowQuickActionRow(
+        icon = Icons.Default.QrCode,
+        title = showMyQrLabel,
+        onClick = onShowMyQr,
+        enabled = showMyQrEnabled,
+    )
 }
