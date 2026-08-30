@@ -5,15 +5,21 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
 
+/** Complete display projection for an available or unavailable reply target. */
 data class TimelineReplyDisplay(
     val sender: String,
     val body: String,
     val mediaKind: ReplyMediaKind = ReplyMediaKind.None,
+    val mediaFileName: String? = null,
+    val mediaType: String? = null,
+    val originalUnavailable: Boolean = false,
     val warning: String? = null,
 )
 
+/** Stable media categories used by reply previews across typed and legacy records. */
 enum class ReplyMediaKind { None, Photo, Video, Voice, Document }
 
+/** Maps a typed MIME value to the reply-preview media category. */
 fun replyMediaKindFromMime(mime: String?): ReplyMediaKind {
     if (mime.isNullOrBlank()) return ReplyMediaKind.None
     return when {
@@ -24,14 +30,17 @@ fun replyMediaKindFromMime(mime: String?): ReplyMediaKind {
     }
 }
 
+/** Preserves the first typed attachment's safe reply-preview inputs. */
 fun typedReplyMediaFallback(media: List<MediaAttachmentReferenceFfi>): MediaPreviewFallback? =
     media.firstOrNull()?.let { attachment ->
         MediaPreviewFallback(
             filename = attachment.fileName.trim().takeIf { it.isNotEmpty() },
             kind = replyMediaKindFromMime(attachment.mediaType),
+            mediaType = attachment.mediaType.trim().takeIf { it.isNotEmpty() },
         )
     }
 
+/** Uses typed media copy only when the reply target has no textual body. */
 fun replyBodyWithTypedMediaFallback(
     plaintext: String,
     projectedBody: String,
@@ -44,8 +53,7 @@ fun replyBodyWithTypedMediaFallback(
         projectedBody
     }
 
-// Heuristic on the FFI's reply preview mediaJson (opaque JSON; just looks
-// for the MIME tree prefix). Cheap and good enough for "what icon to show".
+/** Provides a coarse category by finding MIME-family markers in legacy opaque media JSON. */
 fun replyMediaKindFromJson(mediaJson: String?): ReplyMediaKind {
     if (mediaJson.isNullOrBlank()) return ReplyMediaKind.None
     val lower = localeInvariantFold(mediaJson)
@@ -159,20 +167,35 @@ object TimelineProjector {
         )
     }
 
+    /** Projects a persisted reply, including a truthful unavailable-target state. */
     fun replyPreview(
         record: TimelineMessageRecordFfi,
         copy: MessageTextCopy = MessageTextCopy.Default,
     ): TimelineReplyDisplay? {
-        val preview = record.replyPreview ?: return null
+        val preview = record.replyPreview
+        if (preview == null) {
+            return record.replyToMessageIdHex
+                ?.takeIf(String::isNotBlank)
+                ?.let {
+                    TimelineReplyDisplay(
+                        sender = "",
+                        body = "",
+                        originalUnavailable = true,
+                    )
+                }
+        }
         val mediaFallback = if (preview.deleted) null else typedReplyMediaFallback(preview.media)
         return TimelineReplyDisplay(
             sender = preview.sender,
             body = preview.displayBody(copy, mediaFallback),
             mediaKind = replyPreviewMediaKind(preview.deleted, mediaFallback, preview.mediaJson),
+            mediaFileName = mediaFallback?.filename,
+            mediaType = mediaFallback?.mediaType,
             warning = if (preview.deleted) null else invalidationWarning(preview.invalidationStatus, copy),
         )
     }
 
+    /** Builds the preview shown when the target record itself is still available. */
     fun replyTargetPreview(
         record: TimelineMessageRecordFfi,
         mediaFallback: MediaPreviewFallback? = typedReplyMediaFallback(record.media),
@@ -190,6 +213,8 @@ object TimelineProjector {
                     copy = copy,
                 ),
             mediaKind = replyPreviewMediaKind(record.deleted, visibleMediaFallback, record.mediaJson),
+            mediaFileName = visibleMediaFallback?.filename,
+            mediaType = visibleMediaFallback?.mediaType,
             warning = invalidationWarning(record, copy),
         )
     }

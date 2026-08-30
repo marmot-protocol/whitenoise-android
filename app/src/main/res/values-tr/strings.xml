@@ -484,6 +484,7 @@
     <string name="toast_notification_scope_update_failed">Bu bildirim ayarı güncellenemedi</string>
     <string name="toast_notification_settings_unavailable">Bildirim ayarları açılamadı</string>
     <string name="switch_account">Profil değiştir</string>
+    <string name="switching_to_account">%1$s profiline geçiliyor</string>
     <string name="my_qr_code">QR kodum</string>
     <string name="read_only">Özel anahtar harici bir imzalayıcıda saklanıyor</string>
     <string name="active">Aktif</string>
@@ -1469,7 +1470,7 @@
     <string name="tts_rate_custom">Özel</string>
     <string name="tts_rate_custom_error">0,1× ile 10,0× arasında bir hız girin.</string>
     <string name="tts_rate_apply">Uygula</string>
-    <string name="connectivity_offline">İnternet yok — Wi-Fi veya mobil veriyi açın</string>
+    <string name="connectivity_offline">Çevrimdışı</string>
     <string name="connectivity_connecting">Bağlanıyor…</string>
     <string name="connectivity_connected">Bağlandı</string>
     <string name="amber_signin_waiting_request">İmzalayıcıda kimlik isteğini onaylayın (adım 1/2)…</string>

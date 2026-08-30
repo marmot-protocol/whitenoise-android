@@ -516,6 +516,7 @@
     <string name="toast_notification_scope_update_failed">Не удалось обновить эту настройку уведомлений</string>
     <string name="toast_notification_settings_unavailable">Не удалось открыть настройки уведомлений</string>
     <string name="switch_account">Сменить профиль</string>
+    <string name="switching_to_account">Переключение на %1$s</string>
     <string name="my_qr_code">Мой QR код</string>
     <string name="read_only">Закрытый ключ хранится во внешнем приложении</string>
     <string name="active">Активный</string>
@@ -1533,7 +1534,7 @@
     <string name="tts_rate_custom">Настраиваемая</string>
     <string name="tts_rate_custom_error">Введите скорость от 0,1× до 10,0×.</string>
     <string name="tts_rate_apply">Применить</string>
-    <string name="connectivity_offline">Нет интернета — включите Wi-Fi или мобильные данные</string>
+    <string name="connectivity_offline">Не в сети</string>
     <string name="connectivity_connecting">Подключение…</string>
     <string name="connectivity_connected">Подключено</string>
     <string name="amber_signin_waiting_request">Подтвердите запрос личности в подписывающем приложении (шаг 1 из 2)…</string>

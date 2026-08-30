@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import java.util.Locale
 
 internal enum class AttachmentIconCategory {
@@ -107,6 +108,7 @@ private val videoExtensions = setOf("mp4", "m4v", "webm", "mkv", "mov", "avi")
 private val compoundExtensions = listOf("tar.gz", "tar.bz2", "tar.xz")
 private val safeSimpleExtension = Regex("^[a-z0-9]{1,8}$")
 
+/** Resolves a display label and icon without overriding the attachment's real MIME type. */
 internal fun resolveAttachmentPresentation(
     mediaType: String,
     fileName: String,
@@ -130,6 +132,12 @@ internal fun resolveAttachmentPresentation(
         ?: byExtension
         ?: AttachmentPresentation(extension?.uppercase(Locale.ROOT), AttachmentIconCategory.Generic)
 }
+
+/** A remote attachment name reduced to a non-spoofing, display-only basename. */
+internal fun safeAttachmentDisplayName(fileName: String): String? =
+    ProfileSanitizer
+        .displayName(fileName.replace('\\', '/').substringAfterLast('/'))
+        ?.takeIf { it != "." && it != ".." }
 
 private fun mimeFamilyCategory(mime: String): AttachmentIconCategory? =
     when {

@@ -56,6 +56,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val publishReady = body.indexOf("isLoading = false", startIndex = secondSnapshot)
         val renderFrame = body.indexOf("awaitRenderedChatListFrame()", startIndex = publishReady)
         val catchUp = body.indexOf("connectionOwner.launchCatchUp()", startIndex = renderFrame)
+        val initialValidation = body.indexOf("connectionOwner.beginSubscriptionValidation")
+        val retryAttempt = body.indexOf("connectionOwner.beginSessionAttempt", startIndex = initialValidation)
 
         assertTrue("a constructor seed must be detected before bind clears state", seededSnapshot >= 0)
         assertTrue("the seeded target list must draw before its catch-up starts", seededCatchUp > seededRenderFrame)
@@ -78,6 +80,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
             "live consumers must start after catch-up is launched",
             body.indexOf("runUntilFirstLiveSubscriptionEnds(") > catchUp,
         )
+        assertTrue("the first UI projection bind must validate without presenting a retry", initialValidation >= 0)
+        assertTrue("only a later subscription iteration may present Connecting", retryAttempt > initialValidation)
     }
 
     @Test

@@ -101,6 +101,6 @@ internal fun ConversationControllerReleasedPerformanceMarker(controllerReleased:
     )
 }
 
-internal const val CONVERSATION_ROUTE_TRANSITION_MILLIS = 240
+internal const val CONVERSATION_ROUTE_TRANSITION_MILLIS = 200
 internal const val CONVERSATION_PENDING_OPEN_TIMEOUT_MILLIS = 300L
 internal const val MAIN_SHELL_ROUTE_KEY = "main-shell"

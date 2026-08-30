@@ -484,6 +484,7 @@
     <string name="toast_notification_scope_update_failed">Impossible de mettre à jour ce réglage de notification</string>
     <string name="toast_notification_settings_unavailable">Impossible d’ouvrir les réglages de notifications</string>
     <string name="switch_account">Changer de profil</string>
+    <string name="switching_to_account">Passage à %1$s</string>
     <string name="my_qr_code">Mon code QR</string>
     <string name="read_only">La clé privée est stockée dans un signataire externe</string>
     <string name="active">Actif</string>
@@ -1471,7 +1472,7 @@
     <string name="tts_rate_custom">Personnalisée</string>
     <string name="tts_rate_custom_error">Saisissez une vitesse comprise entre 0,1× et 10,0×.</string>
     <string name="tts_rate_apply">Appliquer</string>
-    <string name="connectivity_offline">Pas d\'internet — activez le Wi-Fi ou les données mobiles</string>
+    <string name="connectivity_offline">Hors ligne</string>
     <string name="connectivity_connecting">Connexion…</string>
     <string name="connectivity_connected">Connecté</string>
     <string name="amber_signin_waiting_request">Approuvez la demande d\'identité dans votre signataire (étape 1 sur 2)…</string>

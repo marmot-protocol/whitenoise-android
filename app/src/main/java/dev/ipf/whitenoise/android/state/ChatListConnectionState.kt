@@ -12,10 +12,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
-internal enum class ChatListConnectionPhase {
-    Idle,
-    Attempting,
-    Ready,
+internal enum class ChatListConnectionPhase(
+    val canAcceptReadiness: Boolean,
+) {
+    Idle(false),
+    Validating(true),
+    Attempting(true),
+    Ready(false),
 }
 
 /**
@@ -64,10 +67,29 @@ internal fun ChatListConnectionState.beginSessionAttempt(
         phase = ChatListConnectionPhase.Attempting,
     )
 
-internal fun ChatListConnectionState.beginReadinessRefresh(): ChatListConnectionState =
+internal fun ChatListConnectionState.beginSubscriptionValidation(
+    accountRef: String,
+    runtimeGeneration: Int,
+    bindEpoch: Long,
+): ChatListConnectionState =
+    ChatListConnectionState(
+        accountRef = accountRef,
+        runtimeGeneration = runtimeGeneration,
+        bindEpoch = bindEpoch,
+        sessionAttemptId = sessionAttemptId + 1L,
+        evidenceEpoch = evidenceEpoch + 1L,
+        phase = ChatListConnectionPhase.Validating,
+    )
+
+internal fun ChatListConnectionState.beginReadinessRefresh(presentAttempt: Boolean): ChatListConnectionState =
     copy(
         evidenceEpoch = evidenceEpoch + 1L,
-        phase = ChatListConnectionPhase.Attempting,
+        phase =
+            if (presentAttempt) {
+                ChatListConnectionPhase.Attempting
+            } else {
+                ChatListConnectionPhase.Validating
+            },
     )
 
 internal fun ChatListConnectionState.invalidateReadiness(): ChatListConnectionState =
@@ -88,14 +110,14 @@ internal fun ChatListConnectionState.evidenceTokenOrNull(): ChatListConnectionEv
 }
 
 internal fun ChatListConnectionState.readyFromCatchUp(token: ChatListConnectionEvidenceToken): ChatListConnectionState =
-    if (matches(token) && phase == ChatListConnectionPhase.Attempting) {
+    if (matches(token) && phase.canAcceptReadiness) {
         copy(phase = ChatListConnectionPhase.Ready)
     } else {
         this
     }
 
 internal fun ChatListConnectionState.catchUpFailed(token: ChatListConnectionEvidenceToken): ChatListConnectionState =
-    if (matches(token) && phase == ChatListConnectionPhase.Attempting) {
+    if (matches(token) && phase.canAcceptReadiness) {
         invalidateReadiness()
     } else {
         this
@@ -180,9 +202,18 @@ internal class ChatListConnectionOwner(
         return state
     }
 
+    fun beginSubscriptionValidation(
+        accountRef: String,
+        bindEpoch: Long,
+    ): ChatListConnectionState {
+        readinessJob?.cancel()
+        state = state.beginSubscriptionValidation(accountRef, appState.runtimeGeneration, bindEpoch)
+        return state
+    }
+
     fun observe(catchUp: Deferred<Boolean>) {
         val token = state.evidenceTokenOrNull() ?: return
-        if (state.phase != ChatListConnectionPhase.Attempting) return
+        if (!state.phase.canAcceptReadiness) return
         readinessJob?.cancel()
         readinessJob =
             scope.launch {
@@ -222,17 +253,26 @@ internal class ChatListConnectionOwner(
         }
     }
 
-    fun refresh() {
+    fun refresh(presentAttempt: Boolean) {
         if (!cleared) {
             when {
                 !appState.connectivitySignals.value.hasValidatedInternet -> invalidate()
-                hasCurrentSubscriptions() && state.phase != ChatListConnectionPhase.Attempting -> {
-                    state = state.beginReadinessRefresh()
+                hasCurrentSubscriptions() && shouldRefresh(presentAttempt) -> {
+                    state = state.beginReadinessRefresh(presentAttempt)
                     observe(launchCatchUp())
                 }
             }
         }
     }
+
+    private fun shouldRefresh(presentAttempt: Boolean): Boolean =
+        when (state.phase) {
+            ChatListConnectionPhase.Attempting -> false
+            ChatListConnectionPhase.Validating -> presentAttempt
+            ChatListConnectionPhase.Idle,
+            ChatListConnectionPhase.Ready,
+            -> true
+        }
 
     fun launchCatchUp(): Deferred<Boolean> = appState.launchCatchUpAccounts(state.evidenceTokenOrNull())
 

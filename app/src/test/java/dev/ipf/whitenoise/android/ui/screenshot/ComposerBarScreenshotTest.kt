@@ -5,16 +5,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -141,6 +144,34 @@ class ComposerBarScreenshotTest {
     fun composerBarLongDraftAmoled() {
         renderLongComposer(darkTheme = true, amoled = true)
         composeRule.onNodeWithTag(LONG_TAG).captureRoboImage("src/test/snapshots/composer_bar_long_draft_amoled.png")
+    }
+
+    /** Captures the first, next, and settled frames after one long bulk replacement. */
+    @Test
+    fun composerBulkPasteFirstNextAndSettledFrames() {
+        renderBulkPasteComposer()
+        val field = composeRule.onNode(hasSetTextAction())
+        val root = composeRule.onNodeWithTag(BULK_PASTE_TAG)
+        val replacement = (1..18).joinToString("\n") { line -> "Bulk paste caret frame $line stays visible." }
+
+        field.performClick()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            field.performTextReplacement(replacement)
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.runOnIdle { }
+            root.captureRoboImage("src/test/snapshots/composer_bulk_paste_first_frame.png")
+
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.runOnIdle { }
+            root.captureRoboImage("src/test/snapshots/composer_bulk_paste_next_frame.png")
+
+            repeat(30) { composeRule.mainClock.advanceTimeByFrame() }
+            composeRule.runOnIdle { }
+            root.captureRoboImage("src/test/snapshots/composer_bulk_paste_settled.png")
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
     }
 
     @Test
@@ -440,6 +471,26 @@ class ComposerBarScreenshotTest {
         composeRule.waitForIdle()
     }
 
+    /** Renders a short focused composer at the bottom of a fixed phone viewport. */
+    private fun renderBulkPasteComposer() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(Modifier.width(360.dp).height(720.dp).testTag(BULK_PASTE_TAG)) {
+                    Box(contentAlignment = Alignment.BottomCenter) {
+                        ComposerBar(
+                            replyingTo = null,
+                            messageTextCopy = MessageTextCopy.Default,
+                            onCancelReply = {},
+                            onSend = { _, _ -> },
+                            initialDraft = TextFieldValue("Short"),
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+    }
+
     private fun previewVoiceRecordingController(): VoiceRecordingController {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         return VoiceRecordingController(
@@ -511,6 +562,7 @@ class ComposerBarScreenshotTest {
     private companion object {
         const val TAG = "composer-bar"
         const val LONG_TAG = "long-composer-bar"
+        const val BULK_PASTE_TAG = "bulk-paste-composer"
         const val RECORDING_STRIP_TAG = "composer-voice-recording-strip"
         const val ACCOUNT = "account"
         const val GROUP = "group"

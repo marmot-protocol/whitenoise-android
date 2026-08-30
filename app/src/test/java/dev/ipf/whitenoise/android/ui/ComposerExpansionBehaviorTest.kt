@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
@@ -36,6 +37,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -359,10 +361,11 @@ class ComposerExpansionBehaviorTest {
         )
     }
 
+    /** A wrapping bulk replacement keeps both outer and pill heights monotonic on every frame. */
     @Test
     fun bulkReplacementKeepsEveryFrameVisibleAndHeightMonotonic() {
         val initialDraft = "Short draft"
-        val replacement = (1..24).joinToString("\n") { "Bulk line $it remains visible" }
+        val replacement = (1..24).joinToString("\n") { "Bulk paste caret frame $it stays visible." }
         render(initialDraft)
         val editor = composeRule.onNode(hasSetTextAction())
         editor.performClick()
@@ -392,9 +395,11 @@ class ComposerExpansionBehaviorTest {
             assertTextFitsInsidePill(geometry)
         }
         assertMonotonic(allFrames.map { it.composer.height }, increasing = true)
+        assertMonotonic(allFrames.map { it.pill.height }, increasing = true)
         assertEditorState(editor, replacement, TextRange(replacement.length))
     }
 
+    /** A newer compact replacement prevents an unsettled long value from restoring expansion. */
     @Test
     fun supersedingBulkReplacementCannotRestoreStaleExpandedMode() {
         val initialDraft = "Short draft"
@@ -423,6 +428,85 @@ class ComposerExpansionBehaviorTest {
 
         resizeHandle().assertDoesNotExist()
         assertEditorState(editor, committedReplacement, TextRange(committedReplacement.length))
+    }
+
+    /** A second long replacement supersedes the first while retaining an expanded final layout. */
+    @Test
+    fun supersedingBulkReplacementCanCommitANewerExpandedMode() {
+        val staleReplacement = (1..24).joinToString("\n") { "Stale bulk line $it" }
+        val committedReplacement = (1..18).joinToString("\n") { "Committed bulk line $it" }
+        render("Short draft")
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+
+        val frames =
+            withManualClock {
+                editor.performTextReplacement(staleReplacement)
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.runOnIdle { }
+                editor.performTextReplacement(committedReplacement)
+                buildList {
+                    repeat(20) {
+                        composeRule.mainClock.advanceTimeByFrame()
+                        composeRule.runOnIdle { }
+                        assertEquals(
+                            committedReplacement,
+                            editor.fetchSemanticsNode().config[SemanticsProperties.EditableText].text,
+                        )
+                        add(composerGeometry())
+                    }
+                }
+            }
+        composeRule.waitForIdle()
+
+        frames.forEach { geometry ->
+            assertTrue("superseding expanded edit must keep the editor visible", geometry.editor.height > 0f)
+            assertTextFitsInsidePill(geometry)
+        }
+        resizeHandle().assertExists()
+        assertEditorState(editor, committedReplacement, TextRange(committedReplacement.length))
+    }
+
+    /** Large-font RTL threshold growth remains bottom-anchored and monotonic on every frame. */
+    @Test
+    fun largeFontRtlThresholdReplacementStaysVisibleAndMonotonic() {
+        val compact = "First line\nSecond line"
+        val expanded = "$compact\nThird line"
+        render(
+            draft = compact,
+            width = 300,
+            layoutDirection = LayoutDirection.Rtl,
+            fontScale = 1.45f,
+        )
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        val initial = composerGeometry()
+
+        val frames =
+            withManualClock {
+                editor.performTextReplacement(expanded)
+                buildList {
+                    repeat(20) {
+                        composeRule.mainClock.advanceTimeByFrame()
+                        composeRule.runOnIdle { }
+                        add(composerGeometry())
+                    }
+                }
+            }
+        composeRule.waitForIdle()
+        val allFrames = listOf(initial) + frames + composerGeometry()
+
+        allFrames.drop(1).forEach { geometry ->
+            assertTrue("large-font RTL replacement must keep non-zero editor bounds", geometry.editor.height > 0f)
+            assertTrue(
+                "large-font RTL replacement must remain bottom-anchored",
+                abs(geometry.composer.bottom - initial.composer.bottom) <= 1f,
+            )
+            assertTextFitsInsidePill(geometry)
+        }
+        assertMonotonic(allFrames.map { it.composer.height }, increasing = true)
+        assertMonotonic(allFrames.map { it.pill.height }, increasing = true)
+        assertEditorState(editor, expanded, TextRange(expanded.length))
     }
 
     @Test
@@ -665,6 +749,7 @@ class ComposerExpansionBehaviorTest {
         editor.assertIsNotFocused()
     }
 
+    /** Renders the production composer in a fixed viewport and configurable text environment. */
     private fun render(
         draft: String,
         overlayBackRegistrar: ComposerOverlayBackRegistrar? = null,
@@ -673,10 +758,15 @@ class ComposerExpansionBehaviorTest {
         topInteractionClearance: Dp = 0.dp,
         onTopBarClick: (() -> Unit)? = null,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+        fontScale: Float = 1f,
     ) {
         var value by mutableStateOf(TextFieldValue(draft))
         composeRule.setContent {
-            CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalLayoutDirection provides layoutDirection,
+                LocalDensity provides Density(density.density, fontScale),
+            ) {
                 WhiteNoiseTheme {
                     Surface(modifier = Modifier.width(width.dp).height(720.dp)) {
                         Box(contentAlignment = Alignment.BottomCenter) {

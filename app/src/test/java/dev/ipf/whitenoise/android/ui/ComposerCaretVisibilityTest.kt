@@ -7,10 +7,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -27,6 +29,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
@@ -66,6 +69,164 @@ class ComposerCaretVisibilityTest {
         assertTrue("a clipped bulk replacement must scroll to its end caret", scroll.value() > 0f)
         assertEquals(scroll.maxValue(), scroll.value(), 1f)
         assertEquals(TextRange(harness.value.text.length), harness.value.selection)
+    }
+
+    /** Proves a bulk replacement keeps its terminal caret visible on every resize frame. */
+    @Test
+    fun clipboardBulkReplacementKeepsSelectionAndCaretVisibleOnEveryExpansionFrame() {
+        val harness = renderComposerBar(TextFieldValue("Short"))
+        val field = composeRule.onNode(hasSetTextAction())
+        val replacement = longDraft()
+
+        field.performClick()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            field.performTextReplacement(replacement)
+            repeat(20) { frame ->
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.runOnIdle { }
+
+                field.assertIsFocused()
+                assertEquals(
+                    "replacement changed at frame $frame",
+                    replacement,
+                    field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text,
+                )
+                assertEquals(
+                    "selection changed at frame $frame",
+                    TextRange(replacement.length),
+                    field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange],
+                )
+                field.assertActiveCaretVisible()
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(replacement, harness.value.text)
+        assertEquals(TextRange(replacement.length), harness.value.selection)
+        field.assertActiveCaretVisible()
+    }
+
+    /** Proves profile hydration cannot reuse caret geometry from an older mention transformation. */
+    @Test
+    fun mentionTransformationChangeWithUnchangedDraftKeepsTheTerminalCaretVisible() {
+        val npub = "npub1" + "q".repeat(58)
+        val draft = longDraft() + "\n@$npub"
+        val focusRequester = FocusRequester()
+        var value by mutableStateOf(TextFieldValue(draft, TextRange(draft.length)))
+        var candidate by
+            mutableStateOf(
+                MentionComposer.Candidate(
+                    accountIdHex = "aa".repeat(32),
+                    npub = npub,
+                    displayName = "A",
+                    nip05 = null,
+                ),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    Box(Modifier.width(300.dp).height(140.dp)) {
+                        ComposerPill(
+                            textFieldValue = value,
+                            composerFocus = focusRequester,
+                            emojiPickerOpen = false,
+                            onValueChange = { value = it },
+                            onEmojiPickerToggle = {},
+                            onAttachmentsToggle = {},
+                            attachmentSheetOpen = false,
+                            onPickFromGallery = null,
+                            onPickDocument = null,
+                            highlightMentionChips = true,
+                            mentionCandidates = listOf(candidate),
+                            expansionMode = ComposerExpansionMode.Manual,
+                            modifier = Modifier.height(140.dp),
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val field = composeRule.onNode(hasSetTextAction())
+        composeRule.runOnIdle { focusRequester.requestFocus() }
+        field.assertActiveCaretVisible()
+
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.runOnIdle {
+                candidate =
+                    candidate.copy(
+                        displayName = "Alice Long Profile Name Reflowing The Mention Across Multiple Visual Lines",
+                    )
+            }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.runOnIdle { }
+
+            composeRule.runOnIdle { assertEquals(TextRange(draft.length), value.selection) }
+            field.assertActiveCaretVisible()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    /** A conversation-key draft restore cancels the prior bulk edit's layout and scroll work. */
+    @Test
+    fun conversationDraftRestoreSupersedesAnUnsettledBulkReplacement() {
+        val focusRequester = FocusRequester()
+        val restored = TextFieldValue("Restored\nconversation draft", TextRange(3))
+        var draftKey by mutableStateOf("first-conversation")
+        var initialDraft by mutableStateOf(TextFieldValue("Short"))
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(360.dp).height(720.dp)) {
+                    Box(contentAlignment = Alignment.BottomCenter) {
+                        ComposerBar(
+                            replyingTo = null,
+                            messageTextCopy = MessageTextCopy.Default,
+                            onCancelReply = {},
+                            onSend = { _, _ -> },
+                            initialDraft = initialDraft,
+                            onDraftChange = { initialDraft = it },
+                            draftKey = draftKey,
+                            composerFocus = focusRequester,
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val field = composeRule.onNode(hasSetTextAction())
+        field.performClick()
+
+        composeRule.mainClock.autoAdvance = false
+        try {
+            field.performTextReplacement(longDraft())
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.runOnIdle { }
+            composeRule.runOnIdle {
+                initialDraft = restored
+                draftKey = "second-conversation"
+            }
+            repeat(3) {
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.runOnIdle { }
+                assertEquals(
+                    restored.text,
+                    field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text,
+                )
+                assertEquals(
+                    restored.selection,
+                    field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange],
+                )
+                field.assertActiveCaretVisible()
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+
+        assertEquals(0f, field.verticalScroll().value(), 0f)
     }
 
     @Test
@@ -199,8 +360,33 @@ class ComposerCaretVisibilityTest {
         return harness
     }
 
+    /** Renders the production composer in a fixed phone viewport for frame-controlled assertions. */
+    private fun renderComposerBar(initial: TextFieldValue): Harness {
+        val harness = Harness(initial)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(360.dp).height(720.dp)) {
+                    Box(contentAlignment = Alignment.BottomCenter) {
+                        ComposerBar(
+                            replyingTo = null,
+                            messageTextCopy = MessageTextCopy.Default,
+                            onCancelReply = {},
+                            onSend = { _, _ -> },
+                            initialDraft = harness.value,
+                            onDraftChange = { harness.value = it },
+                            composerFocus = harness.focusRequester,
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        return harness
+    }
+
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.verticalScroll() = fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
 
+    /** Asserts that the active caret is inside the editor's current scroll viewport. */
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertActiveCaretVisible() {
         val node = fetchSemanticsNode()
         val selection = node.config[SemanticsProperties.TextSelectionRange]
@@ -209,8 +395,14 @@ class ComposerCaretVisibilityTest {
         val caret = layouts.single().getCursorRect(selection.end)
         val scrollTop = verticalScroll().value()
         val scrollBottom = scrollTop + node.boundsInRoot.height
-        assertTrue("active caret top must stay inside the editor viewport", caret.top >= scrollTop - 1f)
-        assertTrue("active caret bottom must stay inside the editor viewport", caret.bottom <= scrollBottom + 1f)
+        assertTrue(
+            "active caret top ${caret.top} must stay below viewport top $scrollTop",
+            caret.top >= scrollTop - 1f,
+        )
+        assertTrue(
+            "active caret bottom ${caret.bottom} must stay above viewport bottom $scrollBottom",
+            caret.bottom <= scrollBottom + 1f,
+        )
     }
 
     private fun replyRecord() =
