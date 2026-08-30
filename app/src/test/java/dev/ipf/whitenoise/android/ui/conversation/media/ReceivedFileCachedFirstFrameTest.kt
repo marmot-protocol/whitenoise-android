@@ -51,6 +51,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -132,7 +133,7 @@ class ReceivedFileCachedFirstFrameTest {
         composeRule.runOnIdle {
             keys.forEach { key ->
                 assertEquals(AttachmentTransferState.Available, firstFrames.getValue(key).first())
-                assertTrue("an L2 hit must hydrate L1", l1.getValue(key).isNotEmpty())
+                assertFalse("an availability-only L2 probe must not hydrate L1", l1.containsKey(key))
             }
             assertEquals(0, remoteCalls.get())
             showConversation.value = false
@@ -148,7 +149,7 @@ class ReceivedFileCachedFirstFrameTest {
     }
 
     @Test
-    fun productionFileBubblePublishesColdL2HitBeforeItsFirstVisibleFrame() {
+    fun productionFileBubblePublishesColdL2HitWithoutHydratingPlaintext() {
         val cases =
             listOf(
                 productionCase("documents-off", autoDownloadAllowed = false),
@@ -198,8 +199,8 @@ class ReceivedFileCachedFirstFrameTest {
                     },
                 )
             composeRule.onNodeWithText(case.fileName).assertExists()
-            assertTrue(
-                "an authenticated L2 hit must hydrate production L1",
+            assertFalse(
+                "first-frame availability must not hydrate production L1",
                 case.controller.hasCachedAttachmentInMemory(case.messageIdHex, 0),
             )
             assertEquals("a cached first frame must not cross the MDK boundary", 0, case.marmotCalls.get())
@@ -277,9 +278,7 @@ class ReceivedFileCachedFirstFrameTest {
                 initiallyResolved = initiallyAvailable,
             ) {
                 coordinator.refresh(key) {
-                    val bytes = withContext(Dispatchers.IO) { cold.get(key) }
-                    if (bytes != null) l1[key] = bytes
-                    bytes != null
+                    withContext(Dispatchers.IO) { cold.containsAfterHydration(key) }
                 }
             }
         if (resolved) {
