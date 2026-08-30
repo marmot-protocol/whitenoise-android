@@ -42,6 +42,12 @@ internal fun conversationMemberCountLabel(
         else -> String.format(membersFormat, count)
     }
 
+/** Freezes transition consumers immediately and through the retained terminal-frame hold. */
+internal fun conversationRoutePresentationShouldFreeze(
+    routeTransitionInProgress: Boolean,
+    retainedPresentationFreeze: Boolean,
+): Boolean = routeTransitionInProgress || retainedPresentationFreeze
+
 /** UI-only scroll anchor for a conversation the user left while reading history. */
 internal data class ConversationScrollSnapshot(
     val firstVisibleItemIndex: Int,

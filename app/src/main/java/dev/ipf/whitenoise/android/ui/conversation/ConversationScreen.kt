@@ -701,6 +701,11 @@ internal fun ConversationScreen(
         }
     var routePresentationFrozen by
         remember(controller) { mutableStateOf(routeTransitionInProgress) }
+    val freezeRoutePresentation =
+        conversationRoutePresentationShouldFreeze(
+            routeTransitionInProgress = routeTransitionInProgress,
+            retainedPresentationFreeze = routePresentationFrozen,
+        )
     var bottomChromeReanchorPending by remember(controller) { mutableStateOf(false) }
     // Single conversation-level owner of which message's action menu is open, so
     // only one popover can be open at a time. With the keyboard up the menu is
@@ -2910,7 +2915,7 @@ internal fun ConversationScreen(
                 groupTitleCopy = groupTitleCopy,
                 openedAsDmHint = openedAsDmHint,
                 firstFrameAvatar = chat.firstFrameAvatar,
-                freezeRoutePresentation = routePresentationFrozen,
+                freezeRoutePresentation = freezeRoutePresentation,
                 openDetailsDescription = openDetailsDescription,
                 onOpenDetails = { showDetails = true },
                 onBack = exitConversation,
@@ -3124,10 +3129,10 @@ internal fun ConversationScreen(
                 voiceRecordingController = voiceRecordingController,
                 mentionCandidates = mentionPicker.candidates,
                 mentionPickerEnabled = mentionPicker.enabled,
-                autoFocusOnEnter = justCreated && !routePresentationFrozen,
+                autoFocusOnEnter = justCreated && !freezeRoutePresentation,
                 autoFocusOnDraftRestore =
                     shouldFocusComposerOnDraftRestore(restoredDraftSnapshot) &&
-                        !routePresentationFrozen,
+                        !freezeRoutePresentation,
                 autoFocusConsumedState = composerAutoFocusConsumed,
                 composerFocus = composerFocus,
                 onComposerFocusChanged = { focused ->
@@ -3157,7 +3162,7 @@ internal fun ConversationScreen(
                         bottomChromeHeightObserver.onMeasured(heightPx) &&
                         !scrollCoordinator.foregroundRestoreInProgress
                     ) {
-                        if (routePresentationFrozen) {
+                        if (freezeRoutePresentation) {
                             bottomChromeReanchorPending = true
                         } else {
                             reanchorNewestAfterBottomInputChange(frameCount = 1)
