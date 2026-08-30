@@ -912,6 +912,16 @@ internal fun ComposerBar(
             }
         val expandedControlLayout =
             composerUsesMultilineControls || composerExpansion.mode != ComposerExpansionMode.Automatic
+        val expandedActionInsetProgress =
+            animateFloatAsState(
+                targetValue = if (expandedControlLayout) 1f else 0f,
+                animationSpec =
+                    tween(
+                        durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
+                        easing = FastOutSlowInEasing,
+                    ),
+                label = "expanded composer action inset",
+            )
         val composerHeightTransitionActive =
             composerHeightTransitionEpoch != completedComposerHeightTransitionEpoch
         val transitionTargetHeightPx =
@@ -1282,7 +1292,7 @@ internal fun ComposerBar(
                             modifier =
                                 Modifier
                                     .align(Alignment.BottomEnd)
-                                    .height(44.dp),
+                                    .expandedComposerActionRow { expandedActionInsetProgress.value },
                         ) {
                             if (dictationActiveElsewhere && dictationController != null) {
                                 ConversationDictationElsewhereAction(
@@ -1305,7 +1315,7 @@ internal fun ComposerBar(
                                 }
                                 FloatingActionButton(
                                     onClick = { voiceRecordingController.stop() },
-                                    modifier = Modifier.size(44.dp),
+                                    modifier = Modifier.composerActionSize { expandedActionInsetProgress.value },
                                     containerColor = actionColors.container,
                                     contentColor = actionColors.content,
                                 ) {
@@ -1323,7 +1333,7 @@ internal fun ComposerBar(
                             } else if (showPrimaryTrailingAction) {
                                 FloatingActionButton(
                                     onClick = { submitMessage() },
-                                    modifier = Modifier.size(44.dp),
+                                    modifier = Modifier.composerActionSize { expandedActionInsetProgress.value },
                                     containerColor = actionColors.container,
                                     contentColor = actionColors.content,
                                 ) {

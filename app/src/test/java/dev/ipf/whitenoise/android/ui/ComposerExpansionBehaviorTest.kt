@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -15,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -35,6 +37,7 @@ import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
@@ -195,7 +198,7 @@ class ComposerExpansionBehaviorTest {
     }
 
     @Test
-    fun resizeHandleSitsAboveThePillBorderAndTheTargetStopsAtTheFirstLine() {
+    fun resizeHandleIsCenteredOnThePillBorderAndTheTargetStopsAtTheFirstLine() {
         val draft = longDraft()
         render(draft)
 
@@ -214,9 +217,26 @@ class ComposerExpansionBehaviorTest {
 
         assertTrue("resize target must extend above the pill", target.top < surface.top)
         assertTrue("resize target must extend into the pill", target.bottom > surface.top)
-        assertTrue("the visible handle must stay above the pill border", indicator.bottom < surface.top)
-        assertTrue("expanded editor top inset should be 20dp", abs(editor.top - surface.top - 20f) <= 1f)
+        assertTrue(
+            "the visible handle must be centered on the pill border",
+            abs(indicator.center.y - surface.top) <= 1f,
+        )
+        assertTrue("expanded editor top inset should match half the target", abs(editor.top - surface.top - 24f) <= 1f)
         assertTrue("first-line gestures must start below the resize target", editor.top >= target.bottom - 1f)
+    }
+
+    @Test
+    fun expandedSendKeepsCornerSafeInsetInLtr() {
+        render(longDraft())
+
+        assertExpandedSendInset(LayoutDirection.Ltr)
+    }
+
+    @Test
+    fun expandedSendKeepsCornerSafeInsetInRtl() {
+        render(longDraft(), layoutDirection = LayoutDirection.Rtl)
+
+        assertExpandedSendInset(LayoutDirection.Rtl)
     }
 
     @Test
@@ -337,6 +357,72 @@ class ComposerExpansionBehaviorTest {
             "the editor viewport must expose the newly added line immediately",
             frames.first().editor.height > oneLineGeometry.editor.height + 10f,
         )
+    }
+
+    @Test
+    fun bulkReplacementKeepsEveryFrameVisibleAndHeightMonotonic() {
+        val initialDraft = "Short draft"
+        val replacement = (1..24).joinToString("\n") { "Bulk line $it remains visible" }
+        render(initialDraft)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        val initialGeometry = composerGeometry()
+
+        val frames =
+            withManualClock {
+                editor.performTextReplacement(replacement)
+                buildList {
+                    repeat(20) {
+                        composeRule.mainClock.advanceTimeByFrame()
+                        composeRule.runOnIdle { }
+                        assertEquals(
+                            replacement,
+                            editor.fetchSemanticsNode().config[SemanticsProperties.EditableText].text,
+                        )
+                        add(composerGeometry())
+                    }
+                }
+            }
+        composeRule.waitForIdle()
+        val allFrames = listOf(initialGeometry) + frames + composerGeometry()
+
+        allFrames.drop(1).forEach { geometry ->
+            assertTrue("bulk replacement must retain non-zero composer bounds", geometry.composer.height > 0f)
+            assertTrue("bulk replacement must retain non-zero editor bounds", geometry.editor.height > 0f)
+            assertTextFitsInsidePill(geometry)
+        }
+        assertMonotonic(allFrames.map { it.composer.height }, increasing = true)
+        assertEditorState(editor, replacement, TextRange(replacement.length))
+    }
+
+    @Test
+    fun supersedingBulkReplacementCannotRestoreStaleExpandedMode() {
+        val initialDraft = "Short draft"
+        val staleReplacement = (1..24).joinToString("\n") { "Stale bulk line $it" }
+        val committedReplacement = "Newest short draft"
+        render(initialDraft)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+
+        withManualClock {
+            editor.performTextReplacement(staleReplacement)
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.runOnIdle { }
+            editor.performTextReplacement(committedReplacement)
+            repeat(20) {
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.runOnIdle { }
+                assertEquals(
+                    committedReplacement,
+                    editor.fetchSemanticsNode().config[SemanticsProperties.EditableText].text,
+                )
+                assertTrue("superseding edit must keep the editor visible", composerGeometry().editor.height > 0f)
+            }
+        }
+        composeRule.waitForIdle()
+
+        resizeHandle().assertDoesNotExist()
+        assertEditorState(editor, committedReplacement, TextRange(committedReplacement.length))
     }
 
     @Test
@@ -586,36 +672,39 @@ class ComposerExpansionBehaviorTest {
         width: Int = 360,
         topInteractionClearance: Dp = 0.dp,
         onTopBarClick: (() -> Unit)? = null,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
     ) {
         var value by mutableStateOf(TextFieldValue(draft))
         composeRule.setContent {
-            WhiteNoiseTheme {
-                Surface(modifier = Modifier.width(width.dp).height(720.dp)) {
-                    Box(contentAlignment = Alignment.BottomCenter) {
-                        ComposerBar(
-                            replyingTo = null,
-                            messageTextCopy = MessageTextCopy.Default,
-                            onCancelReply = {},
-                            onSend = { _, _ -> },
-                            onPickFromGallery = {},
-                            onPickDocument = {},
-                            dictationController = dictationController,
-                            dictationAccountRef = dictationController?.let { ACCOUNT },
-                            dictationGroupIdHex = dictationController?.let { GROUP },
-                            initialDraft = value,
-                            onDraftChange = { value = it },
-                            overlayBackRegistrar = overlayBackRegistrar,
-                            topInteractionClearance = topInteractionClearance,
-                            modifier = Modifier.testTag(TAG),
-                        )
-                        if (onTopBarClick != null) {
-                            Box(
-                                Modifier
-                                    .align(Alignment.TopCenter)
-                                    .fillMaxWidth()
-                                    .height(topInteractionClearance)
-                                    .clickable(onClick = onTopBarClick),
+            CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                WhiteNoiseTheme {
+                    Surface(modifier = Modifier.width(width.dp).height(720.dp)) {
+                        Box(contentAlignment = Alignment.BottomCenter) {
+                            ComposerBar(
+                                replyingTo = null,
+                                messageTextCopy = MessageTextCopy.Default,
+                                onCancelReply = {},
+                                onSend = { _, _ -> },
+                                onPickFromGallery = {},
+                                onPickDocument = {},
+                                dictationController = dictationController,
+                                dictationAccountRef = dictationController?.let { ACCOUNT },
+                                dictationGroupIdHex = dictationController?.let { GROUP },
+                                initialDraft = value,
+                                onDraftChange = { value = it },
+                                overlayBackRegistrar = overlayBackRegistrar,
+                                topInteractionClearance = topInteractionClearance,
+                                modifier = Modifier.testTag(TAG),
                             )
+                            if (onTopBarClick != null) {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.TopCenter)
+                                        .fillMaxWidth()
+                                        .height(topInteractionClearance)
+                                        .clickable(onClick = onTopBarClick),
+                                )
+                            }
                         }
                     }
                 }
@@ -690,6 +779,23 @@ class ComposerExpansionBehaviorTest {
             "editor must stay inside the pill's bottom edge",
             geometry.editor.bottom <= geometry.pill.bottom + 1f,
         )
+    }
+
+    private fun assertExpandedSendInset(layoutDirection: LayoutDirection) {
+        val surface =
+            composeRule
+                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val send = composerControlBounds(R.string.send)
+
+        assertTrue("Send must keep at least a 48dp semantics target", send.width >= 48f && send.height >= 48f)
+        assertTrue("Send must keep bottom breathing room", surface.bottom - send.bottom >= 4f)
+        if (layoutDirection == LayoutDirection.Ltr) {
+            assertTrue("LTR Send must keep end breathing room", surface.right - send.right >= 4f)
+        } else {
+            assertTrue("RTL Send must keep end breathing room", send.left - surface.left >= 4f)
+        }
     }
 
     private fun sampleComposerHeights(
