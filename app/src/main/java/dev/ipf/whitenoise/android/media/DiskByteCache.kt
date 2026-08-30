@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.media
 
-import android.util.Log
 import java.io.Closeable
 import java.io.File
 import java.io.FileInputStream
@@ -14,6 +13,7 @@ import java.security.GeneralSecurityException
 import java.security.MessageDigest
 import java.security.ProviderException
 import java.util.concurrent.atomic.AtomicLong
+import java.util.logging.Logger
 import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
@@ -33,7 +33,9 @@ internal data class DiskByteCachePublicationToken(
 /** Owner-private authenticated plaintext materialization. Closing deletes it. */
 internal class DiskByteCacheLease internal constructor(
     val file: File,
-    private val onDeleteFailure: (String) -> Unit = { message -> Log.w("DiskByteCacheLease", message) },
+    private val onDeleteFailure: (String) -> Unit = { message ->
+        Logger.getLogger("DiskByteCacheLease").warning(message)
+    },
 ) : Closeable {
     override fun close() {
         val failure =
@@ -1127,7 +1129,7 @@ internal class DiskByteCache(
     ) {
         val ciphertextBytes = fileBytes - headerBytes - METADATA_AUTH_BYTES - IV_BYTES
         val plaintextBytes = validateLegacyPayloadSize(ciphertextBytes)
-        ensurePlaintextAllocationFits(plaintextBytes)
+        ensurePlaintextAllocationFits(Math.addExact(ciphertextBytes, plaintextBytes))
         val payloadIv = input.readExactly(IV_BYTES)
         cancellationCheck()
         val ciphertext = input.readExactly(ciphertextBytes.toInt())

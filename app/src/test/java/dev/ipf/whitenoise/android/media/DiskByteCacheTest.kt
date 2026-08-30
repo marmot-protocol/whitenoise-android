@@ -517,7 +517,8 @@ class DiskByteCacheTest {
                 keyProvider = keyProvider,
                 maxBytes = 128L * 1024L * 1024L,
                 maxEntryBytes = 64L * 1024L * 1024L,
-                availablePlaintextAllocationBytes = { 0L },
+                // Legacy ciphertext and plaintext coexist during authenticated decryption.
+                availablePlaintextAllocationBytes = { payload.size.toLong() },
             )
 
         assertNull(reopened.materialize("legacy-budget"))
