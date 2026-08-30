@@ -245,7 +245,10 @@ class MainActivity : AppCompatActivity() {
                             appLockScreenVisible = appState.appLockScreenVisible,
                         ),
                 )
-            if (!retain) appState.recordStartupSystemSplashHandoff()
+            if (!retain) {
+                appState.recordStartupSystemSplashHandoff()
+                (application as WhiteNoiseApplication).ensurePeriodicWorkScheduled()
+            }
             retain
         }
     }
