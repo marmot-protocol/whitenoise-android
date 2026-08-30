@@ -77,6 +77,15 @@ internal class ConversationTtsFollowHandle internal constructor(
         if (policy.requestExplicitReveal()) retryGeneration += 1L
     }
 
+    fun onSentenceSeek(
+        state: TtsState,
+        ownsSession: Boolean,
+    ) {
+        if (!ownsSession) return
+        policy.observe(state, ownsSession)
+        state.conversationFollowTargetOrNull()?.let(policy::suppressNextFollowFor)
+    }
+
     internal fun retryFailedFollowAttempt(target: ConversationTtsFollowTarget) {
         if (policy.retryFailedFollowAttempt(target)) retryGeneration += 1L
     }

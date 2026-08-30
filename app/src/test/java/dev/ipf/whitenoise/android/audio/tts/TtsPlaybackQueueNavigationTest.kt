@@ -7,6 +7,122 @@ import org.junit.Test
 @Suppress("LargeClass") // This class intentionally keeps the queue's navigation matrix together.
 class TtsPlaybackQueueNavigationTest {
     @Test
+    fun seekWithinMessageRestartsAtTargetWithoutRepeatingSender() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        queue.start(ttsMessages(ttsMessageWithId("message-0", "alice", "Alice", "One.", "Two.", "Three.")))
+        queue.onDone(harness.utteranceId(0))
+
+        assertEquals(TtsSeekResult.Repositioned, queue.seekTo("message-0", 2))
+
+        assertEquals(
+            speakingTts(2, 3, 0, 1, "One. Two. Three.", sentenceIndex = 2, sentenceCount = 3),
+            queue.state.value,
+        )
+        assertEquals(
+            "Three.",
+            harness.enqueued
+                .last()
+                .first.text,
+        )
+    }
+
+    @Test
+    fun seekAcrossMessagesAnnouncesTargetSender() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        queue.start(
+            ttsMessages(
+                ttsMessageWithId("message-0", "alice", "Alice", "One."),
+                ttsMessageWithId("message-1", "bob", "Bob", "Two.", "Three."),
+            ),
+        )
+
+        assertEquals(TtsSeekResult.RepositionedAcrossMessages, queue.seekTo("message-1", 1))
+
+        assertEquals(
+            "Bob: Three.",
+            harness.enqueued
+                .last()
+                .first.text,
+        )
+    }
+
+    @Test
+    fun seekAfterWindowShiftClassifiesCrossMessageFromStableIdentity() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        queue.start(
+            ttsMessages(
+                ttsMessageWithId("message-1", "bob", "Bob", "One."),
+                ttsMessageWithId("message-2", "carol", "Carol", "Two."),
+            ),
+        )
+        assertEquals(
+            true,
+            queue.replaceWindow(
+                window =
+                    ttsMessages(
+                        ttsMessageWithId("message-0", "alice", "Alice", "Zero."),
+                        ttsMessageWithId("message-1", "bob", "Bob", "One."),
+                        ttsMessageWithId("message-2", "carol", "Carol", "Two."),
+                    ),
+                targetMessageIdHex = "message-1",
+                targetSentence = TtsWindowSentenceTarget.First,
+            ),
+        )
+
+        val beforeSameMessageSeek = harness.enqueued.size
+        assertEquals(TtsSeekResult.Repositioned, queue.seekTo("message-1", 0))
+        assertEquals("One.", harness.enqueued[beforeSameMessageSeek].first.text)
+        val beforeCrossMessageSeek = harness.enqueued.size
+        assertEquals(TtsSeekResult.RepositionedAcrossMessages, queue.seekTo("message-2", 0))
+        assertEquals("Carol: Two.", harness.enqueued[beforeCrossMessageSeek].first.text)
+    }
+
+    @Test
+    fun seekToCurrentSentenceExplicitlyRestartsIt() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        queue.start(ttsMessages(ttsMessageWithId("message-0", "alice", "Alice", "One.", "Two.")))
+        val submissionsBeforeSeek = harness.enqueued.size
+
+        assertEquals(TtsSeekResult.Repositioned, queue.seekTo("message-0", 0))
+
+        assertEquals(submissionsBeforeSeek + 2, harness.enqueued.size)
+        assertEquals("One.", harness.enqueued[submissionsBeforeSeek].first.text)
+    }
+
+    @Test
+    fun seekInvalidatesAnArmedEdgeSettlement() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        queue.start(ttsMessages(ttsMessageWithId("message-0", "alice", "Alice", "One.", "Two.")))
+        assertEquals(TtsNavigationOutcome.AtNewerEdge, queue.skipNextMessage(deferAtEdge = true))
+
+        assertEquals(TtsSeekResult.Repositioned, queue.seekTo("message-0", 1))
+        val afterSeek = queue.state.value
+        queue.settleEdgeRequest(TtsEdgeSettlement.CompletedSession)
+
+        assertEquals(afterSeek, queue.state.value)
+        assertEquals(0, harness.terminalCalls)
+    }
+
+    @Test
+    fun seekReportsEveryFailureWithoutMoving() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        assertEquals(TtsSeekResult.SessionInactive, queue.seekTo("message-0", 0))
+        queue.start(ttsMessages(ttsMessageWithId("message-0", "alice", "Alice", "One.")))
+        val before = queue.state.value
+
+        assertEquals(TtsSeekResult.MessageNotInWindow, queue.seekTo("missing", 0))
+        assertEquals(TtsSeekResult.SentenceOutOfRange, queue.seekTo("message-0", -1))
+        assertEquals(TtsSeekResult.SentenceOutOfRange, queue.seekTo("message-0", 1))
+        assertEquals(before, queue.state.value)
+    }
+
+    @Test
     fun skipPreviousMessageFromLaterSentenceStartsPreviousMessage() {
         val harness = TtsQueueHarness()
         val queue = harness.queue

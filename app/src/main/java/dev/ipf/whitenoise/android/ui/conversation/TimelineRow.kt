@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onSizeChanged
+import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
@@ -70,6 +71,7 @@ internal fun TimelineRow(
     mentionPickerEnabled: Boolean,
     collapseLongMessages: Boolean,
     ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
+    onTtsSentenceSeek: (TtsState) -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth()) {
         val daySeparatorLabel =
@@ -233,6 +235,7 @@ internal fun TimelineRow(
                     collapseLongMessages = collapseLongMessages,
                     readOnly = controller.group.pendingConfirmation,
                     ttsSentenceLayoutSink = ttsSentenceLayoutSink,
+                    onTtsSentenceSeek = onTtsSentenceSeek,
                 )
             }
         }

@@ -1,9 +1,17 @@
+@file:Suppress("MatchingDeclarationName") // Render hits and inverse sentence mapping share one projection contract.
+
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.boundsInWindow
 import dev.ipf.whitenoise.android.audio.tts.TtsChunker
 import java.util.Locale
+
+internal data class RenderedTextHit(
+    val leafId: String,
+    val renderedText: String,
+    val renderedOffset: Int,
+)
 
 /**
  * Maps a rendered visible offset to the speakable sentence index for Speak
@@ -153,6 +161,44 @@ internal fun textOffsetAtWindowPosition(
     val precedingLength =
         preceding.sumOf { visibleLayoutSentence(it.layoutResult.layoutInput.text.text).length } + preceding.size
     return precedingLength + rawOffset
+}
+
+/** Returns the exact rendered Markdown leaf hit by a window-space press. */
+@Suppress("ReturnCount")
+internal fun renderedTextHitAtWindowPosition(
+    layouts: Collection<SelectableTextLayout>,
+    pressInWindow: Offset?,
+): RenderedTextHit? {
+    if (pressInWindow == null) return null
+    val targets =
+        layouts.filter { layout ->
+            layout.coordinates.isAttached &&
+                layout.layoutResult.layoutInput.text
+                    .isNotBlank() &&
+                layout.coordinates.boundsInWindow().contains(pressInWindow)
+        }
+    val target = targets.singleOrNull() ?: return null
+    val leafId = target.key as? String ?: return null
+    val renderedText = target.layoutResult.layoutInput.text.text
+    val local = target.coordinates.windowToLocal(pressInWindow)
+    val renderedOffset =
+        target.layoutResult.getOffsetForPosition(
+            Offset(
+                x =
+                    local.x.coerceIn(
+                        0f,
+                        target.coordinates.size.width
+                            .toFloat(),
+                    ),
+                y =
+                    local.y.coerceIn(
+                        0f,
+                        target.coordinates.size.height
+                            .toFloat(),
+                    ),
+            ),
+        )
+    return RenderedTextHit(leafId, renderedText, renderedOffset)
 }
 
 private fun visibleLayoutSentence(text: String): String {

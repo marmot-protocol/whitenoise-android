@@ -3367,6 +3367,13 @@ internal fun ConversationScreen(
                                     mentionPickerEnabled = mentionPicker.enabled,
                                     collapseLongMessages = collapseLongMessages,
                                     ttsSentenceLayoutSink = ttsFollowHandle.sentenceLayouts,
+                                    onTtsSentenceSeek = { state ->
+                                        ttsFollowHandle.onSentenceSeek(
+                                            state = state,
+                                            ownsSession =
+                                                appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                        )
+                                    },
                                 )
                             }
                             conversationLoadErrorItem(

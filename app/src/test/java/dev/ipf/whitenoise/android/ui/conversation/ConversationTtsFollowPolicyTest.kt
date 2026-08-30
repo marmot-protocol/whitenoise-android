@@ -17,6 +17,62 @@ class ConversationTtsFollowPolicyTest {
     private val saveableScope = SaverScope { true }
 
     @Test
+    fun directSeekSuppressesExactlyTheSeekTargetThenFollowsNextSentence() {
+        val policy = ConversationTtsFollowPolicy()
+        val seeked = speaking(sessionId = 1, sentenceIndex = 1)
+        policy.observe(seeked, ownsSession = true)
+        policy.suppressNextFollowFor(seeked.followTarget())
+
+        assertNull(policy.claimPendingTarget())
+        policy.observe(seeked, ownsSession = true)
+        assertNull(policy.claimPendingTarget())
+
+        val next = speaking(sessionId = 1, sentenceIndex = 2)
+        policy.observe(next, ownsSession = true)
+        assertEquals(next.followTarget(), policy.claimPendingTarget())
+    }
+
+    @Test
+    fun directSeekToCurrentSentenceStillSuppressesItsPendingCycle() {
+        val policy = ConversationTtsFollowPolicy()
+        val current = speaking(sessionId = 1, sentenceIndex = 0)
+        policy.observe(current, ownsSession = true)
+        assertEquals(current.followTarget(), policy.claimPendingTarget())
+
+        policy.suppressNextFollowFor(current.followTarget())
+        policy.observe(current, ownsSession = true)
+
+        assertNull(policy.claimPendingTarget())
+    }
+
+    @Test
+    fun directSeekPreservesUserDisabledFollowState() {
+        val policy = ConversationTtsFollowPolicy()
+        val current = speaking(sessionId = 1, sentenceIndex = 0)
+        policy.observe(current, ownsSession = true)
+        policy.claimPendingTarget()
+        policy.onUserDrag()
+
+        policy.suppressNextFollowFor(current.followTarget())
+
+        assertFalse(policy.isFollowEnabled)
+        assertTrue(policy.showResumeAction)
+        assertNull(policy.claimPendingTarget())
+    }
+
+    @Test
+    fun staleSeekSuppressionPreservesADifferentPendingTarget() {
+        val policy = ConversationTtsFollowPolicy()
+        val pending = speaking(sessionId = 1, sentenceIndex = 2)
+        policy.observe(pending, ownsSession = true)
+        val stale = speaking(sessionId = 1, sentenceIndex = 1).followTarget()
+
+        policy.suppressNextFollowFor(stale)
+
+        assertEquals(pending.followTarget(), policy.claimPendingTarget())
+    }
+
+    @Test
     fun eachSentenceIsClaimedOnceAndWordProgressDoesNotCreateAnotherScroll() {
         val policy = ConversationTtsFollowPolicy()
         val first = speaking(sessionId = 1, sentenceIndex = 0)

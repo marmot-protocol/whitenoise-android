@@ -7,6 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
 
+@Suppress("LargeClass") // Controller lifecycle, focus, and seek cases share one fake engine/focus harness.
 class TtsControllerTest {
     @Test
     fun projectedMappingsSurviveChunkingAndEngineRangeCallbacks() {
@@ -228,6 +229,49 @@ class TtsControllerTest {
             controller.state.value,
         )
         assertEquals("Bob: Third.", engine.spoken.last().text)
+    }
+
+    @Test
+    fun pausedSeekRepositionsAndResumesThroughAudioFocus() {
+        val engine = FakeTtsSpeechEngine()
+        val focus = FakeTtsAudioFocus()
+        val controller = controller(focus)
+        controller.attachEngine(engine)
+        controller.speak(
+            listOf(
+                TtsSpeakableEntry("alice", "Alice", "First.", messageIdHex = "m1"),
+                TtsSpeakableEntry("bob", "Bob", "Second. Third.", messageIdHex = "m2"),
+            ),
+            Locale.US,
+        )
+        controller.pause()
+
+        assertEquals(TtsSeekResult.RepositionedAcrossMessages, controller.seekToSentence("m2", 1))
+
+        assertEquals(2, focus.acquireCalls)
+        assertTrue(controller.state.value is TtsState.Speaking)
+        assertEquals(1, controller.state.value.sentenceIndexWithinMessage)
+        assertEquals("Bob: Third.", engine.spoken.last().text)
+    }
+
+    @Test
+    fun pausedSeekLeavesCursorUnchangedWhenAudioFocusIsDenied() {
+        val engine = FakeTtsSpeechEngine()
+        val focus = FakeTtsAudioFocus(acquireResults = ArrayDeque(listOf(true, false)))
+        val controller = controller(focus)
+        controller.attachEngine(engine)
+        controller.speak(
+            listOf(TtsSpeakableEntry("alice", "Alice", "First. Second.", messageIdHex = "m1")),
+            Locale.US,
+        )
+        controller.pause()
+        val pausedBeforeSeek = controller.state.value
+        val spokenBeforeSeek = engine.spoken.size
+
+        assertEquals(TtsSeekResult.SessionInactive, controller.seekToSentence("m1", 1))
+
+        assertEquals(pausedBeforeSeek, controller.state.value)
+        assertEquals(spokenBeforeSeek, engine.spoken.size)
     }
 
     @Test
@@ -799,7 +843,9 @@ class TtsControllerTest {
         }
     }
 
-    private class FakeTtsAudioFocus : TtsAudioFocus {
+    private class FakeTtsAudioFocus(
+        private val acquireResults: ArrayDeque<Boolean> = ArrayDeque(),
+    ) : TtsAudioFocus {
         var acquireCalls = 0
         var releaseCalls = 0
         private var onFocusLoss: (() -> Unit)? = null
@@ -812,7 +858,7 @@ class TtsControllerTest {
             acquireCalls += 1
             this.onFocusLoss = onFocusLoss
             this.onOwnerSurrender = onOwnerSurrender
-            return true
+            return acquireResults.removeFirstOrNull() ?: true
         }
 
         override fun release() {
