@@ -1467,7 +1467,7 @@
     <string name="tts_rate_custom">Benutzerdefiniert</string>
     <string name="tts_rate_custom_error">Gib eine Geschwindigkeit von 0,1× bis 10,0× ein.</string>
     <string name="tts_rate_apply">Anwenden</string>
-    <string name="connectivity_offline">Offline</string>
+    <string name="connectivity_offline">Keine Verbindung</string>
     <string name="connectivity_connecting">Verbinden…</string>
     <string name="connectivity_connected">Verbunden</string>
     <string name="amber_signin_waiting_request">Identitätsanfrage im Signer bestätigen (Schritt 1 von 2)…</string>
