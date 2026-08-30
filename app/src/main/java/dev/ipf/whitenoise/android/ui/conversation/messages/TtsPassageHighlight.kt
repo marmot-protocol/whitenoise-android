@@ -47,6 +47,41 @@ internal class TtsHighlightProjectionResolver(
     internal val cachedLeafCount: Int
         get() = leafSpanCache.size
 
+    /** Inverts the highlight projection for an exact rendered-leaf hit. */
+    @Suppress("ReturnCount")
+    internal fun sentenceIndexAtRenderedOffset(hit: RenderedTextHit): Int? {
+        if (hit.renderedOffset !in 0..hit.renderedText.length) return null
+        val mappedSpans =
+            mapProjectionSpansToRenderedLeaf(
+                projection = projection,
+                renderedLeafId = hit.leafId,
+                renderedText = hit.renderedText,
+                leafSpanCache = leafSpanCache,
+            ) ?: return null
+        val candidates =
+            mappedSpans.filter { mapped ->
+                val spokenLength = mapped.source.spokenEnd - mapped.source.spokenStart
+                val visibleLength = mapped.source.visibleEnd - mapped.source.visibleStart
+                mapped.source.leafId.belongsToRenderedLeaf(hit.leafId) &&
+                    spokenLength > 0 &&
+                    spokenLength == visibleLength
+            }
+        if (candidates.isEmpty()) return null
+        val mapped =
+            candidates.minByOrNull { candidate ->
+                val end = candidate.renderedStart + candidate.source.spokenEnd - candidate.source.spokenStart
+                when {
+                    hit.renderedOffset < candidate.renderedStart -> candidate.renderedStart - hit.renderedOffset
+                    hit.renderedOffset > end -> hit.renderedOffset - end
+                    else -> 0
+                }
+            } ?: return null
+        val renderedEnd = mapped.renderedStart + mapped.source.spokenEnd - mapped.source.spokenStart
+        val clampedRenderedOffset = hit.renderedOffset.coerceIn(mapped.renderedStart, renderedEnd - 1)
+        val spokenOffset = mapped.source.spokenStart + clampedRenderedOffset - mapped.renderedStart
+        return sentenceChunks.firstOrNull { spokenOffset in it.sourceStart until it.sourceEnd }?.sentenceIndex
+    }
+
     internal fun resolverFor(
         passage: TtsPassage,
         messageIdHex: String,

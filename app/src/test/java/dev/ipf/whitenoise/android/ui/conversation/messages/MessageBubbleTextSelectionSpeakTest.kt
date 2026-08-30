@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuData
 import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -37,15 +38,19 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MarkdownAutolinkKindFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineInfo
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -54,8 +59,11 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.conversation.timelineRowTtsHighlightPassage
+import dev.ipf.whitenoise.android.ui.conversation.timelineRowTtsReadAloudProgress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -66,10 +74,12 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h240dp-mdpi")
+@Suppress("LargeClass") // Message-body gestures share one production bubble and native Compose fixture.
 class MessageBubbleTextSelectionSpeakTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -142,11 +152,170 @@ class MessageBubbleTextSelectionSpeakTest {
         }
         composeRule.waitForIdle()
 
-        doubleTapOnMessageText("Second sentence")
+        doubleTapOnMessageText("First sentence")
         waitForTts(engine)
+        val originalSessionId = appState.ttsController.state.value.sessionId
+        val submissionsBeforeSeek = engine.spoken.size
+        assertTrue(appState.ownsTtsAutoReadSession(GROUP_ID))
+
+        doubleTapOnMessageText("Second sentence")
+        composeRule.waitForIdle()
 
         assertFalse(actionMenuOpen)
-        assertEquals("Second sentence.", engine.spoken.first().text)
+        assertEquals(originalSessionId, appState.ttsController.state.value.sessionId)
+        assertEquals(1, appState.ttsController.state.value.sentenceIndexWithinMessage)
+        assertEquals(submissionsBeforeSeek + 1, engine.spoken.size)
+        assertEquals("Second sentence.", engine.spoken.last().text)
+    }
+
+    @Test
+    fun doubleTapSeeksInsideActiveTruncatedMessageProjection() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = timelineMessage("First sentence. Second sentence.", contentTokensTruncated = true)
+        val controller = conversationController(appState)
+        var actionMenuOpen by mutableStateOf(false)
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(
+                        item = item,
+                        controller = controller,
+                        appState = appState,
+                        textSelectionMode = false,
+                        onTextSelectionModeChange = {},
+                        isActionMenuOpen = actionMenuOpen,
+                        onActionMenuOpenChange = { actionMenuOpen = it },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        longPressOnMessageText("First sentence")
+        composeRule.onNodeWithText(app.getString(R.string.speak_aloud)).performClick()
+        waitForTts(engine)
+        val originalSessionId = appState.ttsController.state.value.sessionId
+
+        doubleTapOnMessageText("Second sentence")
+        composeRule.waitForIdle()
+
+        assertEquals(originalSessionId, appState.ttsController.state.value.sessionId)
+        assertEquals(1, appState.ttsController.state.value.sentenceIndexWithinMessage)
+        assertEquals("Second sentence.", engine.spoken.last().text)
+    }
+
+    @Test
+    fun singleLinkTapDuringReadAloudOpensOnlyAfterDoubleTapWindow() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = timelineMessageWithAutolink()
+        val controller = conversationController(appState)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(item, controller, appState, false, {})
+                }
+            }
+        }
+        assertTrue(
+            appState.speakAloudAutoRead(
+                GROUP_ID,
+                listOf(projectedTtsEntry(item)),
+                Locale.getDefault(),
+            ),
+        )
+        waitForTts(engine)
+        assertTrue(appState.ownsTtsAutoReadSession(GROUP_ID))
+        composeRule.mainClock.autoAdvance = false
+
+        singleTapOnMessageText("https://example.com")
+        assertEquals(null, shadowOf(app).nextStartedActivity)
+        composeRule.mainClock.advanceTimeBy(
+            android.view.ViewConfiguration
+                .getDoubleTapTimeout()
+                .toLong() + 1L,
+        )
+        composeRule.waitForIdle()
+
+        val opened = shadowOf(app).nextStartedActivity
+        assertEquals(Intent.ACTION_VIEW, opened?.action)
+        assertEquals("https://example.com", opened?.dataString)
+    }
+
+    @Test
+    fun doubleTapOnLinkDuringReadAloudSeeksAndDoesNotOpenLink() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = timelineMessageWithAutolink()
+        val controller = conversationController(appState)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(item, controller, appState, false, {})
+                }
+            }
+        }
+        assertTrue(
+            appState.speakAloudAutoRead(
+                GROUP_ID,
+                listOf(projectedTtsEntry(item)),
+                Locale.getDefault(),
+            ),
+        )
+        waitForTts(engine)
+        composeRule.mainClock.autoAdvance = false
+        val sessionId = appState.ttsController.state.value.sessionId
+        val submissionsBeforeSeek = engine.spoken.size
+
+        doubleTapOnMessageText("https://example.com")
+        composeRule.mainClock.advanceTimeBy(
+            android.view.ViewConfiguration
+                .getDoubleTapTimeout()
+                .toLong() + 1L,
+        )
+        composeRule.waitForIdle()
+
+        assertEquals(null, shadowOf(app).nextStartedActivity)
+        assertEquals(sessionId, appState.ttsController.state.value.sessionId)
+        assertEquals(1, appState.ttsController.state.value.sentenceIndexWithinMessage)
+        assertEquals("Read now.", engine.spoken[submissionsBeforeSeek].text)
+    }
+
+    @Test
+    fun doubleTapLinkStillOpensWhenItsMessageIsOutsideTheActiveQueue() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = timelineMessageWithAutolink()
+        val controller = conversationController(appState)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(item, controller, appState, false, {})
+                }
+            }
+        }
+        assertTrue(
+            appState.speakAloudAutoRead(
+                GROUP_ID,
+                listOf(projectedTtsEntry(item).copy(messageIdHex = "outside-window")),
+                Locale.getDefault(),
+            ),
+        )
+        waitForTts(engine)
+        val sessionId = appState.ttsController.state.value.sessionId
+        composeRule.mainClock.autoAdvance = false
+
+        doubleTapOnMessageText("https://example.com")
+        composeRule.mainClock.advanceTimeBy(
+            android.view.ViewConfiguration
+                .getDoubleTapTimeout()
+                .toLong() + 1L,
+        )
+        composeRule.waitForIdle()
+
+        assertEquals(Intent.ACTION_VIEW, shadowOf(app).nextStartedActivity?.action)
+        assertEquals(sessionId, appState.ttsController.state.value.sessionId)
     }
 
     @Test
@@ -387,6 +556,14 @@ class MessageBubbleTextSelectionSpeakTest {
         }
     }
 
+    private fun singleTapOnMessageText(substring: String) {
+        val pressOnHost = messageTextPositionOnHost(substring)
+        composeRule.onNodeWithTag(MESSAGE_HOST_TAG).performTouchInput {
+            down(pressOnHost)
+            up()
+        }
+    }
+
     private fun messageTextPositionOnHost(substring: String): Offset {
         val layoutResults = mutableListOf<TextLayoutResult>()
         composeRule
@@ -432,6 +609,7 @@ class MessageBubbleTextSelectionSpeakTest {
         onActionMenuOpenChange: (Boolean) -> Unit = {},
     ) {
         val composerTextState = ComposerTextState(TextFieldValue(""))
+        val ttsState by appState.ttsController.state.collectAsState()
         CompositionLocalProvider(LocalTextContextMenuToolbarProvider provides nativeTextMenuProvider) {
             MessageBubble(
                 item = item,
@@ -465,6 +643,8 @@ class MessageBubbleTextSelectionSpeakTest {
                 onDeclineInvite = {},
                 mentionCandidates = emptyList(),
                 mentionPickerEnabled = false,
+                ttsHighlightPassage = timelineRowTtsHighlightPassage(item.record.messageIdHex, ttsState),
+                ttsReadAloudProgress = timelineRowTtsReadAloudProgress(item.record.messageIdHex, ttsState),
             )
         }
     }
@@ -519,7 +699,10 @@ class MessageBubbleTextSelectionSpeakTest {
     private fun conversationController(appState: WhiteNoiseAppState): ConversationController =
         ConversationController(appState = appState, initialGroup = group())
 
-    private fun timelineMessage(body: String): TimelineMessage {
+    private fun timelineMessage(
+        body: String,
+        contentTokensTruncated: Boolean = false,
+    ): TimelineMessage {
         val messageId = "05" + "00".repeat(31)
         return TimelineMessage(
             id = "msg:$messageId",
@@ -532,7 +715,7 @@ class MessageBubbleTextSelectionSpeakTest {
                     plaintext = body,
                     contentTokens =
                         MarkdownDocumentFfi(
-                            truncated = false,
+                            truncated = contentTokensTruncated,
                             blocks =
                                 listOf(
                                     MarkdownBlockFfi.Paragraph(
@@ -552,6 +735,46 @@ class MessageBubbleTextSelectionSpeakTest {
             status = MessageStatus.Received,
         )
     }
+
+    private fun timelineMessageWithAutolink(): TimelineMessage {
+        val body = "First sentence. Read https://example.com now. Third sentence."
+        val item = timelineMessage(body)
+        return item.copy(
+            record =
+                item.record.copy(
+                    contentTokens =
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks =
+                                listOf(
+                                    MarkdownBlockFfi.Paragraph(
+                                        inlines =
+                                            listOf(
+                                                MarkdownInlineFfi.Text("First sentence. Read "),
+                                                MarkdownInlineFfi.Autolink(
+                                                    url = "https://example.com",
+                                                    kind = MarkdownAutolinkKindFfi.URI,
+                                                    classification = MarkdownLinkDestinationKindFfi.WEB,
+                                                ),
+                                                MarkdownInlineFfi.Text(" now. Third sentence."),
+                                            ),
+                                    ),
+                                ),
+                            blankLinesBefore = byteArrayOf(),
+                        ),
+                ),
+        )
+    }
+
+    private fun projectedTtsEntry(item: TimelineMessage): TtsSpeakableEntry =
+        runBlocking {
+            projectTtsSpeakableEntry(
+                message = item.record,
+                editedText = null,
+                senderDisplayName = "Sender",
+                parseMarkdown = { error("stored content tokens must be used") },
+            )!!
+        }
 
     private fun group() =
         AppGroupRecordFfi(

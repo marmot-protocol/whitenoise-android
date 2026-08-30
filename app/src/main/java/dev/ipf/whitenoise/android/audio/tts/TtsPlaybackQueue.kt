@@ -95,6 +95,15 @@ enum class TtsNavigationOutcome {
     Inactive,
 }
 
+/** Exact result of an explicit sentence seek within the active queue window. */
+enum class TtsSeekResult {
+    Repositioned,
+    RepositionedAcrossMessages,
+    MessageNotInWindow,
+    SentenceOutOfRange,
+    SessionInactive,
+}
+
 /**
  * How the outcome of a deferred edge request resolves the cursor it left
  * behind. The tap's meaning was fixed when it armed the deferral, so the
@@ -412,6 +421,45 @@ internal class TtsPlaybackQueue(
                 }
             moveTo(target, announcementForTarget(target))
             TtsNavigationOutcome.Moved
+        }
+    }
+
+    /**
+     * Repositions to the first chunk of [sentenceIndex] in [messageIdHex].
+     * Unlike ordinary previous/next navigation, seeking to the current
+     * sentence is an explicit replay request and therefore always requeues it.
+     */
+    @Suppress("ReturnCount") // Each result preserves the exact reason a requested seek could not move.
+    fun seekTo(
+        messageIdHex: String,
+        sentenceIndex: Int,
+    ): TtsSeekResult {
+        if (!isNavigable()) return TtsSeekResult.SessionInactive
+        val targetMessage = messages.indexOfFirst { it.messageIdHex == messageIdHex }
+        if (targetMessage < 0) return TtsSeekResult.MessageNotInWindow
+        if (sentenceIndex !in 0 until messageSentenceCount[targetMessage]) {
+            return TtsSeekResult.SentenceOutOfRange
+        }
+        val target =
+            projection.firstChunkIndexOfSentence(targetMessage, sentenceIndex)
+                ?: return TtsSeekResult.SentenceOutOfRange
+        // An explicit seek supersedes any in-flight history-edge request. Its
+        // eventual settlement must not move the freshly chosen cursor.
+        edgeRequestGeneration = null
+        parkedTerminalGeneration = null
+        val crossedMessage = projection.messageIndexForChunk(currentIndex) != targetMessage
+        val announcement = if (crossedMessage) SenderAnnouncement.Announce else SenderAnnouncement.Suppress
+        if (_state.value is TtsState.Paused) {
+            currentIndex = target
+            pendingResumeAnnouncement = announcement
+            publishPaused(target)
+        } else {
+            requeueFrom(target, announcement)
+        }
+        return if (crossedMessage) {
+            TtsSeekResult.RepositionedAcrossMessages
+        } else {
+            TtsSeekResult.Repositioned
         }
     }
 

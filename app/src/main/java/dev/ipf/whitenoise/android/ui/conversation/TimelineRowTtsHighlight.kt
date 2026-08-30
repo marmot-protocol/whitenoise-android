@@ -103,6 +103,7 @@ internal fun TimelineRowMessageBubble(
     collapseLongMessages: Boolean,
     readOnly: Boolean,
     ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
+    onTtsSentenceSeek: (TtsState) -> Unit = {},
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
 ) {
     val ttsHighlightState by rememberRowScopedTtsHighlightState(messageIdHex, appState)
@@ -161,6 +162,7 @@ internal fun TimelineRowMessageBubble(
         ttsReadAloudProgress = ttsHighlightState.progress,
         ttsFollowTarget = ttsHighlightState.followTarget,
         ttsSentenceLayoutSink = ttsSentenceLayoutSink,
+        onTtsSentenceSeek = onTtsSentenceSeek,
         ttsRowInstance = ttsRowInstance,
         parseMarkdown = parseMarkdown,
     )

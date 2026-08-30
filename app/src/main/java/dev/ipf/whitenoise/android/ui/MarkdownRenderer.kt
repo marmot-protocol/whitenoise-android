@@ -148,6 +148,7 @@ internal fun MarkdownMessageBody(
     onLinkTextLayoutChanged: MarkdownLinkTextLayoutReporter? = null,
     // Accessibility actions invoke the same copy path without a pointer event.
     onCopyLink: ((String) -> Unit)? = null,
+    deferLinkActivation: ((() -> Unit) -> Unit)? = null,
     ttsLeafHighlightResolver: TtsLeafHighlightResolver? = null,
     ttsReadAloudHighlightStyle: TtsReadAloudHighlightStyle? = null,
     ttsSentenceLayoutReporter: TtsSentenceLayoutReporter? = null,
@@ -162,19 +163,28 @@ internal fun MarkdownMessageBody(
     // surface destinations hidden behind author-controlled labels first;
     // nostr-profile Clickable annotations stay in-app.
     val linkListener =
-        remember(context, onNostrProfileTap) {
+        remember(context, onNostrProfileTap, deferLinkActivation) {
             LinkInteractionListener { annotation ->
-                when (annotation) {
-                    is LinkAnnotation.Url -> openMarkdownLink(context, annotation.url)
-                    is LinkAnnotation.Clickable ->
-                        when {
-                            annotation.tag.startsWith(CONFIRM_LINK_TAG_PREFIX) ->
-                                pendingLinkUrl = annotation.tag.removePrefix(CONFIRM_LINK_TAG_PREFIX)
-                            annotation.tag.startsWith(NOSTR_PROFILE_LINK_TAG_PREFIX) ->
-                                onNostrProfileTap?.invoke(annotation.tag.removePrefix(NOSTR_PROFILE_LINK_TAG_PREFIX))
-                            else -> Unit
-                        }
-                    else -> Unit
+                val activate: () -> Unit = {
+                    when (annotation) {
+                        is LinkAnnotation.Url -> openMarkdownLink(context, annotation.url)
+                        is LinkAnnotation.Clickable ->
+                            when {
+                                annotation.tag.startsWith(CONFIRM_LINK_TAG_PREFIX) ->
+                                    pendingLinkUrl = annotation.tag.removePrefix(CONFIRM_LINK_TAG_PREFIX)
+                                annotation.tag.startsWith(NOSTR_PROFILE_LINK_TAG_PREFIX) ->
+                                    onNostrProfileTap?.invoke(
+                                        annotation.tag.removePrefix(NOSTR_PROFILE_LINK_TAG_PREFIX),
+                                    )
+                                else -> Unit
+                            }
+                        else -> Unit
+                    }
+                }
+                if (deferLinkActivation != null) {
+                    deferLinkActivation(activate)
+                } else {
+                    activate()
                 }
             }
         }

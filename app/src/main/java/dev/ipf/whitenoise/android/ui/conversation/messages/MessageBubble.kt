@@ -73,6 +73,8 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
+import dev.ipf.whitenoise.android.audio.tts.TtsSeekResult
+import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
@@ -323,6 +325,7 @@ internal fun MessageBubble(
     ttsReadAloudProgress: TtsReadAloudProgress? = null,
     ttsFollowTarget: ConversationTtsFollowTarget? = null,
     ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
+    onTtsSentenceSeek: (TtsState) -> Unit = {},
     ttsRowInstance: Any? = null,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
 ) {
@@ -791,6 +794,28 @@ internal fun MessageBubble(
     var messageShareInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     var messageShareJob by remember(record.messageIdHex) { mutableStateOf<Job?>(null) }
     val messageShareScope = rememberCoroutineScope()
+    val ttsLinkTapCoordinator =
+        remember(record.messageIdHex, messageShareScope, appState, controller.group.groupIdHex) {
+            TtsLinkTapCoordinator(
+                scope = messageShareScope,
+                isReadAloudActive = {
+                    val state = appState.ttsController.state.value
+                    (state is TtsState.Speaking || state is TtsState.Paused) &&
+                        appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
+                },
+                doubleTapTimeoutMillis =
+                    android.view.ViewConfiguration
+                        .getDoubleTapTimeout()
+                        .toLong(),
+            )
+        }
+    DisposableEffect(ttsLinkTapCoordinator) {
+        onDispose { ttsLinkTapCoordinator.cancelPendingActivation() }
+    }
+    val deferMarkdownLinkActivation =
+        remember(ttsLinkTapCoordinator) {
+            { action: () -> Unit -> ttsLinkTapCoordinator.activate(action) }
+        }
     key(record.messageIdHex) {
         val currentActionMenuOpen by rememberUpdatedState(isActionMenuOpen)
         val currentActionMenuOpenChange by rememberUpdatedState(onActionMenuOpenChange)
@@ -993,8 +1018,38 @@ internal fun MessageBubble(
     @Suppress("ComplexCondition", "ReturnCount")
     fun seekSpeakAloudAt(pressInWindow: Offset) {
         if (deleted || selectionMode || textSelectionMode || !canSpeakAloud) return
-        if (markdownHasLinkAnnotationAt(markdownLinkLayouts.values, pressInWindow)) return
         val layouts = selectableTextLayouts.snapshot()
+        val activeState = appState.ttsController.state.value
+        val ownsActiveSession =
+            (activeState is TtsState.Speaking || activeState is TtsState.Paused) &&
+                appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
+        if (ownsActiveSession) {
+            val hit = renderedTextHitAtWindowPosition(layouts, pressInWindow)
+            val sentenceIndex = hit?.let { ttsProjectionResolver?.sentenceIndexAtRenderedOffset(it) }
+            if (sentenceIndex != null) {
+                when (appState.ttsController.seekToSentence(record.messageIdHex, sentenceIndex)) {
+                    TtsSeekResult.Repositioned,
+                    TtsSeekResult.RepositionedAcrossMessages,
+                    -> {
+                        ttsLinkTapCoordinator.cancelPendingActivation()
+                        onTtsSentenceSeek(appState.ttsController.state.value)
+                        return
+                    }
+
+                    TtsSeekResult.MessageNotInWindow,
+                    TtsSeekResult.SentenceOutOfRange,
+                    TtsSeekResult.SessionInactive,
+                    -> Unit
+                }
+            }
+            // An owned session must never be replaced merely because a hit is
+            // ambiguous, outside the queue window, or denied audio focus. A
+            // pending link remains armed and opens after its tap window.
+            return
+        }
+        // Outside playback, links retain their immediate activation and do
+        // not become a read-aloud gesture target.
+        if (markdownHasLinkAnnotationAt(markdownLinkLayouts.values, pressInWindow)) return
         val visibleOffset =
             if (record.contentTokens.truncated) {
                 null
@@ -1080,17 +1135,10 @@ internal fun MessageBubble(
                             }
                     )
             )
-    val currentMessageTextDoubleTap =
-        rememberUpdatedState<(Offset) -> Unit> { position ->
-            val pressInWindow =
-                rowCoordinates[0]?.localToWindow(position)
-                    ?: return@rememberUpdatedState
-            seekSpeakAloudAt(pressInWindow)
-        }
-    val stableMessageTextDoubleTap =
-        remember {
-            { position: Offset -> currentMessageTextDoubleTap.value(position) }
-        }
+    val messageTextDoubleTap: (Offset) -> Unit = { position ->
+        val pressInWindow = rowCoordinates[0]?.localToWindow(position)
+        if (pressInWindow != null) seekSpeakAloudAt(pressInWindow)
+    }
 
     // Resolved when the gesture fires rather than on every recomposition: the
     // conversation recomposes constantly while a message is being read, and a
@@ -1200,7 +1248,24 @@ internal fun MessageBubble(
                     ).then(
                         Modifier.observeMessageTextDoubleTap(
                             enabled = !deleted && !selectionMode && !textSelectionMode && canSpeakAloud,
-                            onDoubleTap = stableMessageTextDoubleTap,
+                            allowConsumedTapAt = { position ->
+                                rowCoordinates[0]
+                                    ?.localToWindow(position)
+                                    ?.let { press ->
+                                        markdownHasLinkAnnotationAt(markdownLinkLayouts.values, press)
+                                    } == true
+                            },
+                            onPointerDown = { position ->
+                                val pressInWindow = rowCoordinates[0]?.localToWindow(position)
+                                if (
+                                    pressInWindow != null &&
+                                    markdownHasLinkAnnotationAt(markdownLinkLayouts.values, pressInWindow)
+                                ) {
+                                    ttsLinkTapCoordinator.beginPointerActivation()
+                                }
+                            },
+                            onPointerFinished = ttsLinkTapCoordinator::endPointerActivation,
+                            onDoubleTap = messageTextDoubleTap,
                         ),
                     ).then(
                         // Long-press lives in a raw pointerInput, not
@@ -1803,6 +1868,7 @@ internal fun MessageBubble(
                                     selectableTextLayoutReporter = selectableTextLayoutReporter,
                                     markdownLinkLayoutReporter = markdownLinkLayoutReporter,
                                     onCopyMarkdownLink = ::copyMarkdownLink,
+                                    deferMarkdownLinkActivation = deferMarkdownLinkActivation,
                                     plainTextSelectionModifier = plainTextSelectionModifier,
                                     onPlainTextLayout = onPlainTextLayout,
                                     ttsLeafHighlightResolver = ttsLeafHighlightResolver,
@@ -1871,6 +1937,7 @@ internal fun MessageBubble(
                                     selectableTextLayoutReporter = selectableTextLayoutReporter,
                                     markdownLinkLayoutReporter = markdownLinkLayoutReporter,
                                     onCopyMarkdownLink = ::copyMarkdownLink,
+                                    deferMarkdownLinkActivation = deferMarkdownLinkActivation,
                                     plainTextSelectionModifier = plainTextSelectionModifier,
                                     onPlainTextLayout = onPlainTextLayout,
                                     ttsLeafHighlightResolver = ttsLeafHighlightResolver,
@@ -1937,6 +2004,7 @@ internal fun MessageBubble(
                             selectableTextLayoutReporter = selectableTextLayoutReporter,
                             markdownLinkLayoutReporter = markdownLinkLayoutReporter,
                             onCopyMarkdownLink = ::copyMarkdownLink,
+                            deferMarkdownLinkActivation = deferMarkdownLinkActivation,
                             plainTextSelectionModifier = plainTextSelectionModifier,
                             onPlainTextLayout = onPlainTextLayout,
                             ttsLeafHighlightResolver = ttsLeafHighlightResolver,

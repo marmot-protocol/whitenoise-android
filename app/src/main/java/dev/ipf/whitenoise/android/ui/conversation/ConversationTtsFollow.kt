@@ -301,6 +301,19 @@ internal class ConversationTtsFollowPolicy private constructor(
         return true
     }
 
+    /**
+     * A direct seek already placed the target under the listener's finger.
+     * Skip exactly that target's automatic scroll without overriding a user's
+     * explicit follow-disabled state or discarding another pending sentence.
+     */
+    fun suppressNextFollowFor(target: ConversationTtsFollowTarget) {
+        activeTarget = target
+        evaluatedTarget = target
+        if (pendingTarget == target) pendingTarget = null
+        retriedTarget = null
+        explicitRevealTarget = null
+    }
+
     fun claimPendingRequest(): ConversationTtsFollowRequest? {
         val target = pendingTarget?.takeIf { isFollowEnabled } ?: return null
         pendingTarget = null

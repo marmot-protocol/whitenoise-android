@@ -16,6 +16,56 @@ import java.util.Locale
 
 class TtsPassageHighlightTest {
     @Test
+    fun renderedHitDistinguishesRepeatedSentencesByProjectionOffset() {
+        val text = "Again. Again."
+        val projection =
+            SpeakableTextProjection(
+                text = text,
+                spans = listOf(SpeakableTextProjectionSpan(0, text.length, "plain", 0, text.length)),
+            )
+        val resolver = TtsHighlightProjectionResolver(projection, Locale.US)
+
+        assertEquals(0, resolver.sentenceIndexAtRenderedOffset(RenderedTextHit("plain", text, 1)))
+        assertEquals(1, resolver.sentenceIndexAtRenderedOffset(RenderedTextHit("plain", text, 9)))
+    }
+
+    @Test
+    fun renderedHitUsesNearestMappedNeighborInsideOmittedStretch() {
+        val rendered = "Read https://example.com now. Next."
+        val spoken = "Read now. Next."
+        val projection =
+            SpeakableTextProjection(
+                text = spoken,
+                spans =
+                    listOf(
+                        SpeakableTextProjectionSpan(0, 5, "plain", 0, 5),
+                        SpeakableTextProjectionSpan(5, 9, "plain", 25, 29),
+                        SpeakableTextProjectionSpan(9, 15, "plain", 29, 35),
+                    ),
+            )
+        val resolver = TtsHighlightProjectionResolver(projection, Locale.US)
+
+        assertEquals(0, resolver.sentenceIndexAtRenderedOffset(RenderedTextHit("plain", rendered, 12)))
+        assertEquals(1, resolver.sentenceIndexAtRenderedOffset(RenderedTextHit("plain", rendered, 32)))
+    }
+
+    @Test
+    fun inverseMappingIgnoresEmptyOrUnequalProjectionSpans() {
+        val projection =
+            SpeakableTextProjection(
+                text = "Hello.",
+                spans =
+                    listOf(
+                        SpeakableTextProjectionSpan(0, 0, "plain", 0, 0),
+                        SpeakableTextProjectionSpan(0, 6, "plain", 0, 5),
+                    ),
+            )
+        val resolver = TtsHighlightProjectionResolver(projection, Locale.US)
+
+        assertNull(resolver.sentenceIndexAtRenderedOffset(RenderedTextHit("plain", "Hello", 2)))
+    }
+
+    @Test
     fun sentenceLayoutRequiresAndCombinesEveryRenderedLeafFragment() {
         val projection =
             SpeakableTextProjection(

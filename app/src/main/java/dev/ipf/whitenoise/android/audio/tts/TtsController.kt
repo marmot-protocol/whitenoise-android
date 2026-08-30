@@ -284,6 +284,30 @@ class TtsController internal constructor(
         return queue.skipPreviousSentence(deferAtEdge)
     }
 
+    /** Seeks within the current queue. A tap-to-jump resumes paused playback. */
+    @Synchronized
+    fun seekToSentence(
+        messageIdHex: String,
+        sentenceIndex: Int,
+    ): TtsSeekResult {
+        val wasPaused = state.value is TtsState.Paused
+        // A tap-to-jump is a playback intent. Do not silently move the paused
+        // cursor when another audio owner refuses focus.
+        if (wasPaused && !acquireAudioFocus()) return TtsSeekResult.SessionInactive
+        val result = queue.seekTo(messageIdHex, sentenceIndex)
+        if (
+            wasPaused &&
+            (result == TtsSeekResult.Repositioned || result == TtsSeekResult.RepositionedAcrossMessages)
+        ) {
+            queue.resume()
+        } else if (wasPaused) {
+            // Validation can race a window replacement between the rendered
+            // hit and this synchronized call. Return focus if no seek landed.
+            audioFocus.release()
+        }
+        return result
+    }
+
     /**
      * Resolves a deferred edge navigation once its history request settled,
      * applying [settlement] to whatever cursor the queue is holding.

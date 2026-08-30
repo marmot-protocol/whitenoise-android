@@ -26,6 +26,16 @@ internal data class TtsQueueProjection(
 
     fun firstChunkIndexOfMessage(messageIndex: Int): Int = messageFirstChunkIndex[messageIndex]
 
+    fun firstChunkIndexOfSentence(
+        messageIndex: Int,
+        sentenceIndex: Int,
+    ): Int? {
+        val first = firstChunkIndexOfMessage(messageIndex)
+        val endExclusive =
+            messageFirstChunkIndex.getOrNull(messageIndex + 1) ?: chunks.size
+        return (first until endExclusive).firstOrNull { chunks[it].sentenceIndex == sentenceIndex }
+    }
+
     fun firstChunkIndexOfSentenceContaining(chunkIndex: Int): Int {
         var index = chunkIndex
         while (index > 0 && inSameSentence(index - 1, chunkIndex)) index--
