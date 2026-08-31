@@ -85,8 +85,27 @@ class BootstrapSplashHandoffTest {
         val source = mainActivitySource()
         val handoff = source.substringAfter("private fun holdSplashThroughBootstrap(")
 
-        assertTrue(handoff.contains("if (!retain) appState.recordStartupSystemSplashHandoff()"))
-        assertTrue(handoff.indexOf("recordStartupSystemSplashHandoff()") < handoff.indexOf("retain\n"))
+        val recordHandoffIndex = handoff.indexOf("appState.recordStartupSystemSplashHandoff()")
+        val schedulePeriodicWorkIndex = handoff.indexOf("schedulePeriodicWorkAfterFirstFrame()")
+        val returnRetainIndex = handoff.indexOf("retain\n")
+
+        assertTrue(handoff.contains("if (!retain) {"))
+        assertTrue(recordHandoffIndex >= 0)
+        assertTrue(schedulePeriodicWorkIndex > recordHandoffIndex)
+        assertTrue(returnRetainIndex > schedulePeriodicWorkIndex)
+    }
+
+    @Test
+    fun periodicWorkIsPostedToTheAnimationStepAfterSplashRelease() {
+        val source = mainActivitySource()
+        val scheduling = source.substringAfter("private fun schedulePeriodicWorkAfterFirstFrame()")
+
+        val postAnimationIndex = scheduling.indexOf("window.decorView.postOnAnimation")
+        val schedulePeriodicWorkIndex =
+            scheduling.indexOf("(application as WhiteNoiseApplication).ensurePeriodicWorkScheduled()")
+
+        assertTrue(postAnimationIndex >= 0)
+        assertTrue(schedulePeriodicWorkIndex > postAnimationIndex)
     }
 
     @Test

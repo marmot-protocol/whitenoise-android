@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android
 
 import android.app.Application
 import android.util.Log
+import androidx.work.Configuration
+import androidx.work.Operation
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -14,8 +16,31 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
-open class WhiteNoiseApplication : Application() {
+internal class BackgroundWorkSchedulingGate {
+    private val started = AtomicBoolean(false)
+
+    fun start(block: () -> Unit): Boolean {
+        if (!started.compareAndSet(false, true)) return false
+        block()
+        return true
+    }
+
+    fun resetAfterFailure() {
+        started.set(false)
+    }
+}
+
+open class WhiteNoiseApplication :
+    Application(),
+    Configuration.Provider {
+    override val workManagerConfiguration: Configuration by lazy {
+        Configuration.Builder().build()
+    }
+    private val backgroundWorkSchedulingGate = BackgroundWorkSchedulingGate()
+
     val appState: WhiteNoiseAppState by lazy {
         WhiteNoiseAppState(this)
     }
@@ -64,10 +89,34 @@ open class WhiteNoiseApplication : Application() {
         // onCreate on API 32 and lower so it can wrap the Activity context.
         applyApplicationLanguageTag(persistedApplicationLanguageTag(this))
         VoicePlaybackController.attach(this)
-        // Coarse background prune of expired disappearing messages in closed
-        // conversations (#745). KEEP-policy unique work, so this just ensures
-        // the schedule exists without resetting an already-running cadence.
-        DisappearingMessageSweepWorker.schedule(this)
-        AppUpdateWorker.schedule(this)
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    internal fun ensurePeriodicWorkScheduled(
+        scope: CoroutineScope = applicationScope,
+        schedule: () -> List<Operation> = {
+            buildList {
+                add(DisappearingMessageSweepWorker.schedule(this@WhiteNoiseApplication))
+                AppUpdateWorker.schedule(this@WhiteNoiseApplication)?.let(::add)
+            }
+        },
+    ) {
+        backgroundWorkSchedulingGate.start {
+            scope.launch {
+                try {
+                    schedule().forEach { operation -> operation.result.get() }
+                } catch (cancellation: kotlin.coroutines.cancellation.CancellationException) {
+                    backgroundWorkSchedulingGate.resetAfterFailure()
+                    throw cancellation
+                } catch (error: Exception) {
+                    backgroundWorkSchedulingGate.resetAfterFailure()
+                    if (BuildConfig.DEBUG) {
+                        Log.w("WhiteNoiseApplication", "periodic work scheduling failed", error)
+                    } else {
+                        Log.w("WhiteNoiseApplication", "periodic work scheduling failed")
+                    }
+                }
+            }
+        }
     }
 }
