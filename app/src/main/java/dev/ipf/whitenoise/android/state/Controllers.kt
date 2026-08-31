@@ -2313,77 +2313,6 @@ internal fun unreadReceivedMentionIds(
 }
 
 /**
- * Monotonic read-anchor advance. Returns the candidate row's id (the row at
- * [candidateIndex]) only when it is strictly deeper than the current anchor's
- * live position — or when there is no current anchor, or the current anchor
- * has fallen out of the loaded window. Otherwise returns [currentAnchorId]
- * unchanged, so scrolling up can never move the read pointer backwards.
- */
-internal fun nextReadAnchor(
-    timeline: List<TimelineMessage>,
-    currentAnchorId: String?,
-    candidateIndex: Int,
-): String? {
-    val candidate = timeline.getOrNull(candidateIndex)
-    val candidateId = candidate?.record?.messageIdHex
-    if (candidateId.isNullOrBlank()) return currentAnchorId
-    // Synthetic streaming-debug rows carry a non-hex id and never mark read;
-    // don't let one become the read anchor or it would pin the pointer off a
-    // real message until the next chat row advances it.
-    if (candidateId.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) return currentAnchorId
-    if (currentAnchorId == null) return candidateId
-    val anchorIdx = timeline.indexOfFirst { it.record.messageIdHex == currentAnchorId }
-    return if (anchorIdx < 0 || candidateIndex > anchorIdx) candidateId else currentAnchorId
-}
-
-/**
- * Advance the conversation's UI read anchor without losing the durable
- * watermark when the screen is recreated. A restored history viewport can be
- * older than the persisted anchor; treating its first visible row as a fresh
- * anchor would move read state backwards and inflate the unread badge.
- */
-internal fun advanceConversationReadAnchor(
-    timeline: List<TimelineMessage>,
-    currentUiAnchorId: String?,
-    durableAnchorId: String?,
-    candidateIndex: Int,
-    canRebaseMissingAnchor: Boolean = false,
-): String? {
-    val baseline = currentUiAnchorId ?: durableAnchorId
-    if (!baseline.isNullOrBlank() && timeline.none { it.record.messageIdHex == baseline }) {
-        // A local send first renders with a UUID, then keeps the same list slot
-        // while convergence replaces it with the confirmed 64-hex id. Rebase
-        // that transient UI-only anchor through the durable watermark instead
-        // of preserving a UUID that can never be found or marked read.
-        return when {
-            currentUiAnchorId != null && isOptimisticMessageId(currentUiAnchorId) ->
-                nextReadAnchor(
-                    timeline = timeline,
-                    currentAnchorId = durableAnchorId,
-                    candidateIndex = candidateIndex,
-                )
-            canRebaseMissingAnchor ->
-                nextReadAnchor(
-                    timeline = timeline,
-                    currentAnchorId = null,
-                    candidateIndex = candidateIndex,
-                )
-            else -> baseline
-        }
-    }
-    return nextReadAnchor(
-        timeline = timeline,
-        currentAnchorId = baseline,
-        candidateIndex = candidateIndex,
-    )
-}
-
-private val OPTIMISTIC_TIMELINE_MESSAGE_ID =
-    Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
-
-private fun isOptimisticMessageId(messageId: String): Boolean = OPTIMISTIC_TIMELINE_MESSAGE_ID.matches(messageId)
-
-/**
  * Whether send-time disappearing expiry should stay suspended for [record]
  * until the user scrolls past it (#797). Own sends always use send-time or a
  * display anchor; received rows after the persisted read watermark stay
@@ -10899,7 +10828,11 @@ class ConversationController(
 
     internal fun testActiveStreamIds(): Set<String> = activeStreamIds.toSet()
 
-    internal fun testSweepExpiryIds(): List<String> = sweepExpiryMessages().map { it.record.messageIdHex }
+    /** Returns loaded ordinary-message ids eligible for the foreground expiry sweep. */
+    internal fun testSweepExpiryIds(): List<String> =
+        sweepExpiryMessages()
+            .filter { shouldApplyLocalDisappearingExpiry(it.record) }
+            .map { it.record.messageIdHex }
 
     /**
      * Resolved reply target as (sender pubkey, display body). Returns the raw

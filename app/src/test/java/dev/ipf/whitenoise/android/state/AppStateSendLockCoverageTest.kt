@@ -183,6 +183,7 @@ class AppStateSendLockCoverageTest {
         )
     }
 
+    /** Guards the engine-owned projected deadline contract used by loaded-row expiry checks. */
     @Test
     fun localExpiryRowsFeedEngineAuthoritativeExpiry() {
         // localExpiryRow is an expression-body function, so window the source
@@ -193,8 +194,10 @@ class AppStateSendLockCoverageTest {
 
         assertTrue(
             "the loaded-row hide filter must prefer the engine's projected per-message expiry",
-            "expiresAtLocalSeconds = record.retentionExpiresAt" in
-                source.substring(start, (start + 800).coerceAtMost(source.length)),
+            source.substring(start, (start + 800).coerceAtMost(source.length)).let { body ->
+                "val authoritativeExpiry = record.retentionExpiresAt?.takeIf { it > 0uL }" in body &&
+                    "expiresAtLocalSeconds = authoritativeExpiry" in body
+            },
         )
     }
 
