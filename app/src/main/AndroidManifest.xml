@@ -53,6 +53,12 @@
         <intent>
             <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
         </intent>
+        <!-- Package visibility for app-owned SpeechRecognizer binding. The
+             selected RecognitionService is probed and bound explicitly; White
+             Noise never falls back to an arbitrary service. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
     </queries>
 
     <application

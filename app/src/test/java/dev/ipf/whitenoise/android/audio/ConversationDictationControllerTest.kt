@@ -31,6 +31,38 @@ class ConversationDictationControllerTest {
     }
 
     @Test
+    fun appOwnedStartPinsTheInAppModeBeforeCreatingARecognizer() {
+        val fixture = fixture(draft = TextFieldValue("Keep", TextRange(4)))
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertEquals(
+            ConversationDictationMode.InApp,
+            fixture.controller.state.target
+                ?.mode,
+        )
+        assertTrue(fixture.platform.session.started)
+    }
+
+    @Test
+    fun providerBindingFailureDoesNotFallBackToAnImplicitRecognizer() {
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Keep", TextRange(4)),
+                platform = FakePlatform(createFailure = ConversationDictationProviderUnavailableException()),
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertEquals(
+            ConversationDictationFailure.ProviderUnavailable,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+        assertFalse(fixture.controller.ownsMicrophone)
+    }
+
+    @Test
     fun resultIsInsertedAtCapturedSelectionAndNeverSent() {
         val fixture = fixture(draft = TextFieldValue("Hello world", TextRange(6, 11)))
 
@@ -807,6 +839,7 @@ class ConversationDictationControllerTest {
         var available: Boolean = true,
         var activityAvailable: Boolean = true,
         private val deferActivityReadiness: Boolean = false,
+        var createFailure: Throwable? = null,
     ) : ConversationDictationPlatform {
         lateinit var listener: ConversationDictationRecognitionListener
         var session = FakeSession()
@@ -828,6 +861,7 @@ class ConversationDictationControllerTest {
         }
 
         override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
+            createFailure?.let { throw it }
             this.listener = listener
             session = FakeSession()
             return session
