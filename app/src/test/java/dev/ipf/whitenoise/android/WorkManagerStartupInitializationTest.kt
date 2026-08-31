@@ -9,10 +9,16 @@ import androidx.work.Configuration
 import androidx.work.WorkManager
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
+import dev.ipf.whitenoise.android.notifications.NotificationAction
+import dev.ipf.whitenoise.android.notifications.NotificationActionKind
+import dev.ipf.whitenoise.android.notifications.NotificationMarkReadWorker
+import dev.ipf.whitenoise.android.notifications.NotificationTarget
+import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -53,13 +59,13 @@ class WorkManagerStartupInitializationTest {
     fun periodicWorkSchedulingStartsAtTheSplashHandoff() {
         val application = projectFile("src/main/java/dev/ipf/whitenoise/android/WhiteNoiseApplication.kt").readText()
         val activity = projectFile("src/main/java/dev/ipf/whitenoise/android/MainActivity.kt").readText()
+        val handoff = activity.substringAfter("private fun holdSplashThroughBootstrap(")
+        val postFrame = activity.substringAfter("private fun schedulePeriodicWorkAfterFirstFrame()")
 
         assertFalse(application.functionBody("onCreate").contains("ensurePeriodicWorkScheduled()"))
-        assertTrue(
-            activity
-                .substringAfter("private fun holdSplashThroughBootstrap(")
-                .contains("(application as WhiteNoiseApplication).ensurePeriodicWorkScheduled()"),
-        )
+        assertTrue(handoff.contains("schedulePeriodicWorkAfterFirstFrame()"))
+        assertTrue(postFrame.contains("window.decorView.postOnAnimation"))
+        assertTrue(postFrame.contains("(application as WhiteNoiseApplication).ensurePeriodicWorkScheduled()"))
     }
 
     @Test
@@ -111,8 +117,42 @@ class WorkManagerStartupInitializationTest {
 
         val workManager = WorkManager.getInstance(context)
         assertEquals(1, workManager.getWorkInfosForUniqueWork("disappearing_message_sweep").get().size)
-        assertEquals(1, workManager.getWorkInfosForUniqueWork("darkmatter-zapstore-update-check").get().size)
+        assertEquals(
+            if (BuildConfig.SELF_UPDATE_ENABLED) 1 else 0,
+            workManager.getWorkInfosForUniqueWork("darkmatter-zapstore-update-check").get().size,
+        )
     }
+
+    @Test
+    fun coldNotificationActionEnqueueInitializesWorkManagerThroughApplicationProvider() =
+        runTest {
+            val application = ApplicationProvider.getApplicationContext<WhiteNoiseApplication>()
+            val action =
+                NotificationAction(
+                    kind = NotificationActionKind.MARK_READ,
+                    target =
+                        NotificationTarget(
+                            accountRef = "cold-account",
+                            groupIdHex = "cold-group",
+                            messageIdHex = "cold-message",
+                            kind = NotificationTargetKind.MESSAGE,
+                        ),
+                    notificationTag = "cold-account|cold-group",
+                    notificationId = 2324,
+                )
+
+            assertTrue(application is Configuration.Provider)
+            assertTrue(NotificationMarkReadWorker.enqueue(application, action))
+
+            val workManager = WorkManager.getInstance(application)
+            assertEquals(
+                1,
+                workManager
+                    .getWorkInfosForUniqueWork(NotificationMarkReadWorker.notificationMarkReadWorkName(action))
+                    .get()
+                    .size,
+            )
+        }
 
     private fun projectFile(relativePath: String): File =
         listOf(File(relativePath), File("app/$relativePath"))

@@ -273,9 +273,20 @@ class MainActivity : AppCompatActivity() {
                 )
             if (!retain) {
                 appState.recordStartupSystemSplashHandoff()
-                (application as WhiteNoiseApplication).ensurePeriodicWorkScheduled()
+                schedulePeriodicWorkAfterFirstFrame()
             }
             retain
+        }
+    }
+
+    /**
+     * Posting from the splash-release pre-draw callback to the next animation
+     * step guarantees that app-owned UI gets its first frame before the first
+     * WorkManager use can initialize its database on a background thread.
+     */
+    private fun schedulePeriodicWorkAfterFirstFrame() {
+        window.decorView.postOnAnimation {
+            (application as WhiteNoiseApplication).ensurePeriodicWorkScheduled()
         }
     }
 
