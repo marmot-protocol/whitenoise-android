@@ -6,12 +6,15 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Covers read deferral without allowing group-policy changes to rewrite history. */
 class DisappearingReadAnchorTest {
+    /** Duplicate reconciliation ids keep the first projected ordering position. */
     @Test
     fun messageOrderPreservesFirstOccurrenceForOptimisticReconciliationDuplicates() {
         assertTrue(firstMessageOrder(listOf("before", "duplicate", "duplicate", "after"))["duplicate"] == 1)
     }
 
+    /** Locally sent rows never wait for a received-message read watermark. */
     @Test
     fun ownSendNeverDefersSendTimeExpiry() {
         assertFalse(
@@ -24,6 +27,7 @@ class DisappearingReadAnchorTest {
         )
     }
 
+    /** Received rows defer when no durable read watermark exists. */
     @Test
     fun unreadReceivedDefersWhenNoReadWatermark() {
         assertTrue(
@@ -36,6 +40,7 @@ class DisappearingReadAnchorTest {
         )
     }
 
+    /** A received row after the last-read id remains deferred. */
     @Test
     fun receivedAfterReadMessageIdDefers() {
         assertTrue(
@@ -56,6 +61,30 @@ class DisappearingReadAnchorTest {
         )
     }
 
+    /** A group-system read watermark remains an ordering anchor even though it never expires. */
+    @Test
+    fun groupSystemReadAnchorPartitionsOrdinaryRowsUsingTheCompleteOrder() {
+        val messageOrder = firstMessageOrder(listOf("before", "retention-change", "after"))
+
+        assertFalse(
+            isDisappearingSendTimeExpiryDeferred(
+                record = message(direction = "received", id = "before", timelineAt = 100uL),
+                lastReadMessageId = "retention-change",
+                lastReadTimelineAt = null,
+                messageOrder = messageOrder,
+            ),
+        )
+        assertTrue(
+            isDisappearingSendTimeExpiryDeferred(
+                record = message(direction = "received", id = "after", timelineAt = 100uL),
+                lastReadMessageId = "retention-change",
+                lastReadTimelineAt = null,
+                messageOrder = messageOrder,
+            ),
+        )
+    }
+
+    /** Timeline time provides the fallback ordering when no read id exists. */
     @Test
     fun receivedAfterLastReadTimelineAtDefers() {
         assertTrue(
@@ -68,6 +97,7 @@ class DisappearingReadAnchorTest {
         )
     }
 
+    /** Group-system history is excluded from local message expiry. */
     @Test
     fun groupSystemHistoryNeverParticipatesInLocalMessageExpiry() {
         val groupSystem =
@@ -80,33 +110,45 @@ class DisappearingReadAnchorTest {
         val expiredAtSendTime =
             DisappearingMessageSweep.LocalExpiryRow(
                 timelineAtSeconds = groupSystem.recordedAt,
+                retentionAtSendSeconds = 60uL,
             )
 
         assertFalse(shouldApplyLocalDisappearingExpiry(groupSystem))
         assertFalse(
             isTimelineRecordLocallyExpired(
                 nowMillis = 1_000_000L,
-                disappearingMessageSecs = 60uL,
                 record = groupSystem,
                 row = expiredAtSendTime,
             ),
         )
     }
 
+    /** Ordinary projected rows expire only when they own a pinned deadline. */
     @Test
-    fun ordinaryMessagesKeepTheirExistingLocalExpiryBehavior() {
+    fun ordinaryProjectedMessageRequiresItsOwnPinnedExpiry() {
         val chatMessage = message(direction = "received", id = "chat-message", timelineAt = 100uL)
 
-        assertTrue(
+        assertFalse(
             isTimelineRecordLocallyExpired(
                 nowMillis = 1_000_000L,
-                disappearingMessageSecs = 60uL,
                 record = chatMessage,
                 row = DisappearingMessageSweep.LocalExpiryRow(timelineAtSeconds = chatMessage.recordedAt),
             ),
         )
+        assertTrue(
+            isTimelineRecordLocallyExpired(
+                nowMillis = 1_000_000L,
+                record = chatMessage,
+                row =
+                    DisappearingMessageSweep.LocalExpiryRow(
+                        timelineAtSeconds = chatMessage.recordedAt,
+                        retentionAtSendSeconds = 60uL,
+                    ),
+            ),
+        )
     }
 
+    /** Builds the minimal projected row used by read-anchor decisions. */
     private fun message(
         direction: String,
         id: String,

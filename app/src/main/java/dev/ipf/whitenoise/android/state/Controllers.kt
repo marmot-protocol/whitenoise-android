@@ -1012,9 +1012,10 @@ data class TimelineMessage(
     val projected: TimelineMessageRecordFfi? = null,
     val timelineOrder: ULong = 0uL,
     /**
-     * Immutable presentation hint captured from the group when this local send was accepted.
-     * It keeps the waiting timer visible until MarmotKit projects the authoritative retention
-     * duration and expiry; it is never used to calculate or enforce expiration.
+     * Immutable retention snapshot captured when this local send was accepted.
+     * It keeps the waiting timer accurate and supplies the bounded local expiry
+     * fallback only until MarmotKit projects the authoritative source-epoch
+     * duration and deadline.
      */
     val retentionAtSendSeconds: ULong? = null,
 )
@@ -2312,70 +2313,6 @@ internal fun unreadReceivedMentionIds(
 }
 
 /**
- * Monotonic read-anchor advance. Returns the candidate row's id (the row at
- * [candidateIndex]) only when it is strictly deeper than the current anchor's
- * live position — or when there is no current anchor, or the current anchor
- * has fallen out of the loaded window. Otherwise returns [currentAnchorId]
- * unchanged, so scrolling up can never move the read pointer backwards.
- */
-internal fun nextReadAnchor(
-    timeline: List<TimelineMessage>,
-    currentAnchorId: String?,
-    candidateIndex: Int,
-): String? {
-    val candidate = timeline.getOrNull(candidateIndex)
-    val candidateId = candidate?.record?.messageIdHex
-    if (candidateId.isNullOrBlank()) return currentAnchorId
-    // Synthetic streaming-debug rows carry a non-hex id and never mark read;
-    // don't let one become the read anchor or it would pin the pointer off a
-    // real message until the next chat row advances it.
-    if (candidateId.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) return currentAnchorId
-    if (currentAnchorId == null) return candidateId
-    val anchorIdx = timeline.indexOfFirst { it.record.messageIdHex == currentAnchorId }
-    return if (anchorIdx < 0 || candidateIndex > anchorIdx) candidateId else currentAnchorId
-}
-
-/**
- * Advance the conversation's UI read anchor without losing the durable
- * watermark when the screen is recreated. A restored history viewport can be
- * older than the persisted anchor; treating its first visible row as a fresh
- * anchor would move read state backwards and inflate the unread badge.
- */
-internal fun advanceConversationReadAnchor(
-    timeline: List<TimelineMessage>,
-    currentUiAnchorId: String?,
-    durableAnchorId: String?,
-    candidateIndex: Int,
-): String? {
-    val baseline = currentUiAnchorId ?: durableAnchorId
-    if (!baseline.isNullOrBlank() && timeline.none { it.record.messageIdHex == baseline }) {
-        // A local send first renders with a UUID, then keeps the same list slot
-        // while convergence replaces it with the confirmed 64-hex id. Rebase
-        // that transient UI-only anchor through the durable watermark instead
-        // of preserving a UUID that can never be found or marked read.
-        return if (currentUiAnchorId != null && isOptimisticMessageId(currentUiAnchorId)) {
-            nextReadAnchor(
-                timeline = timeline,
-                currentAnchorId = durableAnchorId,
-                candidateIndex = candidateIndex,
-            )
-        } else {
-            baseline
-        }
-    }
-    return nextReadAnchor(
-        timeline = timeline,
-        currentAnchorId = baseline,
-        candidateIndex = candidateIndex,
-    )
-}
-
-private val OPTIMISTIC_TIMELINE_MESSAGE_ID =
-    Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
-
-private fun isOptimisticMessageId(messageId: String): Boolean = OPTIMISTIC_TIMELINE_MESSAGE_ID.matches(messageId)
-
-/**
  * Whether send-time disappearing expiry should stay suspended for [record]
  * until the user scrolls past it (#797). Own sends always use send-time or a
  * display anchor; received rows after the persisted read watermark stay
@@ -2405,16 +2342,15 @@ internal fun isDisappearingSendTimeExpiryDeferred(
  */
 internal fun shouldApplyLocalDisappearingExpiry(record: AppMessageRecordFfi): Boolean = !MessageProjector.isGroupSystem(record)
 
+/** Applies the row-owned deadline only to ordinary message history. */
 internal fun isTimelineRecordLocallyExpired(
     nowMillis: Long,
-    disappearingMessageSecs: ULong,
     record: AppMessageRecordFfi,
     row: DisappearingMessageSweep.LocalExpiryRow,
 ): Boolean =
     shouldApplyLocalDisappearingExpiry(record) &&
         DisappearingMessageSweep.isLocallyExpired(
             nowMillis = nowMillis,
-            disappearingMessageSecs = disappearingMessageSecs,
             row = row,
         )
 
@@ -6636,6 +6572,7 @@ class ConversationController(
     private val mediaPublisher: MediaPublisher = { account, groupIdHex, references, caption ->
         appState.marmotIo { sendMediaAttachments(account, groupIdHex, references, caption) }
     },
+    private val clockMillis: () -> Long = System::currentTimeMillis,
 ) {
     private val liveSubscriptions = appState.conversationLiveSubscriptions()
 
@@ -7072,9 +7009,10 @@ class ConversationController(
     // Drives read-anchored disappearing-message deferral (#797).
     private var persistedLastReadTimelineAt: ULong? = initialChatListRow?.lastReadTimelineAt
 
-    // Session read/display anchors keyed by message id. Maps to the local
-    // second the row became visible/read; TTL is anchored there until the
-    // engine exposes per-row `expires_at_local` in SQLite.
+    // Session display/read anchors for received rows and local optimistic
+    // sends. They override send-time expiry only when the row also carries
+    // its pinned retention duration; projected sends otherwise use MDK's
+    // authoritative deadline.
     private val readAnchoredAtSeconds = mutableMapOf<String, ULong>()
 
     val title: String
@@ -7363,10 +7301,12 @@ class ConversationController(
         publishTimelineFromIndexes()
     }
 
+    /** Runs MDK's authoritative sweep while any loaded row owns a deadline. */
     private suspend fun runForegroundDisappearingMessageSweep(account: String) {
         while (coroutineContext.isActive) {
-            if (group.disappearingMessageSecs > 0uL) {
-                val nowMillis = System.currentTimeMillis()
+            val expiryRows = foregroundSweepExpiryRows()
+            if (expiryRows.any(DisappearingMessageSweep::hasLocalExpiry)) {
+                val nowMillis = clockMillis()
                 lastForegroundSweepStartedAtMillis = nowMillis
                 // Engine-owned gate + prune: the account worker runs the
                 // skew/unread deferrals atomically with the prune, serialized
@@ -7404,38 +7344,47 @@ class ConversationController(
         }
     }
 
+    /** Returns the next loaded row deadline, capped to the foreground cadence. */
     private fun foregroundDisappearingSweepDelayMillis(): Long =
         DisappearingMessageSweep.nextForegroundSweepDelayMillis(
-            nowMillis = System.currentTimeMillis(),
-            disappearingMessageSecs = group.disappearingMessageSecs,
+            nowMillis = clockMillis(),
             rows = foregroundSweepExpiryRows(),
         )
 
+    /** Projects loaded timeline messages into their row-owned expiry inputs. */
     private fun foregroundSweepExpiryRows(): List<DisappearingMessageSweep.LocalExpiryRow> {
-        val records = sweepExpiryRecords()
-        val messageOrder = firstMessageOrder(records.map { it.messageIdHex })
-        return records
+        val messages = sweepExpiryMessages()
+        val messageOrder = firstMessageOrder(messages.map { it.record.messageIdHex })
+        return messages
+            .filter { shouldApplyLocalDisappearingExpiry(it.record) }
             .map { localExpiryRow(it, messageOrder) }
     }
 
-    private fun sweepExpiryRecords(): List<AppMessageRecordFfi> =
+    /** Returns every loaded row so a group-system read anchor keeps its ordering position. */
+    private fun sweepExpiryMessages(): List<TimelineMessage> =
         buildList {
-            optimisticMessages.values.forEach { add(it.record) }
-            timelineOrder.mapNotNull { timelineItemsById[it]?.record }.forEach(::add)
-        }.filter(::shouldApplyLocalDisappearingExpiry)
+            addAll(optimisticMessages.values)
+            timelineOrder.mapNotNullTo(this) { timelineItemsById[it] }
+        }
 
+    /** Builds expiry input without consulting the group's mutable policy. */
     private fun localExpiryRow(
-        record: AppMessageRecordFfi,
+        message: TimelineMessage,
         messageOrder: Map<String, Int>,
-    ): DisappearingMessageSweep.LocalExpiryRow =
-        DisappearingMessageSweep.LocalExpiryRow(
+    ): DisappearingMessageSweep.LocalExpiryRow {
+        val record = message.record
+        val authoritativeExpiry = record.retentionExpiresAt?.takeIf { it > 0uL }
+        return DisappearingMessageSweep.LocalExpiryRow(
             timelineAtSeconds = record.recordedAt,
             // The engine's authoritative per-message expiry wins over the
             // send-time + retention arithmetic below when it is projected.
             // Zero is not a real expiry (the engine emits null when retention
             // is off); guard like message info does so a zero could never
             // read as epoch-expired and hide the row instantly.
-            expiresAtLocalSeconds = record.retentionExpiresAt?.takeIf { it > 0uL },
+            expiresAtLocalSeconds = authoritativeExpiry,
+            retentionAtSendSeconds =
+                record.retentionSeconds?.takeIf { authoritativeExpiry != null && it > 0uL }
+                    ?: message.retentionAtSendSeconds?.takeIf { it > 0uL },
             readAnchoredAtSeconds = readAnchoredAtSeconds[record.messageIdHex],
             deferSendTimeExpiry =
                 isDisappearingSendTimeExpiryDeferred(
@@ -7445,13 +7394,14 @@ class ConversationController(
                     messageOrder = messageOrder,
                 ),
         )
+    }
 
+    /** Distinguishes timeout wakes from publish signals that expose due rows. */
     private fun shouldRunForegroundSweepAfterWake(wakeSignalReceived: Boolean): Boolean =
         DisappearingMessageSweep.shouldRunForegroundSweepAfterWake(
             wakeSignalReceived = wakeSignalReceived,
-            nowMillis = System.currentTimeMillis(),
+            nowMillis = clockMillis(),
             lastSweepStartedAtMillis = lastForegroundSweepStartedAtMillis,
-            disappearingMessageSecs = group.disappearingMessageSecs,
             rows = foregroundSweepExpiryRows(),
         )
 
@@ -7650,10 +7600,9 @@ class ConversationController(
     }
 
     // Apply a fresh group-state snapshot/update, republishing the timeline when
-    // the disappearing-message window changed. A controller seeded from
-    // emptyGroupRecord() starts at retention 0, so the first real snapshot can
-    // flip it on — without this republish the expiry filter wouldn't apply until
-    // the next 60s sweep, flashing expired messages for up to a minute (#674).
+    // the current policy changes so optimistic-send state is immediately
+    // reconciled. Each row's pinned deadline remains independent of the current
+    // policy, so historical rows are never reinterpreted by this republish.
     private fun applyGroupState(update: AppGroupRecordFfi) {
         val previousRetention = group.disappearingMessageSecs
         group =
@@ -10879,7 +10828,11 @@ class ConversationController(
 
     internal fun testActiveStreamIds(): Set<String> = activeStreamIds.toSet()
 
-    internal fun testSweepExpiryIds(): List<String> = sweepExpiryRecords().map { it.messageIdHex }
+    /** Returns loaded ordinary-message ids eligible for the foreground expiry sweep. */
+    internal fun testSweepExpiryIds(): List<String> =
+        sweepExpiryMessages()
+            .filter { shouldApplyLocalDisappearingExpiry(it.record) }
+            .map { it.record.messageIdHex }
 
     /**
      * Resolved reply target as (sender pubkey, display body). Returns the raw
@@ -11280,7 +11233,7 @@ class ConversationController(
                     applyChatListRow = { appState.applyChatListRowFromMarkRead(account, it) },
                 )
         }
-        val anchoredAtSeconds = (System.currentTimeMillis() / 1_000L).toULong()
+        val anchoredAtSeconds = (clockMillis() / 1_000L).toULong()
         anchorReadExpiryUpTo(trimmed, anchoredAtSeconds)
         runCatchingCancellable {
             appState.dismissConversationNotifications(account, group.groupIdHex)
@@ -11937,6 +11890,7 @@ class ConversationController(
         }
     }
 
+    /** Publishes the indexed window after row-owned expiry and visibility filters. */
     private fun publishTimelineFromIndexesInternal() {
         // Preserve the handoff snapshot for one complete frame. Any projection
         // or optimistic mutation arriving during that frame is already reflected
@@ -11946,18 +11900,20 @@ class ConversationController(
             return
         }
         val projected = timelineOrder.mapNotNull { timelineItemsById[it] }
-        // Read-anchored local expiry (#797) with send-time fallback for rows
-        // the user has already read through. Unread received rows stay visible
-        // past their wire send-time expiry until scroll-driven mark-read anchors
-        // a session TTL. Own sends anchor at first render. Window 0 (off)
-        // filters nothing.
-        val window = group.disappearingMessageSecs
+        // Read-anchored local expiry (#797) uses only the policy pinned to each
+        // row. The mutable group policy cannot reinterpret projected history.
+        // When no row owns a deadline, keep the no-filter-allocation fast path.
+        val candidates = optimisticMessages.values + projected
+        val hasExpiryCandidate =
+            candidates.any { message ->
+                message.record.retentionExpiresAt?.let { it > 0uL } == true ||
+                    message.retentionAtSendSeconds?.let { it > 0uL } == true
+            }
         val live =
-            if (window == 0uL) {
-                // Timer off: skip the expiry scan/allocation fast path entirely.
-                optimisticMessages.values + projected
+            if (!hasExpiryCandidate) {
+                candidates
             } else {
-                val nowMillis = System.currentTimeMillis()
+                val nowMillis = clockMillis()
                 val nowSeconds = (nowMillis.coerceAtLeast(0L) / 1_000L).toULong()
                 val messageOrder =
                     firstMessageOrder(
@@ -11966,16 +11922,15 @@ class ConversationController(
                             projected.forEach { add(it.record.messageIdHex) }
                         },
                     )
-                (optimisticMessages.values + projected).filter { message ->
+                candidates.filter { message ->
                     val record = message.record
-                    if (record.direction == "sent") {
+                    if (record.direction == "sent" && message.projected == null) {
                         readAnchoredAtSeconds.putIfAbsent(record.messageIdHex, nowSeconds)
                     }
                     !isTimelineRecordLocallyExpired(
                         nowMillis = nowMillis,
-                        disappearingMessageSecs = window,
                         record = record,
-                        row = localExpiryRow(record, messageOrder),
+                        row = localExpiryRow(message, messageOrder),
                     )
                 }
             }
@@ -12644,7 +12599,8 @@ class ConversationController(
             .orEmpty()
     }
 
-    private fun nowSeconds(): ULong = (System.currentTimeMillis() / 1000L).toULong()
+    /** Current wall-clock seconds from the controller's lifecycle-stable clock. */
+    private fun nowSeconds(): ULong = (clockMillis() / 1000L).toULong()
 
     // --- Send-latency trace (issues #913, #2224) -----------------------------
     private fun traceNowMs(): Long = SystemClock.elapsedRealtime()

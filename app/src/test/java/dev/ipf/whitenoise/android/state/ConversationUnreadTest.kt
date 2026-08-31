@@ -261,6 +261,24 @@ class ConversationUnreadTest {
         )
     }
 
+    /** The loaded tail replaces an expired off-window watermark and clears the local badge. */
+    @Test
+    fun fullyLoadedTailRebasesDurableAnchorThatExpiredOutOfTheTimeline() {
+        val timeline = (1..3).map { received("r$it") }
+
+        val anchor =
+            advanceConversationReadAnchor(
+                timeline = timeline,
+                currentUiAnchorId = null,
+                durableAnchorId = "expired-read-watermark",
+                candidateIndex = timeline.lastIndex,
+                canRebaseMissingAnchor = true,
+            )
+
+        assertEquals("r3", anchor)
+        assertEquals(0, countUnreadIncoming(timeline, anchor))
+    }
+
     @Test
     fun optimisticAnchorRebasesToConfirmedCandidateInTheSameSlot() {
         val durableId = "11".repeat(32)
