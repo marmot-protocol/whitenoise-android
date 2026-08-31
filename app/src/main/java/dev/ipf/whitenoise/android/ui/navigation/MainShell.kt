@@ -56,10 +56,9 @@ import dev.ipf.whitenoise.android.notifications.runInactiveNotificationRouteStag
 import dev.ipf.whitenoise.android.notifications.shouldDeferNotificationChatListBind
 import dev.ipf.whitenoise.android.notifications.shouldRetryNotificationMessageLoadAfterActivation
 import dev.ipf.whitenoise.android.notifications.stateFor
-import dev.ipf.whitenoise.android.share.PendingShareRequestStore
+import dev.ipf.whitenoise.android.share.SerializedPendingShareRequestStore
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.createPendingShareRequestStore
-import dev.ipf.whitenoise.android.share.resolveShareDirectGroupId
 import dev.ipf.whitenoise.android.share.shouldPresentInboundShare
 import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.AppPhase
@@ -88,10 +87,8 @@ import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
 import dev.ipf.whitenoise.android.ui.share.ShareChatPickerFullScreen
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 internal data class ConversationOpenContext(
@@ -631,21 +628,31 @@ internal fun MainShell(
     val currentInboundNotificationTarget by rememberUpdatedState(inboundNotificationTarget)
     val currentInboundNotificationRequestId by rememberUpdatedState(inboundNotificationRequestId)
     val currentRuntimeGeneration by rememberUpdatedState(appState.runtimeGeneration)
-    var pendingShareRequestStore by remember(context) { mutableStateOf<PendingShareRequestStore?>(null) }
+    var pendingShareRequestStore by remember(context) { mutableStateOf<SerializedPendingShareRequestStore?>(null) }
     LaunchedEffect(context) {
-        pendingShareRequestStore = createPendingShareRequestStore(context)
+        pendingShareRequestStore = SerializedPendingShareRequestStore(createPendingShareRequestStore(context))
     }
-    var sharePickerRequest by remember { mutableStateOf<ShareRequest?>(null) }
-    var savedSharePickerRequestId by rememberSaveable { mutableStateOf<String?>(null) }
+    val inboundDirectGroupId =
+        inboundShareRequest?.let {
+            shellStateHolder.visibleShareDirectGroupId(
+                activeAccountRef = appState.activeAccountRef,
+                runtimeGeneration = appState.runtimeGeneration,
+            )
+        }
+    val visibleShareRequest = inboundShareRequest ?: shellStateHolder.pendingShareRequest.value
+    val visiblePickerRequest = visibleShareRequest.takeUnless { inboundDirectGroupId != null }
     var pendingStagedShareOpen by remember { mutableStateOf<PendingStagedShareOpen?>(null) }
     val clearSharePickerRequest: () -> Unit = {
-        val requestId = savedSharePickerRequestId ?: sharePickerRequest?.requestId
-        sharePickerRequest = null
-        savedSharePickerRequestId = null
+        val request = visibleShareRequest
+        val requestId = request?.requestId ?: shellStateHolder.pendingShareRequestId
+        shellStateHolder.clearPendingShareRequest(requestId)
+        if (request != null && inboundShareRequest?.requestId == request.requestId) {
+            onShareRequestHandled(request)
+        }
         requestId?.let { pendingRequestId ->
             pendingShareRequestStore?.let { store ->
                 appState.launchMutation {
-                    withContext(Dispatchers.IO) { store.remove(pendingRequestId) }
+                    store.remove(pendingRequestId)
                 }
             }
         }
@@ -669,32 +676,32 @@ internal fun MainShell(
         )
     }
 
-    LaunchedEffect(pendingShareRequestStore, savedSharePickerRequestId) {
+    LaunchedEffect(
+        pendingShareRequestStore,
+        shellStateHolder.pendingShareRequestId,
+        inboundShareRequest?.requestId,
+    ) {
         val store = pendingShareRequestStore ?: return@LaunchedEffect
-        val requestId = savedSharePickerRequestId ?: return@LaunchedEffect
-        if (sharePickerRequest?.requestId == requestId) return@LaunchedEffect
-        val restored = withContext(Dispatchers.IO) { store.load(requestId) }
-        if (savedSharePickerRequestId != requestId) return@LaunchedEffect
-        if (restored == null) {
-            savedSharePickerRequestId = null
-        } else {
-            sharePickerRequest = restored
-        }
+        if (inboundShareRequest != null) return@LaunchedEffect
+        val requestId = shellStateHolder.pendingShareRequestId ?: return@LaunchedEffect
+        if (shellStateHolder.pendingShareRequest.value?.requestId == requestId) return@LaunchedEffect
+        val restored = store.load(requestId)
+        shellStateHolder.restorePendingShareRequest(requestId, restored)
     }
 
     LaunchedEffect(
         pendingShareRequestStore,
-        savedSharePickerRequestId,
+        shellStateHolder.pendingShareRequestId,
         inboundShareRequest,
-        sharePickerRequest,
+        shellStateHolder.pendingShareRequest.value,
     ) {
         val store = pendingShareRequestStore ?: return@LaunchedEffect
         if (
-            savedSharePickerRequestId == null &&
+            shellStateHolder.pendingShareRequestId == null &&
             inboundShareRequest == null &&
-            sharePickerRequest == null
+            shellStateHolder.pendingShareRequest.value == null
         ) {
-            withContext(Dispatchers.IO) { store.clear() }
+            store.clear()
         }
     }
 
@@ -1268,44 +1275,48 @@ internal fun MainShell(
         }
     }
 
+    val openAfterStagedShare: (String, List<String>) -> Unit = openStagedShare@{ accountRef, groupIds ->
+        if (groupIds.isEmpty()) return@openStagedShare
+        val otherCount = groupIds.size - 1
+        if (accountRef == appState.activeAccountRef) {
+            val allChats = chatsController.items + chatsController.archivedItems
+            if (!openChatForShare(allChats, groupIds.first())) {
+                appState.present(R.string.toast_notification_conversation_unavailable)
+                return@openStagedShare
+            }
+            if (otherCount > 0) {
+                appState.presentTransient(
+                    AppText.Resource(R.string.toast_share_staged_other_chats, listOf(otherCount)),
+                )
+            }
+        } else {
+            val pending =
+                PendingStagedShareOpen(
+                    accountRef = accountRef,
+                    groupIdHex = groupIds.first(),
+                    otherChatCount = otherCount,
+                )
+            pendingStagedShareOpen = pending
+            appState.launchMutation {
+                appState.setActiveAccount(accountRef)
+                if (
+                    appState.activeAccountRef != accountRef &&
+                    pendingStagedShareOpen === pending
+                ) {
+                    pendingStagedShareOpen = null
+                }
+            }
+        }
+    }
     val stageShareToChats:
         (ShareRequest, String, List<String>) -> Boolean =
         stageShare@{ request, accountRef, groupIds ->
             if (groupIds.isEmpty()) return@stageShare false
-            val otherCount = groupIds.size - 1
             if (!appState.stageInboundShare(accountRef, groupIds, request.payload)) {
                 appState.present(R.string.toast_notification_account_unavailable)
                 return@stageShare false
             }
-            if (accountRef == appState.activeAccountRef) {
-                val allChats = chatsController.items + chatsController.archivedItems
-                if (!openChatForShare(allChats, groupIds.first())) {
-                    appState.present(R.string.toast_notification_conversation_unavailable)
-                    return@stageShare true
-                }
-                if (otherCount > 0) {
-                    appState.presentTransient(
-                        AppText.Resource(R.string.toast_share_staged_other_chats, listOf(otherCount)),
-                    )
-                }
-            } else {
-                val pending =
-                    PendingStagedShareOpen(
-                        accountRef = accountRef,
-                        groupIdHex = groupIds.first(),
-                        otherChatCount = otherCount,
-                    )
-                pendingStagedShareOpen = pending
-                appState.launchMutation {
-                    appState.setActiveAccount(accountRef)
-                    if (
-                        appState.activeAccountRef != accountRef &&
-                        pendingStagedShareOpen === pending
-                    ) {
-                        pendingStagedShareOpen = null
-                    }
-                }
-            }
+            openAfterStagedShare(accountRef, groupIds)
             true
         }
 
@@ -1363,7 +1374,6 @@ internal fun MainShell(
     LaunchedEffect(appState.appLockScreenVisible) {
         if (appState.appLockScreenVisible) {
             supersedePendingTtsDestinationNavigation()
-            clearSharePickerRequest()
             routingShare = false
         }
     }
@@ -1378,7 +1388,11 @@ internal fun MainShell(
         chatsController,
         chatsController.boundAccountRef,
         chatsController.isLoading,
+        chatsController.hasLoadedLocalSnapshot,
         chatsController.items,
+        chatsController.archivedItems,
+        inboundDirectGroupId,
+        shellStateHolder.pendingShareRequestId,
     ) {
         val request =
             inboundShareRequest ?: run {
@@ -1387,26 +1401,51 @@ internal fun MainShell(
             }
         routingShare = true
         supersedePendingTtsDestinationNavigation()
+        val store = pendingShareRequestStore ?: return@LaunchedEffect
+        var persisted = shellStateHolder.pendingShareRequestId == request.requestId
+        if (!persisted) {
+            persisted = store.save(request)
+            if (persisted && !shellStateHolder.markInboundSharePersisted(request.requestId)) {
+                store.remove(request.requestId)
+                return@LaunchedEffect
+            }
+        }
         if (!shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) return@LaunchedEffect
+        if (request.shortcutId.isNullOrBlank()) {
+            val promoted = shellStateHolder.promoteInboundShareRequest(request, persisted)
+            if (promoted) {
+                routingShare = false
+                onShareRequestHandled(request)
+            }
+            return@LaunchedEffect
+        }
         if (appState.accounts.isEmpty()) return@LaunchedEffect
         val accountRef = appState.activeAccountRef ?: return@LaunchedEffect
         val chatListReady =
             chatsController.boundAccountRef == accountRef &&
                 !chatsController.isLoading
         if (!chatListReady) return@LaunchedEffect
-        val allChats = chatsController.items + chatsController.archivedItems
-        val activeGroupIds = allChats.mapTo(mutableSetOf()) { it.group.groupIdHex }
-        val directGroupId = resolveShareDirectGroupId(request, accountRef, activeGroupIds)
+        val directGroupId = inboundDirectGroupId
         if (directGroupId != null) {
+            val staged =
+                appState.stageInboundShareForFirstFrame(
+                    accountRef = accountRef,
+                    targetGroupIds = listOf(directGroupId),
+                    payload = request.payload,
+                )
             clearSharePickerRequest()
-            onShareRequestHandled(request)
-            stageShareToChats(request, accountRef, listOf(directGroupId))
+            if (staged) {
+                openAfterStagedShare(accountRef, listOf(directGroupId))
+            } else {
+                appState.present(R.string.toast_notification_account_unavailable)
+            }
             routingShare = false
         } else {
-            val store = pendingShareRequestStore ?: return@LaunchedEffect
-            val persisted = withContext(Dispatchers.IO) { store.save(request) }
-            sharePickerRequest = request
-            savedSharePickerRequestId = request.requestId.takeIf { persisted }
+            val promoted = shellStateHolder.promoteInboundShareRequest(request, persisted)
+            if (!promoted) {
+                if (persisted) store.remove(request.requestId)
+                return@LaunchedEffect
+            }
             routingShare = false
             onShareRequestHandled(request)
         }
@@ -1978,14 +2017,6 @@ internal fun MainShell(
         LoadingScreen()
         return
     }
-    if (
-        shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible) &&
-        savedSharePickerRequestId != null &&
-        sharePickerRequest == null
-    ) {
-        LoadingScreen()
-        return
-    }
     ProfileGroupForegroundCoordinator(
         appState = appState,
         conversationController = selectedOrPendingConversationController.takeIf { selectedChat != null },
@@ -2351,7 +2382,7 @@ internal fun MainShell(
     // Dialog owns pointer and accessibility focus while preserving the route
     // underneath for an exact return after cancellation (issue #1721).
     if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
-        sharePickerRequest?.let { request ->
+        visiblePickerRequest?.let { request ->
             ShareChatPickerFullScreen(
                 appState = appState,
                 requestId = request.requestId,

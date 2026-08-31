@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.benchmark
 
+import android.content.ComponentName
+import android.content.Intent
 import android.graphics.Rect
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
@@ -56,6 +58,22 @@ internal class WhiteNoiseJourneys {
      */
     fun MacrobenchmarkScope.launchForStartupMeasurement() {
         startActivityAndWait()
+    }
+
+    /** Launches an explicit text share and waits for the picker useful surface. */
+    fun MacrobenchmarkScope.launchSharePickerForStartupMeasurement() {
+        startActivityAndWait(
+            Intent(Intent.ACTION_SEND)
+                .setComponent(
+                    ComponentName(
+                        BenchmarkConfig.TARGET_PACKAGE,
+                        "dev.ipf.whitenoise.android.MainActivity",
+                    ),
+                ).setType("text/plain")
+                .putExtra(Intent.EXTRA_TEXT, "Inbound share startup benchmark")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        waitForVisibleTag(PerformanceTags.SHARE_PICKER, STARTUP_TIMEOUT_MS)
     }
 
     /**

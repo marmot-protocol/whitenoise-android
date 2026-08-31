@@ -23,6 +23,19 @@ class BaselineProfileGenerator {
         }
     }
 
+    /** Includes cold share parsing and picker composition in the startup profile. */
+    @Test
+    fun generateInboundShareStartup() {
+        val journeys = WhiteNoiseJourneys()
+        journeys.prepareAuthenticatedChatList()
+        baselineProfileRule.collect(
+            packageName = BenchmarkConfig.TARGET_PACKAGE,
+            includeInStartupProfile = true,
+        ) {
+            journeys.run { launchSharePickerForStartupMeasurement() }
+        }
+    }
+
     @Test
     fun generateCriticalUserJourneys() {
         val groupName = BenchmarkConfig.requireGeneratorFixture(BenchmarkConfig.groupName, "groupName")

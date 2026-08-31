@@ -68,6 +68,24 @@ class InboundShareAccountOwnershipTest {
         assertTrue(persistence.isEmpty())
     }
 
+    /** Duplicate recipient ids cannot stage the same payload into one draft twice. */
+    @Test
+    fun duplicateRecipientIdsStageThePayloadExactlyOnce() {
+        val personal = account("personal", "a0".repeat(32))
+        val appState = appState(listOf(personal), activeAccountRef = personal.label)
+
+        assertTrue(
+            appState.stageInboundShare(
+                accountRef = personal.label,
+                targetGroupIds = listOf("group", "group", "group"),
+                payload = SharePayload("private draft", emptyList(), "text/plain"),
+            ),
+        )
+
+        assertEquals("private draft", appState.draftStore.get(personal.label, "group"))
+        assertEquals(1, appState.shareStaging.revision)
+    }
+
     private fun appState(
         accounts: List<AccountSummaryFfi>,
         activeAccountRef: String,

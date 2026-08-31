@@ -3045,21 +3045,63 @@ class WhiteNoiseAppState private constructor(
         targetGroupIds: List<String>,
         payload: SharePayload,
     ): Boolean {
-        val account =
-            accounts.firstOrNull { summary ->
-                summary.label == accountRef && summary.isSignedInSigningAccount()
-            }
-        val validGroupIds = targetGroupIds.filter(String::isNotBlank)
-        if (account == null || validGroupIds.isEmpty()) return false
+        val target = validatedInboundShareTarget(accountRef, targetGroupIds) ?: return false
         shareInboundStager.stageToChats(
             context = appContext,
-            accountIdHex = account.accountIdHex,
-            groupIds = validGroupIds,
+            accountIdHex = target.accountIdHex,
+            groupIds = target.groupIds,
             payload = payload,
             draftAccountRef = accountRef,
         )
         return true
     }
+
+    /**
+     * Prepares provider MIME metadata on I/O for the automatic Direct Share
+     * route, then applies draft/staging state on the calling Main coroutine.
+     */
+    suspend fun stageInboundShareForFirstFrame(
+        accountRef: String,
+        targetGroupIds: List<String>,
+        payload: SharePayload,
+    ): Boolean {
+        val initialTarget = validatedInboundShareTarget(accountRef, targetGroupIds)
+        if (initialTarget == null) return false
+        val prepared = withContext(Dispatchers.IO) { shareInboundStager.prepare(appContext, payload) }
+        val target = validatedInboundShareTarget(accountRef, targetGroupIds)
+        return if (target == initialTarget) {
+            shareInboundStager.stagePreparedToChats(
+                accountIdHex = target.accountIdHex,
+                groupIds = target.groupIds,
+                prepared = prepared,
+                draftAccountRef = accountRef,
+            )
+            true
+        } else {
+            false
+        }
+    }
+
+    /** Revalidates account ownership and de-duplicates recipient ids at the commit boundary. */
+    private fun validatedInboundShareTarget(
+        accountRef: String,
+        targetGroupIds: List<String>,
+    ): ValidatedInboundShareTarget? {
+        val account =
+            accounts.firstOrNull { summary ->
+                summary.label == accountRef && summary.isSignedInSigningAccount()
+            } ?: return null
+        val validGroupIds = targetGroupIds.filter(String::isNotBlank).distinct()
+        return validGroupIds
+            .takeIf { it.isNotEmpty() }
+            ?.let { ValidatedInboundShareTarget(account.accountIdHex, it) }
+    }
+
+    /** Account-bound destination resolved immediately before local staging. */
+    private data class ValidatedInboundShareTarget(
+        val accountIdHex: String,
+        val groupIds: List<String>,
+    )
 
     fun consumeInboundShareStreamsCapped(
         groupIdHex: String,

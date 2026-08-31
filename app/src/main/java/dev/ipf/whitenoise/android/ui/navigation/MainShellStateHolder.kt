@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import dev.ipf.whitenoise.android.share.ShareRequest
+import dev.ipf.whitenoise.android.share.resolveShareDirectGroupId
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
@@ -175,6 +176,7 @@ internal class MainShellProcessState(
  * lightweight account/group keys enter [SavedStateHandle]; live controllers
  * and UI projections transfer by ownership within the surviving process.
  */
+@Suppress("TooManyFunctions") // One Activity-owned adapter keeps saved routes and retained shell state coherent.
 internal class MainShellStateHolder(
     appState: WhiteNoiseAppState,
     private val savedStateHandle: SavedStateHandle,
@@ -186,6 +188,7 @@ internal class MainShellStateHolder(
      * process-global state to bridge separate tasks.
      */
     val inboundShareRequest = mutableStateOf<ShareRequest?>(null)
+    val pendingShareRequest = mutableStateOf<ShareRequest?>(null)
     val selectedChat = processState.selectedChat
     val selectedChatOpenContext = processState.selectedChatOpenContext
     val selectedChatJustCreated = processState.selectedChatJustCreated
@@ -195,6 +198,90 @@ internal class MainShellStateHolder(
     private var savedAccountRef: String? = savedStateHandle[SAVED_ACCOUNT_REF_KEY]
     private var savedGroupIdHex: String? = savedStateHandle[SAVED_GROUP_ID_KEY]
     private var savedRouteResolutionPending = savedGroupIdHex != null
+    private var savedPendingShareRequestId: String? = savedStateHandle[SAVED_PENDING_SHARE_REQUEST_ID_KEY]
+
+    /** Newest in-memory request that must own the picker route immediately. */
+    val visibleShareRequest: ShareRequest?
+        get() = inboundShareRequest.value ?: pendingShareRequest.value
+
+    /** Encrypted-store token that can restore an unresolved picker after process death. */
+    val pendingShareRequestId: String?
+        get() = savedPendingShareRequestId
+
+    /** True while either an in-memory request or its encrypted restore token remains unresolved. */
+    val hasPendingShareRoute: Boolean
+        get() =
+            inboundShareRequest.value != null ||
+                pendingShareRequest.value != null ||
+                savedPendingShareRequestId != null
+
+    /** Replaces any older unresolved route with the newest external share intent. */
+    fun acceptInboundShareRequest(request: ShareRequest?) {
+        if (request == null) {
+            inboundShareRequest.value = null
+            return
+        }
+        val replacesCurrent = visibleShareRequest?.requestId != request.requestId
+        inboundShareRequest.value = request
+        if (replacesCurrent) {
+            pendingShareRequest.value = null
+            savePendingShareRequestId(null)
+        }
+    }
+
+    /** Promotes one parsed intent into the picker-owned route after encrypted persistence is attempted. */
+    fun promoteInboundShareRequest(
+        request: ShareRequest,
+        persisted: Boolean,
+    ): Boolean {
+        if (inboundShareRequest.value?.requestId != request.requestId) return false
+        pendingShareRequest.value = request
+        inboundShareRequest.value = null
+        savePendingShareRequestId(request.requestId.takeIf { persisted })
+        return true
+    }
+
+    /** Records successful encrypted persistence while Direct Share validation is still pending. */
+    fun markInboundSharePersisted(requestId: String): Boolean {
+        if (inboundShareRequest.value?.requestId != requestId) return false
+        savePendingShareRequestId(requestId)
+        return true
+    }
+
+    /** Restores only the request named by the retained saved-state token. */
+    fun restorePendingShareRequest(
+        expectedRequestId: String,
+        request: ShareRequest?,
+    ): Boolean {
+        val routeIsOccupiedOrMismatched =
+            inboundShareRequest.value != null ||
+                pendingShareRequest.value != null ||
+                savedPendingShareRequestId != expectedRequestId
+        return when {
+            routeIsOccupiedOrMismatched -> false
+            request == null || request.requestId != expectedRequestId -> {
+                savePendingShareRequestId(null)
+                false
+            }
+            else -> {
+                pendingShareRequest.value = request
+                true
+            }
+        }
+    }
+
+    /** Acknowledges only the one-shot intent; the promoted picker route remains owned. */
+    fun acknowledgeInboundShareRequest(requestId: String) {
+        if (inboundShareRequest.value?.requestId == requestId) inboundShareRequest.value = null
+    }
+
+    /** Clears one matching inbound, promoted, or process-restored request. */
+    fun clearPendingShareRequest(requestId: String?) {
+        requestId ?: return
+        if (inboundShareRequest.value?.requestId == requestId) inboundShareRequest.value = null
+        if (pendingShareRequest.value?.requestId == requestId) pendingShareRequest.value = null
+        if (savedPendingShareRequestId == requestId) savePendingShareRequestId(null)
+    }
 
     val hasSavedConversationRoute: Boolean
         get() = savedAccountRef != null && savedGroupIdHex != null
@@ -304,6 +391,49 @@ internal class MainShellStateHolder(
         )
     }
 
+    /**
+     * Prepares the picker-owned local recipient projection without waiting for
+     * relay freshness or profile enrichment. A completed local load failure is
+     * also renderable because the picker presents an inline error beside its
+     * direct empty state instead of replacing the route with a spinner.
+     */
+    fun prepareSharePickerFirstFrame(
+        phase: AppPhase,
+        activeAccountRef: String?,
+        runtimeGeneration: Int,
+        appLockScreenVisible: Boolean,
+    ): Boolean =
+        when {
+            appLockScreenVisible -> true
+            phase == AppPhase.Bootstrapping -> false
+            phase != AppPhase.Ready -> true
+            else -> {
+                val controller = chatsController(activeAccountRef, runtimeGeneration)
+                controller.boundAccountRef == activeAccountRef && !controller.isLoading
+            }
+        }
+
+    /** Resolves a visible Direct Share only from the active account's loaded local rows. */
+    fun visibleShareDirectGroupId(
+        activeAccountRef: String?,
+        runtimeGeneration: Int,
+    ): String? {
+        val request = visibleShareRequest
+        return if (request == null || request.shortcutId.isNullOrBlank() || activeAccountRef == null) {
+            null
+        } else {
+            val controller = chatsController(activeAccountRef, runtimeGeneration)
+            if (controller.boundAccountRef != activeAccountRef || !controller.hasLoadedLocalSnapshot) {
+                null
+            } else {
+                val localGroupIds =
+                    (controller.items + controller.archivedItems)
+                        .mapTo(mutableSetOf()) { it.group.groupIdHex }
+                resolveShareDirectGroupId(request, activeAccountRef, localGroupIds)
+            }
+        }
+    }
+
     fun localProjectionAvailable(
         activeAccountRef: String?,
         runtimeGeneration: Int,
@@ -328,6 +458,16 @@ internal class MainShellStateHolder(
         savedStateHandle.remove<String>(SAVED_GROUP_ID_KEY)
     }
 
+    /** Saves only the opaque encrypted-store lookup token across process recreation. */
+    private fun savePendingShareRequestId(requestId: String?) {
+        savedPendingShareRequestId = requestId
+        if (requestId == null) {
+            savedStateHandle.remove<String>(SAVED_PENDING_SHARE_REQUEST_ID_KEY)
+        } else {
+            savedStateHandle[SAVED_PENDING_SHARE_REQUEST_ID_KEY] = requestId
+        }
+    }
+
     class Factory(
         private val appState: WhiteNoiseAppState,
         private val processState: MainShellProcessState = MainShellProcessState(appState),
@@ -347,6 +487,7 @@ internal class MainShellStateHolder(
     private companion object {
         const val SAVED_ACCOUNT_REF_KEY = "main_shell_selected_account_ref"
         const val SAVED_GROUP_ID_KEY = "main_shell_selected_group_id"
+        const val SAVED_PENDING_SHARE_REQUEST_ID_KEY = "main_shell_pending_share_request_id"
     }
 }
 
