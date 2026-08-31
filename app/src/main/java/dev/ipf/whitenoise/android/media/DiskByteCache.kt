@@ -1182,7 +1182,7 @@ internal class DiskByteCache(
     ): ByteArray {
         val ciphertextBytes = fileBytes - headerBytes - METADATA_AUTH_BYTES - IV_BYTES
         val plaintextBytes = validateLegacyPayloadSize(ciphertextBytes)
-        ensurePlaintextAllocationFits(plaintextBytes)
+        ensurePlaintextAllocationFits(Math.addExact(ciphertextBytes, plaintextBytes))
         val payloadIv = input.readExactly(IV_BYTES)
         val ciphertext = input.readExactly(ciphertextBytes.toInt())
         requirePayloadExhausted(input)

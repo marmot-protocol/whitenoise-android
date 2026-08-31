@@ -544,9 +544,9 @@ class DiskByteCacheTest {
         assertTrue(envelope.isFile)
     }
 
-    /** Applies the live heap budget to legacy materialization without deleting valid ciphertext. */
+    /** Applies the live heap budget to legacy reads without deleting valid ciphertext. */
     @Test
-    fun legacyMaterializationHonorsHeapBudgetWithoutEviction() {
+    fun legacyReadsHonorHeapBudgetWithoutEviction() {
         val payload = ByteArray(512 * 1024) { 5 }
         val envelope = writeLegacyEnvelope("legacy-budget", payload)
         val reopened =
@@ -559,6 +559,8 @@ class DiskByteCacheTest {
                 availablePlaintextAllocationBytes = { payload.size.toLong() },
             )
 
+        assertNull(reopened.get("legacy-budget"))
+        assertTrue(envelope.isFile)
         assertNull(reopened.materialize("legacy-budget"))
         assertTrue(envelope.isFile)
     }
