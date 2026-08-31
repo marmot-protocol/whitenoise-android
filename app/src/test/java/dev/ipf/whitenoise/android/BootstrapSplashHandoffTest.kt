@@ -85,8 +85,15 @@ class BootstrapSplashHandoffTest {
         val source = mainActivitySource()
         val handoff = source.substringAfter("private fun holdSplashThroughBootstrap(")
 
-        assertTrue(handoff.contains("if (!retain) appState.recordStartupSystemSplashHandoff()"))
-        assertTrue(handoff.indexOf("recordStartupSystemSplashHandoff()") < handoff.indexOf("retain\n"))
+        val recordHandoffIndex = handoff.indexOf("appState.recordStartupSystemSplashHandoff()")
+        val schedulePeriodicWorkIndex =
+            handoff.indexOf("(application as WhiteNoiseApplication).ensurePeriodicWorkScheduled()")
+        val returnRetainIndex = handoff.indexOf("retain\n")
+
+        assertTrue(handoff.contains("if (!retain) {"))
+        assertTrue(recordHandoffIndex >= 0)
+        assertTrue(schedulePeriodicWorkIndex > recordHandoffIndex)
+        assertTrue(returnRetainIndex > schedulePeriodicWorkIndex)
     }
 
     @Test
