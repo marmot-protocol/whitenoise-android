@@ -92,6 +92,28 @@ class ForwardProgressScreenshotTest {
         )
     }
 
+    /** Captures the terminal APK-preparation deadline with its actionable failure copy. */
+    @Test
+    fun preparationTimeoutDark() {
+        capture(
+            name = "forward_progress_preparation_timeout_dark",
+            darkTheme = true,
+            snapshot =
+                snapshot(
+                    phase = ForwardOperationPhase.Failed,
+                    ForwardTargetProgress(
+                        "family",
+                        ForwardTargetPhase.Failed,
+                        0,
+                        1,
+                        0,
+                        1,
+                        ForwardFailureStage.PreparationTimeout,
+                    ),
+                ),
+        )
+    }
+
     @Test
     fun cancelledLargeTextRtl() {
         capture(

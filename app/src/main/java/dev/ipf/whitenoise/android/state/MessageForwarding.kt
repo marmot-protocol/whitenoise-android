@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal enum class ForwardOperationPhase {
     Preparing,
@@ -45,6 +46,7 @@ internal enum class ForwardTargetPhase {
 
 internal enum class ForwardFailureStage {
     Materialize,
+    PreparationTimeout,
     Upload,
     Publish,
     PayloadTooLarge,
@@ -81,6 +83,12 @@ internal data class ForwardOperationSnapshot(
                         target.failureStage != ForwardFailureStage.Expired &&
                         target.failureStage != ForwardFailureStage.SessionChanged
                 }
+
+    /** Timeout is user-recoverable but must not immediately re-enter the same stalled source work. */
+    val canAutomaticallyRetry: Boolean
+        get() =
+            canRetry &&
+                targets.none { target -> target.failureStage == ForwardFailureStage.PreparationTimeout }
     val canCancel: Boolean
         get() =
             (phase == ForwardOperationPhase.Preparing || phase == ForwardOperationPhase.Running) &&
@@ -93,6 +101,23 @@ internal data class ForwardOperationSnapshot(
                 phase == ForwardOperationPhase.Running ||
                 phase == ForwardOperationPhase.Cancelling
 }
+
+/** Preserves completed destinations while cancelling all unfinished destination work. */
+private fun ForwardOperationSnapshot.asCancelled(): ForwardOperationSnapshot =
+    copy(
+        phase = ForwardOperationPhase.Cancelled,
+        targets =
+            targets.map { target ->
+                if (
+                    target.phase == ForwardTargetPhase.Completed ||
+                    target.phase == ForwardTargetPhase.Failed
+                ) {
+                    target
+                } else {
+                    target.copy(phase = ForwardTargetPhase.Cancelled)
+                }
+            },
+    )
 
 internal sealed interface PreparedForwardMessage {
     data class Text(
@@ -113,6 +138,9 @@ internal interface ForwardTransport {
         sourceMessageIdHex: String,
         source: ForwardAttachmentSource,
     ): PendingAttachment
+
+    /** Cancels source work that outlived a forwarding deadline or explicit cancellation. */
+    fun cancelStalledMaterialization() = Unit
 
     suspend fun upload(
         targetGroupIdHex: String,
@@ -135,6 +163,16 @@ internal interface ForwardTransport {
         uploadedReferences: List<MediaAttachmentReferenceFfi>,
         evidence: ForwardPublishRecoveryEvidence,
     ): ForwardPublishRecoveryResult
+}
+
+/** Keeps transport cleanup failures from masking cancellation or the actionable timeout state. */
+@Suppress("SwallowedException")
+private fun ForwardTransport.cancelStalledMaterializationBestEffort() {
+    try {
+        cancelStalledMaterialization()
+    } catch (_: Exception) {
+        // State cleanup must still complete; transport cleanup is best effort.
+    }
 }
 
 /** Resolves optimistic metadata before any source bytes cross into a forward session. */
@@ -167,6 +205,8 @@ internal class ForwardPayloadTooLargeException : IllegalArgumentException(FORWAR
 internal class ForwardAttachmentExpiredException : IllegalStateException("forward attachment expired")
 
 internal class ForwardSessionInvalidatedException : IllegalStateException("forward session account changed")
+
+internal class ForwardPreparationTimeoutException : IllegalStateException("forward attachment preparation timed out")
 
 internal data class ForwardPublishRecoveryEvidence(
     val messageIndex: Int,
@@ -260,6 +300,7 @@ internal class ForwardSession(
     private val transport: ForwardTransport,
     private val maxRetainedBytes: Long = ConversationController.MEDIA_RETAINED_MAX_BYTES,
     private val targetFanout: Int = 2,
+    private val preparationTimeoutMillis: Long = DEFAULT_FORWARD_PREPARATION_TIMEOUT_MILLIS,
     private val clockSeconds: () -> ULong = {
         (System.currentTimeMillis() / MILLIS_PER_SECOND).toULong()
     },
@@ -308,6 +349,7 @@ internal class ForwardSession(
         require(messages.isNotEmpty()) { "forward messages must not be empty" }
         require(normalizedTargets.isNotEmpty()) { "forward targets must not be empty" }
         require(targetFanout > 0) { "target fan-out must be positive" }
+        require(preparationTimeoutMillis > 0) { "preparation timeout must be positive" }
         require(
             messages.all { message ->
                 when (message) {
@@ -360,10 +402,14 @@ internal class ForwardSession(
         launchAttempt(failedTargets)
     }
 
+    /** Atomically accepts cancellation only while the operation is still cancellable. */
     fun cancel() {
         val job = activeJob?.takeIf(Job::isActive) ?: return
-        if (_state.value.targets.any { it.phase == ForwardTargetPhase.Sending || it.sentMessages > 0 }) return
-        _state.update { it.copy(phase = ForwardOperationPhase.Cancelling) }
+        while (true) {
+            val snapshot = _state.value
+            if (!snapshot.canCancel) return
+            if (_state.compareAndSet(snapshot, snapshot.copy(phase = ForwardOperationPhase.Cancelling))) break
+        }
         job.cancel(CancellationException("forward cancelled"))
     }
 
@@ -379,47 +425,38 @@ internal class ForwardSession(
         }
     }
 
-    // Transport implementations may surface any non-cancellation runtime failure.
+    /** Launches one preparation/send attempt and projects every terminal cause into durable UI state. */
     @Suppress("TooGenericExceptionCaught")
     private fun launchAttempt(targets: List<String>) {
         val job =
             scope.launch {
                 try {
-                    val prepared = preparedMessages ?: materializeMessages()
+                    val prepared =
+                        preparedMessages
+                            ?: withTimeoutOrNull(preparationTimeoutMillis) { materializeMessages() }
+                            ?: run {
+                                currentCoroutineContext().ensureActive()
+                                transport.cancelStalledMaterializationBestEffort()
+                                throw ForwardPreparationTimeoutException()
+                            }
                     _state.update { it.copy(phase = ForwardOperationPhase.Running) }
                     runTargets(targets, prepared)
                     finishAttempt()
                 } catch (cancellation: CancellationException) {
-                    _state.update { snapshot ->
-                        snapshot.copy(
-                            phase = ForwardOperationPhase.Cancelled,
-                            targets =
-                                snapshot.targets.map { target ->
-                                    if (
-                                        target.phase == ForwardTargetPhase.Completed ||
-                                        target.phase == ForwardTargetPhase.Failed
-                                    ) {
-                                        target
-                                    } else {
-                                        target.copy(phase = ForwardTargetPhase.Cancelled)
-                                    }
-                                },
-                        )
-                    }
+                    if (preparedMessages == null) transport.cancelStalledMaterializationBestEffort()
+                    _state.update { it.asCancelled() }
                     clearSessionState(clearRetryState = true)
                     throw cancellation
-                } catch (tooLarge: ForwardPayloadTooLargeException) {
-                    onFailure(null, ForwardFailureStage.PayloadTooLarge, tooLarge)
-                    failMaterialization(ForwardFailureStage.PayloadTooLarge)
-                } catch (expired: ForwardAttachmentExpiredException) {
-                    onFailure(null, ForwardFailureStage.Expired, expired)
-                    failMaterialization(ForwardFailureStage.Expired)
-                } catch (invalidated: ForwardSessionInvalidatedException) {
-                    onFailure(null, ForwardFailureStage.SessionChanged, invalidated)
-                    failMaterialization(ForwardFailureStage.SessionChanged)
                 } catch (failure: Exception) {
-                    onFailure(null, ForwardFailureStage.Materialize, failure)
-                    failMaterialization(ForwardFailureStage.Materialize)
+                    val stage =
+                        when (failure) {
+                            is ForwardPayloadTooLargeException -> ForwardFailureStage.PayloadTooLarge
+                            is ForwardAttachmentExpiredException -> ForwardFailureStage.Expired
+                            is ForwardSessionInvalidatedException -> ForwardFailureStage.SessionChanged
+                            is ForwardPreparationTimeoutException -> ForwardFailureStage.PreparationTimeout
+                            else -> ForwardFailureStage.Materialize
+                        }
+                    if (failMaterialization(stage)) onFailure(null, stage, failure)
                 }
             }
         activeJob = job
@@ -582,25 +619,39 @@ internal class ForwardSession(
         )
     }
 
-    private fun failMaterialization(stage: ForwardFailureStage) {
+    /** Clears sensitive plaintext and atomically marks unfinished destinations failed or cancelled. */
+    private fun failMaterialization(stage: ForwardFailureStage): Boolean {
         // A retry may be re-materializing source bytes for an earlier ambiguous
         // publish. Preserve destination references and recovery evidence across
         // another transient materialization failure so a later retry cannot
         // duplicate that uncertain message.
-        clearSessionState(clearRetryState = stage != ForwardFailureStage.Materialize)
         _state.update { snapshot ->
-            snapshot.copy(
-                phase = ForwardOperationPhase.Failed,
-                targets =
-                    snapshot.targets.map { target ->
-                        if (target.phase == ForwardTargetPhase.Completed) {
-                            target
-                        } else {
-                            target.copy(phase = ForwardTargetPhase.Failed, failureStage = stage)
-                        }
-                    },
-            )
+            if (snapshot.phase == ForwardOperationPhase.Cancelling) {
+                snapshot.asCancelled()
+            } else {
+                snapshot.copy(
+                    phase = ForwardOperationPhase.Failed,
+                    targets =
+                        snapshot.targets.map { target ->
+                            if (target.phase == ForwardTargetPhase.Completed) {
+                                target
+                            } else {
+                                target.copy(phase = ForwardTargetPhase.Failed, failureStage = stage)
+                            }
+                        },
+                )
+            }
         }
+        val cancelled = _state.value.phase == ForwardOperationPhase.Cancelled
+        clearSessionState(
+            clearRetryState =
+                cancelled ||
+                    (
+                        stage != ForwardFailureStage.Materialize &&
+                            stage != ForwardFailureStage.PreparationTimeout
+                    ),
+        )
+        return !cancelled
     }
 
     private fun clearSessionState(clearRetryState: Boolean) {
@@ -615,6 +666,7 @@ internal class ForwardSession(
 
     private companion object {
         const val MILLIS_PER_SECOND = 1_000L
+        const val DEFAULT_FORWARD_PREPARATION_TIMEOUT_MILLIS = 120_000L
     }
 }
 
@@ -702,12 +754,13 @@ internal class ForwardOperationOwner(
             }
     }
 
+    /** Retries transient destination failures while leaving preparation timeouts for explicit user action. */
     private suspend fun retryAutomatically(
         candidate: ForwardSession,
         snapshot: ForwardOperationSnapshot,
         retryCount: Int,
     ): Boolean =
-        if (snapshot.canRetry && retryCount < automaticRetryAttempts) {
+        if (snapshot.canAutomaticallyRetry && retryCount < automaticRetryAttempts) {
             delay(retryDelayMillis(retryCount))
             if (session === candidate && candidate.state.value == snapshot) {
                 candidate.retryFailed()

@@ -345,6 +345,7 @@
     <string name="forward_cancelled">Annullato</string>
     <string name="forward_cancelling">Annullamento…</string>
     <string name="forward_failed_preparing">Impossibile preparare gli allegati</string>
+    <string name="forward_failed_preparation_timeout">Tempo scaduto durante la preparazione. Riprova oppure chiudi per interrompere l’inoltro.</string>
     <string name="forward_failed_upload">Impossibile caricare gli allegati</string>
     <string name="forward_failed_publish">Impossibile inviare i messaggi</string>
     <string name="forward_payload_too_large">Questi allegati sono troppo grandi per essere inoltrati insieme</string>

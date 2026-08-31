@@ -34,6 +34,31 @@ class ForwardProductionBoundaryCoverageTest {
         assertTrue("onMessagePublished(messageIndex)" in body)
     }
 
+    /** Production timeout cleanup cancels only account-scoped memoized source requests for this batch. */
+    @Test
+    fun productionTransportReleasesTimedOutMaterializationForFreshRetry() {
+        val source = appStateSource().readText()
+        val body = source.functionBody("startForwardMessages")
+        val cleanup = source.functionBody("cancelMemoizedAttachmentDownload")
+
+        assertTrue("val materializationRequests =" in body)
+        assertTrue("override fun cancelStalledMaterialization()" in body)
+        assertTrue("materializationRequests.forEach(::cancelMemoizedAttachmentDownload)" in body)
+        assertTrue("request.accountRef" in cleanup)
+        assertTrue("inFlightDownloads[cacheKey]?.takeIf { it.isActive }" in cleanup)
+        assertTrue("active?.cancel(" in cleanup)
+    }
+
+    /** Session policy bounds preparation and deliberately excludes timeout from automatic retry loops. */
+    @Test
+    fun forwardingSessionBoundsPreparationWithoutAutomaticRestall() {
+        val source = messageForwardingSource().readText()
+
+        assertTrue("withTimeoutOrNull(preparationTimeoutMillis) { materializeMessages() }" in source)
+        assertTrue("throw ForwardPreparationTimeoutException()" in source)
+        assertTrue("if (snapshot.canAutomaticallyRetry && retryCount < automaticRetryAttempts)" in source)
+    }
+
     @Test
     fun uncertainPublishUsesConvergenceAndTheAppScopeOwnsCompletion() {
         val body = appStateSource().readText().functionBody("startForwardMessages")

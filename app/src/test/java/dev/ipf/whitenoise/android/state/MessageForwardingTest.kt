@@ -20,6 +20,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("LargeClass") // Cross-phase forwarding races share one transport fake and assertion vocabulary.
 class MessageForwardingTest {
     @Test
     fun cancelledOperationNeverOffersRetryForEarlierFailures() {
@@ -270,6 +271,7 @@ class MessageForwardingTest {
             assertEquals(listOf("target"), transport.convergenceTargets)
         }
 
+    /** Cancellation after upload begins must not cancel unrelated source-cache work. */
     @Test
     fun cancellationWhileUploadingPublishesNothing() =
         runTest {
@@ -290,6 +292,7 @@ class MessageForwardingTest {
 
             assertEquals(emptyList<Pair<String, Int>>(), transport.published)
             assertEquals(ForwardOperationPhase.Cancelled, session.state.value.phase)
+            assertEquals(0, transport.cancelledMaterializations)
         }
 
     @Test
@@ -338,6 +341,230 @@ class MessageForwardingTest {
             advanceUntilIdle()
             assertEquals(3, transport.materializedIndices.size)
             assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+        }
+
+    /** A never-completing APK source becomes an actionable failure without any destination side effect. */
+    @Test
+    fun apkPreparationTimeoutIsRecoverableAndPublishesNothing() =
+        runTest {
+            val stalledSource = CompletableDeferred<Unit>()
+            val transport = RecordingForwardTransport(materializeGates = ArrayDeque(listOf(stalledSource)))
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(apkPayload()),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                    preparationTimeoutMillis = 1_000L,
+                )
+
+            session.start()
+            runCurrent()
+            assertEquals(ForwardOperationPhase.Preparing, session.state.value.phase)
+
+            advanceTimeBy(1_000L)
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
+            assertEquals(
+                ForwardFailureStage.PreparationTimeout,
+                session.state.value.targets
+                    .single()
+                    .failureStage,
+            )
+            assertTrue(session.state.value.canRetry)
+            assertFalse(session.state.value.canAutomaticallyRetry)
+            assertEquals(1, transport.cancelledMaterializations)
+            assertTrue(transport.uploadTargets.isEmpty())
+            assertTrue(transport.published.isEmpty())
+
+            session.cancel()
+            assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
+        }
+
+    /** Manual retry reacquires a timed-out APK and preserves its typed filename without duplicate sends. */
+    @Test
+    fun manualRetryAfterTimeoutReacquiresApkAndPublishesExactlyOnce() =
+        runTest {
+            val stalledSource = CompletableDeferred<Unit>()
+            val transport = RecordingForwardTransport(materializeGates = ArrayDeque(listOf(stalledSource)))
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(apkPayload()),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                    preparationTimeoutMillis = 1_000L,
+                )
+
+            session.start()
+            advanceTimeBy(1_000L)
+            advanceUntilIdle()
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            assertEquals(listOf(0, 0), transport.materializedIndices)
+            assertEquals(listOf("target"), transport.uploadTargets)
+            assertEquals(listOf("target" to 0), transport.published)
+            assertEquals(listOf("white-noise.apk"), transport.publishedMediaFileNames.getValue("target"))
+            assertEquals(listOf(APK_MIME), transport.publishedMediaTypes.getValue("target"))
+            assertEquals(1, transport.cancelledMaterializations)
+        }
+
+    /** Explicit cancellation wins the timeout race and never uploads or publishes the stalled APK. */
+    @Test
+    fun cancellingStalledApkBeforeDeadlineStaysCancelled() =
+        runTest {
+            val transport =
+                RecordingForwardTransport(
+                    materializeGates = ArrayDeque(listOf(CompletableDeferred<Unit>())),
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(apkPayload()),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                    preparationTimeoutMillis = 1_000L,
+                )
+
+            session.start()
+            runCurrent()
+            advanceTimeBy(999L)
+            runCurrent()
+            session.cancel()
+            advanceUntilIdle()
+            advanceTimeBy(1L)
+            runCurrent()
+
+            assertEquals(ForwardOperationPhase.Cancelled, session.state.value.phase)
+            assertEquals(1, transport.cancelledMaterializations)
+            assertTrue(transport.uploadTargets.isEmpty())
+            assertTrue(transport.published.isEmpty())
+        }
+
+    /** Timeout wipes plaintext prepared by siblings before one attachment became stuck. */
+    @Test
+    fun preparationTimeoutWipesPartiallyPreparedPlaintext() =
+        runTest {
+            val retained = byteArrayOf(7, 8, 9)
+            val ready = CompletableDeferred(Unit)
+            val stalled = CompletableDeferred<Unit>()
+            val transport =
+                RecordingForwardTransport(
+                    materializeGates = ArrayDeque(listOf(ready, stalled)),
+                    materializedBytes = retained,
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(mediaPayload("apk-message", null, "ready.apk", "stalled.apk")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                    preparationTimeoutMillis = 1_000L,
+                )
+
+            session.start()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
+            assertTrue(retained.contentEquals(byteArrayOf(0, 0, 0)))
+            assertTrue(transport.uploadTargets.isEmpty())
+            assertTrue(transport.published.isEmpty())
+        }
+
+    /** A transport cleanup exception cannot replace the recoverable deadline state. */
+    @Test
+    fun cleanupFailureDoesNotMaskPreparationTimeout() =
+        runTest {
+            val transport =
+                RecordingForwardTransport(
+                    materializeGate = CompletableDeferred<Unit>(),
+                    failMaterializationCleanup = true,
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(apkPayload()),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                    preparationTimeoutMillis = 1_000L,
+                )
+
+            session.start()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
+            assertEquals(
+                ForwardFailureStage.PreparationTimeout,
+                session.state.value.targets
+                    .single()
+                    .failureStage,
+            )
+            assertEquals(1, transport.cancelledMaterializations)
+            assertTrue(transport.published.isEmpty())
+        }
+
+    /** Cancellation accepted from inside deadline cleanup wins the race with timeout projection. */
+    @Test
+    fun cancellationDuringTimeoutCleanupFinishesCancelled() =
+        runTest {
+            lateinit var session: ForwardSession
+            val transport =
+                RecordingForwardTransport(
+                    materializeGate = CompletableDeferred<Unit>(),
+                    onMaterializationCleanup = { session.cancel() },
+                )
+            session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(apkPayload()),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                    preparationTimeoutMillis = 1_000L,
+                )
+
+            session.start()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Cancelled, session.state.value.phase)
+            assertEquals(1, transport.cancelledMaterializations)
+            assertTrue(transport.uploadTargets.isEmpty())
+            assertTrue(transport.published.isEmpty())
+        }
+
+    /** The app owner surfaces preparation timeout once instead of silently repeating the same stall. */
+    @Test
+    fun ownerDoesNotAutomaticallyRetryPreparationTimeout() =
+        runTest {
+            val terminalSnapshots = mutableListOf<ForwardOperationSnapshot>()
+            val transport = RecordingForwardTransport(materializeGate = CompletableDeferred<Unit>())
+            val owner =
+                ForwardOperationOwner(
+                    scope = this,
+                    automaticRetryAttempts = 3,
+                    retryDelayMillis = { 1L },
+                    onTerminal = terminalSnapshots::add,
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(apkPayload()),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                    preparationTimeoutMillis = 1_000L,
+                )
+
+            assertTrue(owner.start(session))
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Failed, owner.state.value?.phase)
+            assertTrue(owner.state.value?.canRetry == true)
+            assertEquals(listOf(0), transport.materializedIndices)
+            assertEquals(listOf(ForwardOperationPhase.Failed), terminalSnapshots.map { it.phase })
+            assertTrue(transport.published.isEmpty())
+            owner.release()
         }
 
     @Test
@@ -644,6 +871,9 @@ class MessageForwardingTest {
         private val failPublishBeforeCommitOnceFor: MutableSet<String> = mutableSetOf(),
         private val uploadGate: CompletableDeferred<Unit>? = null,
         private val materializeGate: CompletableDeferred<Unit>? = null,
+        private val materializeGates: ArrayDeque<CompletableDeferred<Unit>> = ArrayDeque(),
+        private val failMaterializationCleanup: Boolean = false,
+        private val onMaterializationCleanup: () -> Unit = {},
         private val failMaterializeOnCall: Int? = null,
         private val materializedByteCount: Int = 1,
         private val materializedBytes: ByteArray? = null,
@@ -661,15 +891,17 @@ class MessageForwardingTest {
         val publishedMediaCaptions = mutableMapOf<String, List<String?>>()
         val publishedMediaFileNames = mutableMapOf<String, List<String>>()
         val publishedMediaTypes = mutableMapOf<String, List<String>>()
+        var cancelledMaterializations = 0
         private var materializeCallCount = 0
 
+        /** Suspends on the configured attempt gate before returning source metadata and plaintext. */
         override suspend fun materialize(
             sourceGroupIdHex: String,
             sourceMessageIdHex: String,
             source: ForwardAttachmentSource,
         ): PendingAttachment {
             materializedIndices += source.attachmentIndex
-            materializeGate?.await()
+            (materializeGates.removeFirstOrNull() ?: materializeGate)?.await()
             materializeCallCount += 1
             if (materializeCallCount == failMaterializeOnCall) error("materialize failed")
             return PendingAttachment(
@@ -681,6 +913,13 @@ class MessageForwardingTest {
                 dim = source.reference.dim,
                 thumbhash = source.reference.thumbhash,
             )
+        }
+
+        /** Records the session's request to discard transport work that exceeded its preparation lifetime. */
+        override fun cancelStalledMaterialization() {
+            cancelledMaterializations += 1
+            onMaterializationCleanup()
+            if (failMaterializationCleanup) error("cleanup failed")
         }
 
         override suspend fun upload(
@@ -772,22 +1011,41 @@ class MessageForwardingTest {
             },
     )
 
+    /** Builds the APK payload used to verify both liveness and typed metadata preservation. */
+    private fun apkPayload() =
+        ForwardMessagePayload.Media(
+            sourceGroupIdHex = "source",
+            sourceMessageIdHex = "apk-message",
+            caption = null,
+            attachments =
+                listOf(
+                    ForwardAttachmentSource(
+                        attachmentIndex = 0,
+                        reference = reference("white-noise.apk", "apk-source", mediaType = APK_MIME),
+                    ),
+                ),
+        )
+
     private companion object {
+        /** Builds a complete encrypted-media reference while allowing tests to retain the source MIME type. */
         fun reference(
             fileName: String,
             hashPrefix: String,
             sourceEpoch: ULong = 7uL,
+            mediaType: String = "application/octet-stream",
         ) = MediaAttachmentReferenceFfi(
             locators = listOf(MediaLocatorFfi("blossom-v1", "https://media.example/$hashPrefix")),
             ciphertextSha256 = "$hashPrefix-${"a".repeat(64)}",
             plaintextSha256 = "b".repeat(64),
             nonceHex = "c".repeat(24),
             fileName = fileName,
-            mediaType = "application/octet-stream",
+            mediaType = mediaType,
             version = EncryptedMediaVersionFfi.V1,
             sourceEpoch = sourceEpoch,
             dim = null,
             thumbhash = null,
         )
+
+        const val APK_MIME = "application/vnd.android.package-archive"
     }
 }

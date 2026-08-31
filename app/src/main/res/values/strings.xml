@@ -454,6 +454,7 @@
     <string name="forward_cancelled">Cancelled</string>
     <string name="forward_cancelling">Cancelling…</string>
     <string name="forward_failed_preparing">Couldn\'t prepare attachments</string>
+    <string name="forward_failed_preparation_timeout">Preparation timed out. Retry, or dismiss to stop forwarding.</string>
     <string name="forward_failed_upload">Couldn\'t upload attachments</string>
     <string name="forward_failed_publish">Couldn\'t send messages</string>
     <string name="forward_payload_too_large">These attachments are too large to forward together</string>
