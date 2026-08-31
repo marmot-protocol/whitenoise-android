@@ -43,6 +43,7 @@ internal fun stripImageContainerMetadata(bytes: ByteArray): ByteArray? =
     }
 
 /** Walks JPEG markers and drops EXIF, XMP, Photoshop/IPTC, and comment segments. */
+@Suppress("ReturnCount") // Each malformed marker must fail closed at its exact boundary.
 internal fun stripJpegMetadata(bytes: ByteArray): ByteArray? {
     if (!isJpeg(bytes)) return null
     val out = ByteArrayOutputStream(bytes.size)
@@ -108,6 +109,7 @@ private fun isJpegMetadataMarker(marker: Int): Boolean =
         marker == 0xfe // User comments can carry device/location notes.
 
 /** Walks PNG chunks and drops textual, timestamp, and EXIF metadata chunks. */
+@Suppress("ReturnCount") // Each malformed chunk must fail closed before copying bytes.
 internal fun stripPngMetadata(bytes: ByteArray): ByteArray? {
     if (!isPng(bytes)) return null
     val out = ByteArrayOutputStream(bytes.size)
@@ -130,6 +132,7 @@ internal fun stripPngMetadata(bytes: ByteArray): ByteArray? {
 }
 
 /** Walks RIFF chunks, drops private WebP chunks, and rewrites the bounded RIFF size. */
+@Suppress("ReturnCount") // Each malformed RIFF boundary must fail closed before output.
 internal fun stripWebpMetadata(bytes: ByteArray): ByteArray? {
     if (!isWebp(bytes)) return null
     val out = ByteArrayOutputStream(bytes.size)
@@ -262,10 +265,15 @@ private fun isGifLoopApplicationExtension(
 internal fun isJpeg(bytes: ByteArray): Boolean = bytes.size >= 2 && u8(bytes, 0) == 0xff && u8(bytes, 1) == 0xd8
 
 /** Tests the complete PNG signature without reading outside [bytes]. */
-internal fun isPng(bytes: ByteArray): Boolean = bytes.size >= PNG_SIGNATURE.size && PNG_SIGNATURE.indices.all { bytes[it] == PNG_SIGNATURE[it] }
+internal fun isPng(bytes: ByteArray): Boolean =
+    bytes.size >= PNG_SIGNATURE.size &&
+        PNG_SIGNATURE.indices.all { bytes[it] == PNG_SIGNATURE[it] }
 
 /** Tests the RIFF and WEBP signatures without trusting the declared RIFF size. */
-internal fun isWebp(bytes: ByteArray): Boolean = bytes.size >= 12 && asciiEquals(bytes, 0, "RIFF") && asciiEquals(bytes, 8, "WEBP")
+internal fun isWebp(bytes: ByteArray): Boolean =
+    bytes.size >= 12 &&
+        asciiEquals(bytes, 0, "RIFF") &&
+        asciiEquals(bytes, 8, "WEBP")
 
 /** Tests either complete GIF version signature without reading outside [bytes]. */
 internal fun isGif(bytes: ByteArray): Boolean =
