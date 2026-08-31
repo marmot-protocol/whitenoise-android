@@ -7,6 +7,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -18,6 +20,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
@@ -25,8 +28,12 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
+import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -78,16 +85,59 @@ class ComposerDictationControlTest {
         composeRule.onNodeWithContentDescription("Send").assertIsDisplayed()
     }
 
+    /** Verifies app-owned controls replace only their compact slot and leave adjacent actions stable. */
     @Test
-    fun compactComposerActionUsesTheProviderOwnedRecognitionActivity() {
-        val controller = render()
+    fun compactComposerActionMorphsToAppOwnedDoneAndCancelWithoutMovingNeighbors() {
+        val controller = render(draft = TextFieldValue("Ready"))
+        val field = composeRule.onNode(hasSetTextAction()).performClick().assertIsFocused()
+        val emojiBefore = composeRule.onNodeWithContentDescription("Open emoji picker").getUnclippedBoundsInRoot()
+        val sendBefore = composeRule.onNodeWithContentDescription("Send").getUnclippedBoundsInRoot()
 
         composeRule.onNodeWithContentDescription("Dictate text").performClick()
 
-        assertTrue(controller.state is ConversationDictationState.ProviderActivityRequired)
-        assertFalse(controller.ownsMicrophone)
+        assertTrue(controller.state is ConversationDictationState.Starting)
+        assertTrue(controller.ownsMicrophone)
         composeRule.onNodeWithTag(COMPOSER_DICTATION_STRIP_TAG).assertDoesNotExist()
-        composeRule.onNode(hasSetTextAction()).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
+        field.assertIsDisplayed().assertIsFocused()
+        assertEquals(
+            emojiBefore,
+            composeRule.onNodeWithContentDescription("Open emoji picker").getUnclippedBoundsInRoot(),
+        )
+        assertEquals(sendBefore, composeRule.onNodeWithContentDescription("Send").getUnclippedBoundsInRoot())
+    }
+
+    /** Verifies starting dictation does not focus a composer whose keyboard was already closed. */
+    @Test
+    fun appOwnedDictationDoesNotOpenAnInitiallyClosedComposer() {
+        val controller = render(draft = TextFieldValue("Ready"))
+        val field = composeRule.onNode(hasSetTextAction()).assertIsNotFocused()
+
+        composeRule.onNodeWithContentDescription("Dictate text").performClick()
+
+        assertTrue(controller.state is ConversationDictationState.Starting)
+        field.assertIsDisplayed().assertIsNotFocused()
+        composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
+    }
+
+    /** Verifies app-owned dictation removes the competing voice-note microphone from the same composer. */
+    @Test
+    fun composerOwnedDictationSuppressesTheCompetingVoiceNoteMicrophone() {
+        val voiceRecording = previewVoiceRecordingController()
+        try {
+            render(voiceRecordingController = voiceRecording)
+            composeRule.onNodeWithContentDescription("Hold to record voice message").assertExists()
+
+            composeRule.onNodeWithContentDescription("Dictate text").performClick()
+
+            composeRule.onNodeWithContentDescription("Hold to record voice message").assertDoesNotExist()
+            composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
+        } finally {
+            voiceRecording.release()
+        }
     }
 
     @Test
@@ -135,6 +185,7 @@ class ComposerDictationControlTest {
         rtl: Boolean = false,
         draft: TextFieldValue = TextFieldValue(""),
         withAttachments: Boolean = false,
+        voiceRecordingController: VoiceRecordingController? = null,
     ): ConversationDictationController {
         val dictationController = idleDictationController(draft)
         composeRule.setContent {
@@ -154,12 +205,26 @@ class ComposerDictationControlTest {
                         dictationController = dictationController,
                         dictationAccountRef = ACCOUNT,
                         dictationGroupIdHex = GROUP,
+                        voiceRecordingController = voiceRecordingController,
                         modifier = Modifier.width(320.dp).testTag(ROOT_TAG),
                     )
                 }
             }
         }
         return dictationController
+    }
+
+    /** Creates a no-I/O voice recorder used only to exercise composer action ownership. */
+    private fun previewVoiceRecordingController(): VoiceRecordingController {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        return VoiceRecordingController(
+            context = context,
+            outputDirectory = context.cacheDir,
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+            onPermissionRequest = { true },
+            onRecordingComplete = { _, _ -> },
+            onError = {},
+        )
     }
 
     private fun idleDictationController(draft: TextFieldValue): ConversationDictationController =

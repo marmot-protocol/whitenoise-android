@@ -18,7 +18,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
-import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationStrip
+import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationFloatingControl
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -35,6 +35,7 @@ class ConversationDictationReadinessScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Captures the bounded provider check before Android resolves an Activity. */
     @Test
     fun largeFontRtlCheckingServiceReadiness() {
         val fixture = fixture()
@@ -44,6 +45,7 @@ class ConversationDictationReadinessScreenshotTest {
         )
     }
 
+    /** Captures the transition from provider readiness to queued Activity launch. */
     @Test
     fun largeFontRtlOpeningServiceReadiness() {
         val fixture = fixture()
@@ -54,6 +56,7 @@ class ConversationDictationReadinessScreenshotTest {
         )
     }
 
+    /** Captures the stable owner state after the provider Activity opens. */
     @Test
     fun largeFontRtlServiceOpenReadiness() {
         val fixture = fixture()
@@ -65,6 +68,7 @@ class ConversationDictationReadinessScreenshotTest {
         )
     }
 
+    /** Builds a provider-Activity fixture whose readiness callback is controlled by the test. */
     private fun fixture(): Fixture {
         val draft = TextFieldValue("Keep")
         val platform = DeferredActivityPlatform()
@@ -81,6 +85,7 @@ class ConversationDictationReadinessScreenshotTest {
         return Fixture(controller, platform)
     }
 
+    /** Renders one readiness phase at large font in RTL and records its baseline. */
     private fun capture(
         fixture: Fixture,
         snapshotName: String,
@@ -93,10 +98,9 @@ class ConversationDictationReadinessScreenshotTest {
             ) {
                 WhiteNoiseTheme {
                     Box(Modifier.width(268.dp)) {
-                        ConversationDictationStrip(
+                        ConversationDictationFloatingControl(
                             state = fixture.controller.state,
                             controller = fixture.controller,
-                            modifier = Modifier.width(268.dp),
                         )
                     }
                 }
@@ -123,6 +127,7 @@ class ConversationDictationReadinessScreenshotTest {
             return ConversationDictationTimeoutHandle {}
         }
 
+        /** Completes the deferred provider check with the requested availability. */
         fun completeReadinessCheck(available: Boolean) = readinessCallback(available)
 
         override fun createSession(listener: ConversationDictationRecognitionListener): RecognitionSession =
