@@ -1,149 +1,184 @@
-# Composer dictation device matrix
+# Composer dictation compatibility matrix
 
-This runbook records the device evidence for the provider-owned dictation flow
-requested by
-[#1911](https://github.com/marmot-protocol/whitenoise-android/issues/1911).
-The compact composer waveform is the single dictation entry point and launches
-the installed-provider Activity; White Noise does not run a separate in-app
-recognizer. This product decision supersedes the attachment-sheet entry point in
-#1911 and the in-app listening and processing UI described by #1969/#2029, so
-those trackers need an explicit scope update before the PR can claim to close
-them.
+This runbook is the source of truth for the Android speech contracts that White
+Noise can use for composer dictation. It covers
+[#2276](https://github.com/marmot-protocol/whitenoise-android/issues/2276) and
+provides the compatibility boundary consumed by the app-owned work in
+[#2198](https://github.com/marmot-protocol/whitenoise-android/issues/2198).
 
-The provider-Activity contract exposes availability and launch, but not model
-load progress or a microphone-free warm-up API. White Noise therefore performs
-a cancellable, 1.5-second availability check after an explicit dictation tap,
-shows **Checking speech service…** before launch, and then truthfully reports
-**Opening speech service…**. It does not claim that a model is loading or ready
-to listen; those phases remain provider-owned. No lazy prewarm is implemented:
-there is no safe way to prewarm this path without launching provider UI, and
-White Noise never opens the microphone while idle or in the background.
+White Noise must choose one mode before a session starts. It must never move to
+a different speech contract after an error: there is **no silent fallback**
+between provider Activity, app-owned `SpeechRecognizer`, and keyboard/IME
+handoff.
 
-## Safety rules
+The current provider-Activity path performs a cancellable 1.5-second
+availability check after an explicit dictation tap. It shows **Checking speech
+service…** before launch and **Opening speech service…** only after the provider
+resolves. This is launch-readiness feedback, not a claim that the provider's
+model is loaded or ready to listen. White Noise does not prewarm this path,
+launch provider UI while idle, or open the microphone in the background.
 
-- Never uninstall White Noise from a physical device. Install the debug APK in
-  place with `adb install -r` so identity, drafts, and message history survive.
-- Never run `connectedAndroidTest` on a physical device without
-  `-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true`.
-- Do not remove or disable a speech provider on a personal device to manufacture
-  the unavailable case. Use provider-free hardware or an emulator created for
-  that purpose.
-- Record an item as passing only after observing it on the named device. An
-  emulator result cannot be relabelled as physical-device evidence.
+## Android speech contracts
 
-## Evidence record
+| Contract | Who owns capture and UI? | White Noise entry point | Required Android capability | Current support |
+|---|---|---|---|---|
+| Provider Activity | The installed provider owns capture, endpointing, permission UI, and its Activity. | `RecognizerIntent.ACTION_RECOGNIZE_SPEECH` from the composer waveform. | A visible Activity resolving `android.speech.action.RECOGNIZE_SPEECH`. | Current composer default. Returned text is inserted into the immutable origin draft and is never sent automatically. |
+| App-owned recognizer | White Noise owns session controls and lifecycle; the selected service owns recognition. | `SpeechRecognizer.createSpeechRecognizer(context, selectedComponent)`. | `RECORD_AUDIO`, a non-empty selected `Settings.Secure.VOICE_RECOGNITION_SERVICE`, and that exact component discoverable through `RecognitionService.SERVICE_INTERFACE`. | Controller integration is available for [#2198](https://github.com/marmot-protocol/whitenoise-android/issues/2198), but the current composer does not select this mode. It binds the selected component explicitly and never asks Android to choose an arbitrary fallback. |
+| Voice IME / keyboard handoff | The enabled keyboard or voice IME owns capture, model lifecycle, and text commit. | Normal editor connection and committed text; no White Noise speech API call. | An enabled input method that provides voice input. | Supported as ordinary keyboard input. It is not a White Noise dictation session and cannot provide app-owned Done/Cancel, navigation persistence, or immutable-origin routing. |
 
-| Date | Configuration | Provider package | Device | Cold tap → provider UI | Warm tap → provider UI | Readiness before launch | Result | Evidence |
-|---|---|---|---|---:|---:|---|---|---|
-| 2026-08-16 | Previous split implementation | Not recorded | Pixel 9 Pro XL (device A) | Not recorded | Not recorded | Superseded UI | Superseded evidence | The attachment-sheet provider Activity returned editable text successfully, but the composer still used the now-removed in-app recognizer. Do not treat this row as verification of the unified-provider composer shortcut. |
-| 2026-08-16 | Provider unavailable | None | Disposable API 36 Google Play emulator | N/A | N/A | Automated fallback | Pass | With no recognition Activity available, the provider path returned `ProviderUnavailable`, preserved the draft, and performed no White Noise microphone capture or provider download. |
-| Pending | GrapheneOS provider configured | `app.grapheneos.speechservices` | Pixel 6a | Pending | Pending | Pending | Not run on issue #2275 head | Record both timings from tap until provider UI is visibly interactive, and confirm **Checking speech service…** appears before launch. Do not infer `RecognitionService` support solely from package installation. |
+The composer must keep provider Activity behavior until [#2198](https://github.com/marmot-protocol/whitenoise-android/issues/2198) deliberately changes its selected mode. The app-owned controller is not a fallback for a missing Activity, and the Activity is not a fallback for a missing selected `RecognitionService`.
 
-## Build and install without data loss
+## Runtime probes and deterministic failures
 
-```sh
-ANDROID_HOME="$HOME/Library/Android/sdk" ./gradlew :app:assembleDevPlayDebug
-adb -s DEVICE_SERIAL install -r app/build/outputs/apk/devPlay/debug/app-dev-play-universal-debug.apk
-```
+### Provider Activity mode
 
-The application id is `dev.ipf.whitenoise.android.dev`. Confirm that the
-existing installation was updated rather than replaced:
+1. Query `ACTION_RECOGNIZE_SPEECH` through package visibility.
+2. If no Activity resolves, report `ProviderUnavailable` without changing the draft.
+3. If the provider cancels or returns blank text, preserve the draft. A late or duplicate result cannot change another conversation.
 
-```sh
-adb -s DEVICE_SERIAL shell dumpsys package dev.ipf.whitenoise.android.dev \
-  | grep -E 'firstInstallTime|lastUpdateTime|versionName'
-```
+### App-owned `SpeechRecognizer` mode
 
-## Capture the device configuration
-
-Save these values with the test result:
-
-```sh
-adb -s DEVICE_SERIAL shell getprop ro.product.manufacturer
-adb -s DEVICE_SERIAL shell getprop ro.product.model
-adb -s DEVICE_SERIAL shell getprop ro.build.version.release
-adb -s DEVICE_SERIAL shell getprop ro.build.version.sdk
-adb -s DEVICE_SERIAL shell getprop ro.build.fingerprint
-adb -s DEVICE_SERIAL shell cmd package query-activities \
-  -a android.speech.action.RECOGNIZE_SPEECH
-```
-
-For the unavailable row, the recognition-Activity query must report no handlers
-before opening White Noise.
-
-## Configured-provider physical journey
-
-Use a test conversation and a recognizable phrase such as "dictation matrix
-alpha". Do not use a production message that might be sent accidentally.
-
-1. With TalkBack enabled, focus the emoji, composer dictation, attachment, and
-   voice-note actions. Confirm the spoken labels are respectively **Open emoji
-   picker**, **Dictate text**, **Add attachment**, and **Hold to record voice
-   message**. Confirm the emoji action remains in its original leading position.
-2. Test blank and nonblank drafts. **Dictate text** must remain reachable, and a
-   nonblank draft must still show **Send**.
-3. Tap the composer waveform. The IME must fully close before the installed
-   provider's UI appears. White Noise must show **Checking speech service…**
-   without expanding the compact composer, followed by **Opening speech
-   service…** when the provider is available. It must not claim **Loading
-   model** or **Ready to listen**, show a blank keyboard-sized gap, or show its
-   voice-note recording UI.
-4. Cancel from the provider. The composer must remain usable, preserve the
-   draft, and receive no late text.
-5. Complete provider recognition. The phrase must enter the editable draft at
-   the saved cursor/selection and must never send automatically.
-6. Start again, navigate to another chat, and complete recognition. The visible
-   chat must remain unchanged. Reopen the origin and confirm its normal
-   MDK-backed draft contains the phrase.
-7. Repeat step 6 while switching accounts. The result must remain owned by the
-   originating account and conversation.
-8. Open attachments and confirm there is no second **Dictate text** action.
-9. Confirm dictation does not ask White Noise for microphone permission; any
-   capture permission and UI belong to the installed provider.
-10. Hold the voice-note button and slide to cancel. Its existing gesture and
-    plain-microphone icon must remain unchanged and distinct from the waveform.
-11. Enable Android developer option **Don't keep activities**, launch the
-    composer provider, and return a result. The recreated White Noise
-    Activity must not launch a second provider and must deliver at most once to
-    the immutable origin. Disable **Don't keep activities** immediately after.
-12. Confirm chat-list voice search still launches its existing provider flow and
-    fills search without affecting a conversation draft.
-13. After a provider update or long idle, record cold tap-to-provider-UI time;
-    cancel, retry immediately, and record the warm time. Record the provider
-    package and whether readiness feedback rendered before each launch.
-
-## Provider-unavailable physical journey
-
-Run this only on a device whose configuration query reports no recognition
-Activity.
-
-1. Open an origin draft containing `Keep this text` with a nontrivial cursor or
+1. Read the selected recognition component from
+   `Settings.Secure.VOICE_RECOGNITION_SERVICE`.
+2. Reject an empty or malformed component.
+3. Query `android.speech.RecognitionService` and require that the exact selected
+   component is present.
+4. Bind that component explicitly with
+   `SpeechRecognizer.createSpeechRecognizer(context, component)`.
+5. If the selected provider disappears between probe and bind, report
+   `ProviderUnavailable`; never retry through Android's implicit provider
    selection.
-2. Tap the composer waveform. Confirm the concise unavailable state appears,
-   no microphone indicator appears in system privacy UI, and the draft remains
-   byte-for-byte unchanged.
-3. Dismiss, open attachments, and confirm there is no second **Dictate text**
-   action.
-4. Navigate, switch accounts, background/foreground the app, and reopen the
-   origin. Confirm no draft changed and no stale result appears.
-5. With TalkBack enabled, confirm the unavailable copy, Retry, and Dismiss
-   actions are announced once and remain reachable.
-6. Record the OS/build/provider-query output in the evidence table above.
+6. Map unsupported language/model errors to `ProviderUnavailable`, network
+   errors to `Network`, and recognizer saturation to `RecognizerBusy`.
 
-## Automated acceptance gate
+The app-owned API does not expose a portable, synchronous guarantee that a
+provider's offline model is already loaded. White Noise therefore does not
+claim offline readiness from service discovery alone. A provider that reports
+language/model unavailability is unsupported for that session; downloading or
+configuring models remains provider-owned.
 
-Run after the final code change:
+### Voice IME mode
+
+White Noise receives ordinary committed editor text. It cannot probe whether a
+voice IME has downloaded a local model, cancel its recognition session, or
+recover its partial transcript. Those controls remain in the IME.
+
+## Product-facing unsupported states
+
+| State | User-visible outcome | Safe recovery |
+|---|---|---|
+| No recognition Activity for current composer mode | Dictation is unavailable; draft and cursor remain unchanged. | Configure an Android speech provider in voice-input settings, use keyboard voice input, or continue typing. |
+| No selected `RecognitionService` for app-owned mode | App-owned dictation does not start. No implicit service is tried. | Select a voice-recognition service in Android settings. |
+| Selected service not discoverable or removed | `ProviderUnavailable`; no transcript is written. | Re-enable/reinstall the selected provider or select another service. |
+| Provider language/model unavailable | `ProviderUnavailable`; no automatic network/provider fallback. | Configure a supported language/model in the provider, or use another input path. |
+| Network required but unavailable | `Network`; draft remains unchanged. | Restore connectivity or use a provider/IME with a downloaded local model. |
+| Provider/IME controls differ from White Noise controls | White Noise cannot promise manual stop, cancellation, or navigation persistence. | Use the controls supplied by that provider/IME. App-owned controls are tracked by [#2198](https://github.com/marmot-protocol/whitenoise-android/issues/2198). |
+
+Android exposes voice-input settings on builds that implement
+`android.settings.VOICE_INPUT_SETTINGS`; keyboard configuration uses
+`android.settings.INPUT_METHOD_SETTINGS`. A settings deep link must itself be
+resolved before launch because some GrapheneOS/provider combinations omit the
+voice-input screen.
+
+## GrapheneOS and provider matrix
+
+A row is a compatibility claim only after its probe and journey have been run
+on that configuration. Do not infer support from the presence of an app icon or
+IME alone.
+
+| Configuration | Activity probe | Selected-service probe | Expected supported mode | Evidence status |
+|---|---|---|---|---|
+| GrapheneOS + Google speech provider with configured service | Record exact resolver output. | Record selected component and matching service. | Provider Activity now; app-owned mode only after [#2198](https://github.com/marmot-protocol/whitenoise-android/issues/2198) selects it. | Pending exact-head physical run. |
+| GrapheneOS + Voice IME only | May be absent. | Do not assume Voice IME exports a `RecognitionService`; record actual output. | Keyboard/IME handoff. Provider Activity and app-owned mode are unsupported unless their independent probes pass. | Pending exact-head physical run. |
+| GrapheneOS with no configured speech provider | Absent or non-launchable. | Empty/undiscoverable. | Typing and ordinary keyboard input only. | Pending exact-head physical run; deterministic unit coverage protects the draft. |
+| API 36 provider-free emulator | Absent. | Empty/undiscoverable. | No White Noise speech mode. | Automated unavailable-path coverage. |
+
+### Observed capability probe
+
+- 2026-08-31, Pixel 6a (`bluejay`) running GrapheneOS: Offline Voice Input (`dev.notune.transcribe`) was the selected service. Package queries returned one exported `RecognitionService` and one `ACTION_RECOGNIZE_SPEECH` Activity. This proves both Android contracts are discoverable on that configuration; the exact-APK UI journeys remain pending.
+
+## Capture the configuration
+
+On a development device, record these values without changing provider or app
+data. The commands below use the guarded Hermes physical-fixture client; other
+development environments may substitute their ordinary `adb` client. Hold an
+`android-device-session` for any stateful UI journey.
 
 ```sh
-ANDROID_HOME="$HOME/Library/Android/sdk" ./gradlew --no-daemon \
-  :app:ktlintCheck \
-  :app:testDevPlayDebugUnitTest \
-  :app:verifyRoborazziDevPlayDebug \
-  :app:verifyRoborazziDevZapstoreDebug \
-  :app:assembleDevPlayDebug
+/opt/data/.local/bin/phone-adb shell getprop ro.product.manufacturer
+/opt/data/.local/bin/phone-adb shell getprop ro.product.model
+/opt/data/.local/bin/phone-adb shell getprop ro.build.version.release
+/opt/data/.local/bin/phone-adb shell getprop ro.build.version.sdk
+/opt/data/.local/bin/phone-adb shell getprop ro.build.fingerprint
+/opt/data/.local/bin/phone-adb shell settings get secure voice_recognition_service
+/opt/data/.local/bin/phone-adb shell cmd package query-activities -a android.speech.action.RECOGNIZE_SPEECH
+/opt/data/.local/bin/phone-adb shell cmd package query-services -a android.speech.RecognitionService
 ```
 
-The provider coordinator coverage explicitly checks success, cancellation,
-empty results, stale or duplicate callbacks, navigation and target
-disappearance, unavailable providers, immutable draft ownership, and host
-recreation without a duplicate provider launch.
+Never disable, remove, or reconfigure a personal speech provider merely to
+manufacture an unsupported row. Use provider-free test hardware or an emulator.
+
+## Provider Activity physical journey
+
+Use a test conversation and a recognizable phrase such as “dictation matrix
+alpha.” Do not use a production message that might be sent accidentally.
+
+1. Record the configuration probes above.
+2. With TalkBack enabled, verify **Dictate text** remains distinct from **Hold to
+   record voice message**.
+3. With blank and nonblank drafts, tap the composer waveform. Confirm White
+   Noise shows **Checking speech service…**, then **Opening speech service…**,
+   and the configured provider Activity opens without showing White Noise's
+   in-app listening strip. It must not claim **Loading model** or **Ready to
+   listen**.
+4. Cancel. Confirm the original draft and selection remain unchanged.
+5. Complete recognition. Confirm text is inserted at the captured selection and
+   remains editable; it must never send automatically.
+6. Start again, navigate to another conversation/account, and complete. Confirm
+   only the immutable origin draft changes.
+7. Enable Android developer option **Don't keep activities**, launch and return
+   once, and verify no duplicate provider launch or duplicate insertion. Disable
+   the option immediately afterward.
+
+## App-owned recognizer physical journey
+
+Run this only on an exact head whose composer deliberately selects
+`ConversationDictationMode.InApp` (the current composer does not).
+
+1. Require the selected-service probe to return one exact matching component.
+2. Start dictation and verify White Noise, rather than a provider Activity, owns
+   Done/Cancel and session status.
+3. Stop, cancel, navigate, background/foreground, and remove the origin target;
+   confirm cancellation is bounded and late callbacks cannot write.
+4. Repeat after configuring the provider's local model. Record observed offline
+   behavior, but do not generalize it to other provider versions or languages.
+5. Remove the local model only on disposable test hardware, then verify the
+   provider's language/model error is surfaced without switching contracts.
+
+## Regression hooks
+
+The compatibility contract is anchored by:
+
+- `app/src/main/AndroidManifest.xml`: visibility for both speech contracts.
+- `ConversationDictationController.kt`: bounded provider-Activity readiness,
+  selected-service probe, explicit component binding, failure mapping,
+  cancellation, and immutable-origin writes.
+- `ConversationDictationCompatibilityContractTest.kt`: malformed/missing/
+  undiscoverable selected-service probes plus manifest/runbook anchors.
+- `ConversationDictationControllerTest.kt`: app-owned mode selection,
+  unavailable-provider mapping, cancellation, stale callbacks, and draft
+  preservation.
+- `ComposerDictationControlTest.kt`: the current composer selects provider
+  Activity mode and does not silently enter the app-owned controller path.
+
+Run focused coverage and the repository fast gate:
+
+```sh
+./gradlew --no-daemon \
+  :app:testDevPlayDebugUnitTest \
+  --tests 'dev.ipf.whitenoise.android.audio.ConversationDictationCompatibilityContractTest' \
+  --tests 'dev.ipf.whitenoise.android.audio.ConversationDictationControllerTest' \
+  --tests 'dev.ipf.whitenoise.android.ui.conversation.composer.ComposerDictationControlTest'
+python3 /opt/data/scripts/hermes_test_gate.py --tier fast -- \
+  ./gradlew --no-daemon :app:ktlintCheck :app:testDevPlayDebugUnitTest
+```

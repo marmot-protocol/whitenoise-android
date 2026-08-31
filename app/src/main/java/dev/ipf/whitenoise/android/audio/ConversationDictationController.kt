@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -8,7 +9,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.provider.Settings
 import android.speech.RecognitionListener
+import android.speech.RecognitionService
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.compose.runtime.Stable
@@ -172,6 +175,8 @@ internal interface ConversationDictationRecognitionSession {
 
     fun destroy()
 }
+
+internal class ConversationDictationProviderUnavailableException : IllegalStateException()
 
 internal interface ConversationDictationPlatform {
     fun hasRecordAudioPermission(): Boolean
@@ -701,8 +706,16 @@ internal class ConversationDictationController internal constructor(
             }
         runCatching {
             platform.createSession(listener).also { recognitionSession = it }.start()
-        }.onFailure {
-            fail(sessionId, target, ConversationDictationFailure.Unknown)
+        }.onFailure { error ->
+            fail(
+                sessionId,
+                target,
+                if (error is ConversationDictationProviderUnavailableException) {
+                    ConversationDictationFailure.ProviderUnavailable
+                } else {
+                    ConversationDictationFailure.Unknown
+                },
+            )
         }
     }
 
@@ -1075,6 +1088,7 @@ private const val MAX_ANCHOR_SCORE_CHARS = 64
 private const val MAX_EMPTY_SELECTION_SCAN_LENGTH = 4_096
 private const val EMPTY_SELECTION_SCAN_RADIUS = 1_024
 private const val READINESS_UI_FRAME_MILLIS = 16L
+private const val VOICE_RECOGNITION_SERVICE_SETTING = "voice_recognition_service"
 
 @Suppress("MaxLineLength")
 private class AndroidConversationDictationPlatform(
@@ -1086,7 +1100,14 @@ private class AndroidConversationDictationPlatform(
             Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
 
-    override fun recognitionAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
+    override fun recognitionAvailable(): Boolean {
+        val selected = selectedRecognitionService() ?: return false
+        val discovered =
+            context.packageManager
+                .queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), PackageManager.MATCH_ALL)
+                .map { ComponentName(it.serviceInfo.packageName, it.serviceInfo.name) }
+        return conversationDictationRecognitionServiceAvailable(selected, discovered)
+    }
 
     override fun recognitionActivityAvailable(): Boolean = conversationDictationRecognitionActivityIntent().resolveActivity(context.packageManager) != null
 
@@ -1108,8 +1129,40 @@ private class AndroidConversationDictationPlatform(
     }
 
     override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession =
-        AndroidConversationDictationRecognitionSession(context, listener)
+        AndroidConversationDictationRecognitionSession(
+            context = context,
+            recognitionService = selectedRecognitionService() ?: throw ConversationDictationProviderUnavailableException(),
+            listener = listener,
+        )
+
+    private fun selectedRecognitionService(): ComponentName? =
+        conversationDictationRecognitionServiceComponent(
+            Settings.Secure.getString(
+                context.contentResolver,
+                VOICE_RECOGNITION_SERVICE_SETTING,
+            ),
+        )
 }
+
+internal fun conversationDictationRecognitionServiceComponent(configuredValue: String?): ComponentName? {
+    val value = configuredValue?.trim()?.takeIf(String::isNotEmpty) ?: return null
+    val separator = value.indexOf('/')
+    if (separator <= 0 || separator == value.lastIndex) return null
+    val packageName = value.substring(0, separator)
+    val configuredClassName = value.substring(separator + 1)
+    val className =
+        if (configuredClassName.startsWith('.')) {
+            packageName + configuredClassName
+        } else {
+            configuredClassName
+        }
+    return ComponentName(packageName, className)
+}
+
+internal fun conversationDictationRecognitionServiceAvailable(
+    selected: ComponentName?,
+    discovered: Collection<ComponentName>,
+): Boolean = selected != null && discovered.any { it == selected }
 
 internal fun conversationDictationRecognitionActivityIntent(): Intent =
     Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -1119,9 +1172,10 @@ internal fun conversationDictationRecognitionActivityIntent(): Intent =
 
 private class AndroidConversationDictationRecognitionSession(
     private val context: Context,
+    recognitionService: ComponentName,
     listener: ConversationDictationRecognitionListener,
 ) : ConversationDictationRecognitionSession {
-    private val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
+    private val recognizer = SpeechRecognizer.createSpeechRecognizer(context, recognitionService)
     private var destroyed = false
 
     init {
