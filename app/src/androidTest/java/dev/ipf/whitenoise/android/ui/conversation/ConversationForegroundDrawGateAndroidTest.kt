@@ -4,6 +4,7 @@ import android.view.ViewTreeObserver
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -43,7 +44,8 @@ class ConversationForegroundDrawGateAndroidTest {
      */
     @Test
     fun focusedComposerResumeSchedulesAUsefulFrameAndKeepsEditingState() {
-        val fixture = ForegroundResumeFixture()
+        lateinit var fixture: ForegroundResumeFixture
+        composeRule.runOnIdle { fixture = ForegroundResumeFixture() }
         composeRule.setContent { fixture.Content() }
 
         composeRule.runOnIdle { fixture.startAndFocus() }
@@ -65,11 +67,13 @@ class ConversationForegroundDrawGateAndroidTest {
     private class ForegroundResumeFixture {
         private val lifecycleOwner = TestLifecycleOwner()
         private val focusRequester = FocusRequester()
+        private val scrollCoordinator =
+            ConversationScrollCoordinator(LazyListConversationScrollWriter(LazyListState()))
         val usefulFrames = AtomicInteger()
         val expectedSelection = TextRange(2, 7)
         var value by mutableStateOf(TextFieldValue("draft text", expectedSelection))
         private var composerFocused by mutableStateOf(false)
-        private var gateBlocked by mutableStateOf(false)
+        private var foregroundRestoreToken: ConversationForegroundRestoreToken? = null
 
         /** Mounts the production draw gate and lifecycle effect around a real editor. */
         @Composable
@@ -84,7 +88,7 @@ class ConversationForegroundDrawGateAndroidTest {
                 }
             }
             ConversationForegroundDrawGateEffect(
-                isBlocked = gateBlocked,
+                isBlocked = { scrollCoordinator.foregroundRestoreInProgress },
                 onPreDraw = {},
             )
             ConversationComposerLifecycleEffect(
@@ -93,11 +97,30 @@ class ConversationForegroundDrawGateAndroidTest {
                 composerFocused = composerFocused,
                 searchOpen = false,
                 hasActiveEditOrReplySession = false,
-                onPause = { gateBlocked = true },
+                onPause = {
+                    foregroundRestoreToken =
+                        scrollCoordinator.beginForegroundRestore(
+                            ConversationForegroundSnapshot(
+                                scrollBookmark =
+                                    scrollCoordinator.bookmark(
+                                        ConversationScrollAnchor(
+                                            listIndex = 0,
+                                            pixelOffset = 0,
+                                            itemId = null,
+                                            messageId = null,
+                                        ),
+                                    ),
+                                geometry = ConversationForegroundGeometry(100, 1, 10),
+                            ),
+                        )
+                },
                 onResume = { restoreFocus, _ ->
                     if (restoreFocus) focusRequester.requestFocus()
-                    gateBlocked = false
-                    requestConversationForegroundFrame(rootView)
+                    foregroundRestoreToken?.let { restoreToken ->
+                        scrollCoordinator.releaseForegroundRestoreGate(restoreToken)
+                        requestConversationForegroundFrame(rootView)
+                        foregroundRestoreToken = null
+                    }
                 },
             )
             Box(Modifier.fillMaxSize()) {

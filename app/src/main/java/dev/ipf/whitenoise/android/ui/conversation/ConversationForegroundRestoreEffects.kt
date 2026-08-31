@@ -164,7 +164,7 @@ internal fun ConversationForegroundRestoreEffects(
             },
         )
     ConversationForegroundDrawGateEffect(
-        isBlocked = scrollCoordinator.foregroundRestoreInProgress,
+        isBlocked = { scrollCoordinator.foregroundRestoreInProgress },
         onPreDraw = { foregroundPreDrawSignals.trySend(Unit) },
     )
     ConversationComposerLifecycleEffect(

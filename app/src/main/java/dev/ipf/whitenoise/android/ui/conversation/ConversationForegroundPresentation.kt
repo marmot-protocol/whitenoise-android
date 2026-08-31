@@ -80,7 +80,7 @@ internal class ConversationForegroundDrawGate(
 @Suppress("FunctionNaming")
 @Composable
 internal fun ConversationForegroundDrawGateEffect(
-    isBlocked: Boolean,
+    isBlocked: () -> Boolean,
     onPreDraw: () -> Unit,
 ) {
     val view = LocalView.current
@@ -91,7 +91,7 @@ internal fun ConversationForegroundDrawGateEffect(
         val observer = view.viewTreeObserver
         val gate =
             ConversationForegroundDrawGate(
-                isBlocked = { currentIsBlocked },
+                isBlocked = { currentIsBlocked() },
                 onPreDrawSignal = { currentOnPreDraw() },
             )
         observer.addOnPreDrawListener(gate)
