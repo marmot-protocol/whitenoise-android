@@ -436,6 +436,8 @@ private fun rememberConversationBatchSelectionUiState(
  * Read anchor stored as the message id of the deepest row the user has
  * settled on. The candidate id is a key so an optimistic UUID being replaced
  * in the same list slot still advances the anchor to the confirmed message.
+ * A missing durable watermark rebases only at the fully loaded tail; while a
+ * newer page exists it may be off-window and must remain monotonic.
  */
 @Composable
 private fun rememberConversationReadAnchor(
@@ -483,6 +485,9 @@ private fun rememberConversationReadAnchor(
                 currentUiAnchorId = readAnchor.value,
                 durableAnchorId = controller.lastReadMessageId,
                 candidateIndex = idx,
+                canRebaseMissingAnchor =
+                    idx == renderedTimeline.lastIndex &&
+                        !controller.hasMoreAfterTimeline,
             )
     }
     return readAnchor

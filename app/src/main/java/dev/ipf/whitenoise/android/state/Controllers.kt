@@ -2347,6 +2347,7 @@ internal fun advanceConversationReadAnchor(
     currentUiAnchorId: String?,
     durableAnchorId: String?,
     candidateIndex: Int,
+    canRebaseMissingAnchor: Boolean = false,
 ): String? {
     val baseline = currentUiAnchorId ?: durableAnchorId
     if (!baseline.isNullOrBlank() && timeline.none { it.record.messageIdHex == baseline }) {
@@ -2354,14 +2355,20 @@ internal fun advanceConversationReadAnchor(
         // while convergence replaces it with the confirmed 64-hex id. Rebase
         // that transient UI-only anchor through the durable watermark instead
         // of preserving a UUID that can never be found or marked read.
-        return if (currentUiAnchorId != null && isOptimisticMessageId(currentUiAnchorId)) {
-            nextReadAnchor(
-                timeline = timeline,
-                currentAnchorId = durableAnchorId,
-                candidateIndex = candidateIndex,
-            )
-        } else {
-            baseline
+        return when {
+            currentUiAnchorId != null && isOptimisticMessageId(currentUiAnchorId) ->
+                nextReadAnchor(
+                    timeline = timeline,
+                    currentAnchorId = durableAnchorId,
+                    candidateIndex = candidateIndex,
+                )
+            canRebaseMissingAnchor ->
+                nextReadAnchor(
+                    timeline = timeline,
+                    currentAnchorId = null,
+                    candidateIndex = candidateIndex,
+                )
+            else -> baseline
         }
     }
     return nextReadAnchor(
@@ -7419,15 +7426,17 @@ class ConversationController(
     private fun foregroundSweepExpiryRows(): List<DisappearingMessageSweep.LocalExpiryRow> {
         val messages = sweepExpiryMessages()
         val messageOrder = firstMessageOrder(messages.map { it.record.messageIdHex })
-        return messages.map { localExpiryRow(it, messageOrder) }
+        return messages
+            .filter { shouldApplyLocalDisappearingExpiry(it.record) }
+            .map { localExpiryRow(it, messageOrder) }
     }
 
-    /** Returns ordinary loaded rows eligible for local expiry presentation. */
+    /** Returns every loaded row so a group-system read anchor keeps its ordering position. */
     private fun sweepExpiryMessages(): List<TimelineMessage> =
         buildList {
             addAll(optimisticMessages.values)
             timelineOrder.mapNotNullTo(this) { timelineItemsById[it] }
-        }.filter { shouldApplyLocalDisappearingExpiry(it.record) }
+        }
 
     /** Builds expiry input without consulting the group's mutable policy. */
     private fun localExpiryRow(

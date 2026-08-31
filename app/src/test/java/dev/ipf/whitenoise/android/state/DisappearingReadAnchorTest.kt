@@ -61,6 +61,29 @@ class DisappearingReadAnchorTest {
         )
     }
 
+    /** A group-system read watermark remains an ordering anchor even though it never expires. */
+    @Test
+    fun groupSystemReadAnchorPartitionsOrdinaryRowsUsingTheCompleteOrder() {
+        val messageOrder = firstMessageOrder(listOf("before", "retention-change", "after"))
+
+        assertFalse(
+            isDisappearingSendTimeExpiryDeferred(
+                record = message(direction = "received", id = "before", timelineAt = 100uL),
+                lastReadMessageId = "retention-change",
+                lastReadTimelineAt = null,
+                messageOrder = messageOrder,
+            ),
+        )
+        assertTrue(
+            isDisappearingSendTimeExpiryDeferred(
+                record = message(direction = "received", id = "after", timelineAt = 100uL),
+                lastReadMessageId = "retention-change",
+                lastReadTimelineAt = null,
+                messageOrder = messageOrder,
+            ),
+        )
+    }
+
     /** Timeline time provides the fallback ordering when no read id exists. */
     @Test
     fun receivedAfterLastReadTimelineAtDefers() {
