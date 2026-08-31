@@ -26,6 +26,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
 
 internal data class ConversationDictationTarget(
     val accountRef: String,
@@ -64,6 +66,21 @@ internal enum class ConversationDictationFailure {
     Unknown,
 }
 
+/** PII-free provider readiness phases emitted for local diagnostics and tests. */
+internal enum class ConversationDictationReadinessPhase {
+    CheckingService,
+    ServiceReady,
+    ProviderUnavailable,
+    TimedOut,
+    Cancelled,
+    LaunchingProvider,
+}
+
+internal data class ConversationDictationReadinessEvent(
+    val phase: ConversationDictationReadinessPhase,
+    val elapsedMillis: Long,
+)
+
 internal sealed interface ConversationDictationState {
     val sessionId: Long?
     val target: ConversationDictationTarget?
@@ -86,6 +103,13 @@ internal sealed interface ConversationDictationState {
     data class Starting(
         override val sessionId: Long,
         override val target: ConversationDictationTarget,
+    ) : ConversationDictationState
+
+    /** A bounded, microphone-free availability check for the provider Activity. */
+    data class CheckingProvider(
+        override val sessionId: Long,
+        override val target: ConversationDictationTarget,
+        val startedAtElapsedMillis: Long,
     ) : ConversationDictationState
 
     data class Listening(
@@ -156,6 +180,11 @@ internal interface ConversationDictationPlatform {
 
     fun recognitionActivityAvailable(): Boolean = true
 
+    fun checkRecognitionActivity(callback: (Boolean) -> Unit): ConversationDictationTimeoutHandle {
+        callback(recognitionActivityAvailable())
+        return ConversationDictationTimeoutHandle {}
+    }
+
     fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession
 }
 
@@ -205,6 +234,7 @@ internal class ConversationDictationController internal constructor(
     private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
     private val scheduleTimeout: (delayMillis: Long, callback: () -> Unit) -> ConversationDictationTimeoutHandle =
         ::scheduleConversationDictationTimeout,
+    private val onReadinessEvent: (ConversationDictationReadinessEvent) -> Unit = {},
 ) {
     constructor(
         context: Context,
@@ -254,6 +284,8 @@ internal class ConversationDictationController internal constructor(
     private var nextSessionId = 0L
     private var recognitionSession: ConversationDictationRecognitionSession? = null
     private var timeoutHandle: ConversationDictationTimeoutHandle? = null
+    private var readinessHandle: ConversationDictationTimeoutHandle? = null
+    private var readinessStartedAtMillis: Long? = null
     private var microphoneHeld = false
     private var validatingSessionId: Long? = null
 
@@ -401,6 +433,9 @@ internal class ConversationDictationController internal constructor(
     }
 
     fun cancel() {
+        if (state is ConversationDictationState.CheckingProvider) {
+            emitReadiness(ConversationDictationReadinessPhase.Cancelled)
+        }
         clearRecognitionSession(cancel = true)
         state = ConversationDictationState.Idle
     }
@@ -408,6 +443,7 @@ internal class ConversationDictationController internal constructor(
     fun beginProviderActivityLaunch(requestId: Long): Boolean {
         if (requestId != providerActivityRequestId) return false
         val pending = state as? ConversationDictationState.ProviderActivityRequired ?: return false
+        emitReadiness(ConversationDictationReadinessPhase.LaunchingProvider)
         state = ConversationDictationState.ProviderActivityActive(pending.sessionId, pending.target)
         return true
     }
@@ -524,6 +560,7 @@ internal class ConversationDictationController internal constructor(
             is ConversationDictationState.DisclosureRequired,
             is ConversationDictationState.PermissionRequired,
             is ConversationDictationState.Starting,
+            is ConversationDictationState.CheckingProvider,
             is ConversationDictationState.Listening,
             is ConversationDictationState.Processing,
             -> cancel()
@@ -551,12 +588,35 @@ internal class ConversationDictationController internal constructor(
         sessionId: Long,
         target: ConversationDictationTarget,
     ) {
-        state = ConversationDictationState.ProviderActivityRequired(sessionId, target)
-        if (!platform.recognitionActivityAvailable()) {
-            fail(sessionId, target, ConversationDictationFailure.ProviderUnavailable)
-            return
+        val startedAt = elapsedRealtime()
+        readinessStartedAtMillis = startedAt
+        state = ConversationDictationState.CheckingProvider(sessionId, target, startedAt)
+        emitReadiness(ConversationDictationReadinessPhase.CheckingService)
+        armTimeout(sessionId, PROVIDER_READINESS_TIMEOUT_MILLIS) {
+            emitReadiness(ConversationDictationReadinessPhase.TimedOut)
+            fail(sessionId, target, ConversationDictationFailure.TimedOut)
         }
-        _providerActivityRequestId.longValue += 1L
+        val handle =
+            platform.checkRecognitionActivity { available ->
+                val checking = state as? ConversationDictationState.CheckingProvider
+                if (checking?.sessionId != sessionId) return@checkRecognitionActivity
+                timeoutHandle?.cancel()
+                timeoutHandle = null
+                readinessHandle = null
+                if (!available) {
+                    emitReadiness(ConversationDictationReadinessPhase.ProviderUnavailable)
+                    fail(sessionId, target, ConversationDictationFailure.ProviderUnavailable)
+                    return@checkRecognitionActivity
+                }
+                emitReadiness(ConversationDictationReadinessPhase.ServiceReady)
+                state = ConversationDictationState.ProviderActivityRequired(sessionId, target)
+                _providerActivityRequestId.longValue += 1L
+            }
+        if (state is ConversationDictationState.CheckingProvider) {
+            readinessHandle = handle
+        } else {
+            handle.cancel()
+        }
     }
 
     private fun startOrRequestPermission(
@@ -650,6 +710,7 @@ internal class ConversationDictationController internal constructor(
         state.sessionId == sessionId &&
             (
                 recognitionSession != null ||
+                    state is ConversationDictationState.CheckingProvider ||
                     state is ConversationDictationState.ProviderActivityRequired ||
                     state is ConversationDictationState.ProviderActivityActive
             )
@@ -669,6 +730,9 @@ internal class ConversationDictationController internal constructor(
         validatingSessionId = null
         timeoutHandle?.cancel()
         timeoutHandle = null
+        readinessHandle?.cancel()
+        readinessHandle = null
+        readinessStartedAtMillis = null
         val session = recognitionSession
         recognitionSession = null
         if (cancel) runCatching { session?.cancel() }
@@ -779,6 +843,16 @@ internal class ConversationDictationController internal constructor(
         state = ConversationDictationState.Idle
     }
 
+    private fun emitReadiness(phase: ConversationDictationReadinessPhase) {
+        val startedAt = readinessStartedAtMillis ?: elapsedRealtime()
+        onReadinessEvent(
+            ConversationDictationReadinessEvent(
+                phase = phase,
+                elapsedMillis = (elapsedRealtime() - startedAt).coerceAtLeast(0L),
+            ),
+        )
+    }
+
     private fun armTimeout(
         sessionId: Long,
         delayMillis: Long,
@@ -795,6 +869,7 @@ internal class ConversationDictationController internal constructor(
         const val PREFERENCES_NAME = "whitenoise"
         const val DISCLOSURE_ACCEPTED_KEY = "composer_dictation_external_provider_disclosed"
         const val STARTING_TIMEOUT_MILLIS = 10_000L
+        const val PROVIDER_READINESS_TIMEOUT_MILLIS = 1_500L
         const val MAX_LISTENING_MILLIS = 60_000L
         const val PROCESSING_TIMEOUT_MILLIS = 20_000L
         const val MAX_CONDITIONAL_WRITE_ATTEMPTS = 2
@@ -999,6 +1074,7 @@ private const val MIN_ANCHOR_CONTEXT_CHARS = 3
 private const val MAX_ANCHOR_SCORE_CHARS = 64
 private const val MAX_EMPTY_SELECTION_SCAN_LENGTH = 4_096
 private const val EMPTY_SELECTION_SCAN_RADIUS = 1_024
+private const val READINESS_UI_FRAME_MILLIS = 16L
 
 @Suppress("MaxLineLength")
 private class AndroidConversationDictationPlatform(
@@ -1013,6 +1089,23 @@ private class AndroidConversationDictationPlatform(
     override fun recognitionAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
 
     override fun recognitionActivityAvailable(): Boolean = conversationDictationRecognitionActivityIntent().resolveActivity(context.packageManager) != null
+
+    override fun checkRecognitionActivity(callback: (Boolean) -> Unit): ConversationDictationTimeoutHandle {
+        val handler = Handler(Looper.getMainLooper())
+        val cancelled = AtomicBoolean(false)
+        val worker =
+            thread(name = "dictation-readiness", isDaemon = true) {
+                val available = runCatching(::recognitionActivityAvailable).getOrDefault(false)
+                handler.postDelayed(
+                    { if (!cancelled.get()) callback(available) },
+                    READINESS_UI_FRAME_MILLIS,
+                )
+            }
+        return ConversationDictationTimeoutHandle {
+            cancelled.set(true)
+            worker.interrupt()
+        }
+    }
 
     override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession =
         AndroidConversationDictationRecognitionSession(context, listener)

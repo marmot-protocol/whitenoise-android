@@ -128,6 +128,26 @@ class ConversationDictationStripTest {
     }
 
     @Test
+    fun readinessFeedbackAppearsWithoutExpandingCompactComposer() {
+        val fixture = fixture(TextFieldValue("Keep"), deferActivityReadiness = true)
+        fixture.controller.requestProviderActivityStart(ACCOUNT, GROUP, fixture.draft)
+        render(fixture, fontScale = 2f, rtl = true)
+
+        val root = composeRule.onNodeWithTag(ROOT_TAG).getUnclippedBoundsInRoot()
+        val strip = composeRule.onNodeWithTag(COMPOSER_DICTATION_STRIP_TAG).getUnclippedBoundsInRoot()
+        assertEquals(root.left, strip.left)
+        assertEquals(root.right, strip.right)
+        composeRule.onNodeWithContentDescription("Checking speech service…").assertIsDisplayed()
+        val cancel =
+            composeRule
+                .onNodeWithContentDescription("Cancel dictation")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+        assertTrue(cancel.left >= root.left && cancel.right <= root.right)
+        assertTrue(cancel.right - cancel.left >= 48.dp)
+    }
+
+    @Test
     fun compactLargeFontRtlStripDoesNotClipItsActions() {
         val fixture = fixture(TextFieldValue(""))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
@@ -179,8 +199,11 @@ class ConversationDictationStripTest {
         }
     }
 
-    private fun fixture(initial: TextFieldValue): Fixture {
-        val platform = FakePlatform()
+    private fun fixture(
+        initial: TextFieldValue,
+        deferActivityReadiness: Boolean = false,
+    ): Fixture {
+        val platform = FakePlatform(deferActivityReadiness)
         var draft = initial
         var revision = 0L
         val controller =
@@ -224,12 +247,19 @@ class ConversationDictationStripTest {
     }
 
     @Suppress("MaxLineLength")
-    private class FakePlatform : ConversationDictationPlatform {
+    private class FakePlatform(
+        private val deferActivityReadiness: Boolean,
+    ) : ConversationDictationPlatform {
         lateinit var listener: ConversationDictationRecognitionListener
 
         override fun hasRecordAudioPermission() = true
 
         override fun recognitionAvailable() = true
+
+        override fun checkRecognitionActivity(callback: (Boolean) -> Unit): ConversationDictationTimeoutHandle {
+            if (!deferActivityReadiness) callback(true)
+            return ConversationDictationTimeoutHandle {}
+        }
 
         override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
             this.listener = listener
