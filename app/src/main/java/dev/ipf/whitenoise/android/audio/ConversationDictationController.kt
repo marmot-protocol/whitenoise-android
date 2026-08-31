@@ -1144,26 +1144,6 @@ private class AndroidConversationDictationPlatform(
         )
 }
 
-internal fun conversationDictationRecognitionServiceComponent(configuredValue: String?): ComponentName? {
-    val value = configuredValue?.trim()?.takeIf(String::isNotEmpty) ?: return null
-    val separator = value.indexOf('/')
-    if (separator <= 0 || separator == value.lastIndex) return null
-    val packageName = value.substring(0, separator)
-    val configuredClassName = value.substring(separator + 1)
-    val className =
-        if (configuredClassName.startsWith('.')) {
-            packageName + configuredClassName
-        } else {
-            configuredClassName
-        }
-    return ComponentName(packageName, className)
-}
-
-internal fun conversationDictationRecognitionServiceAvailable(
-    selected: ComponentName?,
-    discovered: Collection<ComponentName>,
-): Boolean = selected != null && discovered.any { it == selected }
-
 internal fun conversationDictationRecognitionActivityIntent(): Intent =
     Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
         .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
