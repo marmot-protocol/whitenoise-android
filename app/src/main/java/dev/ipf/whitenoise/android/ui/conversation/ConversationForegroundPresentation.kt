@@ -17,11 +17,13 @@ internal data class ConversationForegroundSettleState(
     val imeTargetBottomPx: Int,
     val bottomChromeMeasured: Boolean,
 ) {
+    /** Whether every measured surface agrees on one coherent viewport geometry. */
     fun isGeometrySettled(): Boolean =
         geometry.viewportHeightPx > 0 &&
             bottomChromeMeasured &&
             geometry.imeBottomPx == imeTargetBottomPx
 
+    /** Whether coherent geometry also matches the IME visibility requested at resume. */
     fun isSettled(expectedImeVisible: Boolean): Boolean =
         isGeometrySettled() &&
             (geometry.imeBottomPx > 0) == expectedImeVisible
@@ -41,6 +43,7 @@ internal suspend fun awaitConversationForegroundPresentation(
     expectedVisibilityTimeoutMillis: Long,
     onSettleDeadlineExpired: () -> Unit = {},
 ): ConversationForegroundSettleState {
+    /** Returns the first pre-draw state accepted by [predicate]. */
     suspend fun awaitState(predicate: ForegroundSettlePredicate): ConversationForegroundSettleState {
         while (true) {
             preDrawSignals.receive()
@@ -70,6 +73,7 @@ internal class ConversationForegroundDrawGate(
     private val isBlocked: () -> Boolean,
     private val onPreDrawSignal: () -> Unit = {},
 ) : ViewTreeObserver.OnPreDrawListener {
+    /** Signals each frame attempt and exposes it only after the live gate opens. */
     override fun onPreDraw(): Boolean {
         onPreDrawSignal()
         return !isBlocked()
