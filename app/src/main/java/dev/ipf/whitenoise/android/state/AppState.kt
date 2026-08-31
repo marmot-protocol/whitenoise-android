@@ -106,7 +106,6 @@ import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.StartupPerformanceDiagnostics
 import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
-import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
@@ -3924,6 +3923,11 @@ class WhiteNoiseAppState private constructor(
         AttachmentDownloadWorker.enqueue(appContext, request, priority)
     }
 
+    /** Clears a completed foreground request without changing its automatic-download policy. */
+    internal fun clearInteractiveAttachmentDownloadIntent(request: AttachmentTransferRequest) {
+        attachmentDownloadIntents.setInteractive(request, interactive = false)
+    }
+
     /**
      * Revokes one attachment's durable download so a cancel survives both a
      * worker retry and process death, and so recreating the card cannot let the
@@ -3968,64 +3972,12 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** True for retained plaintext in L1 or the authenticated encrypted L2 index. */
-    internal suspend fun hasCachedAttachmentAfterHydration(request: AttachmentTransferRequest): Boolean {
-        val cacheKey =
-            mediaCacheKey(
-                request.accountRef,
-                request.groupIdHex,
-                request.messageIdHex,
-                request.attachmentIndex,
-            )
-        val initialMemoryHit =
-            withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) != null }
-        val diskHit =
-            initialMemoryHit ||
-                withContext(Dispatchers.IO) {
-                    diskMediaCache.containsAfterHydration(cacheKey)
-                }
-        return diskHit ||
-            withContext(Dispatchers.Main.immediate) {
-                cachedMediaPlaintext(cacheKey) != null
-            }
-    }
-
-    /** Returns bounded memory or an owner-private file lease that the caller must close. */
-    internal suspend fun downloadAttachmentPlaintextSource(
-        request: AttachmentTransferRequest,
-        reference: MediaAttachmentReferenceFfi,
-        priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
-        persistInteractiveIntent: Boolean = true,
-        onCacheMiss: (suspend () -> ByteArray)? = null,
-    ): AttachmentPlaintext {
-        val cacheKey =
-            request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) }
-        return resolveAttachmentPlaintext(
-            loadMemory = { withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) } },
-            loadDisk = { cancellationCheck, onAcquired ->
-                withContext(Dispatchers.IO) {
-                    val loaded =
-                        diskMediaCache.getIfSmall(cacheKey)?.let(AttachmentPlaintext::Bytes)
-                            ?: diskMediaCache
-                                .materialize(cacheKey, cancellationCheck)
-                                ?.let(AttachmentPlaintext::Lease)
-                    onAcquired(loaded)
-                    loaded
-                }
-            },
-            cacheMemory = { bytes ->
-                withContext(Dispatchers.Main.immediate) { cacheMediaPlaintext(cacheKey, bytes) }
-            },
-            clearInteractiveIntent = {
-                if (priority == AttachmentDownloadPriority.Interactive && persistInteractiveIntent) {
-                    attachmentDownloadIntents.setInteractive(request, interactive = false)
-                }
-            },
-            loadMiss = {
-                onCacheMiss?.invoke()
-                    ?: downloadAttachmentPlaintext(request, reference, priority, persistInteractiveIntent)
-            },
+    internal suspend fun hasCachedAttachmentAfterHydration(request: AttachmentTransferRequest): Boolean =
+        resolveAttachmentCacheAvailability(
+            cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) },
+            memoryContains = { cachedMediaPlaintext(it) != null },
+            diskContains = diskMediaCache::containsAfterHydration,
         )
-    }
 
     /**
      * Shared download/cache implementation for UI controllers and durable work.
