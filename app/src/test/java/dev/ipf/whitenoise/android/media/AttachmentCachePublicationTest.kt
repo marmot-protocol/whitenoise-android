@@ -11,6 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.io.IOException
+import java.io.OutputStream
 import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -21,6 +22,7 @@ import java.util.concurrent.atomic.AtomicReference
 class AttachmentCachePublicationTest {
     private lateinit var dir: File
 
+    /** Resets global test seams and removes every publication artifact. */
     @After
     fun tearDown() {
         AttachmentCachePublication.commitAwaiterForTests = null
@@ -29,6 +31,7 @@ class AttachmentCachePublicationTest {
         if (::dir.isInitialized) dir.deleteRecursively()
     }
 
+    /** Establishes the complete-file and no-orphan baseline for byte publication. */
     @Test
     fun publishWithPermit_publishesCompleteFileWithoutTempArtifacts() {
         dir = Files.createTempDirectory("attachment-cache-io").toFile()
@@ -51,6 +54,88 @@ class AttachmentCachePublicationTest {
         assertTrue("no .tmp file should linger after successful publish", tmpFiles.isEmpty())
     }
 
+    /** Forces the copy fallback and proves closing removes its private source lease. */
+    @Test
+    fun publishSourceAfterLoad_streamsAndClosesPrivateLease() =
+        runBlocking {
+            dir = Files.createTempDirectory("attachment-source").toFile()
+            val sourceFile = File(dir, "source.lease").apply { writeBytes(byteArrayOf(4, 5, 6)) }
+            val copyOnlySource =
+                object : File(sourceFile.absolutePath) {
+                    /** Forces the deterministic copy fallback regardless of host filesystem behavior. */
+                    override fun renameTo(dest: File): Boolean = false
+                }
+            val finalFile = File(dir, "final.apk")
+            val key = AttachmentCachePublication.attachmentKey("msg-source", 0, 1uL)
+
+            val published =
+                AttachmentCachePublication.publishSourceAfterLoad(key, finalFile) {
+                    AttachmentPlaintext.Lease(DiskByteCacheLease(copyOnlySource))
+                }
+
+            assertTrue(published)
+            assertArrayEquals(byteArrayOf(4, 5, 6), finalFile.readBytes())
+            assertFalse("the copy path must close and delete its source lease", sourceFile.exists())
+        }
+
+    /** Proves a wipe between permit capture and source loading rejects publication. */
+    @Test
+    fun publishSourceAfterLoad_rejectsSourceLoadedAcrossWipe() =
+        runBlocking {
+            dir = Files.createTempDirectory("attachment-source-wipe").toFile()
+            val source = File(dir, "source.lease").apply { writeBytes(byteArrayOf(7, 8, 9)) }
+            val finalFile = File(dir, "final.apk")
+            val key = AttachmentCachePublication.attachmentKey("msg-wipe", 0, 1uL)
+
+            val published =
+                AttachmentCachePublication.publishSourceAfterLoad(key, finalFile) {
+                    AttachmentCachePublication.onWipeStarted()
+                    AttachmentCachePublication.onWipeFinished()
+                    AttachmentPlaintext.Lease(DiskByteCacheLease(source))
+                }
+
+            assertFalse(published)
+            assertFalse(finalFile.exists())
+            assertFalse(source.exists())
+        }
+
+    /** Proves a destination preparation failure still releases acquired plaintext. */
+    @Test
+    fun publishSourceAfterLoad_destinationFailureStillClosesLease() =
+        runBlocking {
+            dir = Files.createTempDirectory("attachment-source-failure").toFile()
+            val source = File(dir, "source.lease").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val blockingParent = File(dir, "not-a-directory").apply { writeText("block") }
+            val finalFile = File(blockingParent, "final.apk")
+            val key = AttachmentCachePublication.attachmentKey("msg-failure", 0, 1uL)
+
+            val published =
+                AttachmentCachePublication.publishSourceAfterLoad(key, finalFile) {
+                    AttachmentPlaintext.Lease(DiskByteCacheLease(source))
+                }
+
+            assertFalse(published)
+            assertFalse(source.exists())
+            assertFalse(finalFile.exists())
+        }
+
+    /** Rejects a source whose streamed length disagrees with its declared bound. */
+    @Test
+    fun publishSourceAfterLoad_rejectsChangedSourceLength() =
+        runBlocking {
+            dir = Files.createTempDirectory("attachment-source-length").toFile()
+            val finalFile = File(dir, "final.apk")
+            val key = AttachmentCachePublication.attachmentKey("msg-length", 0, 1uL)
+            val source = ChangedLengthPlaintext(size = 4L, bytes = byteArrayOf(1, 2, 3))
+
+            val published = AttachmentCachePublication.publishSourceAfterLoad(key, finalFile) { source }
+
+            assertFalse(published)
+            assertFalse(finalFile.exists())
+            assertTrue(dir.listFiles()?.none { it.name.endsWith(".tmp") } ?: true)
+        }
+
+    /** Ensures a failed atomic rename cannot claim publication or strand temp files. */
     @Test
     fun publishWithPermit_doesNotPublishWhenRenameFails() {
         dir = Files.createTempDirectory("attachment-cache-io").toFile()
@@ -74,6 +159,17 @@ class AttachmentCachePublicationTest {
         assertTrue("final path must remain the blocking directory", finalFile.isDirectory)
         val tmpFiles = dir.listFiles()?.filter { it.name.endsWith(".tmp") }.orEmpty()
         assertTrue("failed publish must not leave orphan temp files", tmpFiles.isEmpty())
+    }
+
+    private class ChangedLengthPlaintext(
+        override val size: Long,
+        private val bytes: ByteArray,
+    ) : AttachmentPlaintext {
+        /** Writes the intentionally shorter payload used to exercise length validation. */
+        override fun copyTo(output: OutputStream) = output.write(bytes)
+
+        /** This synthetic source holds no external resource. */
+        override fun close() = Unit
     }
 
     @Test

@@ -5,6 +5,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicLong
 
@@ -102,21 +103,34 @@ internal object AttachmentCachePublication {
         }
     }
 
+    /**
+     * Loads and consumes exactly one source. File-backed leases may be moved into the
+     * publication directory; callers must not reuse the source after returning it.
+     */
     @Throws(IOException::class)
-    fun publishWithPermit(
+    suspend fun publishSourceAfterLoad(
         attachmentKey: String,
         finalFile: File,
-        bytes: ByteArray,
+        loadSource: suspend () -> AttachmentPlaintext,
+    ): Boolean {
+        val permit = capturePermit(attachmentKey) ?: return false
+        return withContext(Dispatchers.IO) {
+            loadSource().use { source -> publishSourceWithPermit(attachmentKey, finalFile, source, permit) }
+        }
+    }
+
+    /** Commits one closeable plaintext source behind the captured wipe and invalidation fence. */
+    @Suppress("ReturnCount", "ThrowsCount")
+    private fun publishSourceWithPermit(
+        attachmentKey: String,
+        finalFile: File,
+        source: AttachmentPlaintext,
         permit: Permit,
     ): Boolean {
-        if (bytes.isEmpty()) {
-            throw IOException("refusing to publish an empty attachment cache ${finalFile.name}")
-        }
-        AttachmentPlaintextCache.requireEntryWithinLimit(finalFile, bytes.size.toLong())
-        if (!prepareParentForTempWrite(attachmentKey, finalFile, permit)) {
-            return false
-        }
-        val tmp = writeTempFile(finalFile, bytes) ?: return false
+        if (source.size <= 0L) throw IOException("refusing to publish an empty attachment cache ${finalFile.name}")
+        AttachmentPlaintextCache.requireEntryWithinLimit(finalFile, source.size)
+        if (!prepareParentForTempWrite(attachmentKey, finalFile, permit)) return false
+        val tmp = writeTempFile(finalFile, source) ?: return false
         AttachmentPlaintextCache.protectPublicationFile(finalFile)
         return try {
             commitAwaiterForTests?.invoke()
@@ -152,6 +166,18 @@ internal object AttachmentCachePublication {
             AttachmentPlaintextCache.unprotectPublicationFile(finalFile)
         }
     }
+
+    /** Publishes retained bytes through the same fenced and durable source path as file leases. */
+    @Throws(IOException::class)
+    fun publishWithPermit(
+        attachmentKey: String,
+        finalFile: File,
+        bytes: ByteArray,
+        permit: Permit,
+    ): Boolean =
+        AttachmentPlaintext.Bytes(bytes).use { source ->
+            publishSourceWithPermit(attachmentKey, finalFile, source, permit)
+        }
 
     @Throws(IOException::class)
     suspend fun invalidateAttachmentCache(
@@ -235,24 +261,36 @@ internal object AttachmentCachePublication {
             permit.stripeGeneration == stripe.generation &&
             stripe.invalidatingCount == 0
 
+    /** Exposes deterministic stripe selection for concurrency regression tests. */
     @VisibleForTesting
     internal fun stripeIndex(attachmentKey: String): Int = attachmentKey.hashCode() and (STRIPE_COUNT - 1)
 
+    /** Maps an attachment key to its fixed publication/invalidation coordination stripe. */
     private fun stripeFor(attachmentKey: String): Stripe = stripes[stripeIndex(attachmentKey)]
 
+    /** Moves or streams one source into a durable, publication-protected sibling temp file. */
     private fun writeTempFile(
         finalFile: File,
-        bytes: ByteArray,
+        source: AttachmentPlaintext,
     ): File? {
         val parent = finalFile.parentFile ?: return null
-        val tmp =
-            File(
-                parent,
-                "${finalFile.name}.cache-${tmpCounter.incrementAndGet()}-${System.nanoTime()}.tmp",
-            )
+        val tmp = File(parent, "${finalFile.name}.cache-${tmpCounter.incrementAndGet()}-${System.nanoTime()}.tmp")
+        val expectedSize = source.size
         AttachmentPlaintextCache.protectPublicationFile(tmp)
         return try {
-            tmp.writeBytes(bytes)
+            // Publication protection is path-based (trim exclusion), so it remains
+            // valid when the lease inode is moved onto this already-protected path.
+            if (source is AttachmentPlaintext.Lease && source.file.renameTo(tmp)) {
+                FileOutputStream(tmp, true).use { output -> output.fd.sync() }
+            } else {
+                FileOutputStream(tmp).use { output ->
+                    source.copyTo(output)
+                    output.fd.sync()
+                }
+            }
+            if (tmp.length() != expectedSize) {
+                throw IOException("attachment cache source length changed while publishing ${finalFile.name}")
+            }
             tmp
         } catch (throwable: Throwable) {
             runCatching { tmp.delete() }

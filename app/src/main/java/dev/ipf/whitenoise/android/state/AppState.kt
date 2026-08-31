@@ -1401,6 +1401,7 @@ class WhiteNoiseAppState private constructor(
     private val mediaCacheRevisionState = MutableStateFlow(0L)
     internal val mediaCacheRevision: StateFlow<Long> = mediaCacheRevisionState.asStateFlow()
 
+    /** Publishes one observable revision for an L1 or encrypted-L2 cache mutation. */
     private fun bumpMediaCacheRevision() {
         mediaCacheRevisionState.update { it + 1L }
     }
@@ -1408,7 +1409,7 @@ class WhiteNoiseAppState private constructor(
     private val mediaPlaintextCache =
         dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, ByteArray>(
             maxBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
-            maxEntryBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
+            maxEntryBytes = MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES,
             sizeOf = { it.size },
         )
 
@@ -1495,6 +1496,7 @@ class WhiteNoiseAppState private constructor(
             cacheDir = java.io.File(appContext.cacheDir, "decrypted-media"),
             maxBytes = DISK_MEDIA_CACHE_MAX_BYTES,
             maxEntryBytes = DISK_MEDIA_CACHE_MAX_ENTRY_BYTES,
+            maxInMemoryEntryBytes = MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES,
             keyProvider = AndroidKeystoreDiskByteCacheKeyProvider(),
             onMutation = ::bumpMediaCacheRevision,
         )
@@ -3946,6 +3948,7 @@ class WhiteNoiseAppState private constructor(
                     record.attachmentIndex.toInt() == request.attachmentIndex
             }?.reference
 
+    /** Persists durable work and promotes explicit requests above automatic-download policy. */
     internal fun enqueueAttachmentDownload(
         request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
@@ -3959,6 +3962,11 @@ class WhiteNoiseAppState private constructor(
             return
         }
         AttachmentDownloadWorker.enqueue(appContext, request, priority)
+    }
+
+    /** Clears a completed foreground request without changing its automatic-download policy. */
+    internal fun clearInteractiveAttachmentDownloadIntent(request: AttachmentTransferRequest) {
+        attachmentDownloadIntents.setInteractive(request, interactive = false)
     }
 
     /**
@@ -4005,32 +4013,14 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** True for retained plaintext in L1 or the authenticated encrypted L2 index. */
-    internal suspend fun hasCachedAttachmentAfterHydration(request: AttachmentTransferRequest): Boolean {
-        val cacheKey =
-            mediaCacheKey(
-                request.accountRef,
-                request.groupIdHex,
-                request.messageIdHex,
-                request.attachmentIndex,
-            )
-        val initialMemoryHit =
-            withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) != null }
-        val diskHit =
-            initialMemoryHit ||
-                withContext(Dispatchers.IO) {
-                    diskMediaCache.containsAfterHydration(cacheKey)
-                }
-        return diskHit ||
-            withContext(Dispatchers.Main.immediate) {
-                cachedMediaPlaintext(cacheKey) != null
-            }
-    }
+    internal suspend fun hasCachedAttachmentAfterHydration(request: AttachmentTransferRequest): Boolean =
+        resolveAttachmentCacheAvailability(
+            cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) },
+            memoryContains = { cachedMediaPlaintext(it) != null },
+            diskContains = diskMediaCache::containsAfterHydration,
+        )
 
-    /**
-     * Shared download/cache implementation for UI controllers and durable work.
-     * MDK owns locator failover, validation and decryption; Android owns the
-     * bounded L1 plus Keystore-encrypted L2 publication.
-     */
+    /** Downloads through MDK and publishes plaintext into bounded L1 and encrypted L2 caches. */
     internal suspend fun downloadAttachmentPlaintext(
         request: AttachmentTransferRequest,
         reference: MediaAttachmentReferenceFfi,
@@ -4079,6 +4069,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Downloads once through MDK and publishes non-empty plaintext into both cache tiers. */
     private suspend fun downloadAndCacheAttachment(
         request: AttachmentTransferRequest,
         reference: MediaAttachmentReferenceFfi,
@@ -4105,6 +4096,7 @@ class WhiteNoiseAppState private constructor(
         return result.plaintext
     }
 
+    /** Logs attachment failures without exposing full identifiers in release builds. */
     private fun logAttachmentDownloadFailure(
         request: AttachmentTransferRequest,
         failure: Throwable,
@@ -4120,12 +4112,17 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Ensures durable work consumes large cache hits as leases instead of full heap copies. */
     internal suspend fun downloadAttachmentForDurableWork(
         request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority,
     ): Boolean {
         val reference = resolveAttachmentReference(request) ?: throw AttachmentReferenceNotReadyException()
-        downloadAttachmentPlaintext(request, reference, priority)
+        downloadAttachmentPlaintextSource(
+            request = request,
+            reference = reference,
+            priority = priority,
+        ).use { }
         return hasCachedAttachmentAfterHydration(request)
     }
 
@@ -10083,6 +10080,9 @@ class WhiteNoiseAppState private constructor(
         // 24 MiB cap on decrypted attachment bytes resident in memory —
         // roughly ten 1920px JPEGs. Persists across conversation re-entry.
         private const val MEDIA_PLAINTEXT_CACHE_MAX_BYTES: Long = 24L * 1024L * 1024L
+
+        // Admit ordinary photos while keeping large documents on the file-lease path.
+        private const val MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES: Long = 8L * 1024L * 1024L
 
         // ~48 MiB of decoded thumbnails (sampled to <=1280px). Enough to keep
         // visible bubbles spinner-free; bounded so it can't grow unbounded.

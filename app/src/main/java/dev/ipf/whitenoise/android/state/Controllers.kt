@@ -9255,34 +9255,6 @@ class ConversationController(
         throw AttachmentReferenceNotReadyException()
     }
 
-    internal fun attachmentTransferKey(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ): String = "$messageIdHex#$attachmentIndex"
-
-    /**
-     * Drop decrypted bytes for one attachment after a decoder/playback failure.
-     * A corrupt cached plaintext hit must fall back to the normal Download/Retry
-     * path rather than recreating the same bad local media file forever.
-     */
-    suspend fun evictCachedAttachment(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ) {
-        val account = conversationAccountRef ?: return
-        val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
-        withContext(Dispatchers.Main.immediate) {
-            appState.removeMediaMemoryCacheEntry(cacheKey)
-        }
-        withContext(Dispatchers.IO) { appState.diskMediaCache.remove(cacheKey) }
-    }
-
-    /**
-     * Fetch and decrypt a Blossom-stored attachment. Backed by the app-level
-     * LRU ([WhiteNoiseAppState.cachedMediaPlaintext], keyed via [mediaCacheKey])
-     * so re-opening a conversation doesn't re-download media already fetched
-     * this session. Throws on download/decrypt failure — the caller surfaces it.
-     */
     internal suspend fun downloadAttachment(
         messageIdHex: String,
         attachmentIndex: Int,

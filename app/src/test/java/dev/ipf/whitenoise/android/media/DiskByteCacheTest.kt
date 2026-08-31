@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.media
 
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -9,16 +10,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.lang.reflect.Modifier
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
+import java.nio.file.attribute.PosixFilePermission
 import java.security.ProviderException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
+import kotlin.coroutines.cancellation.CancellationException
 
 class DiskByteCacheTest {
     private lateinit var dir: File
@@ -124,6 +129,7 @@ class DiskByteCacheTest {
         assertTrue(reopened.get("tiny")!!.contentEquals(payload))
     }
 
+    /** Rejects pre-envelope data even when its first byte resembles a supported version. */
     @Test
     fun malformedPreEnvelopeEntry_withVersionLikeIvPrefix_isRejectedDuringHydration() {
         val file = File(dir, sha256Hex("legacy") + ".enc")
@@ -133,6 +139,22 @@ class DiskByteCacheTest {
 
         assertEquals(0, reopened.size())
         assertFalse(file.exists())
+    }
+
+    /** Confirms a lease cleanup failure is diagnostic-only after publication completes. */
+    @Test
+    fun leaseCloseDoesNotMaskCompletedPublicationWhenDeletionFails() {
+        val backing = File(dir, "undeletable.lease").apply { writeBytes(byteArrayOf(1)) }
+        val undeletable =
+            object : File(backing.absolutePath) {
+                /** Simulates a filesystem cleanup failure without replacing the published result. */
+                override fun delete(): Boolean = false
+            }
+
+        var diagnostic: String? = null
+        DiskByteCacheLease(undeletable) { diagnostic = it }.close()
+        assertTrue(backing.exists())
+        assertTrue(diagnostic?.contains("failed to delete plaintext cache lease") == true)
     }
 
     @Test
@@ -252,6 +274,7 @@ class DiskByteCacheTest {
         assertTrue(dir.listFiles()?.none { it.name.endsWith(".bin") } ?: true)
     }
 
+    /** Confirms entries larger than the configured plaintext bound are never persisted. */
     @Test
     fun oversizedEntry_isNotPersistedOrReadBack() {
         val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024, maxEntryBytes = 64)
@@ -263,6 +286,7 @@ class DiskByteCacheTest {
         assertTrue(dir.listFiles()?.none { it.name.endsWith(".enc") } ?: true)
     }
 
+    /** Ensures a stricter restarted cache drops an envelope before attempting plaintext reads. */
     @Test
     fun rehydrateDropsOversizedEntryBeforeReadBytes() {
         val writer = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024, maxEntryBytes = 128)
@@ -272,6 +296,341 @@ class DiskByteCacheTest {
         assertNull(tighter.get("large"))
         assertEquals(0L, tighter.residentBytes())
         assertTrue(dir.listFiles()?.none { it.name.endsWith(".enc") } ?: true)
+    }
+
+    /** Verifies large entries use chunk authentication and materialize without whole-result allocation. */
+    @Test
+    fun largeEntry_usesChunkAuthenticatedEnvelopeAndRoundTrips() {
+        val payload = ByteArray(1024 * 1024 + 37) { index -> (index * 31).toByte() }
+        val nearLimit = payload.size.toLong() + 1L
+        val cache =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = nearLimit,
+                availablePlaintextAllocationBytes = { Long.MAX_VALUE },
+            )
+
+        cache.put("large", payload)
+
+        val envelope = File(dir, sha256Hex("large") + ".enc")
+        assertEquals("large entries must use the bounded chunked format", 3, envelope.readBytes()[4].toInt())
+        val reopened =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = nearLimit,
+                availablePlaintextAllocationBytes = { Long.MAX_VALUE },
+                plaintextAllocator = {
+                    throw AssertionError("materialization must not allocate a whole plaintext result")
+                },
+            )
+        assertNull("large entries must never allocate through getIfSmall()", reopened.getIfSmall("large"))
+        reopened.materialize("large").use { lease ->
+            assertNotNull(lease)
+            assertEquals(
+                setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE),
+                Files.getPosixFilePermissions(lease!!.file.toPath()),
+            )
+            assertTrue(payload.contentEquals(lease.file.readBytes()))
+        }
+    }
+
+    /** Preserves compatibility for callers whose decoding API still requires a byte array. */
+    @Test
+    fun get_largeEntryStillSupportsByteOrientedCallers() {
+        val payload = ByteArray(1024 * 1024 + 37) { 6 }
+        largeCache().put("large", payload)
+        val reopened = largeCache()
+
+        assertTrue(payload.contentEquals(reopened.get("large")))
+    }
+
+    /** Rejects tampered chunked ciphertext and removes every partial plaintext artifact. */
+    @Test
+    fun materialize_rejectsTamperedLargeEntryAndDeletesPartialPlaintext() {
+        val payload = ByteArray(1024 * 1024 + 37) { 7 }
+        val cache = largeCache()
+        cache.put("large", payload)
+        val envelope = File(dir, sha256Hex("large") + ".enc")
+        val bytes = envelope.readBytes()
+        bytes[bytes.lastIndex] = (bytes.last().toInt() xor 0x01).toByte()
+        envelope.writeBytes(bytes)
+
+        assertNull(cache.materialize("large"))
+        assertFalse(envelope.exists())
+        assertTrue(dir.listFiles()?.none { it.name.contains("lease") } ?: true)
+    }
+
+    /** Drops stale index accounting when the encrypted backing file disappeared. */
+    @Test
+    fun materialize_dropsStaleIndexWhenBackingFileIsMissing() {
+        val cache = largeCache()
+        cache.put("large", ByteArray(1024 * 1024 + 37) { 3 })
+        File(dir, sha256Hex("large") + ".enc").delete()
+
+        assertNull(cache.materialize("large"))
+        assertFalse(cache.contains("large"))
+        assertEquals(0L, cache.residentBytes())
+    }
+
+    /** Prevents plaintext completed before a concurrent clear from escaping its generation. */
+    @Test
+    fun materialize_generationFenceRejectsPlaintextCompletedAcrossClear() {
+        val plaintextCompleted = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val cache =
+            largeCache(
+                afterLeasePlaintextWritten = {
+                    plaintextCompleted.countDown()
+                    release.await(5, TimeUnit.SECONDS)
+                },
+            )
+        cache.put("large", ByteArray(1024 * 1024 + 37) { 4 })
+        var lease: DiskByteCacheLease? = null
+        val reader = Thread { lease = cache.materialize("large") }
+        reader.start()
+        assertTrue(plaintextCompleted.await(5, TimeUnit.SECONDS))
+        cache.clear()
+        release.countDown()
+        reader.join(5_000)
+
+        assertNull(lease)
+        assertTrue(dir.listFiles()?.none { it.name.contains("lease") } ?: true)
+    }
+
+    /** Ensures cancellation removes partial plaintext while retaining valid ciphertext. */
+    @Test
+    fun materialize_cancellationDeletesPartialPlaintext() {
+        val cache = largeCache()
+        cache.put("large", ByteArray(1024 * 1024 + 37) { 5 })
+        var checks = 0
+
+        try {
+            cache.materialize("large") {
+                checks += 1
+                if (checks >= 3) throw CancellationException("test cancellation")
+            }
+            throw AssertionError("expected cancellation")
+        } catch (_: CancellationException) {
+            // Expected.
+        }
+
+        assertTrue(dir.listFiles()?.none { it.name.contains("lease") } ?: true)
+        assertTrue(cache.contains("large"))
+    }
+
+    /** Treats materialization allocation failure as a recoverable, non-destructive miss. */
+    @Test
+    fun materialize_allocationFailureIsRecoverableAndPreservesEncryptedEnvelope() {
+        val payload = ByteArray(1024 * 1024 + 37) { 5 }
+        val cache =
+            largeCache(
+                afterLeasePlaintextWritten = {
+                    throw OutOfMemoryError("simulated allocation failure")
+                },
+            )
+        cache.put("large", payload)
+        val envelope = File(dir, sha256Hex("large") + ".enc")
+
+        assertNull(cache.materialize("large"))
+
+        assertTrue(envelope.isFile)
+        assertTrue(cache.contains("large"))
+        assertTrue(dir.listFiles()?.none { it.name.contains("lease") } ?: true)
+    }
+
+    /** Verifies sign-out clear deletes plaintext leases that were already handed out. */
+    @Test
+    fun clearDeletesAlreadyIssuedPlaintextLease() {
+        val cache = largeCache()
+        cache.put("large", ByteArray(1024 * 1024 + 37) { 8 })
+        val lease = requireNotNull(cache.materialize("large"))
+        assertTrue(lease.file.isFile)
+
+        cache.clear()
+
+        assertFalse(lease.file.exists())
+        lease.close()
+    }
+
+    /** Verifies restart hydration sweeps an orphaned owner-private plaintext lease. */
+    @Test
+    fun hydrationSweepsOrphanedPlaintextLeaseAfterProcessRestart() {
+        val cache = largeCache()
+        cache.put("large", ByteArray(1024 * 1024 + 37) { 9 })
+        val lease = requireNotNull(cache.materialize("large"))
+        assertTrue(lease.file.isFile)
+
+        largeCache().size()
+
+        assertFalse(lease.file.exists())
+        lease.close()
+    }
+
+    /** Builds a cache configured to exercise the chunked-entry and lease paths. */
+    private fun largeCache(afterLeasePlaintextWritten: () -> Unit = {}): DiskByteCache =
+        DiskByteCache(
+            dir,
+            keyProvider = keyProvider,
+            maxBytes = 2L * 1024L * 1024L,
+            maxEntryBytes = 2L * 1024L * 1024L,
+            availablePlaintextAllocationBytes = { Long.MAX_VALUE },
+            afterLeasePlaintextWritten = afterLeasePlaintextWritten,
+        )
+
+    /** Confirms per-chunk authentication failure evicts the poisoned envelope. */
+    @Test
+    fun chunkAuthenticationFailure_isRejectedAndEvicted() {
+        val payload = ByteArray(1024 * 1024 + 37) { 7 }
+        val writer =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = 2L * 1024L * 1024L,
+            )
+        writer.put("large", payload)
+        val envelope = File(dir, sha256Hex("large") + ".enc")
+        val bytes = envelope.readBytes()
+        bytes[bytes.lastIndex] = (bytes.last().toInt() xor 0x01).toByte()
+        envelope.writeBytes(bytes)
+        val reopened =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = 2L * 1024L * 1024L,
+                availablePlaintextAllocationBytes = { Long.MAX_VALUE },
+            )
+
+        assertNull(reopened.materialize("large"))
+        assertFalse(envelope.exists())
+    }
+
+    /** Confirms legacy authentication completes before any plaintext lease is published. */
+    @Test
+    fun legacyAuthenticationFailure_isRejectedBeforePlaintextPublication() {
+        val payload = ByteArray(512 * 1024) { 4 }
+        DiskByteCache(
+            dir,
+            keyProvider = keyProvider,
+            maxBytes = 2L * 1024L * 1024L,
+            maxEntryBytes = 2L * 1024L * 1024L,
+        ).put("legacy", payload)
+        val envelope = File(dir, sha256Hex("legacy") + ".enc")
+        val bytes = envelope.readBytes()
+        bytes[bytes.lastIndex] = (bytes.last().toInt() xor 0x01).toByte()
+        envelope.writeBytes(bytes)
+        val reopened = largeCache()
+
+        assertNull(reopened.materialize("legacy"))
+        assertFalse(envelope.exists())
+        assertTrue(dir.listFiles()?.none { it.name.contains("lease") } ?: true)
+    }
+
+    /** Treats an oversized legacy envelope as a non-destructive cache miss. */
+    @Test
+    fun oversizedLegacyEnvelope_isRecoverableNonDestructiveMiss() {
+        val payload = ByteArray(1024 * 1024 + 37) { 2 }
+        val envelope = writeLegacyEnvelope("legacy-large", payload)
+        val reopened = largeCache()
+
+        assertNull(reopened.get("legacy-large"))
+        assertTrue(envelope.isFile)
+        assertNull(reopened.materialize("legacy-large"))
+        assertTrue(envelope.isFile)
+    }
+
+    /** Applies the live heap budget to legacy reads without deleting valid ciphertext. */
+    @Test
+    fun legacyReadsHonorHeapBudgetWithoutEviction() {
+        val payload = ByteArray(512 * 1024) { 5 }
+        val envelope = writeLegacyEnvelope("legacy-budget", payload)
+        val reopened =
+            DiskByteCache(
+                cacheDir = dir,
+                keyProvider = keyProvider,
+                maxBytes = 128L * 1024L * 1024L,
+                maxEntryBytes = 64L * 1024L * 1024L,
+                // Legacy ciphertext and plaintext coexist during authenticated decryption.
+                availablePlaintextAllocationBytes = { payload.size.toLong() },
+            )
+
+        assertNull(reopened.get("legacy-budget"))
+        assertTrue(envelope.isFile)
+        assertNull(reopened.materialize("legacy-budget"))
+        assertTrue(envelope.isFile)
+    }
+
+    /** Keeps small entries usable by reserving headroom proportionally on constrained heaps. */
+    @Test
+    fun proportionalReserve_preservesTinyEntriesUnderLowHeadroom() {
+        val budget = plaintextAllocationBudget(256L * 1024L, 256L * 1024L * 1024L)
+        val cache =
+            DiskByteCache(
+                cacheDir = dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = 2L * 1024L * 1024L,
+                availablePlaintextAllocationBytes = { budget },
+            )
+        val payload = ByteArray(64 * 1024) { 9 }
+
+        cache.put("tiny-pending-share", payload)
+
+        assertEquals(192L * 1024L, budget)
+        assertArrayEquals(payload, cache.get("tiny-pending-share"))
+    }
+
+    /** Leaves a valid entry intact when current heap headroom cannot hold its plaintext. */
+    @Test
+    fun insufficientHeapHeadroom_isRecoverableMissWithoutEvictingValidEntry() {
+        val payload = ByteArray(1024 * 1024 + 1) { 5 }
+        DiskByteCache(
+            dir,
+            keyProvider = keyProvider,
+            maxBytes = 2L * 1024L * 1024L,
+            maxEntryBytes = 2L * 1024L * 1024L,
+        ).put("large", payload)
+        val constrained =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = 2L * 1024L * 1024L,
+                availablePlaintextAllocationBytes = { payload.size.toLong() - 1L },
+            )
+
+        assertNull(constrained.get("large"))
+        assertTrue(constrained.contains("large"))
+        assertTrue(File(dir, sha256Hex("large") + ".enc").exists())
+    }
+
+    /** Converts an allocator OOM into a recoverable cache miss without envelope eviction. */
+    @Test
+    fun plaintextAllocationFailure_isRecoverableMiss() {
+        val payload = ByteArray(1024 * 1024 + 1) { 9 }
+        DiskByteCache(
+            dir,
+            keyProvider = keyProvider,
+            maxBytes = 2L * 1024L * 1024L,
+            maxEntryBytes = 2L * 1024L * 1024L,
+        ).put("large", payload)
+        val constrained =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 2L * 1024L * 1024L,
+                maxEntryBytes = 2L * 1024L * 1024L,
+                availablePlaintextAllocationBytes = { Long.MAX_VALUE },
+                plaintextAllocator = { throw OutOfMemoryError("injected") },
+            )
+
+        assertNull(constrained.get("large"))
+        assertTrue(constrained.contains("large"))
     }
 
     @Test
@@ -1450,6 +1809,7 @@ class DiskByteCacheTest {
         assertNotNull(cache.get("k"))
     }
 
+    /** Guards that distinct privacy-sensitive cache keys hash to distinct disk entries. */
     @Test
     fun differentKeys_collideToDifferentFiles() {
         // Defense against hash collision oversight — two keys must map to
@@ -1460,6 +1820,51 @@ class DiskByteCacheTest {
         cache.put("bob|group|msg-1", ByteArray(30))
         assertEquals(2, cache.size())
         assertEquals(174L, cache.residentBytes())
+    }
+
+    /** Writes a valid legacy envelope to exercise backward-compatible read safeguards. */
+    private fun writeLegacyEnvelope(
+        key: String,
+        plaintext: ByteArray,
+    ): File {
+        val cache = largeCache()
+        val fileName = sha256Hex(key) + ".enc"
+        val header =
+            DiskByteCache::class.java
+                .getDeclaredMethod("envelopeHeaderBytes", String::class.java, Int::class.javaPrimitiveType)
+                .apply { isAccessible = true }
+                .invoke(cache, null, 1) as ByteArray
+        val metadataAad =
+            DiskByteCache::class.java
+                .getDeclaredMethod("buildMetadataAad", String::class.java, ByteArray::class.java)
+                .apply { isAccessible = true }
+                .invoke(cache, fileName, header) as ByteArray
+        val metadataCipher = Cipher.getInstance("AES/GCM/NoPadding")
+        metadataCipher.init(Cipher.ENCRYPT_MODE, keyProvider.getOrCreate())
+        metadataCipher.updateAAD(metadataAad)
+        val metadataTag = metadataCipher.doFinal()
+        val payloadAad =
+            DiskByteCache::class.java
+                .getDeclaredMethod(
+                    "buildPayloadAad",
+                    String::class.java,
+                    ByteArray::class.java,
+                    ByteArray::class.java,
+                    ByteArray::class.java,
+                ).apply { isAccessible = true }
+                .invoke(cache, fileName, header, metadataCipher.iv, metadataTag) as ByteArray
+        val payloadCipher = Cipher.getInstance("AES/GCM/NoPadding")
+        payloadCipher.init(Cipher.ENCRYPT_MODE, keyProvider.getOrCreate())
+        payloadCipher.updateAAD(payloadAad)
+        val envelope = File(dir, fileName)
+        FileOutputStream(envelope).use { output ->
+            output.write(header)
+            output.write(metadataCipher.iv)
+            output.write(metadataTag)
+            output.write(payloadCipher.iv)
+            output.write(payloadCipher.doFinal(plaintext))
+        }
+        return envelope
     }
 
     private fun sha256Hex(value: String): String {

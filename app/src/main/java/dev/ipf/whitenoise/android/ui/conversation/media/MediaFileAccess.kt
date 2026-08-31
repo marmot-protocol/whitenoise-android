@@ -3,7 +3,10 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.content.Context
 import android.util.Log
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -21,19 +24,30 @@ internal suspend fun materializeMediaFile(
 ): File? {
     val retained = retainedMediaFileBytes(controller, messageIdHex, attachmentIndex, mine)
     return runCatchingCancellable {
-        materializeDocumentAttachment(
+        materializeDocumentAttachmentSource(
             context = context,
             messageIdHex = messageIdHex,
             attachmentIndex = attachmentIndex,
             reference = reference,
-            resolveBytes = {
-                controller
-                    .requestAttachmentTransfer(
-                        messageIdHex = messageIdHex,
-                        attachmentIndex = attachmentIndex,
-                        reference = reference,
-                        retainedPlaintext = retained,
-                    ).await()
+            resolveSource = {
+                if (retained != null) {
+                    AttachmentPlaintext.Bytes(
+                        controller
+                            .requestAttachmentTransfer(
+                                messageIdHex = messageIdHex,
+                                attachmentIndex = attachmentIndex,
+                                reference = reference,
+                                retainedPlaintext = retained,
+                            ).await(),
+                    )
+                } else {
+                    controller.downloadAttachmentSource(
+                        messageIdHex,
+                        attachmentIndex,
+                        reference,
+                        AttachmentDownloadPriority.Interactive,
+                    )
+                }
             },
         )
     }.onFailure {

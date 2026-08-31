@@ -50,6 +50,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
@@ -59,6 +60,8 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.downloadAttachmentSource
+import dev.ipf.whitenoise.android.state.evictCachedAttachment
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
@@ -708,8 +711,10 @@ internal fun MediaVideoBubble(
     }
 }
 
-/** Decrypted video on disk under cacheDir/video_attachments; reuses the
- *  age-based janitor that already sweeps shared_media / voice_attachments. */
+/**
+ * Publishes supplied video bytes through the legacy test seam into the
+ * age-swept `video_attachments` cache.
+ */
 @VisibleForTesting
 internal suspend fun materializeVideoAttachment(
     context: android.content.Context,
@@ -737,6 +742,7 @@ internal suspend fun materializeVideoAttachment(
     }
 }
 
+/** Resolves retained or downloaded video plaintext into the stable playback cache. */
 internal suspend fun materializeVideoAttachment(
     context: android.content.Context,
     controller: ConversationController,
@@ -750,12 +756,12 @@ internal suspend fun materializeVideoAttachment(
         authoritativeVisualMediaReference(reference, mine) {
             controller.authoritativeAttachmentReference(messageIdHex, attachmentIndex, reference)
         }
-    return materializeVideoAttachment(
+    return materializeVideoAttachmentSource(
         context = context,
         messageIdHex = messageIdHex,
         attachmentIndex = attachmentIndex,
         reference = resolvedReference,
-        resolveBytes = {
+        resolveSource = {
             val retained =
                 if (mine) {
                     controller
@@ -765,9 +771,36 @@ internal suspend fun materializeVideoAttachment(
                 } else {
                     null
                 }
-            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, resolvedReference, priority)
+            retained?.let(AttachmentPlaintext::Bytes)
+                ?: controller.downloadAttachmentSource(
+                    messageIdHex,
+                    attachmentIndex,
+                    resolvedReference,
+                    priority,
+                )
         },
     )
+}
+
+/** Publishes a closeable video source and reuses a complete stable playback file. */
+private suspend fun materializeVideoAttachmentSource(
+    context: android.content.Context,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    resolveSource: suspend () -> AttachmentPlaintext,
+): java.io.File {
+    val file = videoAttachmentCacheFile(context, messageIdHex, attachmentIndex, reference)
+    val attachmentKey = AttachmentCachePublication.attachmentKey(messageIdHex, attachmentIndex, reference.sourceEpoch)
+    return videoMaterializations.run(file.absolutePath) {
+        withContext(Dispatchers.IO) {
+            file.takeIf { it.isFile && it.length() > 0L }?.also(AttachmentPlaintextCache::touch)
+        } ?: run {
+            val published = AttachmentCachePublication.publishSourceAfterLoad(attachmentKey, file, resolveSource)
+            if (!published) throw IOException("attachment cache publication aborted for ${file.name}")
+            file
+        }
+    }
 }
 
 private suspend fun materializeVideoAttachmentOnce(

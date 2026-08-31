@@ -37,7 +37,7 @@ class MainThreadConfinementCoverageTest {
 
     @Test
     fun controllerMediaPathsUseTheGuardedAppStateBoundary() {
-        val source = controllersSource().readText()
+        val source = controllerSources()
 
         assertFalse(
             "controllers must not bypass the guarded plaintext LRU boundary",
@@ -79,7 +79,7 @@ class MainThreadConfinementCoverageTest {
 
     @Test
     fun mixedMediaPathsConfineL1ToMainAndKeepSlowWorkOffMain() {
-        val source = controllersSource().readText()
+        val source = controllerSources()
 
         listOf("evictExpiredMediaCaches", "evictCachedAttachment").forEach { functionName ->
             val body = source.functionSection(functionName)
@@ -166,13 +166,19 @@ class MainThreadConfinementCoverageTest {
         assertTrue("$functionName must assert before $mutation", guardIndex < mutationIndex)
     }
 
+    /** Extracts a named member or extension function body from Kotlin source text. */
     private fun String.functionSection(functionName: String): String {
         val declaration =
-            Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
+            Regex("""\bfun\s+(?:\w+\.)?${Regex.escape(functionName)}\s*\(""")
                 .find(this)
                 ?: error("Missing function $functionName")
+        val nextFunction =
+            Regex(
+                """\n\s*(?:(?:private|internal|public|protected)\s+)?""" +
+                    """(?:(?:suspend|inline|operator|override)\s+)*fun\s+(?:\w+\.)?\w+\s*\(""",
+            )
         val nextDeclaration =
-            Regex("""\n\s*(?:(?:private|internal|public|protected)\s+)?(?:(?:suspend|inline|operator|override)\s+)*fun\s+\w+\s*\(""")
+            nextFunction
                 .find(this, declaration.range.last + 1)
                 ?.range
                 ?.first
@@ -182,7 +188,10 @@ class MainThreadConfinementCoverageTest {
 
     private fun appStateSource(): File = sourceFile("AppState.kt")
 
-    private fun controllersSource(): File = sourceFile("Controllers.kt")
+    /** Reads every source file that contributes attachment-cache behavior to conversation controllers. */
+    private fun controllerSources(): String =
+        listOf("Controllers.kt", "AttachmentControllerCache.kt")
+            .joinToString(separator = "\n") { sourceFile(it).readText() }
 
     private fun sourceFile(name: String): File =
         listOf(
