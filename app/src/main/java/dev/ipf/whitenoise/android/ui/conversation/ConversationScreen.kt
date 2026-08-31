@@ -172,6 +172,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDia
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInfoSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
+import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.nostr.publicEventCardRelays
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
@@ -661,6 +662,7 @@ internal fun ConversationScreen(
                 initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
             )
         }
+    val ttsQuickTransportViewportLock = rememberTtsQuickTransportViewportLock(listState)
     var unreadJumpState by
         remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
             mutableStateOf(ConversationUnreadJumpState())
@@ -3401,6 +3403,7 @@ internal fun ConversationScreen(
                                     mentionCandidates = mentionPicker.candidates,
                                     mentionPickerEnabled = mentionPicker.enabled,
                                     collapseLongMessages = collapseLongMessages,
+                                    ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
                                     ttsSentenceLayoutSink = ttsFollowHandle.sentenceLayouts,
                                     onTtsSentenceSeek = { state ->
                                         ttsFollowHandle.onSentenceSeek(

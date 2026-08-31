@@ -47,6 +47,36 @@ class TtsQuickTransportWiringCoverageTest {
         assertTrue("the two-finger detector must come before the long press", gesture < longPress)
     }
 
+    /** The screen owns one list lock and passes it through every bubble to the detector. */
+    @Test
+    fun theConversationViewportLockReachesEveryMessageRow() {
+        val screen = source("ui/conversation/ConversationScreen.kt")
+        val timelineRow = source("ui/conversation/TimelineRow.kt")
+        val highlightedRow = source("ui/conversation/TimelineRowTtsHighlight.kt")
+        val bubble = source("ui/conversation/messages/MessageBubble.kt")
+
+        assertTrue(
+            "the LazyColumn owner must remember the lock against its list state",
+            "rememberTtsQuickTransportViewportLock(listState)" in screen,
+        )
+        assertTrue(
+            "the conversation must pass its lock into each timeline row",
+            "ttsQuickTransportViewportLock = ttsQuickTransportViewportLock" in screen,
+        )
+        assertTrue(
+            "the timeline row must preserve the conversation-owned lock",
+            "ttsQuickTransportViewportLock = ttsQuickTransportViewportLock" in timelineRow,
+        )
+        assertTrue(
+            "the TTS-highlight wrapper must preserve the same lock",
+            "ttsQuickTransportViewportLock = ttsQuickTransportViewportLock" in highlightedRow,
+        )
+        assertTrue(
+            "the message row must hand the lock to the two-finger detector",
+            "viewportLock = ttsQuickTransportViewportLock" in bubble,
+        )
+    }
+
     @Test
     fun eachResolvedActionRoutesToItsOwnTransportCall() {
         val body =

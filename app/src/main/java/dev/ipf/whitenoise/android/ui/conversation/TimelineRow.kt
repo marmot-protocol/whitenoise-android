@@ -24,9 +24,11 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import java.util.Locale
 
+/** Renders one projected timeline item and delegates bubble gestures to the conversation owner. */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun TimelineRow(
@@ -70,6 +72,7 @@ internal fun TimelineRow(
     mentionCandidates: List<MentionComposer.Candidate>,
     mentionPickerEnabled: Boolean,
     collapseLongMessages: Boolean,
+    ttsQuickTransportViewportLock: TtsQuickTransportViewportLock? = null,
     ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
     onTtsSentenceSeek: (TtsState) -> Unit = {},
 ) {
@@ -234,6 +237,7 @@ internal fun TimelineRow(
                     showSenderAvatar = senderDecoration.showAvatar,
                     collapseLongMessages = collapseLongMessages,
                     readOnly = controller.group.pendingConfirmation,
+                    ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
                     ttsSentenceLayoutSink = ttsSentenceLayoutSink,
                     onTtsSentenceSeek = onTtsSentenceSeek,
                 )

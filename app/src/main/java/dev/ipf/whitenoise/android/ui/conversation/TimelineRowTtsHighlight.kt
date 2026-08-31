@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudProgress
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -62,6 +63,7 @@ internal data class TimelineRowTtsHighlightState(
     val followTarget: ConversationTtsFollowTarget? = null,
 )
 
+/** Observes row-scoped TTS state and renders the bubble with conversation gesture arbitration. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 internal fun TimelineRowMessageBubble(
@@ -102,6 +104,7 @@ internal fun TimelineRowMessageBubble(
     showSenderAvatar: Boolean,
     collapseLongMessages: Boolean,
     readOnly: Boolean,
+    ttsQuickTransportViewportLock: TtsQuickTransportViewportLock? = null,
     ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
     onTtsSentenceSeek: (TtsState) -> Unit = {},
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
@@ -161,6 +164,7 @@ internal fun TimelineRowMessageBubble(
         ttsHighlightPassage = ttsHighlightState.passage,
         ttsReadAloudProgress = ttsHighlightState.progress,
         ttsFollowTarget = ttsHighlightState.followTarget,
+        ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
         ttsSentenceLayoutSink = ttsSentenceLayoutSink,
         onTtsSentenceSeek = onTtsSentenceSeek,
         ttsRowInstance = ttsRowInstance,
