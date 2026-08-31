@@ -747,59 +747,6 @@ internal class NotificationJobSlot {
     }
 }
 
-internal class InFlightMediaUploads {
-    private val lock = Any()
-    private val jobs = mutableMapOf<String, Job>()
-
-    fun track(
-        conversationKey: String,
-        uploadKey: String,
-        job: Job,
-    ) {
-        val key = registryKey(conversationKey, uploadKey)
-        synchronized(lock) {
-            jobs[key] = job
-        }
-        job.invokeOnCompletion {
-            synchronized(lock) {
-                if (jobs[key] === job) {
-                    jobs.remove(key)
-                }
-            }
-        }
-    }
-
-    fun untrack(
-        conversationKey: String,
-        uploadKey: String,
-        job: Job,
-    ) {
-        val key = registryKey(conversationKey, uploadKey)
-        synchronized(lock) {
-            if (jobs[key] === job) {
-                jobs.remove(key)
-            }
-        }
-    }
-
-    fun cancelAll(): Int {
-        val active =
-            synchronized(lock) {
-                jobs
-                    .values
-                    .toSet()
-                    .also { jobs.clear() }
-            }
-        active.forEach { it.cancel(CancellationException("media upload cancelled by account switch")) }
-        return active.size
-    }
-
-    private fun registryKey(
-        conversationKey: String,
-        uploadKey: String,
-    ): String = "$conversationKey\u0000$uploadKey"
-}
-
 /** Inline account profiles that the chat-list top bar can render at once. */
 internal const val MAX_TOP_BAR_OTHER_ACCOUNTS = 3
 
