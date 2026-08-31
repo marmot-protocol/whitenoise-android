@@ -14,11 +14,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AgentStreamSubscription
 import dev.ipf.marmotkit.AgentStreamUpdateFfi
+import dev.ipf.marmotkit.AppBlobEndpointFfi
+import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
@@ -28,6 +31,7 @@ import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ChatsSubscription
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
@@ -83,7 +87,6 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
-import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.GroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.MediaPipeline
@@ -540,6 +543,56 @@ internal fun nextTimelineOrder(
     published: Sequence<ULong>,
     pending: Sequence<ULong>,
 ): ULong = (published + pending).maxOrNull()?.plus(1uL) ?: 1uL
+
+internal fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
+    AppGroupRecordFfi(
+        groupIdHex = row.groupIdHex,
+        protocolProfile = AppProtocolProfileFfi.LEGACY,
+        endpoint = "",
+        profilePresent = false,
+        name = row.groupName,
+        description = "",
+        admins = emptyList(),
+        relays = emptyList(),
+        nostrGroupIdHex = "",
+        avatarUrl = row.avatarUrl,
+        avatarDim = null,
+        avatarThumbhash = null,
+        imageHashHex = row.avatar?.imageHashHex,
+        encryptedMedia = defaultEncryptedMediaComponent(),
+        archived = row.archived,
+        pendingConfirmation = row.pendingConfirmation,
+        unrecoverable = false,
+        selfMembership = row.selfMembership,
+        welcomerAccountIdHex = null,
+        viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        // The row projects the authoritative lifecycle; a cold open of a
+        // disbanding/disbanded chat must not flash an active composer while
+        // the full group record is still loading.
+        disbanding = row.disbanding,
+        disbanded = row.lifecycleState == GroupLifecycleStateFfi.DISBANDED,
+        disbandRequest = row.disbandRequest,
+    )
+
+private fun defaultEncryptedMediaComponent(): AppGroupEncryptedMediaComponentFfi =
+    AppGroupEncryptedMediaComponentFfi(
+        componentId = 0x8008u,
+        component = "marmot.group.encrypted-media.v1",
+        required = true,
+        version = EncryptedMediaVersionFfi.V1,
+        mediaFormat = "encrypted-media-v1",
+        allowedLocatorKinds = listOf("blossom-v1"),
+        defaultBlobEndpoints =
+            listOf(
+                AppBlobEndpointFfi(
+                    locatorKind = "blossom-v1",
+                    baseUrl = "https://blossom.primal.net",
+                ),
+            ),
+    )
 
 data class GroupMemberSnapshot(
     val members: List<AppGroupMemberRecordFfi>,
@@ -9200,57 +9253,6 @@ class ConversationController(
             }
         }
         throw AttachmentReferenceNotReadyException()
-    }
-
-    internal fun attachmentTransferKey(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ): String = "$messageIdHex#$attachmentIndex"
-
-    /**
-     * Drop decrypted bytes for one attachment after a decoder/playback failure.
-     * A corrupt cached plaintext hit must fall back to the normal Download/Retry
-     * path rather than recreating the same bad local media file forever.
-     */
-    suspend fun evictCachedAttachment(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ) {
-        val account = conversationAccountRef ?: return
-        val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
-        withContext(Dispatchers.Main.immediate) {
-            appState.removeMediaMemoryCacheEntry(cacheKey)
-        }
-        withContext(Dispatchers.IO) { appState.diskMediaCache.remove(cacheKey) }
-    }
-
-    /**
-     * Fetch and decrypt a Blossom-stored attachment. Backed by the app-level
-     * LRU ([WhiteNoiseAppState.cachedMediaPlaintext], keyed via [mediaCacheKey])
-     * so re-opening a conversation doesn't re-download media already fetched
-     * this session. Throws on download/decrypt failure — the caller surfaces it.
-     */
-    internal suspend fun downloadAttachmentSource(
-        messageIdHex: String,
-        attachmentIndex: Int,
-        reference: MediaAttachmentReferenceFfi,
-        priority: AttachmentDownloadPriority,
-    ): AttachmentPlaintext {
-        val account = conversationAccountRef ?: error("no active account")
-        val request = AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex)
-        return appState.downloadAttachmentPlaintextSource(
-            request = request,
-            reference = reference,
-            priority = priority,
-            onCacheMiss = {
-                requestAttachmentTransfer(
-                    messageIdHex = messageIdHex,
-                    attachmentIndex = attachmentIndex,
-                    reference = reference,
-                    priority = priority,
-                ).await()
-            },
-        )
     }
 
     internal suspend fun downloadAttachment(

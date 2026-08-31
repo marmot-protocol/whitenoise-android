@@ -148,6 +148,7 @@ internal suspend fun materializeDocumentAttachment(
     }
 }
 
+/** Publishes a closeable document source and reuses a complete stable viewer file. */
 internal suspend fun materializeDocumentAttachmentSource(
     context: Context,
     messageIdHex: String,

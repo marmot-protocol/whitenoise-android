@@ -20,6 +20,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 internal fun interface DiskByteCacheKeyProvider {
+    /** Returns the non-exportable key used to authenticate encrypted cache envelopes. */
     @Throws(GeneralSecurityException::class, IOException::class)
     fun getOrCreate(): SecretKey
 }
@@ -37,6 +38,7 @@ internal class DiskByteCacheLease internal constructor(
         Logger.getLogger("DiskByteCacheLease").warning(message)
     },
 ) : Closeable {
+    /** Deletes the owner-private plaintext lease, leaving failed cleanup for hydration. */
     override fun close() {
         val failure =
             runCatching { file.delete() || !file.exists() }
@@ -49,6 +51,21 @@ internal class DiskByteCacheLease internal constructor(
             onDeleteFailure("failed to delete plaintext cache lease ${file.absolutePath}: $failure")
         }
     }
+}
+
+/** Reserves proportional process headroom before permitting a plaintext allocation. */
+internal fun plaintextAllocationBudget(
+    availableBytes: Long,
+    maxMemoryBytes: Long,
+): Long {
+    val available = availableBytes.coerceAtLeast(0L)
+    val reserve =
+        minOf(
+            32L * 1024L * 1024L,
+            maxMemoryBytes.coerceAtLeast(0L) / 8L,
+            available / 4L,
+        )
+    return (available - reserve).coerceAtLeast(0L)
 }
 
 /**
@@ -80,20 +97,6 @@ internal class DiskByteCacheLease internal constructor(
  * During preparation, the directory is scanned and the in-memory index is
  * repopulated using file `lastModified` as the proxy for recency.
  */
-internal fun plaintextAllocationBudget(
-    availableBytes: Long,
-    maxMemoryBytes: Long,
-): Long {
-    val available = availableBytes.coerceAtLeast(0L)
-    val reserve =
-        minOf(
-            32L * 1024L * 1024L,
-            maxMemoryBytes.coerceAtLeast(0L) / 8L,
-            available / 4L,
-        )
-    return (available - reserve).coerceAtLeast(0L)
-}
-
 internal class DiskByteCache(
     private val cacheDir: File,
     private val maxBytes: Long,
@@ -201,12 +204,14 @@ internal class DiskByteCache(
         return contains(key)
     }
 
+    /** Returns an authenticated entry when its bounded allocation fits current heap headroom. */
     fun get(key: String): ByteArray? = getInternal(key, smallOnly = false)
 
     /** Returns only entries that are safe to promote into the bounded plaintext L1. */
     fun getIfSmall(key: String): ByteArray? = getInternal(key, smallOnly = true)
 
     @Suppress("CyclomaticComplexMethod", "ReturnCount")
+    /** Authenticates and reads one entry while preserving recoverable misses on resource pressure. */
     private fun getInternal(
         key: String,
         smallOnly: Boolean,
@@ -339,6 +344,7 @@ internal class DiskByteCache(
         }
     }
 
+    /** Removes stale accounting only when [entry] is still the indexed generation. */
     private fun dropMissingEntry(
         hashed: String,
         entry: Entry,
@@ -351,9 +357,11 @@ internal class DiskByteCache(
         }
     }
 
+    /** Captures the wipe and expiry generations that a deferred publication must match. */
     @Synchronized
     fun capturePublicationToken(): DiskByteCachePublicationToken = DiskByteCachePublicationToken(generation, expirySweepEpoch)
 
+    /** Encrypts and atomically publishes bounded plaintext under a captured invalidation token. */
     fun put(
         key: String,
         bytes: ByteArray,
@@ -662,6 +670,7 @@ internal class DiskByteCache(
         return complete
     }
 
+    /** Deletes stale startup artifacts only while the observed cache generation remains current. */
     private fun deleteHydrationArtifactsIfGenerationMatches(
         generationAtStart: Int,
         files: List<File>,
@@ -678,6 +687,7 @@ internal class DiskByteCache(
         }
     }
 
+    /** Reconstructs authenticated index metadata without exposing plaintext during startup. */
     private fun buildHydratedIndex(generationAtStart: Int): HydratedIndex {
         val hydratedIndex = LinkedHashMap<String, Entry>(8, 0.75f, true)
         val unresolvedDuringHydration = mutableSetOf<String>()
@@ -754,6 +764,7 @@ internal class DiskByteCache(
         return HydratedIndex(hydratedIndex, hydratedBytes, unresolvedDuringHydration)
     }
 
+    /** Computes the exact authenticated envelope length for the declared plaintext size. */
     private fun expectedEnvelopeBytes(
         envelope: EnvelopeHeader,
         plaintextBytes: Long,
@@ -765,6 +776,7 @@ internal class DiskByteCache(
             envelope.headerBytes + ENVELOPE_CRYPTO_OVERHEAD_BYTES + plaintextBytes
         }
 
+    /** Rejects envelopes whose declaration and physical size cannot describe the same payload. */
     private fun isInvalidEnvelopeSize(
         envelope: EnvelopeHeader,
         fileBytes: Long,
@@ -774,7 +786,7 @@ internal class DiskByteCache(
             plaintextBytes !in 1L..entryByteLimit ||
             fileBytes != expectedEnvelopeBytes(envelope, plaintextBytes)
 
-    // Legacy sibling sidecar from the pre-#1373 two-file layout.
+    /** Locates a metadata sidecar left by the pre-#1373 two-file cache format. */
     private fun legacyTagFileFor(
         dataFile: File,
         dataSuffix: String,
@@ -790,6 +802,7 @@ internal class DiskByteCache(
             get() = bytes.size
     }
 
+    /** Encodes a versioned header, choosing chunk authentication for large plaintext. */
     private fun envelopeHeaderBytes(
         ciphertextTag: String?,
         plaintextBytes: Int,
@@ -827,6 +840,7 @@ internal class DiskByteCache(
         val outcome: EnvelopeHeaderOutcome,
     )
 
+    /** Classifies an envelope header as authenticated, corrupt, or transiently unreadable. */
     private fun readAuthenticatedEnvelopeHeader(file: File): EnvelopeHeaderRead {
         if (file.length() < MIN_ENVELOPE_BYTES) {
             return EnvelopeHeaderRead(null, EnvelopeHeaderOutcome.CORRUPT)
@@ -861,6 +875,7 @@ internal class DiskByteCache(
         }
     }
 
+    /** Parses and bounds the versioned header before any ciphertext allocation. */
     @Throws(IOException::class)
     private fun readEnvelopeHeader(input: InputStream): EnvelopeHeader {
         val fixedHeader = input.readExactly(FIXED_ENVELOPE_HEADER_BYTES)
@@ -885,6 +900,7 @@ internal class DiskByteCache(
         )
     }
 
+    /** Validates the cache magic and supported envelope version before parsing metadata. */
     private fun validateEnvelopePrefix(
         fixedHeader: ByteArray,
         version: Byte,
@@ -897,6 +913,7 @@ internal class DiskByteCache(
         }
     }
 
+    /** Rejects authenticated size declarations outside the configured entry bound. */
     private fun validateDeclaredPlaintextBytes(plaintextBytes: Long?) {
         if (plaintextBytes != null && plaintextBytes !in 1L..entryByteLimit) {
             throw IOException("decrypted cache payload exceeds entry limit")
@@ -932,6 +949,7 @@ internal class DiskByteCache(
         header: ByteArray,
     ): ByteArray = METADATA_AAD_DOMAIN + fileName.toByteArray(Charsets.UTF_8) + header
 
+    /** Binds payload ciphertext to its filename, header, and authenticated metadata record. */
     private fun buildPayloadAad(
         fileName: String,
         header: ByteArray,
@@ -944,6 +962,7 @@ internal class DiskByteCache(
             metadataIv +
             metadataAuthTag
 
+    /** Writes and durably syncs one metadata-bound authenticated envelope. */
     @Throws(GeneralSecurityException::class, IOException::class)
     private fun writeEncrypted(
         output: FileOutputStream,
@@ -980,6 +999,7 @@ internal class DiskByteCache(
         output.fd.sync()
     }
 
+    /** Encrypts a small payload as one legacy-compatible authenticated message. */
     private fun writeLegacyPayload(
         output: FileOutputStream,
         plaintext: ByteArray,
@@ -990,6 +1010,7 @@ internal class DiskByteCache(
         output.write(cipher.doFinal(plaintext))
     }
 
+    /** Encrypts a large payload in independently authenticated, bounded-size chunks. */
     private fun writeChunkedPayload(
         output: FileOutputStream,
         plaintext: ByteArray,
@@ -1007,6 +1028,7 @@ internal class DiskByteCache(
         }
     }
 
+    /** Creates a payload cipher bound to the envelope metadata and optional supplied IV. */
     private fun newPayloadCipher(
         mode: Int,
         aad: ByteArray,
@@ -1024,6 +1046,7 @@ internal class DiskByteCache(
             cipher.updateAAD(aad)
         }
 
+    /** Binds each chunk's index and plaintext length into its authentication domain. */
     private fun buildChunkAad(
         payloadAad: ByteArray,
         chunkIndex: Int,
@@ -1036,6 +1059,7 @@ internal class DiskByteCache(
                 .putInt(plaintextBytes)
                 .array()
 
+    /** Authenticates one envelope into a bounded byte array for byte-oriented callers. */
     @Throws(GeneralSecurityException::class, IOException::class)
     private fun readEncrypted(
         file: File,
@@ -1058,6 +1082,7 @@ internal class DiskByteCache(
         }
 
     @Throws(GeneralSecurityException::class, IOException::class)
+    /** Authenticates an envelope and streams its plaintext into an owner-private file. */
     private fun readEncryptedTo(
         file: File,
         fileName: String,
@@ -1095,6 +1120,7 @@ internal class DiskByteCache(
         }
     }
 
+    /** Verifies and streams every large-entry chunk while honoring cancellation boundaries. */
     private fun readChunkedPayloadTo(
         input: InputStream,
         output: FileOutputStream,
@@ -1124,6 +1150,7 @@ internal class DiskByteCache(
         if (written != plaintextBytes) throw IOException("invalid decrypted cache payload length")
     }
 
+    /** Authenticates a legacy payload before publishing it into the lease output. */
     private fun readLegacyPayloadTo(
         input: InputStream,
         output: FileOutputStream,
@@ -1146,6 +1173,7 @@ internal class DiskByteCache(
         output.write(plaintext)
     }
 
+    /** Authenticates a bounded legacy payload into a caller-owned byte array. */
     private fun readLegacyPayload(
         input: InputStream,
         fileBytes: Long,
@@ -1163,6 +1191,7 @@ internal class DiskByteCache(
             .also(::validatePlaintext)
     }
 
+    /** Derives and validates the plaintext length of a single-message legacy payload. */
     private fun validateLegacyPayloadSize(ciphertextBytes: Long): Long {
         if (ciphertextBytes < GCM_TAG_BYTES) throw IOException("truncated encrypted cache payload")
         val plaintextBytes = ciphertextBytes - GCM_TAG_BYTES
@@ -1172,6 +1201,7 @@ internal class DiskByteCache(
         return plaintextBytes
     }
 
+    /** Authenticates a chunked entry into one bounded byte array for legacy callers. */
     private fun readChunkedPayload(
         input: InputStream,
         plaintextBytes: Long,
@@ -1201,10 +1231,12 @@ internal class DiskByteCache(
         return plaintext
     }
 
+    /** Rejects trailing unauthenticated or undeclared bytes after the expected payload. */
     private fun requirePayloadExhausted(input: InputStream) {
         if (input.read() >= 0) throw IOException("encrypted cache payload exceeds entry limit")
     }
 
+    /** Enforces entry and live-heap budgets before allocating plaintext storage. */
     private fun ensurePlaintextAllocationFits(plaintextBytes: Long) {
         val allocationLimit = minOf(entryByteLimit, Int.MAX_VALUE.toLong())
         if (plaintextBytes !in 1L..allocationLimit) {
@@ -1215,6 +1247,7 @@ internal class DiskByteCache(
         }
     }
 
+    /** Enforces non-empty, bounded plaintext after authenticated decryption. */
     private fun validatePlaintext(plaintext: ByteArray) {
         if (plaintext.isEmpty()) throw IOException("empty decrypted cache payload")
         if (plaintext.size.toLong() > entryByteLimit) throw IOException("decrypted cache payload exceeds entry limit")
@@ -1234,8 +1267,10 @@ internal class DiskByteCache(
 
     private fun Throwable.isAuthenticationFailure(): Boolean = generateSequence<Throwable>(this) { it.cause }.any { it is AEADBadTagException }
 
+    /** Detects an authentication failure through wrapped I/O causes. */
     private fun IOException.isAuthenticationFailure(): Boolean = (this as Throwable).isAuthenticationFailure()
 
+    /** Identifies structural failures that make an encrypted envelope unsafe to retain. */
     private fun IOException.isMalformedEnvelope(): Boolean =
         message == "invalid cache envelope magic" ||
             message == "unsupported cache envelope version" ||
@@ -1269,8 +1304,10 @@ internal class DiskByteCache(
     private val fileNameMemo = LinkedHashMap<String, String>(16, 0.75f, true)
     private var fileNameMemoEpoch = 0L
 
+    /** Reports memo occupancy for bounded-key-retention regression tests. */
     internal fun memoizedFileNameKeyCount(): Int = synchronized(fileNameMemo) { fileNameMemo.size }
 
+    /** Hashes privacy-sensitive logical keys into bounded, memoized disk filenames. */
     private fun fileNameFor(key: String): String {
         val epochAtLookup =
             synchronized(fileNameMemo) {
@@ -1356,6 +1393,7 @@ internal class DiskByteCache(
         val PAYLOAD_AAD_DOMAIN = "WN-DC-PAY".toByteArray(Charsets.UTF_8)
         val TMP_COUNTER = AtomicLong()
 
+        /** Reports allocatable plaintext bytes after retaining process safety headroom. */
         fun defaultAvailablePlaintextAllocationBytes(): Long {
             val runtime = Runtime.getRuntime()
             val available = runtime.maxMemory() - runtime.totalMemory() + runtime.freeMemory()

@@ -2,9 +2,10 @@ package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.ui.conversation.media.cachedVoiceAttachmentFile
-import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachmentSource
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldInvalidateVoiceAttachmentCache
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldStartVoiceAttachmentDownload
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
@@ -117,6 +118,7 @@ class VoiceAttachmentCacheStateTest {
         )
     }
 
+    /** Guards source epoch as part of the stable voice-cache destination filename. */
     @Test
     fun sourceEpochIsPartOfVoiceCacheDestinationIdentity() {
         val context = RuntimeEnvironment.getApplication()
@@ -131,6 +133,7 @@ class VoiceAttachmentCacheStateTest {
         assertNull(cachedVoiceAttachmentFile(context, messageId, 1, epochTwo))
     }
 
+    /** Guards source epoch as part of playback identity so stale callbacks cannot match replacements. */
     @Test
     fun sourceEpochIsPartOfVoicePlaybackIdentity() {
         val messageId = "voice-playback-epoch-identity"
@@ -146,6 +149,7 @@ class VoiceAttachmentCacheStateTest {
         )
     }
 
+    /** Guards that production voice publication enters single-flight before its cache probe. */
     @Test
     fun voiceMaterializationUsesSharedSingleFlight() {
         val source = mediaVoiceSource().readText()
@@ -158,12 +162,13 @@ class VoiceAttachmentCacheStateTest {
         )
         assertTrue(
             "the flight must begin before the materializer checks the cache fast path",
-            Regex(
-                """voiceMaterializations\.run\(file\.absolutePath\)\s*\{\s*materializeVoiceAttachmentOnce\(""",
-            ).containsMatchIn(source),
+            "voiceMaterializations.run(file.absolutePath)" in
+                source
+                    .substringAfter("internal suspend fun materializeVoiceAttachmentSource("),
         )
     }
 
+    /** Proves a waiter cannot accept a partial file while the owner publishes the same path. */
     @Test
     fun samePathWaiterAwaitsActiveMaterializationDespitePartialCacheFile() {
         runBlocking {
@@ -186,15 +191,15 @@ class VoiceAttachmentCacheStateTest {
 
                 val owner =
                     async(start = CoroutineStart.UNDISPATCHED) {
-                        materializeVoiceAttachment(
+                        materializeVoiceAttachmentSource(
                             context = context,
                             messageIdHex = messageId,
                             attachmentIndex = attachmentIndex,
                             reference = reference,
-                            resolveBytes = {
+                            resolveSource = {
                                 downloadEntered.complete(Unit)
                                 releaseDownload.await()
-                                fullBytes
+                                AttachmentPlaintext.Bytes(fullBytes)
                             },
                         )
                     }
@@ -207,12 +212,12 @@ class VoiceAttachmentCacheStateTest {
 
                     val waiter =
                         async(start = CoroutineStart.UNDISPATCHED) {
-                            materializeVoiceAttachment(
+                            materializeVoiceAttachmentSource(
                                 context = context,
                                 messageIdHex = messageId,
                                 attachmentIndex = attachmentIndex,
                                 reference = reference,
-                                resolveBytes = { error("waiter must join the owner's flight") },
+                                resolveSource = { error("waiter must join the owner's flight") },
                             )
                         }
 

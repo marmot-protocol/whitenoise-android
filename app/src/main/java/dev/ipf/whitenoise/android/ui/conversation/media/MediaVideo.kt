@@ -60,6 +60,8 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.downloadAttachmentSource
+import dev.ipf.whitenoise.android.state.evictCachedAttachment
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
@@ -709,8 +711,10 @@ internal fun MediaVideoBubble(
     }
 }
 
-/** Decrypted video on disk under cacheDir/video_attachments; reuses the
- *  age-based janitor that already sweeps shared_media / voice_attachments. */
+/**
+ * Publishes supplied video bytes through the legacy test seam into the
+ * age-swept `video_attachments` cache.
+ */
 @VisibleForTesting
 internal suspend fun materializeVideoAttachment(
     context: android.content.Context,
@@ -738,6 +742,7 @@ internal suspend fun materializeVideoAttachment(
     }
 }
 
+/** Resolves retained or downloaded video plaintext into the stable playback cache. */
 internal suspend fun materializeVideoAttachment(
     context: android.content.Context,
     controller: ConversationController,
@@ -777,6 +782,7 @@ internal suspend fun materializeVideoAttachment(
     )
 }
 
+/** Publishes a closeable video source and reuses a complete stable playback file. */
 private suspend fun materializeVideoAttachmentSource(
     context: android.content.Context,
     messageIdHex: String,

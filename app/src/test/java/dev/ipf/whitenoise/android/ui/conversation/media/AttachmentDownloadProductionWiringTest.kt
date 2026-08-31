@@ -48,6 +48,7 @@ class AttachmentDownloadProductionWiringTest {
         )
     }
 
+    /** Guards file-open work against restarting for unrelated cache revisions. */
     @Test
     fun fileOpenEffectIsNotRestartedByUnrelatedCacheMutations() {
         val file = source("MediaFileBubble.kt").normalized()
@@ -61,6 +62,7 @@ class AttachmentDownloadProductionWiringTest {
         )
     }
 
+    /** Guards that durable file-open intent survives until background availability is terminal. */
     @Test
     fun pendingFileOpenDoesNotReportFailureBeforeDurableCompletion() {
         val file = source("MediaFileBubble.kt").normalized()
@@ -71,9 +73,12 @@ class AttachmentDownloadProductionWiringTest {
         assertTrue("onTerminalFailure = { appState.present(couldntLoadMessage) }" in file)
     }
 
+    /** Guards foreground enqueueing, source single-flight, and terminal durable cleanup wiring. */
     @Test
     fun everyInteractiveControllerDownloadHasDurableTerminalCleanup() {
         val controller = projectSource("state/Controllers.kt").normalized()
+        val sourceController = projectSource("state/AttachmentControllerCache.kt").normalized()
+        val appState = projectSource("state/AppState.kt").normalized()
         val worker = projectSource("state/AttachmentDownloadWorker.kt").normalized()
 
         assertTrue(
@@ -83,12 +88,20 @@ class AttachmentDownloadProductionWiringTest {
                 "return appState.downloadAttachmentPlaintext(" in controller,
         )
         val sourceDownload =
-            controller
-                .substringAfter("internal suspend fun downloadAttachmentSource(")
-                .substringBefore("internal suspend fun downloadAttachment(")
+            sourceController.substringAfter(
+                "internal suspend fun ConversationController.downloadAttachmentSource(",
+            )
         assertTrue(
             "File-backed cache misses must retain controller single-flight and transfer-state bookkeeping",
             "onCacheMiss = { requestAttachmentTransfer(" in sourceDownload,
+        )
+        val durableDownload =
+            appState
+                .substringAfter("internal suspend fun downloadAttachmentForDurableWork(")
+                .substringBefore("suspend fun bootstrap()")
+        assertTrue(
+            "Durable cache hits must close a source lease instead of materializing large byte arrays",
+            "downloadAttachmentPlaintextSource(" in durableDownload && ").use { }" in durableDownload,
         )
         val retryDecision = worker.indexOf("if (shouldRetryAttachmentDownloadWork(")
         val terminalCleanup = worker.indexOf("intentStore.setInteractive(request, interactive = false)", retryDecision)
@@ -99,6 +112,7 @@ class AttachmentDownloadProductionWiringTest {
         )
     }
 
+    /** Guards retained outgoing documents against bypassing transfer and encrypted-cache bookkeeping. */
     @Test
     fun retainedDocumentOpenStillUsesTransferCoordinator() {
         val access = source("MediaFileAccess.kt").normalized()

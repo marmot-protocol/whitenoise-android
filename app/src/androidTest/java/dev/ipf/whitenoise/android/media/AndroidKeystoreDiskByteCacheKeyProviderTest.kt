@@ -62,6 +62,7 @@ class AndroidKeystoreDiskByteCacheKeyProviderTest {
         assertArrayEquals(plaintext, restartedCache.get(cacheKey))
     }
 
+    /** Verifies the platform Keystore can stream a maximum-size chunked entry across restart. */
     @Test
     fun androidKeystoreMaterializesReal64MiBChunkedEntry() {
         val entryBytes = 64 * 1024 * 1024
@@ -96,6 +97,7 @@ class AndroidKeystoreDiskByteCacheKeyProviderTest {
         }
     }
 
+    /** Digests a materialized lease incrementally so the test does not allocate another 64 MiB. */
     private fun sha256(file: File): ByteArray {
         val digest = MessageDigest.getInstance("SHA-256")
         val buffer = ByteArray(64 * 1024)

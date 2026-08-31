@@ -119,6 +119,7 @@ internal object AttachmentCachePublication {
         }
     }
 
+    /** Commits one closeable plaintext source behind the captured wipe and invalidation fence. */
     @Suppress("ReturnCount", "ThrowsCount")
     private fun publishSourceWithPermit(
         attachmentKey: String,
@@ -166,56 +167,17 @@ internal object AttachmentCachePublication {
         }
     }
 
+    /** Publishes retained bytes through the same fenced and durable source path as file leases. */
     @Throws(IOException::class)
     fun publishWithPermit(
         attachmentKey: String,
         finalFile: File,
         bytes: ByteArray,
         permit: Permit,
-    ): Boolean {
-        if (bytes.isEmpty()) {
-            throw IOException("refusing to publish an empty attachment cache ${finalFile.name}")
+    ): Boolean =
+        AttachmentPlaintext.Bytes(bytes).use { source ->
+            publishSourceWithPermit(attachmentKey, finalFile, source, permit)
         }
-        AttachmentPlaintextCache.requireEntryWithinLimit(finalFile, bytes.size.toLong())
-        if (!prepareParentForTempWrite(attachmentKey, finalFile, permit)) {
-            return false
-        }
-        val tmp = writeTempFile(finalFile, bytes) ?: return false
-        AttachmentPlaintextCache.protectPublicationFile(finalFile)
-        return try {
-            commitAwaiterForTests?.invoke()
-            val stripe = stripeFor(attachmentKey)
-            val published =
-                synchronized(stripe) {
-                    if (!permitStillValid(stripe, permit)) {
-                        runCatching { tmp.delete() }
-                        return@synchronized false
-                    }
-                    val renamed =
-                        try {
-                            renameFileForTests?.invoke(tmp, finalFile) ?: tmp.renameTo(finalFile)
-                        } catch (throwable: Throwable) {
-                            runCatching { tmp.delete() }
-                            throw IOException("failed to publish attachment cache ${finalFile.name}", throwable)
-                        }
-                    if (!renamed) {
-                        runCatching { tmp.delete() }
-                        if (!permitStillValid(stripe, permit)) return@synchronized false
-                        throw IOException("failed to publish attachment cache ${finalFile.name}")
-                    }
-                    if (!permitStillValid(stripe, permit)) {
-                        deleteFinalFile(finalFile)
-                        return@synchronized false
-                    }
-                    true
-                }
-            if (published) AttachmentPlaintextCache.onPublished(finalFile)
-            published
-        } finally {
-            AttachmentPlaintextCache.unprotectPublicationFile(tmp)
-            AttachmentPlaintextCache.unprotectPublicationFile(finalFile)
-        }
-    }
 
     @Throws(IOException::class)
     suspend fun invalidateAttachmentCache(
@@ -299,11 +261,14 @@ internal object AttachmentCachePublication {
             permit.stripeGeneration == stripe.generation &&
             stripe.invalidatingCount == 0
 
+    /** Exposes deterministic stripe selection for concurrency regression tests. */
     @VisibleForTesting
     internal fun stripeIndex(attachmentKey: String): Int = attachmentKey.hashCode() and (STRIPE_COUNT - 1)
 
+    /** Maps an attachment key to its fixed publication/invalidation coordination stripe. */
     private fun stripeFor(attachmentKey: String): Stripe = stripes[stripeIndex(attachmentKey)]
 
+    /** Moves or streams one source into a durable, publication-protected sibling temp file. */
     private fun writeTempFile(
         finalFile: File,
         source: AttachmentPlaintext,
@@ -326,27 +291,6 @@ internal object AttachmentCachePublication {
             if (tmp.length() != expectedSize) {
                 throw IOException("attachment cache source length changed while publishing ${finalFile.name}")
             }
-            tmp
-        } catch (throwable: Throwable) {
-            runCatching { tmp.delete() }
-            AttachmentPlaintextCache.unprotectPublicationFile(tmp)
-            if (throwable is IOException) null else throw throwable
-        }
-    }
-
-    private fun writeTempFile(
-        finalFile: File,
-        bytes: ByteArray,
-    ): File? {
-        val parent = finalFile.parentFile ?: return null
-        val tmp =
-            File(
-                parent,
-                "${finalFile.name}.cache-${tmpCounter.incrementAndGet()}-${System.nanoTime()}.tmp",
-            )
-        AttachmentPlaintextCache.protectPublicationFile(tmp)
-        return try {
-            tmp.writeBytes(bytes)
             tmp
         } catch (throwable: Throwable) {
             runCatching { tmp.delete() }

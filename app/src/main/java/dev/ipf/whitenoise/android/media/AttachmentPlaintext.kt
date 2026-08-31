@@ -8,6 +8,7 @@ import java.io.OutputStream
 internal interface AttachmentPlaintext : Closeable {
     val size: Long
 
+    /** Streams the complete plaintext into [output] without transferring resource ownership. */
     fun copyTo(output: OutputStream)
 
     class Bytes(
@@ -15,10 +16,12 @@ internal interface AttachmentPlaintext : Closeable {
     ) : AttachmentPlaintext {
         override val size: Long = bytes.size.toLong()
 
+        /** Writes the bounded in-memory representation to [output]. */
         override fun copyTo(output: OutputStream) {
             output.write(bytes)
         }
 
+        /** Byte-backed plaintext owns no external resource. */
         override fun close() = Unit
     }
 
@@ -31,10 +34,12 @@ internal interface AttachmentPlaintext : Closeable {
         override val size: Long
             get() = file.length()
 
+        /** Streams the owner-private lease without loading it into a second byte array. */
         override fun copyTo(output: OutputStream) {
             file.inputStream().use { it.copyTo(output) }
         }
 
+        /** Releases the lease and deletes its temporary plaintext file. */
         override fun close() = lease.close()
     }
 }

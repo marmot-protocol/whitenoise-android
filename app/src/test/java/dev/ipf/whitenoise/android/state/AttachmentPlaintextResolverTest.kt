@@ -12,6 +12,7 @@ import org.junit.Test
 import java.io.File
 
 class AttachmentPlaintextResolverTest {
+    /** Confirms an L1 hit bypasses disk and clears completed interactive intent. */
     @Test
     fun memoryHitSkipsDiskMissAndRepromotionButClearsInteractiveIntent() =
         runBlocking {
@@ -33,6 +34,7 @@ class AttachmentPlaintextResolverTest {
             assertArrayEquals(expected, (resolved as AttachmentPlaintext.Bytes).bytes)
         }
 
+    /** Confirms small authenticated disk bytes are promoted to L1. */
     @Test
     fun smallDiskBytesArePromotedAndClearInteractiveIntent() =
         runBlocking {
@@ -56,6 +58,7 @@ class AttachmentPlaintextResolverTest {
             assertArrayEquals(expected, (resolved as AttachmentPlaintext.Bytes).bytes)
         }
 
+    /** Confirms a large disk lease transfers to the caller without L1 byte promotion. */
     @Test
     fun diskLeaseIsReturnedWithoutByteArrayPromotion() =
         runBlocking {
@@ -82,6 +85,7 @@ class AttachmentPlaintextResolverTest {
             assertFalse(file.exists())
         }
 
+    /** Confirms post-load bookkeeping failures cannot leak an acquired plaintext lease. */
     @Test
     fun postLoadFailureClosesPendingLease() =
         runBlocking {
@@ -104,6 +108,7 @@ class AttachmentPlaintextResolverTest {
             assertFalse(file.exists())
         }
 
+    /** Confirms cancellation during dispatcher handoff closes the already-acquired lease. */
     @Test
     fun cancelledDiskHandoffClosesAcquiredLease() =
         runBlocking {
@@ -128,6 +133,7 @@ class AttachmentPlaintextResolverTest {
             assertFalse(file.exists())
         }
 
+    /** Confirms a true cache miss preserves the bounded byte-oriented download contract. */
     @Test
     fun missIsWrappedAsBoundedBytes() =
         runBlocking {

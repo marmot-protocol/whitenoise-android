@@ -68,6 +68,8 @@ import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.downloadAttachmentSource
+import dev.ipf.whitenoise.android.state.evictCachedAttachment
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -510,34 +512,9 @@ internal suspend fun materializeVoiceAttachment(
         },
     )
 
+/** Publishes one closeable voice source and reuses a complete stable playback file. */
 @VisibleForTesting
-internal suspend fun materializeVoiceAttachment(
-    context: android.content.Context,
-    messageIdHex: String,
-    attachmentIndex: Int,
-    reference: MediaAttachmentReferenceFfi,
-    resolveBytes: suspend () -> ByteArray,
-): java.io.File {
-    val file =
-        voiceAttachmentCacheFile(
-            context = context,
-            messageIdHex = messageIdHex,
-            attachmentIndex = attachmentIndex,
-            reference = reference,
-        )
-    val attachmentKey =
-        AttachmentCachePublication.attachmentKey(
-            messageIdHex = messageIdHex,
-            attachmentIndex = attachmentIndex,
-            sourceEpoch = reference.sourceEpoch,
-        )
-
-    return voiceMaterializations.run(file.absolutePath) {
-        materializeVoiceAttachmentOnce(attachmentKey, file, resolveBytes)
-    }
-}
-
-private suspend fun materializeVoiceAttachmentSource(
+internal suspend fun materializeVoiceAttachmentSource(
     context: android.content.Context,
     messageIdHex: String,
     attachmentIndex: Int,
@@ -555,30 +532,6 @@ private suspend fun materializeVoiceAttachmentSource(
             file
         }
     }
-}
-
-private suspend fun materializeVoiceAttachmentOnce(
-    attachmentKey: String,
-    file: java.io.File,
-    resolveBytes: suspend () -> ByteArray,
-): java.io.File {
-    val cachedFile =
-        withContext(Dispatchers.IO) {
-            file
-                .takeIf { it.isFile && it.length() > 0L }
-                ?.also(AttachmentPlaintextCache::touch)
-        }
-    if (cachedFile != null) return cachedFile
-    val published =
-        AttachmentCachePublication.publishAfterLoad(
-            attachmentKey = attachmentKey,
-            finalFile = file,
-            loadBytes = resolveBytes,
-        )
-    if (!published) {
-        throw java.io.IOException("attachment cache publication aborted for ${file.name}")
-    }
-    return file
 }
 
 internal fun cachedVoiceAttachmentFile(
