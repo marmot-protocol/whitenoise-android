@@ -19,6 +19,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.lifecycle.LifecycleOwner
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -123,6 +124,7 @@ internal fun ConversationForegroundRestoreEffects(
     val resumeScrollRestoreCoordinator = remember(controller) { ResumeScrollRestoreCoordinator() }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val rootView = LocalView.current
     val density = LocalDensity.current
     val imeInsets = WindowInsets.ime
     val imeAnimationTargetInsets = WindowInsets.imeAnimationTarget
@@ -203,6 +205,7 @@ internal fun ConversationForegroundRestoreEffects(
                     }
                 }
                 if (currentInitialTimelineAnchored && restoreToken != null) {
+                    var releaseFrameRequested = false
                     val resumedPresentation =
                         awaitConversationForegroundPresentation(
                             preDrawSignals = foregroundPreDrawSignals,
@@ -212,19 +215,28 @@ internal fun ConversationForegroundRestoreEffects(
                             // Past the deadline the snapshot stays armed, so the
                             // wait below still applies one correction when
                             // geometry finally settles — only user intent,
-                            // navigation, or disposal discards it.
+                            // navigation, or disposal discards it. Opening the
+                            // gate explicitly invalidates the root because this
+                            // flag was historically read only from onPreDraw and
+                            // could otherwise wait forever for external input.
                             onSettleDeadlineExpired = {
                                 scrollCoordinator.releaseForegroundRestoreGate(restoreToken)
+                                requestConversationForegroundFrame(rootView)
+                                releaseFrameRequested = true
                             },
                         )
-                    scrollCoordinator.completeForegroundRestore(
-                        token = restoreToken,
-                        resumedGeometry = resumedPresentation.geometry,
-                        resumedTimelineStructure = currentTimelineStructureProvider(),
-                        resumedScrollAnchor = currentScrollAnchorProvider(),
-                        resolveAnchorIndex = currentScrollAnchorResolver,
-                        resolveTailIndex = { currentTailIndexProvider() },
-                    )
+                    try {
+                        scrollCoordinator.completeForegroundRestore(
+                            token = restoreToken,
+                            resumedGeometry = resumedPresentation.geometry,
+                            resumedTimelineStructure = currentTimelineStructureProvider(),
+                            resumedScrollAnchor = currentScrollAnchorProvider(),
+                            resolveAnchorIndex = currentScrollAnchorResolver,
+                            resolveTailIndex = { currentTailIndexProvider() },
+                        )
+                    } finally {
+                        if (!releaseFrameRequested) requestConversationForegroundFrame(rootView)
+                    }
                 } else {
                     scrollCoordinator.cancelForegroundRestore()
                 }

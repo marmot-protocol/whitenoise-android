@@ -17,23 +17,24 @@ internal data class ConversationForegroundSettleState(
     val imeTargetBottomPx: Int,
     val bottomChromeMeasured: Boolean,
 ) {
+    /** Whether every measured surface agrees on one coherent viewport geometry. */
     fun isGeometrySettled(): Boolean =
         geometry.viewportHeightPx > 0 &&
             bottomChromeMeasured &&
             geometry.imeBottomPx == imeTargetBottomPx
 
+    /** Whether coherent geometry also matches the IME visibility requested at resume. */
     fun isSettled(expectedImeVisible: Boolean): Boolean =
         isGeometrySettled() &&
             (geometry.imeBottomPx > 0) == expectedImeVisible
 }
 
 /**
- * Waits for the requested IME state, then relaxes only that request after the
- * liveness timeout. Transient inset or unmeasured chrome geometry never passes.
- * The relaxed geometry wait is bounded by the same timeout, so the draw gate is
- * never held longer than twice the liveness window — when that deadline expires
- * [onSettleDeadlineExpired] must open the gate, and the wait keeps the captured
- * snapshot armed until settled geometry arrives to apply the one correction.
+ * Waits for the requested IME state for one bounded liveness window. When that
+ * deadline expires, [onSettleDeadlineExpired] must open the draw gate and
+ * schedule a frame immediately. Coherent geometry can then complete at once;
+ * otherwise the captured snapshot remains armed until later settled geometry
+ * arrives to apply the one deferred correction without blocking presentation.
  */
 internal suspend fun awaitConversationForegroundPresentation(
     preDrawSignals: ReceiveChannel<Unit>,
@@ -42,6 +43,7 @@ internal suspend fun awaitConversationForegroundPresentation(
     expectedVisibilityTimeoutMillis: Long,
     onSettleDeadlineExpired: () -> Unit = {},
 ): ConversationForegroundSettleState {
+    /** Returns the first pre-draw state accepted by [predicate]. */
     suspend fun awaitState(predicate: ForegroundSettlePredicate): ConversationForegroundSettleState {
         while (true) {
             preDrawSignals.receive()
@@ -50,16 +52,15 @@ internal suspend fun awaitConversationForegroundPresentation(
         }
     }
 
-    return withTimeoutOrNull(expectedVisibilityTimeoutMillis) {
-        awaitState { it.isSettled(expectedImeVisible) }
-    } ?: currentState().takeIf { it.isGeometrySettled() }
-        ?: withTimeoutOrNull(expectedVisibilityTimeoutMillis) {
-            awaitState { it.isGeometrySettled() }
+    val requestedPresentation =
+        withTimeoutOrNull(expectedVisibilityTimeoutMillis) {
+            awaitState { it.isSettled(expectedImeVisible) }
         }
-        ?: run {
-            onSettleDeadlineExpired()
-            awaitState { it.isGeometrySettled() }
-        }
+    if (requestedPresentation != null) return requestedPresentation
+
+    onSettleDeadlineExpired()
+    return currentState().takeIf { it.isGeometrySettled() }
+        ?: awaitState { it.isGeometrySettled() }
 }
 
 /**
@@ -72,6 +73,7 @@ internal class ConversationForegroundDrawGate(
     private val isBlocked: () -> Boolean,
     private val onPreDrawSignal: () -> Unit = {},
 ) : ViewTreeObserver.OnPreDrawListener {
+    /** Signals each frame attempt and exposes it only after the live gate opens. */
     override fun onPreDraw(): Boolean {
         onPreDrawSignal()
         return !isBlocked()
@@ -101,4 +103,9 @@ internal fun ConversationForegroundDrawGateEffect(
             if (observer.isAlive) observer.removeOnPreDrawListener(gate)
         }
     }
+}
+
+/** Schedules the first root draw after the foreground gate opens. */
+internal fun requestConversationForegroundFrame(view: android.view.View) {
+    view.postInvalidateOnAnimation()
 }
