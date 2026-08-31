@@ -33,6 +33,7 @@ val fuzzProductionIncludes =
         "dev/ipf/whitenoise/android/core/RecipientReference.kt",
         "dev/ipf/whitenoise/android/core/GroupSystemEventJson.kt",
         "dev/ipf/whitenoise/android/amber/Nip55SignerPure.kt",
+        "dev/ipf/whitenoise/android/media/ImageContainerBytes.kt",
     )
 
 val syncFuzzProductionSources =
@@ -111,6 +112,14 @@ val fuzzCampaignTargets =
             seedCorpusPath =
                 "src/test/resources/dev/ipf/whitenoise/android/fuzz/" +
                     "Nip55SignerProtocolFuzzTestInputs/fuzzNip55SignerProtocol",
+        ),
+        FuzzCampaignTarget(
+            taskName = "fuzzImageContainerBytes",
+            testClass = "dev.ipf.whitenoise.android.fuzz.ImageContainerBytesFuzzTest",
+            methodName = "fuzzImageContainerBytes",
+            seedCorpusPath =
+                "src/test/resources/dev/ipf/whitenoise/android/fuzz/" +
+                    "ImageContainerBytesFuzzTestInputs/fuzzImageContainerBytes",
         ),
     )
 

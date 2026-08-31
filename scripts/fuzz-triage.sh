@@ -32,6 +32,7 @@ Supported tasks:
   :fuzz:fuzzZapstoreProtocol
   :fuzz:fuzzIdentityReference
   :fuzz:fuzzNip55SignerProtocol
+  :fuzz:fuzzImageContainerBytes
   :fuzz:fuzzTriageSelfCheck
 
 Example:
@@ -159,6 +160,9 @@ subtarget_name_for_id() {
         *) return 1 ;;
       esac
       ;;
+    :fuzz:fuzzImageContainerBytes)
+      printf '%s' "AllContainers"
+      ;;
     *)
       return 1
       ;;
@@ -184,6 +188,11 @@ lookup_mapping() {
       ENTRY_METHOD="fuzzNip55SignerProtocol"
       GRADLE_TASK="fuzzNip55SignerProtocol"
       ;;
+    :fuzz:fuzzImageContainerBytes)
+      TEST_CLASS="dev.ipf.whitenoise.android.fuzz.ImageContainerBytesFuzzTest"
+      ENTRY_METHOD="fuzzImageContainerBytes"
+      GRADLE_TASK="fuzzImageContainerBytes"
+      ;;
     :fuzz:fuzzTriageSelfCheck)
       TEST_CLASS="$SELF_CHECK_TEST_CLASS"
       ENTRY_METHOD="$SELF_CHECK_ENTRY_METHOD"
@@ -208,6 +217,7 @@ lookup_mapping() {
     ParseContentRow) SUBTARGET_ID=0 ;;
     ParseActivityResult) SUBTARGET_ID=1 ;;
     SignedEventPubkeyHelpers) SUBTARGET_ID=2 ;;
+    AllContainers) SUBTARGET_ID=0 ;;
     *) return 1 ;;
   esac
   return 0
