@@ -1,7 +1,18 @@
+@file:Suppress(
+    "CyclomaticComplexMethod",
+    "LoopWithTooManyJumpStatements",
+    "MagicNumber",
+    "MatchingDeclarationName",
+    "TooManyFunctions",
+)
+
 package dev.ipf.whitenoise.android.media
 
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
+
+// Keep the format state machines and their byte helpers in one Android-free
+// source so the JVM fuzz module exercises the exact production walkers.
 
 /** Image containers whose metadata can be removed without decoding their pixels. */
 internal enum class ImageContainerKind {
