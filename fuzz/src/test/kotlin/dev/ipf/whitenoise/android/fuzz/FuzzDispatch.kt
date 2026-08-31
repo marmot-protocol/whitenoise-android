@@ -51,6 +51,16 @@ enum class GroupSystemSubtarget {
     }
 }
 
+/** A single selector keeps image-container reproducers compatible with shared triage tooling. */
+enum class ImageContainerSubtarget {
+    AllContainers,
+    ;
+
+    companion object {
+        val COUNT: Int = entries.size
+    }
+}
+
 /**
  * Consumes one selector byte mapped onto `0..count-1`.
  *

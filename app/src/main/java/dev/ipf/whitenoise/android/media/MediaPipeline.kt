@@ -15,7 +15,6 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets
 
 internal enum class ImageAnimationStatus {
     STATIC,
@@ -900,14 +899,8 @@ object MediaPipeline {
         )
     }
 
-    internal fun stripOriginalImageMetadata(bytes: ByteArray): ByteArray? =
-        when (originalImageKind(bytes)) {
-            OriginalImageKind.Jpeg -> stripJpegMetadata(bytes)
-            OriginalImageKind.Png -> stripPngMetadata(bytes)
-            OriginalImageKind.Webp -> stripWebpMetadata(bytes)
-            OriginalImageKind.Gif -> stripGifMetadata(bytes)
-            null -> null
-        }
+    /** Applies the pure container walker selected by the encoded image signature. */
+    internal fun stripOriginalImageMetadata(bytes: ByteArray): ByteArray? = stripImageContainerMetadata(bytes)
 
     /** Strips metadata only when the result remains a positively identified animation. */
     @Suppress("ReturnCount") // Every guard fails closed before provider bytes can become an attachment.
@@ -915,9 +908,9 @@ object MediaPipeline {
         if (imageAnimationStatus(bytes) != ImageAnimationStatus.ANIMATED) return null
         if (exifOrientationRequiresPixelTransform(readExifOrientation(bytes))) return null
         val sanitized =
-            when (originalImageKind(bytes)) {
-                OriginalImageKind.Gif -> stripGifMetadata(bytes)
-                OriginalImageKind.Webp -> stripWebpMetadata(bytes)
+            when (imageContainerKind(bytes)) {
+                ImageContainerKind.Gif -> stripGifMetadata(bytes)
+                ImageContainerKind.Webp -> stripWebpMetadata(bytes)
                 else -> null
             } ?: return null
         return sanitized.takeIf { imageAnimationStatus(it) == ImageAnimationStatus.ANIMATED }
@@ -1114,23 +1107,13 @@ object MediaPipeline {
         return "${w}x$h"
     }
 
-    private enum class OriginalImageKind { Jpeg, Png, Webp, Gif }
-
-    private fun originalImageKind(bytes: ByteArray): OriginalImageKind? =
-        when {
-            isJpeg(bytes) -> OriginalImageKind.Jpeg
-            isPng(bytes) -> OriginalImageKind.Png
-            isWebp(bytes) -> OriginalImageKind.Webp
-            isGif(bytes) -> OriginalImageKind.Gif
-            else -> null
-        }
-
+    /** Maps a positively identified original-image container to its wire MIME. */
     private fun originalImageMediaType(bytes: ByteArray): String? =
-        when (originalImageKind(bytes)) {
-            OriginalImageKind.Jpeg -> "image/jpeg"
-            OriginalImageKind.Png -> "image/png"
-            OriginalImageKind.Webp -> "image/webp"
-            OriginalImageKind.Gif -> "image/gif"
+        when (imageContainerKind(bytes)) {
+            ImageContainerKind.Jpeg -> "image/jpeg"
+            ImageContainerKind.Png -> "image/png"
+            ImageContainerKind.Webp -> "image/webp"
+            ImageContainerKind.Gif -> "image/gif"
             null -> null
         }
 
@@ -1142,15 +1125,10 @@ object MediaPipeline {
             else -> "image.jpg"
         }
 
-    private fun isJpeg(bytes: ByteArray): Boolean = bytes.size >= 2 && u8(bytes, 0) == 0xff && u8(bytes, 1) == 0xd8
-
-    private fun isPng(bytes: ByteArray): Boolean = bytes.size >= PNG_SIGNATURE.size && PNG_SIGNATURE.indices.all { bytes[it] == PNG_SIGNATURE[it] }
-
-    private fun isWebp(bytes: ByteArray): Boolean = bytes.size >= 12 && asciiEquals(bytes, 0, "RIFF") && asciiEquals(bytes, 8, "WEBP")
-
+    /** Retains the existing MediaPipeline test and animation-sniff boundary. */
     internal fun isGif(bytes: ByteArray): Boolean =
-        bytes.size >= 6 &&
-            (asciiEquals(bytes, 0, "GIF87a") || asciiEquals(bytes, 0, "GIF89a"))
+        dev.ipf.whitenoise.android.media
+            .isGif(bytes)
 
     internal fun hasWebpAnimChunk(bytes: ByteArray): Boolean {
         if (!isWebp(bytes)) return false
@@ -1244,328 +1222,30 @@ object MediaPipeline {
         return null
     }
 
-    private fun stripJpegMetadata(bytes: ByteArray): ByteArray? {
-        if (!isJpeg(bytes)) return null
-        val out = ByteArrayOutputStream(bytes.size)
-        out.write(bytes, 0, 2)
-        var pos = 2
-        while (pos < bytes.size) {
-            val markerStart = pos
-            if (u8(bytes, pos) != 0xff) return null
-            while (pos < bytes.size && u8(bytes, pos) == 0xff) pos++
-            if (pos >= bytes.size) return null
-            val marker = u8(bytes, pos++)
-            if (marker == 0x00) return null
-            if (marker == 0xd9 || marker in 0xd0..0xd7 || marker == 0x01) {
-                out.write(bytes, markerStart, pos - markerStart)
-                if (marker == 0xd9) return out.toByteArray()
-                continue
-            }
-            if (pos + 2 > bytes.size) return null
-            val length = u16be(bytes, pos)
-            if (length < 2 || pos + length > bytes.size) return null
-            val segmentEnd = pos + length
-            if (marker == 0xda) {
-                out.write(bytes, markerStart, segmentEnd - markerStart)
-                var scanPos = segmentEnd
-                var nextMarkerStart = -1
-                while (scanPos < bytes.size) {
-                    if (u8(bytes, scanPos) != 0xff) {
-                        scanPos++
-                        continue
-                    }
-                    val candidateStart = scanPos
-                    while (scanPos < bytes.size && u8(bytes, scanPos) == 0xff) scanPos++
-                    if (scanPos >= bytes.size) return null
-                    val candidate = u8(bytes, scanPos)
-                    if (candidate == 0x00) {
-                        scanPos++ // Stuffed 0xff byte inside entropy-coded data.
-                    } else if (candidate in 0xd0..0xd7) {
-                        scanPos++ // Restart markers are part of the scan stream.
-                    } else {
-                        nextMarkerStart = candidateStart
-                        break
-                    }
-                }
-                if (nextMarkerStart < 0) return null
-                out.write(bytes, segmentEnd, nextMarkerStart - segmentEnd)
-                pos = nextMarkerStart
-                continue
-            }
-            if (!isJpegMetadataMarker(marker)) {
-                out.write(bytes, markerStart, segmentEnd - markerStart)
-            }
-            pos = segmentEnd
-        }
-        return null
-    }
-
-    private fun isJpegMetadataMarker(marker: Int): Boolean =
-        marker == 0xe1 ||
-            // EXIF and XMP APP1 payloads.
-            marker == 0xed ||
-            // Photoshop/IPTC APP13 payloads.
-            marker == 0xfe // User comments can carry device/location notes.
-
-    private fun stripPngMetadata(bytes: ByteArray): ByteArray? {
-        if (!isPng(bytes)) return null
-        val out = ByteArrayOutputStream(bytes.size)
-        out.write(bytes, 0, PNG_SIGNATURE.size)
-        var pos = PNG_SIGNATURE.size
-        while (pos + PNG_CHUNK_OVERHEAD <= bytes.size) {
-            val length = u32be(bytes, pos)
-            val dataStart = pos + 8
-            val chunkEndLong = dataStart.toLong() + length + 4L
-            if (chunkEndLong > bytes.size.toLong()) return null
-            val chunkEnd = chunkEndLong.toInt()
-            val type = ascii(bytes, pos + 4, 4)
-            if (!PNG_METADATA_CHUNKS.contains(type)) {
-                out.write(bytes, pos, chunkEnd - pos)
-            }
-            pos = chunkEnd
-            if (type == "IEND") return out.toByteArray()
-        }
-        return null
-    }
-
-    private fun stripWebpMetadata(bytes: ByteArray): ByteArray? {
-        if (!isWebp(bytes)) return null
-        val out = ByteArrayOutputStream(bytes.size)
-        out.write(bytes, 0, 4) // RIFF
-        writeU32le(out, 0) // patched after chunk filtering
-        out.write(bytes, 8, 4) // WEBP
-        var pos = 12
-        while (pos + 8 <= bytes.size) {
-            val chunkType = ascii(bytes, pos, 4)
-            val chunkSize = u32le(bytes, pos + 4)
-            val dataStart = pos + 8
-            val dataEndLong = dataStart.toLong() + chunkSize
-            val paddedEndLong = dataEndLong + (chunkSize and 1L)
-            if (paddedEndLong > bytes.size.toLong()) return null
-            val paddedEnd = paddedEndLong.toInt()
-            when (chunkType) {
-                "EXIF", "XMP ", "ICCP" -> Unit
-                "VP8X" -> {
-                    val chunk = bytes.copyOfRange(pos, paddedEnd)
-                    if (chunkSize > 0) {
-                        // Clear ICC, EXIF, and XMP presence bits after dropping those chunks.
-                        chunk[8] = (chunk[8].toInt() and WEBP_FLAGS_WITHOUT_PRIVATE_METADATA).toByte()
-                    }
-                    out.write(chunk, 0, chunk.size)
-                }
-                else -> out.write(bytes, pos, paddedEnd - pos)
-            }
-            pos = paddedEnd
-        }
-        if (pos != bytes.size) return null
-        val result = out.toByteArray()
-        writeU32le(result, 4, result.size - 8)
-        return result
-    }
-
-    @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
-    // GIF is a block stream. Preserve image data, graphics control, and only
-    // the two standard animation-loop application extensions; drop comments,
-    // plain text, XMP, ICC, and arbitrary application payloads.
-    private fun stripGifMetadata(bytes: ByteArray): ByteArray? {
-        if (!isGif(bytes) || bytes.size < GIF_FIXED_HEADER_BYTES) return null
-        val packed = u8(bytes, GIF_LOGICAL_SCREEN_PACKED_OFFSET)
-        val globalColorBytes =
-            if (packed and GIF_COLOR_TABLE_FLAG != 0) {
-                GIF_COLOR_ENTRY_BYTES * (1 shl ((packed and GIF_COLOR_TABLE_SIZE_MASK) + 1))
-            } else {
-                0
-            }
-        var position = GIF_FIXED_HEADER_BYTES + globalColorBytes
-        if (position > bytes.size) return null
-        val out = ByteArrayOutputStream(bytes.size)
-        out.write(bytes, 0, position)
-        var imageCount = 0
-        while (position < bytes.size) {
-            when (u8(bytes, position)) {
-                GIF_TRAILER -> {
-                    if (position != bytes.lastIndex || imageCount == 0) return null
-                    out.write(GIF_TRAILER)
-                    return out.toByteArray()
-                }
-                GIF_IMAGE_SEPARATOR -> {
-                    if (position + GIF_IMAGE_DESCRIPTOR_BYTES > bytes.size) return null
-                    val imagePacked = u8(bytes, position + GIF_IMAGE_PACKED_OFFSET)
-                    val localColorBytes =
-                        if (imagePacked and GIF_COLOR_TABLE_FLAG != 0) {
-                            GIF_COLOR_ENTRY_BYTES * (1 shl ((imagePacked and GIF_COLOR_TABLE_SIZE_MASK) + 1))
-                        } else {
-                            0
-                        }
-                    val imageDataStart = position + GIF_IMAGE_DESCRIPTOR_BYTES + localColorBytes
-                    if (imageDataStart >= bytes.size) return null
-                    val imageEnd = gifSubBlocksEnd(bytes, imageDataStart + 1) ?: return null
-                    out.write(bytes, position, imageEnd - position)
-                    position = imageEnd
-                    imageCount++
-                }
-                GIF_EXTENSION_INTRODUCER -> {
-                    if (position + 2 > bytes.size) return null
-                    val label = u8(bytes, position + 1)
-                    val extensionEnd = gifSubBlocksEnd(bytes, position + 2) ?: return null
-                    val keep =
-                        when (label) {
-                            GIF_GRAPHICS_CONTROL_LABEL -> true
-                            GIF_APPLICATION_LABEL -> isGifLoopApplicationExtension(bytes, position, extensionEnd)
-                            GIF_COMMENT_LABEL,
-                            GIF_PLAIN_TEXT_LABEL,
-                            -> false
-                            else -> return null
-                        }
-                    if (keep) out.write(bytes, position, extensionEnd - position)
-                    position = extensionEnd
-                }
-                else -> return null
-            }
-        }
-        return null
-    }
-
-    @Suppress("ReturnCount") // A malformed size must stop at the exact failing sub-block.
-    private fun gifSubBlocksEnd(
-        bytes: ByteArray,
-        start: Int,
-    ): Int? {
-        var position = start
-        while (position < bytes.size) {
-            val blockSize = u8(bytes, position)
-            position++
-            if (blockSize == 0) return position
-            if (position + blockSize > bytes.size) return null
-            position += blockSize
-        }
-        return null
-    }
-
-    @Suppress("ReturnCount") // Bounds guards avoid reading an untrusted extension identifier.
-    private fun isGifLoopApplicationExtension(
-        bytes: ByteArray,
-        start: Int,
-        end: Int,
-    ): Boolean {
-        val blockSizeOffset = start + 2
-        if (blockSizeOffset >= end || u8(bytes, blockSizeOffset) != GIF_APPLICATION_IDENTIFIER_BYTES) return false
-        val identifierStart = blockSizeOffset + 1
-        if (identifierStart + GIF_APPLICATION_IDENTIFIER_BYTES > end) return false
-        val identifier = ascii(bytes, identifierStart, GIF_APPLICATION_IDENTIFIER_BYTES)
-        return identifier == "NETSCAPE2.0" || identifier == "ANIMEXTS1.0"
-    }
-
-    private val PNG_SIGNATURE = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
-    private const val PNG_CHUNK_HEADER_BYTES = 8
-    private const val PNG_CHUNK_OVERHEAD = 12
-    private const val PNG_CHUNK_TYPE_OFFSET = 4
-    private const val PNG_CHUNK_TYPE_BYTES = 4
     private const val ISO_BMFF_BOX_TYPE_OFFSET = 4
     private const val ISO_BMFF_MAJOR_BRAND_OFFSET = 8
     private const val ISO_BMFF_COMPATIBLE_BRANDS_OFFSET = 16
     private const val ISO_BMFF_BRAND_BYTES = 4
     private const val ISO_BMFF_FILE_TYPE_MIN_BYTES = 16L
-    private val PNG_METADATA_CHUNKS = setOf("eXIf", "tEXt", "zTXt", "iTXt", "tIME")
-    private const val GIF_FIXED_HEADER_BYTES = 13
-    private const val GIF_LOGICAL_SCREEN_PACKED_OFFSET = 10
-    private const val GIF_COLOR_TABLE_FLAG = 0x80
-    private const val GIF_COLOR_TABLE_SIZE_MASK = 0x07
-    private const val GIF_COLOR_ENTRY_BYTES = 3
-    private const val GIF_TRAILER = 0x3b
-    private const val GIF_IMAGE_SEPARATOR = 0x2c
-    private const val GIF_IMAGE_DESCRIPTOR_BYTES = 10
-    private const val GIF_IMAGE_PACKED_OFFSET = 9
-    private const val GIF_EXTENSION_INTRODUCER = 0x21
-    private const val GIF_GRAPHICS_CONTROL_LABEL = 0xf9
-    private const val GIF_APPLICATION_LABEL = 0xff
-    private const val GIF_COMMENT_LABEL = 0xfe
-    private const val GIF_PLAIN_TEXT_LABEL = 0x01
-    private const val GIF_APPLICATION_IDENTIFIER_BYTES = 11
-    private const val WEBP_FLAGS_WITHOUT_PRIVATE_METADATA = 0xd3
     private val EXIF_PREAMBLE = byteArrayOf(0x45, 0x78, 0x69, 0x66, 0x00, 0x00) // "Exif\u0000\u0000"
     private const val EXIF_FALLBACK_PREFIX_BYTES = 256 * 1024
     private const val EXIF_ORIENTATION_TAG = 0x0112
     private const val TIFF_IFD_ENTRY_SIZE = 12
     private const val TIFF_TYPE_SHORT = 3
 
-    private fun u8(
-        bytes: ByteArray,
-        offset: Int,
-    ): Int = bytes[offset].toInt() and 0xff
-
-    private fun u16be(
-        bytes: ByteArray,
-        offset: Int,
-    ): Int = (u8(bytes, offset) shl 8) or u8(bytes, offset + 1)
-
-    private fun u16le(
-        bytes: ByteArray,
-        offset: Int,
-    ): Int = u8(bytes, offset) or (u8(bytes, offset + 1) shl 8)
-
+    /** Reads a TIFF 16-bit value using its declared byte order. */
     private fun u16(
         bytes: ByteArray,
         offset: Int,
         littleEndian: Boolean,
     ): Int = if (littleEndian) u16le(bytes, offset) else u16be(bytes, offset)
 
-    private fun u32be(
-        bytes: ByteArray,
-        offset: Int,
-    ): Long =
-        (u8(bytes, offset).toLong() shl 24) or
-            (u8(bytes, offset + 1).toLong() shl 16) or
-            (u8(bytes, offset + 2).toLong() shl 8) or
-            u8(bytes, offset + 3).toLong()
-
-    private fun u32le(
-        bytes: ByteArray,
-        offset: Int,
-    ): Long =
-        u8(bytes, offset).toLong() or
-            (u8(bytes, offset + 1).toLong() shl 8) or
-            (u8(bytes, offset + 2).toLong() shl 16) or
-            (u8(bytes, offset + 3).toLong() shl 24)
-
+    /** Reads a TIFF 32-bit value using its declared byte order. */
     private fun u32(
         bytes: ByteArray,
         offset: Int,
         littleEndian: Boolean,
     ): Long = if (littleEndian) u32le(bytes, offset) else u32be(bytes, offset)
-
-    private fun ascii(
-        bytes: ByteArray,
-        offset: Int,
-        length: Int,
-    ): String = String(bytes, offset, length, StandardCharsets.US_ASCII)
-
-    private fun asciiEquals(
-        bytes: ByteArray,
-        offset: Int,
-        value: String,
-    ): Boolean = offset + value.length <= bytes.size && ascii(bytes, offset, value.length) == value
-
-    private fun writeU32le(
-        out: ByteArrayOutputStream,
-        value: Int,
-    ) {
-        out.write(value and 0xff)
-        out.write((value ushr 8) and 0xff)
-        out.write((value ushr 16) and 0xff)
-        out.write((value ushr 24) and 0xff)
-    }
-
-    private fun writeU32le(
-        bytes: ByteArray,
-        offset: Int,
-        value: Int,
-    ) {
-        bytes[offset] = (value and 0xff).toByte()
-        bytes[offset + 1] = ((value ushr 8) and 0xff).toByte()
-        bytes[offset + 2] = ((value ushr 16) and 0xff).toByte()
-        bytes[offset + 3] = ((value ushr 24) and 0xff).toByte()
-    }
 
     /**
      * Largest power-of-two inSampleSize that keeps the decoded bitmap at

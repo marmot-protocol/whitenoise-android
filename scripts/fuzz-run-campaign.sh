@@ -10,6 +10,7 @@ TARGETS=(
   fuzzIdentityReference
   fuzzGroupSystemEvent
   fuzzNip55SignerProtocol
+  fuzzImageContainerBytes
 )
 
 METADATA_FILE="fuzz/build/fuzz-engine-metadata.properties"

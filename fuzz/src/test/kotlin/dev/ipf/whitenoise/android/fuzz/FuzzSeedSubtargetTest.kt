@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.fuzz
 
+import dev.ipf.whitenoise.android.media.ImageContainerKind
+import dev.ipf.whitenoise.android.media.imageContainerKind
+import dev.ipf.whitenoise.android.media.stripImageContainerMetadata
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -11,6 +14,7 @@ import kotlin.io.path.name
 import kotlin.io.path.readBytes
 
 class FuzzSeedSubtargetTest {
+    /** Verifies every checked-in seed routes to the subtarget its filename documents. */
     @TestFactory
     fun checkedInSeedsSelectSubtargetNamedInFilename(): List<DynamicTest> =
         SEED_EXPECTATIONS.map { expectation ->
@@ -25,11 +29,17 @@ class FuzzSeedSubtargetTest {
             }
         }
 
+    /** Confirms the framed payload remains structurally useful after consuming its selector. */
     private fun assertSeedPayload(
         seedName: String,
         provider: ByteArrayFuzzedDataProvider,
     ) {
         when {
+            seedName in IMAGE_CONTAINER_SEEDS -> {
+                val bytes = imageContainerFuzzInput(provider.consumeRemainingAsBytes())
+                assertEquals(IMAGE_CONTAINER_SEEDS.getValue(seedName), imageContainerKind(bytes))
+                assertTrue(stripImageContainerMetadata(bytes) != null, "$seedName must be accepted by its byte walker")
+            }
             seedName in GROUP_SYSTEM_SEEDS ->
                 assertTrue(provider.consumeParserInput().trimStart().startsWith("{"), "$seedName must replay JSON")
             seedName.startsWith("nostr_event_") ->
@@ -82,6 +92,13 @@ class FuzzSeedSubtargetTest {
                 "truncated_nested.input",
                 "unicode_unknown.input",
             )
+        private val IMAGE_CONTAINER_SEEDS =
+            mapOf(
+                "minimal_jpeg.input" to ImageContainerKind.Jpeg,
+                "minimal_png.input" to ImageContainerKind.Png,
+                "minimal_webp.input" to ImageContainerKind.Webp,
+                "minimal_gif.input" to ImageContainerKind.Gif,
+            )
 
         private val SEED_EXPECTATIONS: List<SeedExpectation> =
             Files.walk(resourcesRoot).use { paths ->
@@ -91,9 +108,17 @@ class FuzzSeedSubtargetTest {
                     .toList()
             }
 
+        /** Maps a corpus filename to the selector contract used by its Jazzer target. */
         private fun expectationFor(seedPath: Path): SeedExpectation {
             val name = seedPath.name
             return when {
+                name in IMAGE_CONTAINER_SEEDS ->
+                    seedExpectation(
+                        seedPath,
+                        ImageContainerSubtarget.COUNT,
+                        ImageContainerSubtarget.AllContainers.ordinal,
+                        ImageContainerSubtarget.AllContainers.name,
+                    )
                 name in GROUP_SYSTEM_SEEDS ->
                     seedExpectation(
                         seedPath,
@@ -175,6 +200,7 @@ class FuzzSeedSubtargetTest {
             }
         }
 
+        /** Creates one normalized filename-to-selector expectation. */
         private fun seedExpectation(
             seedPath: Path,
             subtargetCount: Int,
