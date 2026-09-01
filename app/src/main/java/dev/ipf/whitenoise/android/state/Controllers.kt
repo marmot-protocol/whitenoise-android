@@ -2903,7 +2903,7 @@ private data class RemovedChatRowSnapshot(
     val optimisticState: OptimisticChatListPreviewState?,
 )
 
-private class OptimisticArchiveIntent(
+internal class OptimisticArchiveIntent(
     val bindEpoch: Long,
     val archived: Boolean,
 )
@@ -5090,6 +5090,24 @@ class ChatsController private constructor(
         return succeeded
     }
 
+    /**
+     * Begin a single-row presentation-only archive intent on behalf of a
+     * conversation surface (top bar or Group Details), so the chat-list row
+     * moves in the same frame the surface acknowledges the action. Returns null
+     * when the row is absent or already presents [archived]; the caller must
+     * finish the returned intent once its engine commit settles either way.
+     */
+    internal fun beginConversationArchiveIntent(
+        groupIdHex: String,
+        archived: Boolean,
+    ): OptimisticArchiveIntent? = beginOptimisticArchive(listOf(groupIdHex), archived, bindEpoch).singleOrNull()?.second
+
+    /** Retire a conversation-surface archive intent; stale or rebound intents are ignored. */
+    internal fun finishConversationArchiveIntent(
+        groupIdHex: String,
+        intent: OptimisticArchiveIntent,
+    ) = finishOptimisticArchive(groupIdHex, intent)
+
     private fun beginOptimisticArchive(
         groupIds: Collection<String>,
         archived: Boolean,
@@ -6476,6 +6494,11 @@ class ConversationController(
     private val mediaPublisher: MediaPublisher = { account, groupIdHex, references, caption ->
         appState.marmotIo { sendMediaAttachments(account, groupIdHex, references, caption) }
     },
+    private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
+    private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi =
+        { account, groupIdHex, archived ->
+            appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
+        },
     private val clockMillis: () -> Long = System::currentTimeMillis,
     private val inviteAcceptor: InviteAcceptor = { account, groupIdHex ->
         appState.marmotIo(MarmotTraceSection.ACCEPT_GROUP_INVITE) {
@@ -6487,6 +6510,29 @@ class ConversationController(
 
     var group by mutableStateOf(initialGroup)
         private set
+
+    /** The accepted in-flight archive/restore, presentation-only; identity-compared on settle. */
+    private class ConversationArchiveIntent(
+        val archived: Boolean,
+    )
+
+    private var pendingArchiveIntent by mutableStateOf<ConversationArchiveIntent?>(null)
+
+    // Main-confined count of authoritative group applications (subscription
+    // updates and details/rebind round-trips). A mutation captures it before
+    // suspending in engine I/O and applies its returned record only while the
+    // count is unchanged, so a newer authoritative update always wins over a
+    // late completion.
+    private var groupAuthorityEpoch = 0L
+
+    /**
+     * Archived state the conversation surfaces should present: the accepted
+     * in-flight archive/restore intent when one exists, else the authoritative
+     * group. Failure or cancellation only clears the intent, so the newest
+     * authoritative state shows through instead of a captured snapshot.
+     */
+    val presentedArchived: Boolean
+        get() = pendingArchiveIntent?.archived ?: group.archived
 
     private var acceptedInvitePeerAccount by mutableStateOf<String?>(null)
 
@@ -7538,8 +7584,14 @@ class ConversationController(
     // the current policy changes so optimistic-send state is immediately
     // reconciled. Each row's pinned deadline remains independent of the current
     // policy, so historical rows are never reinterpreted by this republish.
+
+    /** Test entry to the subscription-update application path. */
+    @VisibleForTesting
+    internal fun applyGroupStateForTest(update: AppGroupRecordFfi) = applyGroupState(update)
+
     private fun applyGroupState(update: AppGroupRecordFfi) {
         val previousRetention = group.disappearingMessageSecs
+        groupAuthorityEpoch += 1L
         group =
             reconcileTerminalSelfMembership(
                 update = update,
@@ -9835,23 +9887,53 @@ class ConversationController(
             }
         }
 
+    /**
+     * Archive or restore this conversation with a presentation-only optimistic
+     * intent: the conversation surfaces and the bound chat-list row acknowledge
+     * the accepted action before the engine commit starts or waits behind the
+     * group commit lock. MDK stays authoritative — success settles into the
+     * returned group in the same frame the intent retires, while failure or
+     * cancellation clears only the matching intent so the newest authoritative
+     * projection shows through instead of a captured snapshot. The mutation
+     * lock drops repeated taps while one logical mutation is in flight, so no
+     * duplicate commits or conflicting overlays can start.
+     */
     suspend fun setArchived(archived: Boolean): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            runCatchingCancellable {
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    val updated = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
-                    group = updated
-                    appState.applyLocalGroupUpdate(updated)
-                }
-                presentConversationTransient(
-                    if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored,
-                )
-                true
-            }.onFailure {
-                recordMutationFailure(R.string.toast_couldnt_update_chat, "GROUP_ARCHIVE_UPDATE", it)
-            }.getOrDefault(false)
+            val groupIdHex = group.groupIdHex
+            val intent = ConversationArchiveIntent(archived)
+            pendingArchiveIntent = intent
+            val chatListIntent = appState.beginChatListArchiveIntent(account, groupIdHex, archived)
+            val authorityEpochBefore = groupAuthorityEpoch
+            try {
+                runCatchingCancellable {
+                    appState.withGroupCommitLock(account, groupIdHex) {
+                        val updated = groupArchivedUpdater(account, groupIdHex, archived)
+                        // A newer authoritative application (subscription update
+                        // or details round-trip) that landed while this commit
+                        // was in flight wins over the late success; the engine's
+                        // own archive-change event reconverges the projection.
+                        if (groupAuthorityEpoch == authorityEpochBefore) {
+                            group = updated
+                            appState.applyLocalGroupUpdate(updated)
+                        }
+                    }
+                    presentConversationTransient(
+                        if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored,
+                    )
+                    true
+                }.onFailure {
+                    recordMutationFailure(R.string.toast_couldnt_update_chat, "GROUP_ARCHIVE_UPDATE", it)
+                }.getOrDefault(false)
+            } finally {
+                // Identity-compared so a newer action's intent is never cleared
+                // by an older completion, and account/group switches (which
+                // rebind the chat list) cannot receive this stale settle.
+                if (pendingArchiveIntent === intent) pendingArchiveIntent = null
+                appState.finishChatListArchiveIntent(account, groupIdHex, chatListIntent)
+            }
         }
 
     suspend fun deleteGroupLocal(): Boolean =
@@ -12287,6 +12369,7 @@ class ConversationController(
             return null
         }
         val applied = resolution.applied
+        groupAuthorityEpoch += 1L
         group =
             reconcileTerminalSelfMembership(
                 update = applied.group,

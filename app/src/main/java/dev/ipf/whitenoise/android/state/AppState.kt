@@ -2943,6 +2943,33 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
+     * Begin a presentation-only chat-list archive intent for a
+     * conversation-surface archive/restore, scoped to the bound
+     * [ChatsController] account like the other chat-list bridges so an intent
+     * from one account cannot land on another controller after a switch.
+     */
+    internal fun beginChatListArchiveIntent(
+        accountRef: String?,
+        groupIdHex: String,
+        archived: Boolean,
+    ): OptimisticArchiveIntent? =
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.beginConversationArchiveIntent(groupIdHex, archived)
+
+    /** Retire [intent] once its engine commit settled; a rebound controller ignores it. */
+    internal fun finishChatListArchiveIntent(
+        accountRef: String?,
+        groupIdHex: String,
+        intent: OptimisticArchiveIntent?,
+    ) {
+        intent ?: return
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.finishConversationArchiveIntent(groupIdHex, intent)
+    }
+
+    /**
      * Apply the authoritative chat-list row returned by [markTimelineMessageRead].
      * Scoped to the bound [ChatsController] account so a mark-read on one
      * account cannot fold onto another after a switch.
