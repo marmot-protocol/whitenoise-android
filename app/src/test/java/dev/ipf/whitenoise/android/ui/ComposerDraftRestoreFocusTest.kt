@@ -2,16 +2,25 @@ package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.state.ComposerDraftSnapshot
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.conversationRoutePresentationShouldFreeze
+import dev.ipf.whitenoise.android.ui.conversation.shouldAutoFocusComposerOnDraftRestore
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -25,6 +34,80 @@ import org.robolectric.annotation.Config
 class ComposerDraftRestoreFocusTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun inPlaceDictationCompletionRehydratesComposerWithoutRequestingFocusOrIme() {
+        val draftKey = "conversation-1"
+        var persistedDraft by mutableStateOf<ComposerDraftSnapshot?>(null)
+        var dictationRevision by mutableIntStateOf(0)
+        lateinit var composerState: ComposerTextState
+        var focusGainCount = 0
+        val keyboardController = RecordingSoftwareKeyboardController()
+
+        composeRule.setContent {
+            val snapshot = persistedDraft
+            val autoFocusConsumed = remember(draftKey) { mutableStateOf(false) }
+            val dictationRevisionOnEntry = remember(draftKey) { dictationRevision }
+            composerState =
+                rememberComposerTextState(
+                    draftKey = draftKey,
+                    initialDraft = snapshot?.textFieldValue ?: TextFieldValue(),
+                    externalRevision = 0 to dictationRevision,
+                )
+            WhiteNoiseTheme {
+                Surface {
+                    ComposerBar(
+                        replyingTo = null,
+                        messageTextCopy = MessageTextCopy.Default,
+                        onCancelReply = {},
+                        onSend = { _, _ -> },
+                        initialDraft = snapshot?.textFieldValue ?: TextFieldValue(),
+                        draftKey = draftKey,
+                        textState = composerState,
+                        autoFocusOnDraftRestore =
+                            shouldAutoFocusComposerOnDraftRestore(
+                                snapshot = snapshot,
+                                dictationRevisionOnEntry = dictationRevisionOnEntry,
+                                currentDictationRevision = dictationRevision,
+                            ),
+                        autoFocusConsumedState = autoFocusConsumed,
+                        softwareKeyboardController = keyboardController,
+                        onComposerFocusChanged = { focused ->
+                            if (focused) focusGainCount += 1
+                        },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val accepted = TextFieldValue("accepted words", TextRange(3, 11))
+        composeRule.runOnIdle {
+            persistedDraft = ComposerDraftSnapshot(accepted, focusOnRestore = true)
+            dictationRevision += 1
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            assertEquals(accepted, composerState.valueState.value)
+            assertEquals(0, focusGainCount)
+            assertEquals(0, keyboardController.showRequests)
+        }
+
+        composeRule.onNodeWithText("accepted words").performClick()
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals(1, focusGainCount) }
+    }
+
+    private class RecordingSoftwareKeyboardController : SoftwareKeyboardController {
+        var showRequests = 0
+
+        override fun show() {
+            showRequests += 1
+        }
+
+        override fun hide() = Unit
+    }
 
     @Test
     fun restoredDraftFocusSurvivesComposerRemountWithSameDraftKey() {

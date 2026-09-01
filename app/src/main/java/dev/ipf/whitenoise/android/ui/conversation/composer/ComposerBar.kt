@@ -67,6 +67,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextRange
@@ -356,6 +357,7 @@ internal fun ComposerBar(
     // Defaulted to a locally-remembered requester so other call sites keep the
     // previous self-contained behavior.
     composerFocus: FocusRequester = remember { FocusRequester() },
+    softwareKeyboardController: SoftwareKeyboardController? = LocalSoftwareKeyboardController.current,
     // #589: surfaces the live focus state up to the conversation screen so the
     // resume observer can tell whether the keyboard was up when we were paused.
     onComposerFocusChanged: (Boolean) -> Unit = {},
@@ -478,7 +480,7 @@ internal fun ComposerBar(
     // gated by a non-saveable flag so a direct in-place conversation switch
     // can focus the new draft without recomposition re-firing it. Skipped while
     // editing — the edit effect above already owns focus then.
-    val keyboardController = LocalSoftwareKeyboardController.current
+    val keyboardController = softwareKeyboardController
     val focusManager = LocalFocusManager.current
     val controllerForDictation = dictationController
     val accountForDictation = dictationAccountRef
