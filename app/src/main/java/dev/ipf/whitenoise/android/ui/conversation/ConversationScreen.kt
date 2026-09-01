@@ -125,7 +125,6 @@ import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
-import dev.ipf.whitenoise.android.state.shouldFocusComposerOnDraftRestore
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.MentionDetectionCache
@@ -2792,6 +2791,15 @@ internal fun ConversationScreen(
                 groupIdHex = controller.group.groupIdHex,
             )
         } ?: 0
+    // Capture the revision for this navigation entry. A later accepted
+    // transcript must rehydrate text/selection without being mistaken for a
+    // restored draft and reopening the IME. Re-entering the conversation gets
+    // a fresh baseline, so genuine draft restoration still focuses once.
+    val composerDictationRevisionOnEntry =
+        rememberComposerDictationRevisionOnEntry(
+            groupIdHex = controller.group.groupIdHex,
+            currentRevision = composerDictationRevision,
+        )
     val composerTextState =
         rememberComposerTextState(
             draftKey = controller.group.groupIdHex,
@@ -3139,7 +3147,11 @@ internal fun ConversationScreen(
                 mentionPickerEnabled = mentionPicker.enabled,
                 autoFocusOnEnter = justCreated && !freezeRoutePresentation,
                 autoFocusOnDraftRestore =
-                    shouldFocusComposerOnDraftRestore(restoredDraftSnapshot) &&
+                    shouldAutoFocusComposerOnDraftRestore(
+                        snapshot = restoredDraftSnapshot,
+                        dictationRevisionOnEntry = composerDictationRevisionOnEntry,
+                        currentDictationRevision = composerDictationRevision,
+                    ) &&
                         !freezeRoutePresentation,
                 autoFocusConsumedState = composerAutoFocusConsumed,
                 composerFocus = composerFocus,
