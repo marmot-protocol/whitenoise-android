@@ -26,6 +26,7 @@ internal fun WhiteNoiseAppState.forwardTransport(
     materializationRequests: List<AttachmentTransferRequest>,
     batchMessageCount: Int,
 ): ForwardTransport {
+    /** Rejects source reads after their explicitly bound signing account leaves the runtime. */
     fun requireSourceAccount() {
         if (!isForwardOwnerSignedIn(sourceAccount)) throw ForwardSessionInvalidatedException()
     }
@@ -36,6 +37,7 @@ internal fun WhiteNoiseAppState.forwardTransport(
     }
 
     return object : ForwardTransport {
+        /** Resolves and decrypts one attachment strictly through the source account. */
         override suspend fun materialize(
             sourceGroupIdHex: String,
             sourceMessageIdHex: String,
@@ -74,6 +76,7 @@ internal fun WhiteNoiseAppState.forwardTransport(
             materializationRequests.forEach(::cancelMemoizedAttachmentDownload)
         }
 
+        /** Uploads already-materialized bytes strictly through the destination account. */
         override suspend fun upload(
             targetGroupIdHex: String,
             message: PreparedForwardMessage.Media,
@@ -105,6 +108,7 @@ internal fun WhiteNoiseAppState.forwardTransport(
             return uploaded
         }
 
+        /** Reads enough recent destination history to classify an uncertain batch publication. */
         private suspend fun recentForwardTimeline(
             targetGroupIdHex: String,
             batchMessageCount: Int,
@@ -127,6 +131,7 @@ internal fun WhiteNoiseAppState.forwardTransport(
             }.also { requireDestinationAccount() }
         }
 
+        /** Serializes a destination batch and records exact evidence around uncertain commits. */
         @Suppress("LongMethod", "ThrowsCount", "TooGenericExceptionCaught")
         override suspend fun publishBatch(
             targetGroupIdHex: String,
@@ -209,6 +214,7 @@ internal fun WhiteNoiseAppState.forwardTransport(
             }
         }
 
+        /** Reconciles one uncertain destination publication without risking a duplicate send. */
         @Suppress("ThrowsCount")
         override suspend fun recoverPendingPublish(
             targetGroupIdHex: String,

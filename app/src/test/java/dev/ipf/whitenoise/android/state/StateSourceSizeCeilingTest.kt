@@ -44,7 +44,7 @@ class StateSourceSizeCeilingTest {
         // Lowered again when the forwarding transport moved to
         // AppStateForwardTransport.kt; headroom stays deliberately small so new
         // work keeps landing in smaller units.
-        const val APP_STATE_MAX_LINES = 10050
+        const val APP_STATE_MAX_LINES = 9950
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }

@@ -120,6 +120,7 @@ class ForwardProductionBoundaryCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull(File::exists) ?: error("Missing AppState.kt source file")
 
+    /** Locates the extracted production transport in root- and module-scoped test layouts. */
     private fun transportSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt"),
