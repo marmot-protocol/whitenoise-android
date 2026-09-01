@@ -2213,6 +2213,14 @@ class WhiteNoiseAppState private constructor(
             onTerminal = ::scheduleForwardTerminalDismiss,
         )
     internal val activeForwardOperation: StateFlow<ForwardOperationSnapshot?> = forwardOperationOwner.state
+
+    /** Destination owner of the visible forward operation, for account-scoped progress UI. */
+    internal var activeForwardDestinationAccountRef by mutableStateOf<String?>(null)
+        private set
+
+    /** Destination chat titles captured at forward acceptance, keyed by lowercase group id. */
+    internal var activeForwardTargetTitles by mutableStateOf<Map<String, String>>(emptyMap())
+        private set
     private val draftWriter =
         CoalescingMessageDraftWriter(
             scope = mutationsScope,
@@ -2974,11 +2982,46 @@ class WhiteNoiseAppState private constructor(
         chatsController?.retryLoad()
     }
 
+    /** True while [accountRef] can still own one side of a forwarding operation. */
+    internal fun isForwardOwnerSignedIn(accountRef: String): Boolean =
+        accounts.any { account ->
+            account.label == accountRef && account.isSignedInSigningAccount()
+        }
+
+    private var forwardRequestPersistenceOverride: SerializedPendingForwardRequestStore? = null
+
+    private val forwardRequestPersistence: SerializedPendingForwardRequestStore
+        get() = forwardRequestPersistenceOverride ?: EncryptedPendingForwardRequestStore.forContext(appContext)
+
+    /** Test seam replacing the encrypted on-disk pending-forward store. */
+    internal fun overrideForwardRequestPersistence(store: SerializedPendingForwardRequestStore) {
+        forwardRequestPersistenceOverride = store
+    }
+
+    /** Mirrors one unresolved forward request into encrypted no-backup storage. */
+    internal fun persistPendingForwardRequest(request: PendingForwardRequest) {
+        mutationsScope.launch { forwardRequestPersistence.save(request) }
+    }
+
+    /** Discards an unresolved forward request after explicit dismissal or acceptance. */
+    internal fun discardPendingForwardRequest(requestId: String) {
+        mutationsScope.launch { forwardRequestPersistence.remove(requestId) }
+    }
+
+    /** Loads the unresolved forward request, if any, for process-recreation restore. */
+    internal suspend fun loadPendingForwardRequest(): PendingForwardRequest? = forwardRequestPersistence.load()
+
     internal fun cancelActiveForwardOperation(): Boolean = forwardOperationOwner.cancel()
 
     internal fun retryActiveForwardOperation(): Boolean = forwardOperationOwner.retry()
 
-    internal fun dismissActiveForwardOperation(): Boolean = forwardOperationOwner.dismiss()
+    internal fun dismissActiveForwardOperation(): Boolean =
+        forwardOperationOwner.dismiss().also { dismissed ->
+            if (dismissed) {
+                activeForwardDestinationAccountRef = null
+                activeForwardTargetTitles = emptyMap()
+            }
+        }
 
     /**
      * Stage an inbound Android share for the explicitly chosen local account.
@@ -3077,14 +3120,23 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Start one ordered text/media forward operation. Source attachments are
-     * materialized through their original group, while every destination gets
-     * a separate upload before its batch acquires the destination commit lock.
+     * Start one ordered text/media forward operation with explicit account
+     * ownership. Source attachments are materialized through their original
+     * group only under [sourceAccountRef]; destination upload, commit
+     * locking, publish, convergence recovery, and retries run only under
+     * [destinationAccountRef]. Switching the globally active account cannot
+     * redirect either side: neither boundary ever re-reads the live active
+     * account. Each boundary instead revalidates that its own bound account
+     * is still a signed-in signing account, so removal or sign-out of either
+     * owner stops the operation without falling back to another account.
      */
     @Suppress("CyclomaticComplexMethod", "LongMethod")
     internal fun startForwardMessages(
         targetGroupIds: List<String>,
         messages: List<ForwardMessagePayload>,
+        sourceAccountRef: String? = activeAccountRef,
+        destinationAccountRef: String? = sourceAccountRef,
+        targetTitles: Map<String, String> = emptyMap(),
     ): Boolean {
         val sourceGroupIds =
             messages
@@ -3094,16 +3146,18 @@ class WhiteNoiseAppState private constructor(
             MessageProjector
                 .normalizeForwardTargets(targetGroupIds)
                 .filterNot { target -> sourceGroupIds.any { it.equals(target, ignoreCase = true) } }
-        val account = activeAccountRef?.takeIf(String::isNotBlank)
-        if (account == null || messages.isEmpty() || targets.isEmpty()) return false
-        val sessionEpoch = mediaUploadSessionEpoch()
+        val sourceAccount = sourceAccountRef?.takeIf(String::isNotBlank)?.takeIf(::isForwardOwnerSignedIn)
+        val account = destinationAccountRef?.takeIf(String::isNotBlank)?.takeIf(::isForwardOwnerSignedIn)
+        val startable =
+            sourceAccount != null && account != null && messages.isNotEmpty() && targets.isNotEmpty()
+        if (!startable || sourceAccount == null || account == null) return false
         val materializationRequests =
             messages
                 .filterIsInstance<ForwardMessagePayload.Media>()
                 .flatMap { message ->
                     message.attachments.map { source ->
                         AttachmentTransferRequest(
-                            accountRef = account,
+                            accountRef = sourceAccount,
                             groupIdHex = message.sourceGroupIdHex,
                             messageIdHex = message.sourceMessageIdHex,
                             attachmentIndex = source.attachmentIndex,
@@ -3111,10 +3165,12 @@ class WhiteNoiseAppState private constructor(
                     }
                 }.distinct()
 
-        fun requireCurrentAccount() {
-            if (activeAccountRef != account || mediaUploadSessionEpoch() != sessionEpoch) {
-                throw ForwardSessionInvalidatedException()
-            }
+        fun requireSourceAccount() {
+            if (!isForwardOwnerSignedIn(sourceAccount)) throw ForwardSessionInvalidatedException()
+        }
+
+        fun requireDestinationAccount() {
+            if (!isForwardOwnerSignedIn(account)) throw ForwardSessionInvalidatedException()
         }
 
         val transport =
@@ -3124,10 +3180,10 @@ class WhiteNoiseAppState private constructor(
                     sourceMessageIdHex: String,
                     source: dev.ipf.whitenoise.android.core.ForwardAttachmentSource,
                 ): PendingAttachment {
-                    requireCurrentAccount()
+                    requireSourceAccount()
                     val request =
                         AttachmentTransferRequest(
-                            accountRef = account,
+                            accountRef = sourceAccount,
                             groupIdHex = sourceGroupIdHex,
                             messageIdHex = sourceMessageIdHex,
                             attachmentIndex = source.attachmentIndex,
@@ -3135,11 +3191,11 @@ class WhiteNoiseAppState private constructor(
                     return materializeForwardAttachment(
                         source = source,
                         resolveAuthoritativeReference = {
-                            requireCurrentAccount()
-                            resolveAttachmentReference(request).also { requireCurrentAccount() }
+                            requireSourceAccount()
+                            resolveAttachmentReference(request).also { requireSourceAccount() }
                         },
                         downloadPlaintext = { reference ->
-                            requireCurrentAccount()
+                            requireSourceAccount()
                             // Forwarding owns its operation lifecycle: retain user-level queue priority
                             // without creating a durable attachment-open intent that no Worker will clear.
                             downloadAttachmentPlaintext(
@@ -3147,7 +3203,7 @@ class WhiteNoiseAppState private constructor(
                                 reference = reference,
                                 priority = AttachmentDownloadPriority.Interactive,
                                 persistInteractiveIntent = false,
-                            ).also { requireCurrentAccount() }
+                            ).also { requireSourceAccount() }
                         },
                     )
                 }
@@ -3161,7 +3217,7 @@ class WhiteNoiseAppState private constructor(
                     targetGroupIdHex: String,
                     message: PreparedForwardMessage.Media,
                 ): List<MediaAttachmentReferenceFfi> {
-                    requireCurrentAccount()
+                    requireDestinationAccount()
                     val uploaded =
                         marmotIo {
                             uploadMedia(
@@ -3184,7 +3240,7 @@ class WhiteNoiseAppState private constructor(
                                 ),
                             ).attachments.map { it.reference }
                         }
-                    requireCurrentAccount()
+                    requireDestinationAccount()
                     return uploaded
                 }
 
@@ -3192,7 +3248,7 @@ class WhiteNoiseAppState private constructor(
                     targetGroupIdHex: String,
                     batchMessageCount: Int,
                 ): List<TimelineMessageRecordFfi> {
-                    requireCurrentAccount()
+                    requireDestinationAccount()
                     val limit = maxOf(100u, batchMessageCount.toUInt() + 100u)
                     return marmotIo {
                         timelineMessages(
@@ -3207,7 +3263,7 @@ class WhiteNoiseAppState private constructor(
                                 limit = limit,
                             ),
                         ).messages
-                    }.also { requireCurrentAccount() }
+                    }.also { requireDestinationAccount() }
                 }
 
                 private fun forwardProjectionRecords(
@@ -3239,7 +3295,7 @@ class WhiteNoiseAppState private constructor(
                     onBeforeMessagePublished: (messageIndex: Int) -> Unit,
                     onMessagePublished: (messageIndex: Int) -> Unit,
                 ) {
-                    requireCurrentAccount()
+                    requireDestinationAccount()
                     withGroupCommitLock(account, targetGroupIdHex) {
                         val knownMessageIds =
                             recentForwardTimeline(targetGroupIdHex, messages.size)
@@ -3247,7 +3303,7 @@ class WhiteNoiseAppState private constructor(
                         for (messageIndex in startIndex until messages.size) {
                             currentCoroutineContext().ensureActive()
                             onBeforeMessagePublished(messageIndex)
-                            requireCurrentAccount()
+                            requireDestinationAccount()
                             val message = messages[messageIndex]
                             val references = uploadedReferences[messageIndex].orEmpty()
                             val evidenceBefore = knownMessageIds.toSet()
@@ -3319,7 +3375,7 @@ class WhiteNoiseAppState private constructor(
                     uploadedReferences: List<MediaAttachmentReferenceFfi>,
                     evidence: ForwardPublishRecoveryEvidence,
                 ): ForwardPublishRecoveryResult {
-                    requireCurrentAccount()
+                    requireDestinationAccount()
                     val recovered =
                         withGroupCommitLock(account, targetGroupIdHex) {
                             val timeline =
@@ -3372,7 +3428,7 @@ class WhiteNoiseAppState private constructor(
                                 ForwardPublishRecoveryResult.Unavailable
                             }
                         }
-                    requireCurrentAccount()
+                    requireDestinationAccount()
                     return recovered
                 }
             }
@@ -3394,6 +3450,9 @@ class WhiteNoiseAppState private constructor(
         val started = forwardOperationOwner.start(session)
         if (!started) {
             session.release()
+        } else {
+            activeForwardDestinationAccountRef = account
+            activeForwardTargetTitles = targetTitles
         }
         return started
     }
@@ -5384,6 +5443,12 @@ class WhiteNoiseAppState private constructor(
                 runCatchingCancellable { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.COMPOSER_PASTE).deleteRecursively() }
                     .onFailure {
                         appStateDebug { "composer paste media wipe failed: ${it.readableMessage()}" }
+                    }
+                // The single pending-forward entry can hold the wiped account's
+                // message plaintext; a destructive wipe drops it unconditionally.
+                runCatchingCancellable { forwardRequestPersistence.clear() }
+                    .onFailure {
+                        appStateDebug { "pending forward request wipe failed: ${it.readableMessage()}" }
                     }
             } finally {
                 AttachmentCachePublication.onWipeFinished()

@@ -24,14 +24,39 @@ class ForwardProductionBoundaryCoverageTest {
     }
 
     @Test
-    fun productionTransportGuardsAccountEpochAndSerializesEachDestinationBatch() {
+    fun productionTransportGuardsBothOwnersAndSerializesEachDestinationBatch() {
         val body = appStateSource().readText().functionBody("startForwardMessages")
 
-        assertTrue("mediaUploadSessionEpoch()" in body)
-        assertTrue("requireCurrentAccount()" in body)
+        assertTrue("fun requireSourceAccount()" in body)
+        assertTrue("fun requireDestinationAccount()" in body)
+        assertTrue("isForwardOwnerSignedIn(sourceAccount)" in body)
+        assertTrue("isForwardOwnerSignedIn(account)" in body)
         assertTrue("withGroupCommitLock(account, targetGroupIdHex)" in body)
         assertTrue("for (messageIndex in startIndex until messages.size)" in body)
         assertTrue("onMessagePublished(messageIndex)" in body)
+    }
+
+    /** Materialization stays bound to the source owner; upload/publish stay bound to the destination owner. */
+    @Test
+    fun productionTransportSplitsSourceAndDestinationOwnership() {
+        val body = appStateSource().readText().functionBody("startForwardMessages")
+
+        assertTrue("accountRef = sourceAccount" in body)
+        val materializeBlock =
+            body
+                .substringAfter("override suspend fun materialize(")
+                .substringBefore("override fun cancelStalledMaterialization")
+        assertTrue("requireSourceAccount()" in materializeBlock)
+        assertFalse("requireDestinationAccount()" in materializeBlock)
+        val uploadBlock =
+            body
+                .substringAfter("override suspend fun upload(")
+                .substringBefore("private suspend fun recentForwardTimeline")
+        assertTrue("requireDestinationAccount()" in uploadBlock)
+        assertFalse("requireSourceAccount()" in uploadBlock)
+        // Neither boundary may re-read the live active account inside the transport.
+        val transport = body.substringAfter("object : ForwardTransport {")
+        assertFalse("activeAccountRef" in transport)
     }
 
     /** Production timeout cleanup cancels only account-scoped memoized source requests for this batch. */

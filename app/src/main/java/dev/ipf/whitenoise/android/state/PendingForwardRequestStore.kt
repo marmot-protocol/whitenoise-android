@@ -1,0 +1,319 @@
+package dev.ipf.whitenoise.android.state
+
+import android.content.Context
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaLocatorFfi
+import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
+import dev.ipf.whitenoise.android.core.ForwardMessagePayload
+import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
+import dev.ipf.whitenoise.android.media.DiskByteCache
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+
+/**
+ * One unresolved in-app forward: everything the picker needs to restore after
+ * process death without substituting any live account for a bound owner.
+ *
+ * [payloads] keep the accepted source identity and original timeline order.
+ * [destinationAccountRef] and [selectedGroupIds] mirror the picker's current
+ * choices; both are revalidated against live accounts and live destination
+ * chats before the restored request can be accepted.
+ */
+internal data class PendingForwardRequest(
+    val requestId: String,
+    val sourceAccountRef: String,
+    val originGroupIdHex: String,
+    val payloads: List<ForwardMessagePayload>,
+    val destinationAccountRef: String?,
+    val selectedGroupIds: List<String>,
+)
+
+/**
+ * Process-death bridge for the single unresolved forward request. Content is
+ * encrypted at rest in no-backup storage, mirroring the inbound-share store:
+ * plaintext message text never reaches backups or the saved-state Bundle.
+ */
+internal interface PendingForwardRequestStore {
+    fun save(request: PendingForwardRequest): Boolean
+
+    fun load(): PendingForwardRequest?
+
+    fun remove(requestId: String)
+
+    fun clear()
+}
+
+/**
+ * Serializes store access before dispatching blocking encryption and disk
+ * work, so a newer request or dismissal always lands after an in-flight write
+ * instead of being overwritten by stale work.
+ */
+internal class SerializedPendingForwardRequestStore(
+    private val delegate: PendingForwardRequestStore,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
+    suspend fun save(request: PendingForwardRequest): Boolean =
+        processMutex.withLock {
+            withContext(ioDispatcher) {
+                delegate.save(request).also { saved ->
+                    if (!saved) delegate.clear()
+                }
+            }
+        }
+
+    suspend fun load(): PendingForwardRequest? =
+        processMutex.withLock {
+            withContext(ioDispatcher) { delegate.load() }
+        }
+
+    suspend fun remove(requestId: String) {
+        processMutex.withLock { withContext(ioDispatcher) { delegate.remove(requestId) } }
+    }
+
+    suspend fun clear() {
+        processMutex.withLock { withContext(ioDispatcher) { delegate.clear() } }
+    }
+
+    private companion object {
+        /** Shared across Activity recreation because old cancelled I/O can outlive its wrapper. */
+        val processMutex = Mutex()
+    }
+}
+
+internal class EncryptedPendingForwardRequestStore(
+    private val cache: DiskByteCache,
+) : PendingForwardRequestStore {
+    override fun save(request: PendingForwardRequest): Boolean {
+        val valid =
+            request.requestId.isNotBlank() &&
+                request.sourceAccountRef.isNotBlank() &&
+                request.payloads.isNotEmpty()
+        val encoded = if (valid) encodePendingForwardRequest(request) else null
+        if (encoded == null || encoded.size > MAX_PENDING_FORWARD_REQUEST_BYTES) return false
+        cache.clear()
+        cache.put(ENTRY_KEY, encoded)
+        return cache.containsAfterHydration(ENTRY_KEY)
+    }
+
+    override fun load(): PendingForwardRequest? = cache.get(ENTRY_KEY)?.let(::decodePendingForwardRequest)
+
+    /** Removes only the matching entry so a stale dismisser cannot delete a newer request. */
+    override fun remove(requestId: String) {
+        if (requestId.isNotBlank() && load()?.requestId == requestId) cache.remove(ENTRY_KEY)
+    }
+
+    override fun clear() = cache.clear()
+
+    companion object {
+        private const val ENTRY_KEY = "pending-forward-request"
+        private const val STORE_DIRECTORY = "pending-forward-requests"
+        private const val STORE_KEY_ALIAS = "whitenoise.pending_forward_requests.aes_gcm.v1"
+        private const val PENDING_FORWARD_REQUEST_CACHE_BYTES = 512 * 1024
+        internal const val MAX_PENDING_FORWARD_REQUEST_BYTES = 256 * 1024
+
+        @Volatile
+        private var processInstance: SerializedPendingForwardRequestStore? = null
+
+        /** One process-wide store: every picker surface shares the single unresolved entry. */
+        fun forContext(context: Context): SerializedPendingForwardRequestStore =
+            processInstance ?: synchronized(this) {
+                processInstance ?: SerializedPendingForwardRequestStore(create(context))
+                    .also { processInstance = it }
+            }
+
+        fun create(context: Context): EncryptedPendingForwardRequestStore {
+            val app = context.applicationContext
+            return EncryptedPendingForwardRequestStore(
+                DiskByteCache(
+                    cacheDir = File(app.noBackupFilesDir, STORE_DIRECTORY),
+                    maxBytes = PENDING_FORWARD_REQUEST_CACHE_BYTES.toLong(),
+                    maxEntryBytes = MAX_PENDING_FORWARD_REQUEST_BYTES.toLong(),
+                    keyProvider = AndroidKeystoreDiskByteCacheKeyProvider(STORE_KEY_ALIAS),
+                ),
+            )
+        }
+    }
+}
+
+private const val KEY_VERSION = "version"
+private const val KEY_REQUEST_ID = "requestId"
+private const val KEY_SOURCE_ACCOUNT = "sourceAccountRef"
+private const val KEY_ORIGIN_GROUP = "originGroupIdHex"
+private const val KEY_DESTINATION_ACCOUNT = "destinationAccountRef"
+private const val KEY_SELECTED_GROUPS = "selectedGroupIds"
+private const val KEY_PAYLOADS = "payloads"
+private const val KEY_KIND = "kind"
+private const val KEY_SOURCE_GROUP = "sourceGroupIdHex"
+private const val KEY_SOURCE_MESSAGE = "sourceMessageIdHex"
+private const val KEY_TEXT = "text"
+private const val KEY_CAPTION = "caption"
+private const val KEY_EXPIRES_AT = "expiresAtSeconds"
+private const val KEY_ATTACHMENTS = "attachments"
+private const val KEY_ATTACHMENT_INDEX = "attachmentIndex"
+private const val KEY_REFERENCE = "reference"
+private const val KEY_LOCATORS = "locators"
+private const val KEY_LOCATOR_KIND = "kind"
+private const val KEY_LOCATOR_VALUE = "value"
+private const val KEY_CIPHERTEXT_SHA256 = "ciphertextSha256"
+private const val KEY_PLAINTEXT_SHA256 = "plaintextSha256"
+private const val KEY_NONCE_HEX = "nonceHex"
+private const val KEY_FILE_NAME = "fileName"
+private const val KEY_MEDIA_TYPE = "mediaType"
+private const val KEY_MEDIA_VERSION = "mediaVersion"
+private const val KEY_SOURCE_EPOCH = "sourceEpoch"
+private const val KEY_DIM = "dim"
+private const val KEY_THUMBHASH = "thumbhash"
+private const val KIND_TEXT = "text"
+private const val KIND_MEDIA = "media"
+private const val FORMAT_VERSION = 1
+
+internal fun encodePendingForwardRequest(request: PendingForwardRequest): ByteArray =
+    JSONObject()
+        .put(KEY_VERSION, FORMAT_VERSION)
+        .put(KEY_REQUEST_ID, request.requestId)
+        .put(KEY_SOURCE_ACCOUNT, request.sourceAccountRef)
+        .put(KEY_ORIGIN_GROUP, request.originGroupIdHex)
+        .put(KEY_DESTINATION_ACCOUNT, request.destinationAccountRef ?: JSONObject.NULL)
+        .put(KEY_SELECTED_GROUPS, JSONArray(request.selectedGroupIds))
+        .put(KEY_PAYLOADS, JSONArray(request.payloads.map(::encodePayload)))
+        .toString()
+        .encodeToByteArray()
+
+@Suppress("SwallowedException", "TooGenericExceptionCaught")
+internal fun decodePendingForwardRequest(encoded: ByteArray): PendingForwardRequest? =
+    try {
+        val json = JSONObject(encoded.decodeToString())
+        val requestId = json.getString(KEY_REQUEST_ID)
+        if (json.getInt(KEY_VERSION) != FORMAT_VERSION || requestId.isBlank()) {
+            null
+        } else {
+            val payloadsJson = json.getJSONArray(KEY_PAYLOADS)
+            PendingForwardRequest(
+                requestId = requestId,
+                sourceAccountRef = json.getString(KEY_SOURCE_ACCOUNT),
+                originGroupIdHex = json.getString(KEY_ORIGIN_GROUP),
+                destinationAccountRef =
+                    json.optString(KEY_DESTINATION_ACCOUNT).takeIf {
+                        !json.isNull(KEY_DESTINATION_ACCOUNT) && it.isNotBlank()
+                    },
+                selectedGroupIds =
+                    json.getJSONArray(KEY_SELECTED_GROUPS).let { array ->
+                        List(array.length()) { index -> array.getString(index) }
+                    },
+                payloads =
+                    List(payloadsJson.length()) { index ->
+                        decodePayload(payloadsJson.getJSONObject(index))
+                    },
+            ).takeIf { it.payloads.isNotEmpty() }
+        }
+    } catch (malformed: Exception) {
+        // Any malformed or version-skewed entry is unrecoverable state, never a crash.
+        null
+    }
+
+private fun encodePayload(payload: ForwardMessagePayload): JSONObject =
+    when (payload) {
+        is ForwardMessagePayload.Text ->
+            JSONObject()
+                .put(KEY_KIND, KIND_TEXT)
+                .put(KEY_SOURCE_GROUP, payload.sourceGroupIdHex)
+                .put(KEY_SOURCE_MESSAGE, payload.sourceMessageIdHex)
+                .put(KEY_TEXT, payload.text)
+        is ForwardMessagePayload.Media ->
+            JSONObject()
+                .put(KEY_KIND, KIND_MEDIA)
+                .put(KEY_SOURCE_GROUP, payload.sourceGroupIdHex)
+                .put(KEY_SOURCE_MESSAGE, payload.sourceMessageIdHex)
+                .put(KEY_CAPTION, payload.caption ?: JSONObject.NULL)
+                .put(KEY_EXPIRES_AT, payload.expiresAtSeconds?.toString() ?: JSONObject.NULL)
+                .put(
+                    KEY_ATTACHMENTS,
+                    JSONArray(
+                        payload.attachments.map { attachment ->
+                            JSONObject()
+                                .put(KEY_ATTACHMENT_INDEX, attachment.attachmentIndex)
+                                .put(KEY_REFERENCE, encodeReference(attachment.reference))
+                        },
+                    ),
+                )
+    }
+
+private fun decodePayload(json: JSONObject): ForwardMessagePayload =
+    when (val kind = json.getString(KEY_KIND)) {
+        KIND_TEXT ->
+            ForwardMessagePayload.Text(
+                sourceGroupIdHex = json.getString(KEY_SOURCE_GROUP),
+                sourceMessageIdHex = json.getString(KEY_SOURCE_MESSAGE),
+                text = json.getString(KEY_TEXT),
+            )
+        KIND_MEDIA -> {
+            val attachments = json.getJSONArray(KEY_ATTACHMENTS)
+            ForwardMessagePayload.Media(
+                sourceGroupIdHex = json.getString(KEY_SOURCE_GROUP),
+                sourceMessageIdHex = json.getString(KEY_SOURCE_MESSAGE),
+                caption = if (json.isNull(KEY_CAPTION)) null else json.getString(KEY_CAPTION),
+                expiresAtSeconds =
+                    if (json.isNull(KEY_EXPIRES_AT)) null else json.getString(KEY_EXPIRES_AT).toULong(),
+                attachments =
+                    List(attachments.length()) { index ->
+                        val attachment = attachments.getJSONObject(index)
+                        ForwardAttachmentSource(
+                            attachmentIndex = attachment.getInt(KEY_ATTACHMENT_INDEX),
+                            reference = decodeReference(attachment.getJSONObject(KEY_REFERENCE)),
+                        )
+                    },
+            )
+        }
+        else -> throw IllegalArgumentException("unknown forward payload kind: $kind")
+    }
+
+private fun encodeReference(reference: MediaAttachmentReferenceFfi): JSONObject =
+    JSONObject()
+        .put(
+            KEY_LOCATORS,
+            JSONArray(
+                reference.locators.map { locator ->
+                    JSONObject()
+                        .put(KEY_LOCATOR_KIND, locator.kind)
+                        .put(KEY_LOCATOR_VALUE, locator.value)
+                },
+            ),
+        ).put(KEY_CIPHERTEXT_SHA256, reference.ciphertextSha256)
+        .put(KEY_PLAINTEXT_SHA256, reference.plaintextSha256)
+        .put(KEY_NONCE_HEX, reference.nonceHex)
+        .put(KEY_FILE_NAME, reference.fileName)
+        .put(KEY_MEDIA_TYPE, reference.mediaType)
+        .put(KEY_MEDIA_VERSION, reference.version.name)
+        .put(KEY_SOURCE_EPOCH, reference.sourceEpoch.toString())
+        .put(KEY_DIM, reference.dim ?: JSONObject.NULL)
+        .put(KEY_THUMBHASH, reference.thumbhash ?: JSONObject.NULL)
+
+private fun decodeReference(json: JSONObject): MediaAttachmentReferenceFfi {
+    val locators = json.getJSONArray(KEY_LOCATORS)
+    return MediaAttachmentReferenceFfi(
+        locators =
+            List(locators.length()) { index ->
+                val locator = locators.getJSONObject(index)
+                MediaLocatorFfi(
+                    kind = locator.getString(KEY_LOCATOR_KIND),
+                    value = locator.getString(KEY_LOCATOR_VALUE),
+                )
+            },
+        ciphertextSha256 = json.getString(KEY_CIPHERTEXT_SHA256),
+        plaintextSha256 = json.getString(KEY_PLAINTEXT_SHA256),
+        nonceHex = json.getString(KEY_NONCE_HEX),
+        fileName = json.getString(KEY_FILE_NAME),
+        mediaType = json.getString(KEY_MEDIA_TYPE),
+        version = EncryptedMediaVersionFfi.valueOf(json.getString(KEY_MEDIA_VERSION)),
+        sourceEpoch = json.getString(KEY_SOURCE_EPOCH).toULong(),
+        dim = if (json.isNull(KEY_DIM)) null else json.getString(KEY_DIM),
+        thumbhash = if (json.isNull(KEY_THUMBHASH)) null else json.getString(KEY_THUMBHASH),
+    )
+}

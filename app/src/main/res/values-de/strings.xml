@@ -359,6 +359,7 @@
     <string name="forward_partial_summary">An %1$d von %2$d Chats weitergeleitet</string>
     <string name="forward_failed_summary">Weiterleiten an die ausgewählten Chats fehlgeschlagen</string>
     <string name="forward_start_failed">Weiterleiten konnte nicht gestartet werden. Schließe das Fenster und versuche es erneut.</string>
+    <string name="forward_restore_discarded">Die unfertige Weiterleitung konnte nicht sicher wiederhergestellt werden und wurde verworfen</string>
     <string name="forward_retry_failed">Fehlgeschlagene Chats erneut versuchen</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d Anhang</item>

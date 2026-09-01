@@ -359,6 +359,7 @@
     <string name="forward_partial_summary">Transféré vers %1$d discussions sur %2$d</string>
     <string name="forward_failed_summary">Impossible de transférer vers les discussions sélectionnées</string>
     <string name="forward_start_failed">Impossible de démarrer le transfert. Fermez et réessayez.</string>
+    <string name="forward_restore_discarded">Impossible de restaurer en toute sécurité le transfert inachevé, il a donc été abandonné</string>
     <string name="forward_retry_failed">Réessayer pour les discussions en échec</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d pièce jointe</item>

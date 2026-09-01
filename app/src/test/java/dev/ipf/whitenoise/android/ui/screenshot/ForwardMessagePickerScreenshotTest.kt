@@ -88,8 +88,9 @@ class ForwardMessagePickerScreenshotTest {
                             messageCount = 11,
                             attachmentCount = 11,
                             originGroupIdHex = "ff".repeat(32),
+                            sourceAccountRef = ACCOUNT_REF,
                             onDismiss = {},
-                            onForward = { true },
+                            onForward = { _, _ -> true },
                         )
                     }
                 }

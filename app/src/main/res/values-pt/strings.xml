@@ -359,6 +359,7 @@
     <string name="forward_partial_summary">Encaminhado para %1$d de %2$d conversas</string>
     <string name="forward_failed_summary">Não foi possível encaminhar para as conversas selecionadas</string>
     <string name="forward_start_failed">Não foi possível iniciar o encaminhamento. Feche e tente novamente.</string>
+    <string name="forward_restore_discarded">Não foi possível restaurar com segurança o encaminhamento inacabado, por isso ele foi descartado</string>
     <string name="forward_retry_failed">Tentar novamente nas conversas com falha</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d anexo</item>

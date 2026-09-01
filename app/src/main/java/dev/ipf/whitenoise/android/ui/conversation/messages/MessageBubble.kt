@@ -80,7 +80,6 @@ import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.ForwardEligibility
-import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -2291,20 +2290,14 @@ internal fun MessageBubble(
                         },
                     )
                 }
-                if (forwardSheetOpen && !deleted && forwardPayload != null) {
+                val openForwardPayload = forwardPayload
+                if (forwardSheetOpen && !deleted && openForwardPayload != null) {
                     ForwardMessageSheet(
                         appState = appState,
-                        attachmentCount =
-                            (forwardPayload as? ForwardMessagePayload.Media)?.attachments?.size ?: 0,
+                        payloads = listOf(openForwardPayload),
+                        sourceAccountRef = controller.boundAccountRef,
                         originGroupIdHex = record.groupIdHex,
                         onDismiss = { forwardSheetOpen = false },
-                        onForward = { targetGroupIds ->
-                            if (deleted) {
-                                false
-                            } else {
-                                appState.startForwardMessages(targetGroupIds, listOf(forwardPayload))
-                            }
-                        },
                     )
                 }
                 if (deleteDialogOpen) {

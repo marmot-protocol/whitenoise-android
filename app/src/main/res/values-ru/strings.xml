@@ -379,6 +379,7 @@
     <string name="forward_partial_summary">Переслано в %1$d из %2$d чатов</string>
     <string name="forward_failed_summary">Не удалось переслать в выбранные чаты</string>
     <string name="forward_start_failed">Не удалось начать пересылку. Закройте окно и повторите попытку.</string>
+    <string name="forward_restore_discarded">Не удалось безопасно восстановить незавершённую пересылку, поэтому она была отменена</string>
     <string name="forward_retry_failed">Повторить для чатов с ошибкой</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d вложение</item>
