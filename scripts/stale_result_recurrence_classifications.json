@@ -7529,11 +7529,11 @@
     "stale_result": false
   },
   {
-    "adjudicated": false,
+    "adjudicated": true,
     "created": "2026-07-10",
     "exclusion": null,
     "month": "2026-07",
-    "named_recurrence": true,
+    "named_recurrence": false,
     "number": 1251,
     "rules": [],
     "stale_result": false
@@ -8113,7 +8113,7 @@
     "created": "2026-07-14",
     "exclusion": null,
     "month": "2026-07",
-    "named_recurrence": true,
+    "named_recurrence": false,
     "number": 1366,
     "rules": [
       "ownership_with_race",
@@ -10568,11 +10568,11 @@
     "stale_result": false
   },
   {
-    "adjudicated": false,
+    "adjudicated": true,
     "created": "2026-08-05",
     "exclusion": null,
     "month": "2026-08",
-    "named_recurrence": true,
+    "named_recurrence": false,
     "number": 1800,
     "rules": [
       "broad_language_only"
@@ -10580,11 +10580,11 @@
     "stale_result": false
   },
   {
-    "adjudicated": false,
+    "adjudicated": true,
     "created": "2026-08-05",
     "exclusion": null,
     "month": "2026-08",
-    "named_recurrence": true,
+    "named_recurrence": false,
     "number": 1804,
     "rules": [
       "stale_noun"

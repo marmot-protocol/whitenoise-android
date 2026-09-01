@@ -417,6 +417,7 @@ def aggregate(classifications: list[dict]) -> dict:
         "created": 0,
         "eligible": 0,
         "stale_result": 0,
+        "named_recurrence": 0,
         "stale_named_recurrence": 0,
         "exclusions": {code: 0 for code in EXCLUSION_CODES},
     }
@@ -427,6 +428,7 @@ def aggregate(classifications: list[dict]) -> dict:
                 "created": 0,
                 "eligible": 0,
                 "stale_result": 0,
+                "named_recurrence": 0,
                 "stale_named_recurrence": 0,
                 "note": PARTIAL_MONTHS.get(entry["month"], "full month"),
             },
@@ -438,6 +440,9 @@ def aggregate(classifications: list[dict]) -> dict:
             continue
         month["eligible"] += 1
         totals["eligible"] += 1
+        if entry["named_recurrence"]:
+            month["named_recurrence"] += 1
+            totals["named_recurrence"] += 1
         if entry["stale_result"]:
             month["stale_result"] += 1
             totals["stale_result"] += 1
@@ -453,19 +458,20 @@ def render_report(summary: dict) -> str:
         f"Baseline window: {format_timestamp(WINDOW_START)}"
         f"..{format_timestamp(WINDOW_END)} (UTC, inclusive)",
         "",
-        "month    created  eligible  stale  stale+named  note",
+        "month    created  eligible  stale  named  stale+named  note",
     ]
     for month, row in summary["months"].items():
         lines.append(
             f"{month}  {row['created']:>7}  {row['eligible']:>8}  "
-            f"{row['stale_result']:>5}  {row['stale_named_recurrence']:>11}  "
-            f"{row['note']}"
+            f"{row['stale_result']:>5}  {row['named_recurrence']:>5}  "
+            f"{row['stale_named_recurrence']:>11}  {row['note']}"
         )
     totals = summary["totals"]
     lines.append("")
     lines.append(
         f"totals   {totals['created']:>7}  {totals['eligible']:>8}  "
-        f"{totals['stale_result']:>5}  {totals['stale_named_recurrence']:>11}"
+        f"{totals['stale_result']:>5}  {totals['named_recurrence']:>5}  "
+        f"{totals['stale_named_recurrence']:>11}"
     )
     lines.append("")
     lines.append("exclusions:")

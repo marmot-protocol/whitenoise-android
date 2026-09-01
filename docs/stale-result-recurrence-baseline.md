@@ -101,19 +101,22 @@ full issue text:
   was incomplete or itself introduced the defect in the behavior it changed.
 - `named_recurrence` is **false** for references that are context, lineage,
   sibling surfaces ("same family as…"), scope boundaries, "no regression
-  to X" constraints, "regression coverage" test-plan headings, or suspicion
-  aimed at broad unrelated merges.
+  to X" constraints, "regression coverage" test-plan headings, and any
+  suspicion-shaped framing — "likely regression source", "regression lead",
+  "suspect PRs" — that names earlier work without asserting that a fix for
+  this behavior was attempted and failed. A report that itself traces the
+  named fix's path as still sound is likewise not a recurrence.
 
 ## Baseline results
 
 ```
-month    created  eligible  stale  stale+named  note
-2026-05       43        40      0            0  partial: 2026-05-26 through 2026-05-31
-2026-06      514       300     11            0  full month
-2026-07      455       230      4            0  full month
-2026-08      199        99      6            1  partial: 2026-08-01 through 2026-08-20
+month    created  eligible  stale  named  stale+named  note
+2026-05       43        40      0      0            0  partial: 2026-05-26 through 2026-05-31
+2026-06      514       300     11     11            0  full month
+2026-07      455       230      4     15            0  full month
+2026-08      199        99      6     15            0  partial: 2026-08-01 through 2026-08-20
 
-totals      1211       669     21            1
+totals      1211       669     21     41            0
 ```
 
 - Eligible defects: **669** (542 excluded as non-defect task/feature/tracking
@@ -122,8 +125,11 @@ totals      1211       669     21            1
   #680, #778, #805, #809, #821, #856, #878, #1239, #1292, #1316, #1323,
   #1804, #1844, #1849, #1953, #2060, #2065.
 - Stale-result defects that explicitly recur after a named earlier fix:
-  **1** (#1804).
-- Named-recurrence reports across all eligible defects (any category): 45.
+  **0**. The nearest candidate, #1804, names prior work only as "related
+  history" and "the most recent regression lead", which the adjudication
+  policy classifies as suspicion rather than an asserted failed fix.
+- Named-recurrence reports across all eligible defects (any category): **41**,
+  emitted as the `named` column by the `report` command.
 - May and August are partial intervals and are labeled as such; their raw
   counts must not be compared against full calendar months.
 
@@ -135,8 +141,14 @@ Manual validation performed for this baseline:
   issue text. Of 26 automatic stale positives, 16 were overturned (almost all
   matched stale vocabulary inside acceptance-criteria or test-plan
   boilerplate rather than the reported defect). Of 102 automatic named
-  positives, 64 were overturned as context-only references, sibling-surface
-  citations, or "no regression to X" constraints.
+  positives, 67 were overturned as context-only references, sibling-surface
+  citations, "no regression to X" constraints, or suspicion-shaped
+  "regression lead" framing.
+- A second, independent review pass re-read a ten-issue sample plus the
+  outcome-determining candidates and overturned four named-recurrence
+  verdicts (#1366, #1804, #1251, #1800) under the suspicion rule above; the
+  fixture records each with an explicit reason code, and the committed-
+  fixture pinning test now locks the published totals in CI.
 - All 85 ambiguous cases raised by medium-confidence patterns were manually
   adjudicated with recorded reason codes.
 - A loose-pattern false-negative sweep over all eligible non-candidates

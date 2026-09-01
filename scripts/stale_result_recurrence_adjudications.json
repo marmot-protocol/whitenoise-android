@@ -43,6 +43,10 @@
     "named_recurrence": false,
     "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
   },
+  "1251": {
+    "named_recurrence": false,
+    "reason": "prior_work_named_only_as_suspected_lead_not_an_asserted_failed_fix"
+  },
   "1253": {
     "named_recurrence": false,
     "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
@@ -84,8 +88,8 @@
     "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
   },
   "1366": {
-    "named_recurrence": true,
-    "reason": "concurrency_or_refresh_defect_not_stale_result_application; report_names_prior_fix_of_this_behavior_and_asserts_recurrence_or_incomplete_fix",
+    "named_recurrence": false,
+    "reason": "concurrency_or_refresh_defect_not_stale_result_application; named_fix_path_traced_sound_defect_attributed_to_a_different_remaining_path",
     "stale_result": false
   },
   "1373": {
@@ -251,6 +255,14 @@
   "1797": {
     "named_recurrence": false,
     "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1800": {
+    "named_recurrence": false,
+    "reason": "prior_work_named_only_as_suspected_lead_not_an_asserted_failed_fix"
+  },
+  "1804": {
+    "named_recurrence": false,
+    "reason": "prior_work_named_only_as_suspected_lead_not_an_asserted_failed_fix"
   },
   "1816": {
     "named_recurrence": false,

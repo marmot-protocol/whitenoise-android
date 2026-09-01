@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import unittest
 from pathlib import Path
 import sys
@@ -260,6 +261,7 @@ class AggregationTest(unittest.TestCase):
         self.assertEqual(totals["created"], 4)
         self.assertEqual(totals["eligible"], 3)
         self.assertEqual(totals["stale_result"], 2)
+        self.assertEqual(totals["named_recurrence"], 2)
         self.assertEqual(totals["stale_named_recurrence"], 1)
         self.assertEqual(totals["exclusions"]["excluded_duplicate"], 1)
 
@@ -272,6 +274,45 @@ class AggregationTest(unittest.TestCase):
         ]))
         self.assertIn("partial: 2026-05-26 through 2026-05-31", text)
         self.assertIn("must not be compared", text)
+
+
+class CommittedFixtureTest(unittest.TestCase):
+    """Pins the published baseline totals to the committed fixtures so drift fails CI."""
+
+    def test_committed_fixtures_reproduce_the_published_baseline_totals(self):
+        """The frozen fixture aggregates to exactly the documented baseline numbers."""
+        with srr.CLASSIFICATIONS_PATH.open(encoding="utf-8") as handle:
+            classifications = json.load(handle)
+        summary = srr.aggregate(classifications)
+        totals = summary["totals"]
+        self.assertEqual(1211, totals["created"])
+        self.assertEqual(669, totals["eligible"])
+        self.assertEqual(21, totals["stale_result"])
+        self.assertEqual(41, totals["named_recurrence"])
+        self.assertEqual(0, totals["stale_named_recurrence"])
+        self.assertEqual(542, totals["exclusions"]["excluded_non_defect"])
+        expected_months = {
+            "2026-05": (43, 40, 0, 0, 0),
+            "2026-06": (514, 300, 11, 11, 0),
+            "2026-07": (455, 230, 4, 15, 0),
+            "2026-08": (199, 99, 6, 15, 0),
+        }
+        for month, (created, eligible, stale, named, both) in expected_months.items():
+            row = summary["months"][month]
+            observed = (
+                row["created"],
+                row["eligible"],
+                row["stale_result"],
+                row["named_recurrence"],
+                row["stale_named_recurrence"],
+            )
+            self.assertEqual((created, eligible, stale, named, both), observed, month)
+
+    def test_committed_adjudications_validate_and_state_reasons(self):
+        """Every committed adjudication entry passes schema validation."""
+        with srr.ADJUDICATIONS_PATH.open(encoding="utf-8") as handle:
+            adjudications = srr.validate_adjudications(json.load(handle))
+        self.assertGreater(len(adjudications), 0)
 
 
 class FetchTest(unittest.TestCase):
